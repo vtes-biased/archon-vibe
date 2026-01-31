@@ -1,0 +1,667 @@
+<script lang="ts">
+  import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+  import {
+    getAuthState,
+    getAccessToken,
+    logout,
+    updateProfile,
+    registerPasskey,
+    isPasskeySupported,
+    initAuth,
+    storeTokensFromCallback,
+    type ProfileUpdate,
+  } from "$lib/stores/auth.svelte";
+  import { claimVeknId, abandonVeknId, uploadAvatar, type VeknAbandonResponse } from "$lib/api";
+  import { showToast } from "$lib/stores/toast.svelte";
+  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
+  import AvatarCropper from "$lib/components/AvatarCropper.svelte";
+  import Icon from "@iconify/svelte";
+
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+  const auth = $derived(getAuthState());
+  const countries = getCountries();
+  const sortedCountries = Object.values(countries).sort((a, b) => a.name.localeCompare(b.name));
+
+  let isEditing = $state(false);
+  let saving = $state(false);
+  let registeringPasskey = $state(false);
+  let passkeyMessage = $state("");
+  let discordMessage = $state("");
+  let discordError = $state("");
+
+  // VEKN claim/abandon state
+  let showClaimModal = $state(false);
+  let claimVeknIdInput = $state("");
+  let claimingVekn = $state(false);
+  let showAbandonConfirm = $state(false);
+  let abandoningVekn = $state(false);
+
+  // Avatar state
+  let showAvatarCropper = $state(false);
+  let avatarCacheBust = $state(0);
+
+  // Edit form state
+  let editName = $state("");
+  let editNickname = $state("");
+  let editCountry = $state("");
+  let editCity = $state("");
+  let editContactEmail = $state("");
+  let editContactPhone = $state("");
+
+  // Handle Discord link callback
+  onMount(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const discordLinked = params.get("discord_linked");
+    const error = params.get("error");
+
+    if (discordLinked === "success") {
+      discordMessage = "Discord linked successfully!";
+      // Refresh auth state to get updated auth methods
+      await initAuth();
+    } else if (discordLinked === "already") {
+      discordMessage = "Discord is already linked to this account.";
+    } else if (error === "merge_failed") {
+      discordError = "Failed to merge accounts. Please try again.";
+    } else if (error) {
+      discordError = `Discord linking error: ${error}`;
+    }
+
+    // Clear URL params
+    if (discordLinked || error) {
+      window.history.replaceState({}, "", "/profile");
+    }
+  });
+
+  function handleLogout() {
+    logout();
+    goto("/login");
+  }
+
+  function startEdit() {
+    const user = auth.user;
+    if (!user) return;
+    editName = user.name || "";
+    editNickname = user.nickname || "";
+    editCountry = user.country || "";
+    editCity = user.city || "";
+    editContactEmail = user.contact_email || "";
+    editContactPhone = user.contact_phone || "";
+    isEditing = true;
+  }
+
+  function cancelEdit() {
+    isEditing = false;
+  }
+
+  async function saveProfile() {
+    saving = true;
+    const data: ProfileUpdate = {
+      name: editName || undefined,
+      nickname: editNickname || undefined,
+      country: editCountry || undefined,
+      city: editCity || undefined,
+      contact_email: editContactEmail || undefined,
+      contact_phone: editContactPhone || undefined,
+    };
+    const success = await updateProfile(data);
+    saving = false;
+    if (success) {
+      isEditing = false;
+    }
+  }
+
+  async function handleRegisterPasskey() {
+    registeringPasskey = true;
+    passkeyMessage = "";
+    const success = await registerPasskey();
+    registeringPasskey = false;
+    if (success) {
+      passkeyMessage = "Passkey registered successfully!";
+    }
+  }
+
+  function handleLinkDiscord() {
+    // Redirect to Discord OAuth with link=true and token for auth
+    const token = getAccessToken();
+    if (!token) {
+      discordError = "Not authenticated. Please log in again.";
+      return;
+    }
+    window.location.href = `${API_BASE}/auth/discord/authorize?link=true&token=${encodeURIComponent(token)}`;
+  }
+
+  async function handleClaimVekn() {
+    if (!claimVeknIdInput.trim()) return;
+    claimingVekn = true;
+    try {
+      const result = await claimVeknId(claimVeknIdInput.trim());
+      showToast({ type: "success", message: result.message });
+      showClaimModal = false;
+      claimVeknIdInput = "";
+      // Refresh auth state to get updated user
+      await initAuth();
+    } catch {
+      // Error toast is shown by apiRequest
+    } finally {
+      claimingVekn = false;
+    }
+  }
+
+  async function handleAbandonVekn() {
+    abandoningVekn = true;
+    try {
+      const result = await abandonVeknId();
+      showToast({ type: "success", message: result.message });
+      showAbandonConfirm = false;
+      // Store new tokens for the new user (split from VEKN record)
+      await storeTokensFromCallback(result.access_token, result.refresh_token);
+    } catch {
+      // Error toast is shown by apiRequest
+    } finally {
+      abandoningVekn = false;
+    }
+  }
+
+  async function handleSaveAvatar(blob: Blob) {
+    if (!auth.user) return;
+    await uploadAvatar(auth.user.uid, blob);
+    showAvatarCropper = false;
+    // Refresh auth state to get updated user with new avatar_path
+    await initAuth();
+    // Bust browser cache for avatar URL
+    avatarCacheBust = Date.now();
+  }
+
+  function formatLocation(country: string | null, city: string | null): string | null {
+    if (!country) return null;
+    const parts: string[] = [];
+    if (city) parts.push(city);
+    const countryName = countries[country]?.name || country;
+    parts.push(`${getCountryFlag(country)} ${countryName}`);
+    return parts.join(", ");
+  }
+
+  // Check if user has a passkey
+  const hasPasskey = $derived(
+    auth.isAuthenticated && auth.authMethods.some((m) => m.type === "passkey")
+  );
+
+  // Check if user has Discord linked
+  const hasDiscord = $derived(
+    auth.isAuthenticated && auth.authMethods.some((m) => m.type === "discord")
+  );
+
+  // Get Discord username if linked
+  const discordUsername = $derived(
+    auth.authMethods.find((m) => m.type === "discord")?.identifier || null
+  );
+</script>
+
+<svelte:head>
+  <title>Profile - Archon</title>
+</svelte:head>
+
+<div class="p-4 sm:p-8">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-3xl font-light text-crimson-500 mb-6">Profile</h1>
+
+    {#if auth.isLoading}
+      <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
+        <div class="text-ash-400">Loading...</div>
+      </div>
+    {:else if !auth.isAuthenticated || !auth.user}
+      <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
+        <div class="text-ash-500 mb-4">
+          <Icon icon="lucide:user" class="mx-auto h-16 w-16" />
+        </div>
+        <h2 class="text-xl font-medium text-bone-100 mb-2">Sign in Required</h2>
+        <p class="text-ash-400 mb-6">Please sign in to view your profile.</p>
+        <a
+          href="/login"
+          class="inline-block px-6 py-3 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg font-medium transition-colors"
+        >
+          Sign In
+        </a>
+      </div>
+    {:else}
+      {@const user = auth.user}
+
+      {#if isEditing}
+        <!-- Edit Mode -->
+        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800">
+          <div class="p-6 border-b border-ash-800">
+            <h2 class="text-xl font-medium text-bone-100">Edit Profile</h2>
+          </div>
+
+          <form
+            onsubmit={(e) => {
+              e.preventDefault();
+              saveProfile();
+            }}
+            class="p-6 space-y-4"
+          >
+            <div>
+              <label for="edit-name" class="block text-sm font-medium text-ash-400 mb-1">
+                Name
+              </label>
+              <input
+                id="edit-name"
+                type="text"
+                bind:value={editName}
+                class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label for="edit-nickname" class="block text-sm font-medium text-ash-400 mb-1">
+                Nickname
+              </label>
+              <input
+                id="edit-nickname"
+                type="text"
+                bind:value={editNickname}
+                class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label for="edit-country" class="block text-sm font-medium text-ash-400 mb-1">
+                Country
+              </label>
+              <select
+                id="edit-country"
+                bind:value={editCountry}
+                onchange={() => {
+                  editCity = "";
+                }}
+                class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+              >
+                <option value="">Select a country...</option>
+                {#each sortedCountries as country}
+                  <option value={country.iso_code}>
+                    {country.name} {getCountryFlag(country.iso_code)}
+                  </option>
+                {/each}
+              </select>
+            </div>
+
+            <div>
+              <label for="edit-city" class="block text-sm font-medium text-ash-400 mb-1">
+                City
+              </label>
+              <CityAutocomplete
+                bind:value={editCity}
+                countryCode={editCountry}
+                disabled={!editCountry}
+              />
+              {#if !editCountry}
+                <p class="mt-1 text-xs text-mist-500">Select a country first</p>
+              {/if}
+            </div>
+
+            <div class="pt-4 border-t border-ash-800">
+              <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide mb-4">
+                Contact Information
+              </h3>
+
+              <div class="space-y-4">
+                <div>
+                  <label
+                    for="edit-contact-email"
+                    class="block text-sm font-medium text-ash-400 mb-1"
+                  >
+                    Email
+                  </label>
+                  <input
+                    id="edit-contact-email"
+                    type="email"
+                    bind:value={editContactEmail}
+                    class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    for="edit-contact-phone"
+                    class="block text-sm font-medium text-ash-400 mb-1"
+                  >
+                    Phone
+                  </label>
+                  <input
+                    id="edit-contact-phone"
+                    type="tel"
+                    bind:value={editContactPhone}
+                    class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {#if auth.error}
+              <div class="text-sm text-crimson-400">{auth.error}</div>
+            {/if}
+
+            <div class="flex gap-2 pt-4">
+              <button
+                type="submit"
+                disabled={saving}
+                class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button
+                type="button"
+                onclick={cancelEdit}
+                disabled={saving}
+                class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      {:else}
+        <!-- View Mode -->
+        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800">
+          <!-- Header -->
+          <div class="p-6 border-b border-ash-800">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <button
+                  onclick={() => (showAvatarCropper = true)}
+                  class="relative group"
+                  title="Change avatar"
+                >
+                  {#if user.avatar_path}
+                    <img
+                      src={avatarCacheBust ? `${user.avatar_path}?v=${avatarCacheBust}` : user.avatar_path}
+                      alt="Avatar"
+                      class="w-16 h-16 rounded-full object-cover"
+                    />
+                  {:else}
+                    <div
+                      class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center"
+                    >
+                      <Icon icon="lucide:user" class="h-8 w-8 text-ash-500" />
+                    </div>
+                  {/if}
+                  <div class="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Icon icon="lucide:camera" class="h-6 w-6 text-white" />
+                  </div>
+                </button>
+                <div>
+                  <h2 class="text-xl font-medium text-bone-100">
+                    {user.name || "Anonymous"}
+                  </h2>
+                  {#if user.nickname}
+                    <p class="text-ash-400">"{user.nickname}"</p>
+                  {/if}
+                </div>
+              </div>
+              <button
+                onclick={startEdit}
+                class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
+                title="Edit profile"
+              >
+                <Icon icon="lucide:square-pen" class="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Details -->
+          <div class="p-6 space-y-4">
+            {#if user.vekn_id}
+              <div class="flex justify-between items-center">
+                <span class="text-ash-400">VEKN ID</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-bone-100 font-mono">{user.vekn_id}</span>
+                  <button
+                    onclick={() => (showAbandonConfirm = true)}
+                    class="p-1 text-ash-500 hover:text-crimson-400 transition-colors"
+                    title="Abandon VEKN ID"
+                  >
+                    <Icon icon="lucide:unlink" class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            {:else}
+              <div class="flex justify-between items-center">
+                <span class="text-ash-400">VEKN ID</span>
+                <button
+                  onclick={() => (showClaimModal = true)}
+                  class="px-3 py-1 text-sm bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded transition-colors"
+                >
+                  Claim VEKN ID
+                </button>
+              </div>
+            {/if}
+
+            {#if user.country}
+              {@const location = formatLocation(user.country, user.city)}
+              <div class="flex justify-between">
+                <span class="text-ash-400">Location</span>
+                <span class="text-bone-100">{location}</span>
+              </div>
+            {/if}
+
+            {#if user.roles.length > 0}
+              <div class="flex justify-between items-start">
+                <span class="text-ash-400">Roles</span>
+                <div class="flex flex-wrap gap-2 justify-end">
+                  {#each user.roles as role}
+                    <span class="px-2 py-1 text-xs rounded bg-ash-800 text-bone-100"
+                      >{role}</span
+                    >
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Contact Info -->
+          {#if user.contact_email || user.contact_phone}
+            <div class="p-6 border-t border-ash-800 space-y-4">
+              <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">Contact</h3>
+              {#if user.contact_email}
+                <div class="flex justify-between">
+                  <span class="text-ash-400">Email</span>
+                  <a
+                    href="mailto:{user.contact_email}"
+                    class="text-crimson-500 hover:text-crimson-400">{user.contact_email}</a
+                  >
+                </div>
+              {/if}
+              {#if user.contact_phone}
+                <div class="flex justify-between">
+                  <span class="text-ash-400">Phone</span>
+                  <span class="text-bone-100">{user.contact_phone}</span>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Linked Accounts Section -->
+          <div class="p-6 border-t border-ash-800 space-y-4">
+            <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">
+              Linked Accounts
+            </h3>
+
+            <!-- Discord -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <Icon icon="simple-icons:discord" class="w-5 h-5 text-[#5865F2]" />
+                <div>
+                  <p class="text-bone-100">Discord</p>
+                  {#if hasDiscord && discordUsername}
+                    <p class="text-sm text-ash-400">{discordUsername}</p>
+                  {:else}
+                    <p class="text-sm text-ash-400">Not linked</p>
+                  {/if}
+                </div>
+              </div>
+              {#if !hasDiscord}
+                <button
+                  onclick={handleLinkDiscord}
+                  class="px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded font-medium transition-colors"
+                >
+                  Link
+                </button>
+              {:else}
+                <span class="px-3 py-1 text-sm text-green-500 bg-green-500/10 rounded">Linked</span
+                >
+              {/if}
+            </div>
+            {#if discordMessage}
+              <p class="text-sm text-green-500">{discordMessage}</p>
+            {/if}
+            {#if discordError}
+              <p class="text-sm text-crimson-400">{discordError}</p>
+            {/if}
+
+            <!-- Passkey -->
+            {#if isPasskeySupported()}
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <Icon icon="lucide:key-round" class="w-5 h-5 text-ash-400" />
+                  <div>
+                    <p class="text-bone-100">Passkey</p>
+                    <p class="text-sm text-ash-400">
+                      {hasPasskey ? "Face ID, Touch ID, or security key" : "Not set up"}
+                    </p>
+                  </div>
+                </div>
+                {#if !hasPasskey}
+                  <button
+                    onclick={handleRegisterPasskey}
+                    disabled={registeringPasskey}
+                    class="px-4 py-2 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+                  >
+                    {registeringPasskey ? "Adding..." : "Add"}
+                  </button>
+                {:else}
+                  <span class="px-3 py-1 text-sm text-green-500 bg-green-500/10 rounded"
+                    >Active</span
+                  >
+                {/if}
+              </div>
+              {#if passkeyMessage}
+                <p class="text-sm text-green-500">{passkeyMessage}</p>
+              {/if}
+            {/if}
+
+            {#if auth.error}
+              <p class="text-sm text-crimson-400">{auth.error}</p>
+            {/if}
+          </div>
+
+          <!-- Logout -->
+          <div class="p-6 border-t border-ash-800">
+            <button
+              onclick={handleLogout}
+              class="w-full px-6 py-3 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      {/if}
+    {/if}
+  </div>
+</div>
+
+<!-- Claim VEKN ID Modal -->
+{#if showClaimModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4">
+      <div class="p-6 border-b border-ash-800">
+        <h2 class="text-xl font-medium text-bone-100">Claim VEKN ID</h2>
+        <p class="mt-2 text-sm text-ash-400">
+          Enter your VEKN ID to link it to your account. The ID must exist and not be claimed by another user.
+        </p>
+      </div>
+      <form
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleClaimVekn();
+        }}
+        class="p-6 space-y-4"
+      >
+        <div>
+          <label for="claim-vekn-id" class="block text-sm font-medium text-ash-400 mb-1">
+            VEKN ID
+          </label>
+          <input
+            id="claim-vekn-id"
+            type="text"
+            bind:value={claimVeknIdInput}
+            placeholder="1234567"
+            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          />
+        </div>
+        <div class="flex gap-2">
+          <button
+            type="submit"
+            disabled={claimingVekn || !claimVeknIdInput.trim()}
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+          >
+            {claimingVekn ? "Claiming..." : "Claim"}
+          </button>
+          <button
+            type="button"
+            onclick={() => {
+              showClaimModal = false;
+              claimVeknIdInput = "";
+            }}
+            disabled={claimingVekn}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
+
+<!-- Avatar Cropper Modal -->
+{#if showAvatarCropper}
+  <AvatarCropper onSave={handleSaveAvatar} onCancel={() => (showAvatarCropper = false)} />
+{/if}
+
+<!-- Abandon VEKN ID Confirmation Modal -->
+{#if showAbandonConfirm}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4">
+      <div class="p-6 border-b border-ash-800">
+        <h2 class="text-xl font-medium text-crimson-400">Abandon VEKN ID?</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-4">
+          This will unlink your VEKN ID from your account. You will keep your login methods and profile, but your VEKN ID will become unclaimed.
+        </p>
+        <p class="text-sm text-ash-400 mb-6">
+          You or a National Coordinator can claim the VEKN ID again later.
+        </p>
+        <div class="flex gap-2">
+          <button
+            onclick={handleAbandonVekn}
+            disabled={abandoningVekn}
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+          >
+            {abandoningVekn ? "Abandoning..." : "Abandon"}
+          </button>
+          <button
+            onclick={() => (showAbandonConfirm = false)}
+            disabled={abandoningVekn}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}

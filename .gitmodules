@@ -1,0 +1,3 @@
+[submodule "vekn-api"]
+	path = vekn-api
+	url = git@bitbucket.org:vekn/vekn-api.git

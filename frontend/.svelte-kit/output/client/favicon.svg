@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- A shape with ankh cutouts as true holes -->
+  <path fill-rule="evenodd" d="
+    M256 72 L380 448 L324 448 L292 344 L220 344 L188 448 L132 448 L256 72Z
+    M256 184 A36 36 0 1 0 256 256 A36 36 0 1 0 256 184Z
+    M244 244 L268 244 L268 344 L244 344Z
+  " fill="#DC143C"/>
+</svg>

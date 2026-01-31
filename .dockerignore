@@ -1,0 +1,56 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+ARCHITECTURE.md
+
+# IDE
+.cursor
+.vscode
+.idea
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+env/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Rust - exclude most build artifacts but keep the ones we need for Docker
+engine/target/debug/
+engine/target/release/build/
+engine/target/release/deps/
+engine/target/release/examples/
+engine/target/release/incremental/
+engine/target/release/.fingerprint/
+engine/target/CACHEDIR.TAG
+engine/Cargo.lock
+# Note: engine/target/wheels/ and engine/pkg/ are INCLUDED for Docker builds
+
+# Frontend build
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development
+justfile
+

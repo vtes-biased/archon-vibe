@@ -1,0 +1,53 @@
+---
+description: Core architecture reference for offline-first PWA. See ARCHITECTURE.md for details.
+---
+
+## Stack
+- **Frontend**: Svelte + Vite + TypeScript, PWA (service workers), IndexedDB local storage
+- **Backend**: Python FastAPI, PostgreSQL (JSONB), msgspec serialization
+- **Shared**: Rust core (business logic) → WASM (frontend) + PyO3 (backend)
+
+## Data Model
+All objects have:
+- `uid`: UUID v7 (indexed, time-ordered)
+- `modified`: timestamp (indexed)
+- Model-specific fields
+
+**DB Storage**: Single JSONB column in PostgreSQL. Full object serialized with msgspec.
+```sql
+CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
+```
+
+## Events
+
+### Business Events
+- Domain actions (e.g., `Member.New`, `Tournament.RoundStart`)
+- Processed by Rust engine (shared client/server)
+- Transform objects per business rules
+
+### CRUD Events  
+- Sync database state (Create/Update/Delete)
+- Payload: full object with `uid` + `modified`
+- Used for SSE streaming and reconciliation
+
+## Modes
+
+### Online
+1. User action → business event → backend
+2. Backend Rust engine processes → updates PostgreSQL
+3. Backend generates CRUD event → broadcasts via SSE
+4. Frontend receives CRUD → updates IndexedDB → UI reacts
+
+### Offline
+1. PWA detects offline → switches to local mode
+2. Business events processed by WASM Rust engine
+3. IndexedDB updated directly, CRUD log tracked
+4. On reconnect: send CRUD log → server reconciles → apply fixes → resume SSE
+
+**Reconciliation**: Server is source of truth. Returns adjustment CRUD events if conflicts detected.
+
+## Key Constraints
+- Server always wins conflicts
+- Each PWA maintains full dataset in IndexedDB
+- SSE for real-time sync when online
+- Rust ensures consistent business logic across stack

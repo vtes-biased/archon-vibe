@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+    /* VTES Gothic palette - see DESIGN.md */
+    --color-crimson-50: #FDF2F4;
+    --color-crimson-100: #FCE4E8;
+    --color-crimson-200: #F9CCD4;
+    --color-crimson-300: #F4A3B3;
+    --color-crimson-400: #EC6B84;
+    --color-crimson-500: #DC143C;
+    --color-crimson-600: #C41235;
+    --color-crimson-700: #A40F2D;
+    --color-crimson-800: #880C26;
+    --color-crimson-900: #6E0A1F;
+    --color-crimson: #DC143C;
+    --color-crimson-light: #8B0000;
+
+    --color-bone-50: #FDFCFA;
+    --color-bone-100: #FAF8F4;
+    --color-bone-200: #F5F0E6;
+    --color-bone-300: #EBE3D4;
+    --color-bone-400: #DED3BE;
+    --color-bone-500: #CFC0A6;
+    --color-bone-600: #B8A688;
+    --color-bone-700: #9A8A6D;
+    --color-bone-800: #7A6D57;
+    --color-bone-900: #5E5444;
+    --color-bone-950: #2A2520;
+    --color-bone: #F5F0E6;
+
+    --color-dusk-50: #F7F5F2;
+    --color-dusk-100: #EFEBE5;
+    --color-dusk-200: #E8E0D5;
+    --color-dusk-300: #D8CDB9;
+    --color-dusk-400: #C4B69B;
+    --color-dusk-500: #AE9D7D;
+    --color-dusk-600: #968363;
+    --color-dusk-700: #7A6A51;
+    --color-dusk-800: #605343;
+    --color-dusk-900: #4A4035;
+    --color-dusk-950: #1C1A1E;
+    --color-dusk: #E8E0D5;
+
+    --color-ash-50: #F5F4F3;
+    --color-ash-100: #E8E6E4;
+    --color-ash-200: #D4D0CC;
+    --color-ash-300: #B8B2AC;
+    --color-ash-400: #9A938C;
+    --color-ash-500: #7D756E;
+    --color-ash-600: #6B6560;
+    --color-ash-700: #5A5550;
+    --color-ash-800: #4A4642;
+    --color-ash-900: #3D3A37;
+    --color-ash-950: #2A2826;
+    --color-ash: #6B6560;
+
+    --color-mist: #9B9590;
+    --color-mist-light: #9B9590;
+    --color-mist-dark: #605850;
+}
+
+@layer base {
+    /* Default to dark mode - gothic aesthetic */
+    :root {
+        color-scheme: dark;
+    }
+
+    html {
+        @apply bg-bone-950 text-ash-300;
+    }
+
+    html.light {
+        @apply bg-bone-200 text-ash-700;
+    }
+}

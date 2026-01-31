@@ -1,0 +1,42 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/auth/email/verify": [
+		"src/routes/+layout.ts"
+	],
+	"/developer": [
+		"src/routes/+layout.ts"
+	],
+	"/leagues": [
+		"src/routes/+layout.ts"
+	],
+	"/login": [
+		"src/routes/+layout.ts"
+	],
+	"/oauth/consent": [
+		"src/routes/+layout.ts"
+	],
+	"/profile": [
+		"src/routes/+layout.ts"
+	],
+	"/rankings": [
+		"src/routes/+layout.ts"
+	],
+	"/tournaments": [
+		"src/routes/+layout.ts"
+	],
+	"/tournaments/new": [
+		"src/routes/+layout.ts"
+	],
+	"/tournaments/[uid]": [
+		"src/routes/+layout.ts"
+	],
+	"/users": [
+		"src/routes/+layout.ts"
+	],
+	"/users/[uid]": [
+		"src/routes/+layout.ts"
+	]
+}

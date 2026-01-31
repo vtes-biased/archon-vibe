@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "codanna": {
+      "command": "codanna",
+      "args": ["--config", ".codanna/settings.toml", "serve", "--watch"]
+    },
+    "prompts.chat": {
+      "type": "http",
+      "url": "https://prompts.chat/api/mcp"
+    }
+  }
+}

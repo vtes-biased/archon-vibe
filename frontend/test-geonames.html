@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GeoNames Test</title>
+</head>
+<body>
+  <h1>GeoNames Data Test</h1>
+  <div id="output"></div>
+  
+  <script type="module">
+    import { getCountries, getCountry, loadCities, searchCities } from './src/lib/geonames.ts';
+    
+    const output = document.getElementById('output');
+    
+    async function test() {
+      try {
+        // Test countries (eager load)
+        const countries = getCountries();
+        const france = getCountry('FR');
+        output.innerHTML += `<p>✓ Countries loaded: ${Object.keys(countries).length}</p>`;
+        output.innerHTML += `<p>✓ France: ${france?.name}</p>`;
+        
+        // Test cities (lazy load)
+        output.innerHTML += `<p>Loading cities...</p>`;
+        const cities = await loadCities();
+        output.innerHTML += `<p>✓ Cities loaded: ${cities.length}</p>`;
+        
+        // Test search
+        const parisResults = await searchCities('Paris', 'FR', 3);
+        output.innerHTML += `<p>✓ Paris search: ${parisResults.map(c => c.name).join(', ')}</p>`;
+        
+        const springfields = await searchCities('Springfield', 'US', 5);
+        output.innerHTML += `<p>✓ Springfield search: ${springfields.map(c => c.name).join(', ')}</p>`;
+        
+      } catch (error) {
+        output.innerHTML += `<p style="color:red">✗ Error: ${error.message}</p>`;
+        console.error(error);
+      }
+    }
+    
+    test();
+  </script>
+</body>
+</html>
+

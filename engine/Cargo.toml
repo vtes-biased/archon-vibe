@@ -1,0 +1,29 @@
+[package]
+name = "archon-engine"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "archon_engine"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+python = ["pyo3"]
+wasm = ["wasm-bindgen"]
+
+[dependencies]
+json = "0.12"
+wasm-bindgen = { version = "0.2", optional = true }
+pyo3 = { version = "0.27", features = ["extension-module"], optional = true }
+rand = "0.8"
+getrandom = { version = "0.2", features = ["js"] }
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Link-time optimization
+codegen-units = 1   # Better optimization
+strip = true        # Strip symbols
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false    # Disable wasm-opt (compatibility issues with bulk memory)

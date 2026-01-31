@@ -1,0 +1,1 @@
+{"version":3,"file":"_layout.ts.js","sources":["../../../../../src/routes/+layout.ts"],"sourcesContent":["// Disable SSR for SPA mode - all rendering happens client-side\nexport const ssr = false;\nexport const prerender = true;\n"],"names":[],"mappings":"AACO,MAAM,MAAM;AACZ,MAAM,YAAY;"}
