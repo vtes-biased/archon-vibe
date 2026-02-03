@@ -1,6 +1,8 @@
 use json::JsonValue;
 
 // Modules
+pub mod cards;
+pub mod deck;
 mod permissions;
 pub mod ratings;
 pub mod seating;
@@ -351,6 +353,48 @@ mod wasm {
         pub fn rating_category(&self, format: &str, online: bool) -> String {
             ratings::rating_category(format, online).to_string()
         }
+
+        /// Parse a deck list text given a cards JSON database.
+        /// Returns JSON: { name, author, comments, cards: { card_id: count } }
+        #[wasm_bindgen(js_name = parseDeck)]
+        pub fn parse_deck(&self, text: &str, cards_json: &str) -> Result<String, String> {
+            let card_map = cards::CardMap::load(cards_json)?;
+            let d = deck::parse_deck(text, &card_map)?;
+            Ok(d.to_json().dump())
+        }
+
+        /// Validate a deck. Returns JSON array of { severity, message }.
+        #[wasm_bindgen(js_name = validateDeck)]
+        pub fn validate_deck(&self, deck_json: &str, cards_json: &str, format: &str) -> Result<String, String> {
+            let card_map = cards::CardMap::load(cards_json)?;
+            let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+            let mut d = deck::Deck::new();
+            d.name = value["name"].as_str().unwrap_or("").to_string();
+            for (id_str, count_val) in value["cards"].entries() {
+                let id: u32 = id_str.parse().map_err(|_| format!("Invalid card ID: {id_str}"))?;
+                let count = count_val.as_u32().unwrap_or(0);
+                d.cards.insert(id, count);
+            }
+            let errors = deck::validate_deck(&d, &card_map, format);
+            let result = json::JsonValue::Array(errors.iter().map(|e| e.to_json()).collect());
+            Ok(result.dump())
+        }
+
+        /// Enrich a deck with full card details for display.
+        #[wasm_bindgen(js_name = enrichDeck)]
+        pub fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> Result<String, String> {
+            let card_map = cards::CardMap::load(cards_json)?;
+            let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+            let mut d = deck::Deck::new();
+            d.name = value["name"].as_str().unwrap_or("").to_string();
+            d.author = value["author"].as_str().unwrap_or("").to_string();
+            d.comments = value["comments"].as_str().unwrap_or("").to_string();
+            for (id_str, count_val) in value["cards"].entries() {
+                let id: u32 = id_str.parse().map_err(|_| format!("Invalid card ID: {id_str}"))?;
+                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
+            }
+            Ok(deck::enrich_deck(&d, &card_map).dump())
+        }
     }
 }
 
@@ -589,6 +633,78 @@ mod python {
         /// Map format + online to rating category string.
         fn rating_category(&self, format: &str, online: bool) -> String {
             ratings::rating_category(format, online).to_string()
+        }
+
+        /// Parse a deck list text given a cards JSON database.
+        fn parse_deck(&self, text: &str, cards_json: &str) -> PyResult<String> {
+            let card_map = cards::CardMap::load(cards_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+            let d = deck::parse_deck(text, &card_map)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+            Ok(d.to_json().dump())
+        }
+
+        /// Validate a deck. Returns JSON array of { severity, message }.
+        fn validate_deck(&self, deck_json: &str, cards_json: &str, format: &str) -> PyResult<String> {
+            let card_map = cards::CardMap::load(cards_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+            let value = json::parse(deck_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+            let mut d = deck::Deck::new();
+            d.name = value["name"].as_str().unwrap_or("").to_string();
+            for (id_str, count_val) in value["cards"].entries() {
+                let id: u32 = id_str.parse().map_err(|_|
+                    pyo3::exceptions::PyValueError::new_err(format!("Invalid card ID: {id_str}")))?;
+                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
+            }
+            let errors = deck::validate_deck(&d, &card_map, format);
+            let result = json::JsonValue::Array(errors.iter().map(|e| e.to_json()).collect());
+            Ok(result.dump())
+        }
+
+        /// Enrich a deck with full card details for display.
+        fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> PyResult<String> {
+            let card_map = cards::CardMap::load(cards_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+            let value = json::parse(deck_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+            let mut d = deck::Deck::new();
+            d.name = value["name"].as_str().unwrap_or("").to_string();
+            d.author = value["author"].as_str().unwrap_or("").to_string();
+            d.comments = value["comments"].as_str().unwrap_or("").to_string();
+            for (id_str, count_val) in value["cards"].entries() {
+                let id: u32 = id_str.parse().map_err(|_|
+                    pyo3::exceptions::PyValueError::new_err(format!("Invalid card ID: {id_str}")))?;
+                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
+            }
+            Ok(deck::enrich_deck(&d, &card_map).dump())
+        }
+
+        /// Export a deck in TWDA text format.
+        fn export_twda(
+            &self,
+            deck_json: &str,
+            cards_json: &str,
+            tournament_name: &str,
+            tournament_date: &str,
+            tournament_place: &str,
+            player_count: u32,
+            player_name: &str,
+        ) -> PyResult<String> {
+            let card_map = cards::CardMap::load(cards_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+            let value = json::parse(deck_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+            let mut d = deck::Deck::new();
+            d.name = value["name"].as_str().unwrap_or("").to_string();
+            d.author = value["author"].as_str().unwrap_or("").to_string();
+            d.comments = value["comments"].as_str().unwrap_or("").to_string();
+            for (id_str, count_val) in value["cards"].entries() {
+                let id: u32 = id_str.parse().map_err(|_|
+                    pyo3::exceptions::PyValueError::new_err(format!("Invalid card ID: {id_str}")))?;
+                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
+            }
+            Ok(deck::export_twda(&d, &card_map, tournament_name, tournament_date, tournament_place, player_count, player_name))
         }
     }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { createTournament } from "$lib/api";
+  import { saveTournament } from "$lib/db";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import Icon from "@iconify/svelte";
@@ -64,6 +65,7 @@
         multideck: values.multideck,
         decklist_required: values.decklist_required,
       });
+      await saveTournament(tournament);
       goto(`/tournaments/${tournament.uid}`);
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to create tournament";

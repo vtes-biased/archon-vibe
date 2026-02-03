@@ -256,6 +256,23 @@ export interface Rating extends BaseObject {
   limited_offline: CategoryRating | null;
 }
 
+// Card types (VTES card database)
+export interface VtesCard {
+  id: number;
+  name: string;
+  printed_name: string;
+  kind: 'crypt' | 'library';
+  types: string[];
+  disciplines: string[];
+  clan: string;
+  group: string;
+  capacity: number;
+  adv: boolean;
+  banned: string;
+  sets: string[];
+  name_variants: string[];
+}
+
 // GeoNames types
 export type Continent = "AF" | "AN" | "AS" | "EU" | "NA" | "OC" | "SA";
 

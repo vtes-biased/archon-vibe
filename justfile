@@ -72,6 +72,10 @@ lint:
     uv run ruff check --fix backend/ && uv run ruff format backend/
     (cd engine && cargo fmt && cargo clippy --all-targets --all-features)
 
+# Update VTES card data (downloads from krcg.org → engine/data/cards.json)
+cards:
+    uv run python scripts/update_cards.py
+
 # Build GeoNames data (countries and cities)
 build-geonames:
     uv run python backend/scripts/build_geonames.py

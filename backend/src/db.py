@@ -517,9 +517,43 @@ async def get_sanctions_for_user(user_uid: str) -> list[Sanction]:
 
 
 async def delete_user(uid: str) -> None:
-    """Delete a user from the database."""
+    """Delete a user from the database (hard delete)."""
     async with get_connection() as conn:
         await conn.execute("DELETE FROM users WHERE uid = %s", (uid,))
+
+
+async def soft_delete_user(uid: str) -> User | None:
+    """Soft-delete a user by setting deleted_at. Returns updated user for SSE."""
+    from datetime import UTC, datetime
+
+    user = await get_user_by_uid(uid)
+    if not user:
+        return None
+    now = datetime.now(UTC)
+    deleted = User(
+        uid=user.uid,
+        modified=now,
+        name=user.name,
+        country=user.country,
+        vekn_id=user.vekn_id,
+        city=user.city,
+        state=user.state,
+        nickname=user.nickname,
+        roles=user.roles,
+        avatar_path=user.avatar_path,
+        contact_email=user.contact_email,
+        contact_discord=user.contact_discord,
+        contact_phone=user.contact_phone,
+        coopted_by=user.coopted_by,
+        coopted_at=user.coopted_at,
+        vekn_synced=user.vekn_synced,
+        vekn_synced_at=user.vekn_synced_at,
+        local_modifications=user.local_modifications,
+        vekn_prefix=user.vekn_prefix,
+        deleted_at=now,
+    )
+    await update_user(deleted)
+    return deleted
 
 
 async def delete_auth_method(uid: str) -> None:
@@ -680,7 +714,8 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
     if not delete_user_obj:
         return keep_user  # Nothing to merge
 
-    # Merge user data - prefer keep_user values, but fill in blanks from delete_user
+    # Merge user data - prefer keep_user for identity (name, vekn_id, roles),
+    # but prefer delete_user (the claiming user) for contact info
     merged = User(
         uid=keep_user.uid,
         modified=keep_user.modified,
@@ -689,12 +724,12 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         vekn_id=keep_user.vekn_id or delete_user_obj.vekn_id,
         city=keep_user.city or delete_user_obj.city,
         state=keep_user.state or delete_user_obj.state,
-        nickname=keep_user.nickname or delete_user_obj.nickname,
+        nickname=delete_user_obj.nickname or keep_user.nickname,
         roles=list(set(keep_user.roles) | set(delete_user_obj.roles)),  # Union of roles
-        avatar_path=keep_user.avatar_path or delete_user_obj.avatar_path,
-        contact_email=keep_user.contact_email or delete_user_obj.contact_email,
-        contact_discord=keep_user.contact_discord or delete_user_obj.contact_discord,
-        contact_phone=keep_user.contact_phone or delete_user_obj.contact_phone,
+        avatar_path=delete_user_obj.avatar_path or keep_user.avatar_path,
+        contact_email=delete_user_obj.contact_email or keep_user.contact_email,
+        contact_discord=delete_user_obj.contact_discord or keep_user.contact_discord,
+        contact_phone=delete_user_obj.contact_phone or keep_user.contact_phone,
         coopted_by=keep_user.coopted_by or delete_user_obj.coopted_by,
         coopted_at=keep_user.coopted_at or delete_user_obj.coopted_at,
         vekn_synced=keep_user.vekn_synced or delete_user_obj.vekn_synced,
@@ -716,8 +751,8 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
     # Reassign coopted_by references (users who were coopted by deleted user)
     await reassign_coopted_by_references(delete_uid, keep_uid)
 
-    # Delete the duplicate user
-    await delete_user(delete_uid)
+    # Soft-delete the duplicate user (for SSE propagation)
+    await soft_delete_user(delete_uid)
 
     return merged
 
@@ -802,48 +837,69 @@ async def allocate_next_vekn_id() -> str:
         await _pool.putconn(conn)
 
 
-async def strip_vekn_from_user(user_uid: str) -> User | None:
-    """Strip VEKN-related data from a user (abandonment/displacement).
+async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
+    """Displace a user from their VEKN record.
 
-    Clears: auth_methods, roles, coopted_by/at, contact info
-    Keeps: vekn_id, name, vekn_synced (orphaned record)
-
-    Returns the updated user or None if not found.
+    Creates a new user with auth methods and contact info.
+    The VEKN user keeps: uid, vekn_id, roles, name, country, city.
+    Returns (displaced_new_user, stripped_vekn_user) or None if not found.
     """
+    from datetime import UTC, datetime
+
+    from uuid6 import uuid7
+
     user = await get_user_by_uid(user_uid)
     if not user:
         return None
 
-    # Delete all auth methods for this user
-    auth_methods = await get_auth_methods_for_user(user_uid)
-    for auth_method in auth_methods:
-        await delete_auth_method(auth_method.uid)
-
-    # Update user - clear roles and contact info but keep vekn_id
-    stripped = User(
-        uid=user.uid,
-        modified=user.modified,
+    # Create new user for the displaced person (gets auth + contact)
+    new_uid = str(uuid7())
+    now = datetime.now(UTC)
+    displaced = User(
+        uid=new_uid,
+        modified=now,
         name=user.name,
         country=user.country,
-        vekn_id=user.vekn_id,  # Keep VEKN ID
+        vekn_id=None,
         city=user.city,
         state=user.state,
-        nickname=None,  # Clear
-        roles=[],  # Clear all roles
-        avatar_path=None,  # Clear
-        contact_email=None,  # Clear
-        contact_discord=None,  # Clear
-        contact_phone=None,  # Clear
-        coopted_by=None,  # Clear
-        coopted_at=None,  # Clear
-        vekn_synced=user.vekn_synced,  # Keep sync status
-        vekn_synced_at=user.vekn_synced_at,
-        local_modifications=set(),  # Clear
-        vekn_prefix=None,  # Clear
+        nickname=user.nickname,
+        roles=[],  # No roles without vekn_id
+        avatar_path=user.avatar_path,
+        contact_email=user.contact_email,
+        contact_discord=user.contact_discord,
+        contact_phone=user.contact_phone,
     )
+    await insert_user(displaced)
 
+    # Reassign auth methods to the new displaced user
+    await reassign_auth_methods(user_uid, new_uid)
+
+    # Strip the VEKN user: keep identity + roles, clear contact/personal
+    stripped = User(
+        uid=user.uid,
+        modified=now,
+        name=user.name,
+        country=user.country,
+        vekn_id=user.vekn_id,
+        city=user.city,
+        state=user.state,
+        nickname=None,
+        roles=user.roles,  # Roles stay with VEKN user
+        avatar_path=None,
+        contact_email=None,
+        contact_discord=None,
+        contact_phone=None,
+        coopted_by=user.coopted_by,
+        coopted_at=user.coopted_at,
+        vekn_synced=user.vekn_synced,
+        vekn_synced_at=user.vekn_synced_at,
+        local_modifications=set(),
+        vekn_prefix=user.vekn_prefix,
+    )
     await update_user(stripped)
-    return stripped
+
+    return displaced, stripped
 
 
 async def split_user_from_vekn(user_uid: str) -> User | None:

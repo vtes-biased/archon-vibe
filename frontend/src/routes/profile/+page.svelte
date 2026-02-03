@@ -12,11 +12,12 @@
     storeTokensFromCallback,
     type ProfileUpdate,
   } from "$lib/stores/auth.svelte";
-  import { claimVeknId, abandonVeknId, uploadAvatar, type VeknAbandonResponse } from "$lib/api";
+  import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
+  import { syncManager } from "$lib/sync";
   import Icon from "@iconify/svelte";
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -42,6 +43,7 @@
   // Avatar state
   let showAvatarCropper = $state(false);
   let avatarCacheBust = $state(0);
+  let isSyncing = $state(false);
 
   // Edit form state
   let editName = $state("");
@@ -74,6 +76,18 @@
       window.history.replaceState({}, "", "/profile");
     }
   });
+
+  async function handleResync() {
+    try {
+      isSyncing = true;
+      await syncManager.refresh();
+      showToast({ type: "success", message: "Data resynchronized successfully" });
+    } catch (e) {
+      showToast({ type: "error", message: e instanceof Error ? e.message : "Failed to resync" });
+    } finally {
+      isSyncing = false;
+    }
+  }
 
   function handleLogout() {
     logout();
@@ -141,8 +155,8 @@
       showToast({ type: "success", message: result.message });
       showClaimModal = false;
       claimVeknIdInput = "";
-      // Refresh auth state to get updated user
-      await initAuth();
+      // Store new tokens for the VEKN user (uid changed)
+      await storeTokensFromCallback(result.access_token, result.refresh_token);
     } catch {
       // Error toast is shown by apiRequest
     } finally {
@@ -555,6 +569,25 @@
             {#if auth.error}
               <p class="text-sm text-crimson-400">{auth.error}</p>
             {/if}
+          </div>
+
+          <!-- Data -->
+          <div class="p-6 border-t border-ash-800 space-y-4">
+            <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">Data</h3>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-bone-100">Resync local data</p>
+                <p class="text-sm text-ash-400">Clear local database and re-download all data from server</p>
+              </div>
+              <button
+                onclick={handleResync}
+                disabled={isSyncing}
+                class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Icon icon="lucide:refresh-cw" class="w-4 h-4 {isSyncing ? 'animate-spin' : ''}" />
+                {isSyncing ? "Syncing..." : "Resync"}
+              </button>
+            </div>
           </div>
 
           <!-- Logout -->

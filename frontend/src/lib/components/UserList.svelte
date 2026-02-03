@@ -107,19 +107,6 @@
     }
   }
 
-  async function handleRefresh() {
-    try {
-      error = null;
-      isSyncing = true;
-      // Keep showing current data while syncing - don't clear display
-      // hasLoadedOnce stays true so we don't show spinner over existing data
-      await syncManager.refresh();
-    } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to refresh";
-      isSyncing = false;
-      console.error("Error refreshing:", e);
-    }
-  }
 
   function toggleCreateForm() {
     showCreateForm = !showCreateForm;
@@ -359,14 +346,6 @@
             {showCreateForm ? "Cancel" : "+ New User"}
           </button>
 
-          <button
-            id="refresh-button"
-            onclick={handleRefresh}
-            disabled={!isOnline}
-            class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg disabled:cursor-not-allowed"
-          >
-            Refresh
-          </button>
         </div>
       </div>
 

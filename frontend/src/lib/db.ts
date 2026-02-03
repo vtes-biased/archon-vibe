@@ -4,7 +4,7 @@
  */
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { User, Role, Sanction, Tournament, Rating } from '$lib/types';
+import type { User, Role, Sanction, Tournament, Rating, VtesCard } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 
 interface ArchonDB extends DBSchema {
@@ -41,6 +41,10 @@ interface ArchonDB extends DBSchema {
       'by-country': string;
     };
   };
+  cards: {
+    key: number; // card id
+    value: VtesCard;
+  };
   changes: {
     key: number;  // auto-increment
     value: {
@@ -61,8 +65,8 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-// Version 11: single tournament store, generalized changes store, full clear on upgrade
-const DB_VERSION = 11;
+// Version 12: added cards store for VTES card database
+const DB_VERSION = 12;
 
 export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
   if (dbPromise) {
@@ -100,6 +104,9 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       const ratingStore = db.createObjectStore('ratings', { keyPath: 'uid' });
       ratingStore.createIndex('by-user', 'user_uid');
       ratingStore.createIndex('by-country', 'country');
+
+      // Cards store (VTES card database, keyed by card ID)
+      db.createObjectStore('cards', { keyPath: 'id' });
 
       // Changes log (generalized for all object types)
       db.createObjectStore('changes', { keyPath: 'id', autoIncrement: true });

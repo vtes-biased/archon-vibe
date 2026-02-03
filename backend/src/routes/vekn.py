@@ -140,10 +140,17 @@ async def claim_vekn_id(
     if broadcast_resync:
         await broadcast_resync(merged.uid)
 
+    # Issue new tokens for the VEKN user's uid (different from the old user)
+    access_token, expires_in = create_access_token(merged.uid)
+    refresh_token = create_refresh_token(merged.uid)
+
     return Response(
         content=encoder.encode({
             "user": msgspec.to_builtins(merged),
             "message": f"Successfully claimed VEKN ID {request.vekn_id}",
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": expires_in,
         }),
         media_type="application/json",
     )
@@ -321,9 +328,9 @@ async def link_vekn_to_user(
     # Check if VEKN ID is currently claimed
     if await is_vekn_id_claimed(request.vekn_id):
         # Need to displace the current holder
-        displaced = await strip_vekn_from_user(vekn_user.uid)
-        if displaced:
-            displaced_user = displaced
+        result = await strip_vekn_from_user(vekn_user.uid)
+        if result:
+            displaced_user, _stripped_vekn = result
             message = f"Displaced from {vekn_user.name} and linked VEKN ID {request.vekn_id}"
             logger.info(f"Displaced user {vekn_user.uid} from VEKN ID {request.vekn_id}")
 

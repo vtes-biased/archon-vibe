@@ -42,7 +42,7 @@ from .models import (
     TournamentState,
     User,
 )
-from .routes import admin, auth, oauth, sanctions, tournaments, users, vekn
+from .routes import admin, auth, cards, oauth, sanctions, tournaments, users, vekn
 from .vekn_sync import VEKNSyncService
 
 # Load environment variables
@@ -270,6 +270,7 @@ app.include_router(vekn.router)
 app.include_router(sanctions.router)
 app.include_router(tournaments.router)
 app.include_router(oauth.router)
+app.include_router(cards.router)
 
 
 @app.get("/")

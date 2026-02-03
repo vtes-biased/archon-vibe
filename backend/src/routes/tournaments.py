@@ -16,6 +16,7 @@ from ..db import (
     update_tournament,
 )
 from ..models import (
+    Deck,
     DeckListsMode,
     Role,
     StandingsMode,
@@ -886,3 +887,261 @@ async def reopen_tournament(
     return await tournament_action(
         uid, TournamentActionRequest(type="ReopenTournament"), authorization
     )
+
+
+# ============================================================================
+# Deck endpoints
+# ============================================================================
+
+_cards_json: str | None = None
+
+
+def _load_cards_json() -> str:
+    """Load cards.json for the Rust engine (cached in memory)."""
+    global _cards_json
+    if _cards_json is None:
+        import importlib.resources
+        from pathlib import Path
+
+        cards_path = Path(__file__).resolve().parent.parent.parent.parent / "engine" / "data" / "cards.json"
+        if not cards_path.exists():
+            raise HTTPException(status_code=503, detail="Cards data not available. Run: just cards")
+        _cards_json = cards_path.read_text(encoding="utf-8")
+    return _cards_json
+
+
+class DeckUploadRequest(BaseModel):
+    text: str | None = None
+    url: str | None = None
+    name: str = ""
+    author: str = ""
+    comments: str = ""
+
+
+@router.post("/{uid}/decks")
+async def upload_deck(
+    uid: str,
+    body: DeckUploadRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Upload a deck for the current player."""
+    user = await _get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # Check player is registered
+    player_uid = user.uid
+    if not any(p.user_uid == player_uid for p in tournament.players):
+        if not _is_organizer(user, tournament):
+            raise HTTPException(status_code=403, detail="Not a player in this tournament")
+
+    cards = {}
+    deck_name = body.name
+    deck_author = body.author or user.name
+    deck_comments = body.comments
+
+    if body.url:
+        # Fetch from URL provider
+        from ..providers import DeckFetchError, fetch_deck_from_url
+
+        try:
+            result = fetch_deck_from_url(body.url)
+            cards = result["cards"]
+            deck_name = deck_name or result.get("name", "")
+            deck_author = deck_author or result.get("author", "")
+            deck_comments = deck_comments or result.get("comments", "")
+        except DeckFetchError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.exception("Failed to fetch deck from URL")
+            raise HTTPException(status_code=400, detail=f"Failed to fetch deck: {e}")
+    elif body.text:
+        # Parse deck text via Rust engine
+        engine = get_engine()
+        import json as json_mod
+
+        try:
+            result_json = engine.parse_deck(body.text, _load_cards_json())
+            result = json_mod.loads(result_json)
+            cards = result.get("cards", {})
+            deck_name = deck_name or result.get("name", "")
+            deck_author = deck_author or result.get("author", "")
+            deck_comments = deck_comments or result.get("comments", "")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse deck: {e}")
+    else:
+        raise HTTPException(status_code=400, detail="Either text or url is required")
+
+    # Store deck
+    deck = Deck(
+        name=deck_name,
+        author=deck_author,
+        comments=deck_comments,
+        cards={str(k): int(v) for k, v in cards.items()},
+    )
+
+    if player_uid not in tournament.decks:
+        tournament.decks[player_uid] = []
+
+    # For non-multideck, replace existing deck (round=None)
+    if not tournament.multideck:
+        tournament.decks[player_uid] = [deck]
+    else:
+        tournament.decks[player_uid].append(deck)
+
+    tournament.modified = datetime.now(UTC)
+    await update_tournament(tournament)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+
+    return Response(
+        content=encoder.encode(deck),
+        media_type="application/json",
+        status_code=201,
+    )
+
+
+@router.put("/{uid}/decks/{player_uid}")
+async def update_deck(
+    uid: str,
+    player_uid: str,
+    body: DeckUploadRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Update a player's deck (organizer only)."""
+    user = await _get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not _is_organizer(user, tournament) and user.uid != player_uid:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    cards = {}
+    deck_name = body.name
+    deck_author = body.author
+    deck_comments = body.comments
+
+    if body.url:
+        from ..providers import DeckFetchError, fetch_deck_from_url
+
+        try:
+            result = fetch_deck_from_url(body.url)
+            cards = result["cards"]
+            deck_name = deck_name or result.get("name", "")
+            deck_author = deck_author or result.get("author", "")
+            deck_comments = deck_comments or result.get("comments", "")
+        except DeckFetchError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    elif body.text:
+        engine = get_engine()
+        import json as json_mod
+
+        try:
+            result_json = engine.parse_deck(body.text, _load_cards_json())
+            result = json_mod.loads(result_json)
+            cards = result.get("cards", {})
+            deck_name = deck_name or result.get("name", "")
+            deck_author = deck_author or result.get("author", "")
+            deck_comments = deck_comments or result.get("comments", "")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse deck: {e}")
+    else:
+        raise HTTPException(status_code=400, detail="Either text or url is required")
+
+    deck = Deck(
+        name=deck_name,
+        author=deck_author,
+        comments=deck_comments,
+        cards={str(k): int(v) for k, v in cards.items()},
+    )
+    tournament.decks[player_uid] = [deck]
+    tournament.modified = datetime.now(UTC)
+    await update_tournament(tournament)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+
+    return Response(
+        content=encoder.encode(deck),
+        media_type="application/json",
+    )
+
+
+@router.delete("/{uid}/decks/{player_uid}")
+async def delete_deck(
+    uid: str,
+    player_uid: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Delete a player's deck (organizer only)."""
+    user = await _get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not _is_organizer(user, tournament):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if player_uid in tournament.decks:
+        del tournament.decks[player_uid]
+        tournament.modified = datetime.now(UTC)
+        await update_tournament(tournament)
+        if broadcast_tournament_event:
+            await broadcast_tournament_event(tournament)
+
+    return Response(status_code=204)
+
+
+@router.get("/{uid}/decks/{player_uid}/twda")
+async def export_deck_twda(
+    uid: str,
+    player_uid: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Export a player's deck in TWDA text format."""
+    user = await _get_current_user(authorization)
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    decks = tournament.decks.get(player_uid, [])
+    if not decks:
+        raise HTTPException(status_code=404, detail="No deck found for player")
+
+    deck = decks[0]
+    engine = get_engine()
+    import json as json_mod
+
+    deck_json = json_mod.dumps({
+        "name": deck.name,
+        "author": deck.author,
+        "comments": deck.comments,
+        "cards": deck.cards,
+    })
+
+    # Get player name
+    player_user = await get_user_by_uid(player_uid)
+    player_name = player_user.name if player_user else "Unknown"
+    player_count = len(tournament.players)
+    tournament_date = tournament.start or tournament.modified.isoformat()
+
+    text = engine.export_twda(
+        deck_json,
+        _load_cards_json(),
+        tournament.name,
+        str(tournament_date),
+        tournament.country or "",
+        player_count,
+        player_name,
+    )
+    return Response(content=text, media_type="text/plain")

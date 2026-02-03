@@ -60,6 +60,18 @@
     --color-mist-dark: #605850;
 }
 
+/* VTES icon fonts from krcg-static */
+@font-face {
+    font-family: "Ankha VTES";
+    src: url("/fonts/ankha2.otf") format("opentype");
+    font-display: swap;
+}
+@font-face {
+    font-family: "VTES Clans";
+    src: url("/fonts/vtes-clans.otf") format("opentype");
+    font-display: swap;
+}
+
 @layer base {
     /* Default to dark mode - gothic aesthetic */
     :root {
