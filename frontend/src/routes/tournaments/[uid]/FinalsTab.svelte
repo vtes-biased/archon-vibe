@@ -43,7 +43,7 @@
     if (swapSource && swapSource.seat === seat) {
       swapSource = null;
     } else if (swapSource) {
-      doAction("rounds/swap-seats", {
+      doAction("SwapSeats", {
         round: tournament.rounds.length,
         table1: 0,
         seat1: swapSource.seat,
@@ -123,7 +123,7 @@
   }
 
   async function finishFinals() {
-    await doAction("action", { type: "FinishFinals" });
+    await doAction("FinishFinals");
   }
 
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
@@ -232,7 +232,7 @@
                   if (!overrideComment.trim()) return;
                   overrideSaving = true;
                   try {
-                    tournament = await tournamentAction(tournament.uid, "action", { type: "Override", round: tournament.rounds.length, table: 0, comment: overrideComment.trim() });
+                    tournament = await tournamentAction(tournament.uid, "Override", { round: tournament.rounds.length, table: 0, comment: overrideComment.trim() });
                     await loadPlayerNames();
                     overrideTable_ = null;
                     overrideComment = "";
@@ -264,7 +264,7 @@
             onclick={async () => {
               overrideSaving = true;
               try {
-                tournament = await tournamentAction(tournament.uid, "action", { type: "Unoverride", round: tournament.rounds.length, table: 0 });
+                tournament = await tournamentAction(tournament.uid, "Unoverride", { round: tournament.rounds.length, table: 0 });
                 await loadPlayerNames();
               } catch (e) { error = e instanceof Error ? e.message : "Failed to remove override"; } finally { overrideSaving = false; }
             }}

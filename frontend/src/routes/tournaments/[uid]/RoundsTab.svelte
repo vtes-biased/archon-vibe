@@ -167,7 +167,7 @@
     if (swapSource && swapSource.round === round && swapSource.table === table && swapSource.seat === seat) {
       swapSource = null;
     } else if (swapSource && swapSource.round === round) {
-      doAction("rounds/swap-seats", {
+      doAction("SwapSeats", {
         round,
         table1: swapSource.table,
         seat1: swapSource.seat,
@@ -201,8 +201,7 @@
     if (!overrideComment.trim()) return;
     overrideSaving = true;
     try {
-      tournament = await tournamentAction(tournament.uid, "action", {
-        type: "Override",
+      tournament = await tournamentAction(tournament.uid, "Override", {
         round: roundIndex,
         table: tableIndex,
         comment: overrideComment.trim(),
@@ -221,8 +220,7 @@
   async function removeOverride(roundIndex: number, tableIndex: number) {
     overrideSaving = true;
     try {
-      tournament = await tournamentAction(tournament.uid, "action", {
-        type: "Unoverride",
+      tournament = await tournamentAction(tournament.uid, "Unoverride", {
         round: roundIndex,
         table: tableIndex,
       });
@@ -237,7 +235,7 @@
 
   function cancelRound() {
     showCancelConfirm = false;
-    doAction("rounds/cancel");
+    doAction("CancelRound");
   }
 
   function isCurrentRound(idx: number): boolean {
@@ -282,7 +280,7 @@
         </div>
         <div class="flex gap-2">
           <button
-            onclick={() => doAction("rounds/add-table")}
+            onclick={() => doAction("AddTable")}
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
           >
@@ -294,7 +292,7 @@
             class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
           >Cancel Round</button>
           <button
-            onclick={() => doAction("rounds/finish")}
+            onclick={() => doAction("FinishRound")}
             disabled={actionLoading || !allTablesFinished}
             title={allTablesFinished ? "End this round" : "All tables must be Finished first"}
             class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
@@ -424,7 +422,7 @@
                     </span>
                     {#if isEditable && r === tournament.rounds.length - 1 && table.seating.length === 0}
                       <button
-                        onclick={() => doAction("rounds/remove-table", { table: i })}
+                        onclick={() => doAction("RemoveTable", { table: i })}
                         class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors"
                         title="Remove empty table"
                       >
@@ -471,7 +469,7 @@
                         <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
                         {#if isEditable}
                           <button
-                            onclick={() => doAction("unseat-player", { player_uid: seat.player_uid })}
+                            onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
                             class="p-0.5 text-ash-500 hover:text-crimson-400 transition-colors"
                             title="Unseat player"
                           >
@@ -536,7 +534,7 @@
                         {#each unseatedPlayers as player}
                           {@const puid = player.user_uid ?? ""}
                           <button
-                            onclick={() => { doAction("seat-player", { player_uid: puid, table: i, seat: table.seating.length }); seatTargetTable = null; }}
+                            onclick={() => { doAction("SeatPlayer", { player_uid: puid, table: i, seat: table.seating.length }); seatTargetTable = null; }}
                             class="px-2 py-1 text-xs bg-ash-800 hover:bg-emerald-900/60 text-ash-300 hover:text-emerald-300 rounded transition-colors"
                           >{seatDisplay(puid)}</button>
                         {/each}
@@ -556,7 +554,7 @@
             {/each}
             {#if isEditable && r === tournament.rounds.length - 1}
               <button
-                onclick={() => doAction("rounds/add-table")}
+                onclick={() => doAction("AddTable")}
                 disabled={actionLoading}
                 class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
               >

@@ -18,6 +18,7 @@
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
   import ConfigTab from "./ConfigTab.svelte";
+  import DecksTab from "./DecksTab.svelte";
 
   const countries = getCountries();
 
@@ -41,7 +42,7 @@
   const isMinimalView = $derived(!tournament?.players);
 
   // Tab state
-  type TabId = 'overview' | 'players' | 'rounds' | 'finals' | 'config';
+  type TabId = 'overview' | 'players' | 'rounds' | 'finals' | 'decks' | 'config';
   let activeTab = $state<TabId>('overview');
 
   const tabs = $derived.by(() => {
@@ -49,6 +50,7 @@
       { id: 'overview', label: 'Overview', icon: 'lucide:layout-dashboard' },
       { id: 'players', label: 'Players', icon: 'lucide:users' },
       { id: 'rounds', label: 'Rounds', icon: 'lucide:swords' },
+      { id: 'decks', label: 'Decks', icon: 'lucide:file-text' },
     ];
     // Show Finals tab when ≥2 rounds played
     const hasFinalsCandidate = (tournament?.rounds?.length ?? 0) >= 2;
@@ -415,7 +417,7 @@
   }
 
   async function dropPlayer(playerUid: string) {
-    await doAction("dropout", { player_uid: playerUid });
+    await doAction("DropOut", { player_uid: playerUid });
   }
 
   $effect(() => {
@@ -593,6 +595,12 @@
                 {doAction}
                 {loadPlayerNames}
               />
+            {:else if activeTab === 'decks'}
+              <DecksTab
+                {tournament}
+                {playerInfo}
+                isOrganizer={showOrganizerView}
+              />
             {:else if activeTab === 'config'}
               <ConfigTab
                 bind:tournament={tournament}
@@ -608,7 +616,7 @@
         <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6">
           {#if tournament.state === "Registration" && !currentPlayerEntry}
             <button
-              onclick={() => doAction("register")}
+              onclick={() => doAction("Register", { user_uid: auth.user?.uid })}
               disabled={actionLoading}
               class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
             >Register</button>
@@ -619,7 +627,7 @@
                 <span class="ml-2 text-ash-200">{currentPlayerEntry.state}</span>
               </div>
               <button
-                onclick={() => doAction("unregister")}
+                onclick={() => doAction("Unregister", { user_uid: auth.user?.uid })}
                 disabled={actionLoading}
                 class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
               >Unregister</button>
@@ -634,7 +642,7 @@
               </div>
               {#if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
                 <button
-                  onclick={() => doAction("checkin", { player_uid: auth.user?.uid ?? "" })}
+                  onclick={() => doAction("CheckIn", { player_uid: auth.user?.uid ?? "" })}
                   disabled={actionLoading}
                   class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors"
                 >Check In</button>
@@ -776,6 +784,17 @@
                 {/if}
               </div>
             {/if}
+          {/if}
+
+          <!-- Player deck section -->
+          {#if currentPlayerEntry || (tournament.state === 'Finished' && tournament.decklists_mode)}
+            <div class="mt-4">
+              <DecksTab
+                {tournament}
+                {playerInfo}
+                isOrganizer={false}
+              />
+            </div>
           {/if}
         </div>
       {/if}

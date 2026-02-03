@@ -148,6 +148,9 @@ export async function updateUser(
 export interface VeknClaimResponse {
   user: User;
   message: string;
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
 }
 
 export interface VeknSponsorResponse {
@@ -426,20 +429,21 @@ export async function deleteTournamentApi(uid: string): Promise<{ message: strin
 }
 
 export async function tournamentAction(uid: string, action: string, data?: Record<string, unknown>): Promise<Tournament> {
+  const event = { type: action, ...data };
+
   // Try optimistic update via WASM engine
   const current = await getTournament(uid);
   if (current) {
     try {
-      const event = { type: action, ...data };
       const actor = buildActorContext(getAuthState().user ?? null, current);
       const updated = await processTournamentEvent(current, event, actor);
       await saveTournament(updated);
       await logChange('tournaments', 'update', uid, { event });
 
       // Send to server async — SSE will correct if divergence
-      apiRequest<Tournament>(`/api/tournaments/${uid}/${action}`, {
+      apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
         method: 'POST',
-        body: data ? JSON.stringify(data) : undefined,
+        body: JSON.stringify(event),
       }).catch(e => {
         console.error('Server rejected action, SSE will correct:', e);
       });
@@ -454,9 +458,9 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
   if (!isOnline()) {
     throw new Error('Cannot perform tournament action while offline.');
   }
-  return apiRequest<Tournament>(`/api/tournaments/${uid}/${action}`, {
+  return apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
     method: 'POST',
-    body: data ? JSON.stringify(data) : undefined,
+    body: JSON.stringify(event),
   });
 }
 
@@ -466,16 +470,7 @@ export async function setTableScore(
   table: number,
   scores: Array<{ player_uid: string; vp: number }>
 ): Promise<Tournament> {
-  if (!isOnline()) {
-    throw new Error('Cannot set scores while offline.');
-  }
-  return apiRequest<Tournament>(
-    `/api/tournaments/${tournamentUid}/rounds/${round}/tables/${table}/score`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({ scores }),
-    }
-  );
+  return tournamentAction(tournamentUid, 'SetScore', { round, table, scores });
 }
 
 /**

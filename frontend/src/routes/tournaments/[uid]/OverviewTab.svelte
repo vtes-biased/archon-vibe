@@ -115,7 +115,7 @@
 
       {#if tournament.state === "Planned"}
         <button
-          onclick={() => doAction("open-registration")}
+          onclick={() => doAction("OpenRegistration")}
           disabled={actionLoading}
           class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
         >{actionLoading ? "..." : "Open Registration"}</button>
@@ -123,12 +123,12 @@
       {:else if tournament.state === "Registration"}
         <div class="flex flex-wrap gap-2">
           <button
-            onclick={() => doAction("close-registration")}
+            onclick={() => doAction("CloseRegistration")}
             disabled={actionLoading}
             class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded-lg transition-colors"
           >Close Registration & Start Check-in</button>
           <button
-            onclick={() => doAction("cancel-registration")}
+            onclick={() => doAction("CancelRegistration")}
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
           >Back to Planning</button>
@@ -159,24 +159,24 @@
           <div class="flex flex-wrap gap-2">
             {#if hasRounds}
               <button
-                onclick={() => doAction("reset-checkin")}
+                onclick={() => doAction("ResetCheckIn")}
                 disabled={actionLoading}
                 class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
               >Reset Check-In</button>
             {/if}
             <button
-              onclick={() => doAction("checkin-all")}
+              onclick={() => doAction("CheckInAll")}
               disabled={actionLoading}
               class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
             >Check All In</button>
             <button
-              onclick={() => doAction("rounds/start")}
+              onclick={() => doAction("StartRound")}
               disabled={actionLoading || checkedInCount < 4}
               class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
             >Start Round {(tournament.rounds?.length ?? 0) + 1}</button>
             {#if finalsReady}
               <button
-                onclick={() => doAction("action", { type: "StartFinals" })}
+                onclick={() => doAction("StartFinals")}
                 disabled={actionLoading}
                 class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
               >Start Finals</button>
@@ -193,12 +193,12 @@
           <!-- Finish tournament / Reopen registration -->
           <div class="pt-3 border-t border-ash-800 flex flex-wrap gap-2">
             <button
-              onclick={() => doAction("finish")}
+              onclick={() => doAction("FinishTournament")}
               disabled={actionLoading}
               class="px-4 py-2 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
             >Finish Tournament</button>
             <button
-              onclick={() => doAction("reopen-registration")}
+              onclick={() => doAction("ReopenRegistration")}
               disabled={actionLoading}
               class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
             >Reopen Registration</button>
@@ -218,7 +218,7 @@
         <p class="text-ash-400 text-sm">Tournament is finished.</p>
         <div class="flex flex-wrap gap-2 mt-2">
           <button
-            onclick={() => doAction("reopen")}
+            onclick={() => doAction("ReopenTournament")}
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
           >Reopen Tournament</button>

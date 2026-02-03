@@ -85,7 +85,7 @@
   });
 
   async function addPlayerByUser(user: User) {
-    await doAction("add-player", { user_uid: user.uid });
+    await doAction("AddPlayer", { user_uid: user.uid });
     showAddPlayer = false;
   }
 
@@ -93,27 +93,27 @@
     const { getUserByVeknId } = await import("$lib/db");
     const user = await getUserByVeknId(veknId);
     if (!user) return;
-    await doAction("add-player", { user_uid: user.uid });
+    await doAction("AddPlayer", { user_uid: user.uid });
     showAddPlayer = false;
   }
 
   async function removePlayer(userUid: string) {
-    await doAction("remove-player", { user_uid: userUid });
+    await doAction("RemovePlayer", { user_uid: userUid });
   }
 
   async function dropPlayer(playerUid: string) {
-    await doAction("dropout", { player_uid: playerUid });
+    await doAction("DropOut", { player_uid: playerUid });
   }
 
   async function setToss(playerUid: string) {
     const val = parseInt(tossInputs[playerUid] ?? "0", 10);
     if (isNaN(val) || val < 0) return;
-    await doAction("action", { type: "SetToss", player_uid: playerUid, toss: val });
+    await doAction("SetToss", { player_uid: playerUid, toss: val });
     tossInputs[playerUid] = "";
   }
 
   async function randomToss() {
-    await doAction("action", { type: "RandomToss" });
+    await doAction("RandomToss");
   }
 
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
@@ -260,12 +260,12 @@
                 <td class="py-1 text-right whitespace-nowrap">
                   {#if tournament.state === "Waiting" && player.state === "Finished" && puid}
                     <button
-                      onclick={() => doAction("checkin", { player_uid: puid })}
+                      onclick={() => doAction("CheckIn", { player_uid: puid })}
                       class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded transition-colors"
                     >Check in</button>
                   {:else if tournament.state === "Waiting" && player.state === "Registered" && puid}
                     <button
-                      onclick={() => doAction("checkin", { player_uid: puid })}
+                      onclick={() => doAction("CheckIn", { player_uid: puid })}
                       class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded transition-colors"
                     >Check in</button>
                   {/if}
