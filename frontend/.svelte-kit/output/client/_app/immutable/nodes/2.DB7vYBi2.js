@@ -1,2 +1,0 @@
-import{f as e,a}from"../chunks/D_UohZrd.js";import"../chunks/DqgjpaF6.js";import{p as r,o as i,a as n}from"../chunks/BtUdmAei.js";import{i as p}from"../chunks/BvOaWJ56.js";import{g as m}from"../chunks/DgThuZgT.js";var c=e('<div class="flex items-center justify-center min-h-screen"><div class="text-center"><h1 class="text-4xl font-light text-crimson-500 mb-4">Archon</h1> <p class="text-ash-400">Loading...</p></div></div>');function x(t,o){r(o,!1),i(()=>{m("/users",{replaceState:!0})}),p();var s=c();a(t,s),n()}export{x as component};
-//# sourceMappingURL=2.DB7vYBi2.js.map
