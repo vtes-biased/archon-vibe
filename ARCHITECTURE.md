@@ -30,10 +30,11 @@ This project is an offline-first Progressive Web App (PWA) with a client-server 
 
 ### Object Structure
 
-All objects in the system share a common structure:
+All objects in the system share a common structure (via `BaseObject`):
 
 - **`uid`**: UUID v7 (time-ordered, indexed)
 - **`modified`**: Timestamp (indexed)
+- **`deleted_at`**: Soft-delete timestamp (nullable)
 
 All other fields are model specific.
 
@@ -141,6 +142,14 @@ When the PWA is deliberately taken offline (or loses connection):
 - Timestamp-based "last write wins" for simple cases
 - Custom resolution logic in Rust engine for complex business rules
 - Client always accepts server's reconciliation response
+
+## Card/Deck System
+
+**Card Database**: VTES card data loaded from JSON into IndexedDB (`cards` store, keyed by card ID). Rust engine provides card lookup and deck validation.
+
+**Deck Structure**: `Deck { round, name, author, comments, cards: Record<string, number> }`. Embedded in `Tournament.decks` (keyed by player UID). Filtered by `decklists_mode` (Winner/Finalists/All) at member data level.
+
+**Validation**: Rust engine validates deck legality (crypt/library counts, banned cards, multideck rules) before tournament actions that require decks.
 
 ## Serialization
 

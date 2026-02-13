@@ -33,6 +33,8 @@ All objects have (via `BaseObject`):
 CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
 ```
 
+**Card/Deck Support**: VTES card database loaded into IndexedDB (`cards` store). Deck validation in Rust engine, integrated into tournament player workflow.
+
 ## Events
 
 ### Business Events
