@@ -1,8 +1,11 @@
 <script lang="ts">
-  import type { Tournament, User, Player } from "$lib/types";
+  import type { Tournament, User, Player, Deck } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import AddPlayerForm from "$lib/components/AddPlayerForm.svelte";
+  import DeckDisplay from "$lib/components/DeckDisplay.svelte";
+  import DeckUpload from "$lib/components/DeckUpload.svelte";
   import Icon from "@iconify/svelte";
+  import { validateDeck, type ValidationError } from "$lib/engine";
 
   interface StandingEntry {
     user_uid: string;
@@ -34,6 +37,56 @@
   let tossInputs = $state<Record<string, string>>({});
   let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
   let standingsInitialized = false;
+
+  // Deck expansion state
+  let expandedPlayer = $state<string | null>(null);
+  let uploadingFor = $state<string | null>(null);
+  let validationCache = $state<Record<string, ValidationError[]>>({});
+
+  function togglePlayer(uid: string) {
+    expandedPlayer = expandedPlayer === uid ? null : uid;
+    uploadingFor = null;
+  }
+
+  function onUploaded() {
+    uploadingFor = null;
+  }
+
+  // Get player's deck
+  function getPlayerDeck(uid: string): Deck | null {
+    const decks = tournament.decks?.[uid];
+    return decks?.[0] ?? null;
+  }
+
+  // Compute deck status for a player
+  type DeckStatus = 'valid' | 'warning' | 'error' | 'none';
+  function getDeckStatus(uid: string): DeckStatus {
+    const deck = getPlayerDeck(uid);
+    if (!deck) return 'none';
+    const errors = validationCache[uid];
+    if (!errors) return 'valid'; // Not validated yet, assume valid
+    const hasError = errors.some(e => e.severity === 'error');
+    const hasWarning = errors.some(e => e.severity === 'warning');
+    if (hasError) return 'error';
+    if (hasWarning) return 'warning';
+    return 'valid';
+  }
+
+  // Validate decks when they change
+  $effect(() => {
+    const decks = tournament.decks;
+    const format = tournament.format;
+    if (!decks) return;
+
+    for (const [uid, playerDecks] of Object.entries(decks)) {
+      if (playerDecks.length > 0 && playerDecks[0] && !validationCache[uid]) {
+        // Validate asynchronously
+        validateDeck(playerDecks[0], format).then(errors => {
+          validationCache = { ...validationCache, [uid]: errors };
+        });
+      }
+    }
+  });
 
   $effect(() => {
     // Auto-switch to standings only on first availability, not on every change
@@ -194,6 +247,9 @@
               <th class="text-right py-1 px-2">Toss</th>
             {/if}
             <th class="text-left py-1 px-2">Status</th>
+            {#if tournament.decklist_required}
+              <th class="text-center py-1 px-2">Deck</th>
+            {/if}
             {#if isOrganizer}<th></th>{/if}
           </tr>
         </thead>
@@ -256,6 +312,22 @@
                   </span>
                 {/if}
               </td>
+              {#if tournament.decklist_required}
+                {@const deckStatus = getDeckStatus(puid)}
+                <td class="text-center py-1 px-2">
+                  <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-ash-800 rounded transition-colors" title="View deck">
+                    {#if deckStatus === 'valid'}
+                      <Icon icon="lucide:check-circle" class="w-4 h-4 text-emerald-400" />
+                    {:else if deckStatus === 'warning'}
+                      <Icon icon="lucide:alert-triangle" class="w-4 h-4 text-amber-400" />
+                    {:else if deckStatus === 'error'}
+                      <Icon icon="lucide:x-circle" class="w-4 h-4 text-crimson-400" />
+                    {:else}
+                      <Icon icon="lucide:file-x" class="w-4 h-4 text-ash-500" />
+                    {/if}
+                  </button>
+                </td>
+              {/if}
               {#if isOrganizer}
                 <td class="py-1 text-right whitespace-nowrap">
                   {#if tournament.state === "Waiting" && player.state === "Finished" && puid}
@@ -286,6 +358,41 @@
                 </td>
               {/if}
             </tr>
+            <!-- Expanded deck row -->
+            {#if expandedPlayer === puid}
+              {@const playerDeck = getPlayerDeck(puid)}
+              {@const errors = validationCache[puid] ?? []}
+              <tr class="bg-ash-900/50">
+                <td colspan="99" class="p-4">
+                  <div class="space-y-3">
+                    {#if playerDeck}
+                      <DeckDisplay deck={playerDeck} />
+                      {#if errors.length > 0}
+                        <div class="space-y-1">
+                          {#each errors as err}
+                            <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-amber-400'}">
+                              <Icon icon={err.severity === 'error' ? 'lucide:x-circle' : 'lucide:alert-triangle'} class="w-4 h-4 inline mr-1" />
+                              {err.message}
+                            </p>
+                          {/each}
+                        </div>
+                      {/if}
+                      {#if isOrganizer}
+                        <button
+                          onclick={() => uploadingFor = puid}
+                          class="text-sm text-crimson-400 hover:text-crimson-300"
+                        >Replace deck</button>
+                      {/if}
+                    {:else}
+                      <p class="text-sm text-ash-400">No deck uploaded</p>
+                    {/if}
+                    {#if isOrganizer && (uploadingFor === puid || !playerDeck)}
+                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} onuploaded={onUploaded} />
+                    {/if}
+                  </div>
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>

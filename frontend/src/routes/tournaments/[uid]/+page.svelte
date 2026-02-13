@@ -8,17 +8,20 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getUserByVeknId, getTournament } from "$lib/db";
   import type { Tournament, TournamentState, User } from "$lib/types";
-  import { scoreSeatingSync, computeRatingPoints } from "$lib/engine";
+  import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
   import { formatScore } from "$lib/utils";
   import Icon from "@iconify/svelte";
   import { renderMarkdown } from "$lib/markdown";
+
+  // Deck validation state for player's own deck
+  let myDeckErrors = $state<ValidationError[]>([]);
 
   import OverviewTab from "./OverviewTab.svelte";
   import PlayersTab from "./PlayersTab.svelte";
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
   import ConfigTab from "./ConfigTab.svelte";
-  import DecksTab from "./DecksTab.svelte";
+  import DecksTab from "./DecksTab.svelte"; // Used in player view only
 
   const countries = getCountries();
 
@@ -41,8 +44,29 @@
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
 
+  // Player's deck and validation status
+  const myDeck = $derived(
+    (auth.user?.uid && tournament?.decks?.[auth.user.uid]?.[0]) ?? null
+  );
+  const playerHasValidDeck = $derived(
+    !tournament?.decklist_required || (myDeck !== null && !myDeckErrors.some(e => e.severity === 'error'))
+  );
+
+  // Validate player's deck when it changes
+  $effect(() => {
+    const deck = myDeck;
+    const format = tournament?.format;
+    if (!deck || !format) {
+      myDeckErrors = [];
+      return;
+    }
+    validateDeck(deck, format).then(errors => {
+      myDeckErrors = errors;
+    });
+  });
+
   // Tab state
-  type TabId = 'overview' | 'players' | 'rounds' | 'finals' | 'decks' | 'config';
+  type TabId = 'overview' | 'players' | 'rounds' | 'finals' | 'config';
   let activeTab = $state<TabId>('overview');
 
   const tabs = $derived.by(() => {
@@ -50,7 +74,6 @@
       { id: 'overview', label: 'Overview', icon: 'lucide:layout-dashboard' },
       { id: 'players', label: 'Players', icon: 'lucide:users' },
       { id: 'rounds', label: 'Rounds', icon: 'lucide:swords' },
-      { id: 'decks', label: 'Decks', icon: 'lucide:file-text' },
     ];
     // Show Finals tab when ≥2 rounds played
     const hasFinalsCandidate = (tournament?.rounds?.length ?? 0) >= 2;
@@ -595,12 +618,6 @@
                 {doAction}
                 {loadPlayerNames}
               />
-            {:else if activeTab === 'decks'}
-              <DecksTab
-                {tournament}
-                {playerInfo}
-                isOrganizer={showOrganizerView}
-              />
             {:else if activeTab === 'config'}
               <ConfigTab
                 bind:tournament={tournament}
@@ -640,12 +657,24 @@
                   ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? "Finished" : "Dropped")
                   : currentPlayerEntry.state}</span>
               </div>
-              {#if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
-                <button
-                  onclick={() => doAction("CheckIn", { player_uid: auth.user?.uid ?? "" })}
-                  disabled={actionLoading}
-                  class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors"
-                >Check In</button>
+              {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && !playerHasValidDeck}
+                <div class="flex items-center gap-2 text-amber-400 text-sm">
+                  <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
+                  Upload a valid deck to check in
+                </div>
+              {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
+                {#if !playerHasValidDeck}
+                  <div class="flex items-center gap-2 text-amber-400 text-sm">
+                    <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
+                    Upload a valid deck to check in
+                  </div>
+                {:else}
+                  <button
+                    onclick={() => doAction("CheckIn", { player_uid: auth.user?.uid ?? "" })}
+                    disabled={actionLoading}
+                    class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors"
+                  >Check In</button>
+                {/if}
               {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
                 <button
                   onclick={() => dropPlayer(auth.user?.uid ?? "")}

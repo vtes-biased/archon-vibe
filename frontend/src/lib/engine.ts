@@ -303,3 +303,53 @@ export function buildActorContext(user: User | null, tournament: Tournament): Ac
     is_organizer: tournament.organizers_uids?.includes(user.uid) ?? false,
   };
 }
+
+/**
+ * Validation error from deck validation.
+ */
+export interface ValidationError {
+  severity: 'error' | 'warning';
+  message: string;
+}
+
+/**
+ * Validate a deck against format rules using WASM engine.
+ * Returns empty array if engine not initialized or on error.
+ */
+export async function validateDeck(
+  deck: { cards: Record<string, number>; name?: string },
+  format: string
+): Promise<ValidationError[]> {
+  const engine = await initEngine();
+  try {
+    // Get cards JSON from cards module
+    const { getCardsJson } = await import('./cards');
+    const cardsJson = await getCardsJson();
+    if (!cardsJson) return [];
+
+    const deckJson = JSON.stringify({ name: deck.name || '', cards: deck.cards });
+    const resultJson = engine.validateDeck(deckJson, cardsJson, format);
+    return JSON.parse(resultJson);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Validate a deck synchronously (returns null if engine not initialized).
+ */
+export function validateDeckSync(
+  deck: { cards: Record<string, number>; name?: string },
+  cardsJson: string,
+  format: string
+): ValidationError[] | null {
+  const engine = getEngineSync();
+  if (!engine) return null;
+  try {
+    const deckJson = JSON.stringify({ name: deck.name || '', cards: deck.cards });
+    const resultJson = engine.validateDeck(deckJson, cardsJson, format);
+    return JSON.parse(resultJson);
+  } catch {
+    return null;
+  }
+}
