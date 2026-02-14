@@ -151,6 +151,7 @@ export interface Deck {
   author: string;
   comments: string;
   cards: Record<string, number>;
+  attribution?: string | null; // null = anonymous, vekn_id = attributed to member
 }
 
 /**

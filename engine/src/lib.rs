@@ -248,12 +248,13 @@ mod shared {
     pub fn export_twda_json(
         deck_json: &str, cards_json: &str,
         tournament_name: &str, tournament_date: &str, tournament_place: &str,
+        tournament_format: &str, tournament_url: &str,
         player_count: u32, player_name: &str,
     ) -> Result<String, String> {
         let card_map = cards::CardMap::load(cards_json)?;
         let value = json::parse(deck_json).map_err(|e| e.to_string())?;
         let d = deck_from_json(&value, true)?;
-        Ok(deck::export_twda(&d, &card_map, tournament_name, tournament_date, tournament_place, player_count, player_name))
+        Ok(deck::export_twda(&d, &card_map, tournament_name, tournament_date, tournament_place, tournament_format, tournament_url, player_count, player_name))
     }
 }
 
@@ -419,9 +420,10 @@ mod python {
         fn export_twda(
             &self, deck_json: &str, cards_json: &str,
             tournament_name: &str, tournament_date: &str, tournament_place: &str,
+            tournament_format: &str, tournament_url: &str,
             player_count: u32, player_name: &str,
         ) -> PyResult<String> {
-            py_str(export_twda_json(deck_json, cards_json, tournament_name, tournament_date, tournament_place, player_count, player_name))
+            py_str(export_twda_json(deck_json, cards_json, tournament_name, tournament_date, tournament_place, tournament_format, tournament_url, player_count, player_name))
         }
     }
 

@@ -176,6 +176,46 @@ The Dockerfiles automatically build the Rust engine:
 - Python bindings (PyO3) for the backend
 - WebAssembly (WASM) for the frontend
 
+## Configuration
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and fill in the values. Most variables are self-explanatory; the sections below cover the ones that require external setup.
+
+### TWDA Auto-PR (Tournament Winning Deck Archive)
+
+When a sanctioned tournament finishes and the winner's decklist is available, Archon can automatically open a Pull Request on the [GiottoVerducci/TWD](https://github.com/GiottoVerducci/TWD) repository.
+
+This uses a **GitHub App** installed on the TWD repo. To set it up:
+
+1. **Register a GitHub App** at https://github.com/settings/apps/new
+   - **Name**: e.g. "Archon TWDA Bot"
+   - **Homepage URL**: your Archon instance URL
+   - **Permissions** (Repository):
+     - Contents: **Read & Write** (to create branches and commit deck files)
+     - Pull requests: **Read & Write** (to open PRs)
+   - No webhook needed (uncheck "Active" under Webhook)
+   - **Where can this app be installed?**: "Only on this account" is fine
+
+2. **Generate a private key** on the App settings page. Download the `.pem` file.
+
+3. **Install the App** on the `GiottoVerducci/TWD` repository (or ask the repo owner to install it). Note the **Installation ID** from the URL after installation (`https://github.com/settings/installations/{INSTALLATION_ID}`).
+
+4. **Set the environment variables**:
+
+```bash
+# Numeric App ID (visible on the App settings page)
+TWDA_GITHUB_APP_ID=123456
+
+# PEM private key: either inline contents or a path to the .pem file
+TWDA_GITHUB_PRIVATE_KEY=/path/to/private-key.pem
+
+# Installation ID (numeric, from the installation URL)
+TWDA_GITHUB_INSTALLATION_ID=78901234
+```
+
+When all three variables are set, Archon will create a branch `archon/{vekn_event_id}` and open a PR with the winner's deck in TWDA format. If the decklist is updated later, the PR is automatically updated. If the variables are not set, this feature is silently skipped.
+
 ## License
 
 MIT

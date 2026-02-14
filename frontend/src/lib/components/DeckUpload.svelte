@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
+  import { onDestroy } from 'svelte';
 
   let {
     tournamentUid,
@@ -11,13 +11,63 @@
     onuploaded?: () => void;
   } = $props();
 
-  let mode = $state<'text' | 'url'>('text');
+  let mode = $state<'text' | 'url' | 'qr'>('text');
   let deckText = $state('');
   let deckUrl = $state('');
   let deckName = $state('');
+  let attribution = $state<'self' | 'anonymous' | 'other'>('self');
+  let attributionVekn = $state('');
   let loading = $state(false);
   let error = $state<string | null>(null);
   let success = $state(false);
+
+  // QR scanner
+  let videoEl = $state<HTMLVideoElement | null>(null);
+  let scanner: any = null;
+  let qrScanning = $state(false);
+
+  async function startQrScanner() {
+    if (!videoEl) return;
+    const QrScanner = (await import('qr-scanner')).default;
+    scanner = new QrScanner(videoEl, (result: { data: string }) => {
+      const url = result.data;
+      if (url.startsWith('http')) {
+        deckUrl = url;
+        stopQrScanner();
+        mode = 'url';
+      }
+    }, {
+      returnDetailedScanResult: true,
+      highlightScanRegion: true,
+      highlightCodeOutline: true,
+    });
+    try {
+      await scanner.start();
+      qrScanning = true;
+    } catch (e: any) {
+      error = `Camera access failed: ${e.message || e}`;
+    }
+  }
+
+  function stopQrScanner() {
+    if (scanner) {
+      scanner.stop();
+      scanner.destroy();
+      scanner = null;
+    }
+    qrScanning = false;
+  }
+
+  // Start scanner when QR mode is selected
+  $effect(() => {
+    if (mode === 'qr' && videoEl) {
+      startQrScanner();
+    } else if (mode !== 'qr') {
+      stopQrScanner();
+    }
+  });
+
+  onDestroy(() => stopQrScanner());
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -33,9 +83,13 @@
         : `${API_URL}/api/tournaments/${tournamentUid}/decks`;
       const method = playerUid ? 'PUT' : 'POST';
 
-      const body: Record<string, string> = { name: deckName };
+      const body: Record<string, string | null> = { name: deckName };
       if (mode === 'text') body.text = deckText;
       else body.url = deckUrl;
+
+      // Attribution
+      if (attribution === 'anonymous') body.attribution = null;
+      else if (attribution === 'other' && attributionVekn.trim()) body.attribution = attributionVekn.trim();
 
       const resp = await fetch(endpoint, {
         method,
@@ -65,7 +119,7 @@
 </script>
 
 <div class="space-y-3">
-  <div class="flex gap-2">
+  <div class="flex gap-2 flex-wrap">
     <button
       onclick={() => mode = 'text'}
       class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'text' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
@@ -74,30 +128,70 @@
       onclick={() => mode = 'url'}
       class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
     >From URL</button>
+    <button
+      onclick={() => mode = 'qr'}
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+    >Scan QR</button>
   </div>
 
-  <input
-    type="text"
-    bind:value={deckName}
-    placeholder="Deck name (optional)"
-    class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
-  />
-
-  {#if mode === 'text'}
-    <textarea
-      bind:value={deckText}
-      placeholder="Paste your deck list here...&#10;&#10;Example:&#10;2x .44 Magnum&#10;3 Govern the Unaligned&#10;..."
-      rows="12"
-      class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm font-mono resize-y"
-    ></textarea>
+  {#if mode === 'qr'}
+    <div class="relative rounded-lg overflow-hidden bg-black">
+      <!-- svelte-ignore element_invalid_self_closing_tag -->
+      <video bind:this={videoEl} class="w-full max-h-64 object-cover" />
+      {#if !qrScanning}
+        <p class="absolute inset-0 flex items-center justify-center text-ash-400 text-sm">Starting camera...</p>
+      {/if}
+    </div>
+    <p class="text-xs text-ash-500">Point camera at a VDB deck QR code</p>
   {:else}
     <input
-      type="url"
-      bind:value={deckUrl}
-      placeholder="VDB, VTESDecks, or Amaranth URL"
+      type="text"
+      bind:value={deckName}
+      placeholder="Deck name (optional)"
       class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
     />
-    <p class="text-xs text-ash-500">Supported: vdb.im, vtesdecks.com, amaranth.vtes.co.nz</p>
+
+    {#if mode === 'text'}
+      <textarea
+        bind:value={deckText}
+        placeholder="Paste your deck list here...&#10;&#10;Example:&#10;2x .44 Magnum&#10;3 Govern the Unaligned&#10;..."
+        rows="12"
+        class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm font-mono resize-y"
+      ></textarea>
+    {:else}
+      <input
+        type="url"
+        bind:value={deckUrl}
+        placeholder="VDB, VTESDecks, or Amaranth URL"
+        class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+      />
+      <p class="text-xs text-ash-500">Supported: vdb.im, vtesdecks.com, amaranth.vtes.co.nz</p>
+    {/if}
+
+    <!-- Attribution -->
+    <div class="flex items-center gap-3 text-sm flex-wrap">
+      <span class="text-ash-400">Attribution:</span>
+      <label class="flex items-center gap-1 text-ash-200">
+        <input type="radio" bind:group={attribution} value="self" class="accent-crimson-500" />
+        My deck
+      </label>
+      <label class="flex items-center gap-1 text-ash-200">
+        <input type="radio" bind:group={attribution} value="anonymous" class="accent-crimson-500" />
+        Anonymous
+      </label>
+      <label class="flex items-center gap-1 text-ash-200">
+        <input type="radio" bind:group={attribution} value="other" class="accent-crimson-500" />
+        Other
+      </label>
+    </div>
+    {#if attribution === 'other'}
+      <input
+        type="text"
+        bind:value={attributionVekn}
+        placeholder="VEKN ID or name of deck author"
+        class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+      />
+    {/if}
   {/if}
 
   {#if error}
@@ -107,11 +201,13 @@
     <p class="text-sm text-emerald-400">Deck uploaded successfully</p>
   {/if}
 
-  <button
-    onclick={upload}
-    disabled={loading || (mode === 'text' ? !deckText.trim() : !deckUrl.trim())}
-    class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
-  >
-    {loading ? 'Uploading...' : 'Upload Deck'}
-  </button>
+  {#if mode !== 'qr'}
+    <button
+      onclick={upload}
+      disabled={loading || (mode === 'text' ? !deckText.trim() : !deckUrl.trim())}
+      class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+    >
+      {loading ? 'Uploading...' : 'Upload Deck'}
+    </button>
+  {/if}
 </div>

@@ -104,6 +104,63 @@ async def _process_engine_event(
     return updated
 
 
+async def _maybe_submit_twda(tournament: Tournament) -> None:
+    """Submit winner's deck to TWDA if conditions are met.
+
+    Conditions: sanctioned tournament, finished, winner has deck, has VEKN event ID.
+    """
+    if tournament.state != TournamentState.FINISHED:
+        return
+    if not tournament.winner:
+        return
+    if tournament.rank == TournamentRank.BASIC:
+        return  # unsanctioned
+    vekn_event_id = tournament.external_ids.get("vekn")
+    if not vekn_event_id:
+        return
+    winner_decks = tournament.decks.get(tournament.winner, [])
+    if not winner_decks:
+        return
+
+    try:
+        import json as json_mod
+
+        from ..twda import submit_twda_pr
+
+        deck = winner_decks[0]
+        engine = get_engine()
+        deck_json = json_mod.dumps({
+            "name": deck.name,
+            "author": deck.author,
+            "comments": deck.comments,
+            "cards": deck.cards,
+        })
+
+        player_user = await get_user_by_uid(tournament.winner)
+        player_name = player_user.name if player_user else "Unknown"
+        player_count = len(tournament.players)
+        tournament_date = tournament.start or tournament.modified.isoformat()
+        rounds_count = len(tournament.rounds)
+        has_finals = tournament.finals is not None
+        tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
+
+        deck_text = engine.export_twda(
+            deck_json,
+            _load_cards_json(),
+            tournament.name,
+            str(tournament_date),
+            tournament.country or "",
+            tournament_format,
+            "",  # tournament_url
+            player_count,
+            player_name,
+        )
+
+        await submit_twda_pr(vekn_event_id, deck_text, tournament.name)
+    except Exception:
+        logger.exception("Failed to submit TWDA PR")
+
+
 def _build_actor_context(user, tournament: Tournament) -> dict:
     """Build actor context dict for the Rust engine."""
     return {
@@ -566,6 +623,10 @@ async def tournament_action(
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
+    # TWDA auto-PR: trigger when tournament finishes with winner's deck
+    if is_finished and not was_finished:
+        await _maybe_submit_twda(updated)
+
     return Response(
         content=encoder.encode(updated),
         media_type="application/json",
@@ -948,6 +1009,7 @@ class DeckUploadRequest(BaseModel):
     name: str = ""
     author: str = ""
     comments: str = ""
+    attribution: str | None = None  # None=use default, explicit null=anonymous
 
 
 async def _parse_deck_input(body: DeckUploadRequest, default_author: str) -> dict:
@@ -990,12 +1052,15 @@ async def _parse_deck_input(body: DeckUploadRequest, default_author: str) -> dic
     else:
         raise HTTPException(status_code=400, detail="Either text or url is required")
 
-    return {
+    result = {
         "name": deck_name,
         "author": deck_author,
         "comments": deck_comments,
         "cards": {str(k): int(v) for k, v in cards.items()},
     }
+    if body.attribution is not None:
+        result["attribution"] = body.attribution
+    return result
 
 
 @router.post("/{uid}/decks")
@@ -1023,7 +1088,11 @@ async def upload_deck(
         "deck": deck_data,
         "multideck": tournament.multideck,
     }
-    await _process_engine_event(user, tournament, event)
+    updated = await _process_engine_event(user, tournament, event)
+
+    # TWDA: winner uploading deck after tournament finished
+    if updated.state == TournamentState.FINISHED and user.uid == updated.winner:
+        await _maybe_submit_twda(updated)
 
     # Return the deck that was uploaded
     return Response(
@@ -1121,13 +1190,146 @@ async def export_deck_twda(
     player_count = len(tournament.players)
     tournament_date = tournament.start or tournament.modified.isoformat()
 
+    # Build tournament format string (e.g. "2R+F")
+    rounds_count = len(tournament.rounds)
+    has_finals = tournament.finals is not None
+    tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
+
+    # Build tournament URL
+    tournament_url = ""  # Can be set to app URL when deployed
+
     text = engine.export_twda(
         deck_json,
         _load_cards_json(),
         tournament.name,
         str(tournament_date),
         tournament.country or "",
+        tournament_format,
+        tournament_url,
         player_count,
         player_name,
     )
     return Response(content=text, media_type="text/plain")
+
+
+@router.get("/{uid}/report")
+async def tournament_report(
+    uid: str,
+    format: str = "text",
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Download a tournament report with standings, results, and winner's deck.
+
+    Query params:
+    - format: "text" (default) or "json"
+    """
+    user = await _get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if tournament.state != TournamentState.FINISHED:
+        raise HTTPException(status_code=400, detail="Tournament is not finished")
+
+    # Check if organizer
+    if not _is_organizer(user, tournament):
+        raise HTTPException(status_code=403, detail="Only organizers can download reports")
+
+    if format == "json":
+        # JSON report
+        import json as json_mod
+
+        report = {
+            "tournament": {
+                "name": tournament.name,
+                "date": str(tournament.start or tournament.modified.isoformat()),
+                "country": tournament.country,
+                "format": tournament.format.value if hasattr(tournament.format, 'value') else str(tournament.format),
+                "player_count": len(tournament.players),
+                "winner": tournament.winner,
+            },
+            "standings": [
+                {
+                    "user_uid": s.user_uid,
+                    "gw": s.gw,
+                    "vp": s.vp,
+                    "tp": s.tp,
+                    "finalist": s.finalist,
+                }
+                for s in tournament.standings
+            ],
+        }
+        return Response(
+            content=json_mod.dumps(report, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{uid}-report.json"'},
+        )
+
+    # Text report
+    lines = []
+    lines.append(f"Tournament Report: {tournament.name}")
+    lines.append(f"Date: {tournament.start or tournament.modified.isoformat()}")
+    lines.append(f"Location: {tournament.country or 'Unknown'}")
+    lines.append(f"Players: {len(tournament.players)}")
+    lines.append("")
+
+    # Standings
+    lines.append("=== Standings ===")
+    for i, s in enumerate(tournament.standings, 1):
+        player_user = await get_user_by_uid(s.user_uid)
+        name = player_user.name if player_user else s.user_uid
+        finalist_mark = " (F)" if s.finalist else ""
+        winner_mark = " *WINNER*" if s.user_uid == tournament.winner else ""
+        lines.append(f"{i:>3}. {name:30} GW={s.gw:.1f} VP={s.vp:.1f} TP={s.tp}{finalist_mark}{winner_mark}")
+
+    # Winner's deck
+    winner_decks = tournament.decks.get(tournament.winner, []) if tournament.winner else []
+    if winner_decks:
+        lines.append("")
+        lines.append("=== Winner's Decklist ===")
+        try:
+            deck = winner_decks[0]
+            engine = get_engine()
+            import json as json_mod
+
+            deck_json = json_mod.dumps({
+                "name": deck.name,
+                "author": deck.author,
+                "comments": deck.comments,
+                "cards": deck.cards,
+            })
+
+            player_user = await get_user_by_uid(tournament.winner)
+            player_name = player_user.name if player_user else "Unknown"
+            tournament_date = tournament.start or tournament.modified.isoformat()
+            rounds_count = len(tournament.rounds)
+            has_finals = tournament.finals is not None
+            tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
+
+            twda_text = engine.export_twda(
+                deck_json,
+                _load_cards_json(),
+                tournament.name,
+                str(tournament_date),
+                tournament.country or "",
+                tournament_format,
+                "",
+                len(tournament.players),
+                player_name,
+            )
+            lines.append(twda_text)
+        except Exception:
+            lines.append("(Failed to generate decklist)")
+    else:
+        lines.append("")
+        lines.append("Winner's decklist: not available")
+
+    text = "\n".join(lines)
+    return Response(
+        content=text,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{uid}-report.txt"'},
+    )

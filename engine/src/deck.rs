@@ -13,6 +13,7 @@ pub struct Deck {
     pub author: String,
     pub comments: String,
     pub cards: HashMap<u32, u32>, // card_id → count
+    pub attribution: Option<String>, // None = anonymous, Some(vekn_id) = attributed to member
 }
 
 impl Deck {
@@ -22,6 +23,7 @@ impl Deck {
             author: String::new(),
             comments: String::new(),
             cards: HashMap::new(),
+            attribution: None,
         }
     }
 
@@ -56,12 +58,16 @@ impl Deck {
         for (&id, &count) in &self.cards {
             cards[id.to_string()] = count.into();
         }
-        json::object! {
+        let mut obj = json::object! {
             name: self.name.as_str(),
             author: self.author.as_str(),
             comments: self.comments.as_str(),
             cards: cards
+        };
+        if let Some(ref attr) = self.attribution {
+            obj["attribution"] = attr.as_str().into();
         }
+        obj
     }
 }
 
@@ -538,12 +544,18 @@ pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
 // ============================================================================
 
 /// Export a deck in TWDA text format.
+///
+/// Parameters:
+/// - `tournament_format`: e.g. "2R+F", "3R+F"
+/// - `tournament_url`: URL to the tournament page (can be empty)
 pub fn export_twda(
     deck: &Deck,
     card_map: &CardMap,
     tournament_name: &str,
     tournament_date: &str,
     tournament_place: &str,
+    tournament_format: &str,
+    tournament_url: &str,
     player_count: u32,
     player_name: &str,
 ) -> String {
@@ -553,8 +565,15 @@ pub fn export_twda(
     lines.push(tournament_name.to_string());
     lines.push(tournament_place.to_string());
     lines.push(tournament_date.to_string());
+    if !tournament_format.is_empty() {
+        lines.push(format!("{tournament_format}"));
+    }
     lines.push(format!("{player_count} players"));
     lines.push(player_name.to_string());
+    if !tournament_url.is_empty() {
+        lines.push(String::new());
+        lines.push(tournament_url.to_string());
+    }
     lines.push(String::new());
 
     if !deck.name.is_empty() {
@@ -589,7 +608,28 @@ pub fn export_twda(
     });
 
     let crypt_total: u32 = crypt_entries.iter().map(|(_, c)| c).sum();
-    lines.push(format!("Crypt ({crypt_total} cards)"));
+
+    // Compute crypt capacity stats
+    let (min_cap, max_cap, avg_cap) = if !crypt_entries.is_empty() {
+        let mut min = u32::MAX;
+        let mut max = 0u32;
+        let mut sum = 0u32;
+        let mut count_total = 0u32;
+        for (card, count) in &crypt_entries {
+            if card.capacity < min { min = card.capacity; }
+            if card.capacity > max { max = card.capacity; }
+            sum += card.capacity * count;
+            count_total += count;
+        }
+        let avg = if count_total > 0 { sum as f64 / count_total as f64 } else { 0.0 };
+        (min, max, avg)
+    } else {
+        (0, 0, 0.0)
+    };
+
+    lines.push(format!(
+        "Crypt ({crypt_total} cards, min={min_cap}, max={max_cap}, avg={avg_cap:.2})"
+    ));
     lines.push("-".repeat(lines.last().map(|l| l.len()).unwrap_or(0)));
 
     for (card, count) in &crypt_entries {
@@ -635,6 +675,7 @@ pub fn export_twda(
                 .filter(|(c, _)| c.types.first().map(|s| s.as_str()).unwrap_or("") == card_type)
                 .map(|(_, c)| c)
                 .sum();
+            // TODO: Add trifle counts when card data includes trifle flag
             lines.push(format!("{card_type} ({type_count})"));
         }
         lines.push(format!("{}x {}", count, card.name));

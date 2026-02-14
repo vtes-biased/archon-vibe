@@ -1,0 +1,39 @@
+name: Update Cards Data
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 06:00 UTC
+  workflow_dispatch: {}   # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update-cards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run cards update script
+        run: python3 scripts/update_cards.py
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --quiet engine/data/cards.json && echo "changed=false" >> "$GITHUB_OUTPUT" || echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add engine/data/cards.json
+          git commit -m "Update cards data ($DATE)"
+          git tag "cards-$DATE" || true
+          git push
+          git push --tags || true

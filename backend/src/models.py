@@ -309,6 +309,7 @@ class Deck(msgspec.Struct, kw_only=True):
     author: str = ""  # for attribution
     comments: str = ""
     cards: dict[str, int] = msgspec.field(default_factory=dict)  # card_uid: count
+    attribution: str | None = None  # None = anonymous, vekn_id = attributed to member
 
 
 class Standing(msgspec.Struct, kw_only=True, frozen=True):
