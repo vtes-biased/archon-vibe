@@ -12,6 +12,9 @@ const config = {
 			precompress: false,
 			strict: true
 		}),
+		paths: {
+			relative: false
+		},
 		alias: {
 			$lib: 'src/lib',
 			$components: 'src/lib/components',

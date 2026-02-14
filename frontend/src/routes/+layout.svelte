@@ -7,6 +7,9 @@
   import { onMount } from 'svelte';
   import Icon from '@iconify/svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import * as m from '$lib/paraglide/messages.js';
+  import { getLocale } from '$lib/paraglide/runtime.js';
+  import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
 
   let { children } = $props();
 
@@ -15,17 +18,17 @@
   let isSyncing = $state(true);
   let syncError = $state<string | null>(null);
 
-  // Navigation items
+  // Navigation items - use message keys, resolve labels reactively
   const baseNavItems = [
-    { href: '/tournaments', label: 'Tournaments', icon: 'trophy' },
-    { href: '/leagues', label: 'Leagues', icon: 'chart' },
-    { href: '/rankings', label: 'Rankings', icon: 'ranking' },
-    { href: '/users', label: 'Users', icon: 'users' },
-    { href: '/profile', label: 'Profile', icon: 'user' },
+    { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: 'trophy' },
+    { href: '/leagues', labelFn: () => m.nav_leagues(), icon: 'chart' },
+    { href: '/rankings', labelFn: () => m.nav_rankings(), icon: 'ranking' },
+    { href: '/users', labelFn: () => m.nav_users(), icon: 'users' },
+    { href: '/profile', labelFn: () => m.nav_profile(), icon: 'user' },
   ];
   const navItems = $derived(
     hasAnyRole('DEV', 'IC')
-      ? [...baseNavItems, { href: '/developer', label: 'Developer', icon: 'code' }]
+      ? [...baseNavItems, { href: '/developer', labelFn: () => m.nav_developer(), icon: 'code' }]
       : baseNavItems
   );
 
@@ -33,6 +36,11 @@
     if (href === '/') return currentPath === '/';
     return currentPath.startsWith(href);
   }
+
+  // Keep <html lang> in sync with locale
+  $effect(() => {
+    document.documentElement.lang = getLocale();
+  });
 
   onMount(() => {
     // Initialize engine (WASM) for permission checks
@@ -87,7 +95,7 @@
       {#if !isOnline}
         <span class="inline-flex items-center gap-2">
           <Icon icon="lucide:wifi-off" class="w-4 h-4" />
-          Offline - Changes will sync when reconnected
+          {m.status_offline_banner()}
         </span>
       {:else if syncError}
         <span>{syncError}</span>
@@ -122,7 +130,7 @@
           {:else if item.icon === 'code'}
             <Icon icon="lucide:code-2" class="w-6 h-6" />
           {/if}
-          <span class="text-xs mt-1">{item.label}</span>
+          <span class="text-xs mt-1">{item.labelFn()}</span>
         </a>
       {/each}
     </div>
@@ -141,7 +149,7 @@
         <a
           href={item.href}
           class="flex flex-col items-center py-3 px-2 rounded-lg transition-colors {active ? 'bg-crimson-900/50 text-crimson-400' : 'text-ash-400 hover:text-ash-200 hover:bg-ash-800/50'}"
-          title={item.label}
+          title={item.labelFn()}
         >
           {#if item.icon === 'trophy'}
             <Icon icon="lucide:trophy" class="w-6 h-6" />
@@ -156,16 +164,21 @@
           {:else if item.icon === 'code'}
             <Icon icon="lucide:code-2" class="w-6 h-6" />
           {/if}
-          <span class="text-xs mt-1">{item.label}</span>
+          <span class="text-xs mt-1">{item.labelFn()}</span>
         </a>
       {/each}
     </div>
 
-    <!-- Connection status indicator -->
+    <!-- Locale switcher -->
     <div class="mt-auto pt-4">
+      <LocaleSwitcher />
+    </div>
+
+    <!-- Connection status indicator -->
+    <div class="pt-2">
       <div class="flex flex-col items-center gap-1">
         <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-crimson-500'}"></div>
-        <span class="text-[10px] text-ash-500">{isOnline ? (isSyncing ? 'Syncing' : 'Online') : 'Offline'}</span>
+        <span class="text-[10px] text-ash-500">{isOnline ? (isSyncing ? m.status_syncing() : m.status_online()) : m.status_offline()}</span>
       </div>
     </div>
   </nav>

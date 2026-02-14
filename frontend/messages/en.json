@@ -1,0 +1,12 @@
+{
+  "nav_tournaments": "Tournaments",
+  "nav_leagues": "Leagues",
+  "nav_rankings": "Rankings",
+  "nav_users": "Users",
+  "nav_profile": "Profile",
+  "nav_developer": "Developer",
+  "status_online": "Online",
+  "status_offline": "Offline",
+  "status_syncing": "Syncing",
+  "status_offline_banner": "Offline - Changes will sync when reconnected"
+}
