@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { User, Tournament } from "$lib/types";
   import { getFilteredUsers, getUserByVeknId } from "$lib/db";
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     tournament,
@@ -57,14 +58,14 @@
 
 <div class="bg-ash-900/50 rounded-lg p-4 space-y-3">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for="player-search-input">Search by name</label>
+    <label class="block text-sm text-ash-400 mb-1" for="player-search-input">{m.add_player_search_label()}</label>
     <input
       id="player-search-input"
       type="text"
       bind:value={playerSearch}
       oninput={() => searchPlayers()}
       onkeydown={handleSearchKeydown}
-      placeholder="Type a name or VEKN ID..."
+      placeholder={m.add_player_search_placeholder()}
       class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
     />
     {#if searchResults.length > 0}
@@ -82,15 +83,15 @@
         {/each}
         {#if searchTotal > SEARCH_LIMIT}
           <div class="px-3 py-2 text-xs text-ash-500 text-center">
-            {searchTotal - SEARCH_LIMIT} more result{searchTotal - SEARCH_LIMIT !== 1 ? "s" : ""} — refine your search
+            {m.add_player_more_results({ count: (searchTotal - SEARCH_LIMIT).toString() })}
           </div>
         {/if}
       </div>
     {/if}
   </div>
-  <div class="text-center text-ash-500 text-sm">— or —</div>
+  <div class="text-center text-ash-500 text-sm">{m.add_player_or_separator()}</div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for="vekn-id-input">VEKN ID</label>
+    <label class="block text-sm text-ash-400 mb-1" for="vekn-id-input">{m.add_player_vekn_id_label()}</label>
     <div class="flex gap-2">
       <input
         id="vekn-id-input"
@@ -104,7 +105,7 @@
         disabled={!playerVeknId.trim()}
         class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
       >
-        Add
+        {m.common_add()}
       </button>
     </div>
   </div>

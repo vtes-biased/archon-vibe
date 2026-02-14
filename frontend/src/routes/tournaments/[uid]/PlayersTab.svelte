@@ -6,6 +6,7 @@
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import Icon from "@iconify/svelte";
   import { validateDeck, type ValidationError } from "$lib/engine";
+  import * as m from '$lib/paraglide/messages.js';
 
   interface StandingEntry {
     user_uid: string;
@@ -177,14 +178,14 @@
 <div class="space-y-4">
   <!-- Header -->
   <div class="flex items-center justify-between">
-    <p class="text-ash-400">{tournament.players.length} player{tournament.players.length !== 1 ? "s" : ""}</p>
+    <p class="text-ash-400">{m.players_count({ count: String(tournament.players.length) })}</p>
     {#if isOrganizer}
       <button
         onclick={() => showAddPlayer = !showAddPlayer}
         class="px-3 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
       >
         <Icon icon="lucide:user-plus" class="w-4 h-4 inline mr-1" />
-        Add Player
+        {m.players_add()}
       </button>
     {/if}
   </div>
@@ -203,9 +204,9 @@
         class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
       >
         <Icon icon="lucide:dice-3" class="w-4 h-4 inline mr-1" />
-        Random Toss
+        {m.players_random_toss()}
       </button>
-      <span class="text-xs text-ash-500">Break ties by random toss or enter values manually</span>
+      <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
     </div>
   {/if}
 
@@ -216,16 +217,16 @@
         <button
           class="px-2 py-1 text-xs rounded transition-colors {playerSort === 'standings' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
           onclick={() => playerSort = 'standings'}
-        >Standings</button>
+        >{m.players_sort_standings()}</button>
       {/if}
       <button
         class="px-2 py-1 text-xs rounded transition-colors {playerSort === 'name' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
         onclick={() => playerSort = 'name'}
-      >Name</button>
+      >{m.players_sort_name()}</button>
       <button
         class="px-2 py-1 text-xs rounded transition-colors {playerSort === 'vekn' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
         onclick={() => playerSort = 'vekn'}
-      >VEKN</button>
+      >{m.players_sort_vekn()}</button>
     </div>
 
     <!-- Player table -->
@@ -234,21 +235,21 @@
         <thead>
           <tr class="text-ash-500 text-xs">
             {#if playerSort === 'standings' && standings.length > 0}
-              <th class="text-left py-1 pr-2">#</th>
+              <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
             {/if}
-            <th class="text-left py-1 pr-2">Player</th>
+            <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
             {#if standings.length > 0}
-              <th class="text-right py-1 px-2">Score</th>
+              <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
               {#if hasFinals}
-                <th class="text-right py-1 px-2">Finals</th>
+                <th class="text-right py-1 px-2">{m.tournament_col_finals()}</th>
               {/if}
             {/if}
             {#if top5HasTies() && playerSort === 'standings'}
-              <th class="text-right py-1 px-2">Toss</th>
+              <th class="text-right py-1 px-2">{m.tournament_col_toss()}</th>
             {/if}
-            <th class="text-left py-1 px-2">Status</th>
+            <th class="text-left py-1 px-2">{m.tournament_col_status()}</th>
             {#if tournament.decklist_required}
-              <th class="text-center py-1 px-2">Deck</th>
+              <th class="text-center py-1 px-2">{m.tournament_col_deck()}</th>
             {/if}
             {#if isOrganizer}<th></th>{/if}
           </tr>
@@ -265,7 +266,7 @@
                 <td class="py-1 pr-2 text-ash-500">{entry?.rank ?? "—"}</td>
               {/if}
               <td class="py-1 pr-2">
-                <span class="truncate block">{playerInfo[puid]?.name ?? (puid || "(no account)")}</span>
+                <span class="truncate block">{playerInfo[puid]?.name ?? (puid || m.players_no_account())}</span>
                 {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
                   <span class="text-xs text-ash-500 truncate block">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</span>
                 {/if}
@@ -292,7 +293,7 @@
                         onclick={() => setToss(puid)}
                         disabled={actionLoading}
                         class="px-1.5 py-0.5 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded"
-                      >Set</button>
+                      >{m.players_set_toss()}</button>
                     </div>
                   {:else if isTied}
                     {entry?.toss || "—"}
@@ -305,7 +306,7 @@
                 {#if player.state === "Finished"}
                   {@const played = standingsMap.has(puid)}
                   {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
-                  <span class="text-xs px-2 py-0.5 rounded bg-ash-800 text-ash-500">{played && finalsPhase ? "Finished" : "Dropped"}</span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-ash-800 text-ash-500">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
                 {:else}
                   <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'bg-emerald-900/60 text-emerald-300' : 'bg-ash-800 text-ash-400'}">
                     {player.state}
@@ -315,7 +316,7 @@
               {#if tournament.decklist_required}
                 {@const deckStatus = getDeckStatus(puid)}
                 <td class="text-center py-1 px-2">
-                  <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-ash-800 rounded transition-colors" title="View deck">
+                  <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-ash-800 rounded transition-colors" title={m.players_view_deck()}>
                     {#if deckStatus === 'valid'}
                       <Icon icon="lucide:check-circle" class="w-4 h-4 text-emerald-400" />
                     {:else if deckStatus === 'warning'}
@@ -334,23 +335,23 @@
                     <button
                       onclick={() => doAction("CheckIn", { player_uid: puid })}
                       class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded transition-colors"
-                    >Check in</button>
+                    >{m.players_check_in()}</button>
                   {:else if tournament.state === "Waiting" && player.state === "Registered" && puid}
                     <button
                       onclick={() => doAction("CheckIn", { player_uid: puid })}
                       class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded transition-colors"
-                    >Check in</button>
+                    >{m.players_check_in()}</button>
                   {/if}
                   {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
                     <button
                       onclick={() => dropPlayer(puid)}
                       class="px-2 py-1 text-xs text-crimson-400 hover:text-crimson-300 border border-crimson-800 rounded transition-colors"
-                    >Drop</button>
+                    >{m.players_drop()}</button>
                   {:else if puid && !hasRounds}
                     <button
                       onclick={() => removePlayer(puid)}
                       class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors"
-                      title="Remove player"
+                      title={m.players_remove_title()}
                     >
                       <Icon icon="lucide:x" class="w-4 h-4" />
                     </button>
@@ -381,10 +382,10 @@
                         <button
                           onclick={() => uploadingFor = puid}
                           class="text-sm text-crimson-400 hover:text-crimson-300"
-                        >Replace deck</button>
+                        >{m.players_replace_deck()}</button>
                       {/if}
                     {:else}
-                      <p class="text-sm text-ash-400">No deck uploaded</p>
+                      <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
                     {/if}
                     {#if isOrganizer && (uploadingFor === puid || !playerDeck)}
                       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} onuploaded={onUploaded} />

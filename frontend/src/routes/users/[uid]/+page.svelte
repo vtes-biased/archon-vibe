@@ -5,6 +5,7 @@
   import { getCountryFlag, getCountry } from "$lib/geonames";
   import type { User, Rating, RatingCategory, CategoryRating } from "$lib/types";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let user = $state<User | undefined>();
   let rating = $state<Rating | undefined>();
@@ -12,11 +13,11 @@
 
   const uid = $derived($page.params.uid);
 
-  const categoryLabels: Record<RatingCategory, string> = {
-    constructed_offline: "Constructed",
-    constructed_online: "Constructed Online",
-    limited_offline: "Limited",
-    limited_online: "Limited Online",
+  const categoryLabelFns: Record<RatingCategory, () => string> = {
+    constructed_offline: () => m.rankings_cat_constructed(),
+    constructed_online: () => m.rankings_cat_constructed_online(),
+    limited_offline: () => m.rankings_cat_limited(),
+    limited_online: () => m.rankings_cat_limited_online(),
   };
 
   const allCategories: RatingCategory[] = [
@@ -58,14 +59,14 @@
 </script>
 
 <svelte:head>
-  <title>{user?.name ?? "User"} - Archon</title>
+  <title>{user?.name ?? m.user_detail_fallback_title()} - Archon</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto px-4 py-6">
   {#if !user}
     <div class="text-center text-ash-400 py-8">
       <Icon icon="lucide:loader-2" class="w-6 h-6 animate-spin inline-block" />
-      <span class="ml-2">Loading...</span>
+      <span class="ml-2">{m.common_loading()}</span>
     </div>
   {:else}
     <!-- User header -->
@@ -76,7 +77,7 @@
           <span>"{user.nickname}"</span>
         {/if}
         {#if user.vekn_id}
-          <span>VEKN #{user.vekn_id}</span>
+          <span>{m.user_detail_vekn({ id: user.vekn_id })}</span>
         {/if}
         {#if user.country}
           <span>{getCountryFlag(user.country)} {getCountry(user.country)?.name ?? user.country}</span>
@@ -93,7 +94,7 @@
 
     <!-- Ratings -->
     {#if availableCategories.length > 0}
-      <h2 class="text-lg font-semibold text-ash-200 mb-3">Ratings</h2>
+      <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.user_detail_ratings()}</h2>
       <div class="space-y-2">
         {#each availableCategories as cat}
           {@const catRating = rating?.[cat] as CategoryRating}
@@ -104,7 +105,7 @@
               class="w-full flex items-center justify-between px-4 py-3 hover:bg-ash-800/30 transition-colors"
               onclick={() => toggleCategory(cat)}
             >
-              <span class="font-medium text-ash-200">{categoryLabels[cat]}</span>
+              <span class="font-medium text-ash-200">{categoryLabelFns[cat]()}</span>
               <div class="flex items-center gap-3">
                 <span class="text-lg font-bold text-crimson-400">{catRating.total}</span>
                 <Icon
@@ -120,10 +121,10 @@
                 <table class="w-full text-sm">
                   <thead>
                     <tr class="text-ash-500 text-xs">
-                      <th class="py-1 text-left">Tournament</th>
-                      <th class="py-1 text-right">VP</th>
-                      <th class="py-1 text-right">GW</th>
-                      <th class="py-1 text-right">Pts</th>
+                      <th class="py-1 text-left">{m.user_detail_col_tournament()}</th>
+                      <th class="py-1 text-right">{m.user_detail_col_vp()}</th>
+                      <th class="py-1 text-right">{m.user_detail_col_gw()}</th>
+                      <th class="py-1 text-right">{m.user_detail_col_pts()}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -160,7 +161,7 @@
     {:else if rating === undefined}
       <!-- Still loading or no rating data -->
     {:else}
-      <p class="text-ash-500 text-sm">No rating data available.</p>
+      <p class="text-ash-500 text-sm">{m.user_detail_no_rating()}</p>
     {/if}
   {/if}
 </div>

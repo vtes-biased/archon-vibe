@@ -5,6 +5,7 @@
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
 
@@ -37,7 +38,7 @@
 
   async function handleSubmit() {
     if (!values.name.trim()) {
-      error = "Name is required";
+      error = m.tournament_new_error_name_required();
       return;
     }
 
@@ -78,7 +79,7 @@
 </script>
 
 <svelte:head>
-  <title>New Tournament - Archon</title>
+  <title>{m.tournament_new_page_title()} - Archon</title>
 </svelte:head>
 
 <div class="p-4 sm:p-8">
@@ -87,12 +88,12 @@
       <a href="/tournaments" class="text-ash-400 hover:text-ash-200">
         <Icon icon="lucide:arrow-left" class="w-5 h-5" />
       </a>
-      <h1 class="text-3xl font-light text-crimson-500">New Tournament</h1>
+      <h1 class="text-3xl font-light text-crimson-500">{m.tournament_new_title()}</h1>
     </div>
 
     {#if !canCreate}
       <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4">
-        <p class="text-crimson-300">Only IC, NC, or Prince can create tournaments.</p>
+        <p class="text-crimson-300">{m.tournament_new_no_permission()}</p>
       </div>
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
@@ -109,14 +110,14 @@
         <!-- Actions -->
         <div class="flex gap-3 justify-end">
           <a href="/tournaments" class="px-4 py-2 text-sm font-medium text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
-            Cancel
+            {m.common_cancel()}
           </a>
           <button
             type="submit"
             disabled={isSubmitting || !values.name.trim()}
             class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shadow-md disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Creating..." : "Create Tournament"}
+            {isSubmitting ? m.tournament_new_creating() : m.tournament_new_create_btn()}
           </button>
         </div>
       </form>

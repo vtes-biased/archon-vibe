@@ -3,6 +3,7 @@
   import { getCards } from "$lib/cards";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
   import CardSearch from "./CardSearch.svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     deck,
@@ -158,27 +159,27 @@
   <h4 class="text-sm font-semibold text-bone-200 mb-1">{deck.name}</h4>
 {/if}
 {#if deck.author}
-  <p class="text-xs text-ash-400 mb-2">by {deck.author}</p>
+  <p class="text-xs text-ash-400 mb-2">{m.deck_by_author({ author: deck.author })}</p>
 {/if}
 
 {#if editable && !editing}
   <button
     onclick={startEditing}
     class="text-xs text-crimson-400 hover:text-crimson-300 mb-2"
-  >Edit deck</button>
+  >{m.deck_edit()}</button>
 {/if}
 
 {#if editing}
   <div class="mb-3">
     <CardSearch onselect={addCard} />
-    <p class="text-xs text-ash-500 mt-1">Search and select a card to add it to the deck</p>
+    <p class="text-xs text-ash-500 mt-1">{m.deck_edit_search_hint()}</p>
   </div>
 {/if}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
   <!-- Crypt -->
   <div>
-    <h5 class="font-semibold text-ash-200 mb-1">Crypt ({cryptCount})</h5>
+    <h5 class="font-semibold text-ash-200 mb-1">{m.deck_crypt_count({ count: cryptCount.toString() })}</h5>
     <div class="space-y-0.5">
       {#each cryptEntries as entry}
         <div class="flex gap-2 items-center hover:bg-ash-800/50 px-1 rounded min-h-[28px]">
@@ -214,7 +215,7 @@
 
   <!-- Library -->
   <div>
-    <h5 class="font-semibold text-ash-200 mb-1">Library ({libraryCount})</h5>
+    <h5 class="font-semibold text-ash-200 mb-1">{m.deck_library_count({ count: libraryCount.toString() })}</h5>
     {#each libraryByType as [type, entries]}
       <div class="mb-2">
         <p class="text-xs text-ash-500 font-medium">
@@ -260,11 +261,11 @@
       onclick={saveDeck}
       disabled={saving}
       class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
-    >{saving ? 'Saving...' : 'Save Changes'}</button>
+    >{saving ? m.common_saving() : m.deck_save_changes()}</button>
     <button
       onclick={cancelEditing}
       class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-    >Cancel</button>
+    >{m.common_cancel()}</button>
   </div>
 {/if}
 
@@ -279,7 +280,7 @@
   >
     <img
       src={cardImageUrl}
-      alt="Card"
+      alt={m.deck_card_image_alt()}
       class="max-h-[80vh] max-w-full rounded-lg shadow-xl"
       onerror={() => cardImageUrl = null}
     />

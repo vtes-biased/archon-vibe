@@ -13,6 +13,7 @@
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
   import Icon from "@iconify/svelte";
   import { renderMarkdown } from "$lib/markdown";
+  import * as m from '$lib/paraglide/messages.js';
 
   // Deck validation state for player's own deck
   let myDeckErrors = $state<ValidationError[]>([]);
@@ -73,17 +74,17 @@
 
   const tabs = $derived.by(() => {
     const t: { id: TabId; label: string; icon: string }[] = [
-      { id: 'overview', label: 'Overview', icon: 'lucide:layout-dashboard' },
-      { id: 'players', label: 'Players', icon: 'lucide:users' },
-      { id: 'rounds', label: 'Rounds', icon: 'lucide:swords' },
+      { id: 'overview', label: m.tournament_tab_overview(), icon: 'lucide:layout-dashboard' },
+      { id: 'players', label: m.tournament_tab_players(), icon: 'lucide:users' },
+      { id: 'rounds', label: m.tournament_tab_rounds(), icon: 'lucide:swords' },
     ];
     // Show Finals tab when ≥2 rounds played
     const hasFinalsCandidate = (tournament?.rounds?.length ?? 0) >= 2;
     if (hasFinalsCandidate || tournament?.finals) {
-      t.push({ id: 'finals', label: 'Finals', icon: 'lucide:trophy' });
+      t.push({ id: 'finals', label: m.tournament_tab_finals(), icon: 'lucide:trophy' });
     }
     if (showOrganizerView) {
-      t.push({ id: 'config', label: 'Config', icon: 'lucide:settings' });
+      t.push({ id: 'config', label: m.tournament_tab_config(), icon: 'lucide:settings' });
     }
     return t;
   });
@@ -333,7 +334,7 @@
       tournament = await setTableScore(uid, roundIndex, tableIndex, scores);
       await loadPlayerNames();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save scores";
+      error = e instanceof Error ? e.message : m.tournament_error_save_scores();
     } finally {
       scoreSaving = null;
     }
@@ -351,7 +352,7 @@
       tournament = await setTableScore(uid, roundIndex, 0, scores);
       await loadPlayerNames();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save finals scores";
+      error = e instanceof Error ? e.message : m.tournament_error_save_finals();
     } finally {
       scoreSaving = null;
     }
@@ -367,10 +368,10 @@
         await loadPlayerNames();
       } else if (!tournament) {
         // No data in IndexedDB yet — will arrive via SSE
-        error = "Tournament not yet synced. Waiting for data...";
+        error = m.tournament_error_not_synced();
       }
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load tournament";
+      error = e instanceof Error ? e.message : m.tournament_error_load();
     } finally {
       loading = false;
     }
@@ -382,7 +383,7 @@
       tournament = await tournamentAction(uid, action, data);
       await loadPlayerNames();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Action failed";
+      error = e instanceof Error ? e.message : m.tournament_error_action();
     } finally {
       actionLoading = false;
     }
@@ -394,7 +395,7 @@
       showDeleteConfirm = false;
       goto("/tournaments");
     } catch (e) {
-      error = e instanceof Error ? e.message : "Delete failed";
+      error = e instanceof Error ? e.message : m.tournament_error_delete();
       showDeleteConfirm = false;
     }
   }
@@ -445,7 +446,7 @@
 </script>
 
 <svelte:head>
-  <title>{tournament?.name ?? "Tournament"} - Archon</title>
+  <title>{tournament?.name ?? m.tournament_fallback_title()} - Archon</title>
 </svelte:head>
 
 <div class="p-4 sm:p-8">
@@ -453,7 +454,7 @@
     <!-- Back link -->
     <a href="/tournaments" class="inline-flex items-center gap-2 text-ash-400 hover:text-ash-200 mb-4">
       <Icon icon="lucide:arrow-left" class="w-4 h-4" />
-      Tournaments
+      {m.nav_tournaments()}
     </a>
 
     {#if loading}
@@ -484,7 +485,7 @@
           <button
             onclick={() => (showDeleteConfirm = true)}
             class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-          >Delete</button>
+          >{m.common_delete()}</button>
         {/if}
       </div>
 
@@ -498,17 +499,17 @@
       <div class="bg-dusk-950 rounded-lg shadow p-6 border border-ash-800 mb-6">
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
           <div>
-            <div class="text-ash-500">Date</div>
+            <div class="text-ash-500">{m.tournament_info_date()}</div>
             <div class="text-ash-200">{formatDate(tournament.start)}</div>
             {#if formatDateLocal(tournament.start)}
-              <div class="text-xs text-ash-500">{formatDateLocal(tournament.start)} in your timezone</div>
+              <div class="text-xs text-ash-500">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
             {/if}
           </div>
           <div>
-            <div class="text-ash-500">Location</div>
+            <div class="text-ash-500">{m.tournament_info_location()}</div>
             <div class="text-ash-200">
               {#if tournament.online}
-                Online
+                {m.tournaments_online()}
               {:else if tournament.country}
                 {getCountryFlag(tournament.country)} {countries[tournament.country]?.name ?? tournament.country}
                 {#if tournament.venue}
@@ -521,13 +522,13 @@
           </div>
           {#if tournament.players}
           <div>
-            <div class="text-ash-500">Players</div>
-            <div class="text-ash-200">{tournament.players.length} registered</div>
+            <div class="text-ash-500">{m.tournament_info_players()}</div>
+            <div class="text-ash-200">{m.tournament_registered_count({ count: String(tournament.players.length) })}</div>
           </div>
           {/if}
           {#if tournament.description}
             <div class="col-span-full">
-              <div class="text-ash-500">Description</div>
+              <div class="text-ash-500">{m.common_description()}</div>
               <div class="text-ash-300 mt-1 prose prose-invert prose-sm max-w-none">{@html renderMarkdown(tournament.description)}</div>
             </div>
           {/if}
@@ -536,7 +537,7 @@
 
       {#if isMinimalView}
         <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 p-6 text-center">
-          <p class="text-ash-400">Sign in to view full tournament details.</p>
+          <p class="text-ash-400">{m.tournament_sign_in_details()}</p>
         </div>
       {:else}
       <!-- View toggle for organizers -->
@@ -547,7 +548,7 @@
             class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
           >
             <Icon icon={viewAsPlayer ? "lucide:shield" : "lucide:user"} class="w-4 h-4 inline mr-1" />
-            {viewAsPlayer ? "Organizer view" : "Player view"}
+            {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
           </button>
         </div>
       {/if}
@@ -625,68 +626,68 @@
               onclick={() => doAction("Register", { user_uid: auth.user?.uid })}
               disabled={actionLoading}
               class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
-            >Register</button>
+            >{m.tournament_register_btn()}</button>
           {:else if tournament.state === "Registration" && currentPlayerEntry}
             <div class="text-sm mb-3 flex items-center justify-between">
               <div>
-                <span class="text-ash-500">Your status:</span>
+                <span class="text-ash-500">{m.tournament_your_status()}</span>
                 <span class="ml-2 text-ash-200">{currentPlayerEntry.state}</span>
               </div>
               <button
                 onclick={() => doAction("Unregister", { user_uid: auth.user?.uid })}
                 disabled={actionLoading}
                 class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-              >Unregister</button>
+              >{m.tournament_unregister_btn()}</button>
             </div>
           {:else if currentPlayerEntry}
             <div class="text-sm mb-3 flex items-center justify-between">
               <div>
-                <span class="text-ash-500">Your status:</span>
+                <span class="text-ash-500">{m.tournament_your_status()}</span>
                 <span class="ml-2 text-ash-200">{currentPlayerEntry.state === "Finished"
-                  ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? "Finished" : "Dropped")
+                  ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
                   : currentPlayerEntry.state}</span>
               </div>
               {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && !playerHasValidDeck}
                 <div class="flex items-center gap-2 text-amber-400 text-sm">
                   <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
-                  Upload a valid deck to check in
+                  {m.tournament_upload_valid_deck()}
                 </div>
               {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
                 {#if !playerHasValidDeck}
                   <div class="flex items-center gap-2 text-amber-400 text-sm">
                     <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
-                    Upload a valid deck to check in
+                    {m.tournament_upload_valid_deck()}
                   </div>
                 {:else}
                   <button
                     onclick={() => doAction("CheckIn", { player_uid: auth.user?.uid ?? "" })}
                     disabled={actionLoading}
                     class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors"
-                  >Check In</button>
+                  >{m.tournament_check_in_btn()}</button>
                 {/if}
               {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
                 <button
                   onclick={() => dropPlayer(auth.user?.uid ?? "")}
                   disabled={actionLoading}
                   class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-                >Drop Out</button>
+                >{m.tournament_drop_out_btn()}</button>
               {/if}
             </div>
             <!-- Standings for players -->
             {#if tournament.state !== "Finished" && playerStandings.length > 0}
               <div class="bg-ash-900/50 rounded-lg p-4">
                 <h3 class="text-sm font-medium text-bone-100 mb-2">
-                  Standings
+                  {m.tournament_standings()}
                   {#if tournament.standings_mode !== "Public"}
-                    <span class="text-xs text-ash-500 font-normal ml-1">({tournament.standings_mode === "Cutoff" ? "Top 5" : tournament.standings_mode})</span>
+                    <span class="text-xs text-ash-500 font-normal ml-1">({tournament.standings_mode === "Cutoff" ? m.tournament_standings_top5() : tournament.standings_mode})</span>
                   {/if}
                 </h3>
                 <table class="w-full text-sm">
                   <thead>
                     <tr class="text-ash-500 text-xs">
-                      <th class="text-left py-1 pr-2">#</th>
-                      <th class="text-left py-1 pr-2">Player</th>
-                      <th class="text-right py-1 px-2">Score</th>
+                      <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
+                      <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
+                      <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -704,7 +705,7 @@
             <!-- Finals table for player view -->
             {#if isFinals && tournament.finals}
               <div class="bg-ash-900/50 rounded-lg p-4">
-                <h3 class="text-sm font-medium text-bone-100 mb-2">Finals</h3>
+                <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_heading()}</h3>
                 <div class="divide-y divide-ash-800">
                   {#each tournament.finals.seating as seat, j}
                     {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
@@ -715,7 +716,7 @@
                     <div class="py-1.5 flex items-center justify-between text-sm">
                       <div>
                         <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                        <div class="text-xs text-ash-500">Seed #{seedIdx}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+                        <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
                       </div>
                       <div class="flex items-center gap-2">
                         <span class="text-ash-400 text-xs">VP:</span>
@@ -742,7 +743,7 @@
                 {@const myTable = currentRound[myTableIdx]!}
                 <div class="bg-ash-900/50 rounded-lg p-4">
                   <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-medium text-bone-100">Your Table (Table {myTableIdx + 1})</h3>
+                    <h3 class="text-sm font-medium text-bone-100">{m.tournament_your_table({ n: String(myTableIdx + 1) })}</h3>
                     <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'bg-emerald-900/60 text-emerald-300' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'bg-amber-900/60 text-amber-300'}">
                       {myTable.state}
                     </span>
@@ -775,7 +776,7 @@
               {/if}
             {/if}
           {:else}
-            <p class="text-ash-400 text-sm">Registration is not open.</p>
+            <p class="text-ash-400 text-sm">{m.tournament_registration_not_open()}</p>
           {/if}
 
           <!-- Registered players list (player view, Planned/Registration) -->
@@ -788,7 +789,7 @@
                   class="text-sm text-ash-400 hover:text-ash-200 transition-colors flex items-center gap-1"
                 >
                   <Icon icon={showRegisteredPlayers ? "lucide:chevron-down" : "lucide:chevron-right"} class="w-4 h-4" />
-                  Registered players ({registered.length})
+                  {m.tournament_registered_players({ count: String(registered.length) })}
                 </button>
                 {#if showRegisteredPlayers}
                   <div class="mt-2 flex flex-wrap gap-2">
@@ -823,25 +824,25 @@
         <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
           {#if tournament.winner}
             <div class="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4">
-              <div class="text-ash-500 text-sm">Winner</div>
+              <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
               <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
             </div>
           {/if}
           {#if standings.length > 0}
             <div class="bg-ash-900/50 rounded-lg p-4">
-              <h3 class="text-sm font-medium text-bone-100 mb-2">Standings</h3>
+              <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_standings()}</h3>
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
                     <tr class="text-ash-500 text-xs">
-                      <th class="text-left py-1 pr-2">#</th>
-                      <th class="text-left py-1 pr-2">Player</th>
-                      <th class="text-right py-1 px-2">Score</th>
+                      <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
+                      <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
+                      <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
                       {#if hasFinals}
-                        <th class="text-right py-1 px-2">Finals</th>
+                        <th class="text-right py-1 px-2">{m.tournament_col_finals()}</th>
                       {/if}
                       {#if isFinished}
-                        <th class="text-right py-1 px-2">Rating</th>
+                        <th class="text-right py-1 px-2">{m.tournament_col_rating()}</th>
                       {/if}
                     </tr>
                   </thead>
@@ -866,7 +867,7 @@
           {/if}
           {#if tournament.finals}
             <div class="bg-ash-900/50 rounded-lg p-4">
-              <h3 class="text-sm font-medium text-bone-100 mb-2">Finals Table</h3>
+              <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_table()}</h3>
               <div class="divide-y divide-ash-800">
                 {#each tournament.finals.seating as seat, j}
                   {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
@@ -877,7 +878,7 @@
                   <div class="py-1.5 flex items-center justify-between text-sm">
                     <div>
                       <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                      <div class="text-xs text-ash-500">Seed #{seedIdx}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+                      <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
                     </div>
                     <span class="text-ash-500 text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
                   </div>
@@ -905,21 +906,21 @@
       aria-modal="true"
     >
       <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-crimson-400">Delete Tournament?</h2>
+        <h2 class="text-xl font-medium text-crimson-400">{m.tournament_delete_title()}</h2>
       </div>
       <div class="p-6">
         <p class="text-ash-300 mb-6">
-          This will permanently delete this tournament. This action cannot be undone.
+          {m.tournament_delete_msg()}
         </p>
         <div class="flex gap-2">
           <button
             onclick={handleDelete}
             class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded font-medium transition-colors"
-          >Delete</button>
+          >{m.common_delete()}</button>
           <button
             onclick={() => (showDeleteConfirm = false)}
             class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >Cancel</button>
+          >{m.common_cancel()}</button>
         </div>
       </div>
     </div>

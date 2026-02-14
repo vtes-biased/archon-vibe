@@ -5,6 +5,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     user,
@@ -101,7 +102,7 @@
         expires_at: sanctionExpiresAt || null,
       });
       userSanctions = [...userSanctions, sanction];
-      showToast({ type: "success", message: `${sanctionLevel.toUpperCase()} issued successfully` });
+      showToast({ type: "success", message: m.sanction_mgr_issued_success() });
       showSanctionModal = false;
       sanctionTargetUser = null;
       sanctionLevel = "probation";
@@ -127,7 +128,7 @@
         expires_at: editExpiryAllowed && editSanctionExpiresAt ? editSanctionExpiresAt : undefined,
       });
       userSanctions = userSanctions.map((s) => (s.uid === sanctionUid ? updated : s));
-      showToast({ type: "success", message: "Sanction updated" });
+      showToast({ type: "success", message: m.sanction_mgr_updated() });
       closeEditSanctionModal();
     } catch {
       // Error toast shown by apiRequest
@@ -143,7 +144,7 @@
     try {
       const updated = await updateSanction(sanctionUid, { lifted: true });
       userSanctions = userSanctions.map((s) => (s.uid === sanctionUid ? updated : s));
-      showToast({ type: "success", message: "Sanction lifted" });
+      showToast({ type: "success", message: m.sanction_mgr_lifted_success() });
       closeEditSanctionModal();
     } catch {
       // Error toast shown by apiRequest
@@ -159,7 +160,7 @@
     try {
       userSanctions = userSanctions.filter((s) => s.uid !== sanctionUid);
       await deleteSanctionApi(sanctionUid);
-      showToast({ type: "success", message: "Sanction deleted" });
+      showToast({ type: "success", message: m.sanction_mgr_deleted() });
       closeEditSanctionModal();
     } catch {
       if (user) {
@@ -174,7 +175,7 @@
 <!-- Inline sanctions section -->
 {#if canIssueSanctions}
   <fieldset class="border border-crimson-800/50 rounded p-4">
-    <legend class="text-sm font-medium text-crimson-400 px-2">Sanctions</legend>
+    <legend class="text-sm font-medium text-crimson-400 px-2">{m.sanction_mgr_title()}</legend>
 
     {#if userSanctions.length > 0}
       <div class="mb-4 space-y-2">
@@ -207,10 +208,10 @@
         type="button"
         onclick={(e) => { e.stopPropagation(); openSanctionModal(); }}
         class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-bone-100 rounded transition-colors"
-        title="Issue a sanction"
+        title={m.sanction_mgr_issue_btn()}
       >
         <Icon icon="lucide:alert-triangle" class="inline w-3 h-3 mr-1" />
-        Issue Sanction
+        {m.sanction_mgr_issue_btn()}
       </button>
     </div>
   </fieldset>
@@ -219,7 +220,7 @@
 <!-- View mode: sanctions badges -->
 {#if !canIssueSanctions && userSanctions.length > 0}
   <div class="flex items-start gap-2">
-    <span class="font-medium">Sanctions:</span>
+    <span class="font-medium">{m.sanction_mgr_title()}:</span>
     <div class="flex flex-wrap gap-1">
       {#each userSanctions as sanction (sanction.uid)}
         <SanctionBadge {sanction} />
@@ -245,9 +246,9 @@
       class="bg-dusk-950 rounded-lg shadow-xl border border-crimson-800/50 w-full max-w-md mx-4"
     >
       <div class="p-6 border-b border-ash-800">
-        <h2 id="sanction-modal-title" class="text-xl font-medium text-crimson-400">Issue Sanction</h2>
+        <h2 id="sanction-modal-title" class="text-xl font-medium text-crimson-400">{m.sanction_mgr_issue_btn()}</h2>
         <p class="mt-2 text-sm text-ash-400">
-          Issue a sanction to <strong class="text-bone-100">{sanctionTargetUser.name}</strong>
+          {m.sanction_mgr_issue_to({ name: sanctionTargetUser.name })}
         </p>
       </div>
       <form
@@ -259,49 +260,49 @@
       >
         <div>
           <label for="sanction-level" class="block text-sm font-medium text-ash-400 mb-1">
-            Level *
+            {m.common_level()} *
           </label>
           <select
             id="sanction-level"
             bind:value={sanctionLevel}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
           >
-            <option value="probation">Probation</option>
-            <option value="suspension">Suspension</option>
+            <option value="probation">{m.sanction_level_probation()}</option>
+            <option value="suspension">{m.sanction_level_suspension()}</option>
           </select>
           {#if sanctionLevel === "suspension"}
             <p class="mt-1 text-xs text-ash-500">
-              Leave expiry empty for permanent ban
+              {m.sanction_mgr_permanent_hint()}
             </p>
           {/if}
         </div>
 
         <div>
           <label for="sanction-category" class="block text-sm font-medium text-ash-400 mb-1">
-            Category *
+            {m.common_category()} *
           </label>
           <select
             id="sanction-category"
             bind:value={sanctionCategory}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
           >
-            <option value="deck_problem">Deck Problem</option>
-            <option value="procedural">Procedural</option>
-            <option value="cheating">Cheating</option>
-            <option value="unsporting">Unsporting Conduct</option>
-            <option value="other">Other</option>
+            <option value="deck_problem">{m.sanction_mgr_cat_deck_problem()}</option>
+            <option value="procedural">{m.sanction_mgr_cat_procedural()}</option>
+            <option value="cheating">{m.sanction_mgr_cat_cheating()}</option>
+            <option value="unsporting">{m.sanction_mgr_cat_unsporting()}</option>
+            <option value="other">{m.sanction_mgr_cat_other()}</option>
           </select>
         </div>
 
         <div>
           <label for="sanction-description" class="block text-sm font-medium text-ash-400 mb-1">
-            Description *
+            {m.common_description()} *
           </label>
           <textarea
             id="sanction-description"
             bind:value={sanctionDescription}
             rows="3"
-            placeholder="Describe the reason for this sanction..."
+            placeholder={m.sanction_mgr_description_placeholder()}
             required
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent resize-none"
           ></textarea>
@@ -310,7 +311,7 @@
         {#if expiryAllowed}
           <div>
             <label for="sanction-expires" class="block text-sm font-medium text-ash-400 mb-1">
-              Expires At {expiryRequired ? "*" : "(optional)"}
+              {m.sanction_mgr_expires_at()} {expiryRequired ? "*" : ""}
             </label>
             <input
               id="sanction-expires"
@@ -321,7 +322,7 @@
               class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
             />
             <p class="mt-1 text-xs text-ash-500">
-              Maximum 18 months from today
+              {m.sanction_mgr_max_expiry()}
             </p>
           </div>
         {/if}
@@ -332,7 +333,7 @@
             disabled={creatingSanction || !sanctionDescription.trim() || (expiryRequired && !sanctionExpiresAt)}
             class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            {creatingSanction ? "Issuing..." : "Issue Sanction"}
+            {creatingSanction ? m.sanction_mgr_issuing() : m.sanction_mgr_issue_btn()}
           </button>
           <button
             type="button"
@@ -340,7 +341,7 @@
             disabled={creatingSanction}
             class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
         </div>
       </form>
@@ -366,19 +367,19 @@
     >
       <div class="p-6 border-b border-ash-800">
         <div class="flex items-center justify-between">
-          <h2 id="edit-sanction-modal-title" class="text-xl font-medium text-bone-100">Edit Sanction</h2>
+          <h2 id="edit-sanction-modal-title" class="text-xl font-medium text-bone-100">{m.sanction_mgr_edit_title()}</h2>
           {#if editingSanction.lifted_at}
-            <span class="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">Lifted</span>
+            <span class="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">{m.sanction_lifted()}</span>
           {/if}
         </div>
         <p class="mt-1 text-xs text-ash-500">
-          Issued: {new Date(editingSanction.issued_at).toLocaleDateString()}
+          {m.sanction_issued({ date: new Date(editingSanction.issued_at).toLocaleDateString() })}
         </p>
       </div>
       <div class="p-6 space-y-4">
         <div>
           <label for="edit-sanction-level" class="block text-sm font-medium text-ash-400 mb-1">
-            Level
+            {m.common_level()}
           </label>
           <select
             id="edit-sanction-level"
@@ -386,17 +387,17 @@
             disabled={!!editingSanction.lifted_at}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:opacity-50"
           >
-            <option value="caution">Caution</option>
-            <option value="warning">Warning</option>
-            <option value="disqualification">Disqualification</option>
-            <option value="probation">Probation</option>
-            <option value="suspension">Suspension</option>
+            <option value="caution">{m.sanction_level_caution()}</option>
+            <option value="warning">{m.sanction_level_warning()}</option>
+            <option value="disqualification">{m.sanction_level_disqualification()}</option>
+            <option value="probation">{m.sanction_level_probation()}</option>
+            <option value="suspension">{m.sanction_level_suspension()}</option>
           </select>
         </div>
 
         <div>
           <label for="edit-sanction-category" class="block text-sm font-medium text-ash-400 mb-1">
-            Category
+            {m.common_category()}
           </label>
           <select
             id="edit-sanction-category"
@@ -404,17 +405,17 @@
             disabled={!!editingSanction.lifted_at}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:opacity-50"
           >
-            <option value="deck_problem">Deck Problem</option>
-            <option value="procedural">Procedural</option>
-            <option value="cheating">Cheating</option>
-            <option value="unsporting">Unsporting Conduct</option>
-            <option value="other">Other</option>
+            <option value="deck_problem">{m.sanction_mgr_cat_deck_problem()}</option>
+            <option value="procedural">{m.sanction_mgr_cat_procedural()}</option>
+            <option value="cheating">{m.sanction_mgr_cat_cheating()}</option>
+            <option value="unsporting">{m.sanction_mgr_cat_unsporting()}</option>
+            <option value="other">{m.sanction_mgr_cat_other()}</option>
           </select>
         </div>
 
         <div>
           <label for="edit-sanction-description" class="block text-sm font-medium text-ash-400 mb-1">
-            Description
+            {m.common_description()}
           </label>
           <textarea
             id="edit-sanction-description"
@@ -428,7 +429,7 @@
         {#if editExpiryAllowed}
           <div>
             <label for="edit-sanction-expires" class="block text-sm font-medium text-ash-400 mb-1">
-              Expires At {editExpiryRequired ? "*" : "(optional)"}
+              {m.sanction_mgr_expires_at()} {editExpiryRequired ? "*" : ""}
             </label>
             <input
               id="edit-sanction-expires"
@@ -440,7 +441,7 @@
               class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:opacity-50"
             />
             {#if editSanctionLevel === "suspension"}
-              <p class="mt-1 text-xs text-ash-500">Leave empty for permanent ban</p>
+              <p class="mt-1 text-xs text-ash-500">{m.sanction_mgr_permanent_hint()}</p>
             {/if}
           </div>
         {/if}
@@ -453,7 +454,7 @@
               disabled={processingSanctionAction || !editSanctionDescription.trim() || (editExpiryRequired && !editSanctionExpiresAt)}
               class="w-full px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
             >
-              {processingSanctionAction ? "Saving..." : "Save Changes"}
+              {processingSanctionAction ? m.common_saving() : m.sanction_mgr_save_changes()}
             </button>
           {/if}
 
@@ -466,7 +467,7 @@
                 class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
               >
                 <Icon icon="lucide:check-circle" class="inline w-4 h-4 mr-1" />
-                {processingSanctionAction ? "Lifting..." : "Lift"}
+                {processingSanctionAction ? m.sanction_mgr_lifting() : m.sanction_mgr_lift()}
               </button>
             {/if}
 
@@ -477,7 +478,7 @@
               class="flex-1 px-4 py-2 bg-crimson-800 hover:bg-crimson-700 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
             >
               <Icon icon="lucide:trash-2" class="inline w-4 h-4 mr-1" />
-              {processingSanctionAction ? "Deleting..." : "Delete"}
+              {processingSanctionAction ? m.common_deleting() : m.common_delete()}
             </button>
 
             <button
@@ -486,7 +487,7 @@
               disabled={processingSanctionAction}
               class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
           </div>
         </div>

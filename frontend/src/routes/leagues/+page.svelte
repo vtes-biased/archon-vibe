@@ -6,6 +6,7 @@
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import type { League, LeagueStandingsMode } from "$lib/types";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);
   let loaded = $state(false);
@@ -20,9 +21,9 @@
 
   function standingsModeLabel(mode: LeagueStandingsMode): string {
     switch (mode) {
-      case "RTP": return "Rating Points";
-      case "Score": return "GW/VP/TP";
-      case "GP": return "Grand Prix";
+      case "RTP": return m.league_standings_rtp();
+      case "Score": return m.league_standings_score();
+      case "GP": return m.league_standings_gp();
       default: return mode;
     }
   }
@@ -37,7 +38,7 @@
         const end = new Date(league.finish).toLocaleDateString(undefined, opts);
         return `${start} – ${end}`;
       }
-      return `${start} – ongoing`;
+      return `${start} – ${m.league_ongoing()}`;
     } catch {
       return league.start;
     }
@@ -99,21 +100,21 @@
 </script>
 
 <svelte:head>
-  <title>Leagues - Archon</title>
+  <title>{m.leagues_title()} - Archon</title>
 </svelte:head>
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-light text-crimson-500">Leagues</h1>
+      <h1 class="text-3xl font-light text-crimson-500">{m.leagues_title()}</h1>
 
       {#if canCreate}
         <a
           href="/leagues/new"
           class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors shadow-md"
         >
-          + New League
+          {m.league_new_btn()}
         </a>
       {/if}
     </div>
@@ -123,25 +124,25 @@
       <div class="flex flex-wrap gap-4 items-end">
         <!-- Search -->
         <div class="flex-1 min-w-[200px]">
-          <label for="search" class="block text-sm font-medium text-ash-400 mb-1">Search</label>
+          <label for="search" class="block text-sm font-medium text-ash-400 mb-1">{m.common_search()}</label>
           <input
             id="search"
             type="text"
             bind:value={searchQuery}
-            placeholder="Search by name..."
+            placeholder={m.league_search_placeholder()}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 placeholder:text-ash-600"
           />
         </div>
 
         <!-- Country -->
         <div class="min-w-[180px]">
-          <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">Country</label>
+          <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
           <select
             id="country-filter"
             bind:value={selectedCountry}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
           >
-            <option value="all">All Countries</option>
+            <option value="all">{m.league_all_countries()}</option>
             {#each Object.entries(countries) as [code, country]}
               <option value={code}>{country.name} {getCountryFlag(code)}</option>
             {/each}
@@ -155,7 +156,7 @@
             bind:checked={showPast}
             class="rounded border-ash-600 bg-dusk-950 text-crimson-500"
           />
-          Show past leagues
+          {m.league_show_past()}
         </label>
       </div>
     </div>
@@ -165,11 +166,11 @@
       <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
         <!-- Header (desktop) -->
         <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-ash-900 text-sm font-medium text-ash-300 border-b border-ash-700">
-          <div class="col-span-4">Name</div>
-          <div class="col-span-3">Dates</div>
-          <div class="col-span-2">Country</div>
-          <div class="col-span-2">Standings</div>
-          <div class="col-span-1">Kind</div>
+          <div class="col-span-4">{m.common_name()}</div>
+          <div class="col-span-3">{m.league_col_dates()}</div>
+          <div class="col-span-2">{m.common_country()}</div>
+          <div class="col-span-2">{m.league_col_standings()}</div>
+          <div class="col-span-1">{m.league_col_kind()}</div>
         </div>
 
         <div class="divide-y divide-ash-800">
@@ -188,7 +189,7 @@
                     </div>
                   </div>
                   <span class="px-2 py-1 rounded text-xs font-medium {isActive(league) ? 'bg-emerald-900/50 text-emerald-300' : 'bg-ash-800 text-ash-400'}">
-                    {isActive(league) ? "Active" : "Finished"}
+                    {isActive(league) ? m.league_status_active() : m.league_status_finished()}
                   </span>
                 </div>
                 <div class="flex gap-2 text-xs text-ash-500">
@@ -220,7 +221,7 @@
                   {#if league.country}
                     {getCountryFlag(league.country)} {countries[league.country]?.name || league.country}
                   {:else}
-                    Worldwide
+                    {m.league_worldwide()}
                   {/if}
                 </div>
                 <div class="col-span-2 text-sm text-ash-400">
@@ -238,29 +239,29 @@
       </div>
 
       <div class="mt-4 text-sm text-ash-400">
-        {leagues.length} league{leagues.length !== 1 ? "s" : ""}
+        {m.league_total_count({ count: String(leagues.length) })}
       </div>
     {:else if !loaded}
       <div class="text-center py-12">
         <div class="text-ash-500 mb-4">
           <Icon icon="lucide:loader-2" class="mx-auto h-12 w-12 animate-spin" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">Loading...</h3>
-        <p class="text-ash-400">Loading leagues from local storage.</p>
+        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.common_loading()}</h3>
+        <p class="text-ash-400">{m.league_loading_hint()}</p>
       </div>
     {:else}
       <div class="text-center py-12">
         <div class="text-ash-600 mb-4">
           <Icon icon="lucide:bar-chart-3" class="mx-auto h-12 w-12" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">No leagues found</h3>
+        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.league_no_results()}</h3>
         <p class="text-ash-400">
           {#if searchQuery.trim() || selectedCountry !== "all"}
-            Try adjusting your filters.
+            {m.league_adjust_filters()}
           {:else if !showPast}
-            No active leagues. Try enabling "Show past leagues".
+            {m.league_no_active()}
           {:else}
-            No leagues have been created yet.
+            {m.league_none_yet()}
           {/if}
         </p>
       </div>

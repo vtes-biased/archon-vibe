@@ -4,6 +4,7 @@
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
   const isDev = $derived(hasRole("DEV") || hasRole("IC"));
@@ -84,7 +85,7 @@
       newRedirectUris = "";
       newScopes = ["profile:read"];
       await loadClients();
-      showToast({ type: "success", message: "Client registered" });
+      showToast({ type: "success", message: m.developer_client_registered() });
     } catch {
       // handled by apiRequest
     }
@@ -101,7 +102,7 @@
       displayedSecret = result.client_secret;
       displayedClientId = result.client_id;
       confirmAction = null;
-      showToast({ type: "success", message: "Secret regenerated" });
+      showToast({ type: "success", message: m.developer_secret_regenerated() });
     } catch {
       // handled
     }
@@ -112,7 +113,7 @@
       await apiRequest(`/oauth/clients/${clientId}`, { method: "DELETE" });
       confirmAction = null;
       await loadClients();
-      showToast({ type: "success", message: "Client deactivated" });
+      showToast({ type: "success", message: m.developer_client_deactivated() });
     } catch {
       // handled
     }
@@ -120,7 +121,7 @@
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
-    showToast({ type: "success", message: "Copied to clipboard" });
+    showToast({ type: "success", message: m.developer_copied() });
   }
 
   function toggleScope(scope: string) {
@@ -133,21 +134,21 @@
 </script>
 
 <svelte:head>
-  <title>Developer Portal - Archon</title>
+  <title>{m.developer_page_title()} - Archon</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto p-4 sm:p-8">
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h1 class="text-2xl font-light text-bone-100">Developer Portal</h1>
-      <p class="text-ash-400 text-sm">Manage your OAuth applications</p>
+      <h1 class="text-2xl font-light text-bone-100">{m.developer_title()}</h1>
+      <p class="text-ash-400 text-sm">{m.developer_subtitle()}</p>
     </div>
     <button
       onclick={() => (showRegister = !showRegister)}
       class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
     >
       <Icon icon="lucide:plus" class="w-4 h-4" />
-      Register App
+      {m.developer_register_btn()}
     </button>
   </div>
 
@@ -158,7 +159,7 @@
         <Icon icon="lucide:alert-triangle" class="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
         <div class="flex-1 min-w-0">
           <p class="text-yellow-200 text-sm font-medium mb-2">
-            Save this client secret now. It will not be shown again.
+            {m.developer_secret_warning()}
           </p>
           <div class="flex items-center gap-2">
             <code class="text-xs bg-dusk-900 px-3 py-2 rounded text-bone-200 break-all flex-1">
@@ -167,19 +168,19 @@
             <button
               onclick={() => copyToClipboard(displayedSecret!)}
               class="p-2 bg-dusk-900 hover:bg-dusk-800 rounded transition-colors shrink-0"
-              title="Copy secret"
+              title={m.developer_copy_secret()}
             >
               <Icon icon="lucide:copy" class="w-4 h-4 text-ash-300" />
             </button>
           </div>
           {#if displayedClientId}
-            <p class="text-ash-400 text-xs mt-2">Client ID: {displayedClientId}</p>
+            <p class="text-ash-400 text-xs mt-2">{m.developer_client_id_label({ id: displayedClientId })}</p>
           {/if}
           <button
             onclick={() => { displayedSecret = null; displayedClientId = null; }}
             class="text-xs text-ash-400 hover:text-ash-200 mt-2"
           >
-            Dismiss
+            {m.toast_dismiss()}
           </button>
         </div>
       </div>
@@ -189,10 +190,10 @@
   <!-- Register form -->
   {#if showRegister}
     <div class="mb-6 bg-dusk-950 rounded-lg border border-ash-800 p-6">
-      <h2 class="text-lg font-medium text-bone-100 mb-4">Register New Application</h2>
+      <h2 class="text-lg font-medium text-bone-100 mb-4">{m.developer_register_title()}</h2>
       <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }} class="space-y-4">
         <div>
-          <label for="app-name" class="block text-sm text-ash-400 mb-1">Application Name</label>
+          <label for="app-name" class="block text-sm text-ash-400 mb-1">{m.developer_app_name()}</label>
           <input
             type="text"
             id="app-name"
@@ -202,7 +203,7 @@
           />
         </div>
         <div>
-          <label for="redirect-uris" class="block text-sm text-ash-400 mb-1">Redirect URIs (one per line)</label>
+          <label for="redirect-uris" class="block text-sm text-ash-400 mb-1">{m.developer_redirect_uris()}</label>
           <textarea
             id="redirect-uris"
             bind:value={newRedirectUris}
@@ -212,7 +213,7 @@
           ></textarea>
         </div>
         <div>
-          <label class="block text-sm text-ash-400 mb-2">Scopes</label>
+          <label class="block text-sm text-ash-400 mb-2">{m.developer_scopes()}</label>
           <div class="space-y-2">
             <label class="flex items-center gap-3 cursor-pointer">
               <input
@@ -223,7 +224,7 @@
               />
               <div>
                 <span class="text-bone-200 text-sm">profile:read</span>
-                <p class="text-ash-500 text-xs">Read basic profile (roles, VEKN ID)</p>
+                <p class="text-ash-500 text-xs">{m.developer_scope_profile_read_desc()}</p>
               </div>
             </label>
             <label class="flex items-center gap-3 cursor-pointer">
@@ -235,7 +236,7 @@
               />
               <div>
                 <span class="text-bone-200 text-sm">user:impersonate</span>
-                <p class="text-ash-500 text-xs">Act on behalf of the user on API endpoints</p>
+                <p class="text-ash-500 text-xs">{m.developer_scope_impersonate_desc()}</p>
               </div>
             </label>
           </div>
@@ -246,7 +247,7 @@
             onclick={() => (showRegister = false)}
             class="flex-1 py-3 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
           <button
             type="submit"
@@ -256,7 +257,7 @@
             {#if registering}
               <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
             {/if}
-            Register
+            {m.developer_register_submit()}
           </button>
         </div>
       </form>
@@ -271,8 +272,8 @@
   {:else if clients.length === 0}
     <div class="text-center py-12">
       <Icon icon="lucide:code-2" class="w-12 h-12 text-ash-600 mx-auto mb-4" />
-      <p class="text-ash-400">No OAuth applications registered yet.</p>
-      <p class="text-ash-500 text-sm mt-1">Click "Register App" to get started.</p>
+      <p class="text-ash-400">{m.developer_no_clients()}</p>
+      <p class="text-ash-500 text-sm mt-1">{m.developer_no_clients_hint()}</p>
     </div>
   {:else}
     <div class="space-y-4">
@@ -283,29 +284,29 @@
               <div class="flex items-center gap-2">
                 <h3 class="text-bone-100 font-medium">{client.name}</h3>
                 {#if client.active}
-                  <span class="px-2 py-0.5 bg-green-900/30 text-green-400 text-xs rounded-full">Active</span>
+                  <span class="px-2 py-0.5 bg-green-900/30 text-green-400 text-xs rounded-full">{m.developer_status_active()}</span>
                 {:else}
-                  <span class="px-2 py-0.5 bg-red-900/30 text-red-400 text-xs rounded-full">Inactive</span>
+                  <span class="px-2 py-0.5 bg-red-900/30 text-red-400 text-xs rounded-full">{m.developer_status_inactive()}</span>
                 {/if}
               </div>
               <div class="mt-2 space-y-1">
                 <div class="flex items-center gap-2">
-                  <span class="text-ash-500 text-xs">Client ID:</span>
+                  <span class="text-ash-500 text-xs">{m.developer_client_id()}</span>
                   <code class="text-xs text-ash-300 bg-dusk-900 px-2 py-0.5 rounded">{client.client_id}</code>
                   <button
                     onclick={() => copyToClipboard(client.client_id)}
                     class="text-ash-500 hover:text-ash-300"
-                    title="Copy"
+                    title={m.developer_copy()}
                   >
                     <Icon icon="lucide:copy" class="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <div class="flex items-center gap-2">
-                  <span class="text-ash-500 text-xs">Scopes:</span>
+                  <span class="text-ash-500 text-xs">{m.developer_scopes_label()}</span>
                   <span class="text-xs text-ash-300">{client.scopes.join(", ")}</span>
                 </div>
                 <div class="text-xs text-ash-500">
-                  Redirect URIs: {client.redirect_uris.join(", ")}
+                  {m.developer_redirect_uris_label({ uris: client.redirect_uris.join(", ") })}
                 </div>
               </div>
             </div>
@@ -314,14 +315,14 @@
                 <button
                   onclick={() => (confirmAction = { clientId: client.client_id, action: "regenerate" })}
                   class="p-2 text-ash-400 hover:text-ash-200 hover:bg-dusk-900 rounded transition-colors"
-                  title="Regenerate secret"
+                  title={m.developer_regenerate_title()}
                 >
                   <Icon icon="lucide:refresh-cw" class="w-4 h-4" />
                 </button>
                 <button
                   onclick={() => (confirmAction = { clientId: client.client_id, action: "deactivate" })}
                   class="p-2 text-red-400 hover:text-red-300 hover:bg-dusk-900 rounded transition-colors"
-                  title="Deactivate"
+                  title={m.developer_deactivate_title()}
                 >
                   <Icon icon="lucide:power-off" class="w-4 h-4" />
                 </button>
@@ -347,41 +348,41 @@
         aria-labelledby="confirm-dialog-title"
       >
         {#if confirmAction.action === "regenerate"}
-          <h3 id="confirm-dialog-title" class="text-bone-100 font-medium mb-2">Regenerate Secret?</h3>
+          <h3 id="confirm-dialog-title" class="text-bone-100 font-medium mb-2">{m.developer_confirm_regenerate()}</h3>
           <p class="text-ash-400 text-sm mb-4">
-            This will invalidate the current client secret. All existing integrations using the old secret will stop working.
+            {m.developer_confirm_regenerate_msg()}
           </p>
           <div class="flex gap-3">
             <button
               onclick={() => (confirmAction = null)}
               class="flex-1 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg text-sm transition-colors"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
             <button
               onclick={() => handleRegenerate(confirmAction!.clientId)}
               class="flex-1 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg text-sm transition-colors"
             >
-              Regenerate
+              {m.developer_regenerate_btn()}
             </button>
           </div>
         {:else}
-          <h3 id="confirm-dialog-title" class="text-bone-100 font-medium mb-2">Deactivate Client?</h3>
+          <h3 id="confirm-dialog-title" class="text-bone-100 font-medium mb-2">{m.developer_confirm_deactivate()}</h3>
           <p class="text-ash-400 text-sm mb-4">
-            This will deactivate the OAuth client. All tokens issued by this client will stop working.
+            {m.developer_confirm_deactivate_msg()}
           </p>
           <div class="flex gap-3">
             <button
               onclick={() => (confirmAction = null)}
               class="flex-1 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg text-sm transition-colors"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
             <button
               onclick={() => handleDeactivate(confirmAction!.clientId)}
               class="flex-1 py-2 bg-red-700 hover:bg-red-600 text-bone-100 rounded-lg text-sm transition-colors"
             >
-              Deactivate
+              {m.developer_deactivate_btn()}
             </button>
           </div>
         {/if}

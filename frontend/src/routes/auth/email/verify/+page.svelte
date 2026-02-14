@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "$lib/stores/auth.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
 
@@ -20,7 +21,7 @@
     const token = params.get("token");
 
     if (!token) {
-      error = "Missing verification token";
+      error = m.auth_verify_error_missing_token();
       verifying = false;
       return;
     }
@@ -42,12 +43,12 @@
 
     // Validate
     if (password.length < 8) {
-      passwordError = "Password must be at least 8 characters";
+      passwordError = m.auth_verify_error_password_length();
       return;
     }
 
     if (!verifyResult) {
-      passwordError = "Session expired. Please request a new link.";
+      passwordError = m.auth_verify_error_session_expired();
       return;
     }
 
@@ -61,19 +62,19 @@
   }
 
   const isSignup = $derived(verifyResult?.purpose === "signup");
-  const heading = $derived(isSignup ? "Set your password" : "Reset your password");
-  const buttonText = $derived(isSignup ? "Create Account" : "Reset Password");
+  const heading = $derived(isSignup ? m.auth_verify_set_password() : m.auth_verify_reset_password());
+  const buttonText = $derived(isSignup ? m.auth_verify_create_account() : m.auth_verify_reset_btn());
 </script>
 
 <svelte:head>
-  <title>{isSignup ? "Complete Signup" : "Reset Password"} - Archon</title>
+  <title>{isSignup ? m.auth_verify_title_signup() : m.auth_verify_title_reset()} - Archon</title>
 </svelte:head>
 
 <div class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
       <h1 class="text-4xl font-light text-crimson-500 mb-2">Archon</h1>
-      <p class="text-ash-400">VEKN Tournament Management</p>
+      <p class="text-ash-400">{m.common_tagline()}</p>
     </div>
 
     <div class="bg-dusk-950 rounded-lg shadow-lg p-8 border border-ash-800">
@@ -83,8 +84,8 @@
           <div class="w-16 h-16 mx-auto flex items-center justify-center">
             <Icon icon="lucide:loader-2" class="w-10 h-10 animate-spin text-crimson-500" />
           </div>
-          <h2 class="text-lg font-medium text-bone-100">Verifying link...</h2>
-          <p class="text-ash-400 text-sm">Please wait</p>
+          <h2 class="text-lg font-medium text-bone-100">{m.auth_verify_verifying()}</h2>
+          <p class="text-ash-400 text-sm">{m.auth_verify_please_wait()}</p>
         </div>
 
       {:else if error}
@@ -93,16 +94,16 @@
           <div class="w-16 h-16 mx-auto bg-red-900/30 rounded-full flex items-center justify-center">
             <Icon icon="lucide:x" class="w-8 h-8 text-red-400" />
           </div>
-          <h2 class="text-lg font-medium text-bone-100">Link expired or invalid</h2>
+          <h2 class="text-lg font-medium text-bone-100">{m.auth_verify_link_invalid()}</h2>
           <p class="text-ash-400 text-sm">{error}</p>
           <p class="text-ash-500 text-xs">
-            The link may have expired or already been used.
+            {m.auth_verify_link_expired_msg()}
           </p>
           <a
             href="/login"
             class="inline-block mt-4 px-6 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg font-medium transition-colors"
           >
-            Back to Login
+            {m.auth_verify_back_to_login()}
           </a>
         </div>
 
@@ -118,7 +119,7 @@
 
           <form onsubmit={(e) => { e.preventDefault(); handleSetPassword(); }} class="space-y-4">
             <div>
-              <label for="email" class="block text-sm text-ash-400 mb-1">Email</label>
+              <label for="email" class="block text-sm text-ash-400 mb-1">{m.common_email()}</label>
               <input
                 type="email"
                 id="email"
@@ -131,14 +132,14 @@
             </div>
 
             <div>
-              <label for="new-password" class="block text-sm text-ash-400 mb-1">Password</label>
+              <label for="new-password" class="block text-sm text-ash-400 mb-1">{m.common_password()}</label>
               <input
                 type="password"
                 id="new-password"
                 name="new-password"
                 autocomplete="new-password"
                 bind:value={password}
-                placeholder="At least 8 characters"
+                placeholder={m.auth_verify_password_placeholder()}
                 disabled={auth.isLoading}
                 minlength="8"
                 required
@@ -159,7 +160,7 @@
           </form>
 
           <p class="text-center text-xs text-ash-500 mt-4">
-            Your password must be at least 8 characters.
+            {m.auth_verify_password_hint()}
           </p>
         </div>
       {/if}

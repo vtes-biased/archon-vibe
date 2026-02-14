@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Sanction, SanctionLevel } from "$lib/types";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let { sanction }: { sanction: Sanction } = $props();
 
@@ -43,17 +44,17 @@
     },
   };
 
-  const levelLabels: Record<SanctionLevel, string> = {
-    caution: "Caution",
-    warning: "Warning",
-    disqualification: "DQ",
-    suspension: "Suspension",
-    probation: "Probation",
-    score_adjustment: "Score Adj",
+  const levelLabelFns: Record<SanctionLevel, () => string> = {
+    caution: () => m.sanction_level_caution(),
+    warning: () => m.sanction_level_warning(),
+    disqualification: () => m.sanction_level_dq(),
+    suspension: () => m.sanction_level_suspension(),
+    probation: () => m.sanction_level_probation(),
+    score_adjustment: () => m.sanction_level_score_adj(),
   };
 
   const colors = $derived(SANCTION_COLORS[sanction.level]);
-  const label = $derived(levelLabels[sanction.level]);
+  const label = $derived(levelLabelFns[sanction.level]());
 
   // Format date for tooltip
   const formatDate = (dateStr: string) => {
@@ -61,15 +62,15 @@
   };
 
   const tooltipText = $derived(() => {
-    let text = `${label}: ${sanction.description}\nIssued: ${formatDate(sanction.issued_at)}`;
+    let text = `${label}: ${sanction.description}\n${m.sanction_issued({ date: formatDate(sanction.issued_at) })}`;
     if (sanction.expires_at) {
-      text += `\nExpires: ${formatDate(sanction.expires_at)}`;
+      text += `\n${m.sanction_expires({ date: formatDate(sanction.expires_at) })}`;
     }
     if (isLifted && sanction.lifted_at) {
-      text += `\nLifted: ${formatDate(sanction.lifted_at)}`;
+      text += `\n${m.sanction_lifted_date({ date: formatDate(sanction.lifted_at) })}`;
     }
     if (isPermanent) {
-      text += "\nPermanent ban";
+      text += `\n${m.sanction_permanent_ban()}`;
     }
     return text;
   });
@@ -86,8 +87,8 @@
   {/if}
   {label}
   {#if isLifted}
-    <span title="Lifted"><Icon icon="lucide:check" class="w-3 h-3" /></span>
+    <span title={m.sanction_lifted()}><Icon icon="lucide:check" class="w-3 h-3" /></span>
   {:else if isExpired()}
-    <span title="Expired"><Icon icon="lucide:clock" class="w-3 h-3" /></span>
+    <span title={m.sanction_expired()}><Icon icon="lucide:clock" class="w-3 h-3" /></span>
   {/if}
 </span>

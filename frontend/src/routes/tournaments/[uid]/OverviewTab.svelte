@@ -4,6 +4,7 @@
   import { computeRatingPoints } from "$lib/engine";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   interface StandingEntry {
     user_uid: string;
@@ -77,12 +78,12 @@
       {tournament.state}
     </span>
     <span class="text-sm text-ash-400">
-      {registeredCount} player{registeredCount !== 1 ? "s" : ""}
+      {m.overview_player_count({ count: String(registeredCount) })}
       {#if hasRounds}
-        · {tournament.rounds.length} round{tournament.rounds.length !== 1 ? "s" : ""}
+        · {m.overview_round_count({ count: String(tournament.rounds.length) })}
       {/if}
       {#if isFinals}
-        · Finals in progress
+        · {m.overview_finals_in_progress()}
       {/if}
     </span>
   </div>
@@ -90,7 +91,7 @@
   <!-- Winner display -->
   {#if tournament.winner}
     <div class="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4">
-      <div class="text-ash-500 text-sm">Winner</div>
+      <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
       <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
     </div>
   {/if}
@@ -98,14 +99,14 @@
   <!-- Transition actions (organizer only) -->
   {#if isOrganizer}
     <div class="bg-ash-900/30 rounded-lg p-4 space-y-3">
-      <h3 class="text-sm font-medium text-ash-300">Actions</h3>
+      <h3 class="text-sm font-medium text-ash-300">{m.overview_actions()}</h3>
 
       {#if tournament.state === "Planned"}
         <button
           onclick={() => doAction("OpenRegistration")}
           disabled={actionLoading}
           class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
-        >{actionLoading ? "..." : "Open Registration"}</button>
+        >{actionLoading ? "..." : m.overview_open_registration()}</button>
 
       {:else if tournament.state === "Registration"}
         <div class="flex flex-wrap gap-2">
@@ -113,12 +114,12 @@
             onclick={() => doAction("CloseRegistration")}
             disabled={actionLoading}
             class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded-lg transition-colors"
-          >Close Registration & Start Check-in</button>
+          >{m.overview_close_registration()}</button>
           <button
             onclick={() => doAction("CancelRegistration")}
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
-          >Back to Planning</button>
+          >{m.overview_back_to_planning()}</button>
         </div>
 
       {:else if tournament.state === "Waiting"}
@@ -126,21 +127,21 @@
           <!-- Guidance -->
           <div class="text-sm text-ash-300">
             {#if hasFinalsCandidate}
-              Round {tournament.rounds.length} complete.
+              {m.overview_round_complete({ n: String(tournament.rounds.length) })}
               {#if top5HasTies()}
-                <span class="text-amber-300">Resolve ties in top 5 before starting finals.</span>
+                <span class="text-amber-300">{m.overview_resolve_ties()}</span>
               {:else}
-                <span class="text-emerald-300">Finals ready!</span>
+                <span class="text-emerald-300">{m.overview_finals_ready()}</span>
               {/if}
             {:else if hasRounds}
-              Round {tournament.rounds.length} complete. Check in players for the next round.
+              {m.overview_round_complete_checkin({ n: String(tournament.rounds.length) })}
             {:else}
-              Check in registered players to start.
+              {m.overview_checkin_to_start()}
             {/if}
           </div>
 
           <div class="flex flex-wrap gap-2">
-            <span class="text-sm text-ash-400">{checkedInCount} / {registeredCount - finishedPlayerCount} checked in</span>
+            <span class="text-sm text-ash-400">{m.overview_checked_in_count({ checked: String(checkedInCount), total: String(registeredCount - finishedPlayerCount) })}</span>
           </div>
 
           <div class="flex flex-wrap gap-2">
@@ -149,31 +150,31 @@
                 onclick={() => doAction("ResetCheckIn")}
                 disabled={actionLoading}
                 class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-              >Reset Check-In</button>
+              >{m.overview_reset_checkin()}</button>
             {/if}
             <button
               onclick={() => doAction("CheckInAll")}
               disabled={actionLoading}
               class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-            >Check All In</button>
+            >{m.overview_check_all_in()}</button>
             <button
               onclick={() => doAction("StartRound")}
               disabled={actionLoading || checkedInCount < 4}
               class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
-            >Start Round {(tournament.rounds?.length ?? 0) + 1}</button>
+            >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
             {#if finalsReady}
               <button
                 onclick={() => doAction("StartFinals")}
                 disabled={actionLoading}
                 class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
-              >Start Finals</button>
+              >{m.overview_start_finals()}</button>
             {/if}
           </div>
 
           <!-- Seating warnings -->
           {#if [6, 7, 11].includes(checkedInCount)}
             <div class="bg-amber-900/20 border border-amber-800 rounded-lg p-3">
-              <p class="text-amber-300 text-sm">{checkedInCount} players cannot be seated (impossible configuration).</p>
+              <p class="text-amber-300 text-sm">{m.overview_seating_warning({ count: String(checkedInCount) })}</p>
             </div>
           {/if}
 
@@ -183,32 +184,32 @@
               onclick={() => doAction("FinishTournament")}
               disabled={actionLoading}
               class="px-4 py-2 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-            >Finish Tournament</button>
+            >{m.overview_finish_tournament()}</button>
             <button
               onclick={() => doAction("ReopenRegistration")}
               disabled={actionLoading}
               class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
-            >Reopen Registration</button>
+            >{m.overview_reopen_registration()}</button>
           </div>
         </div>
 
       {:else if tournament.state === "Playing"}
         <p class="text-ash-400 text-sm">
           {#if isFinals}
-            Finals in progress. Manage scoring in the Finals tab.
+            {m.overview_finals_manage()}
           {:else}
-            Round {tournament.rounds.length} in progress. Manage scoring in the Rounds tab.
+            {m.overview_round_manage({ n: String(tournament.rounds.length) })}
           {/if}
         </p>
 
       {:else if tournament.state === "Finished"}
-        <p class="text-ash-400 text-sm">Tournament is finished.</p>
+        <p class="text-ash-400 text-sm">{m.overview_tournament_finished()}</p>
         <div class="flex flex-wrap gap-2 mt-2">
           <button
             onclick={() => doAction("ReopenTournament")}
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
-          >Reopen Tournament</button>
+          >{m.overview_reopen_tournament()}</button>
         </div>
       {/if}
     </div>
@@ -217,18 +218,18 @@
   <!-- Summary standings (top 5) -->
   {#if standings.length > 0}
     <div class="bg-ash-900/30 rounded-lg p-4">
-      <h3 class="text-sm font-medium text-ash-300 mb-2">Top Standings</h3>
+      <h3 class="text-sm font-medium text-ash-300 mb-2">{m.overview_top_standings()}</h3>
       <table class="w-full text-sm">
         <thead>
           <tr class="text-ash-500 text-xs">
-            <th class="text-left py-1 pr-2">#</th>
-            <th class="text-left py-1 pr-2">Player</th>
-            <th class="text-right py-1 px-2">Score</th>
+            <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
+            <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
+            <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
             {#if hasFinals}
-              <th class="text-right py-1 px-2">Finals</th>
+              <th class="text-right py-1 px-2">{m.tournament_col_finals()}</th>
             {/if}
             {#if isFinished}
-              <th class="text-right py-1 px-2">Rating</th>
+              <th class="text-right py-1 px-2">{m.tournament_col_rating()}</th>
             {/if}
           </tr>
         </thead>

@@ -3,6 +3,7 @@
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     tournament,
@@ -79,12 +80,12 @@
         href="{API_URL}/api/tournaments/{tournament.uid}/report?format=text"
         class="px-3 py-1.5 text-sm bg-ash-800 text-ash-200 hover:bg-ash-700 rounded-lg transition-colors"
         download
-      >Download Report (Text)</a>
+      >{m.decks_download_report_text()}</a>
       <a
         href="{API_URL}/api/tournaments/{tournament.uid}/report?format=json"
         class="px-3 py-1.5 text-sm bg-ash-800 text-ash-200 hover:bg-ash-700 rounded-lg transition-colors"
         download
-      >Download Report (JSON)</a>
+      >{m.decks_download_report_json()}</a>
     </div>
   {/if}
 
@@ -92,13 +93,13 @@
   {#if tournament.decklist_required && (tournament.state === 'Registration' || tournament.state === 'Waiting')}
     <div class="bg-amber-900/30 border border-amber-700/50 rounded-lg p-3 text-sm text-amber-200">
       {#if isOrganizer}
-        Decklists are required. Players checking in without a decklist will receive a warning.
+        {m.decks_required_organizer_hint()}
       {:else if isPlayer && myDecks.length === 0}
-        A decklist is required for this tournament. Please upload your deck before check-in to avoid a warning sanction.
+        {m.decks_required_player_hint()}
       {:else if isPlayer}
-        Decklist submitted. You can replace it until the tournament starts.
+        {m.decks_required_submitted()}
       {:else}
-        Decklists are required for this tournament.
+        {m.decks_required_notice()}
       {/if}
     </div>
   {/if}
@@ -107,11 +108,11 @@
   {#if tournament.state === 'Finished' && winnerUid && !winnerHasDeck}
     {#if isWinner}
       <div class="bg-crimson-900/30 border border-crimson-700/50 rounded-lg p-3 text-sm text-crimson-200">
-        Congratulations on your win! Your decklist is missing — please upload it so it can be preserved in the tournament records.
+        {m.decks_winner_nudge_self()}
       </div>
     {:else if isOrganizer}
       <div class="bg-amber-900/30 border border-amber-700/50 rounded-lg p-3 text-sm text-amber-200">
-        Winner's decklist is missing. Please remind {playerInfo[winnerUid]?.name ?? 'the winner'} to upload their deck.
+        {m.decks_winner_nudge_organizer({ name: playerInfo[winnerUid]?.name ?? 'the winner' })}
       </div>
     {/if}
   {/if}
@@ -119,7 +120,7 @@
   <!-- Player's own deck upload -->
   {#if isPlayer && !isOrganizer}
     <div class="bg-ash-900/50 rounded-lg p-4">
-      <h3 class="text-sm font-semibold text-bone-200 mb-3">My Deck</h3>
+      <h3 class="text-sm font-semibold text-bone-200 mb-3">{m.decks_my_deck()}</h3>
       {#if myDecks.length > 0 && myDecks[0]}
         <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} />
         {#if canPlayerUpload}
@@ -127,11 +128,11 @@
             <button
               onclick={() => uploadingFor = myUid}
               class="text-sm text-crimson-400 hover:text-crimson-300"
-            >Replace deck</button>
+            >{m.decks_replace()}</button>
           </div>
         {/if}
       {:else}
-        <p class="text-sm text-ash-400 mb-3">No deck uploaded yet</p>
+        <p class="text-sm text-ash-400 mb-3">{m.decks_no_deck_yet()}</p>
       {/if}
       {#if canPlayerUpload && (uploadingFor === myUid || myDecks.length === 0)}
         <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
@@ -143,9 +144,9 @@
   {#if isOrganizer}
     <div class="space-y-3">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-bone-200">Player Decks</h3>
+        <h3 class="text-sm font-semibold text-bone-200">{m.decks_player_decks()}</h3>
         <span class="text-xs text-ash-500">
-          {Object.keys(tournament.decks ?? {}).length} / {tournament.players?.length ?? 0} submitted
+          {m.decks_submitted_count({ submitted: String(Object.keys(tournament.decks ?? {}).length), total: String(tournament.players?.length ?? 0) })}
         </span>
       </div>
 
@@ -160,7 +161,7 @@
           >
             <span class="text-sm text-ash-200">{info?.name ?? uid}</span>
             <span class="text-xs {decks.length ? 'text-emerald-400' : tournament.decklist_required ? 'text-amber-400' : 'text-ash-500'}">
-              {decks.length ? `${decks.length} deck(s)` : tournament.decklist_required ? 'Missing!' : 'No deck'}
+              {decks.length ? m.decks_deck_count({ count: String(decks.length) }) : tournament.decklist_required ? m.decks_missing() : m.decks_no_deck()}
             </span>
           </button>
 
@@ -172,7 +173,7 @@
               <button
                 onclick={() => uploadingFor = uid}
                 class="text-sm text-crimson-400 hover:text-crimson-300"
-              >{decks.length ? 'Replace deck' : 'Upload deck'}</button>
+              >{decks.length ? m.decks_replace() : m.decks_upload()}</button>
               {#if uploadingFor === uid}
                 <DeckUpload tournamentUid={tournament.uid} playerUid={uid} onuploaded={onUploaded} />
               {/if}
@@ -189,7 +190,7 @@
       {#if uid !== myUid}
         <div class="bg-ash-900/50 rounded-lg p-4">
           <h3 class="text-sm font-semibold text-bone-200 mb-2">
-            {playerInfo[uid]?.name ?? uid}'s Deck
+            {m.decks_player_deck({ name: playerInfo[uid]?.name ?? uid })}
           </h3>
           {#each decks as deck}
             <DeckDisplay {deck} />

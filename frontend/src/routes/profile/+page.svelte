@@ -19,6 +19,7 @@
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import { syncManager } from "$lib/sync";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -60,15 +61,15 @@
     const error = params.get("error");
 
     if (discordLinked === "success") {
-      discordMessage = "Discord linked successfully!";
+      discordMessage = m.profile_discord_linked();
       // Refresh auth state to get updated auth methods
       await initAuth();
     } else if (discordLinked === "already") {
-      discordMessage = "Discord is already linked to this account.";
+      discordMessage = m.profile_discord_already();
     } else if (error === "merge_failed") {
-      discordError = "Failed to merge accounts. Please try again.";
+      discordError = m.profile_discord_merge_failed();
     } else if (error) {
-      discordError = `Discord linking error: ${error}`;
+      discordError = m.profile_discord_error({ error });
     }
 
     // Clear URL params
@@ -81,9 +82,9 @@
     try {
       isSyncing = true;
       await syncManager.refresh();
-      showToast({ type: "success", message: "Data resynchronized successfully" });
+      showToast({ type: "success", message: m.profile_resync_success() });
     } catch (e) {
-      showToast({ type: "error", message: e instanceof Error ? e.message : "Failed to resync" });
+      showToast({ type: "error", message: e instanceof Error ? e.message : m.profile_resync_failed() });
     } finally {
       isSyncing = false;
     }
@@ -133,7 +134,7 @@
     const success = await registerPasskey();
     registeringPasskey = false;
     if (success) {
-      passkeyMessage = "Passkey registered successfully!";
+      passkeyMessage = m.profile_passkey_registered();
     }
   }
 
@@ -141,7 +142,7 @@
     // Redirect to Discord OAuth with link=true and token for auth
     const token = getAccessToken();
     if (!token) {
-      discordError = "Not authenticated. Please log in again.";
+      discordError = m.profile_not_authenticated();
       return;
     }
     window.location.href = `${API_BASE}/auth/discord/authorize?link=true&token=${encodeURIComponent(token)}`;
@@ -200,44 +201,44 @@
 
   // Check if user has a passkey
   const hasPasskey = $derived(
-    auth.isAuthenticated && auth.authMethods.some((m) => m.type === "passkey")
+    auth.isAuthenticated && auth.authMethods.some((am) => am.type === "passkey")
   );
 
   // Check if user has Discord linked
   const hasDiscord = $derived(
-    auth.isAuthenticated && auth.authMethods.some((m) => m.type === "discord")
+    auth.isAuthenticated && auth.authMethods.some((am) => am.type === "discord")
   );
 
   // Get Discord username if linked
   const discordUsername = $derived(
-    auth.authMethods.find((m) => m.type === "discord")?.identifier || null
+    auth.authMethods.find((am) => am.type === "discord")?.identifier || null
   );
 </script>
 
 <svelte:head>
-  <title>Profile - Archon</title>
+  <title>{m.profile_page_title()} - Archon</title>
 </svelte:head>
 
 <div class="p-4 sm:p-8">
   <div class="max-w-2xl mx-auto">
-    <h1 class="text-3xl font-light text-crimson-500 mb-6">Profile</h1>
+    <h1 class="text-3xl font-light text-crimson-500 mb-6">{m.nav_profile()}</h1>
 
     {#if auth.isLoading}
       <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-        <div class="text-ash-400">Loading...</div>
+        <div class="text-ash-400">{m.common_loading()}</div>
       </div>
     {:else if !auth.isAuthenticated || !auth.user}
       <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
         <div class="text-ash-500 mb-4">
           <Icon icon="lucide:user" class="mx-auto h-16 w-16" />
         </div>
-        <h2 class="text-xl font-medium text-bone-100 mb-2">Sign in Required</h2>
-        <p class="text-ash-400 mb-6">Please sign in to view your profile.</p>
+        <h2 class="text-xl font-medium text-bone-100 mb-2">{m.profile_sign_in_required()}</h2>
+        <p class="text-ash-400 mb-6">{m.profile_sign_in_msg()}</p>
         <a
           href="/login"
           class="inline-block px-6 py-3 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg font-medium transition-colors"
         >
-          Sign In
+          {m.login_sign_in()}
         </a>
       </div>
     {:else}
@@ -247,7 +248,7 @@
         <!-- Edit Mode -->
         <div class="bg-dusk-950 rounded-lg shadow border border-ash-800">
           <div class="p-6 border-b border-ash-800">
-            <h2 class="text-xl font-medium text-bone-100">Edit Profile</h2>
+            <h2 class="text-xl font-medium text-bone-100">{m.profile_edit_title()}</h2>
           </div>
 
           <form
@@ -259,7 +260,7 @@
           >
             <div>
               <label for="edit-name" class="block text-sm font-medium text-ash-400 mb-1">
-                Name
+                {m.common_name()}
               </label>
               <input
                 id="edit-name"
@@ -271,7 +272,7 @@
 
             <div>
               <label for="edit-nickname" class="block text-sm font-medium text-ash-400 mb-1">
-                Nickname
+                {m.common_nickname()}
               </label>
               <input
                 id="edit-nickname"
@@ -283,7 +284,7 @@
 
             <div>
               <label for="edit-country" class="block text-sm font-medium text-ash-400 mb-1">
-                Country
+                {m.common_country()}
               </label>
               <select
                 id="edit-country"
@@ -293,7 +294,7 @@
                 }}
                 class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
               >
-                <option value="">Select a country...</option>
+                <option value="">{m.user_country_placeholder()}</option>
                 {#each sortedCountries as country}
                   <option value={country.iso_code}>
                     {country.name} {getCountryFlag(country.iso_code)}
@@ -304,7 +305,7 @@
 
             <div>
               <label for="edit-city" class="block text-sm font-medium text-ash-400 mb-1">
-                City
+                {m.common_city()}
               </label>
               <CityAutocomplete
                 bind:value={editCity}
@@ -312,13 +313,13 @@
                 disabled={!editCountry}
               />
               {#if !editCountry}
-                <p class="mt-1 text-xs text-mist-500">Select a country first</p>
+                <p class="mt-1 text-xs text-mist-500">{m.city_select_country_first()}</p>
               {/if}
             </div>
 
             <div class="pt-4 border-t border-ash-800">
               <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide mb-4">
-                Contact Information
+                {m.profile_contact_info()}
               </h3>
 
               <div class="space-y-4">
@@ -327,7 +328,7 @@
                     for="edit-contact-email"
                     class="block text-sm font-medium text-ash-400 mb-1"
                   >
-                    Email
+                    {m.common_email()}
                   </label>
                   <input
                     id="edit-contact-email"
@@ -342,7 +343,7 @@
                     for="edit-contact-phone"
                     class="block text-sm font-medium text-ash-400 mb-1"
                   >
-                    Phone
+                    {m.profile_phone()}
                   </label>
                   <input
                     id="edit-contact-phone"
@@ -364,7 +365,7 @@
                 disabled={saving}
                 class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
               >
-                {saving ? "Saving..." : "Save"}
+                {saving ? m.common_saving() : m.common_save()}
               </button>
               <button
                 type="button"
@@ -372,7 +373,7 @@
                 disabled={saving}
                 class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
               >
-                Cancel
+                {m.common_cancel()}
               </button>
             </div>
           </form>
@@ -388,7 +389,7 @@
                   <button
                     onclick={() => (showAvatarCropper = true)}
                     class="relative group"
-                    title="Change avatar"
+                    title={m.user_change_avatar()}
                   >
                     {#if user.avatar_path}
                       <img
@@ -410,11 +411,11 @@
                   <button
                     onclick={() => (showAvatarCropper = true)}
                     class="text-xs text-ash-400 hover:text-crimson-400 sm:hidden"
-                  >Change photo</button>
+                  >{m.user_change_photo()}</button>
                 </div>
                 <div>
                   <h2 class="text-xl font-medium text-bone-100">
-                    {user.name || "Anonymous"}
+                    {user.name || m.profile_anonymous()}
                   </h2>
                   {#if user.nickname}
                     <p class="text-ash-400">"{user.nickname}"</p>
@@ -424,7 +425,7 @@
               <button
                 onclick={startEdit}
                 class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
-                title="Edit profile"
+                title={m.profile_edit_btn()}
               >
                 <Icon icon="lucide:square-pen" class="w-5 h-5" />
               </button>
@@ -435,13 +436,13 @@
           <div class="p-6 space-y-4">
             {#if user.vekn_id}
               <div class="flex justify-between items-center">
-                <span class="text-ash-400">VEKN ID</span>
+                <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
                 <div class="flex items-center gap-2">
                   <span class="text-bone-100 font-mono">{user.vekn_id}</span>
                   <button
                     onclick={() => (showAbandonConfirm = true)}
                     class="p-1 text-ash-500 hover:text-crimson-400 transition-colors"
-                    title="Abandon VEKN ID"
+                    title={m.profile_abandon_vekn_tooltip()}
                   >
                     <Icon icon="lucide:unlink" class="w-4 h-4" />
                   </button>
@@ -449,12 +450,12 @@
               </div>
             {:else}
               <div class="flex justify-between items-center">
-                <span class="text-ash-400">VEKN ID</span>
+                <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
                 <button
                   onclick={() => (showClaimModal = true)}
                   class="px-3 py-1 text-sm bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded transition-colors"
                 >
-                  Claim VEKN ID
+                  {m.profile_claim_vekn_title()}
                 </button>
               </div>
             {/if}
@@ -462,14 +463,14 @@
             {#if user.country}
               {@const location = formatLocation(user.country, user.city)}
               <div class="flex justify-between">
-                <span class="text-ash-400">Location</span>
+                <span class="text-ash-400">{m.profile_location()}</span>
                 <span class="text-bone-100">{location}</span>
               </div>
             {/if}
 
             {#if user.roles.length > 0}
               <div class="flex justify-between items-start">
-                <span class="text-ash-400">Roles</span>
+                <span class="text-ash-400">{m.common_roles()}</span>
                 <div class="flex flex-wrap gap-2 justify-end">
                   {#each user.roles as role}
                     <span class="px-2 py-1 text-xs rounded bg-ash-800 text-bone-100"
@@ -484,10 +485,10 @@
           <!-- Contact Info -->
           {#if user.contact_email || user.contact_phone}
             <div class="p-6 border-t border-ash-800 space-y-4">
-              <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">Contact</h3>
+              <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_contact()}</h3>
               {#if user.contact_email}
                 <div class="flex justify-between">
-                  <span class="text-ash-400">Email</span>
+                  <span class="text-ash-400">{m.common_email()}</span>
                   <a
                     href="mailto:{user.contact_email}"
                     class="text-crimson-500 hover:text-crimson-400">{user.contact_email}</a
@@ -496,7 +497,7 @@
               {/if}
               {#if user.contact_phone}
                 <div class="flex justify-between">
-                  <span class="text-ash-400">Phone</span>
+                  <span class="text-ash-400">{m.profile_phone()}</span>
                   <span class="text-bone-100">{user.contact_phone}</span>
                 </div>
               {/if}
@@ -506,7 +507,7 @@
           <!-- Linked Accounts Section -->
           <div class="p-6 border-t border-ash-800 space-y-4">
             <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">
-              Linked Accounts
+              {m.profile_linked_accounts()}
             </h3>
 
             <!-- Discord -->
@@ -518,7 +519,7 @@
                   {#if hasDiscord && discordUsername}
                     <p class="text-sm text-ash-400">{discordUsername}</p>
                   {:else}
-                    <p class="text-sm text-ash-400">Not linked</p>
+                    <p class="text-sm text-ash-400">{m.profile_not_linked()}</p>
                   {/if}
                 </div>
               </div>
@@ -527,10 +528,10 @@
                   onclick={handleLinkDiscord}
                   class="px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded font-medium transition-colors"
                 >
-                  Link
+                  {m.profile_link()}
                 </button>
               {:else}
-                <span class="px-3 py-1 text-sm text-green-500 bg-green-500/10 rounded">Linked</span
+                <span class="px-3 py-1 text-sm text-green-500 bg-green-500/10 rounded">{m.profile_linked()}</span
                 >
               {/if}
             </div>
@@ -549,7 +550,7 @@
                   <div>
                     <p class="text-bone-100">Passkey</p>
                     <p class="text-sm text-ash-400">
-                      {hasPasskey ? "Face ID, Touch ID, or security key" : "Not set up"}
+                      {hasPasskey ? m.profile_passkey_configured() : m.profile_passkey_not_setup()}
                     </p>
                   </div>
                 </div>
@@ -559,11 +560,11 @@
                     disabled={registeringPasskey}
                     class="px-4 py-2 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
                   >
-                    {registeringPasskey ? "Adding..." : "Add"}
+                    {registeringPasskey ? m.profile_passkey_adding() : m.common_add()}
                   </button>
                 {:else}
                   <span class="px-3 py-1 text-sm text-green-500 bg-green-500/10 rounded"
-                    >Active</span
+                    >{m.profile_passkey_active()}</span
                   >
                 {/if}
               </div>
@@ -579,11 +580,11 @@
 
           <!-- Data -->
           <div class="p-6 border-t border-ash-800 space-y-4">
-            <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">Data</h3>
+            <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_data()}</h3>
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-bone-100">Resync local data</p>
-                <p class="text-sm text-ash-400">Clear local database and re-download all data from server</p>
+                <p class="text-bone-100">{m.profile_resync_title()}</p>
+                <p class="text-sm text-ash-400">{m.profile_resync_description()}</p>
               </div>
               <button
                 onclick={handleResync}
@@ -591,7 +592,7 @@
                 class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Icon icon="lucide:refresh-cw" class="w-4 h-4 {isSyncing ? 'animate-spin' : ''}" />
-                {isSyncing ? "Syncing..." : "Resync"}
+                {isSyncing ? m.profile_resyncing() : m.profile_resync_btn()}
               </button>
             </div>
           </div>
@@ -602,7 +603,7 @@
               onclick={handleLogout}
               class="w-full px-6 py-3 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors"
             >
-              Sign Out
+              {m.profile_sign_out()}
             </button>
           </div>
         </div>
@@ -622,9 +623,9 @@
       onclick={(e) => e.stopPropagation()}
     >
       <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-bone-100">Claim VEKN ID</h2>
+        <h2 class="text-xl font-medium text-bone-100">{m.profile_claim_vekn_title()}</h2>
         <p class="mt-2 text-sm text-ash-400">
-          Enter your VEKN ID to link it to your account. The ID must exist and not be claimed by another user.
+          {m.profile_claim_vekn_description()}
         </p>
       </div>
       <form
@@ -636,7 +637,7 @@
       >
         <div>
           <label for="claim-vekn-id" class="block text-sm font-medium text-ash-400 mb-1">
-            VEKN ID
+            {m.add_player_vekn_id_label()}
           </label>
           <input
             id="claim-vekn-id"
@@ -652,7 +653,7 @@
             disabled={claimingVekn || !claimVeknIdInput.trim()}
             class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            {claimingVekn ? "Claiming..." : "Claim"}
+            {claimingVekn ? m.profile_claiming() : m.profile_claim_btn()}
           </button>
           <button
             type="button"
@@ -663,7 +664,7 @@
             disabled={claimingVekn}
             class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
         </div>
       </form>
@@ -687,14 +688,14 @@
       onclick={(e) => e.stopPropagation()}
     >
       <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-crimson-400">Abandon VEKN ID?</h2>
+        <h2 class="text-xl font-medium text-crimson-400">{m.profile_abandon_vekn_title()}</h2>
       </div>
       <div class="p-6">
         <p class="text-ash-300 mb-4">
-          This will unlink your VEKN ID from your account. You will keep your login methods and profile, but your VEKN ID will become unclaimed.
+          {m.profile_abandon_vekn_description()}
         </p>
         <p class="text-sm text-ash-400 mb-6">
-          You or a National Coordinator can claim the VEKN ID again later.
+          {m.profile_abandon_vekn_hint()}
         </p>
         <div class="flex gap-2">
           <button
@@ -702,14 +703,14 @@
             disabled={abandoningVekn}
             class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            {abandoningVekn ? "Abandoning..." : "Abandon"}
+            {abandoningVekn ? m.profile_abandoning() : m.profile_abandon_btn()}
           </button>
           <button
             onclick={() => (showAbandonConfirm = false)}
             disabled={abandoningVekn}
             class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
         </div>
       </div>

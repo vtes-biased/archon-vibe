@@ -3,6 +3,7 @@
   import { updateTournament } from "$lib/api";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const DISCORD_VENUE = "Official Discord";
   const DISCORD_URL = "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091";
@@ -81,7 +82,7 @@
     try {
       tournament = await updateTournament(tournament.uid, { [field]: value });
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save";
+      error = e instanceof Error ? e.message : m.config_error_save();
     } finally {
       saving = false;
     }
@@ -94,7 +95,7 @@
     try {
       tournament = await updateTournament(tournament.uid, fields);
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save";
+      error = e instanceof Error ? e.message : m.config_error_save();
     } finally {
       saving = false;
     }
@@ -161,7 +162,7 @@
   {/if}
 
   {#if !isOrganizer}
-    <p class="text-ash-400">Only organizers can edit tournament settings.</p>
+    <p class="text-ash-400">{m.config_no_permission()}</p>
   {:else}
     <div class="space-y-4">
       <TournamentFields bind:values={fieldValues} onchange={handleFieldChange} {disabledFields} idPrefix="cfg" />
@@ -170,7 +171,7 @@
     {#if saving}
       <div class="text-xs text-ash-500 flex items-center gap-1">
         <Icon icon="lucide:refresh-cw" class="w-3 h-3 animate-spin" />
-        Saving...
+        {m.config_saving()}
       </div>
     {/if}
   {/if}

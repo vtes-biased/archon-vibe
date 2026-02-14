@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { VtesCard } from "$lib/types";
   import { searchCards } from "$lib/cards";
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     onselect,
@@ -49,7 +50,7 @@
     bind:value={query}
     oninput={onInput}
     onkeydown={handleKeydown}
-    placeholder="Search cards..."
+    placeholder={m.card_search_placeholder()}
     class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
   />
 

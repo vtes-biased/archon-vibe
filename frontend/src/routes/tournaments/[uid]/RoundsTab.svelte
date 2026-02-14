@@ -3,6 +3,7 @@
   import { tournamentAction, setTableScore } from "$lib/api";
   import { scoreSeatingSync } from "$lib/engine";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     tournament = $bindable(),
@@ -72,17 +73,10 @@
 
   const hasR1Violation = $derived(seatingScore ? (seatingScore.rules[0] ?? 0) > 0 : false);
 
-  const RULE_LABELS = [
-    "R1 Predator-prey repeat",
-    "R2 Opponent all rounds",
-    "R3 VP distribution",
-    "R4 Opponent twice",
-    "R5 Fifth seat twice",
-    "R6 Same relative pos",
-    "R7 Same seat position",
-    "R8 Transfer distribution",
-    "R9 Same position group",
-  ];
+  const RULE_LABELS = $derived([
+    m.rounds_r1(), m.rounds_r2(), m.rounds_r3(), m.rounds_r4(), m.rounds_r5(),
+    m.rounds_r6(), m.rounds_r7(), m.rounds_r8(), m.rounds_r9(),
+  ]);
 
   function scoreIssueCount(): number {
     if (!seatingScore) return 0;
@@ -191,7 +185,7 @@
       await loadPlayerNames();
       computeSeatingScore();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save scores";
+      error = e instanceof Error ? e.message : m.rounds_error_save();
     } finally {
       scoreSaving = null;
     }
@@ -211,7 +205,7 @@
       overrideTable_ = null;
       overrideComment = "";
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to override";
+      error = e instanceof Error ? e.message : m.override_error();
     } finally {
       overrideSaving = false;
     }
@@ -227,7 +221,7 @@
       await loadPlayerNames();
       computeSeatingScore();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to remove override";
+      error = e instanceof Error ? e.message : m.override_remove_error();
     } finally {
       overrideSaving = false;
     }
@@ -251,19 +245,19 @@
   {/if}
 
   {#if tournament.rounds.length === 0}
-    <p class="text-ash-400">No rounds played yet.</p>
+    <p class="text-ash-400">{m.rounds_no_rounds()}</p>
   {:else}
     <!-- Current round controls -->
     {#if isOrganizer && currentRoundIdx >= 0}
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3">
-          <p class="text-ash-400">Round {currentRoundIdx + 1} in progress</p>
+          <p class="text-ash-400">{m.rounds_round_in_progress({ n: String(currentRoundIdx + 1) })}</p>
           {#if seatingScore}
             {#if hasR1Violation}
               <button
                 onclick={() => showScoreDetails = !showScoreDetails}
                 class="px-2 py-0.5 text-xs rounded-full bg-crimson-900/60 text-crimson-300 font-medium"
-              >Invalid Seating</button>
+              >{m.rounds_seating_invalid()}</button>
             {:else}
               {@const issues = scoreIssueCount()}
               {@const expected = scoreExpectedCount()}
@@ -271,9 +265,9 @@
                 onclick={() => showScoreDetails = !showScoreDetails}
                 class="px-2 py-0.5 text-xs rounded-full {issues === 0 ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'}"
               >
-                {#if issues === 0 && expected === 0}Perfect
-                {:else if issues === 0}OK ({expected} expected)
-                {:else}{issues} issue{issues !== 1 ? "s" : ""}{/if}
+                {#if issues === 0 && expected === 0}{m.rounds_seating_perfect()}
+                {:else if issues === 0}{m.rounds_seating_ok({ count: String(expected) })}
+                {:else}{m.rounds_seating_issues({ count: String(issues) })}{/if}
               </button>
             {/if}
           {/if}
@@ -284,19 +278,19 @@
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
           >
-            <Icon icon="lucide:plus-square" class="w-4 h-4 inline mr-1" />Table
+            <Icon icon="lucide:plus-square" class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
           </button>
           <button
             onclick={() => showCancelConfirm = true}
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-          >Cancel Round</button>
+          >{m.rounds_cancel_round()}</button>
           <button
             onclick={() => doAction("FinishRound")}
             disabled={actionLoading || !allTablesFinished}
-            title={allTablesFinished ? "End this round" : "All tables must be Finished first"}
+            title={allTablesFinished ? m.rounds_end_round_ready() : m.rounds_end_round_hint()}
             class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
-          >End Round</button>
+          >{m.rounds_end_round()}</button>
         </div>
       </div>
 
@@ -324,7 +318,7 @@
                 <span class="text-ash-500">—</span>
                 <span class="text-ash-400">{label}:</span>
                 <span class="text-ash-500">{displayVal}</span>
-                <span class="text-ash-600 text-xs">(unavoidable)</span>
+                <span class="text-ash-600 text-xs">{m.rounds_unavoidable()}</span>
               {:else}
                 <span class="text-amber-400">✗</span>
                 <span class="text-ash-300">{label}:</span>
@@ -341,18 +335,18 @@
       <!-- Cancel round confirmation -->
       {#if showCancelConfirm}
         <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4 space-y-3">
-          <p class="text-crimson-300 text-sm font-medium">Cancel this round?</p>
-          <p class="text-ash-400 text-sm">All seating and scores entered for this round will be permanently lost.</p>
+          <p class="text-crimson-300 text-sm font-medium">{m.rounds_cancel_title()}</p>
+          <p class="text-ash-400 text-sm">{m.rounds_cancel_msg()}</p>
           <div class="flex gap-2">
             <button
               onclick={cancelRound}
               disabled={actionLoading}
               class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 rounded-lg transition-colors"
-            >Yes, cancel round</button>
+            >{m.rounds_cancel_yes()}</button>
             <button
               onclick={() => showCancelConfirm = false}
               class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-            >Keep playing</button>
+            >{m.rounds_cancel_keep()}</button>
           </div>
         </div>
       {/if}
@@ -363,16 +357,16 @@
     {#if swapSource}
       <div class="bg-amber-900/20 border border-amber-800 rounded-lg p-3 flex items-center justify-between">
         <p class="text-amber-300 text-sm">
-          Click another seat to swap with <span class="font-medium">{seatDisplay(swapSource.playerUid)}</span>
+          {m.rounds_swap_hint({ name: seatDisplay(swapSource.playerUid) })}
         </p>
-        <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">Cancel</button>
+        <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">{m.common_cancel()}</button>
       </div>
     {/if}
 
     <!-- Not seated players (outside header, visible in Playing and Finished) -->
     {#if unseatedPlayers.length > 0}
       <div class="bg-amber-900/10 border border-amber-800/50 rounded-lg p-3">
-        <p class="text-xs text-amber-400 mb-2">Not seated</p>
+        <p class="text-xs text-amber-400 mb-2">{m.rounds_not_seated()}</p>
         <div class="flex flex-wrap gap-2">
           {#each unseatedPlayers as player}
             {@const puid = player.user_uid ?? ""}
@@ -396,13 +390,13 @@
           <div class="flex items-center gap-2">
             <Icon icon={isExpanded ? "lucide:chevron-down" : "lucide:chevron-right"} class="w-4 h-4 text-ash-500" />
             <span class="text-sm font-medium {isCurrent ? 'text-bone-100' : 'text-ash-300'}">
-              Round {r + 1}
+              {m.rounds_round_n({ n: String(r + 1) })}
             </span>
             {#if tournament.state === "Playing" && isCurrent}
-              <span class="text-xs px-2 py-0.5 rounded bg-amber-900/60 text-amber-300">In Progress</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-amber-900/60 text-amber-300">{m.rounds_in_progress()}</span>
             {/if}
           </div>
-          <span class="text-xs text-ash-500">{round.length} table{round.length !== 1 ? "s" : ""}</span>
+          <span class="text-xs text-ash-500">{m.rounds_table_count({ count: String(round.length) })}</span>
         </button>
 
         {#if isExpanded}
@@ -411,9 +405,9 @@
               <div class="bg-ash-900/50 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
-                    <h3 class="text-sm font-medium text-bone-100">Table {i + 1}</h3>
+                    <h3 class="text-sm font-medium text-bone-100">{m.rounds_table_n({ n: String(i + 1) })}</h3>
                     {#if table.seating.length < 4 || table.seating.length > 5}
-                      <span class="text-xs text-amber-400">({table.seating.length} players)</span>
+                      <span class="text-xs text-amber-400">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
                     {/if}
                   </div>
                   <div class="flex items-center gap-2">
@@ -424,7 +418,7 @@
                       <button
                         onclick={() => doAction("RemoveTable", { table: i })}
                         class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors"
-                        title="Remove empty table"
+                        title={m.rounds_remove_empty_table()}
                       >
                         <Icon icon="lucide:x" class="w-4 h-4" />
                       </button>
@@ -471,7 +465,7 @@
                           <button
                             onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
                             class="p-0.5 text-ash-500 hover:text-crimson-400 transition-colors"
-                            title="Unseat player"
+                            title={m.rounds_unseat_title()}
                           >
                             <Icon icon="lucide:user-minus" class="w-3.5 h-3.5" />
                           </button>
@@ -484,21 +478,21 @@
                 {#if isOrganizer && (table.state === 'Invalid' || table.state === 'In Progress')}
                   {#if overrideTable_ === i}
                     <div class="mt-2 pt-2 border-t border-ash-800">
-                      <label class="text-xs text-ash-400 block mb-1">Judge comment (required)
+                      <label class="text-xs text-ash-400 block mb-1">{m.override_judge_comment()}
                         <textarea
                           bind:value={overrideComment}
                           class="w-full bg-ash-800 text-bone-100 text-xs rounded px-2 py-1 border border-ash-700 resize-none"
                           rows="2"
-                          placeholder="Explain why this table result is being overridden..."
+                          placeholder={m.override_placeholder()}
                         ></textarea>
                       </label>
                       <div class="flex gap-2 mt-1 justify-end">
-                        <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">Cancel</button>
+                        <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">{m.common_cancel()}</button>
                         <button
                           onclick={() => submitOverride(r, i)}
                           disabled={overrideSaving || !overrideComment.trim()}
                           class="px-3 py-1 text-xs font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
-                        >{overrideSaving ? "Saving..." : "Override → Finished"}</button>
+                        >{overrideSaving ? m.common_saving() : m.override_save()}</button>
                       </div>
                     </div>
                   {:else}
@@ -508,7 +502,7 @@
                         class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
                         title="Override table result as judge"
                       >
-                        <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />Override
+                        <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
                       </button>
                     </div>
                   {/if}
@@ -517,13 +511,13 @@
                   <div class="mt-2 pt-2 border-t border-ash-800 flex items-center justify-between">
                     <span class="text-xs text-amber-400">
                       <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />
-                      Overridden: {table.override.comment}
+                      {m.override_overridden({ comment: table.override.comment })}
                     </span>
                     <button
                       onclick={() => removeOverride(r, i)}
                       disabled={overrideSaving}
                       class="px-2 py-1 text-xs text-ash-500 hover:text-crimson-400 transition-colors"
-                    >Remove override</button>
+                    >{m.override_remove()}</button>
                   </div>
                 {/if}
                 <!-- Seat a player -->
@@ -538,14 +532,14 @@
                             class="px-2 py-1 text-xs bg-ash-800 hover:bg-emerald-900/60 text-ash-300 hover:text-emerald-300 rounded transition-colors"
                           >{seatDisplay(puid)}</button>
                         {/each}
-                        <button onclick={() => seatTargetTable = null} class="px-2 py-1 text-xs text-ash-500 hover:text-ash-300">Cancel</button>
+                        <button onclick={() => seatTargetTable = null} class="px-2 py-1 text-xs text-ash-500 hover:text-ash-300">{m.common_cancel()}</button>
                       </div>
                     {:else}
                       <button
                         onclick={() => seatTargetTable = i}
                         class="text-xs text-ash-500 hover:text-emerald-400 transition-colors"
                       >
-                        <Icon icon="lucide:plus" class="w-3.5 h-3.5 inline mr-1" />Seat a player
+                        <Icon icon="lucide:plus" class="w-3.5 h-3.5 inline mr-1" />{m.rounds_seat_player()}
                       </button>
                     {/if}
                   </div>
@@ -558,7 +552,7 @@
                 disabled={actionLoading}
                 class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
               >
-                <Icon icon="lucide:plus-square" class="w-4 h-4 inline mr-1" />Table
+                <Icon icon="lucide:plus-square" class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
               </button>
             {/if}
           </div>

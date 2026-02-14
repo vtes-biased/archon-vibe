@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getToasts, dismissToast, type Toast } from '$lib/stores/toast.svelte';
   import Icon from '@iconify/svelte';
+  import * as m from '$lib/paraglide/messages.js';
 
   const toasts = $derived(getToasts());
 
@@ -69,7 +70,7 @@
       <button
         onclick={() => dismissToast(toast.id)}
         class="flex-shrink-0 p-1 -m-1 rounded hover:bg-white/10 transition-colors"
-        aria-label="Dismiss"
+        aria-label={m.toast_dismiss()}
       >
         <Icon icon="lucide:x" class="w-4 h-4" />
       </button>

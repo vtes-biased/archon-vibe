@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from '@iconify/svelte';
+  import * as m from '$lib/paraglide/messages.js';
 
   // Props
   interface Props {
@@ -44,7 +45,7 @@
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      alert(m.avatar_select_image_file());
       return;
     }
 
@@ -161,7 +162,7 @@
       await onSave(blob);
     } catch (error) {
       console.error('Failed to save avatar:', error);
-      alert('Failed to save avatar');
+      alert(m.avatar_save_failed());
     } finally {
       saving = false;
     }
@@ -189,7 +190,7 @@
     onkeydown={(e) => e.key === 'Escape' && onCancel()}
     class="bg-dusk-950 rounded-lg p-6 max-w-sm w-full"
   >
-    <h2 id="avatar-modal-title" class="text-lg font-semibold text-bone-200 mb-4">Update Avatar</h2>
+    <h2 id="avatar-modal-title" class="text-lg font-semibold text-bone-200 mb-4">{m.avatar_title()}</h2>
 
     {#if !image}
       <!-- File selection -->
@@ -200,7 +201,7 @@
         >
           <Icon icon="lucide:image-plus" class="w-12 h-12 text-ash-500" />
         </button>
-        <p class="text-sm text-ash-400">Click to select an image</p>
+        <p class="text-sm text-ash-400">{m.avatar_select_image()}</p>
         <input
           bind:this={fileInput}
           type="file"
@@ -215,7 +216,7 @@
         <!-- Canvas with circular mask preview -->
         <div
           role="slider"
-          aria-label="Drag to reposition image"
+          aria-label={m.avatar_drag_reposition()}
           aria-valuemin="0"
           aria-valuemax="100"
           aria-valuenow={50}
@@ -256,7 +257,7 @@
           <Icon icon="lucide:zoom-in" class="w-5 h-5 text-ash-400" />
         </div>
 
-        <p class="text-xs text-ash-500">Drag to reposition</p>
+        <p class="text-xs text-ash-500">{m.avatar_drag_reposition()}</p>
       </div>
     {/if}
 
@@ -266,7 +267,7 @@
         onclick={onCancel}
         class="flex-1 px-4 py-2 rounded-lg border border-ash-600 text-ash-300 hover:bg-ash-800 transition-colors"
       >
-        Cancel
+        {m.common_cancel()}
       </button>
       {#if image}
         <button
@@ -274,7 +275,7 @@
           disabled={saving}
           class="flex-1 px-4 py-2 rounded-lg bg-crimson-600 text-white hover:bg-crimson-500 transition-colors disabled:opacity-50"
         >
-          {saving ? 'Saving...' : 'Save'}
+          {saving ? m.common_saving() : m.common_save()}
         </button>
       {/if}
     </div>

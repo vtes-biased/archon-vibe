@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     tournamentUid,
@@ -123,15 +124,15 @@
     <button
       onclick={() => mode = 'text'}
       class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'text' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
-    >Paste Deck</button>
+    >{m.deck_upload_paste()}</button>
     <button
       onclick={() => mode = 'url'}
       class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
-    >From URL</button>
+    >{m.deck_upload_from_url()}</button>
     <button
       onclick={() => mode = 'qr'}
       class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
-    >Scan QR</button>
+    >{m.deck_upload_scan_qr()}</button>
   </div>
 
   {#if mode === 'qr'}
@@ -139,22 +140,22 @@
       <!-- svelte-ignore element_invalid_self_closing_tag -->
       <video bind:this={videoEl} class="w-full max-h-64 object-cover" />
       {#if !qrScanning}
-        <p class="absolute inset-0 flex items-center justify-center text-ash-400 text-sm">Starting camera...</p>
+        <p class="absolute inset-0 flex items-center justify-center text-ash-400 text-sm">{m.deck_upload_qr_starting()}</p>
       {/if}
     </div>
-    <p class="text-xs text-ash-500">Point camera at a VDB deck QR code</p>
+    <p class="text-xs text-ash-500">{m.deck_upload_qr_hint()}</p>
   {:else}
     <input
       type="text"
       bind:value={deckName}
-      placeholder="Deck name (optional)"
+      placeholder={m.deck_upload_name_placeholder()}
       class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
     />
 
     {#if mode === 'text'}
       <textarea
         bind:value={deckText}
-        placeholder="Paste your deck list here...&#10;&#10;Example:&#10;2x .44 Magnum&#10;3 Govern the Unaligned&#10;..."
+        placeholder={m.deck_upload_text_placeholder()}
         rows="12"
         class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm font-mono resize-y"
       ></textarea>
@@ -162,33 +163,33 @@
       <input
         type="url"
         bind:value={deckUrl}
-        placeholder="VDB, VTESDecks, or Amaranth URL"
+        placeholder={m.deck_upload_url_placeholder()}
         class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
       />
-      <p class="text-xs text-ash-500">Supported: vdb.im, vtesdecks.com, amaranth.vtes.co.nz</p>
+      <p class="text-xs text-ash-500">{m.deck_upload_supported_sites()}</p>
     {/if}
 
     <!-- Attribution -->
     <div class="flex items-center gap-3 text-sm flex-wrap">
-      <span class="text-ash-400">Attribution:</span>
+      <span class="text-ash-400">{m.deck_upload_attribution()}:</span>
       <label class="flex items-center gap-1 text-ash-200">
         <input type="radio" bind:group={attribution} value="self" class="accent-crimson-500" />
-        My deck
+        {m.deck_upload_attr_self()}
       </label>
       <label class="flex items-center gap-1 text-ash-200">
         <input type="radio" bind:group={attribution} value="anonymous" class="accent-crimson-500" />
-        Anonymous
+        {m.deck_upload_attr_anonymous()}
       </label>
       <label class="flex items-center gap-1 text-ash-200">
         <input type="radio" bind:group={attribution} value="other" class="accent-crimson-500" />
-        Other
+        {m.deck_upload_attr_other()}
       </label>
     </div>
     {#if attribution === 'other'}
       <input
         type="text"
         bind:value={attributionVekn}
-        placeholder="VEKN ID or name of deck author"
+        placeholder={m.deck_upload_attr_other_placeholder()}
         class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
       />
     {/if}
@@ -198,7 +199,7 @@
     <p class="text-sm text-red-400">{error}</p>
   {/if}
   {#if success}
-    <p class="text-sm text-emerald-400">Deck uploaded successfully</p>
+    <p class="text-sm text-emerald-400">{m.deck_upload_success()}</p>
   {/if}
 
   {#if mode !== 'qr'}
@@ -207,7 +208,7 @@
       disabled={loading || (mode === 'text' ? !deckText.trim() : !deckUrl.trim())}
       class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
     >
-      {loading ? 'Uploading...' : 'Upload Deck'}
+      {loading ? m.deck_upload_uploading() : m.deck_upload_submit()}
     </button>
   {/if}
 </div>

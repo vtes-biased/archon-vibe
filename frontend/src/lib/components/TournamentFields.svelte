@@ -2,6 +2,7 @@
   import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "$lib/types";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAllLeagues } from "$lib/db";
+  import * as m from '$lib/paraglide/messages.js';
 
   export interface TournamentFieldValues {
     name: string;
@@ -65,7 +66,7 @@
 
 <!-- Name -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("name")}>Name *</label>
+  <label class="block text-sm text-ash-400 mb-1" for={id("name")}>{m.tfield_name_label()}</label>
   <input
     id={id("name")}
     type="text"
@@ -73,14 +74,14 @@
     {disabled}
     oninput={(e) => handleInput("name", (e.target as HTMLInputElement).value)}
     class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
-    placeholder="Tournament name"
+    placeholder={m.tfield_name_placeholder()}
   />
 </div>
 
 <!-- Format & Rank -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("format")}>Format</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("format")}>{m.tfield_format()}</label>
     <select
       id={id("format")}
       value={values.format}
@@ -94,7 +95,7 @@
     </select>
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("rank")}>Rank</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("rank")}>{m.tfield_rank()}</label>
     <select
       id={id("rank")}
       value={values.rank}
@@ -102,7 +103,7 @@
       onchange={(e) => handleInput("rank", (e.target as HTMLSelectElement).value)}
       class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
     >
-      <option value="">Basic</option>
+      <option value="">{m.tfield_rank_basic()}</option>
       <option value="National Championship">National Championship</option>
       <option value="Continental Championship">Continental Championship</option>
     </select>
@@ -144,12 +145,12 @@
       }}
       class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
     />
-    <span class="text-sm text-ash-200">Open Rounds</span>
+    <span class="text-sm text-ash-200">{m.tfield_open_rounds()}</span>
   </label>
-  <p class="text-xs text-ash-500 mt-1 ml-8">Players participate in up to a maximum number of rounds among all scheduled rounds.</p>
+  <p class="text-xs text-ash-500 mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
   {#if values.open_rounds}
     <div class="mt-2 ml-8">
-      <label class="block text-sm text-ash-400 mb-1" for={id("max-rounds")}>Max Rounds</label>
+      <label class="block text-sm text-ash-400 mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
       <select
         id={id("max-rounds")}
         value={String(values.max_rounds)}
@@ -157,7 +158,7 @@
         onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
         class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
       >
-        <option value="0">No limit</option>
+        <option value="0">{m.tfield_max_rounds_no_limit()}</option>
         <option value="1">1</option>
         <option value="2">2</option>
         <option value="3">3</option>
@@ -171,7 +172,7 @@
 <!-- Dates & Timezone -->
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("start")}>Start</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("start")}>{m.tfield_start()}</label>
     <input
       id={id("start")}
       type="datetime-local"
@@ -182,7 +183,7 @@
     />
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("finish")}>Finish</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("finish")}>{m.tfield_finish()}</label>
     <input
       id={id("finish")}
       type="datetime-local"
@@ -193,7 +194,7 @@
     />
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("timezone")}>Timezone</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("timezone")}>{m.tfield_timezone()}</label>
     <select
       id={id("timezone")}
       value={values.timezone}
@@ -217,13 +218,13 @@
     onchange={(e) => handleInput("online", (e.target as HTMLInputElement).checked)}
     class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
   />
-  <span class="text-sm text-ash-200">Online Tournament</span>
+  <span class="text-sm text-ash-200">{m.tfield_online()}</span>
 </label>
 
 <!-- Location fields (hidden when online) -->
 {#if !values.online}
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("country")}>Country</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("country")}>{m.common_country()}</label>
     <select
       id={id("country")}
       value={values.country}
@@ -231,7 +232,7 @@
       onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
       class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
     >
-      <option value="">Select country</option>
+      <option value="">{m.tfield_select_country()}</option>
       {#each Object.entries(countries) as [code, c]}
         <option value={code}>{c.name} {getCountryFlag(code)}</option>
       {/each}
@@ -241,7 +242,7 @@
 
 <!-- Venue (always shown) -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("venue")}>Venue</label>
+  <label class="block text-sm text-ash-400 mb-1" for={id("venue")}>{m.tfield_venue()}</label>
   <input
     id={id("venue")}
     type="text"
@@ -249,13 +250,13 @@
     {disabled}
     oninput={(e) => handleInput("venue", (e.target as HTMLInputElement).value)}
     class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
-    placeholder="Venue name"
+    placeholder={m.tfield_venue_placeholder()}
   />
 </div>
 
 <!-- Venue URL (always shown) -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("venue-url")}>Venue URL</label>
+  <label class="block text-sm text-ash-400 mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
   <input
     id={id("venue-url")}
     type="url"
@@ -270,7 +271,7 @@
 {#if !values.online}
   <!-- Address -->
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("address")}>Address</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("address")}>{m.tfield_address()}</label>
     <input
       id={id("address")}
       type="text"
@@ -278,13 +279,13 @@
       {disabled}
       oninput={(e) => handleInput("address", (e.target as HTMLInputElement).value)}
       class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
-      placeholder="Street address"
+      placeholder={m.tfield_address_placeholder()}
     />
   </div>
 
   <!-- Map URL -->
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("map-url")}>Map URL</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
     <input
       id={id("map-url")}
       type="url"
@@ -299,9 +300,9 @@
 
 <!-- Description -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("description")}>Description</label>
+  <label class="block text-sm text-ash-400 mb-1" for={id("description")}>{m.common_description()}</label>
   <span class="text-xs text-ash-500 mb-1 block">
-    Supports <a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a> formatting
+    {m.tfield_supports()} <a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a> {m.tfield_formatting()}
   </span>
   <textarea
     id={id("description")}
@@ -310,14 +311,14 @@
     oninput={(e) => handleInput("description", (e.target as HTMLTextAreaElement).value)}
     rows="3"
     class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none resize-none"
-    placeholder="Optional description"
+    placeholder={m.tfield_description_placeholder()}
   ></textarea>
 </div>
 
 <!-- Standings & Decklists -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("standings")}>Standings Visibility</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("standings")}>{m.tfield_standings_visibility()}</label>
     <select
       id={id("standings")}
       value={values.standings_mode}
@@ -332,7 +333,7 @@
     </select>
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("decklists")}>Decklists Visibility</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
     <select
       id={id("decklists")}
       value={values.decklists_mode}
@@ -357,7 +358,7 @@
       onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
       class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
     />
-    <span class="text-sm text-ash-200">Allow Proxies</span>
+    <span class="text-sm text-ash-200">{m.tfield_allow_proxies()}</span>
   </label>
   <label class="flex items-center gap-3 cursor-pointer">
     <input
@@ -367,7 +368,7 @@
       onchange={(e) => handleInput("multideck", (e.target as HTMLInputElement).checked)}
       class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
     />
-    <span class="text-sm text-ash-200">Multideck</span>
+    <span class="text-sm text-ash-200">{m.tfield_multideck()}</span>
   </label>
   <label class="flex items-center gap-3 cursor-pointer">
     <input
@@ -377,6 +378,6 @@
       onchange={(e) => handleInput("decklist_required", (e.target as HTMLInputElement).checked)}
       class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
     />
-    <span class="text-sm text-ash-200">Decklist Required</span>
+    <span class="text-sm text-ash-200">{m.tfield_decklist_required()}</span>
   </label>
 </div>

@@ -11,6 +11,7 @@
     login,
   } from "$lib/stores/auth.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -87,13 +88,13 @@
 
     if (error) {
       const errorMessages: Record<string, string> = {
-        invalid_state: "Invalid OAuth state. Please try again.",
-        state_expired: "OAuth session expired. Please try again.",
-        discord_token_failed: "Failed to authenticate with Discord.",
-        discord_user_failed: "Failed to get Discord user info.",
-        discord_error: "Discord authentication error.",
+        invalid_state: m.login_error_invalid_state(),
+        state_expired: m.login_error_state_expired(),
+        discord_token_failed: m.login_error_discord_token(),
+        discord_user_failed: m.login_error_discord_user(),
+        discord_error: m.login_error_discord(),
       };
-      oauthError = errorMessages[error] || `Authentication error: ${error}`;
+      oauthError = errorMessages[error] || m.login_error_auth({ error });
       window.history.replaceState({}, "", "/login");
       return;
     }
@@ -114,14 +115,14 @@
 </script>
 
 <svelte:head>
-  <title>Welcome - Archon</title>
+  <title>{m.login_page_title()} - Archon</title>
 </svelte:head>
 
 <div class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
       <h1 class="text-4xl font-light text-crimson-500 mb-2">Archon</h1>
-      <p class="text-ash-400">VEKN Tournament Management</p>
+      <p class="text-ash-400">{m.common_tagline()}</p>
     </div>
 
     <div class="bg-dusk-950 rounded-lg shadow-lg p-8 border border-ash-800">
@@ -134,7 +135,7 @@
               ? 'bg-crimson-700 text-bone-100'
               : 'text-ash-400 hover:text-ash-200'}"
           >
-            Login
+            {m.login_tab_login()}
           </button>
           <button
             onclick={() => (mode = "signup")}
@@ -142,7 +143,7 @@
               ? 'bg-crimson-700 text-bone-100'
               : 'text-ash-400 hover:text-ash-200'}"
           >
-            Sign Up
+            {m.login_tab_signup()}
           </button>
         </div>
       {/if}
@@ -159,20 +160,20 @@
           <div class="w-16 h-16 mx-auto bg-green-900/30 rounded-full flex items-center justify-center">
             <Icon icon="lucide:mail" class="w-8 h-8 text-green-400" />
           </div>
-          <h2 class="text-lg font-medium text-bone-100">Check your email</h2>
+          <h2 class="text-lg font-medium text-bone-100">{m.login_check_email()}</h2>
           <p class="text-ash-400 text-sm">
-            We sent a link to<br />
+            {m.login_sent_link_to()}<br />
             <span class="text-bone-200 font-medium">{magicLinkEmail}</span>
           </p>
           <p class="text-ash-500 text-xs">
-            Click the link to set your password and complete signup.<br />
-            The link expires in 15 minutes.
+            {m.login_click_link_signup()}<br />
+            {m.login_link_expires()}
           </p>
           <button
             onclick={() => { magicLinkSent = false; magicLinkEmail = ""; }}
             class="text-sm text-crimson-400 hover:text-crimson-300"
           >
-            Use a different email
+            {m.login_use_different_email()}
           </button>
         </div>
 
@@ -182,41 +183,41 @@
           <div class="w-16 h-16 mx-auto bg-green-900/30 rounded-full flex items-center justify-center">
             <Icon icon="lucide:mail" class="w-8 h-8 text-green-400" />
           </div>
-          <h2 class="text-lg font-medium text-bone-100">Check your email</h2>
+          <h2 class="text-lg font-medium text-bone-100">{m.login_check_email()}</h2>
           <p class="text-ash-400 text-sm">
-            We sent a password reset link to<br />
+            {m.login_sent_reset_link()}<br />
             <span class="text-bone-200 font-medium">{magicLinkEmail}</span>
           </p>
           <p class="text-ash-500 text-xs">
-            Click the link to reset your password.<br />
-            The link expires in 15 minutes.
+            {m.login_click_link_reset()}<br />
+            {m.login_link_expires()}
           </p>
           <button
             onclick={() => { resetEmailSent = false; forgotPassword = false; email = ""; }}
             class="text-sm text-crimson-400 hover:text-crimson-300"
           >
-            Back to login
+            {m.login_back_to_login()}
           </button>
         </div>
 
       {:else if forgotPassword}
         <!-- FORGOT PASSWORD FORM -->
         <div class="space-y-4">
-          <h2 class="text-lg font-medium text-bone-100 text-center">Reset your password</h2>
+          <h2 class="text-lg font-medium text-bone-100 text-center">{m.login_reset_title()}</h2>
           <p class="text-ash-400 text-sm text-center">
-            Enter your email and we'll send you a link to reset your password.
+            {m.login_reset_instructions()}
           </p>
 
           <form onsubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} class="space-y-4">
             <div>
-              <label for="reset-email" class="block text-sm text-ash-400 mb-1">Email</label>
+              <label for="reset-email" class="block text-sm text-ash-400 mb-1">{m.common_email()}</label>
               <input
                 type="email"
                 id="reset-email"
                 name="email"
                 autocomplete="username"
                 bind:value={email}
-                placeholder="you@example.com"
+                placeholder={m.login_placeholder_email()}
                 disabled={auth.isLoading}
                 class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
               />
@@ -229,7 +230,7 @@
               {#if auth.isLoading}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
               {/if}
-              Send Reset Link
+              {m.login_send_reset_link()}
             </button>
           </form>
 
@@ -237,7 +238,7 @@
             onclick={() => { forgotPassword = false; email = ""; }}
             class="w-full text-sm text-ash-400 hover:text-ash-200"
           >
-            Back to login
+            {m.login_back_to_login()}
           </button>
         </div>
 
@@ -245,33 +246,33 @@
         <!-- LOGIN MODE -->
         <div class="space-y-4">
           <p class="text-ash-400 text-sm text-center mb-4">
-            Welcome back! Sign in to your account.
+            {m.login_welcome_back()}
           </p>
 
           <!-- Email + Password Form -->
           <form onsubmit={(e) => { e.preventDefault(); handleEmailLogin(); }} class="space-y-4">
             <div>
-              <label for="login-email" class="block text-sm text-ash-400 mb-1">Email</label>
+              <label for="login-email" class="block text-sm text-ash-400 mb-1">{m.common_email()}</label>
               <input
                 type="email"
                 id="login-email"
                 name="email"
                 autocomplete="username"
                 bind:value={email}
-                placeholder="you@example.com"
+                placeholder={m.login_placeholder_email()}
                 disabled={auth.isLoading}
                 class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
               />
             </div>
             <div>
-              <label for="login-password" class="block text-sm text-ash-400 mb-1">Password</label>
+              <label for="login-password" class="block text-sm text-ash-400 mb-1">{m.common_password()}</label>
               <input
                 type="password"
                 id="login-password"
                 name="password"
                 autocomplete="current-password"
                 bind:value={password}
-                placeholder="Enter your password"
+                placeholder={m.login_placeholder_password()}
                 disabled={auth.isLoading}
                 class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
               />
@@ -284,7 +285,7 @@
               {#if auth.isLoading}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
               {/if}
-              Sign In
+              {m.login_sign_in()}
             </button>
           </form>
 
@@ -292,7 +293,7 @@
             onclick={() => { forgotPassword = true; password = ""; }}
             class="w-full text-sm text-ash-400 hover:text-ash-200"
           >
-            Forgot password?
+            {m.login_forgot_password()}
           </button>
 
           <!-- Divider -->
@@ -301,7 +302,7 @@
               <div class="w-full border-t border-ash-700"></div>
             </div>
             <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-dusk-950 text-ash-500">or</span>
+              <span class="px-2 bg-dusk-950 text-ash-500">{m.common_or()}</span>
             </div>
           </div>
 
@@ -312,7 +313,7 @@
               class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               <Icon icon="lucide:key-round" class="w-5 h-5" />
-              Sign in with Passkey
+              {m.login_passkey_login()}
             </button>
           {/if}
 
@@ -323,12 +324,12 @@
             class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
           >
             <Icon icon="simple-icons:discord" class="w-5 h-5" />
-            Continue with Discord
+            {m.login_discord_login()}
           </button>
 
           {#if !passkeySupported}
             <p class="text-center text-sm text-ash-500">
-              Passkeys are not supported in this browser.
+              {m.login_passkey_not_supported()}
             </p>
           {/if}
         </div>
@@ -336,7 +337,7 @@
         <!-- SIGNUP MODE -->
         <div class="space-y-4">
           <p class="text-ash-400 text-sm text-center mb-4">
-            Create a new account to manage tournaments.
+            {m.login_create_account_msg()}
           </p>
 
           {#if passkeySupported}
@@ -350,7 +351,7 @@
               {:else}
                 <Icon icon="lucide:key-round" class="w-5 h-5" />
               {/if}
-              Create Account with Passkey
+              {m.login_passkey_signup()}
             </button>
           {/if}
 
@@ -361,7 +362,7 @@
             class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
           >
             <Icon icon="simple-icons:discord" class="w-5 h-5" />
-            Sign Up with Discord
+            {m.login_discord_signup()}
           </button>
 
           <!-- Divider -->
@@ -370,20 +371,20 @@
               <div class="w-full border-t border-ash-700"></div>
             </div>
             <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-dusk-950 text-ash-500">or sign up with email</span>
+              <span class="px-2 bg-dusk-950 text-ash-500">{m.login_or_signup_email()}</span>
             </div>
           </div>
 
           <!-- Email signup form -->
           <form onsubmit={(e) => { e.preventDefault(); handleSignupMagicLink(); }} class="space-y-3">
-            <label for="signup-email" class="sr-only">Email</label>
+            <label for="signup-email" class="sr-only">{m.common_email()}</label>
             <input
               type="email"
               id="signup-email"
               name="email"
               autocomplete="username"
               bind:value={email}
-              placeholder="Enter your email"
+              placeholder={m.login_placeholder_signup_email()}
               disabled={auth.isLoading}
               class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
             />
@@ -397,18 +398,18 @@
               {:else}
                 <Icon icon="lucide:mail" class="w-5 h-5" />
               {/if}
-              Continue with Email
+              {m.login_email_signup()}
             </button>
           </form>
 
           {#if !passkeySupported}
             <p class="text-center text-sm text-ash-500">
-              Passkeys are not supported in this browser.
+              {m.login_passkey_not_supported()}
             </p>
           {/if}
 
           <p class="text-center text-xs text-ash-500 mt-4">
-            By creating an account, you agree to our terms of service.
+            {m.login_terms_agreement()}
           </p>
         </div>
       {/if}

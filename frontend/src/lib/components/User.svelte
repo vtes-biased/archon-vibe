@@ -10,6 +10,7 @@
   import VeknManagement from "./VeknManagement.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let {
     user,
@@ -139,7 +140,7 @@
   async function autoSave() {
     if (mode === "create" || !user) return;
     if (!editName.trim() || !editCountry.trim()) {
-      error = "Name and country are required";
+      error = m.user_error_name_country_required();
       return;
     }
 
@@ -232,7 +233,7 @@
 
   async function saveEdit() {
     if (!editName.trim() || !editCountry.trim()) {
-      error = "Name and country are required";
+      error = m.user_error_name_country_required();
       return;
     }
 
@@ -288,14 +289,14 @@
           {#if saving}
             <span class="text-xs text-ash-400 flex items-center gap-1">
               <Icon icon="lucide:loader-2" class="w-3 h-3 animate-spin" />
-              Saving
+              {m.user_saving()}
             </span>
           {/if}
           <button
             type="button"
             onclick={cancelEdit}
             class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
-            title="Close"
+            title={m.common_close()}
           >
             <Icon icon="lucide:x" class="w-5 h-5" />
           </button>
@@ -306,7 +307,7 @@
           for="edit-name"
           class="block text-sm font-medium text-ash-400 mb-1"
         >
-          Name *
+          {m.common_name()} *
         </label>
         <input
           id="edit-name"
@@ -325,24 +326,24 @@
             for="edit-email"
             class="block text-sm font-medium text-ash-400 mb-1"
           >
-            Email (optional)
+            {m.user_email_label()}
           </label>
           <input
             id="edit-email"
             type="email"
             bind:value={editEmail}
-            placeholder="user@example.com"
+            placeholder={m.user_email_placeholder()}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
           />
           <p class="mt-1 text-xs text-ash-500">
-            If provided, an invite email will be sent so they can log in.
+            {m.user_email_hint()}
           </p>
         </div>
       {:else}
         {#if !canManage()}
           <!-- VEKN ID (read-only for non-managers) -->
           <div>
-            <span class="block text-sm font-medium text-ash-400 mb-1">VEKN ID</span>
+            <span class="block text-sm font-medium text-ash-400 mb-1">{m.add_player_vekn_id_label()}</span>
             <span class="block px-3 py-2 text-ash-300">{user?.vekn_id || '—'}</span>
           </div>
         {/if}
@@ -353,7 +354,7 @@
           for="edit-country"
           class="block text-sm font-medium text-ash-400 mb-1"
         >
-          Country *
+          {m.common_country()} *
         </label>
         <select
           id="edit-country"
@@ -369,7 +370,7 @@
           }}
           class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
         >
-          <option value="">Select a country...</option>
+          <option value="">{m.user_country_placeholder()}</option>
           {#each sortedCountries as country}
             <option value={country.iso_code}>
               {country.name} {getCountryFlag(country.iso_code)}
@@ -383,7 +384,7 @@
           for="edit-city"
           class="block text-sm font-medium text-ash-400 mb-1"
         >
-          City
+          {m.common_city()}
         </label>
         <CityAutocomplete
           bind:value={editCity}
@@ -393,7 +394,7 @@
         />
         {#if !editCountry}
           <p class="mt-1 text-xs text-mist-dark">
-            Select a country first to search for cities
+            {m.user_city_hint()}
           </p>
         {/if}
       </div>
@@ -403,7 +404,7 @@
           for="edit-nickname"
           class="block text-sm font-medium text-ash-400 mb-1"
         >
-          Nickname
+          {m.common_nickname()}
         </label>
         <input
           id="edit-nickname"
@@ -416,7 +417,7 @@
 
       <fieldset>
         <legend class="block text-sm font-medium text-ash-400 mb-2">
-          Roles
+          {m.common_roles()}
         </legend>
         <div class="flex flex-wrap gap-2">
           {#each availableRoles as role}
@@ -425,7 +426,7 @@
               type="button"
               onclick={(e) => { e.stopPropagation(); if (allowed) toggleRole(role); }}
               disabled={!allowed}
-              title={allowed ? `Toggle ${role}` : `You cannot change ${role}`}
+              title={allowed ? m.user_toggle_role({ role }) : m.user_cannot_change_role({ role })}
               class="px-3 py-1 rounded text-sm font-medium transition-colors {editRoles.includes(role)
                 ? getRoleClasses(role)
                 : 'bg-ash-800 text-ash-400'} {allowed ? 'hover:opacity-80 cursor-pointer' : 'opacity-50 cursor-not-allowed'}"
@@ -436,7 +437,7 @@
         </div>
         {#if mode !== "create" && user && !user.vekn_id}
           <p class="mt-2 text-xs text-crimson-400">
-            User must have a VEKN ID to be assigned roles
+            {m.user_vekn_required_for_roles()}
           </p>
         {/if}
       </fieldset>
@@ -465,7 +466,7 @@
             disabled={saving}
             class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            {saving ? "Creating..." : "Create User"}
+            {saving ? m.user_creating() : m.user_create_btn()}
           </button>
           <button
             type="button"
@@ -473,7 +474,7 @@
             disabled={saving}
             class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
         </div>
       {/if}
@@ -489,7 +490,7 @@
             <button
               onclick={(e) => { e.stopPropagation(); showAvatarCropper = true; }}
               class="relative group"
-              title="Change avatar"
+              title={m.user_change_avatar()}
             >
               {#if user.avatar_path}
                 <img
@@ -509,7 +510,7 @@
             <button
               onclick={(e) => { e.stopPropagation(); showAvatarCropper = true; }}
               class="text-xs text-ash-400 hover:text-crimson-400 sm:hidden"
-            >Change photo</button>
+            >{m.user_change_photo()}</button>
           </div>
         {:else if user.avatar_path}
           <img
@@ -532,37 +533,37 @@
         <div class="mt-2 space-y-1 text-sm text-ash-400">
           {#if user.vekn_id}
             <div class="flex items-center gap-2">
-              <span class="font-medium">VEKN ID:</span>
+              <span class="font-medium">{m.add_player_vekn_id_label()}:</span>
               <span>{user.vekn_id}</span>
             </div>
           {/if}
 
           {#if user.nickname}
             <div class="flex items-center gap-2">
-              <span class="font-medium">Nickname:</span>
+              <span class="font-medium">{m.common_nickname()}:</span>
               <span>{user.nickname}</span>
             </div>
           {/if}
 
           <div class="flex items-center gap-2">
-            <span class="font-medium">Country:</span>
+            <span class="font-medium">{m.common_country()}:</span>
             <span
               >{user.country
                 ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
-                : "N/A"}</span
+                : m.common_na()}</span
             >
           </div>
 
           {#if user.city}
             <div class="flex items-center gap-2">
-              <span class="font-medium">City:</span>
+              <span class="font-medium">{m.common_city()}:</span>
               <span>{user.city}</span>
             </div>
           {/if}
 
           {#if user.roles.length > 0}
             <div class="flex items-start gap-2">
-              <span class="font-medium">Roles:</span>
+              <span class="font-medium">{m.common_roles()}:</span>
               <div class="flex flex-wrap gap-1">
                 {#each user.roles as role}
                   <span
@@ -583,7 +584,7 @@
         <button
           onclick={(e) => { e.stopPropagation(); startEdit(); }}
           class="ml-2 p-2 text-ash-500 hover:text-crimson-400 transition-colors"
-          title="Edit user"
+          title={m.user_edit()}
         >
           <Icon icon="lucide:square-pen" class="w-5 h-5" />
         </button>
@@ -592,14 +593,14 @@
 
     <div class="mt-3 pt-3 border-t border-ash-700">
       <p class="text-xs text-mist-dark">
-        Last modified: {new Date(user.modified).toLocaleString()}
+        {m.user_last_modified({ date: new Date(user.modified).toLocaleString() })}
       </p>
     </div>
 
   {:else}
     <!-- Invalid state -->
     <div class="text-crimson-400">
-      Invalid user component state
+      {m.user_invalid_state()}
     </div>
   {/if}
 </div>

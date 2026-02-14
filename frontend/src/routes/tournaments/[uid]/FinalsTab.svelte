@@ -3,6 +3,7 @@
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/api";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   interface StandingEntry {
     user_uid: string;
@@ -116,7 +117,7 @@
       tournament = await setTableScore(tournament.uid, roundIndex, 0, scores);
       await loadPlayerNames();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save finals scores";
+      error = e instanceof Error ? e.message : m.finals_error_save();
     } finally {
       scoreSaving = null;
     }
@@ -137,36 +138,36 @@
   {/if}
 
   {#if !hasFinalsCandidate}
-    <p class="text-ash-400">Finals require at least 2 rounds and 5 players with results.</p>
+    <p class="text-ash-400">{m.finals_require_rounds()}</p>
   {:else if !tournament.finals}
-    <p class="text-ash-400">Finals have not started yet. Start finals from the Overview tab.</p>
+    <p class="text-ash-400">{m.finals_not_started()}</p>
   {:else}
     <!-- Finish Finals button -->
     {#if isOrganizer && tournament.state === "Playing"}
       <div class="flex items-center justify-between">
-        <h3 class="text-lg font-medium text-bone-100">Finals</h3>
+        <h3 class="text-lg font-medium text-bone-100">{m.finals_title()}</h3>
         <button
           onclick={finishFinals}
           disabled={actionLoading || tournament.finals.state !== "Finished"}
-          title={tournament.finals.state !== "Finished" ? "Finals table must be Finished first" : "Finish finals and determine winner"}
+          title={tournament.finals.state !== "Finished" ? m.finals_finish_hint_not_ready() : m.finals_finish_hint_ready()}
           class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
-        >Finish Finals</button>
+        >{m.finals_finish()}</button>
       </div>
     {/if}
 
     {#if swapSource}
       <div class="bg-amber-900/20 border border-amber-800 rounded-lg p-3 flex items-center justify-between">
         <p class="text-amber-300 text-sm">
-          Click another seat to swap with <span class="font-medium">{seatDisplay(swapSource.playerUid)}</span>
+          {m.rounds_swap_hint({ name: seatDisplay(swapSource.playerUid) })}
         </p>
-        <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">Cancel</button>
+        <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">{m.common_cancel()}</button>
       </div>
     {/if}
 
     <!-- Finals table -->
     <div class="bg-ash-900/50 rounded-lg p-4">
       <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium text-bone-100">Finals Table</h3>
+        <h3 class="text-sm font-medium text-bone-100">{m.finals_table()}</h3>
         <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'bg-emerald-900/60 text-emerald-300' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'bg-amber-900/60 text-amber-300'}">
           {tournament.finals.state}
         </span>
@@ -193,7 +194,7 @@
               {:else}
                 <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
               {/if}
-              <div class="text-xs text-ash-500">Seed #{seedIdx}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+              <div class="text-xs text-ash-500">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-ash-400 text-xs">VP:</span>
@@ -217,16 +218,16 @@
       {#if isOrganizer && (tournament.finals.state === 'Invalid' || tournament.finals.state === 'In Progress')}
         {#if overrideTable_ === -1}
           <div class="mt-2 pt-2 border-t border-ash-800">
-            <label class="text-xs text-ash-400 block mb-1">Judge comment (required)
+            <label class="text-xs text-ash-400 block mb-1">{m.override_judge_comment()}
               <textarea
                 bind:value={overrideComment}
                 class="w-full bg-ash-800 text-bone-100 text-xs rounded px-2 py-1 border border-ash-700 resize-none"
                 rows="2"
-                placeholder="Explain why this table result is being overridden..."
+                placeholder={m.override_placeholder()}
               ></textarea>
             </label>
             <div class="flex gap-2 mt-1 justify-end">
-              <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">Cancel</button>
+              <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">{m.common_cancel()}</button>
               <button
                 onclick={async () => {
                   if (!overrideComment.trim()) return;
@@ -236,11 +237,11 @@
                     await loadPlayerNames();
                     overrideTable_ = null;
                     overrideComment = "";
-                  } catch (e) { error = e instanceof Error ? e.message : "Failed to override"; } finally { overrideSaving = false; }
+                  } catch (e) { error = e instanceof Error ? e.message : m.override_error(); } finally { overrideSaving = false; }
                 }}
                 disabled={overrideSaving || !overrideComment.trim()}
                 class="px-3 py-1 text-xs font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
-              >{overrideSaving ? "Saving..." : "Override → Finished"}</button>
+              >{overrideSaving ? m.common_saving() : m.override_save()}</button>
             </div>
           </div>
         {:else}
@@ -249,7 +250,7 @@
               onclick={() => { overrideTable_ = -1; overrideComment = ""; }}
               class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
             >
-              <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />Override
+              <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
             </button>
           </div>
         {/if}
@@ -258,7 +259,7 @@
         <div class="mt-2 pt-2 border-t border-ash-800 flex items-center justify-between">
           <span class="text-xs text-amber-400">
             <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />
-            Overridden: {tournament.finals.override.comment}
+            {m.override_overridden({ comment: tournament.finals.override.comment })}
           </span>
           <button
             onclick={async () => {
@@ -266,11 +267,11 @@
               try {
                 tournament = await tournamentAction(tournament.uid, "Unoverride", { round: tournament.rounds.length, table: 0 });
                 await loadPlayerNames();
-              } catch (e) { error = e instanceof Error ? e.message : "Failed to remove override"; } finally { overrideSaving = false; }
+              } catch (e) { error = e instanceof Error ? e.message : m.override_remove_error(); } finally { overrideSaving = false; }
             }}
             disabled={overrideSaving}
             class="px-2 py-1 text-xs text-ash-500 hover:text-crimson-400 transition-colors"
-          >Remove override</button>
+          >{m.override_remove()}</button>
         </div>
       {/if}
     </div>

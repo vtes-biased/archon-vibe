@@ -8,6 +8,7 @@
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let filteredUsers = $state<UserType[]>([]);
   let error = $state<string | null>(null);
@@ -334,7 +335,7 @@
     <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center justify-between mb-4">
-        <h1 class="text-3xl font-light text-crimson-500">Users</h1>
+        <h1 class="text-3xl font-light text-crimson-500">{m.nav_users()}</h1>
 
         <div class="flex items-center gap-3">
           <button
@@ -343,7 +344,7 @@
             disabled={!isOnline}
             class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg disabled:cursor-not-allowed"
           >
-            {showCreateForm ? "Cancel" : "+ New User"}
+            {showCreateForm ? m.common_cancel() : m.user_list_new_user()}
           </button>
 
         </div>
@@ -361,14 +362,14 @@
                 for="name-search"
                 class="block text-sm font-medium text-ash-400 mb-1"
               >
-                Search
+                {m.common_search()}
               </label>
               <input
                 id="name-search"
                 type="text"
                 bind:value={searchQuery}
                 oninput={handleSearchInput}
-                placeholder="Search by name or VEKN ID..."
+                placeholder={m.user_list_search_placeholder()}
                 class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 placeholder:text-ash-600"
               />
             </div>
@@ -378,7 +379,7 @@
                 for="country-filter"
                 class="block text-sm font-medium text-ash-400 mb-1"
               >
-                Country
+                {m.common_country()}
               </label>
               <select
                 id="country-filter"
@@ -386,7 +387,7 @@
                 value={selectedCountry}
                 class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
               >
-                <option value="all">All Countries</option>
+                <option value="all">{m.user_list_all_countries()}</option>
                 {#each Object.entries(countries) as [code, country]}
                   <option value={code}
                     >{country.name} {getCountryFlag(code)}</option
@@ -398,7 +399,7 @@
 
           <!-- Role Filters -->
           <div class="mt-4">
-            <div class="block text-sm font-medium text-ash-400 mb-2">Roles</div>
+            <div class="block text-sm font-medium text-ash-400 mb-2">{m.common_roles()}</div>
             <div class="flex flex-wrap gap-2">
               {#each availableRoles as role}
                 <button
@@ -417,7 +418,7 @@
 
           <!-- Sanction Filters -->
           <div class="mt-4">
-            <div class="block text-sm font-medium text-ash-400 mb-2">Sanctions</div>
+            <div class="block text-sm font-medium text-ash-400 mb-2">{m.sanction_mgr_title()}</div>
             <div class="flex flex-wrap gap-2">
               <button
                 onclick={() => toggleSanctionFilter("past")}
@@ -425,7 +426,7 @@
                   ? 'bg-crimson-800/60 text-crimson-200'
                   : 'bg-ash-800 text-ash-400 hover:bg-ash-700'}"
               >
-                Sanctioned
+                {m.user_list_filter_sanctioned()}
               </button>
               <button
                 onclick={() => toggleSanctionFilter("current")}
@@ -433,7 +434,7 @@
                   ? 'bg-crimson-900/80 text-crimson-200'
                   : 'bg-ash-800 text-ash-400 hover:bg-ash-700'}"
               >
-                Active sanction
+                {m.user_list_filter_active_sanction()}
               </button>
             </div>
           </div>
@@ -472,10 +473,10 @@
           id="users-table-header"
           class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-ash-900 text-sm font-medium text-ash-300 border-b border-ash-700"
         >
-          <div id="header-name" class="col-span-3">Name</div>
-          <div id="header-vekn-id" class="col-span-2">VEKN ID</div>
-          <div id="header-country" class="col-span-2">Country</div>
-          <div id="header-roles" class="col-span-5">Roles</div>
+          <div id="header-name" class="col-span-3">{m.common_name()}</div>
+          <div id="header-vekn-id" class="col-span-2">{m.add_player_vekn_id_label()}</div>
+          <div id="header-country" class="col-span-2">{m.common_country()}</div>
+          <div id="header-roles" class="col-span-5">{m.common_roles()}</div>
         </div>
 
         <!-- User Rows -->
@@ -540,7 +541,7 @@
                       <div class="text-sm text-ash-400">
                         {user.country
                           ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
-                          : "N/A"}
+                          : m.common_na()}
                       </div>
                     </div>
                   </div>
@@ -577,7 +578,7 @@
                   <div class="col-span-2 text-sm text-ash-400">
                     {user.country
                       ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
-                      : "N/A"}
+                      : m.common_na()}
                   </div>
                   <div class="col-span-5">
                     {#if user.roles.length > 0}
@@ -607,12 +608,7 @@
       {#if totalPages > 1}
         <div class="mt-6 flex items-center justify-between">
           <div class="text-sm text-ash-400">
-            Showing {(currentPage - 1) * pageSize + 1} to {Math.min(
-              currentPage * pageSize,
-              filteredUsers.length,
-            )} of {filteredUsers.length} user{filteredUsers.length !== 1
-              ? "s"
-              : ""}
+            {m.user_list_showing_range({ from: ((currentPage - 1) * pageSize + 1).toString(), to: Math.min(currentPage * pageSize, filteredUsers.length).toString(), total: filteredUsers.length.toString() })}
           </div>
           <div class="flex items-center gap-2">
             <button
@@ -620,25 +616,23 @@
               disabled={currentPage === 1}
               class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Previous
+              {m.common_previous()}
             </button>
             <span class="text-sm text-ash-400">
-              Page {currentPage} of {totalPages}
+              {m.user_list_page_info({ current: currentPage.toString(), total: totalPages.toString() })}
             </span>
             <button
               onclick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
               class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next
+              {m.common_next()}
             </button>
           </div>
         </div>
       {:else}
         <div class="mt-6 text-center text-sm text-ash-400">
-          Showing {filteredUsers.length} user{filteredUsers.length !== 1
-            ? "s"
-            : ""}
+          {m.user_list_showing_total({ count: filteredUsers.length.toString() })}
         </div>
       {/if}
     {/if}
@@ -651,19 +645,19 @@
           <div class="text-ash-500 mb-4">
             <Icon icon="lucide:refresh-cw" class="mx-auto h-12 w-12 animate-spin" />
           </div>
-          <h3 class="text-lg font-medium text-bone-100 mb-2">Syncing...</h3>
-          <p class="text-ash-400">Loading users from server.</p>
+          <h3 class="text-lg font-medium text-bone-100 mb-2">{m.status_syncing()}...</h3>
+          <p class="text-ash-400">{m.user_list_loading_from_server()}</p>
         {:else}
           <!-- Truly empty state -->
           <div class="text-ash-600 mb-4">
             <Icon icon="lucide:users" class="mx-auto h-12 w-12" />
           </div>
-          <h3 class="text-lg font-medium text-bone-100 mb-2">No users found</h3>
+          <h3 class="text-lg font-medium text-bone-100 mb-2">{m.user_list_no_users()}</h3>
           <p class="text-ash-400">
             {#if searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0 || filterHasPastSanctions || filterCurrentlySanctioned}
-              Try adjusting your filters.
+              {m.user_list_adjust_filters()}
             {:else}
-              There are no users in the system yet.
+              {m.user_list_no_users_yet()}
             {/if}
           </p>
         {/if}

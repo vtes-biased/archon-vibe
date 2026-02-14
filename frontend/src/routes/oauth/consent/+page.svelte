@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import { getAuthState, getAccessToken } from "$lib/stores/auth.svelte";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -35,7 +36,7 @@
     const params = new URLSearchParams(window.location.search);
     const token = getAccessToken();
     if (!token) {
-      error = "Not authenticated";
+      error = m.oauth_error_not_authenticated();
       loading = false;
       return;
     }
@@ -71,7 +72,7 @@
       clientId = data.client_id;
       codeChallenge = data.code_challenge;
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load authorization details";
+      error = e instanceof Error ? e.message : m.oauth_error_load_failed();
     }
 
     loading = false;
@@ -153,14 +154,14 @@
 </script>
 
 <svelte:head>
-  <title>Authorize Application - Archon</title>
+  <title>{m.oauth_page_title()} - Archon</title>
 </svelte:head>
 
 <div class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-6">
       <h1 class="text-2xl font-light text-crimson-500">Archon</h1>
-      <p class="text-ash-400 text-sm">Authorization Request</p>
+      <p class="text-ash-400 text-sm">{m.oauth_subtitle()}</p>
     </div>
 
     <div class="bg-dusk-950 rounded-lg shadow-lg p-8 border border-ash-800">
@@ -178,7 +179,7 @@
             onclick={() => goto("/")}
             class="text-sm text-crimson-400 hover:text-crimson-300"
           >
-            Return to Archon
+            {m.oauth_return_to_archon()}
           </button>
         </div>
       {:else}
@@ -191,12 +192,12 @@
               {clientName}
             </h2>
             <p class="text-ash-400 text-sm mt-1">
-              wants to access your Archon account
+              {m.oauth_wants_access()}
             </p>
           </div>
 
           <div class="space-y-3">
-            <p class="text-sm text-ash-300 font-medium">This will allow the application to:</p>
+            <p class="text-sm text-ash-300 font-medium">{m.oauth_allow_application()}</p>
             {#each scopes as scope}
               <div class="flex items-start gap-3 p-3 bg-dusk-900 rounded-lg">
                 <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
@@ -216,7 +217,7 @@
               disabled={submitting}
               class="flex-1 py-3 bg-ash-800 hover:bg-ash-700 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors"
             >
-              Deny
+              {m.oauth_deny()}
             </button>
             <button
               onclick={handleApprove}
@@ -226,12 +227,12 @@
               {#if submitting}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
               {/if}
-              Approve
+              {m.oauth_approve()}
             </button>
           </div>
 
           <p class="text-center text-xs text-ash-500">
-            Logged in as {auth.user?.name}
+            {m.oauth_logged_in_as({ name: auth.user?.name ?? '' })}
           </p>
         </div>
       {/if}

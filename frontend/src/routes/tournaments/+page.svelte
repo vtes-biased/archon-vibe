@@ -7,6 +7,7 @@
   import type { Tournament, TournamentState, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass } from "$lib/tournament-utils";
   import Icon from "@iconify/svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let tournaments = $state<Tournament[]>([]);
   let totalCount = $state(0);
@@ -107,21 +108,21 @@
 </script>
 
 <svelte:head>
-  <title>Tournaments - Archon</title>
+  <title>{m.tournaments_page_title()} - Archon</title>
 </svelte:head>
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-light text-crimson-500">Tournaments</h1>
+      <h1 class="text-3xl font-light text-crimson-500">{m.nav_tournaments()}</h1>
 
       {#if canCreate}
         <a
           href="/tournaments/new"
           class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors shadow-md"
         >
-          + New Tournament
+          {m.tournaments_new_btn()}
         </a>
       {/if}
     </div>
@@ -131,25 +132,25 @@
       <div class="flex flex-wrap gap-4">
         <!-- Search -->
         <div class="flex-1 min-w-[200px]">
-          <label for="search" class="block text-sm font-medium text-ash-400 mb-1">Search</label>
+          <label for="search" class="block text-sm font-medium text-ash-400 mb-1">{m.common_search()}</label>
           <input
             id="search"
             type="text"
             bind:value={searchQuery}
-            placeholder="Search by name..."
+            placeholder={m.tournaments_search_placeholder()}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 placeholder:text-ash-600"
           />
         </div>
 
         <!-- State -->
         <div class="min-w-[150px]">
-          <label for="state-filter" class="block text-sm font-medium text-ash-400 mb-1">State</label>
+          <label for="state-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.tournaments_state()}</label>
           <select
             id="state-filter"
             bind:value={selectedState}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
           >
-            <option value="all">All States</option>
+            <option value="all">{m.tournaments_all_states()}</option>
             {#each states as s}
               <option value={s}>{s}</option>
             {/each}
@@ -158,13 +159,13 @@
 
         <!-- Format -->
         <div class="min-w-[130px]">
-          <label for="format-filter" class="block text-sm font-medium text-ash-400 mb-1">Format</label>
+          <label for="format-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.tournaments_format()}</label>
           <select
             id="format-filter"
             bind:value={selectedFormat}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
           >
-            <option value="all">All Formats</option>
+            <option value="all">{m.tournaments_all_formats()}</option>
             {#each formats as f}
               <option value={f}>{f}</option>
             {/each}
@@ -173,13 +174,13 @@
 
         <!-- Country -->
         <div class="min-w-[180px]">
-          <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">Country</label>
+          <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
           <select
             id="country-filter"
             bind:value={selectedCountry}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
           >
-            <option value="all">All Countries</option>
+            <option value="all">{m.tournaments_all_countries()}</option>
             {#each Object.entries(countries) as [code, country]}
               <option value={code}>{country.name} {getCountryFlag(code)}</option>
             {/each}
@@ -188,15 +189,15 @@
 
         <!-- Sort -->
         <div class="min-w-[130px]">
-          <label for="sort" class="block text-sm font-medium text-ash-400 mb-1">Sort by</label>
+          <label for="sort" class="block text-sm font-medium text-ash-400 mb-1">{m.tournaments_sort_by()}</label>
           <select
             id="sort"
             bind:value={sortBy}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
           >
-            <option value="date">Date</option>
-            <option value="name">Name</option>
-            <option value="state">State</option>
+            <option value="date">{m.tournaments_sort_date()}</option>
+            <option value="name">{m.tournaments_sort_name()}</option>
+            <option value="state">{m.tournaments_sort_state()}</option>
           </select>
         </div>
       </div>
@@ -214,11 +215,11 @@
       <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
         <!-- Header (desktop) -->
         <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-ash-900 text-sm font-medium text-ash-300 border-b border-ash-700">
-          <div class="col-span-4">Name</div>
-          <div class="col-span-2">Date</div>
-          <div class="col-span-2">Country</div>
-          <div class="col-span-2">Format</div>
-          <div class="col-span-2">State</div>
+          <div class="col-span-4">{m.tournaments_col_name()}</div>
+          <div class="col-span-2">{m.tournaments_col_date()}</div>
+          <div class="col-span-2">{m.tournaments_col_country()}</div>
+          <div class="col-span-2">{m.tournaments_col_format()}</div>
+          <div class="col-span-2">{m.tournaments_col_state()}</div>
         </div>
 
         <div class="divide-y divide-ash-800">
@@ -249,7 +250,7 @@
                     <span>· {tournament.rank}</span>
                   {/if}
                   {#if tournament.online}
-                    <span>· Online</span>
+                    <span>· {m.tournaments_online()}</span>
                   {/if}
                 </div>
               </div>
@@ -269,7 +270,7 @@
                   {#if tournament.country}
                     {getCountryFlag(tournament.country)} {countries[tournament.country]?.name || tournament.country}
                   {:else if tournament.online}
-                    Online
+                    {m.tournaments_online()}
                   {:else}
                     —
                   {/if}
@@ -289,20 +290,20 @@
       </div>
 
       <div class="mt-4 flex items-center justify-between text-sm text-ash-400">
-        <span>{totalCount} tournament{totalCount !== 1 ? "s" : ""}</span>
+        <span>{m.tournaments_total_count({ count: totalCount.toString() })}</span>
         {#if totalPages > 1}
           <div class="flex items-center gap-2">
             <button
               onclick={() => page = Math.max(0, page - 1)}
               disabled={page === 0}
               class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 disabled:cursor-not-allowed text-ash-200"
-            >Prev</button>
-            <span>Page {page + 1} of {totalPages}</span>
+            >{m.tournaments_prev()}</button>
+            <span>{m.tournaments_page_info({ current: String(page + 1), total: String(totalPages) })}</span>
             <button
               onclick={() => page = Math.min(totalPages - 1, page + 1)}
               disabled={page >= totalPages - 1}
               class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 disabled:cursor-not-allowed text-ash-200"
-            >Next</button>
+            >{m.common_next()}</button>
           </div>
         {/if}
       </div>
@@ -311,20 +312,20 @@
         <div class="text-ash-500 mb-4">
           <Icon icon="lucide:loader-2" class="mx-auto h-12 w-12 animate-spin" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">Loading...</h3>
-        <p class="text-ash-400">Loading tournaments from local storage.</p>
+        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.common_loading()}</h3>
+        <p class="text-ash-400">{m.tournaments_loading_from_storage()}</p>
       </div>
     {:else}
       <div class="text-center py-12">
         <div class="text-ash-600 mb-4">
           <Icon icon="lucide:trophy" class="mx-auto h-12 w-12" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">No tournaments found</h3>
+        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.tournaments_no_results()}</h3>
         <p class="text-ash-400">
           {#if searchQuery.trim() || selectedState !== "all" || selectedCountry !== "all" || selectedFormat !== "all"}
-            Try adjusting your filters.
+            {m.tournaments_adjust_filters()}
           {:else}
-            No tournaments have been created yet.
+            {m.tournaments_none_yet()}
           {/if}
         </p>
       </div>
