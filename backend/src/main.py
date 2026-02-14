@@ -19,6 +19,7 @@ from fastapi.responses import StreamingResponse
 from .db import (
     cleanup_expired_oauth_codes,
     cleanup_expired_oauth_tokens,
+    cleanup_expired_tokens,
     close_db,
     delete_sanction_hard,
     get_expired_sanctions,
@@ -163,14 +164,18 @@ async def run_sanction_cleanup() -> None:
 
 
 async def run_oauth_cleanup() -> None:
-    """Clean up expired OAuth authorization codes and revoked tokens."""
+    """Clean up expired OAuth authorization codes, revoked tokens, and transient tokens."""
     try:
         codes = await cleanup_expired_oauth_codes()
         tokens = await cleanup_expired_oauth_tokens()
-        if codes or tokens:
-            logger.info(f"OAuth cleanup: {codes} expired codes, {tokens} revoked tokens removed")
+        transient = await cleanup_expired_tokens()
+        if codes or tokens or transient:
+            logger.info(
+                f"Cleanup: {codes} expired codes, {tokens} revoked tokens, "
+                f"{transient} transient tokens removed"
+            )
     except Exception as e:
-        logger.error(f"Error during OAuth cleanup: {e}", exc_info=True)
+        logger.error(f"Error during cleanup: {e}", exc_info=True)
 
 
 @asynccontextmanager
@@ -178,7 +183,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
     global _scheduler, _sync_service, _shutdown_event
 
-    # Startup
+    # Startup — check JWT secret safety
+    from .jwt_config import JWT_DEFAULT_SECRET, JWT_SECRET
+
+    environment = os.getenv("ENVIRONMENT", "development")
+    if JWT_SECRET == JWT_DEFAULT_SECRET and environment != "development":
+        raise RuntimeError(
+            "JWT_SECRET must be set to a secure value in non-development environments. "
+            "Set the JWT_SECRET environment variable."
+        )
+
     _shutdown_event = asyncio.Event()
     await init_db()
 
@@ -499,19 +513,6 @@ async def broadcast_tournament_event(tournament: Tournament) -> None:
     await _broadcast("tournament", tournament, _filter_tournament)
 
 
-async def broadcast_tournament_delete(uid: str) -> None:
-    """Broadcast a tournament deletion to all connected SSE clients."""
-    event_data = {"type": "tournament_delete", "data": uid}
-    message = f"data: {encoder.encode(event_data).decode('utf-8')}\n\n"
-    disconnected: set[SSEConnection] = set()
-    for conn in _sse_connections:
-        try:
-            conn.queue.put_nowait(message)
-        except asyncio.QueueFull:
-            disconnected.add(conn)
-    _sse_connections.difference_update(disconnected)
-
-
 async def broadcast_rating_event(rating: Rating) -> None:
     await _broadcast("rating", rating, _filter_rating)
 
@@ -532,7 +533,6 @@ async def broadcast_resync(user_uid: str) -> None:
 users.broadcast_user_event = broadcast_user_event
 sanctions.broadcast_sanction_event = broadcast_sanction_event
 tournaments.broadcast_tournament_event = broadcast_tournament_event
-tournaments.broadcast_tournament_delete = broadcast_tournament_delete
 tournaments.broadcast_rating_event = broadcast_rating_event
 users.broadcast_resync = broadcast_resync
 vekn.broadcast_resync = broadcast_resync
@@ -556,7 +556,7 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
     if not token:
         return None
     try:
-        from .middleware.auth import JWT_SECRET, JWT_ALGORITHM
+        from .jwt_config import JWT_ALGORITHM, JWT_SECRET
 
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_uid = payload.get("sub")

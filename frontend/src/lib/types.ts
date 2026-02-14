@@ -81,6 +81,7 @@ export interface Sanction extends BaseObject {
   tournament_uid: string | null; // If tournament-related
   level: SanctionLevel;
   category: SanctionCategory;
+  vp_adjustment?: number;
   description: string;
   issued_at: string;
   expires_at: string | null; // For suspensions/probation (null = permanent)

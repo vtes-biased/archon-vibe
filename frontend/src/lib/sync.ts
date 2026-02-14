@@ -71,7 +71,7 @@ class SyncManager {
    * Start syncing with the backend SSE stream.
    */
   async connect(): Promise<void> {
-    this.disconnect();
+    await this.disconnect();
     this.isSynced = false;
 
     const lastSync = await getLastSyncTimestamp();
@@ -98,15 +98,6 @@ class SyncManager {
         if (message.type === 'resync') {
           await this.clearAllStores();
           this.emit({ type: 'resync' });
-          return;
-        }
-
-        // Handle tournament_delete specially
-        if (message.type === 'tournament_delete') {
-          const uid = message.data as string;
-          await deleteTournament(uid);
-          await clearChangeForUid(uid);
-          this.emit({ type: 'tournament' });
           return;
         }
 
@@ -151,15 +142,7 @@ class SyncManager {
 
     this.eventSource.onerror = (error) => {
       console.error('SSE connection error:', error);
-      this.disconnect();
-
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectAttempts++;
-        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-        setTimeout(() => { this.connect(); }, delay);
-      } else {
-        this.emit({ type: 'error', error: 'Failed to connect after multiple attempts' });
-      }
+      void this.handleError();
     };
   }
 
@@ -204,13 +187,27 @@ class SyncManager {
   }
 
   /**
-   * Disconnect from SSE stream.
+   * Handle SSE error: disconnect (flushing buffers) then schedule reconnect.
    */
-  disconnect(): void {
+  private async handleError(): Promise<void> {
+    await this.disconnect();
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+      setTimeout(() => { void this.connect(); }, delay);
+    } else {
+      this.emit({ type: 'error', error: 'Failed to connect after multiple attempts' });
+    }
+  }
+
+  /**
+   * Disconnect from SSE stream, flushing any buffered data.
+   */
+  async disconnect(): Promise<void> {
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
-      this.flushAllBuffers();
+      await this.flushAllBuffers();
       this.emit({ type: 'disconnected' });
     }
   }

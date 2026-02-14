@@ -79,14 +79,6 @@ export async function fetchUsers(): Promise<User[]> {
   return getAllUsers();
 }
 
-export async function fetchUser(uid: string): Promise<User> {
-  const response = await fetch(`${API_URL}/api/users/${uid}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch user: ${response.statusText}`);
-  }
-  return response.json();
-}
-
 export async function createUser(
   name: string,
   country: string,
@@ -324,14 +316,6 @@ export async function deleteSanctionApi(uid: string): Promise<{ message: string 
   });
 }
 
-/**
- * Get all sanctions for a user (from server, not IndexedDB).
- */
-export async function getUserSanctionsApi(userUid: string, includeDeleted = false): Promise<Sanction[]> {
-  const params = includeDeleted ? '?include_deleted=true' : '';
-  return apiRequest<Sanction[]>(`/sanctions/user/${userUid}${params}`);
-}
-
 // Avatar API
 
 /**
@@ -372,10 +356,6 @@ export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ succe
 }
 
 // Tournament API
-
-export async function fetchTournament(uid: string): Promise<Tournament> {
-  return apiRequest<Tournament>(`/api/tournaments/${uid}`);
-}
 
 export interface CreateTournamentData {
   name: string;

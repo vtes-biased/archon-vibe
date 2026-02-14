@@ -80,8 +80,12 @@ export function scoreSeatingSync(
 export type TournamentEventType =
   | 'OpenRegistration'
   | 'CloseRegistration'
+  | 'CancelRegistration'
+  | 'ReopenRegistration'
+  | 'ReopenTournament'
   | 'FinishTournament'
   | 'Register'
+  | 'Unregister'
   | 'AddPlayer'
   | 'RemovePlayer'
   | 'DropOut'
@@ -90,7 +94,15 @@ export type TournamentEventType =
   | 'ResetCheckIn'
   | 'StartRound'
   | 'FinishRound'
+  | 'CancelRound'
+  | 'SwapSeats'
+  | 'SeatPlayer'
+  | 'UnseatPlayer'
+  | 'AddTable'
   | 'RemoveTable'
+  | 'UploadDeck'
+  | 'UpdateDeck'
+  | 'DeleteDeck'
   | 'SetScore'
   | 'Override'
   | 'Unoverride'
@@ -105,12 +117,19 @@ export interface TournamentEvent {
   player_uid?: string;
   round?: number;
   table?: number;
+  table1?: number;
+  seat1?: number;
+  table2?: number;
+  seat2?: number;
+  seat?: number;
   scores?: Array<{
     player_uid: string;
     vp: number;
   }>;
   comment?: string;
   toss?: number;
+  deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
+  multideck?: boolean;
 }
 
 export interface ActorContext {

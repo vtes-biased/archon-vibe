@@ -31,17 +31,21 @@ from webauthn.helpers.structs import (
 )
 
 from ..db import (
+    delete_transient_token,
     get_auth_method_by_identifier,
     get_auth_methods_for_user,
+    get_transient_token,
     get_user_by_contact_email,
     get_user_by_uid,
     insert_auth_method,
     insert_user,
     merge_users,
+    store_transient_token,
     update_auth_method,
     update_user,
 )
 from ..email_service import send_magic_link_email
+from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
 from ..models import AuthMethod, AuthMethodType, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -51,8 +55,6 @@ encoder = msgspec.json.Encoder()
 ph = PasswordHasher()
 
 # JWT settings
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
-JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
@@ -60,10 +62,6 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 WEBAUTHN_RP_ID = os.getenv("WEBAUTHN_RP_ID", "localhost")
 WEBAUTHN_RP_NAME = os.getenv("WEBAUTHN_RP_NAME", "Archon")
 WEBAUTHN_ORIGIN = os.getenv("WEBAUTHN_ORIGIN", "http://localhost:5173")
-
-# In-memory challenge store (challenge -> {user_uid, expires_at})
-# In production, use Redis or database
-_challenge_store: dict[str, dict] = {}
 
 
 def _get_discord_config() -> tuple[str, str, str, str]:
@@ -77,16 +75,6 @@ def _get_discord_config() -> tuple[str, str, str, str]:
         os.getenv("FRONTEND_URL", "http://localhost:5173"),
     )
 
-
-# In-memory Discord state store (state -> {user_uid?, expires_at, link_mode, redirect})
-_discord_state_store: dict[str, dict] = {}
-
-# In-memory magic link token store (token -> {email, purpose, discord_user_uid?, expires_at})
-_magic_link_store: dict[str, dict] = {}
-
-# In-memory set-password token store (token -> {email, purpose, discord_user_uid?, expires_at})
-# This is issued after magic link verification, allows password setting
-_set_password_store: dict[str, dict] = {}
 
 # Magic link settings
 MAGIC_LINK_EXPIRE_MINUTES = 15
@@ -326,22 +314,6 @@ async def login(request: LoginRequest) -> Response:
 # =============================================================================
 
 
-def _cleanup_expired_magic_links() -> None:
-    """Remove expired magic link tokens from the store."""
-    now = datetime.now(UTC)
-    expired = [k for k, v in _magic_link_store.items() if v["expires_at"] < now]
-    for k in expired:
-        del _magic_link_store[k]
-
-
-def _cleanup_expired_set_password_tokens() -> None:
-    """Remove expired set-password tokens from the store."""
-    now = datetime.now(UTC)
-    expired = [k for k, v in _set_password_store.items() if v["expires_at"] < now]
-    for k in expired:
-        del _set_password_store[k]
-
-
 def _get_frontend_url() -> str:
     """Get frontend URL from environment."""
     return os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -361,16 +333,14 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
     Returns:
         True if email was sent successfully
     """
-    _cleanup_expired_magic_links()
-
     # Generate token
     token = secrets.token_urlsafe(32)
-    _magic_link_store[token] = {
+    expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
+    await store_transient_token(f"magic:{token}", {
         "email": email,
         "purpose": "invite",
         "user_uid": user_uid,
-        "expires_at": datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES),
-    }
+    }, expires_at)
 
     # Build magic link URL
     frontend_url = _get_frontend_url()
@@ -379,7 +349,7 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
     # Send email
     sent = await send_magic_link_email(email, magic_link, purpose="invite")
     if not sent:
-        del _magic_link_store[token]
+        await delete_transient_token(f"magic:{token}")
         raise RuntimeError(f"Failed to send invite email to {email}")
 
     return True
@@ -395,7 +365,6 @@ async def request_magic_link(request: MagicLinkRequest) -> Response:
     """
     email = request.email.lower()
     purpose = request.purpose
-    _cleanup_expired_magic_links()
 
     if purpose not in ("signup", "reset"):
         raise HTTPException(status_code=400, detail="Invalid purpose")
@@ -422,12 +391,12 @@ async def request_magic_link(request: MagicLinkRequest) -> Response:
 
     # Generate token
     token = secrets.token_urlsafe(32)
-    _magic_link_store[token] = {
+    expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
+    await store_transient_token(f"magic:{token}", {
         "email": email,
         "purpose": purpose,
         "discord_user_uid": discord_user_uid,
-        "expires_at": datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES),
-    }
+    }, expires_at)
 
     # Build magic link URL
     frontend_url = _get_frontend_url()
@@ -436,7 +405,7 @@ async def request_magic_link(request: MagicLinkRequest) -> Response:
     # Send email with appropriate subject
     sent = await send_magic_link_email(email, magic_link, purpose=purpose)
     if not sent:
-        del _magic_link_store[token]
+        await delete_transient_token(f"magic:{token}")
         raise HTTPException(status_code=500, detail="Failed to send email")
 
     return Response(
@@ -456,29 +425,22 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
     Returns a short-lived set-password token that allows the user to set their password.
     Does NOT log in directly - user must set password first.
     """
-    _cleanup_expired_magic_links()
-
-    stored = _magic_link_store.get(request.token)
+    stored = await get_transient_token(f"magic:{request.token}")
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    if stored["expires_at"] < datetime.now(UTC):
-        del _magic_link_store[request.token]
-        raise HTTPException(status_code=400, detail="Token expired")
-
     # Clean up magic link token (single use)
-    del _magic_link_store[request.token]
+    await delete_transient_token(f"magic:{request.token}")
 
     # Generate a set-password token
-    _cleanup_expired_set_password_tokens()
     set_password_token = secrets.token_urlsafe(32)
-    _set_password_store[set_password_token] = {
+    expires_at = datetime.now(UTC) + timedelta(minutes=SET_PASSWORD_EXPIRE_MINUTES)
+    await store_transient_token(f"setpwd:{set_password_token}", {
         "email": stored["email"],
         "purpose": stored["purpose"],
         "discord_user_uid": stored.get("discord_user_uid"),
         "user_uid": stored.get("user_uid"),  # For invite flow
-        "expires_at": datetime.now(UTC) + timedelta(minutes=SET_PASSWORD_EXPIRE_MINUTES),
-    }
+    }, expires_at)
 
     return Response(
         content=encoder.encode({
@@ -498,18 +460,12 @@ async def set_password(request: SetPasswordRequest) -> Response:
     Creates user/auth method if signup, updates password if reset.
     Returns authentication tokens on success.
     """
-    _cleanup_expired_set_password_tokens()
-
-    stored = _set_password_store.get(request.token)
+    stored = await get_transient_token(f"setpwd:{request.token}")
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    if stored["expires_at"] < datetime.now(UTC):
-        del _set_password_store[request.token]
-        raise HTTPException(status_code=400, detail="Token expired")
-
     # Clean up token (single use)
-    del _set_password_store[request.token]
+    await delete_transient_token(f"setpwd:{request.token}")
 
     email = stored["email"]
     purpose = stored["purpose"]
@@ -769,14 +725,6 @@ async def update_current_user(
 # =============================================================================
 
 
-def _cleanup_expired_challenges() -> None:
-    """Remove expired challenges from the store."""
-    now = datetime.now(UTC)
-    expired = [k for k, v in _challenge_store.items() if v["expires_at"] < now]
-    for k in expired:
-        del _challenge_store[k]
-
-
 @router.post("/passkey/register/options")
 async def passkey_register_options(
     authorization: str = Header(..., description="Bearer token"),
@@ -817,15 +765,14 @@ async def passkey_register_options(
     )
 
     # Store challenge for verification
-    _cleanup_expired_challenges()
     challenge_b64 = (
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
-    _challenge_store[challenge_b64] = {
+    expires_at = datetime.now(UTC) + timedelta(minutes=5)
+    await store_transient_token(f"challenge:{challenge_b64}", {
         "user_uid": user_uid,
-        "expires_at": datetime.now(UTC) + timedelta(minutes=5),
         "type": "registration",
-    }
+    }, expires_at)
 
     return Response(
         content=options_to_json(options),
@@ -854,7 +801,7 @@ async def passkey_register_verify(
     client_data = json.loads(client_data_json)
     challenge_b64 = client_data["challenge"]
 
-    stored = _challenge_store.get(challenge_b64)
+    stored = await get_transient_token(f"challenge:{challenge_b64}")
     if not stored:
         raise HTTPException(status_code=400, detail="Challenge not found or expired")
     if stored["user_uid"] != user_uid:
@@ -874,7 +821,7 @@ async def passkey_register_verify(
         raise HTTPException(status_code=400, detail=f"Verification failed: {e}") from e
 
     # Clean up challenge
-    del _challenge_store[challenge_b64]
+    await delete_transient_token(f"challenge:{challenge_b64}")
 
     # Store the credential
     credential_id_b64 = (
@@ -932,15 +879,14 @@ async def passkey_create_options() -> Response:
     )
 
     # Store challenge for verification
-    _cleanup_expired_challenges()
     challenge_b64 = (
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
-    _challenge_store[challenge_b64] = {
+    expires_at = datetime.now(UTC) + timedelta(minutes=5)
+    await store_transient_token(f"challenge:{challenge_b64}", {
         "temp_user_uid": temp_user_uid,
-        "expires_at": datetime.now(UTC) + timedelta(minutes=5),
         "type": "create",
-    }
+    }, expires_at)
 
     return Response(
         content=options_to_json(options),
@@ -960,7 +906,7 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
     client_data = json.loads(client_data_json)
     challenge_b64 = client_data["challenge"]
 
-    stored = _challenge_store.get(challenge_b64)
+    stored = await get_transient_token(f"challenge:{challenge_b64}")
     if not stored:
         raise HTTPException(status_code=400, detail="Challenge not found or expired")
     if stored["type"] != "create":
@@ -978,7 +924,7 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
         raise HTTPException(status_code=400, detail=f"Verification failed: {e}") from e
 
     # Clean up challenge
-    del _challenge_store[challenge_b64]
+    await delete_transient_token(f"challenge:{challenge_b64}")
 
     # Create the user with placeholder name
     now = datetime.now(UTC)
@@ -1040,14 +986,13 @@ async def passkey_login_options() -> Response:
     )
 
     # Store challenge for verification
-    _cleanup_expired_challenges()
     challenge_b64 = (
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
-    _challenge_store[challenge_b64] = {
-        "expires_at": datetime.now(UTC) + timedelta(minutes=5),
+    expires_at = datetime.now(UTC) + timedelta(minutes=5)
+    await store_transient_token(f"challenge:{challenge_b64}", {
         "type": "authentication",
-    }
+    }, expires_at)
 
     return Response(
         content=options_to_json(options),
@@ -1077,7 +1022,7 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
     client_data = json.loads(client_data_json)
     challenge_b64 = client_data["challenge"]
 
-    stored = _challenge_store.get(challenge_b64)
+    stored = await get_transient_token(f"challenge:{challenge_b64}")
     if not stored:
         raise HTTPException(status_code=400, detail="Challenge not found or expired")
     if stored["type"] != "authentication":
@@ -1086,13 +1031,13 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
     # Verify the authentication
     try:
         public_key = base64.urlsafe_b64decode(auth_method.credential_hash + "==")
-        verify_authentication_response(
+        verification = verify_authentication_response(
             credential=request.credential,
             expected_challenge=base64.urlsafe_b64decode(challenge_b64 + "=="),
             expected_rp_id=WEBAUTHN_RP_ID,
             expected_origin=WEBAUTHN_ORIGIN,
             credential_public_key=public_key,
-            credential_current_sign_count=0,  # We don't track sign count yet
+            credential_current_sign_count=auth_method.sign_count,
         )
     except Exception as e:
         raise HTTPException(
@@ -1100,9 +1045,9 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
         ) from e
 
     # Clean up challenge
-    del _challenge_store[challenge_b64]
+    await delete_transient_token(f"challenge:{challenge_b64}")
 
-    # Update last_used_at
+    # Update last_used_at and sign_count
     now = datetime.now(UTC)
     updated_auth_method = AuthMethod(
         uid=auth_method.uid,
@@ -1114,6 +1059,7 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
         verified=auth_method.verified,
         created_at=auth_method.created_at,
         last_used_at=now,
+        sign_count=verification.new_sign_count,
     )
     await update_auth_method(updated_auth_method)
 
@@ -1135,14 +1081,6 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
 # =============================================================================
 # Discord OAuth Endpoints
 # =============================================================================
-
-
-def _cleanup_expired_discord_states() -> None:
-    """Remove expired Discord OAuth states from the store."""
-    now = datetime.now(UTC)
-    expired = [k for k, v in _discord_state_store.items() if v["expires_at"] < now]
-    for k in expired:
-        del _discord_state_store[k]
 
 
 @router.get("/discord/authorize")
@@ -1193,8 +1131,8 @@ async def discord_authorize(
         user_uid = verify_token(auth_token, expected_type="access")
         state_data["user_uid"] = user_uid
 
-    _cleanup_expired_discord_states()
-    _discord_state_store[state] = state_data
+    expires_at = state_data.pop("expires_at", datetime.now(UTC) + timedelta(minutes=5))
+    await store_transient_token(f"discord:{state}", state_data, expires_at)
 
     # Build Discord OAuth URL
     params = {
@@ -1224,20 +1162,14 @@ async def discord_callback(
     client_id, client_secret, redirect_uri, frontend_url = _get_discord_config()
 
     # Validate state
-    stored = _discord_state_store.get(state)
+    stored = await get_transient_token(f"discord:{state}")
     if not stored:
         return RedirectResponse(
             url=f"{frontend_url}/login?error=invalid_state", status_code=302
         )
 
-    if stored["expires_at"] < datetime.now(UTC):
-        del _discord_state_store[state]
-        return RedirectResponse(
-            url=f"{frontend_url}/login?error=state_expired", status_code=302
-        )
-
-    # Clean up state
-    del _discord_state_store[state]
+    # Clean up state (single use)
+    await delete_transient_token(f"discord:{state}")
 
     link_mode = stored.get("link_mode", False)
     user_uid_from_state = stored.get("user_uid")

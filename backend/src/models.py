@@ -5,11 +5,11 @@ always run the python-to-typescript-models rule to keep TypeScript
 definitions in frontend/src/lib/types.ts synchronized.
 """
 
+import secrets
 from datetime import datetime
 from enum import StrEnum
 
 import msgspec
-import secrets
 
 
 class DataLevel(StrEnum):
@@ -87,6 +87,7 @@ class AuthMethod(msgspec.Struct, kw_only=True):
     verified: bool = False
     created_at: datetime | None = None
     last_used_at: datetime | None = None
+    sign_count: int = 0  # WebAuthn signature counter for passkeys
 
 
 class User(BaseObject, kw_only=True):

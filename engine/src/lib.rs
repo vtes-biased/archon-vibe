@@ -132,579 +132,296 @@ impl Default for Engine {
     }
 }
 
-// WASM bindings (frontend)
+// ============================================================================
+// Shared JSON→core→JSON functions (used by both WASM and PyO3 shims).
+// Appear unused when neither feature is enabled (test builds).
+// ============================================================================
+#[allow(dead_code)]
+mod shared {
+    use super::*;
+
+    pub fn process_event_json(event_json: &str, objects_json: &str) -> Result<String, String> {
+        let event_value = json::parse(event_json).map_err(|e| e.to_string())?;
+        let event = BusinessEvent::from_json(&event_value)?;
+        let objects_value = json::parse(objects_json).map_err(|e| e.to_string())?;
+        let objects: Vec<BaseObject> = objects_value.members().map(BaseObject::from_json).collect::<Result<_, _>>()?;
+        let crud_events = Engine::new().process_event(event, &objects)?;
+        Ok(JsonValue::Array(crud_events.iter().map(|e| e.to_json()).collect()).dump())
+    }
+
+    pub fn validate_object_json(object_json: &str) -> Result<(), String> {
+        let value = json::parse(object_json).map_err(|e| e.to_string())?;
+        Engine::new().validate_object(&BaseObject::from_json(&value)?)
+    }
+
+    pub fn can_change_role_json(actor_json: &str, target_json: &str, role_str: &str) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let target = UserContext::from_json(&json::parse(target_json).map_err(|e| e.to_string())?)?;
+        let role = Role::from_str(role_str).ok_or_else(|| format!("Unknown role: {}", role_str))?;
+        Ok(can_change_role(&actor, &target, role).to_json().dump())
+    }
+
+    pub fn can_manage_vekn_json(actor_json: &str, target_json: &str) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let target = UserContext::from_json(&json::parse(target_json).map_err(|e| e.to_string())?)?;
+        Ok(can_manage_vekn(&actor, &target).to_json().dump())
+    }
+
+    pub fn can_edit_user_json(actor_json: &str, actor_uid: &str, target_uid: &str, target_json: &str) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let target = UserContext::from_json(&json::parse(target_json).map_err(|e| e.to_string())?)?;
+        Ok(can_edit_user(&actor, actor_uid, target_uid, &target).to_json().dump())
+    }
+
+    pub fn compute_seating_json(config_json: &str) -> Result<String, String> {
+        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+        let players: Vec<String> = config["players"].members()
+            .filter_map(|p| p.as_str().map(|s| s.to_string())).collect();
+        let rounds_count = config["rounds"].as_usize().unwrap_or(3);
+        let previous_rounds: Option<Vec<Vec<Vec<String>>>> = if config["previous_rounds"].is_null() {
+            None
+        } else {
+            Some(config["previous_rounds"].members().map(|r| {
+                r.members().map(|t| {
+                    t.members().filter_map(|p| p.as_str().map(|s| s.to_string())).collect()
+                }).collect()
+            }).collect())
+        };
+        let (rounds, score) = seating::compute_seating(&players, rounds_count, previous_rounds.as_deref())?;
+        let rounds_json: Vec<JsonValue> = rounds.iter().map(|r| {
+            JsonValue::Array(r.iter().map(|t| {
+                JsonValue::Array(t.iter().map(|p| p.as_str().into()).collect())
+            }).collect())
+        }).collect();
+        Ok(json::object! { rounds: rounds_json, score: score.to_json() }.dump())
+    }
+
+    pub fn score_seating_json(config_json: &str) -> Result<String, String> {
+        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+        let rounds: Vec<Vec<Vec<String>>> = config["rounds"].members().map(|r| {
+            r.members().map(|t| {
+                t.members().filter_map(|p| p.as_str().map(|s| s.to_string())).collect()
+            }).collect()
+        }).collect();
+        let score = seating::score_rounds(&rounds)?;
+        let minimums = seating::compute_minimum_violations(&rounds);
+        let mut result = score.to_json();
+        result["minimums"] = JsonValue::Array(minimums.iter().map(|&x| x.into()).collect());
+        Ok(result.dump())
+    }
+
+    /// Parse deck JSON into a Deck struct (shared helper for validate/enrich/export).
+    pub fn deck_from_json(value: &JsonValue, with_metadata: bool) -> Result<deck::Deck, String> {
+        let mut d = deck::Deck::new();
+        d.name = value["name"].as_str().unwrap_or("").to_string();
+        if with_metadata {
+            d.author = value["author"].as_str().unwrap_or("").to_string();
+            d.comments = value["comments"].as_str().unwrap_or("").to_string();
+        }
+        for (id_str, count_val) in value["cards"].entries() {
+            let id: u32 = id_str.parse().map_err(|_| format!("Invalid card ID: {id_str}"))?;
+            d.cards.insert(id, count_val.as_u32().unwrap_or(0));
+        }
+        Ok(d)
+    }
+
+    pub fn parse_deck_json(text: &str, cards_json: &str) -> Result<String, String> {
+        let card_map = cards::CardMap::load(cards_json)?;
+        Ok(deck::parse_deck(text, &card_map)?.to_json().dump())
+    }
+
+    pub fn validate_deck_json(deck_json: &str, cards_json: &str, format: &str) -> Result<String, String> {
+        let card_map = cards::CardMap::load(cards_json)?;
+        let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+        let d = deck_from_json(&value, false)?;
+        let errors = deck::validate_deck(&d, &card_map, format);
+        Ok(JsonValue::Array(errors.iter().map(|e| e.to_json()).collect()).dump())
+    }
+
+    pub fn enrich_deck_json(deck_json: &str, cards_json: &str) -> Result<String, String> {
+        let card_map = cards::CardMap::load(cards_json)?;
+        let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+        let d = deck_from_json(&value, true)?;
+        Ok(deck::enrich_deck(&d, &card_map).dump())
+    }
+
+    pub fn export_twda_json(
+        deck_json: &str, cards_json: &str,
+        tournament_name: &str, tournament_date: &str, tournament_place: &str,
+        player_count: u32, player_name: &str,
+    ) -> Result<String, String> {
+        let card_map = cards::CardMap::load(cards_json)?;
+        let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+        let d = deck_from_json(&value, true)?;
+        Ok(deck::export_twda(&d, &card_map, tournament_name, tournament_date, tournament_place, player_count, player_name))
+    }
+}
+
+// ============================================================================
+// WASM bindings (frontend) — thin shims over shared functions
+// ============================================================================
 #[cfg(feature = "wasm")]
 mod wasm {
-    use super::*;
+    use super::shared::*;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    pub struct WasmEngine {
-        engine: Engine,
-    }
+    pub struct WasmEngine;
 
     #[wasm_bindgen]
     impl WasmEngine {
         #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            WasmEngine {
-                engine: Engine::new(),
-            }
-        }
+        pub fn new() -> Self { WasmEngine }
 
         #[wasm_bindgen(js_name = processEvent)]
         pub fn process_event(&self, event_json: &str, objects_json: &str) -> Result<String, String> {
-            let event_value = json::parse(event_json).map_err(|e| e.to_string())?;
-            let event = BusinessEvent::from_json(&event_value)?;
-
-            let objects_value = json::parse(objects_json).map_err(|e| e.to_string())?;
-            let objects: Result<Vec<BaseObject>, String> = objects_value
-                .members()
-                .map(BaseObject::from_json)
-                .collect();
-            let objects = objects?;
-
-            let crud_events = self.engine.process_event(event, &objects)?;
-            let result =
-                JsonValue::Array(crud_events.iter().map(|e| e.to_json()).collect());
-            Ok(result.dump())
+            process_event_json(event_json, objects_json)
         }
 
         #[wasm_bindgen(js_name = validateObject)]
         pub fn validate_object(&self, object_json: &str) -> Result<(), String> {
-            let value = json::parse(object_json).map_err(|e| e.to_string())?;
-            let object = BaseObject::from_json(&value)?;
-            self.engine.validate_object(&object)
+            validate_object_json(object_json)
         }
 
-        /// Check if actor can change a role on target user.
-        /// Returns JSON: { allowed: bool, reason: string | null }
         #[wasm_bindgen(js_name = canChangeRole)]
-        pub fn can_change_role(
-            &self,
-            actor_json: &str,
-            target_json: &str,
-            role: &str,
-        ) -> Result<String, String> {
-            let actor_value = json::parse(actor_json).map_err(|e| e.to_string())?;
-            let target_value = json::parse(target_json).map_err(|e| e.to_string())?;
-
-            let actor = UserContext::from_json(&actor_value)?;
-            let target = UserContext::from_json(&target_value)?;
-            let role =
-                Role::from_str(role).ok_or_else(|| format!("Unknown role: {}", role))?;
-
-            let result = super::can_change_role(&actor, &target, role);
-            Ok(result.to_json().dump())
+        pub fn can_change_role(&self, actor_json: &str, target_json: &str, role: &str) -> Result<String, String> {
+            can_change_role_json(actor_json, target_json, role)
         }
 
-        /// Check if actor can manage VEKN IDs for target user.
-        /// Returns JSON: { allowed: bool, reason: string | null }
         #[wasm_bindgen(js_name = canManageVekn)]
-        pub fn can_manage_vekn(
-            &self,
-            actor_json: &str,
-            target_json: &str,
-        ) -> Result<String, String> {
-            let actor_value = json::parse(actor_json).map_err(|e| e.to_string())?;
-            let target_value = json::parse(target_json).map_err(|e| e.to_string())?;
-
-            let actor = UserContext::from_json(&actor_value)?;
-            let target = UserContext::from_json(&target_value)?;
-
-            let result = super::can_manage_vekn(&actor, &target);
-            Ok(result.to_json().dump())
+        pub fn can_manage_vekn(&self, actor_json: &str, target_json: &str) -> Result<String, String> {
+            can_manage_vekn_json(actor_json, target_json)
         }
 
-        /// Check if actor can edit target user's profile.
-        /// Returns JSON: { allowed: bool, reason: string | null }
         #[wasm_bindgen(js_name = canEditUser)]
-        pub fn can_edit_user(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            target_uid: &str,
-            target_json: &str,
-        ) -> Result<String, String> {
-            let actor_value = json::parse(actor_json).map_err(|e| e.to_string())?;
-            let target_value = json::parse(target_json).map_err(|e| e.to_string())?;
-
-            let actor = UserContext::from_json(&actor_value)?;
-            let target = UserContext::from_json(&target_value)?;
-
-            let result = super::can_edit_user(&actor, actor_uid, target_uid, &target);
-            Ok(result.to_json().dump())
+        pub fn can_edit_user(&self, actor_json: &str, actor_uid: &str, target_uid: &str, target_json: &str) -> Result<String, String> {
+            can_edit_user_json(actor_json, actor_uid, target_uid, target_json)
         }
 
-        /// Compute optimal seating for a tournament.
-        /// Input JSON: { "players": [...], "rounds": N, "previous_rounds": [[...], ...] | null }
-        /// Output JSON: { "rounds": [...], "score": {...} }
         #[wasm_bindgen(js_name = computeSeating)]
         pub fn compute_seating(&self, config_json: &str) -> Result<String, String> {
-            let config = json::parse(config_json).map_err(|e| e.to_string())?;
-
-            let players: Vec<String> = config["players"]
-                .members()
-                .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                .collect();
-
-            let rounds_count = config["rounds"].as_usize().unwrap_or(3);
-
-            let previous_rounds: Option<Vec<Vec<Vec<String>>>> =
-                if config["previous_rounds"].is_null() {
-                    None
-                } else {
-                    Some(
-                        config["previous_rounds"]
-                            .members()
-                            .map(|r| {
-                                r.members()
-                                    .map(|t| {
-                                        t.members()
-                                            .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                                            .collect()
-                                    })
-                                    .collect()
-                            })
-                            .collect(),
-                    )
-                };
-
-            let (rounds, score) =
-                seating::compute_seating(&players, rounds_count, previous_rounds.as_deref())?;
-
-            let rounds_json: Vec<JsonValue> = rounds
-                .iter()
-                .map(|r| {
-                    JsonValue::Array(
-                        r.iter()
-                            .map(|t| {
-                                JsonValue::Array(t.iter().map(|p| p.as_str().into()).collect())
-                            })
-                            .collect(),
-                    )
-                })
-                .collect();
-
-            let result = json::object! {
-                rounds: rounds_json,
-                score: score.to_json(),
-            };
-            Ok(result.dump())
+            compute_seating_json(config_json)
         }
 
-        /// Score an existing seating arrangement.
-        /// Input JSON: { "rounds": [[[uid, ...], ...], ...] }
-        /// Output JSON: { "rules": [...], "mean_vps": ..., "mean_transfers": ... }
         #[wasm_bindgen(js_name = scoreSeating)]
         pub fn score_seating(&self, config_json: &str) -> Result<String, String> {
-            let config = json::parse(config_json).map_err(|e| e.to_string())?;
-
-            let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
-                .members()
-                .map(|r| {
-                    r.members()
-                        .map(|t| {
-                            t.members()
-                                .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                                .collect()
-                        })
-                        .collect()
-                })
-                .collect();
-
-            let score = seating::score_rounds(&rounds)?;
-            let minimums = seating::compute_minimum_violations(&rounds);
-            let mut result = score.to_json();
-            result["minimums"] = JsonValue::Array(
-                minimums.iter().map(|&x| x.into()).collect()
-            );
-            Ok(result.dump())
+            score_seating_json(config_json)
         }
 
-        /// Process a tournament event.
-        /// Input: tournament JSON, event JSON, actor JSON
-        /// Output: updated tournament JSON
         #[wasm_bindgen(js_name = processTournamentEvent)]
-        pub fn process_tournament_event(
-            &self,
-            tournament_json: &str,
-            event_json: &str,
-            actor_json: &str,
-        ) -> Result<String, String> {
-            tournament::process_tournament_event(tournament_json, event_json, actor_json)
+        pub fn process_tournament_event(&self, tournament_json: &str, event_json: &str, actor_json: &str) -> Result<String, String> {
+            super::tournament::process_tournament_event(tournament_json, event_json, actor_json)
         }
 
-        /// Compute rating points for a single tournament entry.
         #[wasm_bindgen(js_name = computeRatingPoints)]
-        pub fn compute_rating_points(
-            &self,
-            vp: f64,
-            gw: i32,
-            finalist_position: i32,
-            player_count: i32,
-            rank: &str,
-        ) -> i32 {
-            ratings::compute_rating_points(vp, gw, finalist_position, player_count, rank)
+        pub fn compute_rating_points(&self, vp: f64, gw: i32, finalist_position: i32, player_count: i32, rank: &str) -> i32 {
+            super::ratings::compute_rating_points(vp, gw, finalist_position, player_count, rank)
         }
 
-        /// Map format + online to rating category string.
         #[wasm_bindgen(js_name = ratingCategory)]
         pub fn rating_category(&self, format: &str, online: bool) -> String {
-            ratings::rating_category(format, online).to_string()
+            super::ratings::rating_category(format, online).to_string()
         }
 
-        /// Parse a deck list text given a cards JSON database.
-        /// Returns JSON: { name, author, comments, cards: { card_id: count } }
         #[wasm_bindgen(js_name = parseDeck)]
         pub fn parse_deck(&self, text: &str, cards_json: &str) -> Result<String, String> {
-            let card_map = cards::CardMap::load(cards_json)?;
-            let d = deck::parse_deck(text, &card_map)?;
-            Ok(d.to_json().dump())
+            parse_deck_json(text, cards_json)
         }
 
-        /// Validate a deck. Returns JSON array of { severity, message }.
         #[wasm_bindgen(js_name = validateDeck)]
         pub fn validate_deck(&self, deck_json: &str, cards_json: &str, format: &str) -> Result<String, String> {
-            let card_map = cards::CardMap::load(cards_json)?;
-            let value = json::parse(deck_json).map_err(|e| e.to_string())?;
-            let mut d = deck::Deck::new();
-            d.name = value["name"].as_str().unwrap_or("").to_string();
-            for (id_str, count_val) in value["cards"].entries() {
-                let id: u32 = id_str.parse().map_err(|_| format!("Invalid card ID: {id_str}"))?;
-                let count = count_val.as_u32().unwrap_or(0);
-                d.cards.insert(id, count);
-            }
-            let errors = deck::validate_deck(&d, &card_map, format);
-            let result = json::JsonValue::Array(errors.iter().map(|e| e.to_json()).collect());
-            Ok(result.dump())
+            validate_deck_json(deck_json, cards_json, format)
         }
 
-        /// Enrich a deck with full card details for display.
         #[wasm_bindgen(js_name = enrichDeck)]
         pub fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> Result<String, String> {
-            let card_map = cards::CardMap::load(cards_json)?;
-            let value = json::parse(deck_json).map_err(|e| e.to_string())?;
-            let mut d = deck::Deck::new();
-            d.name = value["name"].as_str().unwrap_or("").to_string();
-            d.author = value["author"].as_str().unwrap_or("").to_string();
-            d.comments = value["comments"].as_str().unwrap_or("").to_string();
-            for (id_str, count_val) in value["cards"].entries() {
-                let id: u32 = id_str.parse().map_err(|_| format!("Invalid card ID: {id_str}"))?;
-                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
-            }
-            Ok(deck::enrich_deck(&d, &card_map).dump())
+            enrich_deck_json(deck_json, cards_json)
         }
     }
 }
 
-// Python bindings (backend)
+// ============================================================================
+// Python bindings (backend) — thin shims over shared functions
+// ============================================================================
 #[cfg(feature = "python")]
 mod python {
-    use super::*;
+    use super::shared::*;
     use pyo3::prelude::*;
 
-    #[pyclass]
-    pub struct PyEngine {
-        engine: Engine,
+    fn py_str(r: Result<String, String>) -> PyResult<String> {
+        r.map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
     }
+
+    fn py_unit(r: Result<(), String>) -> PyResult<()> {
+        r.map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+    }
+
+    #[pyclass]
+    pub struct PyEngine;
 
     #[pymethods]
     impl PyEngine {
         #[new]
-        fn new() -> Self {
-            PyEngine {
-                engine: Engine::new(),
-            }
-        }
+        fn new() -> Self { PyEngine }
 
         fn process_event(&self, event_json: &str, objects_json: &str) -> PyResult<String> {
-            let event_value = json::parse(event_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let event = BusinessEvent::from_json(&event_value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-
-            let objects_value = json::parse(objects_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let objects: Result<Vec<BaseObject>, String> = objects_value
-                .members()
-                .map(BaseObject::from_json)
-                .collect();
-            let objects =
-                objects.map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-
-            let crud_events = self
-                .engine
-                .process_event(event, &objects)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let result =
-                JsonValue::Array(crud_events.iter().map(|e| e.to_json()).collect());
-            Ok(result.dump())
+            py_str(process_event_json(event_json, objects_json))
         }
 
         fn validate_object(&self, object_json: &str) -> PyResult<()> {
-            let value = json::parse(object_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let object = BaseObject::from_json(&value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            self.engine
-                .validate_object(&object)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+            py_unit(validate_object_json(object_json))
         }
 
-        /// Check if actor can change a role on target user.
-        /// Returns JSON: { allowed: bool, reason: string | null }
-        fn can_change_role(
-            &self,
-            actor_json: &str,
-            target_json: &str,
-            role: &str,
-        ) -> PyResult<String> {
-            let actor_value = json::parse(actor_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let target_value = json::parse(target_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-
-            let actor = UserContext::from_json(&actor_value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let target = UserContext::from_json(&target_value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let role = Role::from_str(role).ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err(format!("Unknown role: {}", role))
-            })?;
-
-            let result = super::can_change_role(&actor, &target, role);
-            Ok(result.to_json().dump())
+        fn can_change_role(&self, actor_json: &str, target_json: &str, role: &str) -> PyResult<String> {
+            py_str(can_change_role_json(actor_json, target_json, role))
         }
 
-        /// Check if actor can manage VEKN IDs for target user.
-        /// Returns JSON: { allowed: bool, reason: string | null }
         fn can_manage_vekn(&self, actor_json: &str, target_json: &str) -> PyResult<String> {
-            let actor_value = json::parse(actor_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let target_value = json::parse(target_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-
-            let actor = UserContext::from_json(&actor_value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let target = UserContext::from_json(&target_value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-
-            let result = super::can_manage_vekn(&actor, &target);
-            Ok(result.to_json().dump())
+            py_str(can_manage_vekn_json(actor_json, target_json))
         }
 
-        /// Check if actor can edit target user's profile.
-        /// Returns JSON: { allowed: bool, reason: string | null }
-        fn can_edit_user(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            target_uid: &str,
-            target_json: &str,
-        ) -> PyResult<String> {
-            let actor_value = json::parse(actor_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let target_value = json::parse(target_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-
-            let actor = UserContext::from_json(&actor_value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let target = UserContext::from_json(&target_value)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-
-            let result = super::can_edit_user(&actor, actor_uid, target_uid, &target);
-            Ok(result.to_json().dump())
+        fn can_edit_user(&self, actor_json: &str, actor_uid: &str, target_uid: &str, target_json: &str) -> PyResult<String> {
+            py_str(can_edit_user_json(actor_json, actor_uid, target_uid, target_json))
         }
 
-        /// Compute optimal seating for a tournament.
-        /// Input JSON: { "players": [...], "rounds": N, "previous_rounds": [[...], ...] | null }
-        /// Output JSON: { "rounds": [...], "score": {...} }
         fn compute_seating(&self, config_json: &str) -> PyResult<String> {
-            let config = json::parse(config_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-
-            let players: Vec<String> = config["players"]
-                .members()
-                .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                .collect();
-
-            let rounds_count = config["rounds"].as_usize().unwrap_or(3);
-
-            let previous_rounds: Option<Vec<Vec<Vec<String>>>> =
-                if config["previous_rounds"].is_null() {
-                    None
-                } else {
-                    Some(
-                        config["previous_rounds"]
-                            .members()
-                            .map(|r| {
-                                r.members()
-                                    .map(|t| {
-                                        t.members()
-                                            .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                                            .collect()
-                            })
-                                    .collect()
-                            })
-                            .collect(),
-                    )
-                };
-
-            let (rounds, score) =
-                seating::compute_seating(&players, rounds_count, previous_rounds.as_deref())
-                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-
-            let rounds_json: Vec<JsonValue> = rounds
-                .iter()
-                .map(|r| {
-                    JsonValue::Array(
-                        r.iter()
-                            .map(|t| {
-                                JsonValue::Array(t.iter().map(|p| p.as_str().into()).collect())
-                            })
-                            .collect(),
-                    )
-                })
-                .collect();
-
-            let result = json::object! {
-                rounds: rounds_json,
-                score: score.to_json(),
-            };
-            Ok(result.dump())
+            py_str(compute_seating_json(config_json))
         }
 
-        /// Score an existing seating arrangement.
-        /// Input JSON: { "rounds": [[[uid, ...], ...], ...] }
-        /// Output JSON: { "rules": [...], "mean_vps": ..., "mean_transfers": ... }
         fn score_seating(&self, config_json: &str) -> PyResult<String> {
-            let config = json::parse(config_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-
-            let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
-                .members()
-                .map(|r| {
-                    r.members()
-                        .map(|t| {
-                            t.members()
-                                .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                                .collect()
-                        })
-                        .collect()
-                })
-                .collect();
-
-            let score = seating::score_rounds(&rounds)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let minimums = seating::compute_minimum_violations(&rounds);
-            let mut result = score.to_json();
-            result["minimums"] = JsonValue::Array(
-                minimums.iter().map(|&x| x.into()).collect()
-            );
-            Ok(result.dump())
+            py_str(score_seating_json(config_json))
         }
 
-        /// Process a tournament event.
-        /// Input: tournament JSON, event JSON, actor JSON
-        /// Output: updated tournament JSON
-        fn process_tournament_event(
-            &self,
-            tournament_json: &str,
-            event_json: &str,
-            actor_json: &str,
-        ) -> PyResult<String> {
-            tournament::process_tournament_event(tournament_json, event_json, actor_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+        fn process_tournament_event(&self, tournament_json: &str, event_json: &str, actor_json: &str) -> PyResult<String> {
+            py_str(super::tournament::process_tournament_event(tournament_json, event_json, actor_json))
         }
 
-        /// Compute rating points for a single tournament entry.
-        fn compute_rating_points(
-            &self,
-            vp: f64,
-            gw: i32,
-            finalist_position: i32,
-            player_count: i32,
-            rank: &str,
-        ) -> i32 {
-            ratings::compute_rating_points(vp, gw, finalist_position, player_count, rank)
+        fn compute_rating_points(&self, vp: f64, gw: i32, finalist_position: i32, player_count: i32, rank: &str) -> i32 {
+            super::ratings::compute_rating_points(vp, gw, finalist_position, player_count, rank)
         }
 
-        /// Map format + online to rating category string.
         fn rating_category(&self, format: &str, online: bool) -> String {
-            ratings::rating_category(format, online).to_string()
+            super::ratings::rating_category(format, online).to_string()
         }
 
-        /// Parse a deck list text given a cards JSON database.
         fn parse_deck(&self, text: &str, cards_json: &str) -> PyResult<String> {
-            let card_map = cards::CardMap::load(cards_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let d = deck::parse_deck(text, &card_map)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            Ok(d.to_json().dump())
+            py_str(parse_deck_json(text, cards_json))
         }
 
-        /// Validate a deck. Returns JSON array of { severity, message }.
         fn validate_deck(&self, deck_json: &str, cards_json: &str, format: &str) -> PyResult<String> {
-            let card_map = cards::CardMap::load(cards_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let value = json::parse(deck_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let mut d = deck::Deck::new();
-            d.name = value["name"].as_str().unwrap_or("").to_string();
-            for (id_str, count_val) in value["cards"].entries() {
-                let id: u32 = id_str.parse().map_err(|_|
-                    pyo3::exceptions::PyValueError::new_err(format!("Invalid card ID: {id_str}")))?;
-                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
-            }
-            let errors = deck::validate_deck(&d, &card_map, format);
-            let result = json::JsonValue::Array(errors.iter().map(|e| e.to_json()).collect());
-            Ok(result.dump())
+            py_str(validate_deck_json(deck_json, cards_json, format))
         }
 
-        /// Enrich a deck with full card details for display.
         fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> PyResult<String> {
-            let card_map = cards::CardMap::load(cards_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let value = json::parse(deck_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let mut d = deck::Deck::new();
-            d.name = value["name"].as_str().unwrap_or("").to_string();
-            d.author = value["author"].as_str().unwrap_or("").to_string();
-            d.comments = value["comments"].as_str().unwrap_or("").to_string();
-            for (id_str, count_val) in value["cards"].entries() {
-                let id: u32 = id_str.parse().map_err(|_|
-                    pyo3::exceptions::PyValueError::new_err(format!("Invalid card ID: {id_str}")))?;
-                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
-            }
-            Ok(deck::enrich_deck(&d, &card_map).dump())
+            py_str(enrich_deck_json(deck_json, cards_json))
         }
 
-        /// Export a deck in TWDA text format.
         fn export_twda(
-            &self,
-            deck_json: &str,
-            cards_json: &str,
-            tournament_name: &str,
-            tournament_date: &str,
-            tournament_place: &str,
-            player_count: u32,
-            player_name: &str,
+            &self, deck_json: &str, cards_json: &str,
+            tournament_name: &str, tournament_date: &str, tournament_place: &str,
+            player_count: u32, player_name: &str,
         ) -> PyResult<String> {
-            let card_map = cards::CardMap::load(cards_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
-            let value = json::parse(deck_json)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            let mut d = deck::Deck::new();
-            d.name = value["name"].as_str().unwrap_or("").to_string();
-            d.author = value["author"].as_str().unwrap_or("").to_string();
-            d.comments = value["comments"].as_str().unwrap_or("").to_string();
-            for (id_str, count_val) in value["cards"].entries() {
-                let id: u32 = id_str.parse().map_err(|_|
-                    pyo3::exceptions::PyValueError::new_err(format!("Invalid card ID: {id_str}")))?;
-                d.cards.insert(id, count_val.as_u32().unwrap_or(0));
-            }
-            Ok(deck::export_twda(&d, &card_map, tournament_name, tournament_date, tournament_place, player_count, player_name))
+            py_str(export_twda_json(deck_json, cards_json, tournament_name, tournament_date, tournament_place, player_count, player_name))
         }
     }
 

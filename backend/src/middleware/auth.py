@@ -1,16 +1,13 @@
 """Authentication middleware and dependencies."""
 
-import os
 from typing import Annotated
 
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
 
 from ..db import get_oauth_token_by_jti, get_user_by_uid
+from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
 from ..models import Role, User
-
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
-JWT_ALGORITHM = "HS256"
 
 
 async def get_current_user(

@@ -166,6 +166,20 @@ pub enum TournamentEvent {
     RandomToss,
     StartFinals,
     FinishFinals,
+
+    // Deck management
+    UploadDeck {
+        player_uid: String,
+        deck: JsonValue,
+        multideck: bool,
+    },
+    UpdateDeck {
+        player_uid: String,
+        deck: JsonValue,
+    },
+    DeleteDeck {
+        player_uid: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -428,6 +442,35 @@ impl TournamentEvent {
             "RandomToss" => Ok(Self::RandomToss),
             "StartFinals" => Ok(Self::StartFinals),
             "FinishFinals" => Ok(Self::FinishFinals),
+            "UploadDeck" => {
+                let player_uid = value["player_uid"]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string();
+                let deck = value["deck"].clone();
+                if deck.is_null() {
+                    return Err("deck required".to_string());
+                }
+                let multideck = value["multideck"].as_bool().unwrap_or(false);
+                Ok(Self::UploadDeck { player_uid, deck, multideck })
+            }
+            "UpdateDeck" => {
+                let player_uid = value["player_uid"]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string();
+                let deck = value["deck"].clone();
+                if deck.is_null() {
+                    return Err("deck required".to_string());
+                }
+                Ok(Self::UpdateDeck { player_uid, deck })
+            }
+            "DeleteDeck" => Ok(Self::DeleteDeck {
+                player_uid: value["player_uid"]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string(),
+            }),
             _ => Err(format!("Unknown event type: {}", event_type)),
         }
     }
@@ -1493,6 +1536,61 @@ fn apply_event(
             }
 
             update_standings(tournament);
+            Ok(())
+        }
+
+        TournamentEvent::UploadDeck { player_uid, deck, multideck } => {
+            // Auth: organizer or self
+            if !actor.is_organizer && actor.uid != *player_uid {
+                return Err("Only organizers or the player can upload a deck".to_string());
+            }
+            // Verify player is registered
+            let is_registered = tournament["players"].members()
+                .any(|p| p["user_uid"].as_str() == Some(player_uid.as_str()));
+            if !is_registered {
+                return Err("Player is not registered in this tournament".to_string());
+            }
+            // Initialize decks object if needed
+            if tournament["decks"].is_null() {
+                tournament["decks"] = json::object! {};
+            }
+            let pk = player_uid.as_str();
+            if *multideck {
+                // Append to existing decks
+                if tournament["decks"][pk].is_null() {
+                    tournament["decks"][pk] = JsonValue::new_array();
+                }
+                let _ = tournament["decks"][pk].push(deck.clone());
+            } else {
+                // Replace with single deck
+                let mut arr = JsonValue::new_array();
+                let _ = arr.push(deck.clone());
+                tournament["decks"][pk] = arr;
+            }
+            Ok(())
+        }
+
+        TournamentEvent::UpdateDeck { player_uid, deck } => {
+            // Auth: organizer or self
+            if !actor.is_organizer && actor.uid != *player_uid {
+                return Err("Only organizers or the player can update a deck".to_string());
+            }
+            if tournament["decks"].is_null() {
+                tournament["decks"] = json::object! {};
+            }
+            let pk = player_uid.as_str();
+            let mut arr = JsonValue::new_array();
+            let _ = arr.push(deck.clone());
+            tournament["decks"][pk] = arr;
+            Ok(())
+        }
+
+        TournamentEvent::DeleteDeck { player_uid } => {
+            require_organizer(actor)?;
+            let pk = player_uid.as_str();
+            if !tournament["decks"].is_null() && !tournament["decks"][pk].is_null() {
+                tournament["decks"].remove(pk);
+            }
             Ok(())
         }
     }

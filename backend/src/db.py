@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 import msgspec
 import psycopg
+from psycopg import sql
 from psycopg_pool import AsyncConnectionPool
 
 from .models import (
@@ -296,6 +297,19 @@ async def init_db() -> None:
             EXECUTE FUNCTION update_modified_column();
         """)
 
+        # Transient tokens table (auth challenges, magic links, discord state, etc.)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS transient_tokens (
+                key TEXT PRIMARY KEY,
+                data JSONB NOT NULL,
+                expires_at TIMESTAMP NOT NULL
+            );
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_transient_tokens_expires
+            ON transient_tokens(expires_at);
+        """)
+
         # Note: vekn_id_counter table is no longer used.
         # VEKN IDs are now allocated by finding the first gap >= 1000000.
 
@@ -379,16 +393,17 @@ async def stream_objects[T](
         await conn.execute("BEGIN")
         try:
             async with conn.cursor(name=f"{table}_stream") as cursor:
+                tbl = sql.Identifier(table)
                 if since:
                     await cursor.execute(
-                        f"SELECT data, modified FROM {table} "
-                        "WHERE modified > %s ORDER BY modified ASC, uid ASC",
+                        sql.SQL("SELECT data, modified FROM {} "
+                                "WHERE modified > %s ORDER BY modified ASC, uid ASC").format(tbl),
                         (since,),
                     )
                 else:
                     await cursor.execute(
-                        f"SELECT data, modified FROM {table} "
-                        "ORDER BY modified ASC, uid ASC",
+                        sql.SQL("SELECT data, modified FROM {} "
+                                "ORDER BY modified ASC, uid ASC").format(tbl),
                     )
 
                 batch: list[T] = []
@@ -1143,6 +1158,20 @@ async def delete_tournament_db(uid: str) -> None:
         await conn.execute("DELETE FROM tournaments WHERE uid = %s", (uid,))
 
 
+async def soft_delete_tournament(uid: str) -> Tournament | None:
+    """Soft-delete a tournament by setting deleted_at. Returns updated tournament for SSE."""
+    from datetime import UTC, datetime
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        return None
+    now = datetime.now(UTC)
+    tournament.deleted_at = now
+    tournament.modified = now
+    await update_tournament(tournament)
+    return tournament
+
+
 def stream_tournaments(
     since: str | None = None, batch_size: int = 1000
 ) -> AsyncIterator[tuple[list[Tournament], str | None]]:
@@ -1368,6 +1397,51 @@ def stream_ratings(
 ) -> AsyncIterator[tuple[list[Rating], str | None]]:
     """Stream ratings from DB."""
     return stream_objects("ratings", Rating, since=since, batch_size=batch_size)
+
+
+# Transient Token CRUD (auth challenges, magic links, discord state, etc.)
+
+
+async def store_transient_token(key: str, data: dict, expires_at) -> None:
+    """Store a transient token with expiry."""
+    async with get_connection() as conn:
+        await conn.execute(
+            """
+            INSERT INTO transient_tokens (key, data, expires_at)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, expires_at = EXCLUDED.expires_at
+            """,
+            (key, _encoder.encode(data).decode("utf-8"), expires_at),
+        )
+
+
+async def get_transient_token(key: str) -> dict | None:
+    """Get a transient token if not expired. Returns None if missing or expired."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data FROM transient_tokens WHERE key = %s AND expires_at > NOW()",
+            (key,),
+        )
+        row = await result.fetchone()
+        if row:
+            return msgspec.json.decode(row[0]) if isinstance(row[0], (str, bytes)) else row[0]
+        return None
+
+
+async def delete_transient_token(key: str) -> None:
+    """Delete a transient token."""
+    async with get_connection() as conn:
+        await conn.execute("DELETE FROM transient_tokens WHERE key = %s", (key,))
+
+
+async def cleanup_expired_tokens() -> int:
+    """Delete all expired transient tokens. Returns count deleted."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "DELETE FROM transient_tokens WHERE expires_at < NOW() RETURNING key"
+        )
+        rows = await result.fetchall()
+        return len(rows)
 
 
 async def get_tournament_by_external_id(platform: str, ext_id: str) -> Tournament | None:
