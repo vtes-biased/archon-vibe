@@ -283,8 +283,14 @@
         class="space-y-4"
       >
       {#if mode !== "create"}
-        <!-- Close button for edit mode (mirrors edit icon position in view mode) -->
-        <div class="flex justify-end -mt-1 -mr-1">
+        <!-- Close button + saving indicator for edit mode -->
+        <div class="flex justify-end items-center gap-2 -mt-1 -mr-1">
+          {#if saving}
+            <span class="text-xs text-ash-400 flex items-center gap-1">
+              <Icon icon="lucide:loader-2" class="w-3 h-3 animate-spin" />
+              Saving
+            </span>
+          {/if}
           <button
             type="button"
             onclick={cancelEdit}
@@ -479,26 +485,32 @@
       <!-- Avatar -->
       <div class="mr-4 flex-shrink-0">
         {#if canEditAvatar()}
-          <button
-            onclick={(e) => { e.stopPropagation(); showAvatarCropper = true; }}
-            class="relative group"
-            title="Change avatar"
-          >
-            {#if user.avatar_path}
-              <img
-                src={user.avatar_path}
-                alt="{user.name}'s avatar"
-                class="w-16 h-16 rounded-full object-cover ring-2 ring-ash-700 group-hover:ring-crimson-500 transition-all"
-              />
-            {:else}
-              <div class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center ring-2 ring-ash-700 group-hover:ring-crimson-500 transition-all">
-                <Icon icon="lucide:user" class="w-8 h-8 text-ash-500" />
+          <div class="flex flex-col items-center gap-1">
+            <button
+              onclick={(e) => { e.stopPropagation(); showAvatarCropper = true; }}
+              class="relative group"
+              title="Change avatar"
+            >
+              {#if user.avatar_path}
+                <img
+                  src={user.avatar_path}
+                  alt="{user.name}'s avatar"
+                  class="w-16 h-16 rounded-full object-cover ring-2 ring-ash-700 group-hover:ring-crimson-500 transition-all"
+                />
+              {:else}
+                <div class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center ring-2 ring-ash-700 group-hover:ring-crimson-500 transition-all">
+                  <Icon icon="lucide:user" class="w-8 h-8 text-ash-500" />
+                </div>
+              {/if}
+              <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Icon icon="lucide:camera" class="w-5 h-5 text-white" />
               </div>
-            {/if}
-            <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Icon icon="lucide:camera" class="w-5 h-5 text-white" />
-            </div>
-          </button>
+            </button>
+            <button
+              onclick={(e) => { e.stopPropagation(); showAvatarCropper = true; }}
+              class="text-xs text-ash-400 hover:text-crimson-400 sm:hidden"
+            >Change photo</button>
+          </div>
         {:else if user.avatar_path}
           <img
             src={user.avatar_path}

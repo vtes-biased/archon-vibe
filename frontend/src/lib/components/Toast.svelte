@@ -45,7 +45,7 @@
 </script>
 
 <!-- Toast Container -->
-<div class="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+<div class="fixed top-14 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
   {#each toasts as toast (toast.id)}
     <div
       class="pointer-events-auto flex items-start gap-3 p-4 rounded-lg border shadow-lg backdrop-blur-sm animate-slide-in {getStyles(toast.type)}"
@@ -91,5 +91,11 @@
 
   .animate-slide-in {
     animation: slide-in 0.2s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-slide-in {
+      animation: none;
+    }
   }
 </style>

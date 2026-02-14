@@ -107,7 +107,7 @@
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
           href={item.href}
-          class="flex flex-col items-center py-2 px-3 min-w-[64px] {active ? 'text-crimson-500' : 'text-ash-400 hover:text-ash-200'}"
+          class="flex flex-col items-center py-3 px-3 min-w-[64px] {active ? 'text-crimson-500' : 'text-ash-400 hover:text-ash-200'}"
         >
           {#if item.icon === 'trophy'}
             <Icon icon="lucide:trophy" class="w-6 h-6" />
@@ -163,7 +163,10 @@
 
     <!-- Connection status indicator -->
     <div class="mt-auto pt-4">
-      <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-crimson-500'}" title="{isOnline ? (isSyncing ? 'Syncing...' : 'Online') : 'Offline'}"></div>
+      <div class="flex flex-col items-center gap-1">
+        <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-crimson-500'}"></div>
+        <span class="text-[10px] text-ash-500">{isOnline ? (isSyncing ? 'Syncing' : 'Online') : 'Offline'}</span>
+      </div>
     </div>
   </nav>
 

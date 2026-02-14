@@ -376,8 +376,10 @@
 
           <!-- Email signup form -->
           <form onsubmit={(e) => { e.preventDefault(); handleSignupMagicLink(); }} class="space-y-3">
+            <label for="signup-email" class="sr-only">Email</label>
             <input
               type="email"
+              id="signup-email"
               name="email"
               autocomplete="username"
               bind:value={email}

@@ -384,28 +384,34 @@
           <div class="p-6 border-b border-ash-800">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-4">
-                <button
-                  onclick={() => (showAvatarCropper = true)}
-                  class="relative group"
-                  title="Change avatar"
-                >
-                  {#if user.avatar_path}
-                    <img
-                      src={avatarCacheBust ? `${user.avatar_path}?v=${avatarCacheBust}` : user.avatar_path}
-                      alt="Avatar"
-                      class="w-16 h-16 rounded-full object-cover"
-                    />
-                  {:else}
-                    <div
-                      class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center"
-                    >
-                      <Icon icon="lucide:user" class="h-8 w-8 text-ash-500" />
+                <div class="flex flex-col items-center gap-1">
+                  <button
+                    onclick={() => (showAvatarCropper = true)}
+                    class="relative group"
+                    title="Change avatar"
+                  >
+                    {#if user.avatar_path}
+                      <img
+                        src={avatarCacheBust ? `${user.avatar_path}?v=${avatarCacheBust}` : user.avatar_path}
+                        alt="Avatar"
+                        class="w-16 h-16 rounded-full object-cover"
+                      />
+                    {:else}
+                      <div
+                        class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center"
+                      >
+                        <Icon icon="lucide:user" class="h-8 w-8 text-ash-500" />
+                      </div>
+                    {/if}
+                    <div class="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <Icon icon="lucide:camera" class="h-6 w-6 text-white" />
                     </div>
-                  {/if}
-                  <div class="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <Icon icon="lucide:camera" class="h-6 w-6 text-white" />
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onclick={() => (showAvatarCropper = true)}
+                    class="text-xs text-ash-400 hover:text-crimson-400 sm:hidden"
+                  >Change photo</button>
+                </div>
                 <div>
                   <h2 class="text-xl font-medium text-bone-100">
                     {user.name || "Anonymous"}
@@ -607,8 +613,14 @@
 
 <!-- Claim VEKN ID Modal -->
 {#if showClaimModal}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={() => (showClaimModal = false)}
+  >
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      onclick={(e) => e.stopPropagation()}
+    >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-bone-100">Claim VEKN ID</h2>
         <p class="mt-2 text-sm text-ash-400">
@@ -666,8 +678,14 @@
 
 <!-- Abandon VEKN ID Confirmation Modal -->
 {#if showAbandonConfirm}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={() => (showAbandonConfirm = false)}
+  >
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      onclick={(e) => e.stopPropagation()}
+    >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-crimson-400">Abandon VEKN ID?</h2>
       </div>
