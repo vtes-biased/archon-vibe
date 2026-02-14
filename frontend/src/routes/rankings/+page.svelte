@@ -91,7 +91,7 @@
   <title>Rankings - Archon</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="max-w-4xl mx-auto p-4 sm:p-8">
   <h1 class="text-2xl font-bold text-ash-100 mb-4">Rankings</h1>
 
   <!-- Category tabs -->
@@ -111,7 +111,9 @@
 
   <!-- Country filter -->
   <div class="mb-4">
+    <label for="ranking-country" class="sr-only">Country</label>
     <select
+      id="ranking-country"
       bind:value={selectedCountry}
       class="bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2 text-sm text-ash-200 w-full sm:w-64"
     >

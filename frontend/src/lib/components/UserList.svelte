@@ -659,7 +659,13 @@
             <Icon icon="lucide:users" class="mx-auto h-12 w-12" />
           </div>
           <h3 class="text-lg font-medium text-bone-100 mb-2">No users found</h3>
-          <p class="text-ash-400">There are no users in the system yet.</p>
+          <p class="text-ash-400">
+            {#if searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0 || filterHasPastSanctions || filterCurrentlySanctioned}
+              Try adjusting your filters.
+            {:else}
+              There are no users in the system yet.
+            {/if}
+          </p>
         {/if}
       </div>
     {/if}

@@ -5,6 +5,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { hasAnyRole, getAuthState } from "$lib/stores/auth.svelte";
   import type { Tournament, TournamentState, TournamentFormat } from "$lib/types";
+  import { getStateBadgeClass } from "$lib/tournament-utils";
   import Icon from "@iconify/svelte";
 
   let tournaments = $state<Tournament[]>([]);
@@ -51,17 +52,6 @@
       error = e instanceof Error ? e.message : "Failed to load tournaments";
     } finally {
       loaded = true;
-    }
-  }
-
-  function getStateBadgeClass(state: TournamentState): string {
-    switch (state) {
-      case "Planned": return "bg-ash-800 text-ash-300";
-      case "Registration": return "bg-emerald-900/60 text-emerald-300";
-      case "Waiting": return "bg-amber-900/60 text-amber-300";
-      case "Playing": return "bg-crimson-900/60 text-crimson-300";
-      case "Finished": return "bg-ash-700 text-ash-400";
-      default: return "bg-ash-800 text-ash-300";
     }
   }
 

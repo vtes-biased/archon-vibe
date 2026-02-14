@@ -136,7 +136,7 @@
   <title>Developer Portal - Archon</title>
 </svelte:head>
 
-<div class="max-w-3xl mx-auto p-4">
+<div class="max-w-3xl mx-auto p-4 sm:p-8">
   <div class="flex items-center justify-between mb-6">
     <div>
       <h1 class="text-2xl font-light text-bone-100">Developer Portal</h1>
@@ -337,15 +337,17 @@
   {#if confirmAction}
     <div
       class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-      onclick={(e) => { e.stopPropagation(); confirmAction = null; }}
-      role="dialog"
+      onclick={() => (confirmAction = null)}
     >
       <div
         class="bg-dusk-950 rounded-lg border border-ash-800 p-6 w-full max-w-sm"
         onclick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
       >
         {#if confirmAction.action === "regenerate"}
-          <h3 class="text-bone-100 font-medium mb-2">Regenerate Secret?</h3>
+          <h3 id="confirm-dialog-title" class="text-bone-100 font-medium mb-2">Regenerate Secret?</h3>
           <p class="text-ash-400 text-sm mb-4">
             This will invalidate the current client secret. All existing integrations using the old secret will stop working.
           </p>
@@ -364,7 +366,7 @@
             </button>
           </div>
         {:else}
-          <h3 class="text-bone-100 font-medium mb-2">Deactivate Client?</h3>
+          <h3 id="confirm-dialog-title" class="text-bone-100 font-medium mb-2">Deactivate Client?</h3>
           <p class="text-ash-400 text-sm mb-4">
             This will deactivate the OAuth client. All tokens issued by this client will stop working.
           </p>

@@ -10,6 +10,7 @@
   import type { Tournament, TournamentState, User } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
   import { formatScore } from "$lib/utils";
+  import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
   import Icon from "@iconify/svelte";
   import { renderMarkdown } from "$lib/markdown";
 
@@ -40,6 +41,7 @@
   );
   let viewAsPlayer = $state(false);
   let showRegisteredPlayers = $state(false);
+  let showDeleteConfirm = $state(false);
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
@@ -275,10 +277,7 @@
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
 
   function seatDisplay(uid: string): string {
-    const info = playerInfo[uid];
-    if (!info) return uid;
-    const display = info.nickname || info.name;
-    return info.vekn ? `${display} (${info.vekn})` : display;
+    return seatDisplayUtil(uid, playerInfo);
   }
 
   function vpOptions(tableSize: number, allowImpossible: boolean): number[] {
@@ -390,12 +389,13 @@
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this tournament? This cannot be undone.")) return;
     try {
       await deleteTournamentApi(uid);
+      showDeleteConfirm = false;
       goto("/tournaments");
     } catch (e) {
       error = e instanceof Error ? e.message : "Delete failed";
+      showDeleteConfirm = false;
     }
   }
 
@@ -426,17 +426,6 @@
         timeZoneName: "short",
       });
     } catch { return null; }
-  }
-
-  function getStateBadgeClass(state: TournamentState): string {
-    switch (state) {
-      case "Planned": return "bg-ash-800 text-ash-300";
-      case "Registration": return "bg-emerald-900/60 text-emerald-300";
-      case "Waiting": return "bg-amber-900/60 text-amber-300";
-      case "Playing": return "bg-crimson-900/60 text-crimson-300";
-      case "Finished": return "bg-ash-700 text-ash-400";
-      default: return "bg-ash-800 text-ash-300";
-    }
   }
 
   async function dropPlayer(playerUid: string) {
@@ -493,7 +482,7 @@
 
         {#if showOrganizerView && tournament.state === "Planned"}
           <button
-            onclick={handleDelete}
+            onclick={() => (showDeleteConfirm = true)}
             class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
           >Delete</button>
         {/if}
@@ -902,3 +891,37 @@
     {/if}
   </div>
 </div>
+
+<!-- Delete Tournament Confirmation Modal -->
+{#if showDeleteConfirm}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={() => (showDeleteConfirm = false)}
+  >
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 class="text-xl font-medium text-crimson-400">Delete Tournament?</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-6">
+          This will permanently delete this tournament. This action cannot be undone.
+        </p>
+        <div class="flex gap-2">
+          <button
+            onclick={handleDelete}
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded font-medium transition-colors"
+          >Delete</button>
+          <button
+            onclick={() => (showDeleteConfirm = false)}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}

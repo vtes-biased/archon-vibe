@@ -4,7 +4,7 @@
 
   // Redirect to users page on mount
   onMount(() => {
-    goto('/users', { replaceState: true });
+    goto('/tournaments', { replaceState: true });
   });
 </script>
 
