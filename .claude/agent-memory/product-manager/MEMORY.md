@@ -11,6 +11,7 @@
 - `ARCHITECTURE.md` — Tech architecture (offline-first, Rust/WASM/PyO3, SSE sync)
 - `SYNC.md` — SSE streaming, IndexedDB, data levels
 - `frontend/DESIGN.md` — UI guidelines (gothic theme, dark mode, mobile-first)
+- `development-plan.md` — 12-phase roadmap (root)
 - `reference/` — All official VEKN documents (tournament rules, judges guides v1+v2, ethics, game terms)
 
 ## Domain Rules That Drive Features
@@ -35,19 +36,21 @@
 - All business logic in shared Rust engine (not Python or TypeScript)
 - Server always wins conflicts in sync
 
+## Phase Status (as of 2026-02-15)
+- Phase 1 (Decklists): COMPLETE except TWDA integration (1.6)
+- Phase 2 (Leagues): COMPLETE — model, API, SSE, frontend, Rust standings engine
+- Phase 3 (Sanctions Enhancement): NOT STARTED
+- Phase 4 (Ratings/Hall of Fame): NOT STARTED (ratings engine works, visibility missing)
+- Phases 5-12: NOT STARTED
+- HIGH-priority standalone items (from PRODUCT.md 5.2): payment tracking, iCal feed, social export
+
 ## Phase 2: Leagues — Key Decisions
 - See `leagues-design.md` for full design notes
-- League standings modes: RTP, Score, GP (legacy naming)
-- Standings computed at read time, NOT stored in league object
-- Standings computation in Rust engine (shared WASM/PyO3)
-- Frontend computes standings from IndexedDB tournament data (no separate API endpoint)
-- League SSE object is lean (config only); standings derived client-side
-- Tournament already has `league_uid` field in TournamentMinimal
-- Leagues are public data — minimal SSE filtering needed
-- Meta-leagues: 2-level hierarchy max (no meta-of-meta)
+- Standings modes: RTP, Score, GP
+- Standings computed at read time via Rust engine (WASM frontend / PyO3 backend)
+- League SSE is config only; standings derived client-side from IndexedDB tournaments
+- Meta-leagues: 2-level hierarchy max
 - `allow_no_finals` is a hint, not enforcement
-- Score mode subtracts finals scores (only prelim results count)
-- GP points: 25/15/10-3 based on position (legacy engine reference)
 
 Notes:
 - Legacy archon league code at `/Users/lionelpanhaleux/dev/perso/archon/src/archon/db.py` lines 1403-1509

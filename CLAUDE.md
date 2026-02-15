@@ -7,8 +7,9 @@ When implementing features or making significant changes, follow this pipeline u
 3. **After significant code changes**: Launch `principal-engineer` to review architectural alignment — especially for changes touching sync, data model, Rust/WASM pipeline, or cross-module refactors.
 4. **After any UI text change**: Launch `i18n-translator` to update all 5 locale files. Any new or modified user-facing string triggers this.
 5. **After meaningful code changes**: Launch `documentalist` to update CLAUDE.md, ARCHITECTURE.md, SYNC.md, or other docs that are now stale.
+6. **After major features or significant changes**: Launch `senior-qa` to run the test suite and assess whether new tests are warranted. Trigger for: new features touching core logic (tournament lifecycle, pairings, scoring), cross-stack changes (Rust/backend/frontend), refactors of critical paths (sync, reconciliation, access control). Skip for UI-only tweaks, copy changes, or styling.
 
-Steps 3-5 should run in parallel when applicable. Skip agents only for trivial changes (typo fixes, single-line tweaks with no architectural or UI text impact).
+Steps 3-6 should run in parallel when applicable. Skip agents only for trivial changes (typo fixes, single-line tweaks with no architectural or UI text impact).
 
 # Project Guidelines
 
