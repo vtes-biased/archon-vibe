@@ -16,9 +16,9 @@ COPY backend/src/data ./backend-data/
 # Copy frontend source
 COPY frontend/ ./
 
-# Fix symlink to use local copy
-RUN rm -f src/data/geonames && \
-    ln -s ../../backend-data/geonames src/data/geonames
+# Fix symlink to use local copy (geonames is under src/lib/data/)
+RUN rm -f src/lib/data/geonames && \
+    ln -s ../../../backend-data/geonames src/lib/data/geonames
 
 # Build frontend
 RUN npm run build

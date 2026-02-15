@@ -3,13 +3,11 @@ import { test, expect, type Page } from '@playwright/test';
 /**
  * E2E tests for the Archon app.
  * Tests run against the dev server with real backend SSE data.
- * Run serially to avoid overwhelming backend with simultaneous SSE connections.
  */
-test.describe.configure({ mode: 'serial' });
 
 // Helper: wait for users to load via SSE
 async function waitForUsers(page: Page) {
-  await expect(page.locator('#users-list-container')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#users-list-container')).toBeVisible({ timeout: 5_000 });
   await expect(page.locator('.user-row').first()).toBeVisible({ timeout: 5_000 });
 }
 
