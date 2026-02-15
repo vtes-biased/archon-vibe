@@ -428,7 +428,9 @@
                 </td>
               {/if}
               <td class="py-1 px-2">
-                {#if player.state === "Finished"}
+                {#if player.state === "Disqualified"}
+                  <span class="text-xs px-2 py-0.5 rounded bg-crimson-900/60 text-crimson-300">{m.player_state_disqualified()}</span>
+                {:else if player.state === "Finished"}
                   {@const played = standingsMap.has(puid)}
                   {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
                   <span class="text-xs px-2 py-0.5 rounded bg-ash-800 text-ash-500">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
@@ -493,7 +495,7 @@
                       <Icon icon="lucide:x" class="w-4 h-4" />
                     </button>
                   {/if}
-                  {#if puid && hasRounds}
+                  {#if puid && hasRounds && !isOfflineMode}
                     <button
                       onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
                       class="p-1 text-amber-400 hover:text-amber-300 transition-colors"

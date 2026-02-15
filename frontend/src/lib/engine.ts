@@ -5,7 +5,7 @@
  * It enables identical business logic in browser (offline) and server (online).
  */
 
-import type { Tournament, User } from './types';
+import type { Sanction, Tournament, User } from './types';
 
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
@@ -142,25 +142,46 @@ export interface ActorContext {
 }
 
 /**
+ * Build sanctions payload for the Rust engine.
+ * Extracts only the fields the engine needs from full Sanction objects.
+ */
+export function buildSanctionsPayload(sanctions: Sanction[]): string {
+  return JSON.stringify(
+    sanctions
+      .filter(s => !s.deleted_at)
+      .map(s => ({
+        user_uid: s.user_uid,
+        level: s.level,
+        round_number: s.round_number ?? null,
+        lifted_at: s.lifted_at ?? null,
+        deleted_at: s.deleted_at ?? null,
+      }))
+  );
+}
+
+/**
  * Process a tournament event using the WASM engine.
  *
  * @param tournament Current tournament state
  * @param event Event to process
  * @param actor User performing the action
+ * @param sanctions Sanctions for this tournament
  * @returns Updated tournament state
  */
 export async function processTournamentEvent(
   tournament: Tournament,
   event: TournamentEvent,
-  actor: ActorContext
+  actor: ActorContext,
+  sanctions: Sanction[] = []
 ): Promise<Tournament> {
   const engine = await initEngine();
 
   const tournamentJson = JSON.stringify(tournament);
   const eventJson = JSON.stringify(event);
   const actorJson = JSON.stringify(actor);
+  const sanctionsJson = buildSanctionsPayload(sanctions);
 
-  const resultJson = engine.processTournamentEvent(tournamentJson, eventJson, actorJson);
+  const resultJson = engine.processTournamentEvent(tournamentJson, eventJson, actorJson, sanctionsJson);
   return JSON.parse(resultJson);
 }
 

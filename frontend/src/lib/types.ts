@@ -219,7 +219,7 @@ export type TournamentFormat = "Standard" | "V5" | "Limited";
 export type TournamentRank = "" | "National Championship" | "Continental Championship";
 export type StandingsMode = "Private" | "Cutoff" | "Top 10" | "Public";
 export type DeckListsMode = "Winner" | "Finalists" | "All";
-export type PlayerState = "Registered" | "Checked-in" | "Playing" | "Finished";
+export type PlayerState = "Registered" | "Checked-in" | "Playing" | "Finished" | "Disqualified";
 export type PaymentStatus = "Pending" | "Paid" | "Refunded" | "Cancelled";
 export type TableState = "Finished" | "In Progress" | "Invalid";
 

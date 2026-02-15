@@ -180,6 +180,10 @@
   "sanction_permanent_ban": "Permanent ban",
   "sanction_lifted": "Lifted",
   "sanction_expired": "Expired",
+  "player_state_disqualified": "Disqualified",
+  "error_dq_cannot_checkin": "Disqualified players cannot check in",
+  "error_suspended_cannot_checkin": "Suspended players cannot check in",
+  "error_league_dq": "Player is disqualified from a league tournament",
 
   "sanction_cat_procedural_error": "Procedural Error",
   "sanction_cat_tournament_error": "Tournament Error",

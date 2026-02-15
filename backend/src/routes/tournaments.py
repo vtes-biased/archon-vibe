@@ -10,6 +10,8 @@ from uuid6 import uuid7
 
 from ..db import (
     get_auth_method_by_identifier,
+    get_sanctions_for_tournament,
+    get_sanctions_for_user,
     get_tournament_by_uid,
     get_user_by_uid,
     get_user_by_vekn_id,
@@ -21,8 +23,10 @@ from ..db import (
 )
 from ..models import (
     DeckListsMode,
+    PlayerState,
     Role,
     Sanction,
+    SanctionLevel,
     StandingsMode,
     Tournament,
     TournamentFormat,
@@ -90,14 +94,26 @@ async def _process_engine_event(
     Returns the updated tournament.
     """
     actor_data = _build_actor_context(user, tournament)
+    tournament_sanctions = await get_sanctions_for_tournament(tournament.uid)
+    sanctions_data = [
+        {
+            "user_uid": s.user_uid,
+            "level": s.level.value,
+            "round_number": s.round_number,
+            "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
+            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+        }
+        for s in tournament_sanctions
+    ]
     tournament_json = encoder.encode(tournament).decode("utf-8")
     event_json = msgspec.json.encode(event_data).decode("utf-8")
     actor_json = msgspec.json.encode(actor_data).decode("utf-8")
+    sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
 
     engine = get_engine()
     try:
         result_json = engine.process_tournament_event(
-            tournament_json, event_json, actor_json
+            tournament_json, event_json, actor_json, sanctions_json
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -181,6 +197,44 @@ def _build_actor_context(user, tournament: Tournament) -> dict:
 def _can_manage_tournaments(user) -> bool:
     """Check if user can create/manage tournaments."""
     return any(r in user.roles for r in (Role.IC, Role.NC, Role.PRINCE))
+
+
+async def _check_player_barred(
+    player_uid: str, tournament_uid: str, tournament: Tournament
+) -> None:
+    """Check if a player is barred from checking in (cross-tournament sanctions).
+
+    Raises HTTPException(400) if:
+    - Player has an active suspension
+    - Player is DQ'd in a sibling league tournament (league-wide DQ)
+    """
+    from datetime import UTC, datetime
+
+    # Check active suspensions
+    user_sanctions = await get_sanctions_for_user(player_uid)
+    now = datetime.now(UTC)
+    for s in user_sanctions:
+        if s.deleted_at or s.lifted_at:
+            continue
+        if s.level == SanctionLevel.SUSPENSION:
+            if s.expires_at is None or s.expires_at > now:
+                raise HTTPException(
+                    status_code=400, detail="Player is suspended and cannot check in"
+                )
+
+    # Check league-wide DQ (only if tournament is in a league)
+    if tournament.league_uid:
+        for s in user_sanctions:
+            if s.deleted_at or s.lifted_at:
+                continue
+            if s.level == SanctionLevel.DISQUALIFICATION and s.tournament_uid:
+                # Check if the DQ sanction's tournament is in the same league
+                dq_tournament = await get_tournament_by_uid(s.tournament_uid)
+                if dq_tournament and dq_tournament.league_uid == tournament.league_uid:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Player is disqualified from a league tournament and cannot check in",
+                    )
 
 
 def _tournament_to_minimal(t: Tournament) -> TournamentMinimal:
@@ -600,16 +654,34 @@ async def tournament_action(
     # Build actor context for Rust engine
     actor_data = _build_actor_context(current_user, tournament)
 
+    # Fetch sanctions for this tournament
+    tournament_sanctions = await get_sanctions_for_tournament(uid)
+    sanctions_data = [
+        {
+            "user_uid": s.user_uid,
+            "level": s.level.value,
+            "round_number": s.round_number,
+            "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
+            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+        }
+        for s in tournament_sanctions
+    ]
+
     # Serialize tournament to JSON for engine
     tournament_json = encoder.encode(tournament).decode("utf-8")
     event_json = msgspec.json.encode(event_data).decode("utf-8")
     actor_json = msgspec.json.encode(actor_data).decode("utf-8")
+    sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+
+    # Backend pre-checks for cross-tournament sanctions (CheckIn)
+    if request.type == "CheckIn" and request.player_uid:
+        await _check_player_barred(request.player_uid, uid, tournament)
 
     # Call Rust engine
     engine = get_engine()
     try:
         result_json = engine.process_tournament_event(
-            tournament_json, event_json, actor_json
+            tournament_json, event_json, actor_json, sanctions_json
         )
     except ValueError as e:
         # Rust engine returns validation errors as ValueError
@@ -1485,6 +1557,18 @@ async def go_online(
                 status_code=409,
                 detail="Tournament owned by another device. Use force to override.",
             )
+
+    # Validate tournament UID matches URL
+    if request.tournament.get("uid") and request.tournament["uid"] != uid:
+        raise HTTPException(status_code=400, detail="Tournament UID mismatch")
+    request.tournament["uid"] = uid  # Force correct UID
+
+    # Preserve original organizers (prevent client from removing them)
+    if tournament:
+        original_organizers = tournament.organizers_uids or []
+        client_organizers = request.tournament.get("organizers_uids", [])
+        merged = list(dict.fromkeys(original_organizers + client_organizers))
+        request.tournament["organizers_uids"] = merged
 
     # 1. Resolve offline players → real user accounts
     uid_map: dict[str, str] = {}

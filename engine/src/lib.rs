@@ -315,8 +315,8 @@ mod wasm {
         }
 
         #[wasm_bindgen(js_name = processTournamentEvent)]
-        pub fn process_tournament_event(&self, tournament_json: &str, event_json: &str, actor_json: &str) -> Result<String, String> {
-            super::tournament::process_tournament_event(tournament_json, event_json, actor_json)
+        pub fn process_tournament_event(&self, tournament_json: &str, event_json: &str, actor_json: &str, sanctions_json: &str) -> Result<String, String> {
+            super::tournament::process_tournament_event(tournament_json, event_json, actor_json, sanctions_json)
         }
 
         #[wasm_bindgen(js_name = computeRatingPoints)]
@@ -403,8 +403,8 @@ mod python {
             py_str(score_seating_json(config_json))
         }
 
-        fn process_tournament_event(&self, tournament_json: &str, event_json: &str, actor_json: &str) -> PyResult<String> {
-            py_str(super::tournament::process_tournament_event(tournament_json, event_json, actor_json))
+        fn process_tournament_event(&self, tournament_json: &str, event_json: &str, actor_json: &str, sanctions_json: &str) -> PyResult<String> {
+            py_str(super::tournament::process_tournament_event(tournament_json, event_json, actor_json, sanctions_json))
         }
 
         fn compute_rating_points(&self, vp: f64, gw: i32, finalist_position: i32, player_count: i32, rank: &str) -> i32 {

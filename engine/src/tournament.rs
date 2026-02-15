@@ -49,6 +49,7 @@ pub enum PlayerState {
     CheckedIn,
     Playing,
     Finished,
+    Disqualified,
 }
 
 impl PlayerState {
@@ -58,6 +59,7 @@ impl PlayerState {
             "Checked-in" => Some(Self::CheckedIn),
             "Playing" => Some(Self::Playing),
             "Finished" => Some(Self::Finished),
+            "Disqualified" => Some(Self::Disqualified),
             _ => None,
         }
     }
@@ -68,6 +70,7 @@ impl PlayerState {
             Self::CheckedIn => "Checked-in",
             Self::Playing => "Playing",
             Self::Finished => "Finished",
+            Self::Disqualified => "Disqualified",
         }
     }
 }
@@ -268,16 +271,60 @@ fn check_table_vps(vps: &[f64]) -> Option<VpError> {
     None
 }
 
-/// Compute GW for each player: 1 if vp >= 2.0 AND strictly highest at table, else 0
-fn compute_gw(vps: &[f64]) -> Vec<f64> {
+// ============================================================================
+// SANCTIONS HELPERS
+// ============================================================================
+
+/// Check if a sanction is active (not lifted, not deleted).
+fn is_sanction_active(s: &JsonValue) -> bool {
+    s["lifted_at"].is_null() && s["deleted_at"].is_null()
+}
+
+/// Get active SA (standings_adjustment) sanctions: returns (user_uid, round_number) pairs.
+fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
+    let mut result = Vec::new();
+    for s in sanctions.members() {
+        if !is_sanction_active(s) { continue; }
+        if s["level"].as_str() != Some("standings_adjustment") { continue; }
+        let uid = s["user_uid"].as_str().unwrap_or("").to_string();
+        let round = s["round_number"].as_usize().unwrap_or(0);
+        if !uid.is_empty() {
+            result.push((uid, round));
+        }
+    }
+    result
+}
+
+/// Check if a player has an active DQ sanction (in-tournament).
+fn has_dq_sanction(sanctions: &JsonValue, player_uid: &str) -> bool {
+    sanctions.members().any(|s| {
+        is_sanction_active(s)
+            && s["level"].as_str() == Some("disqualification")
+            && s["user_uid"].as_str() == Some(player_uid)
+    })
+}
+
+/// Check if a player has an active suspension.
+fn has_active_suspension(sanctions: &JsonValue, player_uid: &str) -> bool {
+    sanctions.members().any(|s| {
+        is_sanction_active(s)
+            && s["level"].as_str() == Some("suspension")
+            && s["user_uid"].as_str() == Some(player_uid)
+    })
+}
+
+/// Compute GW for each player: 1 if adjusted_vp >= 2.0 AND strictly highest adjusted VP, else 0.
+/// `adjustments` is same length as `vps` with negative values for SA penalties.
+fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
     if vps.is_empty() {
         return vec![];
     }
-    let max_vp = vps.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let max_count = vps.iter().filter(|&&v| v == max_vp).count();
-    vps.iter()
+    let adjusted: Vec<f64> = vps.iter().zip(adjustments.iter()).map(|(v, a)| v + a).collect();
+    let max_adj = adjusted.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let max_count = adjusted.iter().filter(|&&v| v == max_adj).count();
+    adjusted.iter()
         .map(|&v| {
-            if v >= 2.0 && v == max_vp && max_count == 1 {
+            if v >= 2.0 && v == max_adj && max_count == 1 {
                 1.0
             } else {
                 0.0
@@ -532,6 +579,7 @@ impl ActorContext {
 /// * `tournament_json` - Current tournament state as JSON
 /// * `event_json` - Event to process
 /// * `actor_json` - Actor performing the action
+/// * `sanctions_json` - Array of sanctions: [{user_uid, level, round_number, lifted_at, deleted_at}]
 ///
 /// # Returns
 /// * Updated tournament JSON on success
@@ -540,16 +588,18 @@ pub fn process_tournament_event(
     tournament_json: &str,
     event_json: &str,
     actor_json: &str,
+    sanctions_json: &str,
 ) -> Result<String, String> {
     let mut tournament = json::parse(tournament_json).map_err(|e| e.to_string())?;
     let event_value = json::parse(event_json).map_err(|e| e.to_string())?;
     let actor_value = json::parse(actor_json).map_err(|e| e.to_string())?;
+    let sanctions = json::parse(sanctions_json).map_err(|e| e.to_string())?;
 
     let event = TournamentEvent::from_json(&event_value)?;
     let actor = ActorContext::from_json(&actor_value)?;
 
     // Process the event
-    apply_event(&mut tournament, &event, &actor)?;
+    apply_event(&mut tournament, &event, &actor, &sanctions)?;
 
     Ok(tournament.dump())
 }
@@ -565,7 +615,9 @@ struct Standing {
 }
 
 /// Compute standings from all rounds. Sorted by GW desc, VP desc, TP desc, toss desc.
-fn compute_standings(tournament: &JsonValue) -> Vec<Standing> {
+/// Applies SA overflow: if a player has an SA sanction for a round where their raw VP < 1.0,
+/// the overflow (1.0 - raw_vp) is subtracted from their total VP.
+fn compute_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<Standing> {
     let mut map: std::collections::HashMap<String, (f64, f64, f64)> = std::collections::HashMap::new();
 
     // Sum results across all rounds
@@ -578,6 +630,27 @@ fn compute_standings(tournament: &JsonValue) -> Vec<Standing> {
                 entry.0 += seat["result"]["gw"].as_f64().unwrap_or(0.0);
                 entry.1 += seat["result"]["vp"].as_f64().unwrap_or(0.0);
                 entry.2 += seat["result"]["tp"].as_f64().unwrap_or(0.0);
+            }
+        }
+    }
+
+    // Apply SA overflow: for each SA sanction, if the player's raw VP in that round < 1.0,
+    // subtract the overflow from total VP
+    let sa_sanctions = get_sa_sanctions(sanctions);
+    for (sa_uid, sa_round) in &sa_sanctions {
+        if *sa_round >= tournament["rounds"].len() { continue; }
+        // Find the player's raw VP in that round
+        let mut round_vp = 0.0;
+        for table in tournament["rounds"][*sa_round].members() {
+            for seat in table["seating"].members() {
+                if seat["player_uid"].as_str() == Some(sa_uid.as_str()) {
+                    round_vp = seat["result"]["vp"].as_f64().unwrap_or(0.0);
+                }
+            }
+        }
+        if round_vp < 1.0 {
+            if let Some(entry) = map.get_mut(sa_uid) {
+                entry.1 -= 1.0 - round_vp; // subtract overflow
             }
         }
     }
@@ -603,11 +676,11 @@ fn compute_standings(tournament: &JsonValue) -> Vec<Standing> {
 
 /// Compute standings and store them on the tournament JSON object.
 /// Guard: does NOT overwrite standings if rounds are empty (preserves VEKN-synced data).
-fn update_standings(tournament: &mut JsonValue) {
+fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue) {
     if tournament["rounds"].is_empty() {
         return;
     }
-    let standings = compute_standings(tournament);
+    let standings = compute_standings(tournament, sanctions);
     let arr: Vec<JsonValue> = standings.into_iter().map(|s| {
         json::object! {
             "user_uid" => s.user_uid,
@@ -650,6 +723,7 @@ fn apply_event(
     tournament: &mut JsonValue,
     event: &TournamentEvent,
     actor: &ActorContext,
+    sanctions: &JsonValue,
 ) -> Result<(), String> {
     let state = TournamentState::from_str(
         tournament["state"].as_str().unwrap_or("Planned")
@@ -695,14 +769,15 @@ fn apply_event(
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
             tournament["state"] = "Waiting".into();
-            // Reset Finished players back to Checked-in
+            // Reset Finished players back to Checked-in (DQ'd stay DQ'd)
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Finished") {
                     players[i]["state"] = "Checked-in".into();
                 }
+                // Disqualified players stay Disqualified (no reset)
             }
-            update_standings(tournament);
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -809,11 +884,21 @@ fn apply_event(
                 return Err("Only organizers or the player themselves can check in".to_string());
             }
 
-            // TODO: When sanctions are implemented, disqualified players should be
-            // blocked from checking back in (even by organizers).
-
             let idx = find_player_index(&tournament["players"], player_uid)
                 .ok_or("Player not found")?;
+
+            // Block disqualified players from checking in
+            if tournament["players"][idx]["state"].as_str() == Some("Disqualified") {
+                return Err("Disqualified players cannot check in".to_string());
+            }
+
+            // Block players with DQ or suspension sanctions
+            if has_dq_sanction(sanctions, player_uid) {
+                return Err("Player has a disqualification sanction and cannot check in".to_string());
+            }
+            if has_active_suspension(sanctions, player_uid) {
+                return Err("Player is suspended and cannot check in".to_string());
+            }
 
             // Check for missing decklist when required (before mutable borrow)
             let missing_decklist = tournament["decklist_required"].as_bool().unwrap_or(false) && {
@@ -837,8 +922,14 @@ fn apply_event(
 
             let players = &mut tournament["players"];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() == Some("Registered")
-                    || (state == TournamentState::Finished && players[i]["state"].as_str() == Some("Finished"))
+                let ps = players[i]["state"].as_str().unwrap_or("");
+                if ps == "Disqualified" { continue; }
+                let uid = players[i]["user_uid"].as_str().unwrap_or("");
+                if has_dq_sanction(sanctions, uid) || has_active_suspension(sanctions, uid) {
+                    continue;
+                }
+                if ps == "Registered"
+                    || (state == TournamentState::Finished && ps == "Finished")
                 {
                     players[i]["state"] = "Checked-in".into();
                 }
@@ -1013,7 +1104,7 @@ fn apply_event(
             if state != TournamentState::Finished {
                 tournament["state"] = "Waiting".into();
             }
-            update_standings(tournament);
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1042,7 +1133,7 @@ fn apply_event(
             if state != TournamentState::Finished {
                 tournament["state"] = "Waiting".into();
             }
-            update_standings(tournament);
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1220,7 +1311,8 @@ fn apply_event(
             }
 
             // If round == rounds.len() and finals exists, target finals table
-            let is_finals = *round == tournament["rounds"].len() && !tournament["finals"].is_null() && *table == 0;
+            let rounds_len = tournament["rounds"].len();
+            let is_finals = *round == rounds_len && !tournament["finals"].is_null() && *table == 0;
 
             let t = if is_finals {
                 &mut tournament["finals"]
@@ -1282,7 +1374,20 @@ fn apply_event(
                 vps.push(vp);
             }
 
-            let gws = compute_gw(&vps);
+            // Build per-seat SA adjustments: -1.0 VP for each SA sanction on this round
+            let sa_sanctions = get_sa_sanctions(sanctions);
+            let current_round = if is_finals { rounds_len } else { *round };
+            let mut adjustments = vec![0.0f64; table_size];
+            for i in 0..table_size {
+                let player_uid = t["seating"][i]["player_uid"].as_str().unwrap_or("");
+                for (sa_uid, sa_round) in &sa_sanctions {
+                    if sa_uid == player_uid && *sa_round == current_round {
+                        adjustments[i] -= 1.0;
+                    }
+                }
+            }
+
+            let gws = compute_gw(&vps, &adjustments);
             let tps = compute_tp(table_size, &vps);
 
             // Apply scores
@@ -1409,7 +1514,7 @@ fn apply_event(
                 return Err("Need at least 2 rounds before random toss".to_string());
             }
 
-            let standings = compute_standings(tournament);
+            let standings = compute_standings(tournament, sanctions);
 
             // Find tied groups in top-5 cutoff zone that need toss
             // Group players by (gw, vp, tp) where toss == 0
@@ -1484,16 +1589,27 @@ fn apply_event(
                 return Err("Finals already started".to_string());
             }
 
-            let standings = compute_standings(tournament);
-            if standings.len() < 5 {
-                return Err("Need at least 5 players with results for finals".to_string());
+            let standings = compute_standings(tournament, sanctions);
+
+            // Filter out DQ'd players from finals consideration
+            let eligible: Vec<&Standing> = standings.iter()
+                .filter(|s| {
+                    let player = tournament["players"].members()
+                        .find(|p| p["user_uid"].as_str() == Some(&s.user_uid));
+                    let ps = player.and_then(|p| p["state"].as_str()).unwrap_or("");
+                    ps != "Disqualified"
+                })
+                .collect();
+
+            if eligible.len() < 5 {
+                return Err("Need at least 5 eligible players with results for finals".to_string());
             }
             if top5_has_ties(&standings) {
                 return Err("Resolve all ties in top 5 before starting finals".to_string());
             }
 
-            // Top 5 players form the finals table
-            let top5: Vec<&Standing> = standings.iter().take(5).collect();
+            // Top 5 eligible players form the finals table
+            let top5: Vec<&Standing> = eligible.into_iter().take(5).collect();
             let seed_order: Vec<JsonValue> = top5.iter()
                 .map(|s| s.user_uid.as_str().into())
                 .collect();
@@ -1563,10 +1679,12 @@ fn apply_event(
                 tournament["state"] = "Finished".into();
             }
 
-            // Mark all players as finished
+            // Mark all players as finished (except DQ'd)
             let players = &mut tournament["players"];
             for i in 0..players.len() {
-                players[i]["state"] = "Finished".into();
+                if players[i]["state"].as_str() != Some("Disqualified") {
+                    players[i]["state"] = "Finished".into();
+                }
             }
 
             Ok(())
@@ -1580,13 +1698,15 @@ fn apply_event(
 
             tournament["state"] = "Finished".into();
 
-            // Mark all players as finished
+            // Mark all players as finished (except DQ'd)
             let players = &mut tournament["players"];
             for i in 0..players.len() {
-                players[i]["state"] = "Finished".into();
+                if players[i]["state"].as_str() != Some("Disqualified") {
+                    players[i]["state"] = "Finished".into();
+                }
             }
 
-            update_standings(tournament);
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1763,17 +1883,22 @@ mod tests {
         }
     }
 
+    fn no_sanctions() -> String {
+        "[]".to_string()
+    }
+
+    /// Helper to run a tournament event with empty sanctions
+    fn run_event(tournament: &JsonValue, event: &JsonValue, actor: &JsonValue) -> Result<String, String> {
+        process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump(), &no_sanctions())
+    }
+
     #[test]
     fn test_open_registration() {
         let tournament = make_tournament();
         let event = json::object! { type: "OpenRegistration" };
         let actor = make_organizer();
 
-        let result = process_tournament_event(
-            &tournament.dump(),
-            &event.dump(),
-            &actor.dump(),
-        );
+        let result = run_event(&tournament, &event, &actor);
 
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
@@ -1791,11 +1916,7 @@ mod tests {
         };
         let actor = make_player("player-1");
 
-        let result = process_tournament_event(
-            &tournament.dump(),
-            &event.dump(),
-            &actor.dump(),
-        );
+        let result = run_event(&tournament, &event, &actor);
 
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
@@ -1815,11 +1936,7 @@ mod tests {
         let event = json::object! { type: "CheckInAll" };
         let actor = make_organizer();
 
-        let result = process_tournament_event(
-            &tournament.dump(),
-            &event.dump(),
-            &actor.dump(),
-        );
+        let result = run_event(&tournament, &event, &actor);
 
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
@@ -1839,11 +1956,7 @@ mod tests {
         let event = json::object! { type: "StartRound" };
         let actor = make_organizer();
 
-        let result = process_tournament_event(
-            &tournament.dump(),
-            &event.dump(),
-            &actor.dump(),
-        );
+        let result = run_event(&tournament, &event, &actor);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("at least 4"));
@@ -1855,11 +1968,7 @@ mod tests {
         let event = json::object! { type: "OpenRegistration" };
         let actor = make_player("random-player");
 
-        let result = process_tournament_event(
-            &tournament.dump(),
-            &event.dump(),
-            &actor.dump(),
-        );
+        let result = run_event(&tournament, &event, &actor);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("organizers"));
@@ -1886,7 +1995,7 @@ mod tests {
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
     }
 
@@ -1903,7 +2012,7 @@ mod tests {
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("in progress"));
     }
@@ -1921,7 +2030,7 @@ mod tests {
             multideck: false,
         };
         let actor = make_organizer();
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
     }
 
@@ -1935,7 +2044,7 @@ mod tests {
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
     }
 
@@ -1952,7 +2061,7 @@ mod tests {
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("finished"));
     }
@@ -1969,7 +2078,7 @@ mod tests {
             deck: { name: "New", author: "", comments: "", cards: {} },
         };
         let actor = make_player("player-1");
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("in progress"));
     }
@@ -1983,7 +2092,7 @@ mod tests {
 
         let event = json::object! { type: "CheckIn", player_uid: "player-1" };
         let actor = make_organizer();
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
@@ -2001,7 +2110,7 @@ mod tests {
 
         let event = json::object! { type: "CheckIn", player_uid: "player-1" };
         let actor = make_organizer();
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
@@ -2019,7 +2128,7 @@ mod tests {
         ];
         let event = json::object! { type: "SetPaymentStatus", player_uid: "p1", status: "Paid" };
         let actor = make_organizer();
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["payment_status"].as_str(), Some("Paid"));
@@ -2034,7 +2143,7 @@ mod tests {
         ];
         let event = json::object! { type: "SetPaymentStatus", player_uid: "p1", status: "Invalid" };
         let actor = make_organizer();
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid payment status"));
     }
@@ -2050,7 +2159,7 @@ mod tests {
         ];
         let event = json::object! { type: "MarkAllPaid" };
         let actor = make_organizer();
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["payment_status"].as_str(), Some("Paid"));
@@ -2067,8 +2176,139 @@ mod tests {
         ];
         let event = json::object! { type: "SetPaymentStatus", player_uid: "p1", status: "Paid" };
         let actor = make_player("p1");
-        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("organizers"));
+    }
+
+    // ================================================================
+    // Sanctions tests
+    // ================================================================
+
+    #[test]
+    fn test_gw_with_sa_adjustment() {
+        // Player with 2.5 VP normally gets GW, but with -1.0 SA adjustment (1.5 VP adjusted) loses it
+        let vps = vec![2.5, 1.0, 0.5, 0.5, 0.5];
+        let no_adj = vec![0.0; 5];
+        let gw_normal = compute_gw(&vps, &no_adj);
+        assert_eq!(gw_normal[0], 1.0); // normally gets GW
+
+        let adj = vec![-1.0, 0.0, 0.0, 0.0, 0.0];
+        let gw_adjusted = compute_gw(&vps, &adj);
+        assert_eq!(gw_adjusted[0], 0.0); // loses GW: adjusted VP 1.5 < 2.0
+    }
+
+    #[test]
+    fn test_gw_with_sa_still_above_threshold() {
+        // Player with 3.0 VP and -1.0 SA → adjusted 2.0 VP, still >= 2.0 AND still highest → keeps GW
+        let vps = vec![3.0, 1.0, 0.5, 0.5, 0.0];
+        let adj = vec![-1.0, 0.0, 0.0, 0.0, 0.0];
+        let gw = compute_gw(&vps, &adj);
+        assert_eq!(gw[0], 1.0); // keeps GW: adjusted 2.0, still highest
+    }
+
+    #[test]
+    fn test_dq_player_cannot_checkin() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Disqualified", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "CheckIn", player_uid: "p1" };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Disqualified"));
+    }
+
+    #[test]
+    fn test_dq_sanction_blocks_checkin() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Registered", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "CheckIn", player_uid: "p1" };
+        let actor = make_organizer();
+        let sanctions = json::array![
+            { user_uid: "p1", level: "disqualification", round_number: json::Null, lifted_at: json::Null, deleted_at: json::Null }
+        ];
+        let result = process_tournament_event(
+            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump()
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("disqualification"));
+    }
+
+    #[test]
+    fn test_suspension_blocks_checkin() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Registered", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "CheckIn", player_uid: "p1" };
+        let actor = make_organizer();
+        let sanctions = json::array![
+            { user_uid: "p1", level: "suspension", round_number: json::Null, lifted_at: json::Null, deleted_at: json::Null }
+        ];
+        let result = process_tournament_event(
+            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump()
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("suspended"));
+    }
+
+    #[test]
+    fn test_checkinall_skips_dq_players() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Registered", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Disqualified", payment_status: "Pending", toss: 0 },
+            { user_uid: "p3", state: "Registered", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "CheckInAll" };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
+        assert_eq!(updated["players"][1]["state"].as_str(), Some("Disqualified")); // stays DQ'd
+        assert_eq!(updated["players"][2]["state"].as_str(), Some("Checked-in"));
+    }
+
+    #[test]
+    fn test_finish_tournament_preserves_dq() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Disqualified", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "FinishTournament" };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["players"][0]["state"].as_str(), Some("Finished"));
+        assert_eq!(updated["players"][1]["state"].as_str(), Some("Disqualified")); // preserved
+    }
+
+    #[test]
+    fn test_reopen_tournament_preserves_dq() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Finished".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Finished", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Disqualified", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "ReopenTournament" };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
+        assert_eq!(updated["players"][1]["state"].as_str(), Some("Disqualified")); // preserved
     }
 }

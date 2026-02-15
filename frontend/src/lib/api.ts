@@ -3,7 +3,7 @@
  */
 
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, TournamentConfig, League } from '$lib/types';
-import { getAllUsers, getTournament, saveTournament, logChange } from './db';
+import { getAllUsers, getTournament, saveTournament, logChange, getSanctionsForTournament } from './db';
 import { processTournamentEvent, buildActorContext } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
@@ -474,7 +474,8 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
   if (current) {
     try {
       const actor = buildActorContext(getAuthState().user ?? null, current);
-      const updated = await processTournamentEvent(current, event, actor);
+      const sanctions = await getSanctionsForTournament(uid);
+      const updated = await processTournamentEvent(current, event, actor, sanctions);
       await saveTournament(updated);
       await logChange('tournaments', 'update', uid, { event });
 

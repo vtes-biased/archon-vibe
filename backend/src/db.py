@@ -552,6 +552,17 @@ async def get_sanctions_for_user(user_uid: str) -> list[Sanction]:
         return [decode_json(row[0], Sanction) for row in rows]
 
 
+async def get_sanctions_for_tournament(tournament_uid: str) -> list[Sanction]:
+    """Get all non-deleted sanctions for a tournament."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data FROM sanctions WHERE data->>'tournament_uid' = %s AND data->>'deleted_at' IS NULL",
+            (tournament_uid,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], Sanction) for row in rows]
+
+
 async def delete_user(uid: str) -> None:
     """Delete a user from the database (hard delete)."""
     async with get_connection() as conn:

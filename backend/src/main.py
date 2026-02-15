@@ -561,6 +561,7 @@ async def broadcast_resync(user_uid: str) -> None:
 # Make broadcast functions available to routes
 users.broadcast_user_event = broadcast_user_event
 sanctions.broadcast_sanction_event = broadcast_sanction_event
+sanctions.broadcast_tournament_event = broadcast_tournament_event
 tournaments.broadcast_tournament_event = broadcast_tournament_event
 tournaments.broadcast_rating_event = broadcast_rating_event
 tournaments.broadcast_user_event = broadcast_user_event

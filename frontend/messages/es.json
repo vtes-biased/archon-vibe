@@ -180,6 +180,10 @@
   "sanction_permanent_ban": "Suspensión permanente",
   "sanction_lifted": "Levantada",
   "sanction_expired": "Expirada",
+  "player_state_disqualified": "Descalificado",
+  "error_dq_cannot_checkin": "Los jugadores descalificados no pueden registrarse",
+  "error_suspended_cannot_checkin": "Los jugadores suspendidos no pueden registrarse",
+  "error_league_dq": "El jugador está descalificado de un torneo de liga",
 
   "sanction_cat_procedural_error": "Error de Procedimiento",
   "sanction_cat_tournament_error": "Error de Torneo",

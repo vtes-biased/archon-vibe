@@ -16,8 +16,10 @@ from ..db import (
     get_user_by_uid,
     insert_sanction,
     update_sanction,
+    update_tournament,
 )
 from ..models import (
+    PlayerState,
     Role,
     Sanction,
     SanctionCategory,
@@ -31,8 +33,9 @@ router = APIRouter(prefix="/sanctions", tags=["sanctions"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
-# Broadcast function will be set by main.py
+# Broadcast functions will be set by main.py
 broadcast_sanction_event = None
+broadcast_tournament_event = None
 
 # Rust engine for permission checks
 _engine = PyEngine()
@@ -139,6 +142,29 @@ def _validate_expiry(
                 status_code=400,
                 detail=f"SUSPENSION expires_at must be within {MAX_EXPIRY_MONTHS} months",
             )
+
+
+async def _set_player_dq_state(
+    tournament_uid: str, user_uid: str, new_state: PlayerState
+) -> None:
+    """Set a player's state on a tournament (for DQ sanctions).
+
+    Updates the tournament object and broadcasts the change.
+    """
+    tournament = await get_tournament_by_uid(tournament_uid)
+    if not tournament:
+        return
+    for player in tournament.players:
+        if player.user_uid == user_uid:
+            player.state = new_state
+            break
+    else:
+        return  # Player not found in tournament
+
+    tournament.modified = datetime.now(UTC)
+    await update_tournament(tournament)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
 
 
 class CreateSanctionRequest(BaseModel):
@@ -277,6 +303,12 @@ async def create_sanction(
         f"Sanction {sanction.uid} ({level.value}) created for user {request.user_uid} "
         f"by {current_user.uid}"
     )
+
+    # DQ sanction: set player state to Disqualified on the tournament
+    if level == SanctionLevel.DISQUALIFICATION and request.tournament_uid:
+        await _set_player_dq_state(
+            request.tournament_uid, request.user_uid, PlayerState.DISQUALIFIED
+        )
 
     # Broadcast to SSE clients
     if broadcast_sanction_event:
@@ -427,6 +459,17 @@ async def update_sanction_endpoint(
 
     await update_sanction(updated)
     logger.info(f"Sanction {uid} updated by {current_user.uid}")
+
+    # If a DQ sanction was lifted, restore player state on the tournament
+    if (
+        request.lifted is True
+        and sanction.lifted_at is None
+        and sanction.level == SanctionLevel.DISQUALIFICATION
+        and sanction.tournament_uid
+    ):
+        await _set_player_dq_state(
+            sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
+        )
 
     # Broadcast to SSE clients
     if broadcast_sanction_event:

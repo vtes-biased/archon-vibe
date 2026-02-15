@@ -389,6 +389,7 @@ class PlayerState(StrEnum):
     CHECKED_IN = "Checked-in"
     PLAYING = "Playing"
     FINISHED = "Finished"
+    DISQUALIFIED = "Disqualified"
 
 
 class PaymentStatus(StrEnum):
