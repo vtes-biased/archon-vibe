@@ -26,6 +26,7 @@
   "common_previous": "Anterior",
   "common_next": "Próximo",
   "common_na": "N/D",
+  "common_none": "Nenhum",
   "common_name": "Nome",
   "common_country": "País",
   "common_city": "Cidade",
@@ -221,6 +222,7 @@
   "sanction_round_label": "Rodada {round}",
   "sanction_baseline_hint": "Penalidade base: {level}",
   "sanction_escalation_hint": "{count} sanção/ões anterior/es — nível sugerido: {suggested}",
+  "sanction_downgrade_warning": "O nível selecionado é inferior à sanção {existing} existente",
   "sanction_tournament_issue_title": "Emitir Sanção de Torneio",
 
   "sanction_mgr_title": "Sanções",
@@ -449,6 +451,8 @@
   "tfield_allow_proxies": "Permitir Proxies",
   "tfield_multideck": "Multideck",
   "tfield_decklist_required": "Lista de Deck Obrigatória",
+  "tfield_league": "Liga",
+  "tfield_league_not_organizer": "não é organizador",
 
   "tournament_fallback_title": "Torneio",
   "tournament_tab_overview": "Visão Geral",
@@ -471,6 +475,7 @@
   "tournament_drop_out_btn": "Desistir",
   "tournament_upload_valid_deck": "Envie um deck válido para fazer check-in",
   "tournament_standings": "Classificações",
+  "tournament_disqualified": "Desqualificado",
   "tournament_standings_top5": "Top 5",
   "tournament_finals_heading": "Finais",
   "tournament_finals_table": "Mesa Final",

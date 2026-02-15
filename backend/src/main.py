@@ -375,22 +375,12 @@ def _filter_user(user: User, viewer: User | None) -> User | None:
 def _filter_sanction(sanction: Sanction, viewer: User | None) -> Sanction | None:
     """Filter a Sanction based on viewer's access level.
 
-    - Caution-level tournament sanctions: only visible to tournament organizers, IC, or Ethics
-    - Warning+ sanctions: visible to all members
-    - Non-members see nothing
+    All sanctions (including cautions) are visible to members.
+    Caution display scoping is handled in the frontend.
+    Non-members see nothing.
     """
     if not viewer or not viewer.vekn_id:
         return None
-    # Caution-level sanctions are only visible to tournament organizers or IC/Ethics
-    if sanction.level == SanctionLevel.CAUTION and sanction.tournament_uid:
-        if Role.IC in viewer.roles or Role.ETHICS in viewer.roles:
-            return sanction
-        # Check if viewer is organizer of this tournament (requires async lookup,
-        # but we cache tournament data). For SSE filter we rely on the organizers_uids
-        # that we can't easily check here without the tournament object.
-        # This will be enforced at a higher level — for now, cautions flow to members.
-        # TODO: Pass tournament context to filter for strict caution visibility
-        return sanction
     return sanction
 
 

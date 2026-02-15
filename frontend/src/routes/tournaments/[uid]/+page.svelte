@@ -26,6 +26,7 @@
   import FinalsTab from "./FinalsTab.svelte";
   import ConfigTab from "./ConfigTab.svelte";
   import DecksTab from "./DecksTab.svelte"; // Used in player view only
+  import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
 
   const countries = getCountries();
 
@@ -290,6 +291,14 @@
   });
 
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
+
+  // Player DQ state and sanctions helpers for standings display
+  function isPlayerDQ(userUid: string): boolean {
+    return tournament?.players?.some(p => p.user_uid === userUid && p.state === "Disqualified") ?? false;
+  }
+  function sanctionsForPlayer(userUid: string): Sanction[] {
+    return tournamentSanctions.filter(s => s.user_uid === userUid);
+  }
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo);
@@ -812,7 +821,13 @@
                     {#each playerStandings as entry, idx}
                       <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
                         <td class="py-1 pr-2 text-ash-500">{entry.rank}</td>
-                        <td class="py-1 pr-2">{seatDisplay(entry.user_uid)}</td>
+                        <td class="py-1 pr-2">
+                          <span class="inline-flex items-center gap-1">
+                            {seatDisplay(entry.user_uid)}
+                            <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
+                            {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
+                          </span>
+                        </td>
                         <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
                       </tr>
                     {/each}
@@ -968,7 +983,13 @@
                     {#each standings as entry, idx}
                       <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
                         <td class="py-1 pr-2 text-ash-500">{entry.rank}</td>
-                        <td class="py-1 pr-2">{seatDisplay(entry.user_uid)}</td>
+                        <td class="py-1 pr-2">
+                          <span class="inline-flex items-center gap-1">
+                            {seatDisplay(entry.user_uid)}
+                            <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
+                            {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
+                          </span>
+                        </td>
                         <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
                         {#if hasFinals}
                           <td class="text-right py-1 px-2">{entry.finals ?? ""}</td>

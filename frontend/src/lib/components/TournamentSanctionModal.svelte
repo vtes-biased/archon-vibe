@@ -57,14 +57,33 @@
     subcategory ? BASELINE_PENALTIES[subcategory] : null
   );
 
+  // Severity ordering for level comparison
+  const LEVEL_SEVERITY: Record<SanctionLevel, number> = {
+    caution: 0, warning: 1, standings_adjustment: 2,
+    disqualification: 3, suspension: 4, probation: 4,
+  };
+
   // Escalation hint: count prior sanctions and suggest next level
-  const activePriorCount = $derived(
-    priorSanctions.filter(s => !s.lifted_at && !s.deleted_at).length
+  const activePrior = $derived(
+    priorSanctions.filter(s => !s.lifted_at && !s.deleted_at)
   );
+  const activePriorCount = $derived(activePrior.length);
   const suggestedLevel = $derived<SanctionLevel>(
     activePriorCount < ESCALATION_SEQUENCE.length
       ? ESCALATION_SEQUENCE[activePriorCount]!
       : "disqualification"
+  );
+
+  // Warn if selected level is lower than the highest existing sanction
+  const highestExisting = $derived.by(() => {
+    let max: SanctionLevel | null = null;
+    for (const s of activePrior) {
+      if (!max || LEVEL_SEVERITY[s.level] > LEVEL_SEVERITY[max]) max = s.level;
+    }
+    return max;
+  });
+  const isDowngrade = $derived(
+    highestExisting !== null && LEVEL_SEVERITY[level] < LEVEL_SEVERITY[highestExisting]
   );
 
   // Round options
@@ -186,6 +205,15 @@
           <div class="flex items-center gap-2 text-amber-300">
             <Icon icon="lucide:alert-triangle" class="w-4 h-4 shrink-0" />
             {m.sanction_escalation_hint({ count: String(activePriorCount), suggested: levelLabel(suggestedLevel) })}
+          </div>
+        </div>
+      {/if}
+      <!-- Downgrade warning -->
+      {#if isDowngrade && highestExisting}
+        <div class="p-3 rounded bg-crimson-900/30 border border-crimson-800/50 text-sm">
+          <div class="flex items-center gap-2 text-crimson-300">
+            <Icon icon="lucide:arrow-down-circle" class="w-4 h-4 shrink-0" />
+            {m.sanction_downgrade_warning({ existing: levelLabel(highestExisting) })}
           </div>
         </div>
       {/if}

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from uuid6 import uuid7
 
 from ..db import (
+    get_league_by_uid,
     get_sanction_by_uid,
     get_sanctions_for_user,
     get_tournament_by_uid,
@@ -91,24 +92,34 @@ async def _can_issue_sanction(
     return False
 
 
-def _can_lift_sanction(user, sanction: Sanction) -> bool:
+async def _can_lift_sanction(user, sanction: Sanction) -> bool:
     """Check if user can lift a sanction.
 
     Rules:
-    - SUSPENSION/PROBATION: IC only
-    - CAUTION/WARNING/SA/DQ: Rulemonger, NC (same country as sanctioned user), or IC
+    - SUSPENSION/PROBATION: IC or Ethics
+    - CAUTION/WARNING/SA/DQ: IC, Rulemonger, NC (same country as tournament), or
+      league organizer (for DQ in a league tournament)
     """
     if sanction.level in (SanctionLevel.SUSPENSION, SanctionLevel.PROBATION):
-        return Role.IC in user.roles
+        return Role.IC in user.roles or Role.ETHICS in user.roles
 
-    # Tournament-level sanctions: Rulemonger, NC (same country), or IC
+    # Tournament-level sanctions: IC, Rulemonger always
     if Role.IC in user.roles or Role.RULEMONGER in user.roles:
         return True
-    # NC can lift if same country — we'd need the sanctioned user's country.
-    # For now, NC can lift any tournament sanction (country check deferred to
-    # when we load the sanctioned user).
-    if Role.NC in user.roles:
-        return True
+
+    # NC can lift if same country as the tournament
+    if Role.NC in user.roles and sanction.tournament_uid:
+        tournament = await get_tournament_by_uid(sanction.tournament_uid)
+        if tournament and tournament.country and user.country == tournament.country:
+            return True
+
+    # League organizer can lift DQ from their league tournaments
+    if sanction.level == SanctionLevel.DISQUALIFICATION and sanction.tournament_uid:
+        tournament = await get_tournament_by_uid(sanction.tournament_uid)
+        if tournament and tournament.league_uid:
+            league = await get_league_by_uid(tournament.league_uid)
+            if league and user.uid in (league.organizers_uids or []):
+                return True
 
     return False
 
@@ -345,7 +356,7 @@ async def update_sanction_endpoint(
 
     # Check lift permission separately
     if request.lifted is True and sanction.lifted_at is None:
-        if not _can_lift_sanction(current_user, sanction):
+        if not await _can_lift_sanction(current_user, sanction):
             raise HTTPException(
                 status_code=403, detail="You don't have permission to lift this sanction"
             )

@@ -2,6 +2,7 @@
   import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "$lib/types";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAllLeagues } from "$lib/db";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   export interface TournamentFieldValues {
@@ -44,15 +45,25 @@
 
   const countries = getCountries();
   const timezones = Intl.supportedValuesOf("timeZone");
+  const auth = $derived(getAuthState());
 
-  let leagues = $state<League[]>([]);
+  let allActiveLeagues = $state<League[]>([]);
   $effect(() => {
     getAllLeagues().then(all => {
-      leagues = all
+      allActiveLeagues = all
         .filter(l => !l.deleted_at && (!l.finish || new Date(l.finish) >= new Date()))
         .sort((a, b) => a.name.localeCompare(b.name));
     });
   });
+
+  // Leagues where the current user is an organizer (selectable)
+  const myLeagues = $derived(
+    allActiveLeagues.filter(l => l.organizers_uids?.includes(auth.user?.uid ?? ""))
+  );
+  // Leagues where the user is NOT an organizer (shown disabled with explanation)
+  const otherLeagues = $derived(
+    allActiveLeagues.filter(l => !l.organizers_uids?.includes(auth.user?.uid ?? ""))
+  );
 
   function id(name: string) {
     return idPrefix ? `${idPrefix}-${name}` : name;
@@ -111,9 +122,9 @@
 </div>
 
 <!-- League -->
-{#if leagues.length > 0}
+{#if allActiveLeagues.length > 0}
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("league")}>League</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("league")}>{m.tfield_league()}</label>
     <select
       id={id("league")}
       value={values.league_uid}
@@ -121,9 +132,12 @@
       onchange={(e) => handleInput("league_uid", (e.target as HTMLSelectElement).value)}
       class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
     >
-      <option value="">None</option>
-      {#each leagues as league}
+      <option value="">{m.common_none()}</option>
+      {#each myLeagues as league}
         <option value={league.uid}>{league.name}</option>
+      {/each}
+      {#each otherLeagues as league}
+        <option value={league.uid} disabled>{league.name} — {m.tfield_league_not_organizer()}</option>
       {/each}
     </select>
   </div>
