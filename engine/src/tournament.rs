@@ -122,6 +122,10 @@ pub enum TournamentEvent {
     CheckInAll,
     ResetCheckIn,
 
+    // Payment
+    SetPaymentStatus { player_uid: String, status: String },
+    MarkAllPaid,
+
     // Round management
     StartRound,
     FinishRound,
@@ -365,6 +369,18 @@ impl TournamentEvent {
             }),
             "CheckInAll" => Ok(Self::CheckInAll),
             "ResetCheckIn" => Ok(Self::ResetCheckIn),
+            "SetPaymentStatus" => {
+                let player_uid = value["player_uid"]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string();
+                let status = value["status"]
+                    .as_str()
+                    .ok_or("status required")?
+                    .to_string();
+                Ok(Self::SetPaymentStatus { player_uid, status })
+            }
+            "MarkAllPaid" => Ok(Self::MarkAllPaid),
             "StartRound" => Ok(Self::StartRound),
             "FinishRound" => Ok(Self::FinishRound),
             "CancelRound" => Ok(Self::CancelRound),
@@ -838,6 +854,29 @@ fn apply_event(
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Checked-in") {
                     players[i]["state"] = if state == TournamentState::Finished { "Finished" } else { "Registered" }.into();
+                }
+            }
+            Ok(())
+        }
+
+        TournamentEvent::SetPaymentStatus { player_uid, status } => {
+            require_organizer(actor)?;
+            match status.as_str() {
+                "Pending" | "Paid" | "Refunded" | "Cancelled" => {}
+                _ => return Err(format!("Invalid payment status: {}", status)),
+            }
+            let idx = find_player_index(&tournament["players"], player_uid)
+                .ok_or("Player not found")?;
+            tournament["players"][idx]["payment_status"] = status.as_str().into();
+            Ok(())
+        }
+
+        TournamentEvent::MarkAllPaid => {
+            require_organizer(actor)?;
+            let players = &mut tournament["players"];
+            for i in 0..players.len() {
+                if players[i]["payment_status"].as_str() == Some("Pending") {
+                    players[i]["payment_status"] = "Paid".into();
                 }
             }
             Ok(())
@@ -1967,5 +2006,69 @@ mod tests {
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
         assert!(updated["players"][0]["missing_decklist"].is_null());
+    }
+
+    // --- Payment tracking tests ---
+
+    #[test]
+    fn test_set_payment_status() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "SetPaymentStatus", player_uid: "p1", status: "Paid" };
+        let actor = make_organizer();
+        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["players"][0]["payment_status"].as_str(), Some("Paid"));
+    }
+
+    #[test]
+    fn test_set_payment_status_invalid() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "SetPaymentStatus", player_uid: "p1", status: "Invalid" };
+        let actor = make_organizer();
+        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid payment status"));
+    }
+
+    #[test]
+    fn test_mark_all_paid() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Checked-in", payment_status: "Paid", toss: 0 },
+            { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "MarkAllPaid" };
+        let actor = make_organizer();
+        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["players"][0]["payment_status"].as_str(), Some("Paid"));
+        assert_eq!(updated["players"][1]["payment_status"].as_str(), Some("Paid"));
+        assert_eq!(updated["players"][2]["payment_status"].as_str(), Some("Paid"));
+    }
+
+    #[test]
+    fn test_non_organizer_cannot_set_payment() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        ];
+        let event = json::object! { type: "SetPaymentStatus", player_uid: "p1", status: "Paid" };
+        let actor = make_player("p1");
+        let result = process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("organizers"));
     }
 }

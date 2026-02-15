@@ -589,5 +589,14 @@
   "user_detail_col_vp": "VP",
   "user_detail_col_gw": "GW",
   "user_detail_col_pts": "Pts",
-  "user_detail_no_rating": "Nenhum dado de rating disponível."
+  "user_detail_no_rating": "Nenhum dado de rating disponível.",
+
+  "payment_column": "Pagamento",
+  "payment_pending": "Pendente",
+  "payment_paid": "Pago",
+  "payment_mark_paid": "Marcar como pago",
+  "payment_mark_unpaid": "Marcar como não pago",
+  "payment_mark_all_paid": "Marcar todos como pagos",
+  "payment_filter_all": "Todos",
+  "payment_summary": "{paid}/{total} pago(s)"
 }

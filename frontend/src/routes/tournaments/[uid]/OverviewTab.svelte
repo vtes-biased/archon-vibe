@@ -158,6 +158,11 @@
               class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
             >{m.overview_check_all_in()}</button>
             <button
+              onclick={() => doAction("MarkAllPaid")}
+              disabled={actionLoading}
+              class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+            >{m.payment_mark_all_paid()}</button>
+            <button
               onclick={() => doAction("StartRound")}
               disabled={actionLoading || checkedInCount < 4}
               class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"

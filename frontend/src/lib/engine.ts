@@ -92,6 +92,8 @@ export type TournamentEventType =
   | 'CheckIn'
   | 'CheckInAll'
   | 'ResetCheckIn'
+  | 'SetPaymentStatus'
+  | 'MarkAllPaid'
   | 'StartRound'
   | 'FinishRound'
   | 'CancelRound'
@@ -128,6 +130,7 @@ export interface TournamentEvent {
   }>;
   comment?: string;
   toss?: number;
+  status?: string;
   deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
   multideck?: boolean;
 }

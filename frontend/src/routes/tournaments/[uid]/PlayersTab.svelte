@@ -38,6 +38,10 @@
   let tossInputs = $state<Record<string, string>>({});
   let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
   let standingsInitialized = false;
+  let paymentFilter = $state<'all' | 'Pending' | 'Paid'>('all');
+
+  const paidCount = $derived(tournament.players?.filter(p => p.payment_status === 'Paid').length ?? 0);
+  const totalPlayers = $derived(tournament.players?.length ?? 0);
 
   // Deck expansion state
   let expandedPlayer = $state<string | null>(null);
@@ -138,6 +142,11 @@
     return players;
   });
 
+  const filteredPlayers = $derived.by(() => {
+    if (!isOrganizer || paymentFilter === 'all') return sortedPlayers;
+    return sortedPlayers.filter(p => p.payment_status === paymentFilter);
+  });
+
   async function addPlayerByUser(user: User) {
     await doAction("AddPlayer", { user_uid: user.uid });
     showAddPlayer = false;
@@ -229,6 +238,27 @@
       >{m.players_sort_vekn()}</button>
     </div>
 
+    <!-- Payment filter (organizer only) -->
+    {#if isOrganizer}
+      <div class="flex items-center gap-2 mb-2">
+        <div class="flex gap-1">
+          <button
+            class="px-2 py-1 text-xs rounded transition-colors {paymentFilter === 'all' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+            onclick={() => paymentFilter = 'all'}
+          >{m.payment_filter_all()}</button>
+          <button
+            class="px-2 py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'bg-amber-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+            onclick={() => paymentFilter = 'Pending'}
+          >{m.payment_pending()}</button>
+          <button
+            class="px-2 py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'bg-emerald-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+            onclick={() => paymentFilter = 'Paid'}
+          >{m.payment_paid()}</button>
+        </div>
+        <span class="text-xs text-ash-500">{m.payment_summary({ paid: String(paidCount), total: String(totalPlayers) })}</span>
+      </div>
+    {/if}
+
     <!-- Player table -->
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -248,6 +278,9 @@
               <th class="text-right py-1 px-2">{m.tournament_col_toss()}</th>
             {/if}
             <th class="text-left py-1 px-2">{m.tournament_col_status()}</th>
+            {#if isOrganizer}
+              <th class="text-center py-1 px-2">{m.payment_column()}</th>
+            {/if}
             {#if tournament.decklist_required}
               <th class="text-center py-1 px-2">{m.tournament_col_deck()}</th>
             {/if}
@@ -255,7 +288,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each sortedPlayers as player}
+          {#each filteredPlayers as player}
             {@const puid = player.user_uid ?? ""}
             {@const entry = standingsMap.get(puid)}
             {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
@@ -313,6 +346,18 @@
                   </span>
                 {/if}
               </td>
+              {#if isOrganizer}
+                <td class="text-center py-1 px-2">
+                  <button
+                    onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
+                    disabled={actionLoading}
+                    class="px-2 py-0.5 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'bg-emerald-900/60 text-emerald-300 hover:bg-emerald-900/80' : 'bg-amber-900/40 text-amber-300 hover:bg-amber-900/60'}"
+                    title={player.payment_status === 'Paid' ? m.payment_mark_unpaid() : m.payment_mark_paid()}
+                  >
+                    {player.payment_status === 'Paid' ? m.payment_paid() : m.payment_pending()}
+                  </button>
+                </td>
+              {/if}
               {#if tournament.decklist_required}
                 {@const deckStatus = getDeckStatus(puid)}
                 <td class="text-center py-1 px-2">
