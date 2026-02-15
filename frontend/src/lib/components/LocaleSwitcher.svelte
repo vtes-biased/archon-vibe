@@ -24,6 +24,7 @@
 </script>
 
 <select
+  name="locale"
   value={getLocale()}
   onchange={handleChange}
   class="bg-dusk-950 text-ash-400 text-xs border border-ash-800 rounded px-1.5 py-1 cursor-pointer hover:text-ash-200 hover:border-ash-600 focus:outline-none focus:border-crimson-500"
