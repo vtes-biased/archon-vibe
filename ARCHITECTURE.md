@@ -151,6 +151,14 @@ When the PWA is deliberately taken offline (or loses connection):
 
 **Validation**: Rust engine validates deck legality (crypt/library counts, banned cards, multideck rules) before tournament actions that require decks.
 
+## League System
+
+**League Model**: Aggregates tournaments into leagues with standings. Fields: `name`, `kind` (League/Meta-League), `standings_mode` (RTP/Score/GP), `format`, `online`, `country`, `start`/`finish`, `description`, `organizers_uids`, `parent_uid`, `allow_no_finals`.
+
+**Synced Object**: Leagues are streamed via SSE like tournaments/users. Stored in IndexedDB `leagues` store with `by-country` and `by-start` indexes.
+
+**Standings Modes**: RTP (rating points), Score (GW/VP/TP), GP (Grand Prix position-based).
+
 ## Serialization
 
 ### msgspec
@@ -340,10 +348,22 @@ return Response(
 
 For objects that need sync support after deletion:
 
-1. Add `deleted_at: datetime | None` field
+1. Add `deleted_at: datetime | None` field (part of `BaseObject`)
 2. Soft delete: set `deleted_at = now()`
 3. SSE broadcasts the deleted object (with `deleted_at` set)
 4. Frontend receives update, removes from local IndexedDB
 5. Backend cleanup job hard-deletes after 30 days
 
 This ensures clients that were offline during deletion still receive the delete event on reconnect.
+
+## Internationalization (i18n)
+
+**Library**: Paraglide JS (inlang) — client-only, no server-side rendering needed for SPA.
+
+**Locales**: `en` (default), `fr`, `es`, `pt`, `it` — all message files in `frontend/messages/*.json`.
+
+**Detection**: Browser locale auto-detection via `preferredLanguage` strategy + cookie persistence.
+
+**Integration**: Vite plugin compiles messages to TypeScript. Import from `$lib/paraglide/messages` in components.
+
+**Locale Switcher**: Desktop sidebar component (`LocaleSwitcher.svelte`) allows manual locale selection.

@@ -16,7 +16,7 @@ Three access levels determine what data each SSE viewer receives:
 
 ### Generic `stream_objects()`
 
-Single generic function replaces per-type duplicates:
+Single generic function using keyset pagination:
 
 ```python
 # backend/src/db.py
@@ -25,7 +25,7 @@ async def stream_objects[T](
 ) -> AsyncIterator[tuple[list[T], str | None]]:
 ```
 
-Uses server-side cursors with `WHERE modified > %s` (strict `>`, not `>=`) to avoid duplicates on incremental sync.
+**Keyset pagination**: Uses `WHERE (modified, uid) > (%s, %s)` to page through results. DB connections acquired/released per batch (not held for entire stream). Prevents connection pool exhaustion during long SSE streams.
 
 ### Per-Type Filtering
 
@@ -35,6 +35,7 @@ Each object type has a filter function applied per-viewer during both initial sy
 - `_filter_sanction()` — members+ only
 - `_filter_tournament()` — full/member/minimal based on access level, `standings_mode`, `decklists_mode`
 - `_filter_rating()` — public (no filtering)
+- `_filter_league()` — public (no filtering currently)
 
 ### SSE Endpoint (spec-based loop)
 
@@ -44,6 +45,7 @@ _stream_specs = [
     (stream_sanctions, "sanctions", _filter_sanction),
     (stream_tournaments, "tournaments", _filter_tournament),
     (stream_ratings, "ratings", _filter_rating),
+    (stream_leagues, "leagues", _filter_league),
 ]
 
 for stream_fn, event_type, filter_fn in _stream_specs:
@@ -91,6 +93,7 @@ Minimal indexes only:
 | sanctions | `by-user` |
 | tournaments | `by-state`, `by-start`, `by-country`, `by-format` |
 | ratings | `by-user`, `by-country` |
+| leagues | `by-country`, `by-start` |
 
 ### Changes Log (Offline-Ready)
 
@@ -98,7 +101,7 @@ Generalized for all object types:
 
 ```typescript
 changes: {
-  store: string;        // "users" | "sanctions" | "tournaments" | "ratings"
+  store: string;        // "users" | "sanctions" | "tournaments" | "ratings" | "leagues"
   type: 'create' | 'update' | 'delete';
   uid: string;
   timestamp: string;
@@ -121,6 +124,7 @@ const SPECS = [
   { batchType: 'sanctions', singleType: 'sanction', save, saveBatch, del },
   { batchType: 'tournaments', singleType: 'tournament', save, saveBatch, del },
   { batchType: 'ratings', singleType: 'rating', save, saveBatch, del },
+  { batchType: 'leagues', singleType: 'league', save, saveBatch, del },
 ];
 ```
 

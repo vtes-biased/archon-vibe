@@ -35,6 +35,8 @@ CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
 
 **Card/Deck Support**: VTES card database loaded into IndexedDB (`cards` store). Deck validation in Rust engine, integrated into tournament player workflow.
 
+**Object Types**: User, Sanction, Tournament, Rating, League (all synced via SSE). VtesCard (static data, loaded into IndexedDB).
+
 ## Events
 
 ### Business Events
