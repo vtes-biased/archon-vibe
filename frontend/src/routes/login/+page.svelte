@@ -3,13 +3,15 @@
   import { onMount } from "svelte";
   import {
     getAuthState,
-    isPasskeySupported,
-    createAccountWithPasskey,
-    loginWithPasskey,
     storeTokensFromCallback,
     requestMagicLink,
     login,
   } from "$lib/stores/auth.svelte";
+  import {
+    isPasskeySupported,
+    createAccountWithPasskey,
+    loginWithPasskey,
+  } from "$lib/stores/passkeys.svelte";
   import Icon from "@iconify/svelte";
   import * as m from '$lib/paraglide/messages.js';
 

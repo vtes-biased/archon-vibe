@@ -81,10 +81,8 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
     return dbPromise;
   }
 
-  console.log(`Opening IndexedDB archon-db v${DB_VERSION}...`);
   dbPromise = openDB<ArchonDB>('archon-db', DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, transaction) {
-      console.log(`IndexedDB upgrade from version ${oldVersion} to ${DB_VERSION}`);
 
       // On ANY version upgrade: delete all existing stores and recreate fresh.
       // This triggers a full resync from SSE on next connect.
@@ -127,11 +125,7 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       // Metadata store for sync state
       db.createObjectStore('metadata');
 
-      console.log('IndexedDB upgrade complete');
     },
-  }).then(db => {
-    console.log('IndexedDB opened successfully');
-    return db;
   });
 
   return dbPromise;

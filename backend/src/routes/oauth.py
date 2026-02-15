@@ -15,13 +15,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from uuid6 import uuid7
 
-from ..db import (
+from ..db import get_user_by_uid
+from ..db_oauth import (
     get_oauth_client_by_client_id,
     get_oauth_clients_by_owner,
     get_oauth_code,
     get_oauth_consent,
     get_oauth_token_by_jti,
-    get_user_by_uid,
     insert_oauth_client,
     insert_oauth_code,
     insert_oauth_token,

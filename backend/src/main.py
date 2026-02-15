@@ -17,8 +17,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from .db import (
-    cleanup_expired_oauth_codes,
-    cleanup_expired_oauth_tokens,
     cleanup_expired_tokens,
     close_db,
     delete_sanction_hard,
@@ -32,6 +30,7 @@ from .db import (
     stream_users,
     update_sanction,
 )
+from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .models import (
     DataLevel,
     DeckListsMode,

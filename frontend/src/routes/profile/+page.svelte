@@ -6,12 +6,11 @@
     getAccessToken,
     logout,
     updateProfile,
-    registerPasskey,
-    isPasskeySupported,
     initAuth,
     storeTokensFromCallback,
     type ProfileUpdate,
   } from "$lib/stores/auth.svelte";
+  import { registerPasskey, isPasskeySupported } from "$lib/stores/passkeys.svelte";
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";

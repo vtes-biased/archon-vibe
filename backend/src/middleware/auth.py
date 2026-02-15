@@ -5,7 +5,8 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
 
-from ..db import get_oauth_token_by_jti, get_user_by_uid
+from ..db import get_user_by_uid
+from ..db_oauth import get_oauth_token_by_jti
 from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
 from ..models import Role, User
 
