@@ -20,14 +20,115 @@ export type Role =
 
 export type AuthMethodType = "email" | "discord" | "passkey";
 
-export type SanctionLevel = "caution" | "warning" | "disqualification" | "suspension" | "probation" | "score_adjustment";
+export type SanctionLevel = "caution" | "warning" | "standings_adjustment" | "disqualification" | "suspension" | "probation";
 
 export type SanctionCategory =
-  | "deck_problem"
-  | "procedural"
+  | "procedural_error"
+  | "tournament_error"
+  | "unsportsmanlike_conduct";
+
+export type SanctionSubcategory =
+  // Procedural Errors
+  | "missed_mandatory_effect"
+  | "card_access_error"
+  | "game_rule_violation"
+  | "failure_to_maintain_game_state"
+  // Tournament Errors
+  | "illegal_decklist"
+  | "illegal_main_deck_legal_decklist"
+  | "illegal_main_deck_no_decklist"
+  | "outside_assistance"
+  | "slow_play"
+  | "limited_procedure_violation"
+  | "public_info_miscommunication"
+  | "obscuring_game_state"
+  | "marked_cards"
+  | "insufficient_shuffling"
+  // Unsportsmanlike Conduct
+  | "minor"
+  | "major"
+  | "aggressive_behaviour"
+  | "bribery_and_wagering"
+  | "theft_of_tournament_material"
+  | "stalling"
   | "cheating"
-  | "unsporting"
-  | "other";
+  | "fraud"
+  | "collusion"
+  | "health_and_safety_disruption"
+  | "rage_quitting"
+  | "failure_to_play_to_win";
+
+export const SUBCATEGORIES_BY_CATEGORY: Record<SanctionCategory, SanctionSubcategory[]> = {
+  procedural_error: [
+    "missed_mandatory_effect",
+    "card_access_error",
+    "game_rule_violation",
+    "failure_to_maintain_game_state",
+  ],
+  tournament_error: [
+    "illegal_decklist",
+    "illegal_main_deck_legal_decklist",
+    "illegal_main_deck_no_decklist",
+    "outside_assistance",
+    "slow_play",
+    "limited_procedure_violation",
+    "public_info_miscommunication",
+    "obscuring_game_state",
+    "marked_cards",
+    "insufficient_shuffling",
+  ],
+  unsportsmanlike_conduct: [
+    "minor",
+    "major",
+    "aggressive_behaviour",
+    "bribery_and_wagering",
+    "theft_of_tournament_material",
+    "stalling",
+    "cheating",
+    "fraud",
+    "collusion",
+    "health_and_safety_disruption",
+    "rage_quitting",
+    "failure_to_play_to_win",
+  ],
+};
+
+export const BASELINE_PENALTIES: Record<SanctionSubcategory, SanctionLevel> = {
+  // Procedural Errors
+  missed_mandatory_effect: "caution",
+  card_access_error: "warning",
+  game_rule_violation: "warning",
+  failure_to_maintain_game_state: "warning",
+  // Tournament Errors
+  illegal_decklist: "warning",
+  illegal_main_deck_legal_decklist: "standings_adjustment",
+  illegal_main_deck_no_decklist: "disqualification",
+  outside_assistance: "warning",
+  slow_play: "caution",
+  limited_procedure_violation: "warning",
+  public_info_miscommunication: "warning",
+  obscuring_game_state: "warning",
+  marked_cards: "warning",
+  insufficient_shuffling: "caution",
+  // Unsportsmanlike Conduct
+  minor: "warning",
+  major: "standings_adjustment",
+  aggressive_behaviour: "disqualification",
+  bribery_and_wagering: "disqualification",
+  theft_of_tournament_material: "disqualification",
+  stalling: "standings_adjustment",
+  cheating: "disqualification",
+  fraud: "disqualification",
+  collusion: "disqualification",
+  health_and_safety_disruption: "disqualification",
+  rage_quitting: "standings_adjustment",
+  failure_to_play_to_win: "standings_adjustment",
+};
+
+export const ESCALATION_SEQUENCE: SanctionLevel[] = [
+  "caution", "caution", "warning", "warning",
+  "standings_adjustment", "standings_adjustment", "disqualification",
+];
 
 export interface BaseObject {
   uid: string; // UUID v7
@@ -81,7 +182,8 @@ export interface Sanction extends BaseObject {
   tournament_uid: string | null; // If tournament-related
   level: SanctionLevel;
   category: SanctionCategory;
-  vp_adjustment?: number;
+  subcategory?: SanctionSubcategory | null;
+  round_number?: number | null; // Which round the sanction applies to (0-indexed)
   description: string;
   issued_at: string;
   expires_at: string | null; // For suspensions/probation (null = permanent)
@@ -218,6 +320,20 @@ export interface Tournament extends BaseObject {
   winner?: string;
   standings?: Standing[];
   my_tables?: Table[]; // Per-viewer: tables where the viewer sat (NOT stored in DB)
+
+  // Offline mode
+  offline_mode?: boolean;
+  offline_device_id?: string;
+  offline_user_uid?: string;
+  offline_since?: string | null;
+}
+
+/** Player added during offline mode, pending reconciliation with server. */
+export interface OfflinePlayer {
+  temp_uid: string;   // Client-generated UUID
+  name: string;
+  vekn_id?: string;
+  email?: string;
 }
 
 /**

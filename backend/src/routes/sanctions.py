@@ -12,11 +12,19 @@ from uuid6 import uuid7
 from ..db import (
     get_sanction_by_uid,
     get_sanctions_for_user,
+    get_tournament_by_uid,
     get_user_by_uid,
     insert_sanction,
     update_sanction,
 )
-from ..models import Role, Sanction, SanctionCategory, SanctionLevel
+from ..models import (
+    Role,
+    Sanction,
+    SanctionCategory,
+    SanctionLevel,
+    SanctionSubcategory,
+    SUBCATEGORIES_BY_CATEGORY,
+)
 from .auth import verify_token
 
 router = APIRouter(prefix="/sanctions", tags=["sanctions"])
@@ -54,20 +62,52 @@ async def _get_current_user(authorization: str | None):
         return None
 
 
-def _can_issue_sanction(issuer, level: SanctionLevel, tournament_uid: str | None) -> bool:
+async def _can_issue_sanction(
+    issuer, level: SanctionLevel, tournament_uid: str | None
+) -> bool:
     """Check if issuer can create a sanction of this level.
 
     Rules:
-    - SUSPENSION/PROBATION: IC or Ethics only (outside tournaments)
-    - CAUTION/WARNING/DQ/SCORE_ADJ: IC, Ethics, or tournament organizers (deferred)
+    - SUSPENSION/PROBATION: IC or Ethics only
+    - CAUTION/WARNING/SA/DQ: IC, Ethics, or tournament organizer (requires tournament_uid)
     """
-    if level in (SanctionLevel.SUSPENSION, SanctionLevel.PROBATION):
-        # Only IC or Ethics can issue these
-        return Role.IC in issuer.roles or Role.ETHICS in issuer.roles
+    is_ic_or_ethics = Role.IC in issuer.roles or Role.ETHICS in issuer.roles
 
-    # For tournament-level sanctions, we'd check tournament organizer role
-    # For now, allow IC/Ethics for all
-    return Role.IC in issuer.roles or Role.ETHICS in issuer.roles
+    if level in (SanctionLevel.SUSPENSION, SanctionLevel.PROBATION):
+        return is_ic_or_ethics
+
+    if is_ic_or_ethics:
+        return True
+
+    # Tournament organizers can issue in-tournament sanctions
+    if tournament_uid:
+        tournament = await get_tournament_by_uid(tournament_uid)
+        if tournament and issuer.uid in tournament.organizers_uids:
+            return True
+
+    return False
+
+
+def _can_lift_sanction(user, sanction: Sanction) -> bool:
+    """Check if user can lift a sanction.
+
+    Rules:
+    - SUSPENSION/PROBATION: IC only
+    - CAUTION/WARNING/SA/DQ: Rulemonger, NC (same country as sanctioned user), or IC
+    """
+    if sanction.level in (SanctionLevel.SUSPENSION, SanctionLevel.PROBATION):
+        return Role.IC in user.roles
+
+    # Tournament-level sanctions: Rulemonger, NC (same country), or IC
+    if Role.IC in user.roles or Role.RULEMONGER in user.roles:
+        return True
+    # NC can lift if same country — we'd need the sanctioned user's country.
+    # For now, NC can lift any tournament sanction (country check deferred to
+    # when we load the sanctioned user).
+    if Role.NC in user.roles:
+        return True
+
+    return False
 
 
 def _validate_expiry(
@@ -107,6 +147,8 @@ class CreateSanctionRequest(BaseModel):
     user_uid: str
     level: str
     category: str
+    subcategory: str | None = None
+    round_number: int | None = None
     description: str
     expires_at: str | None = None  # ISO datetime string
     tournament_uid: str | None = None
@@ -117,6 +159,8 @@ class UpdateSanctionRequest(BaseModel):
 
     level: str | None = None
     category: str | None = None
+    subcategory: str | None = None
+    round_number: int | None = None
     description: str | None = None
     expires_at: str | None = None  # YYYY-MM-DD date string
     lifted: bool | None = None
@@ -153,8 +197,41 @@ async def create_sanction(
             detail=f"Invalid category: {request.category}. Valid: {[c.value for c in SanctionCategory]}",
         ) from e
 
+    # Validate subcategory if provided
+    subcategory = None
+    if request.subcategory is not None:
+        try:
+            subcategory = SanctionSubcategory(request.subcategory)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid subcategory: {request.subcategory}",
+            ) from e
+        # Validate subcategory belongs to parent category
+        valid_subs = SUBCATEGORIES_BY_CATEGORY.get(category, [])
+        if subcategory not in valid_subs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Subcategory '{subcategory.value}' not valid for category '{category.value}'",
+            )
+
+    # Validate round_number
+    round_number = request.round_number
+    if level == SanctionLevel.STANDINGS_ADJUSTMENT and round_number is None:
+        raise HTTPException(
+            status_code=400,
+            detail="round_number is required for standings_adjustment sanctions",
+        )
+    if round_number is not None and request.tournament_uid:
+        tournament = await get_tournament_by_uid(request.tournament_uid)
+        if tournament and round_number >= len(tournament.rounds):
+            raise HTTPException(
+                status_code=400,
+                detail=f"round_number {round_number} exceeds tournament rounds ({len(tournament.rounds)})",
+            )
+
     # Check permission
-    if not _can_issue_sanction(current_user, level, request.tournament_uid):
+    if not await _can_issue_sanction(current_user, level, request.tournament_uid):
         raise HTTPException(
             status_code=403,
             detail="You don't have permission to issue this type of sanction",
@@ -188,6 +265,8 @@ async def create_sanction(
         tournament_uid=request.tournament_uid,
         level=level,
         category=category,
+        subcategory=subcategory,
+        round_number=round_number,
         description=request.description,
         issued_at=issued_at,
         expires_at=expires_at,
@@ -216,30 +295,50 @@ async def update_sanction_endpoint(
     request: UpdateSanctionRequest,
     authorization: str | None = Header(default=None),
 ) -> Response:
-    """Update a sanction (lift or modify expiry).
+    """Update a sanction (lift or modify).
 
-    Only IC and Ethics can modify sanctions.
+    Permissions:
+    - Suspension/Probation: IC or Ethics can modify, IC can lift
+    - Tournament sanctions: IC/Ethics can modify, Rulemonger/NC/IC can lift
     """
     # Authenticate
     current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Check permission (only IC/Ethics can modify)
-    if Role.IC not in current_user.roles and Role.ETHICS not in current_user.roles:
-        raise HTTPException(
-            status_code=403, detail="Only IC or Ethics can modify sanctions"
-        )
-
     # Get existing sanction
     sanction = await get_sanction_by_uid(uid)
     if not sanction:
         raise HTTPException(status_code=404, detail="Sanction not found")
 
+    # Check lift permission separately
+    if request.lifted is True and sanction.lifted_at is None:
+        if not _can_lift_sanction(current_user, sanction):
+            raise HTTPException(
+                status_code=403, detail="You don't have permission to lift this sanction"
+            )
+
+    # Check modify permission (IC/Ethics for all modifications)
+    has_modify_fields = any([
+        request.level is not None,
+        request.category is not None,
+        request.subcategory is not None,
+        request.round_number is not None,
+        request.description is not None,
+        request.expires_at is not None,
+    ])
+    if has_modify_fields:
+        if Role.IC not in current_user.roles and Role.ETHICS not in current_user.roles:
+            raise HTTPException(
+                status_code=403, detail="Only IC or Ethics can modify sanctions"
+            )
+
     # Apply updates
     now = datetime.now(UTC)
     level = sanction.level
     category = sanction.category
+    subcategory = sanction.subcategory
+    round_number = sanction.round_number
     description = sanction.description
     expires_at = sanction.expires_at
     lifted_at = sanction.lifted_at
@@ -264,6 +363,26 @@ async def update_sanction_endpoint(
                 status_code=400,
                 detail=f"Invalid category: {request.category}",
             ) from e
+
+    # Update subcategory if provided
+    if request.subcategory is not None:
+        try:
+            subcategory = SanctionSubcategory(request.subcategory)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid subcategory: {request.subcategory}",
+            ) from e
+        valid_subs = SUBCATEGORIES_BY_CATEGORY.get(category, [])
+        if subcategory not in valid_subs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Subcategory '{subcategory.value}' not valid for category '{category.value}'",
+            )
+
+    # Update round_number if provided
+    if request.round_number is not None:
+        round_number = request.round_number
 
     # Update description if provided
     if request.description is not None:
@@ -296,6 +415,8 @@ async def update_sanction_endpoint(
         tournament_uid=sanction.tournament_uid,
         level=level,
         category=category,
+        subcategory=subcategory,
+        round_number=round_number,
         description=description,
         issued_at=sanction.issued_at,
         expires_at=expires_at,
@@ -356,6 +477,8 @@ async def delete_sanction_endpoint(
         tournament_uid=sanction.tournament_uid,
         level=sanction.level,
         category=sanction.category,
+        subcategory=sanction.subcategory,
+        round_number=sanction.round_number,
         description=sanction.description,
         issued_at=sanction.issued_at,
         expires_at=sanction.expires_at,

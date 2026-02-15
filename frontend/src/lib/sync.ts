@@ -30,6 +30,7 @@ import {
   clearChangeForUid,
 } from './db';
 import { getAccessToken } from '$lib/stores/auth.svelte';
+import { isOffline } from '$lib/stores/offline.svelte';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -67,6 +68,7 @@ class SyncManager {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private maxReconnectDelay = 120_000; // 2 minutes ceiling
 
   // Generic buffers keyed by batch type
   private buffers: Map<string, any[]> = new Map();
@@ -129,6 +131,10 @@ class SyncManager {
           // Single event (real-time update)
           if (message.type === spec.singleType) {
             const item = message.data as any;
+            // Skip SSE updates for tournaments that are in local offline mode
+            if (spec.singleType === 'tournament' && isOffline(item.uid)) {
+              return;
+            }
             if (item.deleted_at) {
               await spec.del(item.uid);
             } else {
@@ -194,12 +200,20 @@ class SyncManager {
 
   /**
    * Handle SSE error: disconnect (flushing buffers) then schedule reconnect.
+   * When any tournament is offline, retry indefinitely with a higher backoff ceiling.
    */
   private async handleError(): Promise<void> {
     await this.disconnect();
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+    const { getOfflineTournamentUids } = await import('$lib/stores/offline.svelte');
+    const hasOfflineTournaments = getOfflineTournamentUids().size > 0;
+    const maxAttempts = hasOfflineTournaments ? Infinity : this.maxReconnectAttempts;
+
+    if (this.reconnectAttempts < maxAttempts) {
       this.reconnectAttempts++;
-      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+      const delay = Math.min(
+        this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
+        this.maxReconnectDelay,
+      );
       setTimeout(() => { void this.connect(); }, delay);
     } else {
       this.emit({ type: 'error', error: 'Failed to connect after multiple attempts' });

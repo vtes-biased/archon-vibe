@@ -13,7 +13,7 @@
 - `backend/src/routes/auth.py` - Auth flows (email, Discord, WebAuthn, magic link) (~1450 lines)
 - `backend/src/routes/tournaments.py` - Tournament CRUD + action endpoint (~1150 lines)
 - `frontend/src/lib/sync.ts` - SSE SyncManager singleton, spec-based buffering
-- `frontend/src/lib/db.ts` - IndexedDB v12, batch operations
+- `frontend/src/lib/db.ts` - IndexedDB v14, batch operations, sanctions by-tournament index
 - `frontend/src/lib/api.ts` - API client with optimistic updates for tournament actions
 - `frontend/src/lib/engine.ts` - WASM engine wrapper
 - `frontend/src/lib/stores/auth.svelte.ts` - Auth state (Svelte 5 $state runes)
@@ -21,7 +21,8 @@
 ## Known Architectural Issues (2026-02)
 - See `architecture-review.md` for full details
 - `sync.ts:disconnect()` calls async `flushAllBuffers()` without await - data loss risk
-- `api.ts` has GET calls (fetchUser, fetchTournament, getUserSanctionsApi) violating offline-first
+- `api.ts` has GET calls (fetchUser, fetchTournament) violating offline-first
+- `sanctions.py` GET `/sanctions/user/{user_uid}` has no auth — publicly exposes sanctions
 - Deck management (upload/update/delete) is in Python, not Rust engine - breaks offline capability
 - Tournament uses hard-delete, not soft-delete pattern like other objects
 - `engine.ts` TournamentEventType is missing events vs Rust enum
@@ -55,3 +56,9 @@
 - Rust engine errors need migration to structured error codes for i18n
 - Translator agent: `.claude/agents/i18n-translator.md` handles translation updates
 - VTES game terms: card/clan/discipline names stay English; game mechanics terms translated per official rulebook
+
+## Recurring Bug Pattern: Sanction reconstruction
+- `main.py:run_sanction_cleanup()` reconstructs Sanction manually — must include ALL fields
+- Same pattern in `sanctions.py` delete endpoint — also manual reconstruction
+- When new fields are added to Sanction model, search ALL manual Sanction() constructors
+- Svelte 5 `$props()` destructuring: props must be listed in the destructure, not just the type annotation

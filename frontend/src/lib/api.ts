@@ -2,11 +2,12 @@
  * API client for backend communication.
  */
 
-import type { User, Sanction, SanctionLevel, SanctionCategory, Tournament, TournamentConfig, League } from '$lib/types';
+import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, TournamentConfig, League } from '$lib/types';
 import { getAllUsers, getTournament, saveTournament, logChange } from './db';
 import { processTournamentEvent, buildActorContext } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
+import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -252,6 +253,8 @@ export interface CreateSanctionData {
   user_uid: string;
   level: SanctionLevel;
   category: SanctionCategory;
+  subcategory?: SanctionSubcategory | null;
+  round_number?: number | null;
   description: string;
   expires_at?: string | null;  // ISO datetime string
   tournament_uid?: string | null;
@@ -286,6 +289,8 @@ export async function liftSanction(uid: string): Promise<Sanction> {
 export interface UpdateSanctionData {
   level?: SanctionLevel;
   category?: SanctionCategory;
+  subcategory?: SanctionSubcategory | null;
+  round_number?: number | null;
   description?: string;
   expires_at?: string | null;  // YYYY-MM-DD date string
   lifted?: boolean;
@@ -382,12 +387,64 @@ export interface CreateTournamentData {
 
 export async function createTournament(data: CreateTournamentData): Promise<Tournament> {
   if (!isOnline()) {
-    throw new Error('Cannot create tournament while offline.');
+    throw new Error('Cannot create tournament while offline. Use createTournamentOffline().');
   }
   return apiRequest<Tournament>('/api/tournaments/', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+/** Create a tournament locally when offline. Saved to IndexedDB, reconciled on go-online. */
+export async function createTournamentOffline(data: CreateTournamentData): Promise<Tournament> {
+  const { markOffline } = await import('$lib/stores/offline.svelte');
+  const { getDeviceId } = await import('./db');
+  const user = getAuthState().user;
+  const uid = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  const tournament: Tournament = {
+    uid,
+    modified: now,
+    name: data.name,
+    format: (data.format as Tournament['format']) || 'Standard',
+    rank: (data.rank as Tournament['rank']) || '',
+    online: data.online || false,
+    start: data.start || null,
+    finish: data.finish || null,
+    timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    country: data.country || user?.country || null,
+    state: 'Planned',
+    organizers_uids: user ? [user.uid] : [],
+    venue: data.venue || '',
+    venue_url: data.venue_url || '',
+    address: data.address || '',
+    map_url: data.map_url || '',
+    proxies: data.proxies || false,
+    multideck: data.multideck || false,
+    decklist_required: data.decklist_required || false,
+    description: data.description || '',
+    standings_mode: (data.standings_mode as Tournament['standings_mode']) || 'Private',
+    decklists_mode: (data.decklists_mode as Tournament['decklists_mode']) || 'Winner',
+    max_rounds: data.max_rounds || 0,
+    league_uid: data.league_uid || null,
+    players: [],
+    decks: {},
+    rounds: [],
+    finals: null,
+    winner: '',
+    standings: [],
+    offline_mode: true,
+    offline_device_id: getDeviceId(),
+    offline_user_uid: user?.uid || '',
+    offline_since: now,
+  };
+
+  await saveTournament(tournament);
+  await logChange('tournaments', 'create', uid, { data: tournament });
+  await markOffline(uid);
+
+  return tournament;
 }
 
 export async function updateTournament(uid: string, data: Partial<CreateTournamentData>): Promise<Tournament> {
@@ -410,7 +467,7 @@ export async function deleteTournamentApi(uid: string): Promise<{ message: strin
 }
 
 export async function tournamentAction(uid: string, action: string, data?: Record<string, unknown>): Promise<Tournament> {
-  const event = { type: action, ...data };
+  const event = { type: action as import('$lib/engine').TournamentEventType, ...data };
 
   // Try optimistic update via WASM engine
   const current = await getTournament(uid);
@@ -420,6 +477,12 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
       const updated = await processTournamentEvent(current, event, actor);
       await saveTournament(updated);
       await logChange('tournaments', 'update', uid, { event });
+
+      // If tournament is in offline mode, skip server POST entirely
+      if (isOffline(uid)) {
+        scheduleSyncOffline(uid);
+        return updated;
+      }
 
       // Send to server async — SSE will correct if divergence
       apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {

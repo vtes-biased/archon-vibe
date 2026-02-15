@@ -1,7 +1,9 @@
 <script lang="ts">
-  import type { Tournament, Table } from "$lib/types";
+  import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction, setTableScore } from "$lib/api";
   import { scoreSeatingSync } from "$lib/engine";
+  import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import Icon from "@iconify/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -12,6 +14,7 @@
     actionLoading,
     doAction,
     loadPlayerNames,
+    tournamentSanctions,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
@@ -19,7 +22,20 @@
     actionLoading: boolean;
     doAction: (action: string, body?: any) => Promise<void>;
     loadPlayerNames: () => Promise<void>;
+    tournamentSanctions?: Sanction[];
   } = $props();
+
+  // Sanction modal state
+  let sanctionTarget = $state<{ uid: string; name: string; round: number } | null>(null);
+
+  // Build a map of player uid → their sanctions
+  const playerSanctionsMap = $derived.by(() => {
+    const map: Record<string, Sanction[]> = {};
+    for (const s of tournamentSanctions ?? []) {
+      (map[s.user_uid] ??= []).push(s);
+    }
+    return map;
+  });
 
   let error = $state<string | null>(null);
   let swapSource: { round: number; table: number; seat: number; playerUid: string } | null = $state(null);
@@ -440,9 +456,17 @@
                         >
                           <Icon icon={isSwapSource ? "lucide:arrow-left-right" : "lucide:grip-vertical"} class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />
                           {seatDisplay(seat.player_uid)}
+                          {#if playerSanctionsMap[seat.player_uid]?.length}
+                            <SanctionIndicator sanctions={playerSanctionsMap[seat.player_uid]!} />
+                          {/if}
                         </button>
                       {:else}
-                        <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
+                        <span class="text-ash-300 inline-flex items-center gap-1">
+                          {seatDisplay(seat.player_uid)}
+                          {#if playerSanctionsMap[seat.player_uid]?.length}
+                            <SanctionIndicator sanctions={playerSanctionsMap[seat.player_uid]!} />
+                          {/if}
+                        </span>
                       {/if}
                       <div class="flex items-center gap-2">
                         <span class="text-ash-400 text-xs">VP:</span>
@@ -468,6 +492,15 @@
                             title={m.rounds_unseat_title()}
                           >
                             <Icon icon="lucide:user-minus" class="w-3.5 h-3.5" />
+                          </button>
+                        {/if}
+                        {#if isOrganizer}
+                          <button
+                            onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
+                            class="p-0.5 text-ash-500 hover:text-amber-400 transition-colors"
+                            title={m.sanction_tournament_issue_title()}
+                          >
+                            <Icon icon="lucide:alert-triangle" class="w-3.5 h-3.5" />
                           </button>
                         {/if}
                       </div>
@@ -561,3 +594,14 @@
     {/each}
   {/if}
 </div>
+
+<!-- Tournament Sanction Modal -->
+{#if sanctionTarget && isOrganizer}
+  <TournamentSanctionModal
+    {tournament}
+    playerUid={sanctionTarget.uid}
+    playerName={sanctionTarget.name}
+    currentRound={sanctionTarget.round}
+    onClose={() => sanctionTarget = null}
+  />
+{/if}

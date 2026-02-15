@@ -4,8 +4,18 @@
  */
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { User, Role, Sanction, Tournament, Rating, League, VtesCard } from '$lib/types';
+import type { User, Role, Sanction, Tournament, Rating, League, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
+
+// Device ID: persistent random UUID identifying this browser/device
+export function getDeviceId(): string {
+  let id = localStorage.getItem('archon_device_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('archon_device_id', id);
+  }
+  return id;
+}
 
 interface ArchonDB extends DBSchema {
   users: {
@@ -21,6 +31,7 @@ interface ArchonDB extends DBSchema {
     value: Sanction;
     indexes: {
       'by-user': string;  // user_uid index for efficient lookups
+      'by-tournament': string;  // tournament_uid index
     };
   };
   tournaments: {
@@ -73,8 +84,8 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-// Version 13: added leagues store
-const DB_VERSION = 13;
+// Version 14: added by-tournament index on sanctions
+const DB_VERSION = 14;
 
 export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
   if (dbPromise) {
@@ -98,6 +109,7 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       // Sanctions store
       const sanctionStore = db.createObjectStore('sanctions', { keyPath: 'uid' });
       sanctionStore.createIndex('by-user', 'user_uid');
+      sanctionStore.createIndex('by-tournament', 'tournament_uid');
 
       // Tournaments store (single store, all data levels)
       const tournamentStore = db.createObjectStore('tournaments', { keyPath: 'uid' });
@@ -341,6 +353,25 @@ export async function clearAllSanctions(): Promise<void> {
 }
 
 /**
+ * Get all sanctions for a tournament.
+ */
+export async function getSanctionsForTournament(tournamentUid: string): Promise<Sanction[]> {
+  const db = await getDB();
+  return db.getAllFromIndex('sanctions', 'by-tournament', tournamentUid);
+}
+
+/**
+ * Get sanctions for a specific player in a specific tournament.
+ */
+export async function getPlayerSanctionsInTournament(
+  userUid: string,
+  tournamentUid: string
+): Promise<Sanction[]> {
+  const sanctions = await getSanctionsForTournament(tournamentUid);
+  return sanctions.filter(s => s.user_uid === userUid && !s.deleted_at);
+}
+
+/**
  * Get active (non-deleted) sanctions for a user within the last 18 months.
  */
 export async function getActiveSanctionsForUser(userUid: string): Promise<Sanction[]> {
@@ -564,4 +595,69 @@ export async function deleteLeague(uid: string): Promise<void> {
 export async function clearAllLeagues(): Promise<void> {
   const db = await getDB();
   await db.clear('leagues');
+}
+
+// Metadata helpers for offline tournament state
+
+export async function getMetadata(key: string): Promise<string | undefined> {
+  const db = await getDB();
+  return db.get('metadata', key);
+}
+
+export async function setMetadata(key: string, value: string): Promise<void> {
+  const db = await getDB();
+  await db.put('metadata', value, key);
+}
+
+export async function deleteMetadata(key: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('metadata', key);
+}
+
+/** Get all metadata keys matching a prefix. */
+export async function getMetadataByPrefix(prefix: string): Promise<Map<string, string>> {
+  const db = await getDB();
+  const tx = db.transaction('metadata', 'readonly');
+  const result = new Map<string, string>();
+  let cursor = await tx.store.openCursor();
+  while (cursor) {
+    if (typeof cursor.key === 'string' && cursor.key.startsWith(prefix)) {
+      result.set(cursor.key, cursor.value);
+    }
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+  return result;
+}
+
+// Offline players registry (stored as JSON in metadata store)
+
+export async function getOfflinePlayers(tournamentUid: string): Promise<OfflinePlayer[]> {
+  const raw = await getMetadata(`offline_players:${tournamentUid}`);
+  if (!raw) return [];
+  return JSON.parse(raw);
+}
+
+export async function setOfflinePlayers(tournamentUid: string, players: OfflinePlayer[]): Promise<void> {
+  await setMetadata(`offline_players:${tournamentUid}`, JSON.stringify(players));
+}
+
+export async function addOfflinePlayer(tournamentUid: string, player: OfflinePlayer): Promise<void> {
+  const players = await getOfflinePlayers(tournamentUid);
+  players.push(player);
+  await setOfflinePlayers(tournamentUid, players);
+}
+
+// Offline sanctions registry (list of sanction UIDs created offline for a tournament)
+
+export async function getOfflineSanctionUids(tournamentUid: string): Promise<string[]> {
+  const raw = await getMetadata(`offline_sanctions:${tournamentUid}`);
+  if (!raw) return [];
+  return JSON.parse(raw);
+}
+
+export async function addOfflineSanctionUid(tournamentUid: string, sanctionUid: string): Promise<void> {
+  const uids = await getOfflineSanctionUids(tournamentUid);
+  uids.push(sanctionUid);
+  await setMetadata(`offline_sanctions:${tournamentUid}`, JSON.stringify(uids));
 }

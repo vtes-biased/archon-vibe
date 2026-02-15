@@ -9,21 +9,27 @@ from pydantic import BaseModel
 from uuid6 import uuid7
 
 from ..db import (
+    get_auth_method_by_identifier,
     get_tournament_by_uid,
     get_user_by_uid,
+    get_user_by_vekn_id,
+    insert_sanction,
     insert_tournament,
+    insert_user,
     soft_delete_tournament,
     update_tournament,
 )
 from ..models import (
     DeckListsMode,
     Role,
+    Sanction,
     StandingsMode,
     Tournament,
     TournamentFormat,
     TournamentMinimal,
     TournamentRank,
     TournamentState,
+    User,
 )
 from .auth import verify_token
 
@@ -35,6 +41,8 @@ decoder = msgspec.json.Decoder(Tournament)
 # Broadcast functions will be set by main.py
 broadcast_tournament_event = None
 broadcast_rating_event = None
+broadcast_user_event = None
+broadcast_sanction_event = None
 
 # Rust engine - lazy loaded
 _engine = None
@@ -554,6 +562,13 @@ async def tournament_action(
     tournament = await get_tournament_by_uid(uid)
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # Reject actions on offline-locked tournaments
+    if tournament.offline_mode:
+        raise HTTPException(
+            status_code=423,
+            detail="Tournament is in offline mode on another device",
+        )
 
     # Build event JSON for Rust engine
     event_data = {"type": request.type}
@@ -1340,3 +1355,306 @@ async def tournament_report(
         media_type="text/plain",
         headers={"Content-Disposition": f'attachment; filename="{uid}-report.txt"'},
     )
+
+
+# ============================================================================
+# Offline tournament mode endpoints
+# ============================================================================
+
+
+class GoOfflineRequest(BaseModel):
+    device_id: str
+
+
+@router.post("/{uid}/go-offline")
+async def go_offline(
+    uid: str,
+    request: GoOfflineRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Lock a tournament for offline use on a specific device."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not _is_organizer(current_user, tournament):
+        raise HTTPException(status_code=403, detail="Only organizers can take a tournament offline")
+
+    if tournament.offline_mode:
+        raise HTTPException(status_code=409, detail="Tournament is already in offline mode")
+
+    tournament.offline_mode = True
+    tournament.offline_device_id = request.device_id
+    tournament.offline_user_uid = current_user.uid
+    tournament.offline_since = datetime.now(UTC)
+    tournament.modified = datetime.now(UTC)
+
+    await update_tournament(tournament)
+    logger.info(f"Tournament {uid} went offline (device={request.device_id}, user={current_user.uid})")
+
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+class OfflinePlayerData(BaseModel):
+    temp_uid: str
+    name: str
+    vekn_id: str | None = None
+    email: str | None = None
+
+
+class GoOnlineRequest(BaseModel):
+    device_id: str
+    tournament: dict  # Full tournament data from the offline device
+    offline_players: list[OfflinePlayerData] = []
+    offline_sanctions: list[dict] = []
+    force: bool = False
+
+
+async def _resolve_or_create_offline_player(
+    player_data: OfflinePlayerData, tournament_country: str | None
+) -> tuple[str, User]:
+    """Resolve an offline player to a real user. Returns (temp_uid, real_user)."""
+    # 1. Match by vekn_id
+    if player_data.vekn_id:
+        user = await get_user_by_vekn_id(player_data.vekn_id)
+        if user:
+            return player_data.temp_uid, user
+
+    # 2. Match by email
+    if player_data.email:
+        auth_method = await get_auth_method_by_identifier("email", player_data.email)
+        if auth_method:
+            user = await get_user_by_uid(auth_method.user_uid)
+            if user:
+                return player_data.temp_uid, user
+
+    # 3. Create new user
+    now = datetime.now(UTC)
+    new_user = User(
+        uid=str(uuid7()),
+        modified=now,
+        name=player_data.name,
+        country=tournament_country,
+    )
+    await insert_user(new_user)
+    logger.info(f"Created user {new_user.uid} for offline player '{player_data.name}'")
+
+    if broadcast_user_event:
+        await broadcast_user_event(new_user)
+
+    return player_data.temp_uid, new_user
+
+
+def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) -> dict:
+    """Replace all temp_uid references with real UIDs throughout tournament data."""
+    import json as json_mod
+
+    raw = json_mod.dumps(tournament_data)
+    for temp_uid, real_uid in uid_map.items():
+        raw = raw.replace(temp_uid, real_uid)
+    return json_mod.loads(raw)
+
+
+@router.post("/{uid}/go-online")
+async def go_online(
+    uid: str,
+    request: GoOnlineRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Bring a tournament back online with full reconciliation."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    # Tournament might not exist on server (created offline)
+    if tournament and not _is_organizer(current_user, tournament):
+        raise HTTPException(status_code=403, detail="Only organizers can bring a tournament online")
+
+    # Verify device lock
+    if tournament and tournament.offline_mode:
+        if tournament.offline_device_id != request.device_id and not request.force:
+            raise HTTPException(
+                status_code=409,
+                detail="Tournament owned by another device. Use force to override.",
+            )
+
+    # 1. Resolve offline players → real user accounts
+    uid_map: dict[str, str] = {}
+    for player_data in request.offline_players:
+        temp_uid, real_user = await _resolve_or_create_offline_player(
+            player_data, request.tournament.get("country")
+        )
+        uid_map[temp_uid] = real_user.uid
+
+    # 2. Remap UIDs throughout tournament data
+    tournament_data = request.tournament
+    if uid_map:
+        tournament_data = _remap_uids_in_tournament(tournament_data, uid_map)
+
+    # 3. Clear offline fields
+    tournament_data["offline_mode"] = False
+    tournament_data["offline_device_id"] = ""
+    tournament_data["offline_user_uid"] = ""
+    tournament_data["offline_since"] = None
+    tournament_data["modified"] = datetime.now(UTC).isoformat()
+
+    # 4. Save tournament
+    updated = decoder.decode(msgspec.json.encode(tournament_data))
+    updated.modified = datetime.now(UTC)
+
+    if tournament:
+        await update_tournament(updated)
+    else:
+        await insert_tournament(updated)
+
+    logger.info(f"Tournament {uid} went back online (user={current_user.uid}, remapped={len(uid_map)} players)")
+
+    # 5. Save offline sanctions with remapped UIDs
+    for sanction_data in request.offline_sanctions:
+        if uid_map:
+            import json as json_mod
+            raw = json_mod.dumps(sanction_data)
+            for temp_uid, real_uid in uid_map.items():
+                raw = raw.replace(temp_uid, real_uid)
+            sanction_data = json_mod.loads(raw)
+
+        sanction = msgspec.convert(sanction_data, Sanction)
+        await insert_sanction(sanction)
+        if broadcast_sanction_event:
+            await broadcast_sanction_event(sanction)
+
+    # 6. Broadcast updated tournament
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(updated)
+
+    return Response(content=encoder.encode(updated), media_type="application/json")
+
+
+class ForceTakeoverRequest(BaseModel):
+    device_id: str
+
+
+@router.post("/{uid}/force-takeover")
+async def force_takeover(
+    uid: str,
+    request: ForceTakeoverRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Transfer offline lock to a new device (any organizer of this tournament)."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not _is_organizer(current_user, tournament):
+        raise HTTPException(status_code=403, detail="Only organizers can force-takeover")
+
+    if not tournament.offline_mode:
+        raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
+
+    old_device = tournament.offline_device_id
+    tournament.offline_device_id = request.device_id
+    tournament.offline_user_uid = current_user.uid
+    tournament.modified = datetime.now(UTC)
+
+    await update_tournament(tournament)
+    logger.info(f"Tournament {uid} force-takeover: {old_device} → {request.device_id} by {current_user.uid}")
+
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+class SyncOfflineRequest(BaseModel):
+    device_id: str
+    tournament: dict
+
+
+@router.post("/{uid}/sync-offline")
+async def sync_offline(
+    uid: str,
+    request: SyncOfflineRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Background data backup for offline tournament. Saves snapshot without unlocking."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not tournament.offline_mode:
+        raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
+
+    if tournament.offline_device_id != request.device_id:
+        raise HTTPException(status_code=409, detail="Device does not hold the offline lock")
+
+    # Save tournament snapshot (keep offline_mode=True)
+    tournament_data = request.tournament
+    tournament_data["offline_mode"] = True
+    tournament_data["offline_device_id"] = tournament.offline_device_id
+    tournament_data["offline_user_uid"] = tournament.offline_user_uid
+    if tournament.offline_since:
+        tournament_data["offline_since"] = tournament.offline_since.isoformat()
+    tournament_data["modified"] = datetime.now(UTC).isoformat()
+
+    updated = decoder.decode(msgspec.json.encode(tournament_data))
+    updated.modified = datetime.now(UTC)
+    await update_tournament(updated)
+
+    now = datetime.now(UTC)
+    logger.info(f"Tournament {uid} offline sync from device {request.device_id}")
+
+    return Response(
+        content=encoder.encode({"synced_at": now.isoformat()}),
+        media_type="application/json",
+    )
+
+
+@router.post("/{uid}/force-unlock")
+async def force_unlock(
+    uid: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """IC-only emergency unlock. Clears offline mode entirely."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    if Role.IC not in current_user.roles:
+        raise HTTPException(status_code=403, detail="Only IC can force-unlock tournaments")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not tournament.offline_mode:
+        raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
+
+    tournament.offline_mode = False
+    tournament.offline_device_id = ""
+    tournament.offline_user_uid = ""
+    tournament.offline_since = None
+    tournament.modified = datetime.now(UTC)
+
+    await update_tournament(tournament)
+    logger.info(f"Tournament {uid} force-unlocked by IC {current_user.uid}")
+
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+
+    return Response(content=encoder.encode(tournament), media_type="application/json")

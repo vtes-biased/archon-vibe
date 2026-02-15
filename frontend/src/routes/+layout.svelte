@@ -4,6 +4,8 @@
   import { syncManager } from '$lib/sync';
   import { initAuth, hasAnyRole } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine';
+  import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
+  import { initOfflineState } from '$lib/stores/offline.svelte';
   import { onMount } from 'svelte';
   import Icon from '@iconify/svelte';
   import Toast from '$lib/components/Toast.svelte';
@@ -43,11 +45,17 @@
   });
 
   onMount(() => {
+    // Initialize service worker for offline asset caching
+    initServiceWorker();
+
     // Initialize engine (WASM) for permission checks
     initEngine().catch(err => console.error('Failed to initialize engine:', err));
 
     // Initialize auth state
     initAuth();
+
+    // Restore offline tournament state from IndexedDB
+    initOfflineState().catch(err => console.error('Failed to init offline state:', err));
 
     // Connect to SSE stream
     syncManager.connect();
@@ -100,6 +108,17 @@
       {:else if syncError}
         <span>{syncError}</span>
       {/if}
+    </div>
+  {/if}
+
+  <!-- Update available banner -->
+  {#if getUpdateAvailable()}
+    <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm bg-indigo-900/90 text-indigo-100" class:top-10={!isOnline || syncError}>
+      <span class="inline-flex items-center gap-2">
+        <Icon icon="lucide:download" class="w-4 h-4" />
+        {m.update_available()}
+        <button onclick={applyUpdate} class="ml-2 underline hover:no-underline font-medium">{m.update_refresh()}</button>
+      </span>
     </div>
   {/if}
 

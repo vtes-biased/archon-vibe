@@ -1,9 +1,11 @@
 <script lang="ts">
-  import type { Tournament, User, Player, Deck } from "$lib/types";
+  import type { Tournament, User, Player, Deck, Sanction } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import AddPlayerForm from "$lib/components/AddPlayerForm.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
+  import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import Icon from "@iconify/svelte";
   import { validateDeck, type ValidationError } from "$lib/engine";
   import * as m from '$lib/paraglide/messages.js';
@@ -25,6 +27,8 @@
     isOrganizer,
     actionLoading,
     doAction,
+    tournamentSanctions,
+    isOfflineMode = false,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
@@ -32,7 +36,29 @@
     isOrganizer: boolean;
     actionLoading: boolean;
     doAction: (action: string, body?: any) => Promise<void>;
+    tournamentSanctions?: Sanction[];
+    isOfflineMode?: boolean;
   } = $props();
+
+  // Sanction modal state
+  let sanctionTarget = $state<{ uid: string; name: string } | null>(null);
+
+  // Build a map of player uid → their sanctions for this tournament
+  const playerSanctionsMap = $derived.by(() => {
+    const map: Record<string, Sanction[]> = {};
+    for (const s of tournamentSanctions ?? []) {
+      (map[s.user_uid] ??= []).push(s);
+    }
+    return map;
+  });
+
+  // Current round for pre-filling sanction modal
+  const currentRound = $derived.by(() => {
+    const numRounds = tournament.rounds?.length ?? 0;
+    if (numRounds === 0) return null;
+    if (tournament.state === "Playing") return numRounds - 1;
+    return numRounds - 1; // default to last round
+  });
 
   let showAddPlayer = $state(false);
   let tossInputs = $state<Record<string, string>>({});
@@ -182,6 +208,29 @@
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const hasFinals = $derived(standings.some(e => e.finals));
   const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
+
+  // Offline player registration
+  let showOfflinePlayerForm = $state(false);
+  let offlinePlayerName = $state('');
+  let offlinePlayerVeknId = $state('');
+  let offlinePlayerEmail = $state('');
+
+  async function addOfflinePlayerAction() {
+    if (!offlinePlayerName.trim()) return;
+    const tempUid = crypto.randomUUID();
+    const { addOfflinePlayer } = await import('$lib/stores/offline.svelte');
+    await addOfflinePlayer(tournament.uid, {
+      temp_uid: tempUid,
+      name: offlinePlayerName.trim(),
+      vekn_id: offlinePlayerVeknId.trim() || undefined,
+      email: offlinePlayerEmail.trim() || undefined,
+    });
+    await doAction('AddPlayer', { user_uid: tempUid });
+    offlinePlayerName = '';
+    offlinePlayerVeknId = '';
+    offlinePlayerEmail = '';
+    showOfflinePlayerForm = false;
+  }
 </script>
 
 <div class="space-y-4">
@@ -202,6 +251,44 @@
   <!-- Add Player UI -->
   {#if showAddPlayer && isOrganizer}
     <AddPlayerForm {tournament} onadd={addPlayerByUser} onaddvekn={addPlayerByVeknId} />
+    {#if isOfflineMode}
+      <div class="mt-3 border-t border-ash-800 pt-3">
+        <button
+          onclick={() => showOfflinePlayerForm = !showOfflinePlayerForm}
+          class="text-sm text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+        >
+          <Icon icon="lucide:user-plus" class="w-4 h-4" />
+          {m.offline_add_new_player()}
+        </button>
+        {#if showOfflinePlayerForm}
+          <div class="mt-2 space-y-2 bg-ash-900/50 rounded-lg p-3">
+            <input
+              type="text"
+              bind:value={offlinePlayerName}
+              placeholder={m.offline_player_name()}
+              class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+            />
+            <input
+              type="text"
+              bind:value={offlinePlayerVeknId}
+              placeholder={m.offline_player_vekn_id()}
+              class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+            />
+            <input
+              type="email"
+              bind:value={offlinePlayerEmail}
+              placeholder={m.offline_player_email()}
+              class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+            />
+            <button
+              onclick={addOfflinePlayerAction}
+              disabled={!offlinePlayerName.trim() || actionLoading}
+              class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
+            >{m.offline_player_add()}</button>
+          </div>
+        {/if}
+      </div>
+    {/if}
   {/if}
 
   <!-- Toss controls -->
@@ -299,7 +386,12 @@
                 <td class="py-1 pr-2 text-ash-500">{entry?.rank ?? "—"}</td>
               {/if}
               <td class="py-1 pr-2">
-                <span class="truncate block">{playerInfo[puid]?.name ?? (puid || m.players_no_account())}</span>
+                <span class="truncate flex items-center gap-1">
+                  {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
+                  {#if playerSanctionsMap[puid]?.length}
+                    <SanctionIndicator sanctions={playerSanctionsMap[puid]} />
+                  {/if}
+                </span>
                 {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
                   <span class="text-xs text-ash-500 truncate block">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</span>
                 {/if}
@@ -401,6 +493,15 @@
                       <Icon icon="lucide:x" class="w-4 h-4" />
                     </button>
                   {/if}
+                  {#if puid && hasRounds}
+                    <button
+                      onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
+                      class="p-1 text-amber-400 hover:text-amber-300 transition-colors"
+                      title={m.sanction_tournament_issue_title()}
+                    >
+                      <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
+                    </button>
+                  {/if}
                 </td>
               {/if}
             </tr>
@@ -445,3 +546,14 @@
     </div>
   {/if}
 </div>
+
+<!-- Tournament Sanction Modal -->
+{#if sanctionTarget && isOrganizer}
+  <TournamentSanctionModal
+    {tournament}
+    playerUid={sanctionTarget.uid}
+    playerName={sanctionTarget.name}
+    {currentRound}
+    onClose={() => sanctionTarget = null}
+  />
+{/if}

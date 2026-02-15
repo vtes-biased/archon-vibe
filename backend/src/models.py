@@ -48,20 +48,122 @@ class SanctionLevel(StrEnum):
 
     CAUTION = "caution"
     WARNING = "warning"
+    STANDINGS_ADJUSTMENT = "standings_adjustment"
     DISQUALIFICATION = "disqualification"
     SUSPENSION = "suspension"
     PROBATION = "probation"
-    SCORE_ADJUSTMENT = "score_adjustment"
 
 
 class SanctionCategory(StrEnum):
-    """Sanction categories."""
+    """Sanction categories aligned with VEKN Judges Guide v2."""
 
-    DECK_PROBLEM = "deck_problem"
-    PROCEDURAL = "procedural"
+    PROCEDURAL_ERROR = "procedural_error"
+    TOURNAMENT_ERROR = "tournament_error"
+    UNSPORTSMANLIKE_CONDUCT = "unsportsmanlike_conduct"
+
+
+class SanctionSubcategory(StrEnum):
+    """Sanction subcategories from VEKN Judges Guide v2 Appendix I."""
+
+    # Procedural Errors
+    MISSED_MANDATORY_EFFECT = "missed_mandatory_effect"
+    CARD_ACCESS_ERROR = "card_access_error"
+    GAME_RULE_VIOLATION = "game_rule_violation"
+    FAILURE_TO_MAINTAIN_GAME_STATE = "failure_to_maintain_game_state"
+    # Tournament Errors
+    ILLEGAL_DECKLIST = "illegal_decklist"
+    ILLEGAL_MAIN_DECK_LEGAL_DECKLIST = "illegal_main_deck_legal_decklist"
+    ILLEGAL_MAIN_DECK_NO_DECKLIST = "illegal_main_deck_no_decklist"
+    OUTSIDE_ASSISTANCE = "outside_assistance"
+    SLOW_PLAY = "slow_play"
+    LIMITED_PROCEDURE_VIOLATION = "limited_procedure_violation"
+    PUBLIC_INFO_MISCOMMUNICATION = "public_info_miscommunication"
+    OBSCURING_GAME_STATE = "obscuring_game_state"
+    MARKED_CARDS = "marked_cards"
+    INSUFFICIENT_SHUFFLING = "insufficient_shuffling"
+    # Unsportsmanlike Conduct
+    MINOR = "minor"
+    MAJOR = "major"
+    AGGRESSIVE_BEHAVIOUR = "aggressive_behaviour"
+    BRIBERY_AND_WAGERING = "bribery_and_wagering"
+    THEFT_OF_TOURNAMENT_MATERIAL = "theft_of_tournament_material"
+    STALLING = "stalling"
     CHEATING = "cheating"
-    UNSPORTING = "unsporting"
-    OTHER = "other"
+    FRAUD = "fraud"
+    COLLUSION = "collusion"
+    HEALTH_AND_SAFETY_DISRUPTION = "health_and_safety_disruption"
+    RAGE_QUITTING = "rage_quitting"
+    FAILURE_TO_PLAY_TO_WIN = "failure_to_play_to_win"
+
+
+# Mapping: subcategory → parent category
+SUBCATEGORIES_BY_CATEGORY: dict[SanctionCategory, list[SanctionSubcategory]] = {
+    SanctionCategory.PROCEDURAL_ERROR: [
+        SanctionSubcategory.MISSED_MANDATORY_EFFECT,
+        SanctionSubcategory.CARD_ACCESS_ERROR,
+        SanctionSubcategory.GAME_RULE_VIOLATION,
+        SanctionSubcategory.FAILURE_TO_MAINTAIN_GAME_STATE,
+    ],
+    SanctionCategory.TOURNAMENT_ERROR: [
+        SanctionSubcategory.ILLEGAL_DECKLIST,
+        SanctionSubcategory.ILLEGAL_MAIN_DECK_LEGAL_DECKLIST,
+        SanctionSubcategory.ILLEGAL_MAIN_DECK_NO_DECKLIST,
+        SanctionSubcategory.OUTSIDE_ASSISTANCE,
+        SanctionSubcategory.SLOW_PLAY,
+        SanctionSubcategory.LIMITED_PROCEDURE_VIOLATION,
+        SanctionSubcategory.PUBLIC_INFO_MISCOMMUNICATION,
+        SanctionSubcategory.OBSCURING_GAME_STATE,
+        SanctionSubcategory.MARKED_CARDS,
+        SanctionSubcategory.INSUFFICIENT_SHUFFLING,
+    ],
+    SanctionCategory.UNSPORTSMANLIKE_CONDUCT: [
+        SanctionSubcategory.MINOR,
+        SanctionSubcategory.MAJOR,
+        SanctionSubcategory.AGGRESSIVE_BEHAVIOUR,
+        SanctionSubcategory.BRIBERY_AND_WAGERING,
+        SanctionSubcategory.THEFT_OF_TOURNAMENT_MATERIAL,
+        SanctionSubcategory.STALLING,
+        SanctionSubcategory.CHEATING,
+        SanctionSubcategory.FRAUD,
+        SanctionSubcategory.COLLUSION,
+        SanctionSubcategory.HEALTH_AND_SAFETY_DISRUPTION,
+        SanctionSubcategory.RAGE_QUITTING,
+        SanctionSubcategory.FAILURE_TO_PLAY_TO_WIN,
+    ],
+}
+
+# Baseline penalties from Judges Guide v2 Appendix I
+BASELINE_PENALTIES: dict[SanctionSubcategory, SanctionLevel] = {
+    # Procedural Errors
+    SanctionSubcategory.MISSED_MANDATORY_EFFECT: SanctionLevel.CAUTION,
+    SanctionSubcategory.CARD_ACCESS_ERROR: SanctionLevel.WARNING,
+    SanctionSubcategory.GAME_RULE_VIOLATION: SanctionLevel.WARNING,
+    SanctionSubcategory.FAILURE_TO_MAINTAIN_GAME_STATE: SanctionLevel.WARNING,
+    # Tournament Errors
+    SanctionSubcategory.ILLEGAL_DECKLIST: SanctionLevel.WARNING,
+    SanctionSubcategory.ILLEGAL_MAIN_DECK_LEGAL_DECKLIST: SanctionLevel.STANDINGS_ADJUSTMENT,
+    SanctionSubcategory.ILLEGAL_MAIN_DECK_NO_DECKLIST: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.OUTSIDE_ASSISTANCE: SanctionLevel.WARNING,
+    SanctionSubcategory.SLOW_PLAY: SanctionLevel.CAUTION,
+    SanctionSubcategory.LIMITED_PROCEDURE_VIOLATION: SanctionLevel.WARNING,
+    SanctionSubcategory.PUBLIC_INFO_MISCOMMUNICATION: SanctionLevel.WARNING,
+    SanctionSubcategory.OBSCURING_GAME_STATE: SanctionLevel.WARNING,
+    SanctionSubcategory.MARKED_CARDS: SanctionLevel.WARNING,
+    SanctionSubcategory.INSUFFICIENT_SHUFFLING: SanctionLevel.CAUTION,
+    # Unsportsmanlike Conduct
+    SanctionSubcategory.MINOR: SanctionLevel.WARNING,
+    SanctionSubcategory.MAJOR: SanctionLevel.STANDINGS_ADJUSTMENT,
+    SanctionSubcategory.AGGRESSIVE_BEHAVIOUR: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.BRIBERY_AND_WAGERING: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.THEFT_OF_TOURNAMENT_MATERIAL: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.STALLING: SanctionLevel.STANDINGS_ADJUSTMENT,
+    SanctionSubcategory.CHEATING: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.FRAUD: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.COLLUSION: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.HEALTH_AND_SAFETY_DISRUPTION: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.RAGE_QUITTING: SanctionLevel.STANDINGS_ADJUSTMENT,
+    SanctionSubcategory.FAILURE_TO_PLAY_TO_WIN: SanctionLevel.STANDINGS_ADJUSTMENT,
+}
 
 
 class BaseObject(msgspec.Struct, kw_only=True):
@@ -137,10 +239,10 @@ class Score(msgspec.Struct, kw_only=True, frozen=True):
 class Sanction(BaseObject, kw_only=True):
     """Sanction issued to a user.
 
-    Levels: caution, warning, disqualification (organizers/judges)
+    Levels: caution, warning, standings_adjustment, disqualification (organizers/judges)
             suspension, probation (Ethics/IC only, optional expiry)
-            score_adjustment (tournament-specific)
 
+    Categories align with VEKN Judges Guide v2.
     Soft delete: deleted_at is set when expired or manually deleted.
     Hard delete happens 30 days after soft delete.
     """
@@ -150,7 +252,8 @@ class Sanction(BaseObject, kw_only=True):
     tournament_uid: str | None = None  # FK → tournaments (if tournament-related)
     level: SanctionLevel
     category: SanctionCategory
-    vp_adjustment: float = 0.0
+    subcategory: SanctionSubcategory | None = None
+    round_number: int | None = None  # Which round the sanction applies to (0-indexed)
     description: str
     issued_at: datetime
     expires_at: datetime | None = None  # For suspensions/probation (None = permanent)
@@ -369,6 +472,11 @@ class Tournament(TournamentConfig, kw_only=True):
     # Per-viewer field: tables where the viewer sat (populated during SSE filtering,
     # NOT stored in DB)
     my_tables: list[Table] = msgspec.field(default_factory=list)
+    # Offline mode: device-level locking for offline tournament management
+    offline_mode: bool = False
+    offline_device_id: str = ""  # Device identifier (localStorage UUID) that holds the lock
+    offline_user_uid: str = ""  # User UID of organizer who locked it (for display)
+    offline_since: datetime | None = None  # When tournament went offline
 
 
 # OAuth 2.0 models

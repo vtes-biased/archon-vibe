@@ -6,13 +6,15 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
-  import { getUser, getUserByVeknId, getTournament } from "$lib/db";
-  import type { Tournament, TournamentState, User } from "$lib/types";
+  import { getUser, getUserByVeknId, getTournament, getSanctionsForTournament, getDeviceId } from "$lib/db";
+  import type { Tournament, TournamentState, User, Sanction } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
   import { formatScore } from "$lib/utils";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
+  import { isOffline, goOffline, goOnline, forceTakeover, getLastSyncTime } from "$lib/stores/offline.svelte";
   import Icon from "@iconify/svelte";
   import { renderMarkdown } from "$lib/markdown";
+  import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   // Deck validation state for player's own deck
@@ -28,6 +30,7 @@
   const countries = getCountries();
 
   let tournament = $state<Tournament | null>(null);
+  let tournamentSanctions = $state<Sanction[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let actionLoading = $state(false);
@@ -43,6 +46,17 @@
   let viewAsPlayer = $state(false);
   let showRegisteredPlayers = $state(false);
   let showDeleteConfirm = $state(false);
+  // Offline mode state
+  const tournamentIsOffline = $derived(isOffline(uid));
+  const deviceId = getDeviceId();
+  const isLockedByOtherDevice = $derived(
+    tournament?.offline_mode === true && tournament?.offline_device_id !== deviceId
+  );
+  let showGoOfflineConfirm = $state(false);
+  let showGoOnlineConfirm = $state(false);
+  let showForceTakeoverConfirm = $state(false);
+  let offlineActionLoading = $state(false);
+  const lastSync = $derived(getLastSyncTime(uid));
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
@@ -366,6 +380,7 @@
       if (t) {
         tournament = t;
         await loadPlayerNames();
+        tournamentSanctions = await getSanctionsForTournament(uid);
       } else if (!tournament) {
         // No data in IndexedDB yet — will arrive via SSE
         error = m.tournament_error_not_synced();
@@ -397,6 +412,46 @@
     } catch (e) {
       error = e instanceof Error ? e.message : m.tournament_error_delete();
       showDeleteConfirm = false;
+    }
+  }
+
+  async function handleGoOffline() {
+    offlineActionLoading = true;
+    try {
+      await goOffline(uid);
+      showGoOfflineConfirm = false;
+      showToast({ type: 'success', message: m.offline_now_offline() });
+    } catch (e) {
+      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_go_offline() });
+    } finally {
+      offlineActionLoading = false;
+    }
+  }
+
+  async function handleGoOnline() {
+    offlineActionLoading = true;
+    try {
+      tournament = await goOnline(uid);
+      await loadPlayerNames();
+      showGoOnlineConfirm = false;
+      showToast({ type: 'success', message: m.offline_back_online() });
+    } catch (e) {
+      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_go_online() });
+    } finally {
+      offlineActionLoading = false;
+    }
+  }
+
+  async function handleForceTakeover() {
+    offlineActionLoading = true;
+    try {
+      await forceTakeover(uid);
+      showForceTakeoverConfirm = false;
+      showToast({ type: 'success', message: m.offline_takeover_success() });
+    } catch (e) {
+      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_takeover() });
+    } finally {
+      offlineActionLoading = false;
     }
   }
 
@@ -439,6 +494,9 @@
 
     const handleSync = (event: { type: string }) => {
       if (event.type === "tournament") untrack(() => load());
+      if (event.type === "sanction") {
+        getSanctionsForTournament(uid).then(s => { tournamentSanctions = s; });
+      }
     };
     syncManager.addEventListener(handleSync);
     return () => syncManager.removeEventListener(handleSync);
@@ -466,6 +524,52 @@
         <p class="text-crimson-300">{error}</p>
       </div>
     {:else if tournament}
+      <!-- Offline mode banner (this device has lock) -->
+      {#if tournamentIsOffline}
+        <div class="bg-amber-900/30 border border-amber-700 rounded-lg p-4 mb-4 flex items-center justify-between gap-4">
+          <div class="flex items-center gap-2 min-w-0">
+            <Icon icon="lucide:wifi-off" class="w-5 h-5 text-amber-400 shrink-0" />
+            <div class="min-w-0">
+              <span class="text-amber-200 font-medium text-sm">{m.offline_mode_banner()}</span>
+              {#if lastSync}
+                <span class="text-xs text-ash-400 ml-2">{m.offline_last_sync({ time: new Date(lastSync).toLocaleTimeString() })}</span>
+              {:else}
+                <span class="text-xs text-ash-500 ml-2">{m.offline_not_synced()}</span>
+              {/if}
+            </div>
+          </div>
+          <button
+            onclick={() => showGoOnlineConfirm = true}
+            disabled={offlineActionLoading}
+            class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shrink-0"
+          >
+            <Icon icon="lucide:wifi" class="w-4 h-4 inline mr-1" />
+            {m.offline_go_online()}
+          </button>
+        </div>
+      {/if}
+
+      <!-- Locked by another device banner -->
+      {#if isLockedByOtherDevice}
+        <div class="bg-ash-900/50 border border-ash-700 rounded-lg p-4 mb-4">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2 min-w-0">
+              <Icon icon="lucide:lock" class="w-5 h-5 text-ash-400 shrink-0" />
+              <span class="text-ash-300 text-sm">{m.offline_locked_banner()}</span>
+            </div>
+            {#if isOrganizer}
+              <button
+                onclick={() => showForceTakeoverConfirm = true}
+                disabled={offlineActionLoading}
+                class="px-3 py-1.5 text-sm text-amber-400 hover:text-amber-300 border border-amber-800 hover:border-amber-700 rounded-lg transition-colors shrink-0"
+              >
+                {m.offline_force_takeover()}
+              </button>
+            {/if}
+          </div>
+        </div>
+      {/if}
+
       <!-- Header -->
       <div class="flex items-start justify-between mb-6">
         <div>
@@ -481,12 +585,23 @@
           </div>
         </div>
 
-        {#if showOrganizerView && tournament.state === "Planned"}
-          <button
-            onclick={() => (showDeleteConfirm = true)}
-            class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-          >{m.common_delete()}</button>
-        {/if}
+        <div class="flex items-center gap-2">
+          {#if showOrganizerView && !tournament.offline_mode}
+            <button
+              onclick={() => showGoOfflineConfirm = true}
+              class="px-3 py-1.5 text-sm text-amber-400 hover:text-amber-300 border border-amber-800 hover:border-amber-700 rounded-lg transition-colors"
+            >
+              <Icon icon="lucide:wifi-off" class="w-4 h-4 inline mr-1" />
+              {m.offline_go_offline()}
+            </button>
+          {/if}
+          {#if showOrganizerView && tournament.state === "Planned"}
+            <button
+              onclick={() => (showDeleteConfirm = true)}
+              class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
+            >{m.common_delete()}</button>
+          {/if}
+        </div>
       </div>
 
       {#if error}
@@ -588,6 +703,8 @@
                 isOrganizer={true}
                 {actionLoading}
                 {doAction}
+                {tournamentSanctions}
+                isOfflineMode={tournamentIsOffline}
               />
             {:else if activeTab === 'rounds'}
               <RoundsTab
@@ -597,6 +714,7 @@
                 {actionLoading}
                 {doAction}
                 {loadPlayerNames}
+                {tournamentSanctions}
               />
             {:else if activeTab === 'finals'}
               <FinalsTab
@@ -919,6 +1037,105 @@
           >{m.common_delete()}</button>
           <button
             onclick={() => (showDeleteConfirm = false)}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >{m.common_cancel()}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Go Offline Confirmation Modal -->
+{#if showGoOfflineConfirm}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={() => (showGoOfflineConfirm = false)}
+  >
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 class="text-xl font-medium text-amber-400">{m.offline_go_offline_title()}</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-6">{m.offline_go_offline_msg()}</p>
+        <div class="flex gap-2">
+          <button
+            onclick={handleGoOffline}
+            disabled={offlineActionLoading}
+            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors"
+          >{offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}</button>
+          <button
+            onclick={() => (showGoOfflineConfirm = false)}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >{m.common_cancel()}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Go Online Confirmation Modal -->
+{#if showGoOnlineConfirm}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={() => (showGoOnlineConfirm = false)}
+  >
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 class="text-xl font-medium text-emerald-400">{m.offline_go_online_title()}</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-6">{m.offline_go_online_msg()}</p>
+        <div class="flex gap-2">
+          <button
+            onclick={handleGoOnline}
+            disabled={offlineActionLoading}
+            class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors"
+          >{offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}</button>
+          <button
+            onclick={() => (showGoOnlineConfirm = false)}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >{m.common_cancel()}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Force Takeover Confirmation Modal -->
+{#if showForceTakeoverConfirm}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={() => (showForceTakeoverConfirm = false)}
+  >
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 class="text-xl font-medium text-amber-400">{m.offline_force_takeover_title()}</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-6">{m.offline_force_takeover_msg()}</p>
+        <div class="flex gap-2">
+          <button
+            onclick={handleForceTakeover}
+            disabled={offlineActionLoading}
+            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors"
+          >{offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}</button>
+          <button
+            onclick={() => (showForceTakeoverConfirm = false)}
             class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >{m.common_cancel()}</button>
         </div>

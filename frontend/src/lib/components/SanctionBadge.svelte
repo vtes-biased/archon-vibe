@@ -26,6 +26,10 @@
       bg: "bg-orange-900/60",
       text: "text-orange-200",
     },
+    standings_adjustment: {
+      bg: "bg-purple-900/60",
+      text: "text-purple-200",
+    },
     disqualification: {
       bg: "bg-red-900/60",
       text: "text-red-200",
@@ -38,19 +42,15 @@
       bg: "bg-rose-900/60",
       text: "text-rose-200",
     },
-    score_adjustment: {
-      bg: "bg-gray-800/60",
-      text: "text-gray-200",
-    },
   };
 
   const levelLabelFns: Record<SanctionLevel, () => string> = {
     caution: () => m.sanction_level_caution(),
     warning: () => m.sanction_level_warning(),
+    standings_adjustment: () => m.sanction_level_sa(),
     disqualification: () => m.sanction_level_dq(),
     suspension: () => m.sanction_level_suspension(),
     probation: () => m.sanction_level_probation(),
-    score_adjustment: () => m.sanction_level_score_adj(),
   };
 
   const colors = $derived(SANCTION_COLORS[sanction.level]);

@@ -20,7 +20,7 @@
   let showSanctionModal = $state(false);
   let sanctionTargetUser = $state<User | null>(null);
   let sanctionLevel = $state<SanctionLevel>("probation");
-  let sanctionCategory = $state<SanctionCategory>("other");
+  let sanctionCategory = $state<SanctionCategory>("unsportsmanlike_conduct");
   let sanctionDescription = $state("");
   let sanctionExpiresAt = $state("");
   let creatingSanction = $state(false);
@@ -29,7 +29,7 @@
   let showEditSanctionModal = $state(false);
   let editingSanction = $state<Sanction | null>(null);
   let editSanctionLevel = $state<SanctionLevel>("warning");
-  let editSanctionCategory = $state<SanctionCategory>("other");
+  let editSanctionCategory = $state<SanctionCategory>("unsportsmanlike_conduct");
   let editSanctionDescription = $state("");
   let editSanctionExpiresAt = $state("");
   let processingSanctionAction = $state(false);
@@ -67,7 +67,7 @@
   function openSanctionModal() {
     sanctionTargetUser = user;
     sanctionLevel = "probation";
-    sanctionCategory = "other";
+    sanctionCategory = "unsportsmanlike_conduct";
     sanctionDescription = "";
     sanctionExpiresAt = "";
     showSanctionModal = true;
@@ -106,7 +106,7 @@
       showSanctionModal = false;
       sanctionTargetUser = null;
       sanctionLevel = "probation";
-      sanctionCategory = "other";
+      sanctionCategory = "unsportsmanlike_conduct";
       sanctionDescription = "";
       sanctionExpiresAt = "";
     } catch {
@@ -286,11 +286,9 @@
             bind:value={sanctionCategory}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
           >
-            <option value="deck_problem">{m.sanction_mgr_cat_deck_problem()}</option>
-            <option value="procedural">{m.sanction_mgr_cat_procedural()}</option>
-            <option value="cheating">{m.sanction_mgr_cat_cheating()}</option>
-            <option value="unsporting">{m.sanction_mgr_cat_unsporting()}</option>
-            <option value="other">{m.sanction_mgr_cat_other()}</option>
+            <option value="procedural_error">{m.sanction_cat_procedural_error()}</option>
+            <option value="tournament_error">{m.sanction_cat_tournament_error()}</option>
+            <option value="unsportsmanlike_conduct">{m.sanction_cat_unsportsmanlike_conduct()}</option>
           </select>
         </div>
 
@@ -389,6 +387,7 @@
           >
             <option value="caution">{m.sanction_level_caution()}</option>
             <option value="warning">{m.sanction_level_warning()}</option>
+            <option value="standings_adjustment">{m.sanction_level_sa()}</option>
             <option value="disqualification">{m.sanction_level_disqualification()}</option>
             <option value="probation">{m.sanction_level_probation()}</option>
             <option value="suspension">{m.sanction_level_suspension()}</option>
@@ -405,11 +404,9 @@
             disabled={!!editingSanction.lifted_at}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:opacity-50"
           >
-            <option value="deck_problem">{m.sanction_mgr_cat_deck_problem()}</option>
-            <option value="procedural">{m.sanction_mgr_cat_procedural()}</option>
-            <option value="cheating">{m.sanction_mgr_cat_cheating()}</option>
-            <option value="unsporting">{m.sanction_mgr_cat_unsporting()}</option>
-            <option value="other">{m.sanction_mgr_cat_other()}</option>
+            <option value="procedural_error">{m.sanction_cat_procedural_error()}</option>
+            <option value="tournament_error">{m.sanction_cat_tournament_error()}</option>
+            <option value="unsportsmanlike_conduct">{m.sanction_cat_unsportsmanlike_conduct()}</option>
           </select>
         </div>
 

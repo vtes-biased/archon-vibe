@@ -150,7 +150,7 @@ class TestFilterSanction:
     def _make_sanction(self):
         return Sanction(
             uid="s1", modified=NOW, user_uid="u1", issued_by_uid="u2",
-            level=SanctionLevel.WARNING, category=SanctionCategory.PROCEDURAL,
+            level=SanctionLevel.WARNING, category=SanctionCategory.PROCEDURAL_ERROR,
             description="Test sanction", issued_at=NOW,
         )
 
