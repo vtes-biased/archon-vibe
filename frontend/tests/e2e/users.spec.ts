@@ -7,7 +7,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 // Helper: wait for users to load via SSE
 async function waitForUsers(page: Page) {
-  await expect(page.locator('#users-list-container')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#users-list-container')).toBeVisible({ timeout: 5_000 });
   await expect(page.locator('.user-row').first()).toBeVisible({ timeout: 5_000 });
 }
 
@@ -78,18 +78,26 @@ async function loginAs(page: Page, roles: string[] = []) {
 // ─── App Load ──────────────────────────────────────────────────
 
 test.describe('App loads correctly', () => {
-  test('displays main UI elements', async ({ page }) => {
+  test('redirects / to /tournaments', async ({ page }) => {
     await page.goto('/');
+    await expect(page).toHaveURL(/\/tournaments/);
+  });
 
-    await expect(page.locator('#app-title')).toContainText('Archon');
-    await expect(page.locator('#users-heading')).toContainText('Users');
-    await expect(page.locator('#new-user-button')).toBeVisible();
-    await expect(page.locator('#refresh-button')).toBeVisible();
+  test('displays navigation sidebar', async ({ page }) => {
+    await page.goto('/users');
+    // Desktop sidebar nav links
+    await expect(page.getByRole('link', { name: /Tournaments/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Users/ })).toBeVisible();
+  });
+
+  test('displays users page elements', async ({ page }) => {
+    await page.goto('/users');
+    await expect(page.locator('#name-search')).toBeVisible();
     await expect(page.locator('#country-filter')).toBeVisible();
   });
 
   test('loads users via SSE', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     const userName = page.locator('.user-row').first().locator('.user-name').first();
@@ -183,7 +191,7 @@ test.describe('Login page', () => {
 
 test.describe('Users list filtering', () => {
   test('filters users by name search', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     const totalBefore = await page.locator('.user-row').count();
@@ -205,7 +213,7 @@ test.describe('Users list filtering', () => {
   });
 
   test('filters users by country', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Select a specific country
@@ -222,7 +230,7 @@ test.describe('Users list filtering', () => {
   });
 
   test('filters users by role', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Click a role filter button (e.g., "Judge")
@@ -237,7 +245,7 @@ test.describe('Users list filtering', () => {
   });
 
   test('expands a user row to show details', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Click the first user row
@@ -249,7 +257,7 @@ test.describe('Users list filtering', () => {
   });
 
   test('combines name and country filters', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Apply country filter first
@@ -274,7 +282,7 @@ test.describe('Edit user (authenticated)', () => {
     // Set up auth before navigating
     await page.goto('/login'); // Need a page context to set localStorage
     await loginAs(page, ['IC']);
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Expand a user
@@ -288,7 +296,7 @@ test.describe('Edit user (authenticated)', () => {
   test('opens edit mode and shows form fields', async ({ page }) => {
     await page.goto('/login');
     await loginAs(page, ['IC']);
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Expand and edit first user
@@ -311,7 +319,7 @@ test.describe('Edit user (authenticated)', () => {
   test('can close edit mode', async ({ page }) => {
     await page.goto('/login');
     await loginAs(page, ['IC']);
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Expand, edit, then close
@@ -333,7 +341,7 @@ test.describe('Sanctions (authenticated as IC)', () => {
   test('shows sanction controls for IC user', async ({ page }) => {
     await page.goto('/login');
     await loginAs(page, ['IC', 'Ethics']);
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Expand and edit a user
@@ -350,7 +358,7 @@ test.describe('Sanctions (authenticated as IC)', () => {
   test('opens sanction modal with form fields', async ({ page }) => {
     await page.goto('/login');
     await loginAs(page, ['IC', 'Ethics']);
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Navigate to edit mode
@@ -376,7 +384,7 @@ test.describe('Sanctions (authenticated as IC)', () => {
   test('closes sanction modal on cancel', async ({ page }) => {
     await page.goto('/login');
     await loginAs(page, ['IC', 'Ethics']);
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Navigate to sanction modal
@@ -397,7 +405,7 @@ test.describe('Sanctions (authenticated as IC)', () => {
   test('closes sanction modal on Escape key', async ({ page }) => {
     await page.goto('/login');
     await loginAs(page, ['IC', 'Ethics']);
-    await page.goto('/');
+    await page.goto('/users');
     await waitForUsers(page);
 
     // Navigate to sanction modal

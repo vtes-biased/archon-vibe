@@ -39,7 +39,7 @@ async def init_db() -> None:
     _pool = AsyncConnectionPool(
         conninfo=DB_URL,
         min_size=2,
-        max_size=10,
+        max_size=20,
         open=False,
         kwargs={"autocommit": True},
     )
@@ -380,57 +380,60 @@ async def set_user_resync_after(user_uid: str) -> None:
 async def stream_objects[T](
     table: str, type_: type[T], since: str | None = None, batch_size: int = 1000
 ) -> AsyncIterator[tuple[list[T], str | None]]:
-    """Stream objects in batches using a server-side cursor.
+    """Stream objects in batches using keyset pagination.
 
-    Yields (batch, max_modified) tuples. Uses true streaming from DB
-    for constant memory usage regardless of dataset size.
+    Yields (batch, max_modified) tuples. Each batch query acquires and
+    releases a DB connection immediately, so connections are not held
+    during downstream filtering, serialization, or HTTP writes.
+    Memory bounded to one batch at a time.
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
 
-    conn = await _pool.getconn()
-    try:
-        await conn.execute("BEGIN")
-        try:
-            async with conn.cursor(name=f"{table}_stream") as cursor:
-                tbl = sql.Identifier(table)
-                if since:
-                    await cursor.execute(
-                        sql.SQL("SELECT data, modified FROM {} "
-                                "WHERE modified > %s ORDER BY modified ASC, uid ASC").format(tbl),
-                        (since,),
-                    )
-                else:
-                    await cursor.execute(
-                        sql.SQL("SELECT data, modified FROM {} "
-                                "ORDER BY modified ASC, uid ASC").format(tbl),
-                    )
+    tbl = sql.Identifier(table)
+    # Keyset cursor: track (modified, uid) of last row seen
+    cursor_modified = since
+    cursor_uid: str | None = None
 
-                batch: list[T] = []
-                last_modified: str | None = None
+    while True:
+        # Acquire connection, fetch one batch, release immediately
+        async with _pool.connection() as conn:
+            if cursor_uid is not None:
+                # Keyset pagination: continue after last seen (modified, uid)
+                rows = await (await conn.execute(
+                    sql.SQL("SELECT data, modified, uid FROM {} "
+                            "WHERE (modified, uid) > (%s, %s) "
+                            "ORDER BY modified ASC, uid ASC LIMIT %s").format(tbl),
+                    (cursor_modified, cursor_uid, batch_size),
+                )).fetchall()
+            elif cursor_modified:
+                # First batch with a since filter (no uid tiebreaker needed)
+                rows = await (await conn.execute(
+                    sql.SQL("SELECT data, modified, uid FROM {} "
+                            "WHERE modified > %s "
+                            "ORDER BY modified ASC, uid ASC LIMIT %s").format(tbl),
+                    (cursor_modified, batch_size),
+                )).fetchall()
+            else:
+                # Full table scan (initial sync, no since)
+                rows = await (await conn.execute(
+                    sql.SQL("SELECT data, modified, uid FROM {} "
+                            "ORDER BY modified ASC, uid ASC LIMIT %s").format(tbl),
+                    (batch_size,),
+                )).fetchall()
+        # Connection returned to pool here
 
-                async for row in cursor:
-                    obj = decode_json(row[0], type_)
-                    batch.append(obj)
-                    last_modified = row[1].isoformat()
+        if not rows:
+            break
 
-                    if len(batch) >= batch_size:
-                        yield batch, last_modified
-                        batch = []
+        batch = [decode_json(row[0], type_) for row in rows]
+        cursor_modified = rows[-1][1].isoformat()
+        cursor_uid = rows[-1][2]
 
-                if batch:
-                    yield batch, last_modified
-        finally:
-            try:
-                await conn.cancel_safe()
-            except Exception:
-                pass
-            try:
-                await conn.execute("ROLLBACK")
-            except Exception:
-                pass
-    finally:
-        await _pool.putconn(conn)
+        yield batch, cursor_modified
+
+        if len(rows) < batch_size:
+            break
 
 
 def stream_users(

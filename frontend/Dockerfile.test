@@ -33,12 +33,13 @@ RUN npx playwright install --with-deps chromium
 # Copy frontend source
 COPY frontend/ ./
 
-# Fix geonames symlink - copy actual data files from backend
-RUN rm -rf /app/src/data/geonames
-COPY backend/src/data/geonames/ /app/src/data/geonames/
+# Fix geonames symlink - copy actual data files from backend to $lib/data/geonames
+RUN rm -rf /app/src/lib/data/geonames
+COPY backend/src/data/geonames/ /app/src/lib/data/geonames/
 
-# Copy built WASM engine to frontend lib
-RUN mkdir -p /app/src/lib/engine && cp -r /app/engine/pkg/* /app/src/lib/engine/
+# Place WASM engine where the relative import expects it
+# engine.ts imports ../../../engine/pkg/archon_engine (3 levels up from src/lib/ = /)
+RUN mkdir -p /engine/pkg && cp -r /app/engine/pkg/* /engine/pkg/
 
 # Wait for backend, start dev server, and run tests
 CMD ["sh", "-c", "\
