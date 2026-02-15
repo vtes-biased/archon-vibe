@@ -258,9 +258,19 @@ Three data levels control what each connected client sees:
 - VP validation via oust-order algorithm
 
 **Sanctions**:
-- Event-level: Caution, Warning, Disqualification (Standings Adjustment planned)
-- Tracked per event and on player profile
-- Visible to organizers at future events
+- Event-level: Caution, Warning, Standings Adjustment, Disqualification
+- VEKN-wide: Suspension, Probation (IC/Ethics only)
+- Judges Guide v2 categories and subcategories with escalation guidance
+- SA score adjustments applied to round GW computation with overflow to standings
+- DQ barring (tournament, league-wide, suspension-wide) enforced at check-in and finals
+- Tracked per event and on player profile with visual indicators in standings
+- Lifting permissions: IC, Ethics, Rulemonger, NC (same country), league organizers (DQ)
+
+**Leagues**:
+- League and meta-league management (NC/IC only)
+- Three standings modes: RTP, Score (GW/VP/TP from prelims), GP (F1-style points)
+- Tournament-league association with organizer-filtered selection
+- Auto-updating standings on league detail page
 
 **Ratings**:
 - Player ratings computed server-side, updated on tournament finish or modification
@@ -296,29 +306,10 @@ Prioritized features are marked with **[HIGH]**. See `development-plan.md` for i
 - **Tournament logs**: Audit trail of organizer actions during an event (#49)
 - **Player view live updates**: SSE-driven real-time updates on the player's tournament view (#91)
 
-#### Sanctions & Compliance
-
-- **Standings Adjustment** sanction (-1 VP penalty from v2 Judges Guide; not yet in sanctions model)
-- **Sanction categories** (v2 Judges Guide infractions):
-  - Procedural Errors: Missed Mandatory Effect, Card Access Error, Game Rule Violation, Failure to Maintain Game State
-  - Tournament Errors: Deck Problems, Outside Assistance, Slow Play, Limited Procedure Violation, Public Info Miscommunication, Obscuring Game State, Marked Cards, Insufficient Shuffling
-  - Unsportsmanlike Conduct: Minor, Major, Aggressive Behaviour, Bribery & Wagering, Theft, Stalling, Cheating, Fraud, Collusion, Health & Safety, Rage-Quitting, Failure to Play to Win
-- **VEKN-wide sanctions UI** (suspension/probation modal on members list; blocked players at check-in)
-
 #### Analytics & Data
 
 - **Deck statistics**: Aggregate stats on decks played at events (clan distribution, most-played cards, crypt trends). Requires good decklist data.
 - **VEKN results reporting** (automated submission to VEKN; may be manual/export)
-
-#### Leagues
-
-- **League management** (frontend route exists at `/leagues/`):
-  - Leagues group multiple tournaments with combined standings
-  - League of leagues (e.g., Iberic league = regional Spain + Portugal leagues; Grand Prix leagues)
-  - Three scoring modes:
-    - **RTP** (default): Standard ranking points, same formula as global rankings
-    - **GW/VP/TP**: Uses preliminary round results only (excludes finals, since not all players participate)
-    - **Championship**: F1-style points — 25 (winner), 15 (finalists, tied 2nd), 10, 9, 8, 7, 6, 5, 4, 3, 2, 1 (6th–15th)
 
 #### VEKN Integration (Beta Requirement)
 

@@ -97,7 +97,7 @@ Overall: clear UX guidance for decklist management. Good help messages at the ri
 
 ---
 
-## Phase 2: Leagues
+## Phase 2: Leagues ✅
 
 ### 2.1 League Model & Engine (Rust)
 
@@ -141,7 +141,7 @@ Leagues are a new SSE-streamed base object type (follow SYNC.md patterns).
 
 ---
 
-## Phase 3: Tournament Sanctions Enhancement (Delta)
+## Phase 3: Tournament Sanctions Enhancement (Delta) ✅
 
 > Existing: sanction model with 6 levels (caution → probation), 5 categories, VP adjustments, soft-delete. What follows is what's **missing**.
 
