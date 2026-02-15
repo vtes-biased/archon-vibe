@@ -75,3 +75,7 @@ backend/data/geonames_raw/
 
 # Codanna
 .codanna/
+
+# Claude Code (user-specific settings and private memory)
+.claude/settings.local.json
+.claude/projects/

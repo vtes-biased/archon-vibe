@@ -1,3 +1,15 @@
+# Agent Workflow (PROACTIVE — do not wait for user to ask)
+
+When implementing features or making significant changes, follow this pipeline using the Task tool:
+
+1. **Before implementing**: Consult `product-manager` for VEKN rules, feature specs, UX requirements, or prioritization decisions. Always consult when domain context is needed.
+2. **Before/during frontend work**: Consult `staff-frontend-engineer` for UX/UI review, component design, dependency evaluation, or mobile-first guidance.
+3. **After significant code changes**: Launch `principal-engineer` to review architectural alignment — especially for changes touching sync, data model, Rust/WASM pipeline, or cross-module refactors.
+4. **After any UI text change**: Launch `i18n-translator` to update all 5 locale files. Any new or modified user-facing string triggers this.
+5. **After meaningful code changes**: Launch `documentalist` to update CLAUDE.md, ARCHITECTURE.md, SYNC.md, or other docs that are now stale.
+
+Steps 3-5 should run in parallel when applicable. Skip agents only for trivial changes (typo fixes, single-line tweaks with no architectural or UI text impact).
+
 # Project Guidelines
 
 - Keep answers short and token efficient
