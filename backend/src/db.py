@@ -11,6 +11,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from .models import (
     AuthMethod,
+    League,
     OAuthAuthorizationCode,
     OAuthClient,
     OAuthConsent,
@@ -194,6 +195,27 @@ async def init_db() -> None:
         await conn.execute("""
             CREATE TRIGGER ratings_modified_trigger
             BEFORE INSERT OR UPDATE ON ratings
+            FOR EACH ROW
+            EXECUTE FUNCTION update_modified_column();
+        """)
+
+        # Leagues table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS leagues (
+                uid TEXT PRIMARY KEY,
+                modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                data JSONB NOT NULL
+            );
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_leagues_modified ON leagues(modified);
+        """)
+        await conn.execute("""
+            DROP TRIGGER IF EXISTS leagues_modified_trigger ON leagues;
+        """)
+        await conn.execute("""
+            CREATE TRIGGER leagues_modified_trigger
+            BEFORE INSERT OR UPDATE ON leagues
             FOR EACH ROW
             EXECUTE FUNCTION update_modified_column();
         """)
@@ -1474,3 +1496,66 @@ async def get_finished_tournaments_for_category(
         )
         rows = await result.fetchall()
         return [decode_json(row[0], Tournament) for row in rows]
+
+
+# League CRUD
+
+
+async def insert_league(league: League) -> None:
+    """Insert a new league into the database."""
+    async with get_connection() as conn:
+        await conn.execute(
+            "INSERT INTO leagues (uid, data) VALUES (%s, %s)",
+            (league.uid, encode_json(league)),
+        )
+
+
+async def update_league(league: League) -> None:
+    """Update an existing league in the database."""
+    async with get_connection() as conn:
+        await conn.execute(
+            "UPDATE leagues SET data = %s WHERE uid = %s",
+            (encode_json(league), league.uid),
+        )
+
+
+async def get_league_by_uid(uid: str) -> League | None:
+    """Get a league by UID."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data FROM leagues WHERE uid = %s",
+            (uid,),
+        )
+        row = await result.fetchone()
+        if row:
+            return decode_json(row[0], League)
+        return None
+
+
+async def get_child_leagues(parent_uid: str) -> list[League]:
+    """Get child leagues for a meta-league."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data FROM leagues WHERE data->>'parent_uid' = %s",
+            (parent_uid,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], League) for row in rows]
+
+
+async def get_tournaments_for_league(league_uid: str) -> list[Tournament]:
+    """Get all tournaments associated with a league."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data FROM tournaments WHERE data->>'league_uid' = %s",
+            (league_uid,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], Tournament) for row in rows]
+
+
+def stream_leagues(
+    since: str | None = None, batch_size: int = 1000
+) -> AsyncIterator[tuple[list[League], str | None]]:
+    """Stream leagues from DB."""
+    return stream_objects("leagues", League, since=since, batch_size=batch_size)

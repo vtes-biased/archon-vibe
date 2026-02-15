@@ -310,6 +310,38 @@ export function computeRatingPoints(
 }
 
 /**
+ * Compute league standings using the WASM engine.
+ *
+ * @param standingsMode "RTP" | "Score" | "GP"
+ * @param tournaments Array of finished tournament data
+ * @returns Array of standing entries sorted by ranking
+ */
+export async function computeLeagueStandings(
+  standingsMode: string,
+  tournaments: Array<{
+    uid: string;
+    rank: string;
+    player_count: number;
+    winner?: string;
+    standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; finalist: boolean }>;
+    finals: Array<{ player_uid: string; gw: number; vp: number; tp: number }>;
+  }>
+): Promise<Array<{
+  user_uid: string;
+  gw: number;
+  vp: number;
+  tp: number;
+  points?: number;
+  rank: number;
+  tournaments_count: number;
+}>> {
+  const engine = await initEngine();
+  const config = { standings_mode: standingsMode, tournaments };
+  const resultJson = engine.computeLeagueStandings(JSON.stringify(config));
+  return JSON.parse(resultJson);
+}
+
+/**
  * Build actor context from current user and tournament.
  */
 export function buildActorContext(user: User | null, tournament: Tournament): ActorContext {

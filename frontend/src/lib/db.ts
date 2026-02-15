@@ -4,7 +4,7 @@
  */
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { User, Role, Sanction, Tournament, Rating, VtesCard } from '$lib/types';
+import type { User, Role, Sanction, Tournament, Rating, League, VtesCard } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 
 interface ArchonDB extends DBSchema {
@@ -41,6 +41,14 @@ interface ArchonDB extends DBSchema {
       'by-country': string;
     };
   };
+  leagues: {
+    key: string;  // uid
+    value: League;
+    indexes: {
+      'by-country': string;
+      'by-start': string;
+    };
+  };
   cards: {
     key: number; // card id
     value: VtesCard;
@@ -65,8 +73,8 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-// Version 12: added cards store for VTES card database
-const DB_VERSION = 12;
+// Version 13: added leagues store
+const DB_VERSION = 13;
 
 export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
   if (dbPromise) {
@@ -104,6 +112,11 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       const ratingStore = db.createObjectStore('ratings', { keyPath: 'uid' });
       ratingStore.createIndex('by-user', 'user_uid');
       ratingStore.createIndex('by-country', 'country');
+
+      // Leagues store
+      const leagueStore = db.createObjectStore('leagues', { keyPath: 'uid' });
+      leagueStore.createIndex('by-country', 'country');
+      leagueStore.createIndex('by-start', 'start');
 
       // Cards store (VTES card database, keyed by card ID)
       db.createObjectStore('cards', { keyPath: 'id' });
@@ -521,4 +534,40 @@ export async function deleteRating(uid: string): Promise<void> {
 export async function clearAllRatings(): Promise<void> {
   const db = await getDB();
   await db.clear('ratings');
+}
+
+// League operations
+export async function getLeague(uid: string): Promise<League | undefined> {
+  const db = await getDB();
+  return db.get('leagues', uid);
+}
+
+export async function getAllLeagues(): Promise<League[]> {
+  const db = await getDB();
+  return db.getAll('leagues');
+}
+
+export async function saveLeague(league: League): Promise<void> {
+  const db = await getDB();
+  await db.put('leagues', league);
+}
+
+export async function saveLeaguesBatch(leagues: League[]): Promise<void> {
+  if (leagues.length === 0) return;
+  const db = await getDB();
+  const tx = db.transaction('leagues', 'readwrite');
+  for (const l of leagues) {
+    tx.store.put(l);
+  }
+  await tx.done;
+}
+
+export async function deleteLeague(uid: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('leagues', uid);
+}
+
+export async function clearAllLeagues(): Promise<void> {
+  const db = await getDB();
+  await db.clear('leagues');
 }

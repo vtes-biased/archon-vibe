@@ -3,7 +3,7 @@
  * Generic spec-based approach for all object types.
  */
 
-import type { User, Sanction, Tournament, Rating } from '$lib/types';
+import type { User, Sanction, Tournament, Rating, League } from '$lib/types';
 import {
   saveUser,
   saveUsersBatch,
@@ -15,10 +15,14 @@ import {
   deleteTournament,
   saveRating,
   saveRatingsBatch,
+  saveLeague,
+  saveLeaguesBatch,
+  deleteLeague,
   clearAllRatings,
   clearAllUsers,
   clearAllSanctions,
   clearAllTournaments,
+  clearAllLeagues,
   setLastSyncTimestamp,
   getLastSyncTimestamp,
   clearLastSyncTimestamp,
@@ -29,11 +33,11 @@ import { getAccessToken } from '$lib/stores/auth.svelte';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'rating' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
+type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'rating' | 'league' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
 
 interface SyncEvent {
   type: SyncEventType;
-  data?: User | Sanction | Tournament | Rating;
+  data?: User | Sanction | Tournament | Rating | League;
   timestamp?: string | null;
   error?: string;
 }
@@ -54,6 +58,7 @@ const SPECS: ObjectSpec<any>[] = [
   { batchType: 'sanctions', singleType: 'sanction', save: saveSanction, saveBatch: saveSanctionsBatch, del: deleteSanction },
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
   { batchType: 'ratings', singleType: 'rating', save: saveRating, saveBatch: saveRatingsBatch, del: async () => { /* ratings not deleted via SSE currently */ } },
+  { batchType: 'leagues', singleType: 'league', save: saveLeague, saveBatch: saveLeaguesBatch, del: deleteLeague },
 ];
 
 class SyncManager {
@@ -182,6 +187,7 @@ class SyncManager {
     await clearAllSanctions();
     await clearAllTournaments();
     await clearAllRatings();
+    await clearAllLeagues();
     await clearChanges();
     await clearLastSyncTimestamp();
   }

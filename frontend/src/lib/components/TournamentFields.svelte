@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode } from "$lib/types";
+  import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "$lib/types";
   import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getAllLeagues } from "$lib/db";
 
   export interface TournamentFieldValues {
     name: string;
@@ -23,6 +24,7 @@
     proxies: boolean;
     multideck: boolean;
     decklist_required: boolean;
+    league_uid: string;
   }
 
   let {
@@ -41,6 +43,15 @@
 
   const countries = getCountries();
   const timezones = Intl.supportedValuesOf("timeZone");
+
+  let leagues = $state<League[]>([]);
+  $effect(() => {
+    getAllLeagues().then(all => {
+      leagues = all
+        .filter(l => !l.deleted_at && (!l.finish || new Date(l.finish) >= new Date()))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    });
+  });
 
   function id(name: string) {
     return idPrefix ? `${idPrefix}-${name}` : name;
@@ -97,6 +108,25 @@
     </select>
   </div>
 </div>
+
+<!-- League -->
+{#if leagues.length > 0}
+  <div>
+    <label class="block text-sm text-ash-400 mb-1" for={id("league")}>League</label>
+    <select
+      id={id("league")}
+      value={values.league_uid}
+      {disabled}
+      onchange={(e) => handleInput("league_uid", (e.target as HTMLSelectElement).value)}
+      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+    >
+      <option value="">None</option>
+      {#each leagues as league}
+        <option value={league.uid}>{league.name}</option>
+      {/each}
+    </select>
+  </div>
+{/if}
 
 <!-- Open Rounds -->
 <div>

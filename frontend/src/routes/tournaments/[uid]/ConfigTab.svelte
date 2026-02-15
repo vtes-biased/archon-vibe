@@ -40,6 +40,7 @@
     proxies: tournament.proxies,
     multideck: tournament.multideck,
     decklist_required: tournament.decklist_required,
+    league_uid: tournament.league_uid ?? "",
   });
 
   // Sync from tournament when it changes externally (but not while user is editing)
@@ -68,6 +69,7 @@
         proxies: t.proxies,
         multideck: t.multideck,
         decklist_required: t.decklist_required,
+        league_uid: t.league_uid ?? "",
       };
     }
   });
@@ -122,7 +124,7 @@
       return;
     }
     // Normalize empty strings to null for nullable fields
-    const saveValue = (field === "country" || field === "start" || field === "finish")
+    const saveValue = (field === "country" || field === "start" || field === "finish" || field === "league_uid")
       ? (value || null)
       : value;
     if (debouncedFields.has(field)) {

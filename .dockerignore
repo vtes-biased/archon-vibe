@@ -41,8 +41,9 @@ engine/target/release/examples/
 engine/target/release/incremental/
 engine/target/release/.fingerprint/
 engine/target/CACHEDIR.TAG
+engine/target/wheels/
 engine/Cargo.lock
-# Note: engine/target/wheels/ and engine/pkg/ are INCLUDED for Docker builds
+# Note: engine/pkg/ is INCLUDED for Docker builds (frontend WASM)
 
 # Frontend build
 frontend/dist/

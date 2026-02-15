@@ -3,6 +3,7 @@ use json::JsonValue;
 // Modules
 pub mod cards;
 pub mod deck;
+pub mod league;
 mod permissions;
 pub mod ratings;
 pub mod seating;
@@ -256,6 +257,10 @@ mod shared {
         let d = deck_from_json(&value, true)?;
         Ok(deck::export_twda(&d, &card_map, tournament_name, tournament_date, tournament_place, tournament_format, tournament_url, player_count, player_name))
     }
+
+    pub fn compute_league_standings_json(config_json: &str) -> Result<String, String> {
+        league::compute_league_standings(config_json)
+    }
 }
 
 // ============================================================================
@@ -338,6 +343,11 @@ mod wasm {
         pub fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> Result<String, String> {
             enrich_deck_json(deck_json, cards_json)
         }
+
+        #[wasm_bindgen(js_name = computeLeagueStandings)]
+        pub fn compute_league_standings(&self, config_json: &str) -> Result<String, String> {
+            compute_league_standings_json(config_json)
+        }
     }
 }
 
@@ -415,6 +425,10 @@ mod python {
 
         fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> PyResult<String> {
             py_str(enrich_deck_json(deck_json, cards_json))
+        }
+
+        fn compute_league_standings(&self, config_json: &str) -> PyResult<String> {
+            py_str(compute_league_standings_json(config_json))
         }
 
         fn export_twda(

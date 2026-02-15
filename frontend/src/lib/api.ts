@@ -2,7 +2,7 @@
  * API client for backend communication.
  */
 
-import type { User, Sanction, SanctionLevel, SanctionCategory, Tournament, TournamentConfig } from '$lib/types';
+import type { User, Sanction, SanctionLevel, SanctionCategory, Tournament, TournamentConfig, League } from '$lib/types';
 import { getAllUsers, getTournament, saveTournament, logChange } from './db';
 import { processTournamentEvent, buildActorContext } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
@@ -377,6 +377,7 @@ export interface CreateTournamentData {
   proxies?: boolean;
   multideck?: boolean;
   decklist_required?: boolean;
+  league_uid?: string | null;
 }
 
 export async function createTournament(data: CreateTournamentData): Promise<Tournament> {
@@ -456,6 +457,65 @@ export async function setTableScore(
 /**
  * Delete user avatar.
  */
+// League API
+
+export interface CreateLeagueData {
+  name: string;
+  kind?: string;
+  standings_mode?: string;
+  format?: string | null;
+  online?: boolean;
+  country?: string | null;
+  start?: string | null;
+  finish?: string | null;
+  timezone?: string;
+  description?: string;
+  parent_uid?: string | null;
+  allow_no_finals?: boolean;
+}
+
+export async function createLeague(data: CreateLeagueData): Promise<League> {
+  if (!isOnline()) {
+    throw new Error('Cannot create league while offline.');
+  }
+  return apiRequest<League>('/api/leagues/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateLeague(uid: string, data: Partial<CreateLeagueData>): Promise<League> {
+  if (!isOnline()) {
+    throw new Error('Cannot update league while offline.');
+  }
+  return apiRequest<League>(`/api/leagues/${uid}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteLeagueApi(uid: string): Promise<void> {
+  if (!isOnline()) {
+    throw new Error('Cannot delete league while offline.');
+  }
+  await apiRequest<void>(`/api/leagues/${uid}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function addLeagueOrganizer(uid: string, userUid: string): Promise<League> {
+  return apiRequest<League>(`/api/leagues/${uid}/organizers`, {
+    method: 'POST',
+    body: JSON.stringify({ user_uid: userUid }),
+  });
+}
+
+export async function removeLeagueOrganizer(uid: string, organizerUid: string): Promise<League> {
+  return apiRequest<League>(`/api/leagues/${uid}/organizers/${organizerUid}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function deleteAvatar(userUid: string): Promise<{ success: boolean }> {
   if (!isOnline()) {
     throw new Error('Cannot delete avatar while offline.');

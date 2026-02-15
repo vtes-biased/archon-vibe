@@ -222,6 +222,7 @@ class CreateTournamentRequest(BaseModel):
     standings_mode: str = "Private"
     decklists_mode: str = "Winner"
     max_rounds: int = 0
+    league_uid: str | None = None
 
 
 class UpdateTournamentRequest(BaseModel):
@@ -244,6 +245,7 @@ class UpdateTournamentRequest(BaseModel):
     standings_mode: str | None = None
     decklists_mode: str | None = None
     max_rounds: int | None = None
+    league_uid: str | None = None
 
 
 def _parse_datetime(s: str | None) -> datetime | None:
@@ -314,6 +316,7 @@ async def create_tournament(
         standings_mode=standings,
         decklists_mode=decklists,
         max_rounds=request.max_rounds,
+        league_uid=request.league_uid or None,
         organizers_uids=[current_user.uid],
     )
 
@@ -455,6 +458,10 @@ async def update_tournament_endpoint(
         updates["start"] = _parse_datetime(updates["start"])
     if "finish" in updates and updates["finish"]:
         updates["finish"] = _parse_datetime(updates["finish"])
+
+    # Normalize empty league_uid to None
+    if "league_uid" in updates and not updates["league_uid"]:
+        updates["league_uid"] = None
 
     data.update(updates)
     data["modified"] = datetime.now(UTC)

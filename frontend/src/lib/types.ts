@@ -89,6 +89,27 @@ export interface Sanction extends BaseObject {
   lifted_by_uid: string | null;
 }
 
+// League types
+
+export type LeagueKind = "League" | "Meta-League";
+export type LeagueStandingsMode = "RTP" | "Score" | "GP";
+
+export interface League extends BaseObject {
+  name: string;
+  kind: LeagueKind;
+  standings_mode: LeagueStandingsMode;
+  format: string | null; // TournamentFormat value or null = any
+  online: boolean;
+  country: string | null; // null = worldwide
+  start: string | null;
+  finish: string | null; // null = ongoing
+  timezone: string;
+  description: string;
+  organizers_uids: string[];
+  parent_uid: string | null; // FK → leagues (child of meta-league)
+  allow_no_finals: boolean;
+}
+
 // Tournament types
 
 export type TournamentState = "Planned" | "Registration" | "Waiting" | "Playing" | "Finished";

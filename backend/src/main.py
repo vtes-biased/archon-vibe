@@ -25,6 +25,7 @@ from .db import (
     get_expired_sanctions,
     get_sanctions_for_cleanup,
     init_db,
+    stream_leagues,
     stream_ratings,
     stream_sanctions,
     stream_tournaments,
@@ -34,6 +35,7 @@ from .db import (
 from .models import (
     DataLevel,
     DeckListsMode,
+    League,
     Player,
     Rating,
     Role,
@@ -43,7 +45,7 @@ from .models import (
     TournamentState,
     User,
 )
-from .routes import admin, auth, cards, oauth, sanctions, tournaments, users, vekn
+from .routes import admin, auth, cards, leagues, oauth, sanctions, tournaments, users, vekn
 from .vekn_sync import VEKNSyncService
 
 # Load environment variables
@@ -285,6 +287,7 @@ app.include_router(sanctions.router)
 app.include_router(tournaments.router)
 app.include_router(oauth.router)
 app.include_router(cards.router)
+app.include_router(leagues.router)
 
 
 @app.get("/")
@@ -479,6 +482,11 @@ def _filter_rating(rating: Rating, viewer: User | None) -> Rating | None:
     return rating
 
 
+def _filter_league(league: League, viewer: User | None) -> League | None:
+    """Leagues are public."""
+    return league
+
+
 # ---------------------------------------------------------------------------
 # Generic broadcast
 # ---------------------------------------------------------------------------
@@ -517,6 +525,10 @@ async def broadcast_rating_event(rating: Rating) -> None:
     await _broadcast("rating", rating, _filter_rating)
 
 
+async def broadcast_league_event(league: League) -> None:
+    await _broadcast("league", league, _filter_league)
+
+
 async def broadcast_resync(user_uid: str) -> None:
     """Push a resync event to a specific user's SSE connection(s)."""
     event_data = {"type": "resync"}
@@ -534,6 +546,7 @@ users.broadcast_user_event = broadcast_user_event
 sanctions.broadcast_sanction_event = broadcast_sanction_event
 tournaments.broadcast_tournament_event = broadcast_tournament_event
 tournaments.broadcast_rating_event = broadcast_rating_event
+leagues.broadcast_league_event = broadcast_league_event
 users.broadcast_resync = broadcast_resync
 vekn.broadcast_resync = broadcast_resync
 
@@ -601,6 +614,7 @@ async def stream_updates(
         (stream_sanctions, "sanctions", _filter_sanction),
         (stream_tournaments, "tournaments", _filter_tournament),
         (stream_ratings, "ratings", _filter_rating),
+        (stream_leagues, "leagues", _filter_league),
     ]
 
     async def event_generator():

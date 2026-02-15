@@ -191,6 +191,35 @@ class Rating(BaseObject, kw_only=True):
     limited_offline: CategoryRating | None = None
 
 
+class LeagueKind(StrEnum):
+    LEAGUE = "League"
+    META = "Meta-League"
+
+
+class LeagueStandingsMode(StrEnum):
+    RTP = "RTP"  # Rating points (VEKN formula)
+    SCORE = "Score"  # GW/VP/TP from prelims only (finals subtracted)
+    GP = "GP"  # Grand Prix position-based points
+
+
+class League(BaseObject, kw_only=True):
+    """League grouping multiple tournaments with aggregated standings."""
+
+    name: str
+    kind: LeagueKind = LeagueKind.LEAGUE
+    standings_mode: LeagueStandingsMode = LeagueStandingsMode.RTP
+    format: str | None = None  # TournamentFormat value or None = any
+    online: bool = False
+    country: str | None = None  # None = worldwide
+    start: datetime | None = None
+    finish: datetime | None = None  # None = ongoing
+    timezone: str = "UTC"
+    description: str = ""
+    organizers_uids: list[str] = msgspec.field(default_factory=list)
+    parent_uid: str | None = None  # FK → leagues (child of meta-league)
+    allow_no_finals: bool = False
+
+
 class TournamentState(StrEnum):
     PLANNED = "Planned"
     REGISTRATION = "Registration"

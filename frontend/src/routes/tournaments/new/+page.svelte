@@ -29,6 +29,7 @@
     proxies: false,
     multideck: false,
     decklist_required: false,
+    league_uid: "",
   });
 
   let isSubmitting = $state(false);
@@ -64,6 +65,7 @@
         proxies: values.proxies,
         multideck: values.multideck,
         decklist_required: values.decklist_required,
+        league_uid: values.league_uid || null,
       });
       await saveTournament(tournament);
       goto(`/tournaments/${tournament.uid}`);
