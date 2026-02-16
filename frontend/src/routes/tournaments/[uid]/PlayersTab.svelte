@@ -60,7 +60,6 @@
     return numRounds - 1; // default to last round
   });
 
-  let showAddPlayer = $state(false);
   let tossInputs = $state<Record<string, string>>({});
   // svelte-ignore state_referenced_locally — intentionally captures initial value
   let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
@@ -176,15 +175,6 @@
 
   async function addPlayerByUser(user: User) {
     await doAction("AddPlayer", { user_uid: user.uid });
-    showAddPlayer = false;
-  }
-
-  async function addPlayerByVeknId(veknId: string) {
-    const { getUserByVeknId } = await import("$lib/db");
-    const user = await getUserByVeknId(veknId);
-    if (!user) return;
-    await doAction("AddPlayer", { user_uid: user.uid });
-    showAddPlayer = false;
   }
 
   async function removePlayer(userUid: string) {
@@ -244,25 +234,16 @@
 </script>
 
 <div class="space-y-4">
-  <!-- Header -->
-  <div class="flex items-center justify-between">
-    <p class="text-ash-400">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
-    {#if isOrganizer}
-      <button
-        onclick={() => showAddPlayer = !showAddPlayer}
-        class="px-3 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-      >
-        <Icon icon="lucide:user-plus" class="w-4 h-4 inline mr-1" />
-        {m.players_add()}
-      </button>
-    {/if}
-  </div>
-
-  <!-- Add Player UI -->
-  {#if showAddPlayer && isOrganizer}
-    <AddPlayerForm {tournament} onadd={addPlayerByUser} onaddvekn={addPlayerByVeknId} />
-    {#if isOfflineMode}
-      <div class="mt-3 border-t border-ash-800 pt-3">
+  <!-- Header + Add Player -->
+  <div class="space-y-2">
+    <div class="flex items-center gap-3">
+      <p class="text-ash-400 shrink-0">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
+      {#if isOrganizer}
+        <AddPlayerForm {tournament} onadd={addPlayerByUser} />
+      {/if}
+    </div>
+    {#if isOrganizer && isOfflineMode}
+      <div class="border-t border-ash-800 pt-2">
         <button
           onclick={() => showOfflinePlayerForm = !showOfflinePlayerForm}
           class="text-sm text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
@@ -299,7 +280,7 @@
         {/if}
       </div>
     {/if}
-  {/if}
+  </div>
 
   <!-- Toss controls -->
   {#if isOrganizer && hasFinalsCandidate && top5HasTies()}
