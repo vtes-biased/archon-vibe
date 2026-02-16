@@ -414,6 +414,27 @@ export async function isUserCurrentlySanctioned(userUid: string): Promise<boolea
 }
 
 /**
+ * Get the set of user UIDs that are currently suspended.
+ * Single scan of sanctions store — efficient for bulk filtering (e.g., rankings).
+ */
+export async function getSuspendedUserUids(): Promise<Set<string>> {
+  const db = await getDB();
+  const allSanctions = await db.getAll('sanctions');
+  const now = new Date();
+  const suspended = new Set<string>();
+
+  for (const s of allSanctions) {
+    if (s.deleted_at) continue;
+    if (s.level !== 'suspension') continue;
+    if (s.lifted_at) continue;
+    if (s.expires_at && new Date(s.expires_at) < now) continue;
+    suspended.add(s.user_uid);
+  }
+
+  return suspended;
+}
+
+/**
  * Check if user has any past sanctions (including lifted/expired).
  */
 export async function userHasPastSanctions(userUid: string): Promise<boolean> {
