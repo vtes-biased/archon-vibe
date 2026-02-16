@@ -349,6 +349,30 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
         yield conn
 
 
+@asynccontextmanager
+async def tournament_transaction(
+    uid: str,
+) -> AsyncIterator[tuple[Tournament | None, psycopg.AsyncConnection]]:
+    """Lock a tournament row for update within a transaction.
+
+    Uses SELECT ... FOR UPDATE to serialize concurrent writes to the same
+    tournament. Yields (tournament, connection). The caller must use the
+    yielded connection for any UPDATE within the same transaction.
+    Commits on normal exit, rolls back on exception.
+    """
+    if not _pool:
+        raise RuntimeError("Database not initialized")
+    async with _pool.connection() as conn:
+        async with conn.transaction():
+            result = await conn.execute(
+                "SELECT data FROM tournaments WHERE uid = %s FOR UPDATE",
+                (uid,),
+            )
+            row = await result.fetchone()
+            tournament = decode_json(row[0], Tournament) if row else None
+            yield tournament, conn
+
+
 # JSON encoder/decoder
 _encoder = msgspec.json.Encoder()
 _decoder = msgspec.json.Decoder()

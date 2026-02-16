@@ -466,6 +466,23 @@ export async function deleteTournamentApi(uid: string): Promise<{ message: strin
   });
 }
 
+/**
+ * Per-tournament action queue to serialize server POSTs.
+ * Prevents concurrent requests from racing on the same tournament.
+ */
+const actionQueues = new Map<string, Promise<void>>();
+
+function enqueueServerAction(uid: string, fn: () => Promise<void>): void {
+  const prev = actionQueues.get(uid) ?? Promise.resolve();
+  const next = prev.then(fn, fn); // Run fn even if previous failed
+  actionQueues.set(uid, next);
+  next.finally(() => {
+    if (actionQueues.get(uid) === next) {
+      actionQueues.delete(uid);
+    }
+  });
+}
+
 export async function tournamentAction(uid: string, action: string, data?: Record<string, unknown>): Promise<Tournament> {
   const event = { type: action as import('$lib/engine').TournamentEventType, ...data };
 
@@ -485,12 +502,16 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
         return updated;
       }
 
-      // Send to server async — SSE will correct if divergence
-      apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
-        method: 'POST',
-        body: JSON.stringify(event),
-      }).catch(e => {
-        console.error('Server rejected action, SSE will correct:', e);
+      // Queue server POST (serialized per tournament, prevents concurrent races)
+      enqueueServerAction(uid, async () => {
+        try {
+          await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
+            method: 'POST',
+            body: JSON.stringify(event),
+          });
+        } catch (e) {
+          console.error('Server rejected action, SSE will correct:', e);
+        }
       });
 
       return updated;

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from uuid6 import uuid7
 
 from ..db import (
+    encode_json,
     get_auth_method_by_identifier,
     get_sanctions_for_tournament,
     get_sanctions_for_user,
@@ -19,6 +20,7 @@ from ..db import (
     insert_tournament,
     insert_user,
     soft_delete_tournament,
+    tournament_transaction,
     update_tournament,
 )
 from ..models import (
@@ -608,23 +610,15 @@ async def tournament_action(
 
     All tournament state mutations go through this endpoint, which delegates
     to the Rust engine for consistent behavior in online/offline modes.
+
+    Uses SELECT ... FOR UPDATE to serialize concurrent writes per tournament,
+    preventing lost updates when multiple actions arrive simultaneously.
     """
     current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # Reject actions on offline-locked tournaments
-    if tournament.offline_mode:
-        raise HTTPException(
-            status_code=423,
-            detail="Tournament is in offline mode on another device",
-        )
-
-    # Build event JSON for Rust engine
+    # Build event data outside the transaction (no DB needed)
     event_data = {"type": request.type}
     if request.user_uid:
         event_data["user_uid"] = request.user_uid
@@ -651,62 +645,79 @@ async def tournament_action(
     if request.toss is not None:
         event_data["toss"] = request.toss
 
-    # Build actor context for Rust engine
-    actor_data = _build_actor_context(current_user, tournament)
+    # SELECT FOR UPDATE: serialize concurrent writes to this tournament
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    # Fetch sanctions for this tournament
-    tournament_sanctions = await get_sanctions_for_tournament(uid)
-    sanctions_data = [
-        {
-            "user_uid": s.user_uid,
-            "level": s.level.value,
-            "round_number": s.round_number,
-            "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
-            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
-        }
-        for s in tournament_sanctions
-    ]
+        # Reject actions on offline-locked tournaments
+        if tournament.offline_mode:
+            raise HTTPException(
+                status_code=423,
+                detail="Tournament is in offline mode on another device",
+            )
 
-    # Serialize tournament to JSON for engine
-    tournament_json = encoder.encode(tournament).decode("utf-8")
-    event_json = msgspec.json.encode(event_data).decode("utf-8")
-    actor_json = msgspec.json.encode(actor_data).decode("utf-8")
-    sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+        # Build actor context for Rust engine
+        actor_data = _build_actor_context(current_user, tournament)
 
-    # Backend pre-checks for cross-tournament sanctions (CheckIn)
-    if request.type == "CheckIn" and request.player_uid:
-        await _check_player_barred(request.player_uid, uid, tournament)
+        # Fetch sanctions for this tournament
+        tournament_sanctions = await get_sanctions_for_tournament(uid)
+        sanctions_data = [
+            {
+                "user_uid": s.user_uid,
+                "level": s.level.value,
+                "round_number": s.round_number,
+                "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
+                "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+            }
+            for s in tournament_sanctions
+        ]
 
-    # Call Rust engine
-    engine = get_engine()
-    try:
-        result_json = engine.process_tournament_event(
-            tournament_json, event_json, actor_json, sanctions_json
+        # Serialize tournament to JSON for engine
+        tournament_json = encoder.encode(tournament).decode("utf-8")
+        event_json = msgspec.json.encode(event_data).decode("utf-8")
+        actor_json = msgspec.json.encode(actor_data).decode("utf-8")
+        sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+
+        # Backend pre-checks for cross-tournament sanctions (CheckIn)
+        if request.type == "CheckIn" and request.player_uid:
+            await _check_player_barred(request.player_uid, uid, tournament)
+
+        # Call Rust engine
+        engine = get_engine()
+        try:
+            result_json = engine.process_tournament_event(
+                tournament_json, event_json, actor_json, sanctions_json
+            )
+        except ValueError as e:
+            # Rust engine returns validation errors as ValueError
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+        # Parse result — modified is set by DB trigger (CURRENT_TIMESTAMP)
+        updated = decoder.decode(result_json.encode("utf-8"))
+        updated.modified = datetime.now(UTC)
+
+        # Save within the same transaction (row is still locked)
+        await tx_conn.execute(
+            "UPDATE tournaments SET data = %s WHERE uid = %s",
+            (encode_json(updated), updated.uid),
         )
-    except ValueError as e:
-        # Rust engine returns validation errors as ValueError
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        pre_state = tournament.state
 
-    # Parse result and update timestamp
-    updated = decoder.decode(result_json.encode("utf-8"))
-    updated.modified = datetime.now(UTC)
-
-    # Save to database
-    await update_tournament(updated)
+    # --- Transaction committed, row lock released ---
     logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
 
     if broadcast_tournament_event:
         await broadcast_tournament_event(updated)
 
     # Recompute ratings when tournament enters or leaves Finished state
-    was_finished = tournament.state == TournamentState.FINISHED
+    was_finished = pre_state == TournamentState.FINISHED
     is_finished = updated.state == TournamentState.FINISHED
     if was_finished != is_finished:
         try:
             from ..ratings import recompute_ratings_for_players
 
             player_uids = {p.user_uid for p in tournament.players if p.user_uid}
-            # Get category from the pre-change tournament (format/online don't change)
             from ..ratings import _rating_category_for_tournament
 
             category = _rating_category_for_tournament(tournament)
