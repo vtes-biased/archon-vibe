@@ -3,7 +3,7 @@
   import { getUser, getRatingByUserUid } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountryFlag, getCountry } from "$lib/geonames";
-  import type { User, Rating, RatingCategory, CategoryRating } from "$lib/types";
+  import type { User, Rating, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
   import Icon from "@iconify/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -30,6 +30,14 @@
   let availableCategories = $derived(
     allCategories.filter(c => rating?.[c] && (rating[c] as CategoryRating).total > 0)
   );
+
+  function sortedByDate(entries: TournamentRatingEntry[]): TournamentRatingEntry[] {
+    return [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  function top8Uids(entries: TournamentRatingEntry[]): Set<string> {
+    return new Set(entries.slice(0, 8).map(e => e.tournament_uid));
+  }
 
   function toggleCategory(cat: RatingCategory) {
     const next = new Set(expandedCategories);
@@ -128,8 +136,8 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each catRating.tournaments as entry, i}
-                      {@const isTop8 = i < 8}
+                    {#each sortedByDate(catRating.tournaments) as entry}
+                      {@const isTop8 = top8Uids(catRating.tournaments).has(entry.tournament_uid)}
                       <tr class="{isTop8 ? 'text-ash-200' : 'text-ash-500'}">
                         <td class="py-1">
                           <a href="/tournaments/{entry.tournament_uid}" class="hover:text-crimson-400">

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAllRatings, getUser, getSuspendedUserUids } from "$lib/db";
+  import { getAllRatings, getAllUsers, getSuspendedUserUids } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { Rating, RatingCategory } from "$lib/types";
@@ -56,16 +56,17 @@
   let paged = $derived(filtered().slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE));
 
   async function loadRatings() {
-    ratings = await getAllRatings();
-    suspendedUids = await getSuspendedUserUids();
-    // Resolve user names from IndexedDB
+    const [allRatings, allUsers, suspended] = await Promise.all([
+      getAllRatings(),
+      getAllUsers(),
+      getSuspendedUserUids(),
+    ]);
     const names = new Map<string, string>();
-    for (const r of ratings) {
-      if (!names.has(r.user_uid)) {
-        const u = await getUser(r.user_uid);
-        if (u) names.set(r.user_uid, u.name);
-      }
+    for (const u of allUsers) {
+      names.set(u.uid, u.name);
     }
+    ratings = allRatings;
+    suspendedUids = suspended;
     userNames = names;
   }
 
