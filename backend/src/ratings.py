@@ -109,6 +109,11 @@ def _finalist_position(t: Tournament, user_uid: str) -> int:
         for seat in t.finals.seating:
             if seat.player_uid == user_uid and user_uid != t.winner:
                 return 2
+    else:
+        # VEKN-synced tournaments: no finals object, use standings/players
+        for s in t.standings:
+            if s.user_uid == user_uid and s.finalist:
+                return 2
     return 0
 
 
