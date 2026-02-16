@@ -95,6 +95,21 @@ def get_country(iso_code: str) -> Country | None:
     return countries.get(iso_code.upper())
 
 
+def get_continent(country_code: str) -> str | None:
+    """Get the continent code for a country."""
+    country = get_country(country_code)
+    return country["continent"] if country else None
+
+
+def get_countries_on_continent(country_code: str) -> list[str]:
+    """Get all country ISO codes on the same continent as given country."""
+    continent = get_continent(country_code)
+    if not continent:
+        return []
+    countries = load_countries()
+    return [c["iso_code"] for c in countries.values() if c["continent"] == continent]
+
+
 def search_cities(
     query: str, country_code: str | None = None, limit: int = 10
 ) -> list[City]:

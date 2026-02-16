@@ -356,6 +356,35 @@ For objects that need sync support after deletion:
 
 This ensures clients that were offline during deletion still receive the delete event on reconnect.
 
+## Calendar System
+
+**iCal Feed Endpoint**: `GET /api/calendar/tournaments.ics` — generates iCal format for calendar client subscriptions.
+
+**Feed Types**:
+- **Personal**: `?token=<calendar_token>` — agenda matching (same country, online, NC/CC on continent, organizer, participant)
+- **Country**: `?country=XX` — all tournaments in specified country
+- **Global**: no params — all upcoming tournaments
+- **Toggle**: `?online=false` — exclude online events from any feed
+
+**Calendar Token**:
+- `calendar_token` field on User model (nullable, generated on demand)
+- Generated via `POST /auth/me/calendar-token` (returns `{ calendar_token, calendar_url }`)
+- Stripped from SSE stream via `_filter_user()` — only visible via `/auth/me` endpoint
+- DB: partial index on `calendar_token` (WHERE NOT NULL) for fast lookup
+
+**Agenda Matching Logic** (`_matches_agenda()` in calendar.py):
+1. User organizes (any state)
+2. User participates (any state)
+3. For non-finished only: same country, online, or NC/CC on user's continent
+
+**Frontend Integration**:
+- `getAgendaTournaments()` in db.ts — IndexedDB query matching backend agenda logic
+- `getFilteredTournaments()` in db.ts — simplified filters (ongoing toggle, include online toggle, country/format/search)
+- `generateCalendarToken()` in auth.svelte.ts — API call to generate token
+- `getContinent()` / `getCountriesOnContinent()` in geonames.ts — continent matching for agenda
+
+**Tournament List Rework**: Removed sort dropdown and state dropdown. Replaced with "My Agenda" toggle for logged-in members and "Include online" toggle. Both views use the same simplified filters.
+
 ## Internationalization (i18n)
 
 **Library**: Paraglide JS (inlang) — client-only, no server-side rendering needed for SPA.

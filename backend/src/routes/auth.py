@@ -591,6 +591,39 @@ async def set_password(request: SetPasswordRequest) -> Response:
     )
 
 
+@router.post("/me/calendar-token")
+async def generate_calendar_token(
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Generate or regenerate a calendar subscription token."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+
+    token = authorization[7:]
+    user_uid = verify_token(token, expected_type="access")
+
+    user = await get_user_by_uid(user_uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Generate new token
+    cal_token = secrets.token_urlsafe(32)
+    user.calendar_token = cal_token
+    user.modified = datetime.now(UTC)
+    await update_user(user)
+
+    api_base = os.getenv("API_BASE_URL", "http://localhost:8000")
+    calendar_url = f"{api_base}/api/calendar/tournaments.ics?token={cal_token}"
+
+    return Response(
+        content=encoder.encode({
+            "calendar_token": cal_token,
+            "calendar_url": calendar_url,
+        }),
+        media_type="application/json",
+    )
+
+
 @router.post("/refresh")
 async def refresh_token(request: RefreshRequest) -> Response:
     """Refresh an access token using a refresh token."""

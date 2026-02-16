@@ -31,7 +31,7 @@ async def stream_objects[T](
 
 Each object type has a filter function applied per-viewer during both initial sync and real-time broadcast:
 
-- `_filter_user()` — strips contact info for members, skips non-Prince/NC users for public
+- `_filter_user()` — strips contact info for members, skips non-Prince/NC users for public. **Always strips `calendar_token`** (private to user, only visible via `/auth/me`)
 - `_filter_sanction()` — members+ only
 - `_filter_tournament()` — full/member/minimal based on access level, `standings_mode`, `decklists_mode`
 - `_filter_rating()` — public (no filtering)

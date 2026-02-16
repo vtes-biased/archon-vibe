@@ -45,7 +45,7 @@ from .models import (
     TournamentState,
     User,
 )
-from .routes import admin, auth, cards, leagues, oauth, sanctions, tournaments, users, vekn
+from .routes import admin, auth, calendar, cards, leagues, oauth, sanctions, tournaments, users, vekn
 from .vekn_sync import VEKNSyncService
 
 # Load environment variables
@@ -317,6 +317,7 @@ app.include_router(tournaments.router)
 app.include_router(oauth.router)
 app.include_router(cards.router)
 app.include_router(leagues.router)
+app.include_router(calendar.router)
 
 
 @app.get("/")
@@ -366,6 +367,20 @@ def _has_full_access(viewer: User | None, *, country: str | None = None, organiz
 def _filter_user(user: User, viewer: User | None) -> User | None:
     """Filter a User for a given viewer. Returns None to skip entirely."""
     if _has_full_access(viewer, country=user.country):
+        # Strip calendar_token — private to the user, only visible via /auth/me
+        if user.calendar_token:
+            return User(
+                uid=user.uid, modified=user.modified, deleted_at=user.deleted_at,
+                name=user.name, country=user.country, vekn_id=user.vekn_id,
+                city=user.city, state=user.state, nickname=user.nickname,
+                roles=user.roles, avatar_path=user.avatar_path,
+                contact_email=user.contact_email, contact_discord=user.contact_discord,
+                contact_phone=user.contact_phone, coopted_by=user.coopted_by,
+                coopted_at=user.coopted_at, vekn_synced=user.vekn_synced,
+                vekn_synced_at=user.vekn_synced_at,
+                local_modifications=user.local_modifications,
+                vekn_prefix=user.vekn_prefix, resync_after=user.resync_after,
+            )
         return user
     if viewer and viewer.vekn_id:
         # Member: name, nickname, country, vekn_id, roles, city, state — no contact info

@@ -174,6 +174,9 @@ export interface User extends BaseObject {
 
   // VEKN prefix (for Prince/NC users, extracted from princeid/coordinatorid)
   vekn_prefix?: string | null;
+
+  // Calendar feed token (private, only visible via /auth/me)
+  calendar_token?: string | null;
 }
 
 export interface Sanction extends BaseObject {

@@ -46,6 +46,26 @@ export function getCountryFlag(isoCode: string): string {
 }
 
 /**
+ * Get the continent code for a country.
+ */
+export function getContinent(isoCode: string): string | undefined {
+    const country = getCountry(isoCode);
+    return country?.continent;
+}
+
+/**
+ * Get all country ISO codes on the same continent as given country.
+ */
+export function getCountriesOnContinent(isoCode: string): string[] {
+    const continent = getContinent(isoCode);
+    if (!continent) return [];
+    const countries = getCountries();
+    return Object.values(countries)
+        .filter(c => c.continent === continent)
+        .map(c => c.iso_code);
+}
+
+/**
  * Load cities data (lazy-loaded, cached after first load).
  * Cities file is ~6MB, so we load it on-demand.
  */

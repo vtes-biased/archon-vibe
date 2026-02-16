@@ -229,6 +229,9 @@ class User(BaseObject, kw_only=True):
     # triggers full SSE resync for this user on next connect
     resync_after: datetime | None = None
 
+    # Calendar feed: URL-safe token for iCal subscription authentication
+    calendar_token: str | None = None
+
 
 class Score(msgspec.Struct, kw_only=True, frozen=True):
     gw: int = 0

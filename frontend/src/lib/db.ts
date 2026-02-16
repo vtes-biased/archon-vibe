@@ -485,14 +485,24 @@ export interface FilteredTournamentsResult {
   total: number;
 }
 
+const ONGOING_STATES: Set<string> = new Set(['Registration', 'Waiting', 'Playing']);
+
+function sortByDateDesc(items: Tournament[]): void {
+  items.sort((a, b) => {
+    const da = a.start || a.modified;
+    const db_ = b.start || b.modified;
+    return db_.localeCompare(da);
+  });
+}
+
 export async function getFilteredTournaments(
   filters: {
-    state?: string;
+    ongoing?: boolean;
+    includeOnline?: boolean;
     country?: string;
     format?: string;
     search?: string;
   },
-  sortBy: 'date' | 'name' | 'state' = 'date',
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
@@ -500,9 +510,7 @@ export async function getFilteredTournaments(
   let items: Tournament[];
 
   // Pick best index for initial query
-  if (filters.state && filters.state !== 'all') {
-    items = await db.getAllFromIndex('tournaments', 'by-state', filters.state);
-  } else if (filters.country && filters.country !== 'all') {
+  if (filters.country && filters.country !== 'all') {
     items = await db.getAllFromIndex('tournaments', 'by-country', filters.country);
   } else if (filters.format && filters.format !== 'all') {
     items = await db.getAllFromIndex('tournaments', 'by-format', filters.format);
@@ -510,9 +518,15 @@ export async function getFilteredTournaments(
     items = await db.getAll('tournaments');
   }
 
-  // Apply remaining filters in JS
+  // Apply filters in JS
+  if (filters.ongoing) {
+    items = items.filter(t => ONGOING_STATES.has(t.state));
+  }
   if (filters.country && filters.country !== 'all') {
     items = items.filter(t => t.country === filters.country);
+  }
+  if (filters.includeOnline === false) {
+    items = items.filter(t => !t.online);
   }
   if (filters.format && filters.format !== 'all') {
     items = items.filter(t => t.format === filters.format);
@@ -522,19 +536,66 @@ export async function getFilteredTournaments(
     items = items.filter(t => normalizeSearch(t.name).includes(q));
   }
 
-  // Sort
-  if (sortBy === 'date') {
-    items.sort((a, b) => {
-      const da = a.start || a.modified;
-      const db_ = b.start || b.modified;
-      return db_.localeCompare(da);
-    });
-  } else if (sortBy === 'name') {
-    items.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (sortBy === 'state') {
-    const order: Record<string, number> = { Planned: 0, Registration: 1, Waiting: 2, Playing: 3, Finished: 4 };
-    items.sort((a, b) => (order[a.state] ?? 0) - (order[b.state] ?? 0));
+  // Always sort by date desc
+  sortByDateDesc(items);
+
+  const total = items.length;
+  const start = page * pageSize;
+  return { items: items.slice(start, start + pageSize), total };
+}
+
+/**
+ * Get tournaments matching the user's personal agenda.
+ * A tournament matches if ANY of these are true:
+ * 1. Same country (non-finished)
+ * 2. Online (if includeOnline, non-finished)
+ * 3. NC/CC on same continent (non-finished)
+ * 4. User organizes it (any state)
+ * 5. User participates (any state)
+ */
+export async function getAgendaTournaments(
+  userUid: string,
+  userCountry: string,
+  continentCountries: string[],
+  filters: { ongoing?: boolean; includeOnline?: boolean; format?: string; search?: string },
+  page = 0,
+  pageSize = 50,
+): Promise<FilteredTournamentsResult> {
+  const db = await getDB();
+  const allItems = await db.getAll('tournaments');
+  const continentSet = new Set(continentCountries);
+
+  let items = allItems.filter(t => {
+    // User organizes (any state)
+    if (t.organizers_uids?.includes(userUid)) return true;
+    // User participates (any state)
+    if (t.players?.some(p => p.user_uid === userUid)) return true;
+    // Non-finished only for geographic matches
+    if (t.state === 'Finished') return false;
+    // Same country
+    if (t.country === userCountry) return true;
+    // Online
+    if (filters.includeOnline && t.online) return true;
+    // NC/CC on same continent
+    if (t.country && continentSet.has(t.country)) {
+      if (t.rank === 'National Championship' || t.rank === 'Continental Championship') return true;
+    }
+    return false;
+  });
+
+  // Apply additional filters
+  if (filters.ongoing) {
+    items = items.filter(t => ONGOING_STATES.has(t.state));
   }
+  if (filters.format && filters.format !== 'all') {
+    items = items.filter(t => t.format === filters.format);
+  }
+  if (filters.search?.trim()) {
+    const q = normalizeSearch(filters.search.trim());
+    items = items.filter(t => normalizeSearch(t.name).includes(q));
+  }
+
+  sortByDateDesc(items);
 
   const total = items.length;
   const start = page * pageSize;

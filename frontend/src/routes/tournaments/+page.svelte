@@ -1,54 +1,88 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { getFilteredTournaments } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments } from "$lib/db";
   import { syncManager } from "$lib/sync";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { hasAnyRole, getAuthState } from "$lib/stores/auth.svelte";
-  import type { Tournament, TournamentState, TournamentFormat } from "$lib/types";
+  import { getCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
+  import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
+  import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass } from "$lib/tournament-utils";
-  import { Loader2, Trophy } from "lucide-svelte";
+  import { Loader2, Trophy, Calendar, Copy, Check, ChevronDown, ChevronUp } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
+
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   let tournaments = $state<Tournament[]>([]);
   let totalCount = $state(0);
   let loaded = $state(false);
   let error = $state<string | null>(null);
 
+  // View mode
+  const auth = $derived(getAuthState());
+  const canUseAgenda = $derived(auth.isAuthenticated && auth.user?.vekn_id && auth.user?.country);
+  let viewMode = $state<"agenda" | "all">("all");
+
+  // Set initial view mode based on auth
+  $effect(() => {
+    if (canUseAgenda) {
+      untrack(() => { viewMode = "agenda"; });
+    }
+  });
+
   // Filters
   let searchQuery = $state("");
-  let selectedState = $state<string>("all");
+  let ongoing = $state(false);
   let selectedCountry = $state<string>("all");
   let selectedFormat = $state<string>("all");
-  let sortBy = $state<"date" | "name" | "state">("date");
+  let includeOnline = $state(true);
+
+  // Calendar
+  let calendarExpanded = $state(false);
+  let calendarUrl = $state<string | null>(null);
+  let calendarLoading = $state(false);
+  let copied = $state(false);
+  let calendarFeedType = $state<"personal" | "country" | "all">("personal");
+  let calendarOnline = $state(true);
 
   // Pagination
   let page = $state(0);
   const PAGE_SIZE = 50;
 
   const countries = getCountries();
-  const states: TournamentState[] = ["Planned", "Registration", "Waiting", "Playing", "Finished"];
   const formats: TournamentFormat[] = ["Standard", "V5", "Limited"];
 
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
-
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
-  const auth = $derived(getAuthState());
 
   async function loadTournaments() {
     try {
-      const result = await getFilteredTournaments(
-        {
-          state: selectedState,
-          country: selectedCountry,
-          format: selectedFormat,
-          search: searchQuery,
-        },
-        sortBy,
-        page,
-        PAGE_SIZE,
-      );
-      tournaments = result.items;
-      totalCount = result.total;
+      if (viewMode === "agenda" && canUseAgenda) {
+        const user = auth.user!;
+        const continentCountries = user.country ? getCountriesOnContinent(user.country) : [];
+        const result = await getAgendaTournaments(
+          user.uid,
+          user.country!,
+          continentCountries,
+          { ongoing, includeOnline, format: selectedFormat, search: searchQuery },
+          page,
+          PAGE_SIZE,
+        );
+        tournaments = result.items;
+        totalCount = result.total;
+      } else {
+        const result = await getFilteredTournaments(
+          {
+            ongoing,
+            includeOnline,
+            country: selectedCountry,
+            format: selectedFormat,
+            search: searchQuery,
+          },
+          page,
+          PAGE_SIZE,
+        );
+        tournaments = result.items;
+        totalCount = result.total;
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load tournaments";
     } finally {
@@ -72,14 +106,14 @@
     }
   }
 
-  // Re-query when filters, sort, or page change
+  // Re-query when filters or page change
   $effect(() => {
-    // Track reactive dependencies
     const _s = searchQuery;
-    const _st = selectedState;
+    const _o = ongoing;
     const _c = selectedCountry;
     const _f = selectedFormat;
-    const _sb = sortBy;
+    const _io = includeOnline;
+    const _vm = viewMode;
     const _p = page;
     untrack(() => loadTournaments());
   });
@@ -87,23 +121,65 @@
   // Reset page when filters change
   $effect(() => {
     const _s = searchQuery;
-    const _st = selectedState;
+    const _o = ongoing;
     const _c = selectedCountry;
     const _f = selectedFormat;
-    const _sb = sortBy;
+    const _io = includeOnline;
+    const _vm = viewMode;
     untrack(() => { page = 0; });
   });
 
-  // SSE sync listener (separate from filter effect)
+  // SSE sync listener
   $effect(() => {
     const handleSyncEvent = (event: { type: string }) => {
       if (event.type === "tournament" || event.type === "sync_complete") {
         loadTournaments();
       }
     };
-
     syncManager.addEventListener(handleSyncEvent);
     return () => syncManager.removeEventListener(handleSyncEvent);
+  });
+
+  // Calendar helpers
+  async function handleGenerateCalendarToken() {
+    calendarLoading = true;
+    try {
+      const result = await generateCalendarToken();
+      if (result) {
+        calendarUrl = result.calendar_url;
+      }
+    } finally {
+      calendarLoading = false;
+    }
+  }
+
+  function getCalendarUrl(): string {
+    if (calendarFeedType === "personal" && calendarUrl) {
+      return calendarOnline ? calendarUrl : `${calendarUrl}&online=false`;
+    }
+    const params = new URLSearchParams();
+    if (calendarFeedType === "country" && selectedCountry && selectedCountry !== "all") {
+      params.set("country", selectedCountry);
+    }
+    if (!calendarOnline) {
+      params.set("online", "false");
+    }
+    return `${API_BASE}/api/calendar/tournaments.ics${params.toString() ? '?' + params.toString() : ''}`;
+  }
+
+  async function copyToClipboard(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = true;
+      setTimeout(() => { copied = false; }, 2000);
+    } catch { /* noop */ }
+  }
+
+  // Init calendar URL from existing token
+  $effect(() => {
+    if (auth.user?.calendar_token) {
+      calendarUrl = `${API_BASE}/api/calendar/tournaments.ics?token=${auth.user.calendar_token}`;
+    }
   });
 </script>
 
@@ -127,9 +203,27 @@
       {/if}
     </div>
 
+    <!-- View Mode Toggle -->
+    {#if canUseAgenda}
+      <div class="flex mb-4 bg-dusk-950 rounded-lg border border-ash-800 p-1 w-fit">
+        <button
+          onclick={() => viewMode = "agenda"}
+          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'agenda' ? 'bg-crimson-700 text-white' : 'text-ash-400 hover:text-ash-200'}"
+        >
+          {m.tournaments_view_agenda()}
+        </button>
+        <button
+          onclick={() => viewMode = "all"}
+          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'all' ? 'bg-crimson-700 text-white' : 'text-ash-400 hover:text-ash-200'}"
+        >
+          {m.tournaments_view_all()}
+        </button>
+      </div>
+    {/if}
+
     <!-- Filters -->
-    <div class="bg-dusk-950 rounded-lg shadow p-4 mb-6 border border-ash-800">
-      <div class="flex flex-wrap gap-4">
+    <div class="bg-dusk-950 rounded-lg shadow p-4 mb-4 border border-ash-800">
+      <div class="flex flex-wrap gap-4 items-end">
         <!-- Search -->
         <div class="flex-1 min-w-[200px]">
           <label for="search" class="block text-sm font-medium text-ash-400 mb-1">{m.common_search()}</label>
@@ -140,21 +234,6 @@
             placeholder={m.tournaments_search_placeholder()}
             class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 placeholder:text-ash-600"
           />
-        </div>
-
-        <!-- State -->
-        <div class="min-w-[150px]">
-          <label for="state-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.tournaments_state()}</label>
-          <select
-            id="state-filter"
-            bind:value={selectedState}
-            class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
-          >
-            <option value="all">{m.tournaments_all_states()}</option>
-            {#each states as s}
-              <option value={s}>{s}</option>
-            {/each}
-          </select>
         </div>
 
         <!-- Format -->
@@ -172,36 +251,144 @@
           </select>
         </div>
 
-        <!-- Country -->
-        <div class="min-w-[180px]">
-          <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
-          <select
-            id="country-filter"
-            bind:value={selectedCountry}
-            class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
-          >
-            <option value="all">{m.tournaments_all_countries()}</option>
-            {#each Object.entries(countries) as [code, country]}
-              <option value={code}>{country.name} {getCountryFlag(code)}</option>
-            {/each}
-          </select>
+        <!-- Country (hidden in agenda mode) -->
+        {#if viewMode !== "agenda"}
+          <div class="min-w-[180px]">
+            <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
+            <select
+              id="country-filter"
+              bind:value={selectedCountry}
+              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
+            >
+              <option value="all">{m.tournaments_all_countries()}</option>
+              {#each Object.entries(countries) as [code, country]}
+                <option value={code}>{country.name} {getCountryFlag(code)}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+
+        <!-- Ongoing toggle -->
+        <div class="flex items-center gap-3 pb-1">
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" bind:checked={ongoing} class="sr-only peer" />
+            <div class="relative w-11 h-6 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
+              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={ongoing}></div>
+            </div>
+            <span class="text-sm text-ash-300">{m.tournaments_ongoing()}</span>
+          </label>
         </div>
 
-        <!-- Sort -->
-        <div class="min-w-[130px]">
-          <label for="sort" class="block text-sm font-medium text-ash-400 mb-1">{m.tournaments_sort_by()}</label>
-          <select
-            id="sort"
-            bind:value={sortBy}
-            class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
-          >
-            <option value="date">{m.tournaments_sort_date()}</option>
-            <option value="name">{m.tournaments_sort_name()}</option>
-            <option value="state">{m.tournaments_sort_state()}</option>
-          </select>
+        <!-- Include online -->
+        <div class="flex items-center gap-3 pb-1">
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" bind:checked={includeOnline} class="sr-only peer" />
+            <div class="relative w-11 h-6 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
+              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={includeOnline}></div>
+            </div>
+            <span class="text-sm text-ash-300">{m.tournaments_include_online()}</span>
+          </label>
         </div>
       </div>
     </div>
+
+    <!-- Calendar Subscribe Card -->
+    {#if auth.isAuthenticated}
+      <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6">
+        <button
+          onclick={() => calendarExpanded = !calendarExpanded}
+          class="w-full flex items-center justify-between px-4 py-3 text-sm text-ash-300 hover:text-ash-100 transition-colors"
+        >
+          <span class="flex items-center gap-2">
+            <Calendar class="h-4 w-4" />
+            {m.tournaments_calendar_subscribe()}
+          </span>
+          {#if calendarExpanded}
+            <ChevronUp class="h-4 w-4" />
+          {:else}
+            <ChevronDown class="h-4 w-4" />
+          {/if}
+        </button>
+
+        {#if calendarExpanded}
+          <div class="px-4 pb-4 border-t border-ash-800 pt-3 space-y-3">
+            <p class="text-xs text-ash-500">{m.tournaments_calendar_description()}</p>
+
+            <!-- Feed type selector -->
+            <div class="flex flex-wrap gap-2">
+              {#if canUseAgenda}
+                <button
+                  onclick={() => calendarFeedType = "personal"}
+                  class="px-3 py-1.5 text-xs rounded-md transition-colors {calendarFeedType === 'personal' ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:text-ash-100'}"
+                >{m.tournaments_calendar_personal()}</button>
+              {/if}
+              <button
+                onclick={() => calendarFeedType = "country"}
+                class="px-3 py-1.5 text-xs rounded-md transition-colors {calendarFeedType === 'country' ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:text-ash-100'}"
+              >{m.tournaments_calendar_by_country()}</button>
+              <button
+                onclick={() => calendarFeedType = "all"}
+                class="px-3 py-1.5 text-xs rounded-md transition-colors {calendarFeedType === 'all' ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:text-ash-100'}"
+              >{m.tournaments_calendar_all()}</button>
+            </div>
+
+            <!-- Online toggle for calendar feed -->
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" bind:checked={calendarOnline} class="sr-only peer" />
+              <div class="relative w-9 h-5 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
+                <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform" class:translate-x-4={calendarOnline}></div>
+              </div>
+              <span class="text-xs text-ash-400">{m.tournaments_include_online()}</span>
+            </label>
+
+            <!-- Personal: generate token if needed -->
+            {#if calendarFeedType === "personal" && !calendarUrl}
+              <button
+                onclick={handleGenerateCalendarToken}
+                disabled={calendarLoading}
+                class="px-4 py-2 text-sm rounded bg-crimson-700 hover:bg-crimson-600 text-white disabled:opacity-50 transition-colors"
+              >
+                {#if calendarLoading}
+                  <Loader2 class="inline h-4 w-4 animate-spin mr-1" />
+                {/if}
+                {m.tournaments_calendar_generate()}
+              </button>
+            {:else}
+              <!-- URL display + copy -->
+              <div class="flex gap-2">
+                <input
+                  type="text"
+                  readonly
+                  value={getCalendarUrl()}
+                  class="flex-1 px-3 py-1.5 text-xs border border-ash-600 rounded bg-dusk-950 text-ash-400 select-all"
+                />
+                <button
+                  onclick={() => copyToClipboard(getCalendarUrl())}
+                  class="px-3 py-1.5 text-xs rounded bg-ash-800 hover:bg-ash-700 text-ash-200 flex items-center gap-1"
+                >
+                  {#if copied}
+                    <Check class="h-3 w-3" />
+                    {m.tournaments_calendar_copied()}
+                  {:else}
+                    <Copy class="h-3 w-3" />
+                    {m.tournaments_calendar_copy()}
+                  {/if}
+                </button>
+                {#if calendarFeedType === "personal" && calendarUrl}
+                  <button
+                    onclick={handleGenerateCalendarToken}
+                    disabled={calendarLoading}
+                    class="px-3 py-1.5 text-xs rounded bg-ash-800 hover:bg-ash-700 text-ash-200 disabled:opacity-50"
+                  >
+                    {m.tournaments_calendar_regenerate()}
+                  </button>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+    {/if}
 
     <!-- Error -->
     {#if error}
@@ -322,7 +509,7 @@
         </div>
         <h3 class="text-lg font-medium text-bone-100 mb-2">{m.tournaments_no_results()}</h3>
         <p class="text-ash-400">
-          {#if searchQuery.trim() || selectedState !== "all" || selectedCountry !== "all" || selectedFormat !== "all"}
+          {#if searchQuery.trim() || selectedCountry !== "all" || selectedFormat !== "all"}
             {m.tournaments_adjust_filters()}
           {:else}
             {m.tournaments_none_yet()}

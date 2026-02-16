@@ -131,6 +131,30 @@ class TestFilterUser:
         assert result is not None
         assert result.contact_email == "p@test.com"
 
+    def test_full_access_strips_calendar_token(self):
+        """calendar_token must never leak via SSE, even to full-access viewers."""
+        user = _make_user(contact_email="a@b.com", calendar_token="secret-token-123")
+        viewer = _make_viewer(roles=[Role.IC])
+        result = _filter_user(user, viewer)
+        assert result is not user  # new object (not same ref)
+        assert result.calendar_token is None
+        assert result.contact_email == "a@b.com"  # other fields preserved
+        assert result.name == "Alice"
+
+    def test_full_access_no_calendar_token_returns_same_object(self):
+        """When no calendar_token, full-access returns the original object."""
+        user = _make_user(contact_email="a@b.com")
+        viewer = _make_viewer(roles=[Role.IC])
+        result = _filter_user(user, viewer)
+        assert result is user
+
+    def test_member_never_sees_calendar_token(self):
+        """Member-level filtering creates a new object without calendar_token."""
+        user = _make_user(calendar_token="secret-token-123")
+        viewer = _make_viewer()  # member
+        result = _filter_user(user, viewer)
+        assert result.calendar_token is None
+
     def test_organizer_has_full_access(self):
         """Organizers get full access via _has_full_access, but _filter_user
         only checks country-based access, not organizer-based. This test verifies

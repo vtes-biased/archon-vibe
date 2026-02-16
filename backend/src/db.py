@@ -60,6 +60,12 @@ async def init_db() -> None:
             ON users((data->>'vekn_id'))
             WHERE data->>'vekn_id' IS NOT NULL AND data->>'vekn_id' != '';
         """)
+        # Partial index for calendar token lookup
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_users_calendar_token
+            ON users((data->>'calendar_token'))
+            WHERE data->>'calendar_token' IS NOT NULL;
+        """)
 
         # Create trigger function to auto-update modified timestamp
         await conn.execute("""
@@ -829,6 +835,19 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
     await soft_delete_user(delete_uid)
 
     return merged
+
+
+async def get_user_by_calendar_token(token: str) -> User | None:
+    """Lookup user by calendar subscription token."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data FROM users WHERE data->>'calendar_token' = %s LIMIT 1",
+            (token,),
+        )
+        row = await result.fetchone()
+        if row:
+            return decode_json(row[0], User)
+        return None
 
 
 async def get_user_by_vekn_id(vekn_id: str) -> User | None:

@@ -580,3 +580,36 @@ export async function setPassword(token: string, password: string): Promise<bool
     return false;
   }
 }
+
+/**
+ * Generate or regenerate a calendar subscription token.
+ * Returns { calendar_token, calendar_url } on success, null on failure.
+ */
+export async function generateCalendarToken(): Promise<{ calendar_token: string; calendar_url: string } | null> {
+  const token = getAccessToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/me/calendar-token`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.status === 401) {
+      const refreshed = await refreshTokens();
+      if (!refreshed) return null;
+      return generateCalendarToken();
+    }
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    // Update local auth state with new token
+    if (authState.user) {
+      setAuthState({ user: { ...authState.user, calendar_token: data.calendar_token } });
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
