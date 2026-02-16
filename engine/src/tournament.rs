@@ -795,6 +795,8 @@ fn apply_event(
                 state: "Registered",
                 payment_status: "Pending",
                 toss: 0,
+                result: { gw: 0, vp: 0.0, tp: 0 },
+                finalist: false,
             };
             tournament["players"].push(player).map_err(|e| e.to_string())?;
             Ok(())
@@ -830,6 +832,8 @@ fn apply_event(
                 state: "Registered",
                 payment_status: "Pending",
                 toss: 0,
+                result: { gw: 0, vp: 0.0, tp: 0 },
+                finalist: false,
             };
             tournament["players"].push(player).map_err(|e| e.to_string())?;
             Ok(())

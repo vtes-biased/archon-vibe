@@ -152,12 +152,12 @@
         tournament.players.filter(p => p.finalist && p.user_uid).map(p => p.user_uid!)
       );
       const entries: StandingEntry[] = tournament.players
-        .filter(p => p.user_uid && (p.result.gw || p.result.vp || p.result.tp))
+        .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
         .map(p => ({
           user_uid: p.user_uid!,
-          gw: p.result.gw,
-          vp: p.result.vp,
-          tp: p.result.tp,
+          gw: p.result.gw ?? 0,
+          vp: p.result.vp ?? 0,
+          tp: p.result.tp ?? 0,
           toss: p.toss ?? 0,
           rank: 0,
         }));
