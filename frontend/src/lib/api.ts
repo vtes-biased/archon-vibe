@@ -3,7 +3,7 @@
  */
 
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, TournamentConfig, League } from '$lib/types';
-import { getAllUsers, getTournament, saveTournament, logChange, getSanctionsForTournament } from './db';
+import { getAllUsers, getTournament, saveTournament, saveLeague, logChange, getSanctionsForTournament } from './db';
 import { processTournamentEvent, buildActorContext } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
@@ -451,10 +451,14 @@ export async function updateTournament(uid: string, data: Partial<CreateTourname
   if (!isOnline()) {
     throw new Error('Cannot update tournament while offline.');
   }
-  return apiRequest<Tournament>(`/api/tournaments/${uid}`, {
+  const updated = await apiRequest<Tournament>(`/api/tournaments/${uid}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
+  // Save to IndexedDB immediately so other pages see the update
+  // without waiting for the SSE event
+  await saveTournament(updated);
+  return updated;
 }
 
 export async function deleteTournamentApi(uid: string): Promise<{ message: string }> {
@@ -563,20 +567,24 @@ export async function createLeague(data: CreateLeagueData): Promise<League> {
   if (!isOnline()) {
     throw new Error('Cannot create league while offline.');
   }
-  return apiRequest<League>('/api/leagues/', {
+  const created = await apiRequest<League>('/api/leagues/', {
     method: 'POST',
     body: JSON.stringify(data),
   });
+  await saveLeague(created);
+  return created;
 }
 
 export async function updateLeague(uid: string, data: Partial<CreateLeagueData>): Promise<League> {
   if (!isOnline()) {
     throw new Error('Cannot update league while offline.');
   }
-  return apiRequest<League>(`/api/leagues/${uid}`, {
+  const updated = await apiRequest<League>(`/api/leagues/${uid}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
+  await saveLeague(updated);
+  return updated;
 }
 
 export async function deleteLeagueApi(uid: string): Promise<void> {
