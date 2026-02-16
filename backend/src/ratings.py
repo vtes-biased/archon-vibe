@@ -4,8 +4,9 @@ Recomputes player ratings when tournaments finish.
 Uses the Rust engine for per-tournament point calculation.
 """
 
+import calendar
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from uuid6 import uuid7
 
@@ -185,7 +186,14 @@ async def recompute_ratings_for_players(
     if not player_uids:
         return []
 
-    cutoff = datetime.now(UTC) - timedelta(days=RATING_WINDOW_MONTHS * 30)
+    now = datetime.now(UTC)
+    # Exact calendar months (not 30-day approximation) to match VEKN.net
+    y, m = now.year, now.month - RATING_WINDOW_MONTHS
+    while m <= 0:
+        y -= 1
+        m += 12
+    max_day = calendar.monthrange(y, m)[1]
+    cutoff = now.replace(year=y, month=m, day=min(now.day, max_day))
     cutoff_str = cutoff.isoformat()
 
     if category in (RatingCategory.CONSTRUCTED_ONLINE, RatingCategory.CONSTRUCTED_OFFLINE):
@@ -204,7 +212,6 @@ async def recompute_ratings_for_players(
     wins_map = await get_tournament_wins_for_users(player_uids)
 
     updated_ratings: list[Rating] = []
-    now = datetime.now(UTC)
 
     for user_uid in player_uids:
         entries: list[TournamentRatingEntry] = []
