@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAllRatings, getUser } from "$lib/db";
+  import { getAllRatings, getUser, getSuspendedUserUids } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { Rating, RatingCategory } from "$lib/types";
@@ -8,6 +8,7 @@
 
   let ratings = $state<Rating[]>([]);
   let userNames = $state<Map<string, string>>(new Map());
+  let suspendedUids = $state<Set<string>>(new Set());
   let isSyncing = $state(!syncManager.isSynced);
 
   // Filters
@@ -32,6 +33,7 @@
 
   let filtered = $derived(() => {
     let result = ratings.filter(r => {
+      if (suspendedUids.has(r.user_uid)) return false;
       const cat = r[selectedCategory];
       return cat && cat.total > 0;
     });
@@ -55,6 +57,7 @@
 
   async function loadRatings() {
     ratings = await getAllRatings();
+    suspendedUids = await getSuspendedUserUids();
     // Resolve user names from IndexedDB
     const names = new Map<string, string>();
     for (const r of ratings) {
@@ -77,7 +80,7 @@
     loadRatings();
 
     const handleSyncEvent = (event: { type: string }) => {
-      if (event.type === "rating" || event.type === "sync_complete") {
+      if (event.type === "rating" || event.type === "sanction" || event.type === "sync_complete") {
         loadRatings();
         if (event.type === "sync_complete") isSyncing = false;
       }
@@ -93,9 +96,9 @@
 </svelte:head>
 
 <div class="max-w-4xl mx-auto p-4 sm:p-8">
-  <div class="flex items-center gap-3 mb-4">
+  <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold text-ash-100">{m.rankings_page_title()}</h1>
-    <a href="/halloffame" class="text-sm text-ash-400 hover:text-crimson-400 transition-colors flex items-center gap-1">
+    <a href="/halloffame" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-900/40 text-amber-300 hover:bg-amber-900/60 transition-colors text-sm font-medium">
       <Icon icon="lucide:trophy" class="w-4 h-4" />
       {m.rankings_hall_of_fame_link()}
     </a>

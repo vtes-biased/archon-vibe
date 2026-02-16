@@ -22,13 +22,6 @@
       .sort((a, b) => a.name.localeCompare(b.name))
   );
 
-  function tierBadge(wins: number): { bg: string; text: string } {
-    if (wins >= 50) return { bg: 'bg-crimson-900/60', text: 'text-crimson-300' };
-    if (wins >= 20) return { bg: 'bg-yellow-900/60', text: 'text-yellow-300' };
-    if (wins >= 10) return { bg: 'bg-ash-700', text: 'text-ash-300' };
-    return { bg: 'bg-amber-900/60', text: 'text-amber-300' };
-  }
-
   function isActiveSanction(s: Sanction): boolean {
     if (s.deleted_at || s.lifted_at) return false;
     if (s.level !== 'suspension' && s.level !== 'probation') return false;
@@ -98,9 +91,10 @@
 </svelte:head>
 
 <div class="max-w-4xl mx-auto p-4 sm:p-8">
-  <div class="flex items-center gap-3 mb-4">
+  <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold text-ash-100">{m.hof_page_title()}</h1>
-    <a href="/rankings" class="text-sm text-ash-400 hover:text-crimson-400 transition-colors">
+    <a href="/rankings" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dusk-950 text-ash-300 hover:text-ash-100 hover:bg-ash-800/50 transition-colors text-sm font-medium border border-ash-800">
+      <Icon icon="lucide:arrow-left" class="w-4 h-4" />
       {m.hof_back_to_rankings()}
     </a>
   </div>
@@ -137,14 +131,12 @@
             <th class="py-2 px-3 text-left">{m.rankings_col_player()}</th>
             <th class="py-2 px-3 text-left">{m.common_country()}</th>
             <th class="py-2 px-3 text-right">{m.hof_col_wins()}</th>
-            <th class="py-2 px-3 text-center">{m.hof_col_tier()}</th>
           </tr>
         </thead>
         <tbody>
           {#each paged as rating, i}
             {@const rank = page * PAGE_SIZE + i + 1}
             {@const winsCount = rating.wins?.length ?? 0}
-            {@const tier = tierBadge(winsCount)}
             <tr class="border-b border-ash-800/50 hover:bg-ash-800/20">
               <td class="py-2 px-3 text-ash-400">{rank}</td>
               <td class="py-2 px-3">
@@ -161,11 +153,6 @@
               <td class="py-2 px-3 text-right font-medium text-ash-100">
                 <Icon icon="lucide:trophy" class="w-4 h-4 inline mr-1 text-amber-400" />
                 {winsCount}
-              </td>
-              <td class="py-2 px-3 text-center">
-                <span class="px-2 py-0.5 rounded text-xs font-medium {tier.bg} {tier.text}">
-                  {winsCount}
-                </span>
               </td>
             </tr>
           {/each}
