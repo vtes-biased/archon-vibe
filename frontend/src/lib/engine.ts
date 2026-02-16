@@ -375,7 +375,7 @@ export function buildActorContext(user: User | null, tournament: Tournament): Ac
   return {
     uid: user.uid,
     roles: user.roles || [],
-    is_organizer: tournament.organizers_uids?.includes(user.uid) ?? false,
+    is_organizer: (tournament.organizers_uids?.includes(user.uid) || user.roles?.includes('IC')) ?? false,
   };
 }
 

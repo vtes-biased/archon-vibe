@@ -84,8 +84,8 @@ async def _get_current_user(authorization: str | None):
 
 
 def _is_organizer(user, tournament: Tournament) -> bool:
-    """Check if user is an organizer of this tournament."""
-    return user.uid in tournament.organizers_uids
+    """Check if user is an organizer of this tournament (IC is implicit organizer)."""
+    return user.uid in tournament.organizers_uids or Role.IC in user.roles
 
 
 async def _process_engine_event(

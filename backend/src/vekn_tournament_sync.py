@@ -90,6 +90,11 @@ def _map_vekn_to_tournament(
     venue = data.get("venue_name") or ""
     address = data.get("venue_city") or ""
 
+    # Organizer
+    organizer_vekn = str(data.get("organizer_veknid") or "")
+    organizer_user = users_by_vekn_id.get(organizer_vekn)
+    organizers_uids = [organizer_user.uid] if organizer_user else []
+
     # Players
     vekn_players = data.get("players", [])
     now = datetime.now(UTC)
@@ -157,6 +162,7 @@ def _map_vekn_to_tournament(
             venue=venue,
             address=address,
             external_ids={"vekn": str(event_id)},
+            organizers_uids=organizers_uids,
             players=players,
             winner=winner_uid,
             standings=standings,
@@ -177,6 +183,7 @@ def _map_vekn_to_tournament(
             venue=venue,
             address=address,
             external_ids={"vekn": str(event_id)},
+            organizers_uids=organizers_uids,
         )
 
 
@@ -233,6 +240,10 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     or len(existing.players) != len(tournament.players)
                 )
                 if changed:
+                    # Merge organizers: keep existing + add VEKN organizer
+                    merged_organizers = list(dict.fromkeys(
+                        existing.organizers_uids + tournament.organizers_uids
+                    ))
                     tournament = Tournament(
                         uid=existing.uid,
                         modified=datetime.now(UTC),
@@ -247,6 +258,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         venue=tournament.venue,
                         address=tournament.address,
                         external_ids=tournament.external_ids,
+                        organizers_uids=merged_organizers,
                         players=tournament.players,
                         winner=tournament.winner,
                         standings=tournament.standings,

@@ -39,7 +39,8 @@
   const auth = $derived(getAuthState());
   const uid = $derived($page.params.uid as string);
   const isOrganizer = $derived(
-    tournament?.organizers_uids?.includes(auth.user?.uid ?? "") ?? false
+    (tournament?.organizers_uids?.includes(auth.user?.uid ?? "") ||
+      auth.user?.roles?.includes("IC")) ?? false
   );
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
