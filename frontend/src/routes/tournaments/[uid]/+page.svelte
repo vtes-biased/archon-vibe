@@ -653,7 +653,7 @@
           {#if tournament.description}
             <div class="col-span-full">
               <div class="text-ash-500">{m.common_description()}</div>
-              <div class="text-ash-300 mt-1 prose prose-invert prose-sm max-w-none">{@html renderMarkdown(tournament.description)}</div>
+              <div class="mt-1 prose dark:prose-invert prose-sm max-w-none">{@html renderMarkdown(tournament.description)}</div>
             </div>
           {/if}
         </div>
