@@ -147,7 +147,7 @@
   }
 
   const sortedPlayers = $derived.by(() => {
-    const players = [...tournament.players];
+    const players = [...(tournament.players ?? [])];
     const sort = playerSort;
     if (sort === 'standings' && standings.length > 0) {
       const rankMap = new Map(standings.map(s => [s.user_uid, s.rank]));
@@ -236,7 +236,7 @@
 <div class="space-y-4">
   <!-- Header -->
   <div class="flex items-center justify-between">
-    <p class="text-ash-400">{m.players_count({ count: String(tournament.players.length) })}</p>
+    <p class="text-ash-400">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
     {#if isOrganizer}
       <button
         onclick={() => showAddPlayer = !showAddPlayer}
@@ -306,7 +306,7 @@
     </div>
   {/if}
 
-  {#if tournament.players.length > 0}
+  {#if (tournament.players?.length ?? 0) > 0}
     <!-- Sort toggles -->
     <div class="flex gap-1 mb-2">
       {#if standings.length > 0}

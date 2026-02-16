@@ -28,7 +28,7 @@
       return;
     }
     const results = await getFilteredUsers(undefined, undefined, playerSearch.trim());
-    const registeredUids = new Set(tournament?.players.map(p => p.user_uid) ?? []);
+    const registeredUids = new Set(tournament?.players?.map(p => p.user_uid) ?? []);
     const filtered = results.filter(u => !registeredUids.has(u.uid));
     searchTotal = filtered.length;
     searchResults = filtered.slice(0, SEARCH_LIMIT);

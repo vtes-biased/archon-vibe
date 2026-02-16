@@ -80,7 +80,7 @@
     <span class="text-sm text-ash-400">
       {m.overview_player_count({ count: String(registeredCount) })}
       {#if hasRounds}
-        · {m.overview_round_count({ count: String(tournament.rounds.length) })}
+        · {m.overview_round_count({ count: String(tournament.rounds!.length) })}
       {/if}
       {#if isFinals}
         · {m.overview_finals_in_progress()}
@@ -127,14 +127,14 @@
           <!-- Guidance -->
           <div class="text-sm text-ash-300">
             {#if hasFinalsCandidate}
-              {m.overview_round_complete({ n: String(tournament.rounds.length) })}
+              {m.overview_round_complete({ n: String(tournament.rounds!.length) })}
               {#if top5HasTies()}
                 <span class="text-amber-300">{m.overview_resolve_ties()}</span>
               {:else}
                 <span class="text-emerald-300">{m.overview_finals_ready()}</span>
               {/if}
             {:else if hasRounds}
-              {m.overview_round_complete_checkin({ n: String(tournament.rounds.length) })}
+              {m.overview_round_complete_checkin({ n: String(tournament.rounds!.length) })}
             {:else}
               {m.overview_checkin_to_start()}
             {/if}
@@ -203,7 +203,7 @@
           {#if isFinals}
             {m.overview_finals_manage()}
           {:else}
-            {m.overview_round_manage({ n: String(tournament.rounds.length) })}
+            {m.overview_round_manage({ n: String(tournament.rounds!.length) })}
           {/if}
         </p>
 

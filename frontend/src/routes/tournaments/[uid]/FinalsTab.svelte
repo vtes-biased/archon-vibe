@@ -45,7 +45,7 @@
       swapSource = null;
     } else if (swapSource) {
       doAction("SwapSeats", {
-        round: tournament.rounds.length,
+        round: tournament.rounds!.length,
         table1: 0,
         seat1: swapSource.seat,
         table2: 0,
@@ -107,7 +107,7 @@
   }
 
   async function setFinalsVp(playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
-    const roundIndex = tournament.rounds.length; // sentinel for finals
+    const roundIndex = tournament.rounds!.length; // sentinel for finals
     const scores = seating.map(s => ({
       player_uid: s.player_uid,
       vp: s.player_uid === playerUid ? vp : s.result.vp,
@@ -233,7 +233,7 @@
                   if (!overrideComment.trim()) return;
                   overrideSaving = true;
                   try {
-                    tournament = await tournamentAction(tournament.uid, "Override", { round: tournament.rounds.length, table: 0, comment: overrideComment.trim() });
+                    tournament = await tournamentAction(tournament.uid, "Override", { round: tournament.rounds!.length, table: 0, comment: overrideComment.trim() });
                     await loadPlayerNames();
                     overrideTable_ = null;
                     overrideComment = "";
@@ -265,7 +265,7 @@
             onclick={async () => {
               overrideSaving = true;
               try {
-                tournament = await tournamentAction(tournament.uid, "Unoverride", { round: tournament.rounds.length, table: 0 });
+                tournament = await tournamentAction(tournament.uid, "Unoverride", { round: tournament.rounds!.length, table: 0 });
                 await loadPlayerNames();
               } catch (e) { error = e instanceof Error ? e.message : m.override_remove_error(); } finally { overrideSaving = false; }
             }}

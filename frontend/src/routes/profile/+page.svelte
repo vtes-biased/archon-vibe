@@ -193,7 +193,7 @@
     avatarCacheBust = Date.now();
   }
 
-  function formatLocation(country: string | null, city: string | null): string | null {
+  function formatLocation(country: string | null, city?: string | null): string | null {
     if (!country) return null;
     const parts: string[] = [];
     if (city) parts.push(city);

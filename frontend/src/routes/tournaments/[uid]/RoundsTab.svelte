@@ -50,8 +50,8 @@
 
   // Auto-expand current round
   $effect(() => {
-    if (tournament.rounds.length > 0) {
-      const lastIdx = tournament.rounds.length - 1;
+    if (tournament.rounds!.length > 0) {
+      const lastIdx = tournament.rounds!.length - 1;
       if (tournament.state === "Playing") {
         expandedRounds = new Set([lastIdx]);
       } else if (expandedRounds.size === 0) {
@@ -67,19 +67,19 @@
   }
 
   const currentRoundIdx = $derived(
-    tournament.state === "Playing" ? tournament.rounds.length - 1 : -1
+    tournament.state === "Playing" ? tournament.rounds!.length - 1 : -1
   );
   const allTablesFinished = $derived(
-    tournament.rounds.length > 0 && currentRoundIdx >= 0
-    && tournament.rounds[currentRoundIdx]!.every(t => t.state === "Finished")
+    tournament.rounds!.length > 0 && currentRoundIdx >= 0
+    && tournament.rounds![currentRoundIdx]!.every(t => t.state === "Finished")
   );
 
   // Seating score
   let seatingScore = $state<{ rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null>(null);
 
   function computeSeatingScore() {
-    if (!tournament.rounds.length) { seatingScore = null; return; }
-    const rounds = tournament.rounds.map(round =>
+    if (!tournament.rounds!.length) { seatingScore = null; return; }
+    const rounds = tournament.rounds!.map(round =>
       round.map(table => table.seating.map(s => s.player_uid).filter(Boolean))
     );
     seatingScore = scoreSeatingSync(rounds);
@@ -117,13 +117,13 @@
 
   // Organizer can swap/seat on last round in Playing or Finished
   const canEditSeating = $derived(
-    isOrganizer && tournament.rounds.length > 0
+    isOrganizer && tournament.rounds!.length > 0
     && (tournament.state === "Playing" || tournament.state === "Finished")
   );
 
   const unseatedPlayers = $derived(
     canEditSeating
-      ? tournament.players.filter(p => p.state === "Registered")
+      ? (tournament.players ?? []).filter(p => p.state === "Registered")
       : []
   );
 
@@ -260,7 +260,7 @@
     </div>
   {/if}
 
-  {#if tournament.rounds.length === 0}
+  {#if tournament.rounds!.length === 0}
     <p class="text-ash-400">{m.rounds_no_rounds()}</p>
   {:else}
     <!-- Current round controls -->
@@ -430,7 +430,7 @@
                     <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'bg-emerald-900/60 text-emerald-300' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'bg-amber-900/60 text-amber-300'}">
                       {table.state}
                     </span>
-                    {#if isEditable && r === tournament.rounds.length - 1 && table.seating.length === 0}
+                    {#if isEditable && r === tournament.rounds!.length - 1 && table.seating.length === 0}
                       <button
                         onclick={() => doAction("RemoveTable", { table: i })}
                         class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors"
@@ -579,7 +579,7 @@
                 {/if}
               </div>
             {/each}
-            {#if isEditable && r === tournament.rounds.length - 1}
+            {#if isEditable && r === tournament.rounds!.length - 1}
               <button
                 onclick={() => doAction("AddTable")}
                 disabled={actionLoading}

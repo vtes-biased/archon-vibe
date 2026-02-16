@@ -347,7 +347,7 @@
 
   async function setVp(tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
     if (!tournament) return;
-    const roundIndex = tournament.rounds.length - 1;
+    const roundIndex = tournament.rounds!.length - 1;
     const scores = seating.map(s => ({
       player_uid: s.player_uid,
       vp: s.player_uid === playerUid ? vp : s.result.vp,
@@ -365,7 +365,7 @@
 
   async function setFinalsVp(playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
     if (!tournament) return;
-    const roundIndex = tournament.rounds.length;
+    const roundIndex = tournament.rounds!.length;
     const scores = seating.map(s => ({
       player_uid: s.player_uid,
       vp: s.player_uid === playerUid ? vp : s.result.vp,
@@ -869,8 +869,8 @@
                   {/each}
                 </div>
               </div>
-            {:else if tournament.state === "Playing" && tournament.rounds.length > 0 && tournament.rounds[tournament.rounds.length - 1]}
-              {@const currentRound = tournament.rounds[tournament.rounds.length - 1]!}
+            {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0 && tournament.rounds![tournament.rounds!.length - 1]}
+              {@const currentRound = tournament.rounds![tournament.rounds!.length - 1]!}
               {@const myTableIdx = currentRound.findIndex(t => t.seating.some(s => s.player_uid === auth.user?.uid))}
               {#if myTableIdx >= 0 && currentRound[myTableIdx]}
                 {@const myTable = currentRound[myTableIdx]!}
@@ -913,8 +913,8 @@
           {/if}
 
           <!-- Registered players list (player view, Planned/Registration) -->
-          {#if (tournament.state === "Planned" || tournament.state === "Registration") && tournament.players.length > 0}
-            {@const registered = tournament.players.filter(p => p.state === "Registered")}
+          {#if (tournament.state === "Planned" || tournament.state === "Registration") && (tournament.players?.length ?? 0) > 0}
+            {@const registered = tournament.players!.filter(p => p.state === "Registered")}
             {#if registered.length > 0}
               <div class="mt-4">
                 <button
