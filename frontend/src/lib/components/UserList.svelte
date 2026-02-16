@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { goto } from "$app/navigation";
   import User from "./User.svelte";
   import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountries, getCountryFlag } from "$lib/geonames";
@@ -18,9 +19,6 @@
 
   // Create user form
   let showCreateForm = $state(false);
-  let editingUserId = $state<string | null>(null);
-  let expandedUserId = $state<string | null>(null);
-  let isUserEditing = $state(false); // Track when expanded User component is in edit mode
 
   // Pagination and filtering
   let currentPage = $state(1);
@@ -111,9 +109,6 @@
 
   function toggleCreateForm() {
     showCreateForm = !showCreateForm;
-    if (showCreateForm) {
-      editingUserId = null;
-    }
   }
 
   async function handleUserCreated(_created: UserType) {
@@ -126,31 +121,6 @@
     showCreateForm = false;
   }
 
-  async function handleUserUpdated(_updatedUser: UserType) {
-    editingUserId = null;
-    // Reload from DB to get sorted data
-    await loadUsers();
-  }
-  function cancelEditUser() {
-    editingUserId = null;
-  }
-
-  function toggleExpandUser(uid: string) {
-    expandedUserId = expandedUserId === uid ? null : uid;
-    // Reset edit tracking when changing expanded user
-    if (expandedUserId === null) {
-      isUserEditing = false;
-    }
-  }
-
-  function handleUserEditingChange(editing: boolean) {
-    const wasEditing = isUserEditing;
-    isUserEditing = editing;
-    // If we just exited edit mode, refresh to catch any skipped sync updates
-    if (wasEditing && !editing) {
-      scheduleDisplayRefresh();
-    }
-  }
 
   /**
    * Handle incoming sync user update with filter awareness.
@@ -173,12 +143,6 @@
    * Skips refresh if a user is being edited (might have modal open).
    */
   function scheduleDisplayRefresh() {
-    // Skip refresh if user is being edited - they might have a modal open
-    // The list will refresh when they exit edit mode
-    if (isUserEditing) {
-      return;
-    }
-
     // If refresh already scheduled, do nothing - the pending refresh will pick up new data
     if (displayRefreshTimer) {
       return;
@@ -385,7 +349,7 @@
                 id="country-filter"
                 onchange={handleCountryChange}
                 value={selectedCountry}
-                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
+                class="w-full pl-3 pr-9 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
               >
                 <option value="all">{m.user_list_all_countries()}</option>
                 {#each Object.entries(countries) as [code, country]}
@@ -482,42 +446,11 @@
         <!-- User Rows -->
         <div id="users-rows-container" class="divide-y divide-ash-800">
           {#each paginatedUsers() as user (user.uid)}
-            {#if editingUserId === user.uid}
-              <div class="px-6 py-4">
-                <User
-                  {user}
-                  mode="edit"
-                  inline
-                  showManagement={isOnline}
-                  onupdated={handleUserUpdated}
-                  oncancel={cancelEditUser}
-                />
-              </div>
-            {:else if expandedUserId === user.uid}
-              <div
-                class="px-6 py-4 cursor-pointer"
-                onclick={() => toggleExpandUser(user.uid)}
-                onkeydown={(e) =>
-                  e.key === "Enter" && toggleExpandUser(user.uid)}
-                role="button"
-                tabindex="0"
-              >
-                <User
-                  {user}
-                  mode="view"
-                  inline
-                  editable={isOnline}
-                  showManagement={isOnline}
-                  onupdated={handleUserUpdated}
-                  oneditingchange={handleUserEditingChange}
-                />
-              </div>
-            {:else}
               <div
                 class="user-row px-6 py-4 hover:bg-ash-900/50 transition-colors cursor-pointer"
-                onclick={() => toggleExpandUser(user.uid)}
+                onclick={() => goto(`/users/${user.uid}`)}
                 onkeydown={(e) =>
-                  e.key === "Enter" && toggleExpandUser(user.uid)}
+                  e.key === "Enter" && goto(`/users/${user.uid}`)}
                 role="button"
                 tabindex="0"
               >
@@ -599,7 +532,6 @@
                   </div>
                 </div>
               </div>
-            {/if}
           {/each}
         </div>
       </div>

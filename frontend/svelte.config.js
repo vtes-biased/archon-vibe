@@ -12,6 +12,10 @@ const config = {
 			precompress: false,
 			strict: true
 		}),
+		prerender: {
+			handleHttpError: 'warn',
+			handleUnseenRoutes: 'warn'
+		},
 		paths: {
 			relative: false
 		},

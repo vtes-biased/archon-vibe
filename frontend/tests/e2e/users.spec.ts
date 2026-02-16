@@ -244,15 +244,16 @@ test.describe('Users list filtering', () => {
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
-  test('expands a user row to show details', async ({ page }) => {
+  test('navigates to user detail page on row click', async ({ page }) => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Click the first user row
+    // Click the first user row — should navigate to /users/[uid]
     await page.locator('.user-row').first().click();
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
 
-    // The expanded view should show user details (User.svelte in view mode)
-    await expect(page.getByText('Country:')).toBeVisible({ timeout: 3_000 });
+    // The detail page should show user info (User.svelte in view mode)
+    await expect(page.getByText('Country:')).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText('Last modified:')).toBeVisible();
   });
 
@@ -285,9 +286,10 @@ test.describe('Edit user (authenticated)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Expand a user
+    // Click a user row to navigate to detail page
     await page.locator('.user-row').first().click();
-    await expect(page.getByText('Country:')).toBeVisible({ timeout: 3_000 });
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
+    await expect(page.getByText('Country:')).toBeVisible({ timeout: 5_000 });
 
     // Edit button should be visible (pencil icon)
     await expect(page.getByTitle('Edit user')).toBeVisible();
@@ -299,9 +301,10 @@ test.describe('Edit user (authenticated)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Expand and edit first user
+    // Navigate to user detail page and enter edit mode
     await page.locator('.user-row').first().click();
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 3_000 });
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
+    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
 
     // Edit form should appear with fields
@@ -322,9 +325,10 @@ test.describe('Edit user (authenticated)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Expand, edit, then close
+    // Navigate to user detail page, edit, then close
     await page.locator('.user-row').first().click();
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 3_000 });
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
+    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
     await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
 
@@ -344,9 +348,10 @@ test.describe('Sanctions (authenticated as IC)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Expand and edit a user
+    // Navigate to user detail page and enter edit mode
     await page.locator('.user-row').first().click();
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 3_000 });
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
+    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
     await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
 
@@ -361,9 +366,10 @@ test.describe('Sanctions (authenticated as IC)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Navigate to edit mode
+    // Navigate to user detail page and enter edit mode
     await page.locator('.user-row').first().click();
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 3_000 });
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
+    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
     await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
 
@@ -387,9 +393,10 @@ test.describe('Sanctions (authenticated as IC)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Navigate to sanction modal
+    // Navigate to user detail page and open sanction modal
     await page.locator('.user-row').first().click();
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 3_000 });
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
+    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
     await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
     await page.getByRole('button', { name: 'Issue Sanction' }).click();
@@ -408,9 +415,10 @@ test.describe('Sanctions (authenticated as IC)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Navigate to sanction modal
+    // Navigate to user detail page and open sanction modal
     await page.locator('.user-row').first().click();
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 3_000 });
+    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
+    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
     await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
     await page.getByRole('button', { name: 'Issue Sanction' }).click();
