@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "$lib/stores/auth.svelte";
   import Icon from "@iconify/svelte";
@@ -32,7 +32,7 @@
     if (result) {
       verifyResult = result;
       // Clear URL params for security
-      window.history.replaceState({}, "", "/auth/email/verify");
+      replaceState("/auth/email/verify", {});
     } else {
       error = auth.error || "Verification failed";
     }
@@ -101,7 +101,7 @@
           </p>
           <a
             href="/login"
-            class="inline-block mt-4 px-6 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg font-medium transition-colors"
+            class="inline-block mt-4 px-6 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg font-medium transition-colors"
           >
             {m.auth_verify_back_to_login()}
           </a>
@@ -150,7 +150,7 @@
             <button
               type="submit"
               disabled={auth.isLoading || !password}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />

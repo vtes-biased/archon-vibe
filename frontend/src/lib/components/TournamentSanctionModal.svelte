@@ -314,7 +314,7 @@
         <button
           type="submit"
           disabled={creating || !description.trim() || (roundRequired && roundNumber === null)}
-          class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+          class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
         >
           {creating ? m.sanction_mgr_issuing() : m.sanction_mgr_issue_btn()}
         </button>

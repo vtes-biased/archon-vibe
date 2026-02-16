@@ -103,7 +103,7 @@
       <button
         onclick={() => { onaddvekn(playerVeknId.trim()); playerVeknId = ""; }}
         disabled={!playerVeknId.trim()}
-        class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+        class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
       >
         {m.common_add()}
       </button>

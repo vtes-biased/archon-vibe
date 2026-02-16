@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import {
     getAuthState,
@@ -97,13 +97,13 @@
         discord_error: m.login_error_discord(),
       };
       oauthError = errorMessages[error] || m.login_error_auth({ error });
-      window.history.replaceState({}, "", "/login");
+      replaceState("/login", {});
       return;
     }
 
     if (token && refresh) {
       await storeTokensFromCallback(token, refresh);
-      window.history.replaceState({}, "", "/login");
+      replaceState("/login", {});
       goto("/");
     }
   });
@@ -134,7 +134,7 @@
           <button
             onclick={() => (mode = "login")}
             class="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors {mode === 'login'
-              ? 'bg-crimson-700 text-bone-100'
+              ? 'bg-crimson-700 text-white'
               : 'text-ash-400 hover:text-ash-200'}"
           >
             {m.login_tab_login()}
@@ -142,7 +142,7 @@
           <button
             onclick={() => (mode = "signup")}
             class="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors {mode === 'signup'
-              ? 'bg-crimson-700 text-bone-100'
+              ? 'bg-crimson-700 text-white'
               : 'text-ash-400 hover:text-ash-200'}"
           >
             {m.login_tab_signup()}
@@ -227,7 +227,7 @@
             <button
               type="submit"
               disabled={auth.isLoading || !email.trim()}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
@@ -282,7 +282,7 @@
             <button
               type="submit"
               disabled={auth.isLoading || !email.trim() || !password}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
@@ -346,7 +346,7 @@
             <button
               onclick={handleCreateAccount}
               disabled={auth.isLoading}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />

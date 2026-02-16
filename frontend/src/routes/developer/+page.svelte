@@ -145,7 +145,7 @@
     </div>
     <button
       onclick={() => (showRegister = !showRegister)}
-      class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+      class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
     >
       <Icon icon="lucide:plus" class="w-4 h-4" />
       {m.developer_register_btn()}
@@ -252,7 +252,7 @@
           <button
             type="submit"
             disabled={registering || !newName.trim() || !newRedirectUris.trim() || newScopes.length === 0}
-            class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+            class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
           >
             {#if registering}
               <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
@@ -367,7 +367,7 @@
             </button>
             <button
               onclick={() => handleRegenerate(confirmAction!.clientId)}
-              class="flex-1 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg text-sm transition-colors"
+              class="flex-1 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg text-sm transition-colors"
             >
               {m.developer_regenerate_btn()}
             </button>

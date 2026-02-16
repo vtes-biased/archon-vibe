@@ -412,10 +412,13 @@ async def update_user(user: User) -> None:
 
 async def set_user_resync_after(user_uid: str) -> None:
     """Set resync_after to now() on a user, triggering full resync on next SSE connect."""
+    from datetime import UTC, datetime
+
+    now_iso = datetime.now(UTC).isoformat()
     async with get_connection() as conn:
         await conn.execute(
-            "UPDATE users SET data = jsonb_set(data, '{resync_after}', to_jsonb(now()::text)) WHERE uid = %s",
-            (user_uid,),
+            "UPDATE users SET data = jsonb_set(data, '{resync_after}', to_jsonb(%s::text)) WHERE uid = %s",
+            (now_iso, user_uid),
         )
 
 

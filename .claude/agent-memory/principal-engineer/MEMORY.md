@@ -29,6 +29,10 @@
 - WASM/PyO3 bindings duplicated (~300 lines each) in `engine/src/lib.rs`
 - In-memory auth stores in `auth.py` won't survive restarts
 - Test coverage is minimal (4 backend tests, 5 Rust tests)
+- `ratings.py:recompute_all_ratings()` N+1 queries: loads all tournaments into memory, per-user DB calls in loop
+- `ratings.py:recompute_ratings_for_players()` falls back to `existing.wins` which preserves stale wins
+- `db.py:get_all_finished_tournaments()` loads full Tournament objects (rounds/decks/players) into memory
+- `tournaments.py` imports `_rating_category_for_tournament` (private name, cross-module use)
 
 ## SSE Streaming Performance (2026-02)
 - `db.py:stream_objects()` uses server-side cursors - overkill for small datasets

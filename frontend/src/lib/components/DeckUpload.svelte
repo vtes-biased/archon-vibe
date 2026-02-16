@@ -123,15 +123,15 @@
   <div class="flex gap-2 flex-wrap">
     <button
       onclick={() => mode = 'text'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'text' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'text' ? 'bg-crimson-600 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
     >{m.deck_upload_paste()}</button>
     <button
       onclick={() => mode = 'url'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-crimson-600 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
     >{m.deck_upload_from_url()}</button>
     <button
       onclick={() => mode = 'qr'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-crimson-600 text-bone-100' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-crimson-600 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
     >{m.deck_upload_scan_qr()}</button>
   </div>
 
@@ -206,7 +206,7 @@
     <button
       onclick={upload}
       disabled={loading || (mode === 'text' ? !deckText.trim() : !deckUrl.trim())}
-      class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
     >
       {loading ? m.deck_upload_uploading() : m.deck_upload_submit()}
     </button>

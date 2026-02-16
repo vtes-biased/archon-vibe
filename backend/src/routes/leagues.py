@@ -18,7 +18,7 @@ from ..db import (
 from ..models import League, LeagueKind, LeagueStandingsMode, Role
 from .auth import verify_token
 
-router = APIRouter(prefix="/leagues", tags=["leagues"])
+router = APIRouter(prefix="/api/leagues", tags=["leagues"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 

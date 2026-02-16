@@ -550,7 +550,7 @@
           <button
             onclick={() => showGoOnlineConfirm = true}
             disabled={offlineActionLoading}
-            class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shrink-0"
+            class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shrink-0"
           >
             <Icon icon="lucide:wifi" class="w-4 h-4 inline mr-1" />
             {m.offline_go_online()}
@@ -752,7 +752,7 @@
             <button
               onclick={() => doAction("Register", { user_uid: auth.user?.uid })}
               disabled={actionLoading}
-              class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+              class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
             >{m.tournament_register_btn()}</button>
           {:else if tournament.state === "Registration" && currentPlayerEntry}
             <div class="text-sm mb-3 flex items-center justify-between">
@@ -1060,7 +1060,7 @@
         <div class="flex gap-2">
           <button
             onclick={handleDelete}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded font-medium transition-colors"
           >{m.common_delete()}</button>
           <button
             onclick={() => (showDeleteConfirm = false)}
@@ -1099,7 +1099,7 @@
           <button
             onclick={handleGoOffline}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}</button>
           <button
             onclick={() => (showGoOfflineConfirm = false)}
@@ -1138,7 +1138,7 @@
           <button
             onclick={handleGoOnline}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}</button>
           <button
             onclick={() => (showGoOnlineConfirm = false)}
@@ -1177,7 +1177,7 @@
           <button
             onclick={handleForceTakeover}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}</button>
           <button
             onclick={() => (showForceTakeoverConfirm = false)}

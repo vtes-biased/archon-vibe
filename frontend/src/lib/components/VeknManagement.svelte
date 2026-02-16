@@ -100,7 +100,7 @@
       <button
         type="button"
         onclick={(e) => { e.stopPropagation(); showSponsorConfirm = true; }}
-        class="px-3 py-1 text-xs bg-emerald-800 hover:bg-emerald-700 text-bone-100 rounded transition-colors"
+        class="px-3 py-1 text-xs bg-emerald-800 hover:bg-emerald-700 text-white rounded transition-colors"
         title={m.vekn_sponsor_title()}
       >
         <Icon icon="lucide:user-plus" class="inline w-3 h-3 mr-1" />
@@ -119,7 +119,7 @@
       <button
         type="button"
         onclick={(e) => { e.stopPropagation(); showForceAbandonConfirm = true; }}
-        class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-bone-100 rounded transition-colors"
+        class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
         title={m.vekn_abandon_title()}
       >
         <Icon icon="lucide:unlink" class="inline w-3 h-3 mr-1" />
@@ -165,7 +165,7 @@
           <button
             onclick={handleSponsor}
             disabled={processingAction}
-            class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {processingAction ? m.vekn_sponsoring() : m.vekn_sponsor()}
           </button>
@@ -227,7 +227,7 @@
           <button
             type="submit"
             disabled={processingAction || !linkVeknIdInput.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {processingAction ? m.vekn_linking() : m.vekn_link_submit()}
           </button>
@@ -278,7 +278,7 @@
           <button
             onclick={handleForceAbandon}
             disabled={processingAction}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {processingAction ? m.vekn_abandoning() : m.vekn_force_abandon()}
           </button>
@@ -340,7 +340,7 @@
           <button
             type="submit"
             disabled={processingAction || !mergeTargetUid.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {processingAction ? m.vekn_merging() : m.vekn_merge()}
           </button>

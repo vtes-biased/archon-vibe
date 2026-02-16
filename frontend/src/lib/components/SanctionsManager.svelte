@@ -207,7 +207,7 @@
       <button
         type="button"
         onclick={(e) => { e.stopPropagation(); openSanctionModal(); }}
-        class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-bone-100 rounded transition-colors"
+        class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
         title={m.sanction_mgr_issue_btn()}
       >
         <Icon icon="lucide:alert-triangle" class="inline w-3 h-3 mr-1" />
@@ -329,7 +329,7 @@
           <button
             type="submit"
             disabled={creatingSanction || !sanctionDescription.trim() || (expiryRequired && !sanctionExpiresAt)}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {creatingSanction ? m.sanction_mgr_issuing() : m.sanction_mgr_issue_btn()}
           </button>
@@ -449,7 +449,7 @@
               type="button"
               onclick={handleSaveSanction}
               disabled={processingSanctionAction || !editSanctionDescription.trim() || (editExpiryRequired && !editSanctionExpiresAt)}
-              class="w-full px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+              class="w-full px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
             >
               {processingSanctionAction ? m.common_saving() : m.sanction_mgr_save_changes()}
             </button>
@@ -461,7 +461,7 @@
                 type="button"
                 onclick={handleLiftSanction}
                 disabled={processingSanctionAction}
-                class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+                class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
               >
                 <Icon icon="lucide:check-circle" class="inline w-4 h-4 mr-1" />
                 {processingSanctionAction ? m.sanction_mgr_lifting() : m.sanction_mgr_lift()}
@@ -472,7 +472,7 @@
               type="button"
               onclick={handleDeleteSanction}
               disabled={processingSanctionAction}
-              class="flex-1 px-4 py-2 bg-crimson-800 hover:bg-crimson-700 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+              class="flex-1 px-4 py-2 bg-crimson-800 hover:bg-crimson-700 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
             >
               <Icon icon="lucide:trash-2" class="inline w-4 h-4 mr-1" />
               {processingSanctionAction ? m.common_deleting() : m.common_delete()}

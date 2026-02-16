@@ -115,7 +115,7 @@
           <button
             type="submit"
             disabled={isSubmitting || !values.name.trim()}
-            class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shadow-md disabled:cursor-not-allowed"
+            class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shadow-md disabled:cursor-not-allowed"
           >
             {isSubmitting ? m.tournament_new_creating() : m.tournament_new_create_btn()}
           </button>

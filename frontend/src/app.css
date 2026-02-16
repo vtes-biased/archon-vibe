@@ -108,11 +108,10 @@
         --color-crimson: #A40F2D;
         --color-crimson-light: #DC143C;
 
-        /* Bone — lightest at highest numbers.
-         * bone-50/100 stay light: they're only used as text-bone-100 on dark
-         * surfaces (crimson buttons, inputs) and must remain readable. */
-        --color-bone-50: #FDFCFA;
-        --color-bone-100: #FAF8F4;
+        /* Bone — fully inverted like other scales.
+         * For light text on colored buttons (crimson/emerald/amber), use text-white. */
+        --color-bone-50: #2A2520;
+        --color-bone-100: #5E5444;
         --color-bone-200: #7A6D57;
         --color-bone-300: #9A8A6D;
         --color-bone-400: #B8A688;

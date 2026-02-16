@@ -150,7 +150,7 @@
           onclick={finishFinals}
           disabled={actionLoading || tournament.finals.state !== "Finished"}
           title={tournament.finals.state !== "Finished" ? m.finals_finish_hint_not_ready() : m.finals_finish_hint_ready()}
-          class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+          class="px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
         >{m.finals_finish()}</button>
       </div>
     {/if}
@@ -240,7 +240,7 @@
                   } catch (e) { error = e instanceof Error ? e.message : m.override_error(); } finally { overrideSaving = false; }
                 }}
                 disabled={overrideSaving || !overrideComment.trim()}
-                class="px-3 py-1 text-xs font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
+                class="px-3 py-1 text-xs font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
               >{overrideSaving ? m.common_saving() : m.override_save()}</button>
             </div>
           </div>

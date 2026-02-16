@@ -222,7 +222,7 @@
             <button
               onclick={handleApprove}
               disabled={submitting}
-              class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if submitting}
                 <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />

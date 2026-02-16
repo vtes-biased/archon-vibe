@@ -316,7 +316,7 @@
 <div>
   <label class="block text-sm text-ash-400 mb-1" for={id("description")}>{m.common_description()}</label>
   <span class="text-xs text-ash-500 mb-1 block">
-    {m.tfield_supports()} <a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a> {m.tfield_formatting()}
+    {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
   </span>
   <textarea
     id={id("description")}
