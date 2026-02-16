@@ -157,6 +157,8 @@
       claimVeknIdInput = "";
       // Store new tokens for the VEKN user (uid changed)
       await storeTokensFromCallback(result.access_token, result.refresh_token);
+      // Reconnect SSE with new token (uid changed after merge)
+      await syncManager.refresh();
     } catch {
       // Error toast is shown by apiRequest
     } finally {
@@ -172,6 +174,8 @@
       showAbandonConfirm = false;
       // Store new tokens for the new user (split from VEKN record)
       await storeTokensFromCallback(result.access_token, result.refresh_token);
+      // Reconnect SSE with new token (uid changed after split)
+      await syncManager.refresh();
     } catch {
       // Error toast is shown by apiRequest
     } finally {
