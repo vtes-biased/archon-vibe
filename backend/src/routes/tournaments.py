@@ -668,6 +668,7 @@ class TournamentActionRequest(BaseModel):
     scores: list[dict] | None = None  # For SetScore: [{player_uid, vp}]
     comment: str | None = None  # For Override
     toss: int | None = None  # For SetToss
+    status: str | None = None  # For SetPaymentStatus
 
 
 @router.post("/{uid}/action")
@@ -714,6 +715,8 @@ async def tournament_action(
         event_data["comment"] = request.comment
     if request.toss is not None:
         event_data["toss"] = request.toss
+    if request.status:
+        event_data["status"] = request.status
 
     # SELECT FOR UPDATE: serialize concurrent writes to this tournament
     async with tournament_transaction(uid) as (tournament, tx_conn):
