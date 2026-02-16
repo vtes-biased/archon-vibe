@@ -25,6 +25,7 @@
   let level = $state<SanctionLevel>("caution");
   let category = $state<SanctionCategory>("procedural_error");
   let subcategory = $state<SanctionSubcategory | null>(null);
+  // svelte-ignore state_referenced_locally — intentionally captures initial value
   let roundNumber = $state<number | null>(currentRound);
   let description = $state("");
   let creating = $state(false);

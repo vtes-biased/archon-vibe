@@ -393,6 +393,7 @@ export interface Rating extends BaseObject {
   constructed_offline: CategoryRating | null;
   limited_online: CategoryRating | null;
   limited_offline: CategoryRating | null;
+  wins: string[]; // All-time tournament UIDs won
 }
 
 // Card types (VTES card database)

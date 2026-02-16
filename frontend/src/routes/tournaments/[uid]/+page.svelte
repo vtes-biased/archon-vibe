@@ -1034,15 +1034,21 @@
 
 <!-- Delete Tournament Confirmation Modal -->
 {#if showDeleteConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
     onclick={() => (showDeleteConfirm = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showDeleteConfirm = false; }}
   >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
+      tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-crimson-400">{m.tournament_delete_title()}</h2>
@@ -1068,15 +1074,21 @@
 
 <!-- Go Offline Confirmation Modal -->
 {#if showGoOfflineConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
     onclick={() => (showGoOfflineConfirm = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showGoOfflineConfirm = false; }}
   >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
+      tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-amber-400">{m.offline_go_offline_title()}</h2>
@@ -1101,15 +1113,21 @@
 
 <!-- Go Online Confirmation Modal -->
 {#if showGoOnlineConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
     onclick={() => (showGoOnlineConfirm = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showGoOnlineConfirm = false; }}
   >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
+      tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-emerald-400">{m.offline_go_online_title()}</h2>
@@ -1134,15 +1152,21 @@
 
 <!-- Force Takeover Confirmation Modal -->
 {#if showForceTakeoverConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
     onclick={() => (showForceTakeoverConfirm = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showForceTakeoverConfirm = false; }}
   >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
+      tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-amber-400">{m.offline_force_takeover_title()}</h2>

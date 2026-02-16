@@ -292,6 +292,7 @@ class Rating(BaseObject, kw_only=True):
     constructed_offline: CategoryRating | None = None
     limited_online: CategoryRating | None = None
     limited_offline: CategoryRating | None = None
+    wins: list[str] = msgspec.field(default_factory=list)  # All-time tournament UIDs won
 
 
 class LeagueKind(StrEnum):

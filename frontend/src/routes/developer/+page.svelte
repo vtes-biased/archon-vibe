@@ -213,7 +213,7 @@
           ></textarea>
         </div>
         <div>
-          <label class="block text-sm text-ash-400 mb-2">{m.developer_scopes()}</label>
+          <span class="block text-sm text-ash-400 mb-2">{m.developer_scopes()}</span>
           <div class="space-y-2">
             <label class="flex items-center gap-3 cursor-pointer">
               <input
@@ -336,16 +336,22 @@
 
   <!-- Confirm dialog -->
   {#if confirmAction}
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      role="presentation"
       onclick={() => (confirmAction = null)}
+      onkeydown={(e) => { if (e.key === 'Escape') confirmAction = null; }}
     >
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
         class="bg-dusk-950 rounded-lg border border-ash-800 p-6 w-full max-w-sm"
         onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
+        tabindex="-1"
       >
         {#if confirmAction.action === "regenerate"}
           <h3 id="confirm-dialog-title" class="text-bone-100 font-medium mb-2">{m.developer_confirm_regenerate()}</h3>

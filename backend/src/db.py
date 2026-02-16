@@ -1334,6 +1334,34 @@ async def get_tournament_by_external_id(platform: str, ext_id: str) -> Tournamen
         return None
 
 
+async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[str]]:
+    """Get all-time tournament win UIDs for multiple users at once.
+
+    Returns: {user_uid: [tournament_uid, ...]}
+    """
+    if not user_uids:
+        return {}
+    async with get_connection() as conn:
+        # Query finished tournaments where winner is in user_uids
+        placeholders = ", ".join(["%s"] * len(user_uids))
+        result = await conn.execute(
+            f"""
+            SELECT uid, data->>'winner' AS winner FROM tournaments
+            WHERE data->>'state' = 'Finished'
+              AND data->>'winner' IN ({placeholders})
+              AND data->>'deleted_at' IS NULL
+            """,
+            tuple(user_uids),
+        )
+        rows = await result.fetchall()
+        wins: dict[str, list[str]] = {}
+        for row in rows:
+            t_uid, winner = row[0], row[1]
+            wins.setdefault(winner, []).append(t_uid)
+        return wins
+
+
+
 async def get_finished_tournaments_for_category(
     format_value: str, online: bool, since_date: str
 ) -> list[Tournament]:

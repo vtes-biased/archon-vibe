@@ -13,12 +13,13 @@ from .db import (
     get_finished_tournaments_for_category,
     get_rating_by_user_uid,
     get_sanctions_for_tournament,
+    get_tournament_wins_for_users,
     get_user_by_uid,
+    stream_objects,
     upsert_rating,
 )
 from .models import (
     CategoryRating,
-    PlayerState,
     Rating,
     RatingCategory,
     SanctionLevel,
@@ -43,7 +44,7 @@ def _get_engine():
     return _engine
 
 
-def _rating_category_for_tournament(t: Tournament) -> RatingCategory:
+def rating_category_for_tournament(t: Tournament) -> RatingCategory:
     """Map tournament format + online to RatingCategory."""
     engine = _get_engine()
     cat_str = engine.rating_category(t.format.value, t.online)
@@ -110,17 +111,19 @@ def _finalist_position(t: Tournament, user_uid: str) -> int:
     return 0
 
 
-async def _sa_overflow_penalty(t: Tournament, user_uid: str) -> float:
+def _sa_overflow_penalty(
+    t: Tournament, user_uid: str, sanctions: list | None = None
+) -> float:
     """Compute SA overflow VP penalty for a player.
 
     If an SA sanction targets a round where the player's raw VP < 1.0,
     the overflow (1.0 - raw_vp) is an additional VP penalty.
+    sanctions: pre-loaded sanctions for this tournament (avoids DB query).
     """
     if not t.rounds:
         return 0.0
-    sanctions = await get_sanctions_for_tournament(t.uid)
     sa_sanctions = [
-        s for s in sanctions
+        s for s in (sanctions or [])
         if s.level == SanctionLevel.STANDINGS_ADJUSTMENT
         and s.user_uid == user_uid
         and not s.lifted_at
@@ -142,12 +145,13 @@ async def _sa_overflow_penalty(t: Tournament, user_uid: str) -> float:
     return penalty
 
 
-async def _compute_entry(t: Tournament, user_uid: str) -> TournamentRatingEntry:
-    """Compute a TournamentRatingEntry for one player in one tournament."""
+def _compute_entry_sync(
+    t: Tournament, user_uid: str, sanctions: list | None = None
+) -> TournamentRatingEntry:
+    """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions)."""
     engine = _get_engine()
     vp, gw = _player_stats(t, user_uid)
-    # Apply SA overflow penalty to VP
-    overflow = await _sa_overflow_penalty(t, user_uid)
+    overflow = _sa_overflow_penalty(t, user_uid, sanctions)
     vp -= overflow
     fp = _finalist_position(t, user_uid)
     pc = _player_count(t)
@@ -163,6 +167,12 @@ async def _compute_entry(t: Tournament, user_uid: str) -> TournamentRatingEntry:
         finalist_position=fp,
         points=points,
     )
+
+
+async def _compute_entry(t: Tournament, user_uid: str) -> TournamentRatingEntry:
+    """Compute a TournamentRatingEntry for one player in one tournament."""
+    sanctions = await get_sanctions_for_tournament(t.uid)
+    return _compute_entry_sync(t, user_uid, sanctions)
 
 
 async def recompute_ratings_for_players(
@@ -190,6 +200,9 @@ async def recompute_ratings_for_players(
             await get_finished_tournaments_for_category(fmt, online, cutoff_str)
         )
 
+    # Fetch wins for all players in batch
+    wins_map = await get_tournament_wins_for_users(player_uids)
+
     updated_ratings: list[Rating] = []
     now = datetime.now(UTC)
 
@@ -216,12 +229,12 @@ async def recompute_ratings_for_players(
             uid=rating_uid,
             modified=now,
             user_uid=user_uid,
-
             country=country,
             constructed_online=existing.constructed_online if existing else None,
             constructed_offline=existing.constructed_offline if existing else None,
             limited_online=existing.limited_online if existing else None,
             limited_offline=existing.limited_offline if existing else None,
+            wins=wins_map.get(user_uid, []),
         )
         setattr(rating, category.value, cat_rating)
         await upsert_rating(rating)
@@ -233,89 +246,34 @@ async def recompute_ratings_for_players(
     return updated_ratings
 
 
-async def recompute_ratings_for_tournament(tournament: Tournament) -> list[Rating]:
-    """Recompute ratings for all players in a finished tournament.
+async def recompute_all_ratings() -> list[Rating]:
+    """Full recomputation of all ratings and wins. Called daily for consistency.
 
-    Returns list of updated Rating objects (for broadcasting).
+    Lightweight first pass collects player UIDs per category (streaming tournaments
+    in batches). Then reuses recompute_ratings_for_players() per category — same
+    code path as the normal per-tournament trigger, one player at a time.
     """
-    if tournament.state.value != "Finished":
-        return []
+    # Pass 1: stream tournaments to collect player sets per category
+    # Only loads minimal data per batch (discarded after processing)
+    players_by_category: dict[RatingCategory, set[str]] = {
+        cat: set() for cat in RatingCategory
+    }
 
-    category = _rating_category_for_tournament(tournament)
-    players = _players_with_rounds(tournament)
-    if not players:
-        return []
+    async for batch, _ in stream_objects("tournaments", Tournament, batch_size=100):
+        for t in batch:
+            if t.state != "Finished" or t.deleted_at:
+                continue
+            category = rating_category_for_tournament(t)
+            players = _players_with_rounds(t)
+            players_by_category[category].update(players)
 
-    # Date window: 18 months back from now
-    cutoff = datetime.now(UTC) - timedelta(days=RATING_WINDOW_MONTHS * 30)
-    cutoff_str = cutoff.isoformat()
+    # Pass 2: recompute per category using the normal code path
+    all_updated: list[Rating] = []
+    for category, player_uids in players_by_category.items():
+        if not player_uids:
+            continue
+        ratings = await recompute_ratings_for_players(player_uids, category)
+        all_updated.extend(ratings)
 
-    # Determine format values that map to this category
-    # Standard/V5 → constructed, Limited → limited
-    if category in (RatingCategory.CONSTRUCTED_ONLINE, RatingCategory.CONSTRUCTED_OFFLINE):
-        formats = ["Standard", "V5"]
-    else:
-        formats = ["Limited"]
-
-    online = category in (RatingCategory.CONSTRUCTED_ONLINE, RatingCategory.LIMITED_ONLINE)
-
-    # Fetch all finished tournaments in this category within window
-    all_tournaments: list[Tournament] = []
-    for fmt in formats:
-        all_tournaments.extend(
-            await get_finished_tournaments_for_category(fmt, online, cutoff_str)
-        )
-
-    updated_ratings: list[Rating] = []
-    now = datetime.now(UTC)
-
-    for user_uid in players:
-        # Compute entries for this player across all tournaments in window
-        entries: list[TournamentRatingEntry] = []
-        for t in all_tournaments:
-            played = _players_with_rounds(t)
-            if user_uid in played:
-                entries.append(await _compute_entry(t, user_uid))
-
-        # Sort by points descending, take top 8
-        entries.sort(key=lambda e: e.points, reverse=True)
-        top_entries = entries[:TOP_N]
-        total = sum(e.points for e in top_entries)
-
-        # Get or create Rating object
-        existing = await get_rating_by_user_uid(user_uid)
-        if existing:
-            rating_uid = existing.uid
-        else:
-            rating_uid = str(uuid7())
-
-        user = await get_user_by_uid(user_uid)
-
-        country = user.country if user else None
-
-        # Build category rating
-        cat_rating = CategoryRating(total=total, tournaments=entries)
-
-        # Build full Rating, preserving other categories from existing
-        rating = Rating(
-            uid=rating_uid,
-            modified=now,
-            user_uid=user_uid,
-
-            country=country,
-            constructed_online=existing.constructed_online if existing else None,
-            constructed_offline=existing.constructed_offline if existing else None,
-            limited_online=existing.limited_online if existing else None,
-            limited_offline=existing.limited_offline if existing else None,
-        )
-        # Set the computed category
-        setattr(rating, category.value, cat_rating)
-
-        await upsert_rating(rating)
-        updated_ratings.append(rating)
-
-    logger.info(
-        f"Recomputed {len(updated_ratings)} ratings for tournament "
-        f"{tournament.uid} ({category.value})"
-    )
-    return updated_ratings
+    logger.info(f"Full rating recompute: {len(all_updated)} ratings updated")
+    return all_updated

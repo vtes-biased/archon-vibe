@@ -7,7 +7,7 @@
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import Icon from "@iconify/svelte";
-  import { validateDeck, type ValidationError } from "$lib/engine";
+  import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import * as m from '$lib/paraglide/messages.js';
 
   interface StandingEntry {
@@ -62,6 +62,7 @@
 
   let showAddPlayer = $state(false);
   let tossInputs = $state<Record<string, string>>({});
+  // svelte-ignore state_referenced_locally — intentionally captures initial value
   let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
   let standingsInitialized = false;
   let paymentFilter = $state<'all' | 'Pending' | 'Paid'>('all');
@@ -203,6 +204,15 @@
 
   async function randomToss() {
     await doAction("RandomToss");
+  }
+
+  const isFinished = $derived(tournament.state === "Finished");
+
+  function getRatingPts(entry: StandingEntry): number {
+    if (!isFinished) return 0;
+    const finalistPos = entry.user_uid === tournament.winner ? 1
+      : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
+    return computeRatingPoints(entry.vp, entry.gw, finalistPos, standings.length, tournament.rank);
   }
 
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
@@ -360,6 +370,9 @@
               {#if hasFinals}
                 <th class="text-right py-1 px-2">{m.tournament_col_finals()}</th>
               {/if}
+              {#if isFinished && playerSort === 'standings'}
+                <th class="text-right py-1 px-2">{m.tournament_col_rating()}</th>
+              {/if}
             {/if}
             {#if top5HasTies() && playerSort === 'standings'}
               <th class="text-right py-1 px-2">{m.tournament_col_toss()}</th>
@@ -400,6 +413,9 @@
                 <td class="text-right py-1 px-2">{entry ? formatScore(entry.gw, entry.vp, entry.tp) : "—"}</td>
                 {#if hasFinals}
                   <td class="text-right py-1 px-2">{entry?.finals ?? ""}</td>
+                {/if}
+                {#if isFinished && playerSort === 'standings'}
+                  <td class="text-right py-1 px-2 text-ash-400">{entry ? getRatingPts(entry) : "—"}</td>
                 {/if}
               {/if}
               {#if top5HasTies() && playerSort === 'standings'}

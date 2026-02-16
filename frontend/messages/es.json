@@ -346,6 +346,7 @@
   "profile_abandon_vekn_tooltip": "Abandonar ID VEKN",
 
   "rankings_page_title": "Clasificaciones",
+  "rankings_hall_of_fame_link": "Hall of Fame",
   "rankings_cat_constructed": "Constructed",
   "rankings_cat_constructed_online": "Constructed Online",
   "rankings_cat_limited": "Limited",
@@ -358,6 +359,15 @@
   "rankings_col_points": "Puntos",
   "rankings_unknown_player": "Desconocido",
   "rankings_page_info": "{current} / {total}",
+
+  "hof_page_title": "Hall of Fame",
+  "hof_description": "Jugadores con 5 o más victorias en torneos. Se excluyen jugadores sancionados.",
+  "hof_back_to_rankings": "Volver a Clasificaciones",
+  "hof_all_countries": "Todos los países",
+  "hof_loading": "Cargando Hall of Fame...",
+  "hof_no_results": "No se encontraron jugadores que cumplan sus criterios.",
+  "hof_col_wins": "Victorias",
+  "hof_col_tier": "Nivel",
 
   "developer_page_title": "Portal de desarrollador",
   "developer_title": "Portal de desarrollador",

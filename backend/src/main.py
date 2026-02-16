@@ -167,6 +167,20 @@ async def run_sanction_cleanup() -> None:
         logger.error(f"Error during sanction cleanup: {e}", exc_info=True)
 
 
+async def run_rating_recompute() -> None:
+    """Full recomputation of all ratings and wins (scheduled daily)."""
+    try:
+        from .ratings import recompute_all_ratings
+
+        logger.info("Starting daily rating recompute")
+        ratings = await recompute_all_ratings()
+        for rating in ratings:
+            await broadcast_rating_event(rating)
+        logger.info(f"Daily rating recompute complete: {len(ratings)} ratings")
+    except Exception as e:
+        logger.error(f"Error during rating recompute: {e}", exc_info=True)
+
+
 async def run_oauth_cleanup() -> None:
     """Clean up expired OAuth authorization codes, revoked tokens, and transient tokens."""
     try:
@@ -236,6 +250,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         replace_existing=True,
     )
     logger.info("Sanction cleanup scheduled daily")
+
+    # Schedule daily rating recompute (consistency check)
+    _scheduler.add_job(
+        run_rating_recompute,
+        trigger=IntervalTrigger(hours=24),
+        id="rating_recompute",
+        name="Rating Recompute",
+        replace_existing=True,
+    )
+    logger.info("Rating recompute scheduled daily")
 
     # Schedule OAuth token/code cleanup (runs every hour)
     _scheduler.add_job(

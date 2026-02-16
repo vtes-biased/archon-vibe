@@ -710,17 +710,18 @@ async def tournament_action(
     if broadcast_tournament_event:
         await broadcast_tournament_event(updated)
 
-    # Recompute ratings when tournament enters or leaves Finished state
+    # Recompute ratings when tournament enters/leaves Finished state,
+    # or when data changes on a finished tournament (e.g. SetScore)
     was_finished = pre_state == TournamentState.FINISHED
     is_finished = updated.state == TournamentState.FINISHED
-    if was_finished != is_finished:
+    if was_finished != is_finished or is_finished:
         try:
             from ..ratings import recompute_ratings_for_players
 
             player_uids = {p.user_uid for p in tournament.players if p.user_uid}
-            from ..ratings import _rating_category_for_tournament
+            from ..ratings import rating_category_for_tournament
 
-            category = _rating_category_for_tournament(tournament)
+            category = rating_category_for_tournament(tournament)
             ratings = await recompute_ratings_for_players(player_uids, category)
             if broadcast_rating_event:
                 for rating in ratings:

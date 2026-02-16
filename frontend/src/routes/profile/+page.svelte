@@ -617,13 +617,21 @@
 
 <!-- Claim VEKN ID Modal -->
 {#if showClaimModal}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
     onclick={() => (showClaimModal = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showClaimModal = false; }}
   >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-bone-100">{m.profile_claim_vekn_title()}</h2>
@@ -682,13 +690,21 @@
 
 <!-- Abandon VEKN ID Confirmation Modal -->
 {#if showAbandonConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
     onclick={() => (showAbandonConfirm = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showAbandonConfirm = false; }}
   >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
         <h2 class="text-xl font-medium text-crimson-400">{m.profile_abandon_vekn_title()}</h2>
