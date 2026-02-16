@@ -122,15 +122,7 @@
     <div class="bg-ash-900/50 rounded-lg p-4">
       <h3 class="text-sm font-semibold text-bone-200 mb-3">{m.decks_my_deck()}</h3>
       {#if myDecks.length > 0 && myDecks[0]}
-        <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} />
-        {#if canPlayerUpload}
-          <div class="mt-3">
-            <button
-              onclick={() => uploadingFor = myUid}
-              class="text-sm text-crimson-400 hover:text-crimson-300"
-            >{m.decks_replace()}</button>
-          </div>
-        {/if}
+        <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} />
       {:else}
         <p class="text-sm text-ash-400 mb-3">{m.decks_no_deck_yet()}</p>
       {/if}
@@ -168,12 +160,14 @@
           {#if expandedPlayer === uid}
             <div class="mt-3 space-y-3">
               {#each decks as deck}
-                <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} />
+                <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} onreplace={() => uploadingFor = uid} />
               {/each}
-              <button
-                onclick={() => uploadingFor = uid}
-                class="text-sm text-crimson-400 hover:text-crimson-300"
-              >{decks.length ? m.decks_replace() : m.decks_upload()}</button>
+              {#if !decks.length}
+                <button
+                  onclick={() => uploadingFor = uid}
+                  class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                >{m.decks_upload()}</button>
+              {/if}
               {#if uploadingFor === uid}
                 <DeckUpload tournamentUid={tournament.uid} playerUid={uid} onuploaded={onUploaded} />
               {/if}

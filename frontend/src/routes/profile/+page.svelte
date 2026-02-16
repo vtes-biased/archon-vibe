@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import {
     getAuthState,
+    setAuthState,
     getAccessToken,
     logout,
     updateProfile,
@@ -73,7 +74,7 @@
 
     // Clear URL params
     if (discordLinked || error) {
-      window.history.replaceState({}, "", "/profile");
+      replaceState("/profile", {});
     }
   });
 
@@ -157,6 +158,8 @@
       claimVeknIdInput = "";
       // Store new tokens for the VEKN user (uid changed)
       await storeTokensFromCallback(result.access_token, result.refresh_token);
+      // Ensure auth state reflects claimed user even if /auth/me failed
+      setAuthState({ user: result.user, isAuthenticated: true, isLoading: false, error: null });
       // Reconnect SSE with new token (uid changed after merge)
       await syncManager.refresh();
     } catch {
@@ -174,6 +177,8 @@
       showAbandonConfirm = false;
       // Store new tokens for the new user (split from VEKN record)
       await storeTokensFromCallback(result.access_token, result.refresh_token);
+      // Ensure auth state reflects new user even if /auth/me failed
+      setAuthState({ user: result.user, isAuthenticated: true, isLoading: false, error: null });
       // Reconnect SSE with new token (uid changed after split)
       await syncManager.refresh();
     } catch {
@@ -239,7 +244,7 @@
         <p class="text-ash-400 mb-6">{m.profile_sign_in_msg()}</p>
         <a
           href="/login"
-          class="inline-block px-6 py-3 bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded-lg font-medium transition-colors"
+          class="inline-block px-6 py-3 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg font-medium transition-colors"
         >
           {m.login_sign_in()}
         </a>
@@ -366,7 +371,7 @@
               <button
                 type="submit"
                 disabled={saving}
-                class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+                class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
               >
                 {saving ? m.common_saving() : m.common_save()}
               </button>
@@ -456,7 +461,7 @@
                 <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
                 <button
                   onclick={() => (showClaimModal = true)}
-                  class="px-3 py-1 text-sm bg-crimson-700 hover:bg-crimson-600 text-bone-100 rounded transition-colors"
+                  class="px-3 py-1 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded transition-colors"
                 >
                   {m.profile_claim_vekn_title()}
                 </button>
@@ -592,7 +597,7 @@
               <button
                 onclick={handleResync}
                 disabled={isSyncing}
-                class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed flex items-center gap-2"
+                class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Icon icon="lucide:refresh-cw" class="w-4 h-4 {isSyncing ? 'animate-spin' : ''}" />
                 {isSyncing ? m.profile_resyncing() : m.profile_resync_btn()}
@@ -662,7 +667,7 @@
           <button
             type="submit"
             disabled={claimingVekn || !claimVeknIdInput.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {claimingVekn ? m.profile_claiming() : m.profile_claim_btn()}
           </button>
@@ -720,7 +725,7 @@
           <button
             onclick={handleAbandonVekn}
             disabled={abandoningVekn}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {abandoningVekn ? m.profile_abandoning() : m.profile_abandon_btn()}
           </button>

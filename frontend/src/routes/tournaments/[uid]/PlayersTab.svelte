@@ -293,7 +293,7 @@
             <button
               onclick={addOfflinePlayerAction}
               disabled={!offlinePlayerName.trim() || actionLoading}
-              class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
+              class="px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
             >{m.offline_player_add()}</button>
           </div>
         {/if}
@@ -344,11 +344,11 @@
             onclick={() => paymentFilter = 'all'}
           >{m.payment_filter_all()}</button>
           <button
-            class="px-2 py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'bg-amber-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+            class="px-2 py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'bg-amber-700 text-white' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
             onclick={() => paymentFilter = 'Pending'}
           >{m.payment_pending()}</button>
           <button
-            class="px-2 py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'bg-emerald-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+            class="px-2 py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'bg-emerald-700 text-white' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
             onclick={() => paymentFilter = 'Paid'}
           >{m.payment_paid()}</button>
         </div>
@@ -394,7 +394,7 @@
             {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
             {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
             {@const isTied = entry ? standings.some((s, j) => j !== standingsIdx && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5)) : false}
-            <tr class="{isTop5 && playerSort === 'standings' ? 'text-bone-100' : 'text-ash-300'} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-amber-900/20' : ''} border-t border-ash-800">
+            <tr class="{isTop5 && playerSort === 'standings' ? 'text-white' : 'text-ash-300'} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-amber-900/20' : ''} border-t border-ash-800">
               {#if playerSort === 'standings' && standings.length > 0}
                 <td class="py-1 pr-2 text-ash-500">{entry?.rank ?? "—"}</td>
               {/if}
@@ -531,7 +531,7 @@
                 <td colspan="99" class="p-4">
                   <div class="space-y-3">
                     {#if playerDeck}
-                      <DeckDisplay deck={playerDeck} />
+                      <DeckDisplay deck={playerDeck} onreplace={isOrganizer ? () => uploadingFor = puid : undefined} />
                       {#if errors.length > 0}
                         <div class="space-y-1">
                           {#each errors as err}
@@ -541,12 +541,6 @@
                             </p>
                           {/each}
                         </div>
-                      {/if}
-                      {#if isOrganizer}
-                        <button
-                          onclick={() => uploadingFor = puid}
-                          class="text-sm text-crimson-400 hover:text-crimson-300"
-                        >{m.players_replace_deck()}</button>
                       {/if}
                     {:else}
                       <p class="text-sm text-ash-400">{m.players_no_deck()}</p>

@@ -11,12 +11,14 @@
     tournamentUid = '',
     playerUid = '',
     onsaved,
+    onreplace,
   }: {
     deck: Deck;
     editable?: boolean;
     tournamentUid?: string;
     playerUid?: string;
     onsaved?: () => void;
+    onreplace?: () => void;
   } = $props();
 
   let cards = $state<Map<number, VtesCard>>(new Map());
@@ -138,6 +140,14 @@
   const cryptCount = $derived(cryptEntries.reduce((s, e) => s + e.count, 0));
   const libraryCount = $derived(libraryEntries.reduce((s, e) => s + e.count, 0));
 
+  // Standard TWDA library type ordering (from krcg config)
+  const LIBRARY_TYPE_ORDER = [
+    'Master', 'Conviction', 'Action', 'Action/Combat', 'Action/Reaction',
+    'Ally', 'Equipment', 'Political Action', 'Retainer', 'Power',
+    'Action Modifier', 'Action Modifier/Combat', 'Action Modifier/Reaction',
+    'Reaction', 'Combat', 'Combat/Reaction', 'Event',
+  ];
+
   // Group library by type
   const libraryByType = $derived.by(() => {
     const groups: Record<string, DisplayEntry[]> = {};
@@ -145,12 +155,16 @@
       const type = entry.card?.types[0] ?? 'Other';
       (groups[type] ??= []).push(entry);
     }
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    return Object.entries(groups).sort(([a], [b]) => {
+      const ai = LIBRARY_TYPE_ORDER.indexOf(a);
+      const bi = LIBRARY_TYPE_ORDER.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
   });
 
   function showCard(card: VtesCard | undefined) {
     if (!card) return;
-    const normalized = card.name.toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
+    const normalized = card.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
     cardImageUrl = `https://static.krcg.org/card/${normalized}`;
   }
 </script>
@@ -162,11 +176,21 @@
   <p class="text-xs text-ash-400 mb-2">{m.deck_by_author({ author: deck.author })}</p>
 {/if}
 
-{#if editable && !editing}
-  <button
-    onclick={startEditing}
-    class="text-xs text-crimson-400 hover:text-crimson-300 mb-2"
-  >{m.deck_edit()}</button>
+{#if (editable || onreplace) && !editing}
+  <div class="flex gap-2 mb-3">
+    {#if editable}
+      <button
+        onclick={startEditing}
+        class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+      >{m.deck_edit()}</button>
+    {/if}
+    {#if onreplace}
+      <button
+        onclick={onreplace}
+        class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+      >{m.decks_replace()}</button>
+    {/if}
+  </div>
 {/if}
 
 {#if editing}
@@ -260,7 +284,7 @@
     <button
       onclick={saveDeck}
       disabled={saving}
-      class="px-4 py-2 text-sm font-medium text-bone-100 bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
     >{saving ? m.common_saving() : m.deck_save_changes()}</button>
     <button
       onclick={cancelEditing}
