@@ -85,58 +85,60 @@
   }
 </script>
 
-<!-- Inline VEKN section -->
-<fieldset class="border border-ash-700 rounded p-4">
-  <legend class="text-sm font-medium text-ash-400 px-2">{m.vekn_title()}</legend>
-  <p class="text-sm text-ash-300 mb-2">
-    {#if user.vekn_id}
-      {m.vekn_id_display({ id: user.vekn_id })}
-    {:else}
-      {m.vekn_no_id()}
-    {/if}
-  </p>
-  <div class="flex flex-wrap gap-2">
-    {#if !user.vekn_id}
+<!-- VEKN Management Section -->
+<div>
+  <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.vekn_title()}</h2>
+  <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4">
+    <p class="text-sm text-ash-300 mb-3">
+      {#if user.vekn_id}
+        {m.vekn_id_display({ id: user.vekn_id })}
+      {:else}
+        {m.vekn_no_id()}
+      {/if}
+    </p>
+    <div class="flex flex-wrap gap-2">
+      {#if !user.vekn_id}
+        <button
+          type="button"
+          onclick={() => showSponsorConfirm = true}
+          class="px-3 py-1.5 text-sm bg-emerald-800 hover:bg-emerald-700 text-white rounded transition-colors"
+          title={m.vekn_sponsor_title()}
+        >
+          <UserPlus class="inline w-3.5 h-3.5 mr-1" />
+          {m.vekn_sponsor()}
+        </button>
+        <button
+          type="button"
+          onclick={() => showLinkModal = true}
+          class="px-3 py-1.5 text-sm bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
+          title={m.vekn_link_modal_title()}
+        >
+          <Link class="inline w-3.5 h-3.5 mr-1" />
+          {m.vekn_link_btn()}
+        </button>
+      {:else}
+        <button
+          type="button"
+          onclick={() => showForceAbandonConfirm = true}
+          class="px-3 py-1.5 text-sm bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
+          title={m.vekn_abandon_title()}
+        >
+          <Unlink class="inline w-3.5 h-3.5 mr-1" />
+          {m.vekn_force_abandon()}
+        </button>
+      {/if}
       <button
         type="button"
-        onclick={(e) => { e.stopPropagation(); showSponsorConfirm = true; }}
-        class="px-3 py-1 text-xs bg-emerald-800 hover:bg-emerald-700 text-white rounded transition-colors"
-        title={m.vekn_sponsor_title()}
+        onclick={() => showMergeModal = true}
+        class="px-3 py-1.5 text-sm bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
+        title={m.vekn_merge_modal_title()}
       >
-        <UserPlus class="inline w-3 h-3 mr-1" />
-        {m.vekn_sponsor()}
+        <GitMerge class="inline w-3.5 h-3.5 mr-1" />
+        {m.vekn_merge()}
       </button>
-      <button
-        type="button"
-        onclick={(e) => { e.stopPropagation(); showLinkModal = true; }}
-        class="px-3 py-1 text-xs bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
-        title={m.vekn_link_modal_title()}
-      >
-        <Link class="inline w-3 h-3 mr-1" />
-        {m.vekn_link_btn()}
-      </button>
-    {:else}
-      <button
-        type="button"
-        onclick={(e) => { e.stopPropagation(); showForceAbandonConfirm = true; }}
-        class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
-        title={m.vekn_abandon_title()}
-      >
-        <Unlink class="inline w-3 h-3 mr-1" />
-        {m.vekn_force_abandon()}
-      </button>
-    {/if}
-    <button
-      type="button"
-      onclick={(e) => { e.stopPropagation(); showMergeModal = true; }}
-      class="px-3 py-1 text-xs bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
-      title={m.vekn_merge_modal_title()}
-    >
-      <GitMerge class="inline w-3 h-3 mr-1" />
-      {m.vekn_merge()}
-    </button>
+    </div>
   </div>
-</fieldset>
+</div>
 
 <!-- Sponsor Confirmation Modal -->
 {#if showSponsorConfirm}

@@ -10,9 +10,11 @@
   let {
     user,
     canIssueSanctions,
+    inline = false,
   }: {
     user: User;
     canIssueSanctions: boolean;
+    inline?: boolean;
   } = $props();
 
   // Sanctions state
@@ -172,61 +174,81 @@
   }
 </script>
 
-<!-- Inline sanctions section -->
-{#if canIssueSanctions}
-  <fieldset class="border border-crimson-800/50 rounded p-4">
-    <legend class="text-sm font-medium text-crimson-400 px-2">{m.sanction_mgr_title()}</legend>
-
-    {#if userSanctions.length > 0}
-      <div class="mb-4 space-y-2">
+{#if inline}
+  <!-- Inline mode: just badges in a row (for User.svelte view mode) -->
+  {#if userSanctions.length > 0}
+    <div class="flex items-start gap-2">
+      <span class="font-medium">{m.sanction_mgr_title()}:</span>
+      <div class="flex flex-wrap gap-1">
         {#each userSanctions as sanction (sanction.uid)}
-          <button
-            type="button"
-            onclick={(e) => { e.stopPropagation(); openEditSanctionModal(sanction); }}
-            class="w-full flex items-center justify-between gap-2 p-2 bg-dusk-900 rounded border border-ash-700 hover:border-ash-600 transition-colors text-left"
-          >
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <SanctionBadge {sanction} />
-                <span class="text-xs text-ash-400 truncate">{sanction.description}</span>
-              </div>
-              <div class="text-xs text-ash-500 mt-1">
-                {new Date(sanction.issued_at).toLocaleDateString()}
-                {#if sanction.expires_at}
-                  → {new Date(sanction.expires_at).toLocaleDateString()}
-                {/if}
-              </div>
-            </div>
-            <Pencil class="w-4 h-4 text-ash-500" />
-          </button>
+          <SanctionBadge {sanction} />
         {/each}
       </div>
-    {/if}
-
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        onclick={(e) => { e.stopPropagation(); openSanctionModal(); }}
-        class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
-        title={m.sanction_mgr_issue_btn()}
-      >
-        <TriangleAlert class="inline w-3 h-3 mr-1" />
-        {m.sanction_mgr_issue_btn()}
-      </button>
     </div>
-  </fieldset>
-{/if}
+  {/if}
+{:else}
+  <!-- Standalone section card -->
+  {#if canIssueSanctions || userSanctions.length > 0}
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.sanction_mgr_title()}</h2>
+      <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4">
+        {#if userSanctions.length > 0}
+          <div class="space-y-2 {canIssueSanctions ? 'mb-4' : ''}">
+            {#each userSanctions as sanction (sanction.uid)}
+              {#if canIssueSanctions}
+                <button
+                  type="button"
+                  onclick={() => openEditSanctionModal(sanction)}
+                  class="w-full flex items-center justify-between gap-2 p-3 bg-dusk-900 rounded border border-ash-700 hover:border-ash-600 transition-colors text-left"
+                >
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <SanctionBadge {sanction} />
+                      <span class="text-sm text-ash-300 truncate">{sanction.description}</span>
+                    </div>
+                    <div class="text-xs text-ash-500 mt-1">
+                      {new Date(sanction.issued_at).toLocaleDateString()}
+                      {#if sanction.expires_at}
+                        → {new Date(sanction.expires_at).toLocaleDateString()}
+                      {/if}
+                    </div>
+                  </div>
+                  <Pencil class="w-4 h-4 text-ash-500 flex-shrink-0" />
+                </button>
+              {:else}
+                <div class="p-3 bg-dusk-900 rounded border border-ash-700">
+                  <div class="flex items-center gap-2">
+                    <SanctionBadge {sanction} />
+                    <span class="text-sm text-ash-300">{sanction.description}</span>
+                  </div>
+                  <div class="text-xs text-ash-500 mt-1">
+                    {new Date(sanction.issued_at).toLocaleDateString()}
+                    {#if sanction.expires_at}
+                      → {new Date(sanction.expires_at).toLocaleDateString()}
+                    {/if}
+                  </div>
+                </div>
+              {/if}
+            {/each}
+          </div>
+        {/if}
 
-<!-- View mode: sanctions badges -->
-{#if !canIssueSanctions && userSanctions.length > 0}
-  <div class="flex items-start gap-2">
-    <span class="font-medium">{m.sanction_mgr_title()}:</span>
-    <div class="flex flex-wrap gap-1">
-      {#each userSanctions as sanction (sanction.uid)}
-        <SanctionBadge {sanction} />
-      {/each}
+        {#if canIssueSanctions}
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onclick={() => openSanctionModal()}
+              class="px-3 py-1.5 text-sm bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
+              title={m.sanction_mgr_issue_btn()}
+            >
+              <TriangleAlert class="inline w-3.5 h-3.5 mr-1" />
+              {m.sanction_mgr_issue_btn()}
+            </button>
+          </div>
+        {/if}
+      </div>
     </div>
-  </div>
+  {/if}
 {/if}
 
 <!-- Issue Sanction Modal -->

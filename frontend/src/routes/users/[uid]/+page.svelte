@@ -3,9 +3,11 @@
   import { getUser, getRatingByUserUid } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser } from "$lib/engine";
+  import { canEditUser, canManageVekn } from "$lib/engine";
   import type { User, Rating } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
+  import VeknManagement from "$lib/components/VeknManagement.svelte";
+  import SanctionsManager from "$lib/components/SanctionsManager.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
   import { Loader2 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -24,6 +26,21 @@
     } catch {
       return false;
     }
+  });
+
+  const canManage = $derived(() => {
+    if (!auth.user || !user || !isOnline) return false;
+    try {
+      return canManageVekn(auth.user, user).allowed;
+    } catch {
+      return false;
+    }
+  });
+
+  const canIssueSanctions = $derived(() => {
+    if (!auth.user || !user || !isOnline) return false;
+    if (auth.user.uid === user.uid) return false;
+    return auth.user.roles.includes("IC") || auth.user.roles.includes("Ethics");
   });
 
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -90,9 +107,16 @@
       {user}
       mode="view"
       editable={canEdit() && isOnline}
-      showManagement={canEdit() && isOnline}
       onupdated={handleUserUpdated}
     />
+
+    {#if canManage()}
+      <div class="mt-6">
+        <VeknManagement {user} onaction={handleUserUpdated} />
+      </div>
+    {/if}
+
+    <SanctionsManager {user} canIssueSanctions={canIssueSanctions()} />
 
     <div class="mt-6">
       <PlayerRatings {rating} />

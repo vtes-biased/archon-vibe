@@ -4,10 +4,9 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses } from "$lib/roles";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canChangeRole as engineCanChangeRole, canEditUser, canManageVekn } from "$lib/engine";
+  import { canChangeRole as engineCanChangeRole, canEditUser } from "$lib/engine";
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import AvatarCropper from "./AvatarCropper.svelte";
-  import VeknManagement from "./VeknManagement.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -17,7 +16,6 @@
     mode = "view",
     editable = true,
     inline = false,
-    showManagement = false,
     onupdated,
     oncreated,
     oncancel,
@@ -27,7 +25,6 @@
     mode?: "view" | "edit" | "create";
     editable?: boolean;
     inline?: boolean;
-    showManagement?: boolean;
     onupdated?: (user: User) => void;
     oncreated?: (user: User) => void;
     oncancel?: () => void;
@@ -35,25 +32,6 @@
   } = $props();
 
   const auth = $derived(getAuthState());
-
-  // Check if current user can manage this user's VEKN (using engine)
-  const canManage = $derived(() => {
-    if (!auth.user || !user || !showManagement) return false;
-    try {
-      return canManageVekn(auth.user, user).allowed;
-    } catch {
-      // Engine not initialized yet
-      return false;
-    }
-  });
-
-  // Check if current user can issue sanctions (IC or Ethics)
-  const canIssueSanctions = $derived(() => {
-    if (!auth.user || !user || !showManagement) return false;
-    // Can't sanction yourself
-    if (auth.user.uid === user.uid) return false;
-    return auth.user.roles.includes("IC") || auth.user.roles.includes("Ethics");
-  });
 
   // Check if current user can change a specific role (using engine)
   function canChangeRole(role: Role): boolean {
@@ -340,13 +318,11 @@
           </p>
         </div>
       {:else}
-        {#if !canManage()}
-          <!-- VEKN ID (read-only for non-managers) -->
-          <div>
-            <span class="block text-sm font-medium text-ash-400 mb-1">{m.add_player_vekn_id_label()}</span>
-            <span class="block px-3 py-2 text-ash-300">{user?.vekn_id || '—'}</span>
-          </div>
-        {/if}
+        <!-- VEKN ID (read-only, managed via standalone VEKN Management section) -->
+        <div>
+          <span class="block text-sm font-medium text-ash-400 mb-1">{m.add_player_vekn_id_label()}</span>
+          <span class="block px-3 py-2 text-ash-300">{user?.vekn_id || '—'}</span>
+        </div>
       {/if}
 
       <div>
@@ -441,16 +417,6 @@
           </p>
         {/if}
       </fieldset>
-
-      <!-- VEKN Management Section (for NC/Prince/IC in edit mode) -->
-      {#if mode !== "create" && canManage() && user}
-        <VeknManagement {user} onaction={(u) => onupdated?.(u)} />
-      {/if}
-
-      <!-- Sanctions Management Section (for IC/Ethics in edit mode) -->
-      {#if mode !== "create" && user}
-        <SanctionsManager {user} canIssueSanctions={canIssueSanctions()} />
-      {/if}
 
       {#if error}
         <div class="text-sm text-crimson-400">
@@ -576,7 +542,7 @@
             </div>
           {/if}
 
-          <SanctionsManager {user} canIssueSanctions={false} />
+          <SanctionsManager {user} canIssueSanctions={false} inline={true} />
         </div>
       </div>
 
