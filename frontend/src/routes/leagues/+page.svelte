@@ -6,7 +6,7 @@
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
-  import Icon from "@iconify/svelte";
+  import { Loader2, BarChart3 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);
@@ -245,7 +245,7 @@
     {:else if !loaded}
       <div class="text-center py-12">
         <div class="text-ash-500 mb-4">
-          <Icon icon="lucide:loader-2" class="mx-auto h-12 w-12 animate-spin" />
+          <Loader2 class="mx-auto h-12 w-12 animate-spin" />
         </div>
         <h3 class="text-lg font-medium text-bone-100 mb-2">{m.common_loading()}</h3>
         <p class="text-ash-400">{m.league_loading_hint()}</p>
@@ -253,7 +253,7 @@
     {:else}
       <div class="text-center py-12">
         <div class="text-ash-600 mb-4">
-          <Icon icon="lucide:bar-chart-3" class="mx-auto h-12 w-12" />
+          <BarChart3 class="mx-auto h-12 w-12" />
         </div>
         <h3 class="text-lg font-medium text-bone-100 mb-2">{m.league_no_results()}</h3>
         <p class="text-ash-400">

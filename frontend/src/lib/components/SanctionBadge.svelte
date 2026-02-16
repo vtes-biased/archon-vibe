@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Sanction, SanctionLevel } from "$lib/types";
-  import Icon from "@iconify/svelte";
+  import { Ban, Check, Clock } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { sanction }: { sanction: Sanction } = $props();
@@ -83,12 +83,12 @@
   title={tooltipText()}
 >
   {#if isPermanent}
-    <Icon icon="lucide:ban" class="w-3 h-3" />
+    <Ban class="w-3 h-3" />
   {/if}
   {label}
   {#if isLifted}
-    <span title={m.sanction_lifted()}><Icon icon="lucide:check" class="w-3 h-3" /></span>
+    <span title={m.sanction_lifted()}><Check class="w-3 h-3" /></span>
   {:else if isExpired()}
-    <span title={m.sanction_expired()}><Icon icon="lucide:clock" class="w-3 h-3" /></span>
+    <span title={m.sanction_expired()}><Clock class="w-3 h-3" /></span>
   {/if}
 </span>

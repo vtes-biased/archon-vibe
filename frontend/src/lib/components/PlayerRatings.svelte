@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Rating, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
-  import Icon from "@iconify/svelte";
+  import { ChevronDown, Crown, Medal } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { rating }: { rating: Rating | undefined } = $props();
@@ -55,8 +55,7 @@
           <span class="font-medium text-ash-200">{categoryLabelFns[cat]()}</span>
           <div class="flex items-center gap-3">
             <span class="text-lg font-bold text-crimson-400">{catRating.total}</span>
-            <Icon
-              icon="lucide:chevron-down"
+            <ChevronDown
               class="w-4 h-4 text-ash-500 transition-transform {isExpanded ? 'rotate-180' : ''}"
             />
           </div>
@@ -89,9 +88,9 @@
                       </a>
                       <span class="text-xs text-ash-500 ml-1">{entry.date}</span>
                       {#if entry.finalist_position === 1}
-                        <Icon icon="lucide:crown" class="w-3 h-3 inline text-amber-400 ml-1" />
+                        <Crown class="w-3 h-3 inline text-amber-400 ml-1" />
                       {:else if entry.finalist_position === 2}
-                        <Icon icon="lucide:medal" class="w-3 h-3 inline text-ash-400 ml-1" />
+                        <Medal class="w-3 h-3 inline text-ash-400 ml-1" />
                       {/if}
                     </td>
                     <td class="py-1 text-right">{entry.vp}</td>

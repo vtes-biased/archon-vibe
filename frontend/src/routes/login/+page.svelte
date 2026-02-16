@@ -12,7 +12,8 @@
     createAccountWithPasskey,
     loginWithPasskey,
   } from "$lib/stores/passkeys.svelte";
-  import Icon from "@iconify/svelte";
+  import { Mail, Loader2, KeyRound } from 'lucide-svelte';
+  import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -160,7 +161,7 @@
         <!-- SIGNUP: MAGIC LINK SENT -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto bg-green-900/30 rounded-full flex items-center justify-center">
-            <Icon icon="lucide:mail" class="w-8 h-8 text-green-400" />
+            <Mail class="w-8 h-8 text-green-400" />
           </div>
           <h2 class="text-lg font-medium text-bone-100">{m.login_check_email()}</h2>
           <p class="text-ash-400 text-sm">
@@ -183,7 +184,7 @@
         <!-- PASSWORD RESET: EMAIL SENT -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto bg-green-900/30 rounded-full flex items-center justify-center">
-            <Icon icon="lucide:mail" class="w-8 h-8 text-green-400" />
+            <Mail class="w-8 h-8 text-green-400" />
           </div>
           <h2 class="text-lg font-medium text-bone-100">{m.login_check_email()}</h2>
           <p class="text-ash-400 text-sm">
@@ -230,7 +231,7 @@
               class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
-                <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
+                <Loader2 class="w-5 h-5 animate-spin" />
               {/if}
               {m.login_send_reset_link()}
             </button>
@@ -285,7 +286,7 @@
               class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
-                <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
+                <Loader2 class="w-5 h-5 animate-spin" />
               {/if}
               {m.login_sign_in()}
             </button>
@@ -314,7 +315,7 @@
               disabled={auth.isLoading}
               class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
-              <Icon icon="lucide:key-round" class="w-5 h-5" />
+              <KeyRound class="w-5 h-5" />
               {m.login_passkey_login()}
             </button>
           {/if}
@@ -325,7 +326,7 @@
             disabled={auth.isLoading}
             class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
           >
-            <Icon icon="simple-icons:discord" class="w-5 h-5" />
+            <DiscordIcon class="w-5 h-5" />
             {m.login_discord_login()}
           </button>
 
@@ -349,9 +350,9 @@
               class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
-                <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
+                <Loader2 class="w-5 h-5 animate-spin" />
               {:else}
-                <Icon icon="lucide:key-round" class="w-5 h-5" />
+                <KeyRound class="w-5 h-5" />
               {/if}
               {m.login_passkey_signup()}
             </button>
@@ -363,7 +364,7 @@
             disabled={auth.isLoading}
             class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
           >
-            <Icon icon="simple-icons:discord" class="w-5 h-5" />
+            <DiscordIcon class="w-5 h-5" />
             {m.login_discord_signup()}
           </button>
 
@@ -396,9 +397,9 @@
               class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
-                <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
+                <Loader2 class="w-5 h-5 animate-spin" />
               {:else}
-                <Icon icon="lucide:mail" class="w-5 h-5" />
+                <Mail class="w-5 h-5" />
               {/if}
               {m.login_email_signup()}
             </button>

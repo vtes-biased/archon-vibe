@@ -3,7 +3,7 @@
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { Rating, Sanction } from "$lib/types";
-  import Icon from "@iconify/svelte";
+  import { ArrowLeft, Loader2, Trophy, ChevronLeft, ChevronRight } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let ratings = $state<Rating[]>([]);
@@ -94,7 +94,7 @@
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold text-ash-100">{m.hof_page_title()}</h1>
     <a href="/rankings" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dusk-950 text-ash-300 hover:text-ash-100 hover:bg-ash-800/50 transition-colors text-sm font-medium border border-ash-800">
-      <Icon icon="lucide:arrow-left" class="w-4 h-4" />
+      <ArrowLeft class="w-4 h-4" />
       {m.hof_back_to_rankings()}
     </a>
   </div>
@@ -117,7 +117,7 @@
 
   {#if isSyncing && ratings.length === 0}
     <div class="text-center text-ash-400 py-8">
-      <Icon icon="lucide:loader-2" class="w-6 h-6 animate-spin inline-block" />
+      <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.hof_loading()}</span>
     </div>
   {:else if filtered().length === 0}
@@ -151,7 +151,7 @@
                 {/if}
               </td>
               <td class="py-2 px-3 text-right font-medium text-ash-100">
-                <Icon icon="lucide:trophy" class="w-4 h-4 inline mr-1 text-amber-400" />
+                <Trophy class="w-4 h-4 inline mr-1 text-amber-400" />
                 {winsCount}
               </td>
             </tr>
@@ -168,7 +168,7 @@
           disabled={page === 0}
           onclick={() => { page = Math.max(0, page - 1); }}
         >
-          <Icon icon="lucide:chevron-left" class="w-4 h-4 inline" />
+          <ChevronLeft class="w-4 h-4 inline" />
         </button>
         <span class="text-sm text-ash-400">
           {m.rankings_page_info({ current: String(page + 1), total: String(totalPages) })}
@@ -178,7 +178,7 @@
           disabled={page >= totalPages - 1}
           onclick={() => { page = Math.min(totalPages - 1, page + 1); }}
         >
-          <Icon icon="lucide:chevron-right" class="w-4 h-4 inline" />
+          <ChevronRight class="w-4 h-4 inline" />
         </button>
       </div>
     {/if}

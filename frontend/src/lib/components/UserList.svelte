@@ -8,7 +8,7 @@
   import { syncManager } from "$lib/sync";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
-  import Icon from "@iconify/svelte";
+  import { RefreshCw, Users } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let filteredUsers = $state<UserType[]>([]);
@@ -575,14 +575,14 @@
         {#if isSyncing}
           <!-- Syncing state -->
           <div class="text-ash-500 mb-4">
-            <Icon icon="lucide:refresh-cw" class="mx-auto h-12 w-12 animate-spin" />
+            <RefreshCw class="mx-auto h-12 w-12 animate-spin" />
           </div>
           <h3 class="text-lg font-medium text-bone-100 mb-2">{m.status_syncing()}...</h3>
           <p class="text-ash-400">{m.user_list_loading_from_server()}</p>
         {:else}
           <!-- Truly empty state -->
           <div class="text-ash-600 mb-4">
-            <Icon icon="lucide:users" class="mx-auto h-12 w-12" />
+            <Users class="mx-auto h-12 w-12" />
           </div>
           <h3 class="text-lg font-medium text-bone-100 mb-2">{m.user_list_no_users()}</h3>
           <p class="text-ash-400">

@@ -6,7 +6,7 @@
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import Icon from "@iconify/svelte";
+  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X } from "lucide-svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -248,7 +248,7 @@
           onclick={() => showOfflinePlayerForm = !showOfflinePlayerForm}
           class="text-sm text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
         >
-          <Icon icon="lucide:user-plus" class="w-4 h-4" />
+          <UserPlus class="w-4 h-4" />
           {m.offline_add_new_player()}
         </button>
         {#if showOfflinePlayerForm}
@@ -290,7 +290,7 @@
         disabled={actionLoading}
         class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
       >
-        <Icon icon="lucide:dice-3" class="w-4 h-4 inline mr-1" />
+        <Dice3 class="w-4 h-4 inline mr-1" />
         {m.players_random_toss()}
       </button>
       <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
@@ -454,13 +454,13 @@
                 <td class="text-center py-1 px-2">
                   <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-ash-800 rounded transition-colors" title={m.players_view_deck()}>
                     {#if deckStatus === 'valid'}
-                      <Icon icon="lucide:check-circle" class="w-4 h-4 text-emerald-400" />
+                      <CircleCheck class="w-4 h-4 text-emerald-400" />
                     {:else if deckStatus === 'warning'}
-                      <Icon icon="lucide:alert-triangle" class="w-4 h-4 text-amber-400" />
+                      <TriangleAlert class="w-4 h-4 text-amber-400" />
                     {:else if deckStatus === 'error'}
-                      <Icon icon="lucide:x-circle" class="w-4 h-4 text-crimson-400" />
+                      <CircleX class="w-4 h-4 text-crimson-400" />
                     {:else}
-                      <Icon icon="lucide:file-x" class="w-4 h-4 text-ash-500" />
+                      <FileX class="w-4 h-4 text-ash-500" />
                     {/if}
                   </button>
                 </td>
@@ -489,7 +489,7 @@
                       class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors"
                       title={m.players_remove_title()}
                     >
-                      <Icon icon="lucide:x" class="w-4 h-4" />
+                      <X class="w-4 h-4" />
                     </button>
                   {/if}
                   {#if puid && hasRounds && !isOfflineMode}
@@ -498,7 +498,7 @@
                       class="p-1 text-amber-400 hover:text-amber-300 transition-colors"
                       title={m.sanction_tournament_issue_title()}
                     >
-                      <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
+                      <TriangleAlert class="w-4 h-4" />
                     </button>
                   {/if}
                 </td>
@@ -517,7 +517,7 @@
                         <div class="space-y-1">
                           {#each errors as err}
                             <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-amber-400'}">
-                              <Icon icon={err.severity === 'error' ? 'lucide:x-circle' : 'lucide:alert-triangle'} class="w-4 h-4 inline mr-1" />
+                              {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
                               {err.message}
                             </p>
                           {/each}

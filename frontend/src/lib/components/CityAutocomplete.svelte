@@ -1,7 +1,7 @@
 <script lang="ts">
     import { searchCities } from "$lib/geonames";
     import type { City } from "$lib/types";
-    import Icon from "@iconify/svelte";
+    import { Loader2 } from "lucide-svelte";
     import * as m from '$lib/paraglide/messages.js';
 
     let {
@@ -122,7 +122,7 @@
 
     {#if searching}
         <div class="absolute right-3 top-1/2 -translate-y-1/2">
-            <Icon icon="lucide:loader-2" class="animate-spin h-4 w-4 text-mist-dark" />
+            <Loader2 class="animate-spin h-4 w-4 text-mist-dark" />
         </div>
     {/if}
 

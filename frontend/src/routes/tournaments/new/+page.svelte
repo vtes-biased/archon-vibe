@@ -4,7 +4,7 @@
   import { saveTournament } from "$lib/db";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
-  import Icon from "@iconify/svelte";
+  import { ArrowLeft } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
@@ -86,7 +86,7 @@
   <div class="max-w-2xl mx-auto">
     <div class="flex items-center gap-4 mb-6">
       <a href="/tournaments" class="text-ash-400 hover:text-ash-200">
-        <Icon icon="lucide:arrow-left" class="w-5 h-5" />
+        <ArrowLeft class="w-5 h-5" />
       </a>
       <h1 class="text-3xl font-light text-crimson-500">{m.tournament_new_title()}</h1>
     </div>

@@ -2,7 +2,7 @@
   import type { Tournament } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/api";
-  import Icon from "@iconify/svelte";
+  import { ArrowLeftRight, GripVertical, ShieldCheck } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface StandingEntry {
@@ -188,7 +188,7 @@
                   class="text-left transition-colors {isSwapSource ? 'text-amber-300 font-medium' : 'text-ash-300 hover:text-ash-100'}"
                   title={isSwapSource ? "Click to deselect" : "Click to swap this player"}
                 >
-                  <Icon icon={isSwapSource ? "lucide:arrow-left-right" : "lucide:grip-vertical"} class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />
+                  {#if isSwapSource}<ArrowLeftRight class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />{:else}<GripVertical class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />{/if}
                   {seatDisplay(seat.player_uid)}
                 </button>
               {:else}
@@ -250,7 +250,7 @@
               onclick={() => { overrideTable_ = -1; overrideComment = ""; }}
               class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
             >
-              <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
+              <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
             </button>
           </div>
         {/if}
@@ -258,7 +258,7 @@
       {#if isOrganizer && tournament.finals.override}
         <div class="mt-2 pt-2 border-t border-ash-800 flex items-center justify-between">
           <span class="text-xs text-amber-400">
-            <Icon icon="lucide:shield-check" class="w-3.5 h-3.5 inline mr-1" />
+            <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />
             {m.override_overridden({ comment: tournament.finals.override.comment })}
           </span>
           <button

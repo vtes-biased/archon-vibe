@@ -1,20 +1,20 @@
 <script lang="ts">
   import { getToasts, dismissToast, type Toast } from '$lib/stores/toast.svelte';
-  import Icon from '@iconify/svelte';
+  import { CircleCheck, CircleX, TriangleAlert, Info, X } from 'lucide-svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const toasts = $derived(getToasts());
 
-  function getIcon(type: Toast['type']): string {
+  function getIcon(type: Toast['type']): typeof CircleCheck {
     switch (type) {
       case 'success':
-        return 'lucide:check-circle';
+        return CircleCheck;
       case 'error':
-        return 'lucide:x-circle';
+        return CircleX;
       case 'warning':
-        return 'lucide:alert-triangle';
+        return TriangleAlert;
       case 'info':
-        return 'lucide:info';
+        return Info;
     }
   }
 
@@ -48,11 +48,12 @@
 <!-- Toast Container -->
 <div class="fixed top-14 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
   {#each toasts as toast (toast.id)}
+    {@const ToastIcon = getIcon(toast.type)}
     <div
       class="pointer-events-auto flex items-start gap-3 p-4 rounded-lg border shadow-lg backdrop-blur-sm animate-slide-in {getStyles(toast.type)}"
       role="alert"
     >
-      <Icon icon={getIcon(toast.type)} class="w-5 h-5 flex-shrink-0 mt-0.5 {getIconColor(toast.type)}" />
+      <ToastIcon class="w-5 h-5 flex-shrink-0 mt-0.5 {getIconColor(toast.type)}" />
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium">{toast.message}</p>
         {#if toast.action}
@@ -72,7 +73,7 @@
         class="flex-shrink-0 p-1 -m-1 rounded hover:bg-white/10 transition-colors"
         aria-label={m.toast_dismiss()}
       >
-        <Icon icon="lucide:x" class="w-4 h-4" />
+        <X class="w-4 h-4" />
       </button>
     </div>
   {/each}

@@ -18,7 +18,8 @@
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import { syncManager } from "$lib/sync";
-  import Icon from "@iconify/svelte";
+  import { User, Camera, SquarePen, Unlink, KeyRound, RefreshCw } from "lucide-svelte";
+  import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -238,7 +239,7 @@
     {:else if !auth.isAuthenticated || !auth.user}
       <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
         <div class="text-ash-500 mb-4">
-          <Icon icon="lucide:user" class="mx-auto h-16 w-16" />
+          <User class="mx-auto h-16 w-16" />
         </div>
         <h2 class="text-xl font-medium text-bone-100 mb-2">{m.profile_sign_in_required()}</h2>
         <p class="text-ash-400 mb-6">{m.profile_sign_in_msg()}</p>
@@ -409,11 +410,11 @@
                       <div
                         class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center"
                       >
-                        <Icon icon="lucide:user" class="h-8 w-8 text-ash-500" />
+                        <User class="h-8 w-8 text-ash-500" />
                       </div>
                     {/if}
                     <div class="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <Icon icon="lucide:camera" class="h-6 w-6 text-white" />
+                      <Camera class="h-6 w-6 text-white" />
                     </div>
                   </button>
                   <button
@@ -435,7 +436,7 @@
                 class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
                 title={m.profile_edit_btn()}
               >
-                <Icon icon="lucide:square-pen" class="w-5 h-5" />
+                <SquarePen class="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -452,7 +453,7 @@
                     class="p-1 text-ash-500 hover:text-crimson-400 transition-colors"
                     title={m.profile_abandon_vekn_tooltip()}
                   >
-                    <Icon icon="lucide:unlink" class="w-4 h-4" />
+                    <Unlink class="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -521,7 +522,7 @@
             <!-- Discord -->
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <Icon icon="simple-icons:discord" class="w-5 h-5 text-[#5865F2]" />
+                <DiscordIcon class="w-5 h-5 text-[#5865F2]" />
                 <div>
                   <p class="text-bone-100">Discord</p>
                   {#if hasDiscord && discordUsername}
@@ -554,7 +555,7 @@
             {#if isPasskeySupported()}
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                  <Icon icon="lucide:key-round" class="w-5 h-5 text-ash-400" />
+                  <KeyRound class="w-5 h-5 text-ash-400" />
                   <div>
                     <p class="text-bone-100">Passkey</p>
                     <p class="text-sm text-ash-400">
@@ -599,7 +600,7 @@
                 disabled={isSyncing}
                 class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed flex items-center gap-2"
               >
-                <Icon icon="lucide:refresh-cw" class="w-4 h-4 {isSyncing ? 'animate-spin' : ''}" />
+                <RefreshCw class="w-4 h-4 {isSyncing ? 'animate-spin' : ''}" />
                 {isSyncing ? m.profile_resyncing() : m.profile_resync_btn()}
               </button>
             </div>

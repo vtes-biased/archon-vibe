@@ -10,7 +10,7 @@
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { computeLeagueStandings } from "$lib/engine";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
-  import Icon from "@iconify/svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2 } from "lucide-svelte";
 
   const uid = $derived(page.params.uid);
   const countries = getCountries();
@@ -214,11 +214,11 @@
   <div class="max-w-6xl mx-auto">
     {#if !loaded}
       <div class="text-center py-12">
-        <Icon icon="lucide:loader-2" class="mx-auto h-12 w-12 animate-spin text-ash-500" />
+        <Loader2 class="mx-auto h-12 w-12 animate-spin text-ash-500" />
       </div>
     {:else if !league}
       <div class="text-center py-12">
-        <Icon icon="lucide:alert-circle" class="mx-auto h-12 w-12 text-ash-600 mb-4" />
+        <CircleAlert class="mx-auto h-12 w-12 text-ash-600 mb-4" />
         <h3 class="text-lg font-medium text-bone-100 mb-2">League not found</h3>
         <a href="/leagues" class="text-crimson-400 hover:text-crimson-300">Back to leagues</a>
       </div>
@@ -227,7 +227,7 @@
       <div class="flex items-start justify-between mb-6">
         <div class="flex items-center gap-3">
           <a href="/leagues" class="text-ash-400 hover:text-bone-100">
-            <Icon icon="lucide:arrow-left" class="w-5 h-5" />
+            <ArrowLeft class="w-5 h-5" />
           </a>
           <div>
             <h1 class="text-3xl font-light text-crimson-500">{league.name}</h1>
@@ -248,10 +248,10 @@
         {#if isOrganizer}
           <div class="flex gap-2">
             <button onclick={startEdit} class="px-3 py-1.5 text-sm text-ash-300 hover:text-bone-100 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
-              <Icon icon="lucide:pencil" class="w-4 h-4 inline -mt-0.5" /> Edit
+              <Pencil class="w-4 h-4 inline -mt-0.5" /> Edit
             </button>
             <button onclick={handleDelete} class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
-              <Icon icon="lucide:trash-2" class="w-4 h-4 inline -mt-0.5" /> Delete
+              <Trash2 class="w-4 h-4 inline -mt-0.5" /> Delete
             </button>
           </div>
         {/if}

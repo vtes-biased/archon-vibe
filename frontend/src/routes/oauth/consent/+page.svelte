@@ -3,7 +3,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { getAuthState, getAccessToken } from "$lib/stores/auth.svelte";
-  import Icon from "@iconify/svelte";
+  import { Loader2, CircleAlert, ShieldCheck, CircleCheck } from 'lucide-svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -167,12 +167,12 @@
     <div class="bg-dusk-950 rounded-lg shadow-lg p-8 border border-ash-800">
       {#if loading}
         <div class="flex items-center justify-center py-8">
-          <Icon icon="lucide:loader-2" class="w-8 h-8 animate-spin text-ash-400" />
+          <Loader2 class="w-8 h-8 animate-spin text-ash-400" />
         </div>
       {:else if error}
         <div class="text-center space-y-4">
           <div class="w-16 h-16 mx-auto bg-red-900/30 rounded-full flex items-center justify-center">
-            <Icon icon="lucide:alert-circle" class="w-8 h-8 text-red-400" />
+            <CircleAlert class="w-8 h-8 text-red-400" />
           </div>
           <p class="text-red-300 text-sm">{error}</p>
           <button
@@ -186,7 +186,7 @@
         <div class="space-y-6">
           <div class="text-center">
             <div class="w-16 h-16 mx-auto bg-dusk-900 rounded-full flex items-center justify-center mb-4">
-              <Icon icon="lucide:shield-check" class="w-8 h-8 text-crimson-400" />
+              <ShieldCheck class="w-8 h-8 text-crimson-400" />
             </div>
             <h2 class="text-lg font-medium text-bone-100">
               {clientName}
@@ -200,7 +200,7 @@
             <p class="text-sm text-ash-300 font-medium">{m.oauth_allow_application()}</p>
             {#each scopes as scope}
               <div class="flex items-start gap-3 p-3 bg-dusk-900 rounded-lg">
-                <Icon icon="lucide:check-circle" class="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+                <CircleCheck class="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
                 <div>
                   <p class="text-bone-200 text-sm">{scope}</p>
                   {#if scopeDescriptions[scope]}
@@ -225,7 +225,7 @@
               class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if submitting}
-                <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
+                <Loader2 class="w-5 h-5 animate-spin" />
               {/if}
               {m.oauth_approve()}
             </button>

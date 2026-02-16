@@ -5,7 +5,7 @@
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
   import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
-  import Icon from "@iconify/svelte";
+
   import * as m from '$lib/paraglide/messages.js';
 
   interface StandingEntry {

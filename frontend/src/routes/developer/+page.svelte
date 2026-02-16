@@ -3,7 +3,7 @@
   import { getAuthState, getAccessToken, hasRole } from "$lib/stores/auth.svelte";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import Icon from "@iconify/svelte";
+  import { Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
@@ -147,7 +147,7 @@
       onclick={() => (showRegister = !showRegister)}
       class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
     >
-      <Icon icon="lucide:plus" class="w-4 h-4" />
+      <Plus class="w-4 h-4" />
       {m.developer_register_btn()}
     </button>
   </div>
@@ -156,7 +156,7 @@
   {#if displayedSecret}
     <div class="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg">
       <div class="flex items-start gap-3">
-        <Icon icon="lucide:alert-triangle" class="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
+        <TriangleAlert class="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
         <div class="flex-1 min-w-0">
           <p class="text-yellow-200 text-sm font-medium mb-2">
             {m.developer_secret_warning()}
@@ -170,7 +170,7 @@
               class="p-2 bg-dusk-900 hover:bg-dusk-800 rounded transition-colors shrink-0"
               title={m.developer_copy_secret()}
             >
-              <Icon icon="lucide:copy" class="w-4 h-4 text-ash-300" />
+              <Copy class="w-4 h-4 text-ash-300" />
             </button>
           </div>
           {#if displayedClientId}
@@ -255,7 +255,7 @@
             class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
           >
             {#if registering}
-              <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
+              <Loader2 class="w-5 h-5 animate-spin" />
             {/if}
             {m.developer_register_submit()}
           </button>
@@ -267,11 +267,11 @@
   <!-- Client list -->
   {#if loading}
     <div class="flex items-center justify-center py-12">
-      <Icon icon="lucide:loader-2" class="w-8 h-8 animate-spin text-ash-400" />
+      <Loader2 class="w-8 h-8 animate-spin text-ash-400" />
     </div>
   {:else if clients.length === 0}
     <div class="text-center py-12">
-      <Icon icon="lucide:code-2" class="w-12 h-12 text-ash-600 mx-auto mb-4" />
+      <Code2 class="w-12 h-12 text-ash-600 mx-auto mb-4" />
       <p class="text-ash-400">{m.developer_no_clients()}</p>
       <p class="text-ash-500 text-sm mt-1">{m.developer_no_clients_hint()}</p>
     </div>
@@ -298,7 +298,7 @@
                     class="text-ash-500 hover:text-ash-300"
                     title={m.developer_copy()}
                   >
-                    <Icon icon="lucide:copy" class="w-3.5 h-3.5" />
+                    <Copy class="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <div class="flex items-center gap-2">
@@ -317,14 +317,14 @@
                   class="p-2 text-ash-400 hover:text-ash-200 hover:bg-dusk-900 rounded transition-colors"
                   title={m.developer_regenerate_title()}
                 >
-                  <Icon icon="lucide:refresh-cw" class="w-4 h-4" />
+                  <RefreshCw class="w-4 h-4" />
                 </button>
                 <button
                   onclick={() => (confirmAction = { clientId: client.client_id, action: "deactivate" })}
                   class="p-2 text-red-400 hover:text-red-300 hover:bg-dusk-900 rounded transition-colors"
                   title={m.developer_deactivate_title()}
                 >
-                  <Icon icon="lucide:power-off" class="w-4 h-4" />
+                  <PowerOff class="w-4 h-4" />
                 </button>
               </div>
             {/if}

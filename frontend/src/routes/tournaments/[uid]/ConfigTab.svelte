@@ -2,7 +2,7 @@
   import type { Tournament } from "$lib/types";
   import { updateTournament } from "$lib/api";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
-  import Icon from "@iconify/svelte";
+  import { RefreshCw } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const DISCORD_VENUE = "Official Discord";
@@ -170,7 +170,7 @@
 
     {#if saving}
       <div class="text-xs text-ash-500 flex items-center gap-1">
-        <Icon icon="lucide:refresh-cw" class="w-3 h-3 animate-spin" />
+        <RefreshCw class="w-3 h-3 animate-spin" />
         {m.config_saving()}
       </div>
     {/if}

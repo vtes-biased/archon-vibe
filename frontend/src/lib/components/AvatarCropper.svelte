@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte';
+  import { ImagePlus, ZoomOut, ZoomIn } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   // Props
@@ -199,7 +199,7 @@
           onclick={() => fileInput?.click()}
           class="w-32 h-32 rounded-full border-2 border-dashed border-ash-600 flex items-center justify-center hover:border-crimson-500 transition-colors"
         >
-          <Icon icon="lucide:image-plus" class="w-12 h-12 text-ash-500" />
+          <ImagePlus class="w-12 h-12 text-ash-500" />
         </button>
         <p class="text-sm text-ash-400">{m.avatar_select_image()}</p>
         <input
@@ -244,7 +244,7 @@
 
         <!-- Zoom control -->
         <div class="w-full flex items-center gap-3">
-          <Icon icon="lucide:zoom-out" class="w-5 h-5 text-ash-400" />
+          <ZoomOut class="w-5 h-5 text-ash-400" />
           <input
             type="range"
             min={minScale}
@@ -254,7 +254,7 @@
             oninput={handleZoom}
             class="flex-1 accent-crimson-500"
           />
-          <Icon icon="lucide:zoom-in" class="w-5 h-5 text-ash-400" />
+          <ZoomIn class="w-5 h-5 text-ash-400" />
         </div>
 
         <p class="text-xs text-ash-500">{m.avatar_drag_reposition()}</p>

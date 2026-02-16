@@ -96,3 +96,11 @@ When Rust engine capabilities change:
 **BaseObject Pattern:**
 - Confirmed `deleted_at` is part of BaseObject (was already documented correctly)
 - Updated ARCHITECTURE.md to explicitly list deleted_at in Object Structure section
+
+**Session 2026-02-16: Icon library migration (@iconify/svelte → lucide-svelte)**
+- Replaced @iconify/svelte (runtime icon fetching from api.iconify.design) with lucide-svelte (tree-shaken, build-time bundled)
+- Updated staff-frontend-engineer MEMORY.md stack dependencies (line 9)
+- Reason: offline-first PWA requirement — runtime icon fetching breaks offline mode
+- lucide-svelte provides ~2000+ SVG icons, auto tree-shakes unused icons during build
+- New DiscordIcon.svelte component created for Discord logo (not available in lucide)
+- No updates needed to CLAUDE.md, ARCHITECTURE.md, CONTEXT7.md, or frontend/DESIGN.md (icons not a documented architecture concern)

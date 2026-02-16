@@ -4,7 +4,7 @@
   import { getActiveSanctionsForUser } from "$lib/db";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
-  import Icon from "@iconify/svelte";
+  import { Pencil, TriangleAlert, CircleCheck, Trash2 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -197,7 +197,7 @@
                 {/if}
               </div>
             </div>
-            <Icon icon="lucide:pencil" class="w-4 h-4 text-ash-500" />
+            <Pencil class="w-4 h-4 text-ash-500" />
           </button>
         {/each}
       </div>
@@ -210,7 +210,7 @@
         class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
         title={m.sanction_mgr_issue_btn()}
       >
-        <Icon icon="lucide:alert-triangle" class="inline w-3 h-3 mr-1" />
+        <TriangleAlert class="inline w-3 h-3 mr-1" />
         {m.sanction_mgr_issue_btn()}
       </button>
     </div>
@@ -463,7 +463,7 @@
                 disabled={processingSanctionAction}
                 class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
               >
-                <Icon icon="lucide:check-circle" class="inline w-4 h-4 mr-1" />
+                <CircleCheck class="inline w-4 h-4 mr-1" />
                 {processingSanctionAction ? m.sanction_mgr_lifting() : m.sanction_mgr_lift()}
               </button>
             {/if}
@@ -474,7 +474,7 @@
               disabled={processingSanctionAction}
               class="flex-1 px-4 py-2 bg-crimson-800 hover:bg-crimson-700 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
             >
-              <Icon icon="lucide:trash-2" class="inline w-4 h-4 mr-1" />
+              <Trash2 class="inline w-4 h-4 mr-1" />
               {processingSanctionAction ? m.common_deleting() : m.common_delete()}
             </button>
 

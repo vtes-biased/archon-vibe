@@ -5,7 +5,7 @@
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { LeagueKind, LeagueStandingsMode } from "$lib/types";
-  import Icon from "@iconify/svelte";
+  import { ArrowLeft } from "lucide-svelte";
 
   const canCreate = $derived(hasAnyRole("IC", "NC"));
   const countries = getCountries();
@@ -64,7 +64,7 @@
   <div class="max-w-2xl mx-auto">
     <div class="flex items-center gap-3 mb-6">
       <a href="/leagues" class="text-ash-400 hover:text-bone-100">
-        <Icon icon="lucide:arrow-left" class="w-5 h-5" />
+        <ArrowLeft class="w-5 h-5" />
       </a>
       <h1 class="text-3xl font-light text-crimson-500">New League</h1>
     </div>

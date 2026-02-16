@@ -3,7 +3,7 @@
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { Rating, RatingCategory } from "$lib/types";
-  import Icon from "@iconify/svelte";
+  import { Trophy, Loader2, ChevronLeft, ChevronRight } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let ratings = $state<Rating[]>([]);
@@ -100,7 +100,7 @@
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold text-ash-100">{m.rankings_page_title()}</h1>
     <a href="/halloffame" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-900/40 text-amber-300 hover:bg-amber-900/60 transition-colors text-sm font-medium">
-      <Icon icon="lucide:trophy" class="w-4 h-4" />
+      <Trophy class="w-4 h-4" />
       {m.rankings_hall_of_fame_link()}
     </a>
   </div>
@@ -138,7 +138,7 @@
   <!-- Table -->
   {#if isSyncing && ratings.length === 0}
     <div class="text-center text-ash-400 py-8">
-      <Icon icon="lucide:loader-2" class="w-6 h-6 animate-spin inline-block" />
+      <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.rankings_loading()}</span>
     </div>
   {:else if filtered().length === 0}
@@ -186,7 +186,7 @@
           disabled={page === 0}
           onclick={() => { page = Math.max(0, page - 1); }}
         >
-          <Icon icon="lucide:chevron-left" class="w-4 h-4 inline" />
+          <ChevronLeft class="w-4 h-4 inline" />
         </button>
         <span class="text-sm text-ash-400">
           {m.rankings_page_info({ current: String(page + 1), total: String(totalPages) })}
@@ -196,7 +196,7 @@
           disabled={page >= totalPages - 1}
           onclick={() => { page = Math.min(totalPages - 1, page + 1); }}
         >
-          <Icon icon="lucide:chevron-right" class="w-4 h-4 inline" />
+          <ChevronRight class="w-4 h-4 inline" />
         </button>
       </div>
     {/if}

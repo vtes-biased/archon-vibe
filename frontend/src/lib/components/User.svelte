@@ -9,7 +9,7 @@
   import AvatarCropper from "./AvatarCropper.svelte";
   import VeknManagement from "./VeknManagement.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
-  import Icon from "@iconify/svelte";
+  import { Loader2, X, User as UserIcon, Camera, SquarePen } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -288,7 +288,7 @@
         <div class="flex justify-end items-center gap-2 -mt-1 -mr-1">
           {#if saving}
             <span class="text-xs text-ash-400 flex items-center gap-1">
-              <Icon icon="lucide:loader-2" class="w-3 h-3 animate-spin" />
+              <Loader2 class="w-3 h-3 animate-spin" />
               {m.user_saving()}
             </span>
           {/if}
@@ -298,7 +298,7 @@
             class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
             title={m.common_close()}
           >
-            <Icon icon="lucide:x" class="w-5 h-5" />
+            <X class="w-5 h-5" />
           </button>
         </div>
       {/if}
@@ -500,11 +500,11 @@
                 />
               {:else}
                 <div class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center ring-2 ring-ash-700 group-hover:ring-crimson-500 transition-all">
-                  <Icon icon="lucide:user" class="w-8 h-8 text-ash-500" />
+                  <UserIcon class="w-8 h-8 text-ash-500" />
                 </div>
               {/if}
               <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Icon icon="lucide:camera" class="w-5 h-5 text-white" />
+                <Camera class="w-5 h-5 text-white" />
               </div>
             </button>
             <button
@@ -520,7 +520,7 @@
           />
         {:else}
           <div class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center ring-2 ring-ash-700">
-            <Icon icon="lucide:user" class="w-8 h-8 text-ash-500" />
+            <UserIcon class="w-8 h-8 text-ash-500" />
           </div>
         {/if}
       </div>
@@ -586,7 +586,7 @@
           class="ml-2 p-2 text-ash-500 hover:text-crimson-400 transition-colors"
           title={m.user_edit()}
         >
-          <Icon icon="lucide:square-pen" class="w-5 h-5" />
+          <SquarePen class="w-5 h-5" />
         </button>
       {/if}
     </div>

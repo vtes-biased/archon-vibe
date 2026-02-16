@@ -4,7 +4,7 @@
   import { createSanction } from "$lib/api";
   import { getPlayerSanctionsInTournament } from "$lib/db";
   import { showToast } from "$lib/stores/toast.svelte";
-  import Icon from "@iconify/svelte";
+  import { TriangleAlert, CircleArrowDown } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -204,7 +204,7 @@
       {#if activePriorCount > 0}
         <div class="p-3 rounded bg-amber-900/30 border border-amber-800/50 text-sm">
           <div class="flex items-center gap-2 text-amber-300">
-            <Icon icon="lucide:alert-triangle" class="w-4 h-4 shrink-0" />
+            <TriangleAlert class="w-4 h-4 shrink-0" />
             {m.sanction_escalation_hint({ count: String(activePriorCount), suggested: levelLabel(suggestedLevel) })}
           </div>
         </div>
@@ -213,7 +213,7 @@
       {#if isDowngrade && highestExisting}
         <div class="p-3 rounded bg-crimson-900/30 border border-crimson-800/50 text-sm">
           <div class="flex items-center gap-2 text-crimson-300">
-            <Icon icon="lucide:arrow-down-circle" class="w-4 h-4 shrink-0" />
+            <CircleArrowDown class="w-4 h-4 shrink-0" />
             {m.sanction_downgrade_warning({ existing: levelLabel(highestExisting) })}
           </div>
         </div>

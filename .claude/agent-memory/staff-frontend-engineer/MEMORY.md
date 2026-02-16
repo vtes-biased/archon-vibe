@@ -6,7 +6,7 @@
 - Svelte 5 (runes: $state, $derived, $effect, $props), SvelteKit with adapter-static
 - TailwindCSS v4 (via @tailwindcss/vite), @tailwindcss/typography
 - TypeScript ~5.9.3, Vite 6
-- idb (IndexedDB wrapper), @iconify/svelte (icons), marked + dompurify (markdown)
+- idb (IndexedDB wrapper), lucide-svelte (tree-shaken SVG icons), marked + dompurify (markdown)
 - WASM engine (Rust) for business logic (scoring, permissions, validation)
 - Paraglide JS for i18n (en, fr, es, pt, it), messages in frontend/messages/{locale}.json
 

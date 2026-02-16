@@ -7,7 +7,7 @@
   import type { User, Rating } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
-  import Icon from "@iconify/svelte";
+  import { Loader2 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let user = $state<User | undefined>();
@@ -82,7 +82,7 @@
 <div class="max-w-3xl mx-auto px-4 py-6">
   {#if !user}
     <div class="text-center text-ash-400 py-8">
-      <Icon icon="lucide:loader-2" class="w-6 h-6 animate-spin inline-block" />
+      <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.common_loading()}</span>
     </div>
   {:else}

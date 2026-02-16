@@ -2,7 +2,7 @@
   import type { User } from "$lib/types";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import Icon from "@iconify/svelte";
+  import { UserPlus, Link, Unlink, GitMerge } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -103,7 +103,7 @@
         class="px-3 py-1 text-xs bg-emerald-800 hover:bg-emerald-700 text-white rounded transition-colors"
         title={m.vekn_sponsor_title()}
       >
-        <Icon icon="lucide:user-plus" class="inline w-3 h-3 mr-1" />
+        <UserPlus class="inline w-3 h-3 mr-1" />
         {m.vekn_sponsor()}
       </button>
       <button
@@ -112,7 +112,7 @@
         class="px-3 py-1 text-xs bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
         title={m.vekn_link_modal_title()}
       >
-        <Icon icon="lucide:link" class="inline w-3 h-3 mr-1" />
+        <Link class="inline w-3 h-3 mr-1" />
         {m.vekn_link_btn()}
       </button>
     {:else}
@@ -122,7 +122,7 @@
         class="px-3 py-1 text-xs bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
         title={m.vekn_abandon_title()}
       >
-        <Icon icon="lucide:unlink" class="inline w-3 h-3 mr-1" />
+        <Unlink class="inline w-3 h-3 mr-1" />
         {m.vekn_force_abandon()}
       </button>
     {/if}
@@ -132,7 +132,7 @@
       class="px-3 py-1 text-xs bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
       title={m.vekn_merge_modal_title()}
     >
-      <Icon icon="lucide:git-merge" class="inline w-3 h-3 mr-1" />
+      <GitMerge class="inline w-3 h-3 mr-1" />
       {m.vekn_merge()}
     </button>
   </div>

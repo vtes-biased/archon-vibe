@@ -2,7 +2,7 @@
   import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "$lib/stores/auth.svelte";
-  import Icon from "@iconify/svelte";
+  import { Loader2, X } from 'lucide-svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
@@ -82,7 +82,7 @@
         <!-- VERIFYING TOKEN -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto flex items-center justify-center">
-            <Icon icon="lucide:loader-2" class="w-10 h-10 animate-spin text-crimson-500" />
+            <Loader2 class="w-10 h-10 animate-spin text-crimson-500" />
           </div>
           <h2 class="text-lg font-medium text-bone-100">{m.auth_verify_verifying()}</h2>
           <p class="text-ash-400 text-sm">{m.auth_verify_please_wait()}</p>
@@ -92,7 +92,7 @@
         <!-- ERROR -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto bg-red-900/30 rounded-full flex items-center justify-center">
-            <Icon icon="lucide:x" class="w-8 h-8 text-red-400" />
+            <X class="w-8 h-8 text-red-400" />
           </div>
           <h2 class="text-lg font-medium text-bone-100">{m.auth_verify_link_invalid()}</h2>
           <p class="text-ash-400 text-sm">{error}</p>
@@ -153,7 +153,7 @@
               class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {#if auth.isLoading}
-                <Icon icon="lucide:loader-2" class="w-5 h-5 animate-spin" />
+                <Loader2 class="w-5 h-5 animate-spin" />
               {/if}
               {buttonText}
             </button>

@@ -3,7 +3,7 @@
   import { getFilteredUsers, getUser } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import { showToast } from "$lib/stores/toast.svelte";
-  import Icon from "@iconify/svelte";
+  import { X } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -119,7 +119,7 @@
             class="ml-1 text-ash-500 hover:text-crimson-400 transition-colors"
             title={m.common_delete()}
           >
-            <Icon icon="lucide:x" class="w-3.5 h-3.5" />
+            <X class="w-3.5 h-3.5" />
           </button>
         {/if}
       </span>

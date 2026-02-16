@@ -7,7 +7,7 @@
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState } from '$lib/stores/offline.svelte';
   import { onMount } from 'svelte';
-  import Icon from '@iconify/svelte';
+  import { WifiOff, Download, Trophy, BarChart3, Medal, Users, User, Code2, Monitor, Sun, Moon } from 'lucide-svelte';
   import Toast from '$lib/components/Toast.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
@@ -106,7 +106,7 @@
     <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm {!isOnline ? 'bg-amber-900/90 text-amber-100' : 'bg-crimson-900/90 text-crimson-100'}">
       {#if !isOnline}
         <span class="inline-flex items-center gap-2">
-          <Icon icon="lucide:wifi-off" class="w-4 h-4" />
+          <WifiOff class="w-4 h-4" />
           {m.status_offline_banner()}
         </span>
       {:else if syncError}
@@ -119,7 +119,7 @@
   {#if getUpdateAvailable()}
     <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm bg-indigo-900/90 text-indigo-100" class:top-10={!isOnline || syncError}>
       <span class="inline-flex items-center gap-2">
-        <Icon icon="lucide:download" class="w-4 h-4" />
+        <Download class="w-4 h-4" />
         {m.update_available()}
         <button onclick={applyUpdate} class="ml-2 underline hover:no-underline font-medium">{m.update_refresh()}</button>
       </span>
@@ -141,17 +141,17 @@
           class="flex flex-col items-center py-3 px-3 min-w-[64px] {active ? 'text-crimson-500' : 'text-ash-400 hover:text-ash-200'}"
         >
           {#if item.icon === 'trophy'}
-            <Icon icon="lucide:trophy" class="w-6 h-6" />
+            <Trophy class="w-6 h-6" />
           {:else if item.icon === 'chart'}
-            <Icon icon="lucide:bar-chart-3" class="w-6 h-6" />
+            <BarChart3 class="w-6 h-6" />
           {:else if item.icon === 'ranking'}
-            <Icon icon="lucide:medal" class="w-6 h-6" />
+            <Medal class="w-6 h-6" />
           {:else if item.icon === 'users'}
-            <Icon icon="lucide:users" class="w-6 h-6" />
+            <Users class="w-6 h-6" />
           {:else if item.icon === 'user'}
-            <Icon icon="lucide:user" class="w-6 h-6" />
+            <User class="w-6 h-6" />
           {:else if item.icon === 'code'}
-            <Icon icon="lucide:code-2" class="w-6 h-6" />
+            <Code2 class="w-6 h-6" />
           {/if}
           <span class="text-xs mt-1">{item.labelFn()}</span>
         </a>
@@ -161,11 +161,11 @@
         class="flex flex-col items-center py-3 px-3 min-w-[64px] text-ash-400 hover:text-ash-200"
       >
         {#if getTheme() === 'system'}
-          <Icon icon="lucide:monitor" class="w-6 h-6" />
+          <Monitor class="w-6 h-6" />
         {:else if getTheme() === 'light'}
-          <Icon icon="lucide:sun" class="w-6 h-6" />
+          <Sun class="w-6 h-6" />
         {:else}
-          <Icon icon="lucide:moon" class="w-6 h-6" />
+          <Moon class="w-6 h-6" />
         {/if}
         <span class="text-xs mt-1">
           {#if getTheme() === 'system'}{m.theme_system()}{:else if getTheme() === 'light'}{m.theme_light()}{:else}{m.theme_dark()}{/if}
@@ -190,17 +190,17 @@
           title={item.labelFn()}
         >
           {#if item.icon === 'trophy'}
-            <Icon icon="lucide:trophy" class="w-6 h-6" />
+            <Trophy class="w-6 h-6" />
           {:else if item.icon === 'chart'}
-            <Icon icon="lucide:bar-chart-3" class="w-6 h-6" />
+            <BarChart3 class="w-6 h-6" />
           {:else if item.icon === 'ranking'}
-            <Icon icon="lucide:medal" class="w-6 h-6" />
+            <Medal class="w-6 h-6" />
           {:else if item.icon === 'users'}
-            <Icon icon="lucide:users" class="w-6 h-6" />
+            <Users class="w-6 h-6" />
           {:else if item.icon === 'user'}
-            <Icon icon="lucide:user" class="w-6 h-6" />
+            <User class="w-6 h-6" />
           {:else if item.icon === 'code'}
-            <Icon icon="lucide:code-2" class="w-6 h-6" />
+            <Code2 class="w-6 h-6" />
           {/if}
           <span class="text-xs mt-1">{item.labelFn()}</span>
         </a>
@@ -215,11 +215,11 @@
         title={getTheme() === 'system' ? 'System theme' : getTheme() === 'light' ? 'Light theme' : 'Dark theme'}
       >
         {#if getTheme() === 'system'}
-          <Icon icon="lucide:monitor" class="w-5 h-5" />
+          <Monitor class="w-5 h-5" />
         {:else if getTheme() === 'light'}
-          <Icon icon="lucide:sun" class="w-5 h-5" />
+          <Sun class="w-5 h-5" />
         {:else}
-          <Icon icon="lucide:moon" class="w-5 h-5" />
+          <Moon class="w-5 h-5" />
         {/if}
       </button>
     </div>

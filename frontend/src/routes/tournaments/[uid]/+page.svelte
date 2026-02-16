@@ -12,7 +12,7 @@
   import { formatScore } from "$lib/utils";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import Icon from "@iconify/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -89,18 +89,18 @@
   let activeTab = $state<TabId>('overview');
 
   const tabs = $derived.by(() => {
-    const t: { id: TabId; label: string; icon: string }[] = [
-      { id: 'overview', label: m.tournament_tab_overview(), icon: 'lucide:layout-dashboard' },
-      { id: 'players', label: m.tournament_tab_players(), icon: 'lucide:users' },
-      { id: 'rounds', label: m.tournament_tab_rounds(), icon: 'lucide:swords' },
+    const t: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
+      { id: 'overview', label: m.tournament_tab_overview(), icon: LayoutDashboard },
+      { id: 'players', label: m.tournament_tab_players(), icon: Users },
+      { id: 'rounds', label: m.tournament_tab_rounds(), icon: Swords },
     ];
     // Show Finals tab when ≥2 rounds played
     const hasFinalsCandidate = (tournament?.rounds?.length ?? 0) >= 2;
     if (hasFinalsCandidate || tournament?.finals) {
-      t.push({ id: 'finals', label: m.tournament_tab_finals(), icon: 'lucide:trophy' });
+      t.push({ id: 'finals', label: m.tournament_tab_finals(), icon: Trophy });
     }
     if (showOrganizerView) {
-      t.push({ id: 'config', label: m.tournament_tab_config(), icon: 'lucide:settings' });
+      t.push({ id: 'config', label: m.tournament_tab_config(), icon: Settings });
     }
     return t;
   });
@@ -521,13 +521,13 @@
   <div class="max-w-4xl mx-auto">
     <!-- Back link -->
     <a href="/tournaments" class="inline-flex items-center gap-2 text-ash-400 hover:text-ash-200 mb-4">
-      <Icon icon="lucide:arrow-left" class="w-4 h-4" />
+      <ArrowLeft class="w-4 h-4" />
       {m.nav_tournaments()}
     </a>
 
     {#if loading}
       <div class="text-center py-12">
-        <Icon icon="lucide:loader-2" class="mx-auto h-12 w-12 text-ash-500 animate-spin" />
+        <Loader2 class="mx-auto h-12 w-12 text-ash-500 animate-spin" />
       </div>
     {:else if error && !tournament}
       <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4">
@@ -538,7 +538,7 @@
       {#if tournamentIsOffline}
         <div class="bg-amber-900/30 border border-amber-700 rounded-lg p-4 mb-4 flex items-center justify-between gap-4">
           <div class="flex items-center gap-2 min-w-0">
-            <Icon icon="lucide:wifi-off" class="w-5 h-5 text-amber-400 shrink-0" />
+            <WifiOff class="w-5 h-5 text-amber-400 shrink-0" />
             <div class="min-w-0">
               <span class="text-amber-200 font-medium text-sm">{m.offline_mode_banner()}</span>
               {#if lastSync}
@@ -553,7 +553,7 @@
             disabled={offlineActionLoading}
             class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shrink-0"
           >
-            <Icon icon="lucide:wifi" class="w-4 h-4 inline mr-1" />
+            <Wifi class="w-4 h-4 inline mr-1" />
             {m.offline_go_online()}
           </button>
         </div>
@@ -564,7 +564,7 @@
         <div class="bg-ash-900/50 border border-ash-700 rounded-lg p-4 mb-4">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-2 min-w-0">
-              <Icon icon="lucide:lock" class="w-5 h-5 text-ash-400 shrink-0" />
+              <Lock class="w-5 h-5 text-ash-400 shrink-0" />
               <span class="text-ash-300 text-sm">{m.offline_locked_banner()}</span>
             </div>
             {#if isOrganizer}
@@ -601,7 +601,7 @@
               onclick={() => showGoOfflineConfirm = true}
               class="px-3 py-1.5 text-sm text-amber-400 hover:text-amber-300 border border-amber-800 hover:border-amber-700 rounded-lg transition-colors"
             >
-              <Icon icon="lucide:wifi-off" class="w-4 h-4 inline mr-1" />
+              <WifiOff class="w-4 h-4 inline mr-1" />
               {m.offline_go_offline()}
             </button>
           {/if}
@@ -672,7 +672,7 @@
             onclick={() => viewAsPlayer = !viewAsPlayer}
             class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
           >
-            <Icon icon={viewAsPlayer ? "lucide:shield" : "lucide:user"} class="w-4 h-4 inline mr-1" />
+            {#if viewAsPlayer}<Shield class="w-4 h-4 inline mr-1" />{:else}<UserIcon class="w-4 h-4 inline mr-1" />{/if}
             {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
           </button>
         </div>
@@ -684,11 +684,12 @@
           <!-- Tab bar -->
           <div class="flex border-b border-ash-800 overflow-x-auto">
             {#each tabs as tab}
+              {@const TabIcon = tab.icon}
               <button
                 onclick={() => activeTab = tab.id}
                 class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 {activeTab === tab.id ? 'border-crimson-500 text-bone-100' : 'border-transparent text-ash-400 hover:text-ash-200 hover:border-ash-600'}"
               >
-                <Icon icon={tab.icon} class="w-4 h-4" />
+                <TabIcon class="w-4 h-4" />
                 {tab.label}
               </button>
             {/each}
@@ -777,13 +778,13 @@
               </div>
               {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && !playerHasValidDeck}
                 <div class="flex items-center gap-2 text-amber-400 text-sm">
-                  <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
+                  <TriangleAlert class="w-4 h-4" />
                   {m.tournament_upload_valid_deck()}
                 </div>
               {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
                 {#if !playerHasValidDeck}
                   <div class="flex items-center gap-2 text-amber-400 text-sm">
-                    <Icon icon="lucide:alert-triangle" class="w-4 h-4" />
+                    <TriangleAlert class="w-4 h-4" />
                     {m.tournament_upload_valid_deck()}
                   </div>
                 {:else}
@@ -922,7 +923,7 @@
                   onclick={() => showRegisteredPlayers = !showRegisteredPlayers}
                   class="text-sm text-ash-400 hover:text-ash-200 transition-colors flex items-center gap-1"
                 >
-                  <Icon icon={showRegisteredPlayers ? "lucide:chevron-down" : "lucide:chevron-right"} class="w-4 h-4" />
+                  {#if showRegisteredPlayers}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
                   {m.tournament_registered_players({ count: String(registered.length) })}
                 </button>
                 {#if showRegisteredPlayers}
