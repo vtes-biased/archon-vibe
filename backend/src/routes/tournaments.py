@@ -266,6 +266,76 @@ def _strip_for_player(t: Tournament, user_uid: str) -> dict:
     return data
 
 
+class OrganizerAction(BaseModel):
+    user_uid: str
+
+
+@router.post("/{uid}/organizers")
+async def add_organizer(
+    uid: str,
+    body: OrganizerAction,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Add an organizer to a tournament."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not _is_organizer(current_user, tournament):
+        raise HTTPException(status_code=403, detail="Only organizers can manage organizers")
+
+    if body.user_uid not in tournament.organizers_uids:
+        tournament.organizers_uids.append(body.user_uid)
+        tournament.modified = datetime.now(UTC)
+        await update_tournament(tournament)
+        if broadcast_tournament_event:
+            await broadcast_tournament_event(tournament)
+
+    return Response(
+        content=encoder.encode(tournament),
+        media_type="application/json",
+    )
+
+
+@router.delete("/{uid}/organizers/{organizer_uid}")
+async def remove_organizer(
+    uid: str,
+    organizer_uid: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Remove an organizer from a tournament."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not _is_organizer(current_user, tournament):
+        raise HTTPException(status_code=403, detail="Only organizers can manage organizers")
+
+    if organizer_uid in tournament.organizers_uids:
+        if len(tournament.organizers_uids) <= 1:
+            raise HTTPException(
+                status_code=400, detail="Cannot remove the last organizer"
+            )
+        tournament.organizers_uids.remove(organizer_uid)
+        tournament.modified = datetime.now(UTC)
+        await update_tournament(tournament)
+        if broadcast_tournament_event:
+            await broadcast_tournament_event(tournament)
+
+    return Response(
+        content=encoder.encode(tournament),
+        media_type="application/json",
+    )
+
+
 class CreateTournamentRequest(BaseModel):
     name: str
     format: str = "Standard"

@@ -601,6 +601,19 @@ export async function removeLeagueOrganizer(uid: string, organizerUid: string): 
   });
 }
 
+export async function addTournamentOrganizer(uid: string, userUid: string): Promise<Tournament> {
+  return apiRequest<Tournament>(`/api/tournaments/${uid}/organizers`, {
+    method: 'POST',
+    body: JSON.stringify({ user_uid: userUid }),
+  });
+}
+
+export async function removeTournamentOrganizer(uid: string, organizerUid: string): Promise<Tournament> {
+  return apiRequest<Tournament>(`/api/tournaments/${uid}/organizers/${organizerUid}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function deleteAvatar(userUid: string): Promise<{ success: boolean }> {
   if (!isOnline()) {
     throw new Error('Cannot delete avatar while offline.');

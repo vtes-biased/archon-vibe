@@ -3,6 +3,8 @@
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
+  import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
+  import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import Icon from "@iconify/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -105,7 +107,7 @@
         <button
           onclick={() => doAction("OpenRegistration")}
           disabled={actionLoading}
-          class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+          class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
         >{actionLoading ? "..." : m.overview_open_registration()}</button>
 
       {:else if tournament.state === "Registration"}
@@ -113,7 +115,7 @@
           <button
             onclick={() => doAction("CloseRegistration")}
             disabled={actionLoading}
-            class="px-4 py-2 text-sm font-medium text-bone-100 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded-lg transition-colors"
+            class="px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded-lg transition-colors"
           >{m.overview_close_registration()}</button>
           <button
             onclick={() => doAction("CancelRegistration")}
@@ -165,13 +167,13 @@
             <button
               onclick={() => doAction("StartRound")}
               disabled={actionLoading || checkedInCount < 4}
-              class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+              class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
             >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
             {#if finalsReady}
               <button
                 onclick={() => doAction("StartFinals")}
                 disabled={actionLoading}
-                class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+                class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
               >{m.overview_start_finals()}</button>
             {/if}
           </div>
@@ -217,6 +219,26 @@
           >{m.overview_reopen_tournament()}</button>
         </div>
       {/if}
+    </div>
+  {/if}
+
+  <!-- Organizers -->
+  {#if isOrganizer}
+    <div class="bg-ash-900/30 rounded-lg p-4">
+      <OrganizerManager
+        organizerUids={tournament.organizers_uids ?? []}
+        onadd={async (userUid) => { await addTournamentOrganizer(tournament.uid, userUid); }}
+        onremove={async (userUid) => { await removeTournamentOrganizer(tournament.uid, userUid); }}
+      />
+    </div>
+  {:else if tournament.organizers_uids?.length}
+    <div class="bg-ash-900/30 rounded-lg p-4">
+      <h4 class="text-sm font-medium text-ash-300 mb-2">{m.organizers_title()}</h4>
+      <div class="flex flex-wrap gap-2">
+        {#each tournament.organizers_uids as uid}
+          <span class="text-sm text-bone-100">{seatDisplay(uid)}</span>
+        {/each}
+      </div>
     </div>
   {/if}
 

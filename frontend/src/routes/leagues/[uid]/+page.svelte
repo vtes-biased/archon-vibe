@@ -9,6 +9,7 @@
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { computeLeagueStandings } from "$lib/engine";
+  import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import Icon from "@iconify/svelte";
 
   const uid = $derived(page.params.uid);
@@ -291,7 +292,7 @@
           </label>
           <div class="flex gap-3 justify-end">
             <button onclick={() => editing = false} class="px-4 py-2 text-sm text-ash-400 hover:text-bone-100">Cancel</button>
-            <button onclick={saveEdit} class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 rounded-lg">Save</button>
+            <button onclick={saveEdit} class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 rounded-lg">Save</button>
           </div>
         </div>
       {/if}
@@ -313,12 +314,20 @@
           </div>
         </div>
         <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
-          <div class="text-sm text-ash-400">Organizers</div>
-          <div class="text-bone-100 mt-1">
-            {#each league.organizers_uids as ouid}
-              <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
-            {/each}
-          </div>
+          {#if isOrganizer}
+            <OrganizerManager
+              organizerUids={league.organizers_uids}
+              onadd={async (userUid) => { await addLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
+              onremove={async (userUid) => { await removeLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
+            />
+          {:else}
+            <div class="text-sm text-ash-400">Organizers</div>
+            <div class="text-bone-100 mt-1">
+              {#each league.organizers_uids as ouid}
+                <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
+              {/each}
+            </div>
+          {/if}
         </div>
       </div>
 
