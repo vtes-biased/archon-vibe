@@ -4,6 +4,7 @@
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
+  import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
   import Icon from "@iconify/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -64,8 +65,8 @@
       }
       // Filter by search
       if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        all = all.filter(l => l.name.toLowerCase().includes(q));
+        const q = normalizeSearch(searchQuery.trim());
+        all = all.filter(l => normalizeSearch(l.name).includes(q));
       }
       // Sort: active first (by start desc), then finished (by finish desc)
       all.sort((a, b) => {
@@ -112,7 +113,7 @@
       {#if canCreate}
         <a
           href="/leagues/new"
-          class="px-4 py-2 text-sm font-medium text-bone-100 bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors shadow-md"
+          class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors shadow-md"
         >
           {m.league_new_btn()}
         </a>

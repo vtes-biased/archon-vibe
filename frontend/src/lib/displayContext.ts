@@ -7,6 +7,7 @@
 
 import type { User, Role } from '$lib/types';
 import { expandRolesForFilter } from './roles';
+import { normalizeSearch } from './utils';
 
 export interface DisplayFilters {
   country?: string;
@@ -45,7 +46,7 @@ class DisplayContext {
     this.filters = {
       country: country && country !== 'all' ? country : undefined,
       roles: roles && roles.length > 0 ? [...roles] : undefined, // Convert Svelte proxy
-      nameSearch: nameSearch && nameSearch.trim() ? nameSearch.trim().toLowerCase() : undefined,
+      nameSearch: nameSearch && nameSearch.trim() ? normalizeSearch(nameSearch.trim()) : undefined,
       hasPastSanctions: hasPastSanctions || undefined,
       currentlySanctioned: currentlySanctioned || undefined,
     };
@@ -102,8 +103,8 @@ class DisplayContext {
 
     // Check name search filter (prefix match on any word)
     if (nameSearch) {
-      const nameLower = user.name.toLowerCase();
-      const words = nameLower.split(/\s+/);
+      const nameNorm = normalizeSearch(user.name);
+      const words = nameNorm.split(/\s+/);
       const matchesName = words.some(word => word.startsWith(nameSearch));
       if (!matchesName) {
         return false;

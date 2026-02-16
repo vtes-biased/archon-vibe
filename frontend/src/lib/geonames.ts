@@ -6,6 +6,7 @@
  */
 
 import type { Country, City } from '$lib/types';
+import { normalizeSearch } from './utils';
 
 // Countries are small (~32KB), load eagerly
 import countriesData from '$lib/data/geonames/countries.json';
@@ -91,7 +92,7 @@ export async function searchCities(
     limit: number = 10
 ): Promise<City[]> {
     const cities = await loadCities();
-    const queryLower = query.toLowerCase();
+    const queryNorm = normalizeSearch(query);
     const results: City[] = [];
 
     for (const city of cities) {
@@ -104,10 +105,10 @@ export async function searchCities(
             continue;
         }
 
-        // Match query against name or ASCII name
+        // Match query against name or ASCII name (diacritic-insensitive)
         if (
-            city.name.toLowerCase().includes(queryLower) ||
-            city.ascii_name.toLowerCase().includes(queryLower)
+            normalizeSearch(city.name).includes(queryNorm) ||
+            city.ascii_name.toLowerCase().includes(queryNorm)
         ) {
             results.push(city);
         }

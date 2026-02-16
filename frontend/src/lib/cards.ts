@@ -4,6 +4,7 @@
 
 import type { VtesCard } from '$lib/types';
 import { getDB } from './db';
+import { normalizeSearch } from './utils';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -100,14 +101,14 @@ async function refreshCardsFromAPI(): Promise<void> {
 export async function searchCards(query: string, limit = 20): Promise<VtesCard[]> {
   if (!query || query.length < 2) return [];
   const cards = await getCards();
-  const lower = query.toLowerCase();
+  const norm = normalizeSearch(query);
   const results: VtesCard[] = [];
 
   for (const card of cards.values()) {
     if (results.length >= limit) break;
     if (
-      card.name.toLowerCase().includes(lower) ||
-      card.printed_name.toLowerCase().includes(lower)
+      normalizeSearch(card.name).includes(norm) ||
+      normalizeSearch(card.printed_name).includes(norm)
     ) {
       results.push(card);
     }
@@ -115,8 +116,8 @@ export async function searchCards(query: string, limit = 20): Promise<VtesCard[]
 
   // Sort: exact prefix matches first, then by name
   results.sort((a, b) => {
-    const aStarts = a.name.toLowerCase().startsWith(lower) ? 0 : 1;
-    const bStarts = b.name.toLowerCase().startsWith(lower) ? 0 : 1;
+    const aStarts = normalizeSearch(a.name).startsWith(norm) ? 0 : 1;
+    const bStarts = normalizeSearch(b.name).startsWith(norm) ? 0 : 1;
     return aStarts - bStarts || a.name.localeCompare(b.name);
   });
 

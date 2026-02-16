@@ -6,6 +6,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { User, Role, Sanction, Tournament, Rating, League, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
+import { normalizeSearch } from './utils';
 
 // Device ID: persistent random UUID identifying this browser/device
 export function getDeviceId(): string {
@@ -201,7 +202,7 @@ export async function getUsersByCountry(country: string): Promise<User[]> {
  * Each search term must match the start of at least one name word.
  */
 function matchesNameSearch(user: User, search: string): boolean {
-  const nameWords = user.name.toLowerCase().split(/\s+/);
+  const nameWords = normalizeSearch(user.name).split(/\s+/);
   const searchTerms = search.split(/\s+/).filter(t => t.length > 0);
 
   // Each search term must match the prefix of a name word or the VEKN ID
@@ -225,7 +226,7 @@ export async function getFilteredUsers(
   // Convert Svelte proxy to plain array and expand roles (e.g., Judge includes Judgekin)
   const plainRoles = roles && roles.length > 0 ? [...roles] : undefined;
   const expandedRoles = plainRoles ? expandRolesForFilter(plainRoles) : undefined;
-  const searchLower = nameSearch?.trim().toLowerCase();
+  const searchLower = nameSearch?.trim() ? normalizeSearch(nameSearch.trim()) : undefined;
   const db = await getDB();
 
   // Helper to apply name search filter
@@ -496,8 +497,8 @@ export async function getFilteredTournaments(
     items = items.filter(t => t.format === filters.format);
   }
   if (filters.search?.trim()) {
-    const q = filters.search.trim().toLowerCase();
-    items = items.filter(t => t.name.toLowerCase().includes(q));
+    const q = normalizeSearch(filters.search.trim());
+    items = items.filter(t => normalizeSearch(t.name).includes(q));
   }
 
   // Sort
