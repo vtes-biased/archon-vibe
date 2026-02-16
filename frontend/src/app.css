@@ -82,7 +82,79 @@
         @apply bg-bone-950 text-ash-300;
     }
 
+    /*
+     * Light theme — scale inversion.
+     * Dark shade numbers (900/950) map to light values and vice versa.
+     * This means all existing component classes (bg-dusk-950, text-ash-300, etc.)
+     * automatically get appropriate light-mode colors without any class changes.
+     */
     html.light {
-        @apply bg-bone-200 text-ash-700;
+        color-scheme: light;
+
+        /* Crimson — role-mapped for contrast on light backgrounds.
+         * 500 (primary accent) and 700 (CTA) are darker than their dark-mode
+         * counterparts to ensure readability on white. 800-900 become light
+         * tints for decorative backgrounds. Scale is not a pure inversion. */
+        --color-crimson-50: #6E0A1F;
+        --color-crimson-100: #880C26;
+        --color-crimson-200: #A40F2D;
+        --color-crimson-300: #C41235;
+        --color-crimson-400: #DC143C;
+        --color-crimson-500: #A40F2D;
+        --color-crimson-600: #960D29;
+        --color-crimson-700: #880C26;
+        --color-crimson-800: #F9CCD4;
+        --color-crimson-900: #FCE4E8;
+        --color-crimson: #A40F2D;
+        --color-crimson-light: #DC143C;
+
+        /* Bone — lightest at highest numbers.
+         * bone-50/100 stay light: they're only used as text-bone-100 on dark
+         * surfaces (crimson buttons, inputs) and must remain readable. */
+        --color-bone-50: #FDFCFA;
+        --color-bone-100: #FAF8F4;
+        --color-bone-200: #7A6D57;
+        --color-bone-300: #9A8A6D;
+        --color-bone-400: #B8A688;
+        --color-bone-500: #CFC0A6;
+        --color-bone-600: #DED3BE;
+        --color-bone-700: #EBE3D4;
+        --color-bone-800: #FAF8F4;
+        --color-bone-900: #F5F0E6;
+        --color-bone-950: #F5F0E6;
+        --color-bone: #F5F0E6;
+
+        /* Dusk — cards/surfaces become white-ish */
+        --color-dusk-50: #1C1A1E;
+        --color-dusk-100: #4A4035;
+        --color-dusk-200: #605343;
+        --color-dusk-300: #7A6A51;
+        --color-dusk-400: #968363;
+        --color-dusk-500: #AE9D7D;
+        --color-dusk-600: #C4B69B;
+        --color-dusk-700: #D8CDB9;
+        --color-dusk-800: #EFEBE5;
+        --color-dusk-900: #F5F0E6;
+        --color-dusk-950: #FFFFFF;
+        --color-dusk: #E8E0D5;
+
+        /* Ash — text/borders: darker text on light bg */
+        --color-ash-50: #2A2826;
+        --color-ash-100: #3D3A37;
+        --color-ash-200: #4A4642;
+        --color-ash-300: #5A5550;
+        --color-ash-400: #6B6560;
+        --color-ash-500: #7D756E;
+        --color-ash-600: #9A938C;
+        --color-ash-700: #B8B2AC;
+        --color-ash-800: #D4D0CC;
+        --color-ash-900: #E8E6E4;
+        --color-ash-950: #F5F4F3;
+        --color-ash: #6B6560;
+
+        /* Mist */
+        --color-mist: #9B9590;
+        --color-mist-light: #605850;
+        --color-mist-dark: #9B9590;
     }
 }

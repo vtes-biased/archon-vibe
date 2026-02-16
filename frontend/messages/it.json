@@ -10,6 +10,10 @@
   "status_syncing": "Sincronizzazione",
   "status_offline_banner": "Offline - Le modifiche saranno sincronizzate alla riconnessione",
 
+  "theme_system": "Auto",
+  "theme_light": "Chiaro",
+  "theme_dark": "Scuro",
+
   "common_loading": "Caricamento...",
   "common_tagline": "Gestione Tornei VEKN",
   "common_email": "Email",

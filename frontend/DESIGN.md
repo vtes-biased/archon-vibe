@@ -14,6 +14,16 @@ VTES / Vampire: the Masquerade inspired. Gothic horror, pale and muted, with dar
 
 Role badges use distinct colors but remain muted/dusty to fit the gothic aesthetic.
 
+### Light Theme — Scale Inversion
+
+Light mode is implemented via **CSS variable overrides** under `html.light` in `app.css`. The technique is called *scale inversion*: dark shade numbers (900/950) are reassigned to light color values and vice versa. This means all existing Tailwind classes (`bg-dusk-950`, `text-ash-300`, etc.) automatically resolve to appropriate light-mode colors with zero component changes.
+
+**Adding new colors**: If you add a new shade to `@theme`, also add its inverted value under `html.light`.
+
+**Theme toggle**: Users can cycle system / light / dark via the toggle in the sidebar (desktop) or bottom nav (mobile). Preference is stored in `localStorage.theme` and applied before first paint via an inline script in `app.html` to prevent FOUC.
+
+**Store**: `$lib/stores/theme.svelte.ts` — `cycleTheme()`, `getTheme()`, `initTheme()`.
+
 ## Country Display
 
 Show country flag emoji with country name. Use `getCountryFlag(isoCode)` from `lib/geonames.ts`.

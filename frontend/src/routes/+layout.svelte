@@ -12,6 +12,7 @@
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
   import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
+  import { getTheme, cycleTheme, initTheme } from '$lib/stores/theme.svelte';
 
   let { children } = $props();
 
@@ -45,6 +46,9 @@
   });
 
   onMount(() => {
+    // Initialize theme (sync .light class with preference)
+    initTheme();
+
     // Initialize service worker for offline asset caching
     initServiceWorker();
 
@@ -152,6 +156,21 @@
           <span class="text-xs mt-1">{item.labelFn()}</span>
         </a>
       {/each}
+      <button
+        onclick={cycleTheme}
+        class="flex flex-col items-center py-3 px-3 min-w-[64px] text-ash-400 hover:text-ash-200"
+      >
+        {#if getTheme() === 'system'}
+          <Icon icon="lucide:monitor" class="w-6 h-6" />
+        {:else if getTheme() === 'light'}
+          <Icon icon="lucide:sun" class="w-6 h-6" />
+        {:else}
+          <Icon icon="lucide:moon" class="w-6 h-6" />
+        {/if}
+        <span class="text-xs mt-1">
+          {#if getTheme() === 'system'}{m.theme_system()}{:else if getTheme() === 'light'}{m.theme_light()}{:else}{m.theme_dark()}{/if}
+        </span>
+      </button>
     </div>
   </nav>
 
@@ -188,8 +207,25 @@
       {/each}
     </div>
 
-    <!-- Locale switcher -->
+    <!-- Theme toggle -->
     <div class="mt-auto pt-4">
+      <button
+        onclick={cycleTheme}
+        class="flex flex-col items-center text-ash-400 hover:text-ash-200 transition-colors"
+        title={getTheme() === 'system' ? 'System theme' : getTheme() === 'light' ? 'Light theme' : 'Dark theme'}
+      >
+        {#if getTheme() === 'system'}
+          <Icon icon="lucide:monitor" class="w-5 h-5" />
+        {:else if getTheme() === 'light'}
+          <Icon icon="lucide:sun" class="w-5 h-5" />
+        {:else}
+          <Icon icon="lucide:moon" class="w-5 h-5" />
+        {/if}
+      </button>
+    </div>
+
+    <!-- Locale switcher -->
+    <div class="pt-2">
       <LocaleSwitcher />
     </div>
 
