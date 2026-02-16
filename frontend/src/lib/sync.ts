@@ -28,9 +28,10 @@ import {
   clearLastSyncTimestamp,
   clearChanges,
   clearChangeForUid,
+  getTournament,
 } from './db';
 import { getAccessToken } from '$lib/stores/auth.svelte';
-import { isOffline } from '$lib/stores/offline.svelte';
+import { isOffline, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -166,10 +167,11 @@ class SyncManager {
       if (buf && buf.length > 0) {
         this.buffers.set(spec.batchType, []);
         try {
-          // Separate deleted items
+          // Separate deleted items; skip offline tournaments from batch sync
           const toSave: any[] = [];
           const toDelete: string[] = [];
           for (const item of buf) {
+            if (spec.batchType === 'tournaments' && isOffline(item.uid)) continue;
             if (item.deleted_at) {
               toDelete.push(item.uid);
             } else {
@@ -187,8 +189,17 @@ class SyncManager {
 
   /**
    * Clear all IndexedDB stores (used on resync and refresh).
+   * Preserves offline tournament data to avoid data loss.
    */
   private async clearAllStores(): Promise<void> {
+    // Preserve offline tournaments before clearing
+    const offlineUids = getOfflineTournamentUids();
+    const preserved: any[] = [];
+    for (const uid of offlineUids) {
+      const t = await getTournament(uid);
+      if (t) preserved.push(t);
+    }
+
     await clearAllUsers();
     await clearAllSanctions();
     await clearAllTournaments();
@@ -196,6 +207,11 @@ class SyncManager {
     await clearAllLeagues();
     await clearChanges();
     await clearLastSyncTimestamp();
+
+    // Restore offline tournaments
+    if (preserved.length > 0) {
+      await saveTournamentsBatch(preserved);
+    }
   }
 
   /**
