@@ -111,6 +111,9 @@ async def run_vekn_sync() -> None:
     except Exception as e:
         logger.error(f"Error during VEKN tournament sync: {e}", exc_info=True)
 
+    # Recompute ratings after tournaments are up to date
+    await run_rating_recompute()
+
 
 async def run_sanction_cleanup() -> None:
     """Run sanction cleanup (scheduled task).
@@ -259,7 +262,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         name="Rating Recompute",
         replace_existing=True,
     )
-    logger.info("Rating recompute scheduled daily")
+    logger.info("Rating recompute scheduled daily (initial run after VEKN sync)")
 
     # Schedule OAuth token/code cleanup (runs every hour)
     _scheduler.add_job(
