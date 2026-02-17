@@ -2,36 +2,22 @@
   import type { Tournament, TournamentState } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
-  import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
+  import { getStateBadgeClass, seatDisplay as seatDisplayUtil, translateTournamentState, type StandingEntry } from "$lib/tournament-utils";
   import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
 
   import * as m from '$lib/paraglide/messages.js';
-
-  interface StandingEntry {
-    user_uid: string;
-    gw: number;
-    vp: number;
-    tp: number;
-    toss: number;
-    rank: number;
-    finals?: string;
-  }
 
   let {
     tournament,
     playerInfo,
     standings,
     isOrganizer,
-    actionLoading,
-    doAction,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
     standings: StandingEntry[];
     isOrganizer: boolean;
-    actionLoading: boolean;
-    doAction: (action: string, body?: any) => Promise<void>;
   } = $props();
 
   function seatDisplay(uid: string): string {
@@ -39,28 +25,6 @@
   }
 
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
-  const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
-  const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
-  const checkedInCount = $derived(tournament?.players?.filter(p => p.state === "Checked-in").length ?? 0);
-  const registeredCount = $derived(tournament?.players?.length ?? 0);
-
-  function top5HasTies(): boolean {
-    if (standings.length < 5) return false;
-    for (let i = 0; i < 5; i++) {
-      for (let j = i + 1; j < 5; j++) {
-        const a = standings[i]!, b = standings[j]!;
-        if (a.gw === b.gw && a.vp === b.vp && a.tp === b.tp && a.toss === b.toss) return true;
-      }
-    }
-    const fifth = standings[4]!;
-    for (let k = 5; k < standings.length; k++) {
-      const s = standings[k]!;
-      if (s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp && s.toss === fifth.toss) return true;
-    }
-    return false;
-  }
-
-  const finalsReady = $derived(hasFinalsCandidate && !top5HasTies());
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
   const hasFinals = $derived(standings.some(e => e.finals));
   const isFinished = $derived(tournament.state === "Finished");
@@ -77,12 +41,12 @@
   <!-- State badge + summary -->
   <div class="flex items-center gap-3">
     <span class="px-3 py-1.5 rounded text-sm font-medium {getStateBadgeClass(tournament.state)}">
-      {tournament.state}
+      {translateTournamentState(tournament.state)}
     </span>
     <span class="text-sm text-ash-400">
-      {m.overview_player_count({ count: String(registeredCount) })}
+      {m.overview_player_count({ count: tournament.players?.length ?? 0 })}
       {#if hasRounds}
-        · {m.overview_round_count({ count: String(tournament.rounds!.length) })}
+        · {m.overview_round_count({ count: tournament.rounds!.length })}
       {/if}
       {#if isFinals}
         · {m.overview_finals_in_progress()}
@@ -95,130 +59,6 @@
     <div class="banner-emerald border rounded-lg p-4">
       <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
       <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
-    </div>
-  {/if}
-
-  <!-- Transition actions (organizer only) -->
-  {#if isOrganizer}
-    <div class="bg-ash-900/30 rounded-lg p-4 space-y-3">
-      <h3 class="text-sm font-medium text-ash-300">{m.overview_actions()}</h3>
-
-      {#if tournament.state === "Planned"}
-        <button
-          onclick={() => doAction("OpenRegistration")}
-          disabled={actionLoading}
-          class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
-        >{actionLoading ? "..." : m.overview_open_registration()}</button>
-
-      {:else if tournament.state === "Registration"}
-        <div class="flex flex-wrap gap-2">
-          <button
-            onclick={() => doAction("CloseRegistration")}
-            disabled={actionLoading}
-            class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 rounded-lg transition-colors"
-          >{m.overview_close_registration()}</button>
-          <button
-            onclick={() => doAction("CancelRegistration")}
-            disabled={actionLoading}
-            class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
-          >{m.overview_back_to_planning()}</button>
-        </div>
-
-      {:else if tournament.state === "Waiting"}
-        <div class="space-y-2">
-          <!-- Guidance -->
-          <div class="text-sm text-ash-300">
-            {#if hasFinalsCandidate}
-              {m.overview_round_complete({ n: String(tournament.rounds!.length) })}
-              {#if top5HasTies()}
-                <span class="text-amber-300">{m.overview_resolve_ties()}</span>
-              {:else}
-                <span class="text-emerald-300">{m.overview_finals_ready()}</span>
-              {/if}
-            {:else if hasRounds}
-              {m.overview_round_complete_checkin({ n: String(tournament.rounds!.length) })}
-            {:else}
-              {m.overview_checkin_to_start()}
-            {/if}
-          </div>
-
-          <div class="flex flex-wrap gap-2">
-            <span class="text-sm text-ash-400">{m.overview_checked_in_count({ checked: String(checkedInCount), total: String(registeredCount - finishedPlayerCount) })}</span>
-          </div>
-
-          <div class="flex flex-wrap gap-2">
-            {#if hasRounds}
-              <button
-                onclick={() => doAction("ResetCheckIn")}
-                disabled={actionLoading}
-                class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-              >{m.overview_reset_checkin()}</button>
-            {/if}
-            <button
-              onclick={() => doAction("CheckInAll")}
-              disabled={actionLoading}
-              class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-            >{m.overview_check_all_in()}</button>
-            <button
-              onclick={() => doAction("MarkAllPaid")}
-              disabled={actionLoading}
-              class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-            >{m.payment_mark_all_paid()}</button>
-            <button
-              onclick={() => doAction("StartRound")}
-              disabled={actionLoading || checkedInCount < 4}
-              class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
-            >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
-            {#if finalsReady}
-              <button
-                onclick={() => doAction("StartFinals")}
-                disabled={actionLoading}
-                class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
-              >{m.overview_start_finals()}</button>
-            {/if}
-          </div>
-
-          <!-- Seating warnings -->
-          {#if [6, 7, 11].includes(checkedInCount)}
-            <div class="banner-amber border rounded-lg p-3">
-              <p class="text-sm">{m.overview_seating_warning({ count: String(checkedInCount) })}</p>
-            </div>
-          {/if}
-
-          <!-- Finish tournament / Reopen registration -->
-          <div class="pt-3 border-t border-ash-800 flex flex-wrap gap-2">
-            <button
-              onclick={() => doAction("FinishTournament")}
-              disabled={actionLoading}
-              class="px-4 py-2 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-            >{m.overview_finish_tournament()}</button>
-            <button
-              onclick={() => doAction("ReopenRegistration")}
-              disabled={actionLoading}
-              class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
-            >{m.overview_reopen_registration()}</button>
-          </div>
-        </div>
-
-      {:else if tournament.state === "Playing"}
-        <p class="text-ash-400 text-sm">
-          {#if isFinals}
-            {m.overview_finals_manage()}
-          {:else}
-            {m.overview_round_manage({ n: String(tournament.rounds!.length) })}
-          {/if}
-        </p>
-
-      {:else if tournament.state === "Finished"}
-        <p class="text-ash-400 text-sm">{m.overview_tournament_finished()}</p>
-        <div class="flex flex-wrap gap-2 mt-2">
-          <button
-            onclick={() => doAction("ReopenTournament")}
-            disabled={actionLoading}
-            class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
-          >{m.overview_reopen_tournament()}</button>
-        </div>
-      {/if}
     </div>
   {/if}
 

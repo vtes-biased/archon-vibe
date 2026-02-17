@@ -5,6 +5,7 @@
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import { ChevronDown, ChevronRight, SquarePlus, ArrowLeftRight, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus } from "lucide-svelte";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -69,11 +70,6 @@
   const currentRoundIdx = $derived(
     tournament.state === "Playing" ? tournament.rounds!.length - 1 : -1
   );
-  const allTablesFinished = $derived(
-    tournament.rounds!.length > 0 && currentRoundIdx >= 0
-    && tournament.rounds![currentRoundIdx]!.every(t => t.state === "Finished")
-  );
-
   // Seating score
   let seatingScore = $state<{ rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null>(null);
 
@@ -128,49 +124,7 @@
   );
 
   function seatDisplay(uid: string): string {
-    const info = playerInfo[uid];
-    if (!info) return uid;
-    const display = info.nickname || info.name;
-    return info.vekn ? `${display} (${info.vekn})` : display;
-  }
-
-  function vpOptions(tableSize: number, allowImpossible: boolean): number[] {
-    const opts: number[] = [];
-    for (let v = 0; v <= tableSize; v += 0.5) {
-      if (!allowImpossible && v === tableSize - 0.5) continue;
-      opts.push(v);
-    }
-    return opts;
-  }
-
-  function computeGwLocal(vps: number[]): number[] {
-    if (vps.length === 0) return [];
-    const max = Math.max(...vps);
-    const maxCount = vps.filter(v => v === max).length;
-    return vps.map(v => (v >= 2 && v === max && maxCount === 1 ? 1 : 0));
-  }
-
-  function computeTpLocal(tableSize: number, vps: number[]): number[] {
-    const base: Record<number, number[]> = {
-      5: [60, 48, 36, 24, 12],
-      4: [60, 48, 24, 12],
-      3: [60, 36, 12],
-    };
-    const b = base[tableSize];
-    if (!b) return vps.map(() => 0);
-    const indices = vps.map((_, i) => i).sort((a, c) => (vps[c] ?? 0) - (vps[a] ?? 0));
-    const result = new Array(vps.length).fill(0);
-    let i = 0;
-    while (i < indices.length) {
-      let j = i + 1;
-      while (j < indices.length && vps[indices[j]!] === vps[indices[i]!]) j++;
-      let sum = 0;
-      for (let k = i; k < j; k++) sum += b[k] ?? 0;
-      const avg = sum / (j - i);
-      for (let k = i; k < j; k++) result[indices[k]!] = avg;
-      i = j;
-    }
-    return result;
+    return seatDisplayUtil(uid, playerInfo);
   }
 
   function startSwap(round: number, table: number, seat: number, playerUid: string) {
@@ -301,12 +255,6 @@
             disabled={actionLoading}
             class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
           >{m.rounds_cancel_round()}</button>
-          <button
-            onclick={() => doAction("FinishRound")}
-            disabled={actionLoading || !allTablesFinished}
-            title={allTablesFinished ? m.rounds_end_round_ready() : m.rounds_end_round_hint()}
-            class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
-          >{m.rounds_end_round()}</button>
         </div>
       </div>
 
@@ -428,7 +376,7 @@
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-emerald' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
-                      {table.state}
+                      {translateTableState(table.state)}
                     </span>
                     {#if isEditable && r === tournament.rounds!.length - 1 && table.seating.length === 0}
                       <button
@@ -472,7 +420,7 @@
                         <span class="text-ash-400 text-xs">VP:</span>
                         {#if isOrganizer}
                           <select
-                            class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
+                            class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-1.5 sm:py-0.5 border border-ash-700"
                             disabled={scoreSaving === i}
                             value={seat.result.vp}
                             onchange={(e) => setVp(r, i, seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), table.seating)}
@@ -488,19 +436,19 @@
                         {#if isEditable}
                           <button
                             onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
-                            class="p-0.5 text-ash-500 hover:text-crimson-400 transition-colors"
+                            class="p-2 sm:p-0.5 text-ash-500 hover:text-crimson-400 transition-colors"
                             title={m.rounds_unseat_title()}
                           >
-                            <UserMinus class="w-3.5 h-3.5" />
+                            <UserMinus class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
                           </button>
                         {/if}
                         {#if isOrganizer}
                           <button
                             onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
-                            class="p-0.5 text-ash-500 hover:text-amber-400 transition-colors"
+                            class="p-2 sm:p-0.5 text-ash-500 hover:text-amber-400 transition-colors"
                             title={m.sanction_tournament_issue_title()}
                           >
-                            <TriangleAlert class="w-3.5 h-3.5" />
+                            <TriangleAlert class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
                           </button>
                         {/if}
                       </div>

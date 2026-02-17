@@ -82,6 +82,9 @@
         @apply bg-bone-950 text-ash-300;
     }
 
+    button, [role="button"], summary, select { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+
     /*
      * Light theme — scale inversion.
      * Dark shade numbers (900/950) map to light values and vice versa.

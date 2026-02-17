@@ -1145,33 +1145,52 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let rounds = &mut tournament["rounds"];
-            if *round >= rounds.len() {
-                return Err("Invalid round number".to_string());
-            }
-            let round_tables = &mut rounds[*round];
-            if *table1 >= round_tables.len() || *table2 >= round_tables.len() {
-                return Err("Invalid table number".to_string());
-            }
-            if *seat1 >= round_tables[*table1]["seating"].len()
-                || *seat2 >= round_tables[*table2]["seating"].len()
-            {
-                return Err("Invalid seat number".to_string());
-            }
+            // Finals sentinel: round == rounds.len() && table1 == 0 && table2 == 0
+            let is_finals = *round == tournament["rounds"].len()
+                && !tournament["finals"].is_null()
+                && *table1 == 0
+                && *table2 == 0;
 
-            // Extract player_uids to swap
-            let uid1 = round_tables[*table1]["seating"][*seat1]["player_uid"]
-                .as_str()
-                .ok_or("Invalid seat")?
-                .to_string();
-            let uid2 = round_tables[*table2]["seating"][*seat2]["player_uid"]
-                .as_str()
-                .ok_or("Invalid seat")?
-                .to_string();
-
-            // Swap
-            round_tables[*table1]["seating"][*seat1]["player_uid"] = uid2.as_str().into();
-            round_tables[*table2]["seating"][*seat2]["player_uid"] = uid1.as_str().into();
+            if is_finals {
+                let seating = &mut tournament["finals"]["seating"];
+                if *seat1 >= seating.len() || *seat2 >= seating.len() {
+                    return Err("Invalid seat number".to_string());
+                }
+                let uid1 = seating[*seat1]["player_uid"]
+                    .as_str()
+                    .ok_or("Invalid seat")?
+                    .to_string();
+                let uid2 = seating[*seat2]["player_uid"]
+                    .as_str()
+                    .ok_or("Invalid seat")?
+                    .to_string();
+                seating[*seat1]["player_uid"] = uid2.as_str().into();
+                seating[*seat2]["player_uid"] = uid1.as_str().into();
+            } else {
+                let rounds = &mut tournament["rounds"];
+                if *round >= rounds.len() {
+                    return Err("Invalid round number".to_string());
+                }
+                let round_tables = &mut rounds[*round];
+                if *table1 >= round_tables.len() || *table2 >= round_tables.len() {
+                    return Err("Invalid table number".to_string());
+                }
+                if *seat1 >= round_tables[*table1]["seating"].len()
+                    || *seat2 >= round_tables[*table2]["seating"].len()
+                {
+                    return Err("Invalid seat number".to_string());
+                }
+                let uid1 = round_tables[*table1]["seating"][*seat1]["player_uid"]
+                    .as_str()
+                    .ok_or("Invalid seat")?
+                    .to_string();
+                let uid2 = round_tables[*table2]["seating"][*seat2]["player_uid"]
+                    .as_str()
+                    .ok_or("Invalid seat")?
+                    .to_string();
+                round_tables[*table1]["seating"][*seat1]["player_uid"] = uid2.as_str().into();
+                round_tables[*table2]["seating"][*seat2]["player_uid"] = uid1.as_str().into();
+            }
 
             Ok(())
         }

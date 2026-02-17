@@ -3,16 +3,8 @@
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/api";
   import { ArrowLeftRight, GripVertical, ShieldCheck } from "lucide-svelte";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
-
-  interface StandingEntry {
-    user_uid: string;
-    gw: number;
-    vp: number;
-    tp: number;
-    toss: number;
-    rank: number;
-  }
 
   let {
     tournament = $bindable(),
@@ -61,49 +53,7 @@
   let overrideSaving = $state(false);
 
   function seatDisplay(uid: string): string {
-    const info = playerInfo[uid];
-    if (!info) return uid;
-    const display = info.nickname || info.name;
-    return info.vekn ? `${display} (${info.vekn})` : display;
-  }
-
-  function vpOptions(tableSize: number, allowImpossible: boolean): number[] {
-    const opts: number[] = [];
-    for (let v = 0; v <= tableSize; v += 0.5) {
-      if (!allowImpossible && v === tableSize - 0.5) continue;
-      opts.push(v);
-    }
-    return opts;
-  }
-
-  function computeGwLocal(vps: number[]): number[] {
-    if (vps.length === 0) return [];
-    const max = Math.max(...vps);
-    const maxCount = vps.filter(v => v === max).length;
-    return vps.map(v => (v >= 2 && v === max && maxCount === 1 ? 1 : 0));
-  }
-
-  function computeTpLocal(tableSize: number, vps: number[]): number[] {
-    const base: Record<number, number[]> = {
-      5: [60, 48, 36, 24, 12],
-      4: [60, 48, 24, 12],
-      3: [60, 36, 12],
-    };
-    const b = base[tableSize];
-    if (!b) return vps.map(() => 0);
-    const indices = vps.map((_, i) => i).sort((a, c) => (vps[c] ?? 0) - (vps[a] ?? 0));
-    const result = new Array(vps.length).fill(0);
-    let i = 0;
-    while (i < indices.length) {
-      let j = i + 1;
-      while (j < indices.length && vps[indices[j]!] === vps[indices[i]!]) j++;
-      let sum = 0;
-      for (let k = i; k < j; k++) sum += b[k] ?? 0;
-      const avg = sum / (j - i);
-      for (let k = i; k < j; k++) result[indices[k]!] = avg;
-      i = j;
-    }
-    return result;
+    return seatDisplayUtil(uid, playerInfo);
   }
 
   async function setFinalsVp(playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
@@ -123,10 +73,6 @@
     }
   }
 
-  async function finishFinals() {
-    await doAction("FinishFinals");
-  }
-
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
 </script>
 
@@ -142,18 +88,7 @@
   {:else if !tournament.finals}
     <p class="text-ash-400">{m.finals_not_started()}</p>
   {:else}
-    <!-- Finish Finals button -->
-    {#if isOrganizer && tournament.state === "Playing"}
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-medium text-bone-100">{m.finals_title()}</h3>
-        <button
-          onclick={finishFinals}
-          disabled={actionLoading || tournament.finals.state !== "Finished"}
-          title={tournament.finals.state !== "Finished" ? m.finals_finish_hint_not_ready() : m.finals_finish_hint_ready()}
-          class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
-        >{m.finals_finish()}</button>
-      </div>
-    {/if}
+    <h3 class="text-lg font-medium text-bone-100">{m.finals_title()}</h3>
 
     {#if swapSource}
       <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
@@ -169,7 +104,7 @@
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-sm font-medium text-bone-100">{m.finals_table()}</h3>
         <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-emerald' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
-          {tournament.finals.state}
+          {translateTableState(tournament.finals.state)}
         </span>
       </div>
       <div class="divide-y divide-ash-800">
@@ -199,7 +134,7 @@
             <div class="flex items-center gap-2">
               <span class="text-ash-400 text-xs">VP:</span>
               <select
-                class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
+                class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-1.5 sm:py-0.5 border border-ash-700"
                 disabled={scoreSaving === -1}
                 value={seat.result.vp}
                 onchange={(e) => setFinalsVp(seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), tournament.finals!.seating)}

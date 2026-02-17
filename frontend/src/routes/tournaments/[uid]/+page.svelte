@@ -10,7 +10,7 @@
   import type { Tournament, TournamentState, User, Sanction } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
   import { formatScore } from "$lib/utils";
-  import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
+  import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, type StandingEntry } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, getLastSyncTime } from "$lib/stores/offline.svelte";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
@@ -26,6 +26,8 @@
   import FinalsTab from "./FinalsTab.svelte";
   import ConfigTab from "./ConfigTab.svelte";
   import DecksTab from "./DecksTab.svelte"; // Used in player view only
+  import TournamentModals from "./TournamentModals.svelte";
+  import PlayerView from "./PlayerView.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
 
   const countries = getCountries();
@@ -46,7 +48,7 @@
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
   );
   let viewAsPlayer = $state(false);
-  let showRegisteredPlayers = $state(false);
+  let descriptionExpanded = $state(false);
   let showDeleteConfirm = $state(false);
   // Offline mode state
   const tournamentIsOffline = $derived(isOffline(uid));
@@ -134,16 +136,6 @@
   }
 
   // Standings
-  interface StandingEntry {
-    user_uid: string;
-    gw: number;
-    vp: number;
-    tp: number;
-    toss: number;
-    rank: number;
-    finals?: string;
-  }
-
   function computeStandings(): StandingEntry[] {
     if (!tournament || !tournament.players) return [];
 
@@ -302,6 +294,25 @@
 
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
 
+  // Action bar derived values
+  const registeredCount = $derived(tournament?.players?.length ?? 0);
+  const checkedInCount = $derived(tournament?.players?.filter(p => p.state === "Checked-in").length ?? 0);
+  const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
+  const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
+  const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
+  const finalsReady = $derived(hasFinalsCandidate && !top5HasTiesFn(standings));
+  const allTablesFinished = $derived.by(() => {
+    if (!tournament?.rounds?.length) return false;
+    const lastRound = tournament.rounds[tournament.rounds.length - 1]!;
+    return lastRound.length > 0 && lastRound.every(t => t.state === "Finished");
+  });
+  const finalsTableFinished = $derived(tournament?.finals?.state === "Finished");
+  const tablesFinishedCount = $derived.by(() => {
+    if (!tournament?.rounds?.length) return { done: 0, total: 0 };
+    const lastRound = tournament.rounds[tournament.rounds.length - 1]!;
+    return { done: lastRound.filter(t => t.state === "Finished").length, total: lastRound.length };
+  });
+
   // Player DQ state and sanctions helpers for standings display
   function isPlayerDQ(userUid: string): boolean {
     return tournament?.players?.some(p => p.user_uid === userUid && p.state === "Disqualified") ?? false;
@@ -312,45 +323,6 @@
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo);
-  }
-
-  function vpOptions(tableSize: number, allowImpossible: boolean): number[] {
-    const opts: number[] = [];
-    for (let v = 0; v <= tableSize; v += 0.5) {
-      if (!allowImpossible && v === tableSize - 0.5) continue;
-      opts.push(v);
-    }
-    return opts;
-  }
-
-  function computeGwLocal(vps: number[]): number[] {
-    if (vps.length === 0) return [];
-    const max = Math.max(...vps);
-    const maxCount = vps.filter(v => v === max).length;
-    return vps.map(v => (v >= 2 && v === max && maxCount === 1 ? 1 : 0));
-  }
-
-  function computeTpLocal(tableSize: number, vps: number[]): number[] {
-    const base: Record<number, number[]> = {
-      5: [60, 48, 36, 24, 12],
-      4: [60, 48, 24, 12],
-      3: [60, 36, 12],
-    };
-    const b = base[tableSize];
-    if (!b) return vps.map(() => 0);
-    const indices = vps.map((_, i) => i).sort((a, c) => (vps[c] ?? 0) - (vps[a] ?? 0));
-    const result = new Array(vps.length).fill(0);
-    let i = 0;
-    while (i < indices.length) {
-      let j = i + 1;
-      while (j < indices.length && vps[indices[j]!] === vps[indices[i]!]) j++;
-      let sum = 0;
-      for (let k = i; k < j; k++) sum += b[k] ?? 0;
-      const avg = sum / (j - i);
-      for (let k = i; k < j; k++) result[indices[k]!] = avg;
-      i = j;
-    }
-    return result;
   }
 
   let scoreSaving = $state<number | null>(null);
@@ -595,7 +567,7 @@
           <h1 class="text-3xl font-light text-bone-100">{tournament.name}</h1>
           <div class="flex items-center gap-3 mt-2">
             <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
-              {tournament.state}
+              {translateTournamentState(tournament.state)}
             </span>
             <span class="text-sm text-ash-400">{tournament.format}</span>
             {#if tournament.rank}
@@ -673,14 +645,27 @@
             <div class="text-ash-200">{m.tournament_registered_count({ count: String(tournament.players.length) })}</div>
           </div>
           {/if}
-          {#if tournament.description}
-            <div class="col-span-full">
-              <div class="text-ash-500">{m.common_description()}</div>
-              <div class="mt-1 prose dark:prose-invert prose-sm max-w-none">{@html renderMarkdown(tournament.description)}</div>
-            </div>
-          {/if}
         </div>
       </div>
+
+      <!-- Collapsible description -->
+      {#if tournament.description}
+        {@const cleaned = stripLeadingTitle(tournament.description, tournament.name)}
+        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6">
+          <button
+            onclick={() => descriptionExpanded = !descriptionExpanded}
+            class="w-full flex items-center gap-2 px-4 py-3 text-left text-sm font-medium text-ash-300 hover:text-bone-100 transition-colors"
+          >
+            {#if descriptionExpanded}<ChevronDown class="w-4 h-4 shrink-0" />{:else}<ChevronRight class="w-4 h-4 shrink-0" />{/if}
+            {m.common_description()}
+          </button>
+          {#if descriptionExpanded}
+            <div class="px-4 pb-4 prose dark:prose-invert prose-sm max-w-none">{@html renderMarkdown(cleaned)}</div>
+          {:else}
+            <div class="px-4 pb-3 text-sm text-ash-400 line-clamp-3">{@html renderMarkdown(cleaned)}</div>
+          {/if}
+        </div>
+      {/if}
 
       {#if isMinimalView}
         <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 p-6 text-center">
@@ -717,16 +702,128 @@
             {/each}
           </div>
 
+          <!-- Action Bar -->
+          <div class="border-b border-ash-800 px-3 sm:px-6 py-3 space-y-3">
+            <!-- Step indicator -->
+            <div class="flex items-center gap-1 sm:gap-2 text-xs overflow-x-auto">
+              {#each ["Planned", "Registration", "Waiting", "Playing", "Finished"] as step, i}
+                {@const states = ["Planned", "Registration", "Waiting", "Playing", "Finished"]}
+                {@const currentIdx = states.indexOf(tournament.state)}
+                {@const isDone = i < currentIdx}
+                {@const isCurrent = i === currentIdx}
+                {#if i > 0}<span class="text-ash-700">—</span>{/if}
+                <span class="whitespace-nowrap {isDone ? 'text-emerald-400' : isCurrent ? 'text-crimson-400 font-medium' : 'text-ash-600'}">
+                  <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-emerald-400' : isCurrent ? 'bg-crimson-400' : 'bg-ash-700'}"></span>
+                  <span class="hidden sm:inline">{translateTournamentState(step as TournamentState)}</span>
+                </span>
+              {/each}
+            </div>
+
+            <!-- Guidance message -->
+            <p class="text-sm text-ash-400">
+              {#if tournament.state === "Planned"}
+                {m.action_bar_planned()}
+              {:else if tournament.state === "Registration"}
+                {m.action_bar_registration({ count: String(registeredCount) })}
+              {:else if tournament.state === "Waiting"}
+                {#if hasFinalsCandidate}
+                  {m.action_bar_waiting_finals_ready({ n: String(tournament.rounds!.length) })}
+                {:else if hasRounds}
+                  {m.action_bar_waiting_after_round({ n: String(tournament.rounds!.length) })}
+                {:else}
+                  {m.action_bar_waiting_initial({ checked: String(checkedInCount), total: String(registeredCount - finishedPlayerCount) })}
+                {/if}
+              {:else if tournament.state === "Playing"}
+                {#if isFinals}
+                  {m.action_bar_playing_finals()}
+                {:else}
+                  {m.action_bar_playing_round({ n: String(tournament.rounds!.length), done: String(tablesFinishedCount.done), total: String(tablesFinishedCount.total) })}
+                {/if}
+              {:else if tournament.state === "Finished"}
+                {m.action_bar_finished()}
+              {/if}
+            </p>
+
+            <!-- Primary actions -->
+            <div class="flex flex-wrap gap-2">
+              {#if tournament.state === "Planned"}
+                <button onclick={() => doAction("OpenRegistration")} disabled={actionLoading}
+                  class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
+                >{m.overview_open_registration()}</button>
+
+              {:else if tournament.state === "Registration"}
+                <button onclick={() => doAction("CloseRegistration")} disabled={actionLoading}
+                  class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 rounded-lg transition-colors"
+                >{m.overview_close_registration()}</button>
+                <button onclick={() => doAction("CancelRegistration")} disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
+                >{m.overview_back_to_planning()}</button>
+
+              {:else if tournament.state === "Waiting"}
+                <button onclick={() => doAction("StartRound")} disabled={actionLoading || checkedInCount < 4}
+                  class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
+                >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
+                {#if finalsReady}
+                  <button onclick={() => doAction("StartFinals")} disabled={actionLoading}
+                    class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
+                  >{m.overview_start_finals()}</button>
+                {/if}
+                <!-- Secondary actions -->
+                <button onclick={() => doAction("CheckInAll")} disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                >{m.overview_check_all_in()}</button>
+                <button onclick={() => doAction("MarkAllPaid")} disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                >{m.payment_mark_all_paid()}</button>
+                {#if hasRounds}
+                  <button onclick={() => doAction("ResetCheckIn")} disabled={actionLoading}
+                    class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                  >{m.overview_reset_checkin()}</button>
+                {/if}
+                <!-- Seating warning -->
+                {#if [6, 7, 11].includes(checkedInCount)}
+                  <span class="text-sm text-amber-300">{m.overview_seating_warning({ count: String(checkedInCount) })}</span>
+                {/if}
+
+              {:else if tournament.state === "Playing"}
+                {#if isFinals}
+                  <button onclick={() => doAction("FinishFinals")} disabled={actionLoading || !finalsTableFinished}
+                    class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+                  >{m.finals_finish()}</button>
+                {:else}
+                  <button onclick={() => doAction("FinishRound")} disabled={actionLoading || !allTablesFinished}
+                    class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+                  >{m.rounds_end_round()}</button>
+                {/if}
+
+              {:else if tournament.state === "Finished"}
+                <button onclick={() => doAction("ReopenTournament")} disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
+                >{m.overview_reopen_tournament()}</button>
+              {/if}
+            </div>
+
+            <!-- Danger actions (Waiting state) -->
+            {#if tournament.state === "Waiting"}
+              <div class="pt-2 border-t border-ash-800 flex flex-wrap gap-2">
+                <button onclick={() => doAction("FinishTournament")} disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-500 hover:text-crimson-400 transition-colors"
+                >{m.overview_finish_tournament()}</button>
+                <button onclick={() => doAction("ReopenRegistration")} disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-500 hover:text-ash-300 transition-colors"
+                >{m.overview_reopen_registration()}</button>
+              </div>
+            {/if}
+          </div>
+
           <!-- Tab content -->
-          <div class="p-6">
+          <div class="p-3 sm:p-6">
             {#if activeTab === 'overview'}
               <OverviewTab
                 {tournament}
                 {playerInfo}
                 {standings}
                 isOrganizer={true}
-                {actionLoading}
-                {doAction}
               />
             {:else if activeTab === 'players'}
               <PlayersTab
@@ -771,456 +868,40 @@
 
       <!-- Player View (non-organizer) -->
       {#if !showOrganizerView && auth.isAuthenticated}
-        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
-          {#if tournament.state === "Registration" && !currentPlayerEntry}
-            <button
-              onclick={() => doAction("Register", { user_uid: auth.user?.uid })}
-              disabled={actionLoading}
-              class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
-            >{m.tournament_register_btn()}</button>
-          {:else if tournament.state === "Registration" && currentPlayerEntry}
-            <div class="text-sm mb-3 flex items-center justify-between">
-              <div>
-                <span class="text-ash-500">{m.tournament_your_status()}</span>
-                <span class="ml-2 text-ash-200">{currentPlayerEntry.state}</span>
-              </div>
-              <button
-                onclick={() => doAction("Unregister", { user_uid: auth.user?.uid })}
-                disabled={actionLoading}
-                class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-              >{m.tournament_unregister_btn()}</button>
-            </div>
-          {:else if currentPlayerEntry}
-            <div class="text-sm mb-3 flex items-center justify-between">
-              <div>
-                <span class="text-ash-500">{m.tournament_your_status()}</span>
-                <span class="ml-2 text-ash-200">{currentPlayerEntry.state === "Finished"
-                  ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
-                  : currentPlayerEntry.state}</span>
-              </div>
-              {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && !playerHasValidDeck}
-                <div class="flex items-center gap-2 text-amber-400 text-sm">
-                  <TriangleAlert class="w-4 h-4" />
-                  {m.tournament_upload_valid_deck()}
-                </div>
-              {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
-                {#if !playerHasValidDeck}
-                  <div class="flex items-center gap-2 text-amber-400 text-sm">
-                    <TriangleAlert class="w-4 h-4" />
-                    {m.tournament_upload_valid_deck()}
-                  </div>
-                {:else}
-                  <button
-                    onclick={() => doAction("CheckIn", { player_uid: auth.user?.uid ?? "" })}
-                    disabled={actionLoading}
-                    class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors"
-                  >{m.tournament_check_in_btn()}</button>
-                {/if}
-              {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
-                <button
-                  onclick={() => dropPlayer(auth.user?.uid ?? "")}
-                  disabled={actionLoading}
-                  class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-                >{m.tournament_drop_out_btn()}</button>
-              {/if}
-            </div>
-            <!-- Cutoff score threshold for players -->
-            {#if cutoffScore}
-              <div class="bg-ash-900/50 rounded-lg p-4">
-                <h3 class="text-sm font-medium text-bone-100 mb-2">
-                  {m.tournament_standings()}
-                  <span class="text-xs text-ash-500 font-normal ml-1">({m.tournament_standings_cutoff()})</span>
-                </h3>
-                <p class="text-sm text-ash-300">
-                  {m.tournament_cutoff_threshold()} <span class="text-bone-100 font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
-                </p>
-              </div>
-            {/if}
-            <!-- Standings for players -->
-            {#if tournament.state !== "Finished" && playerStandings.length > 0}
-              <div class="bg-ash-900/50 rounded-lg p-4">
-                <h3 class="text-sm font-medium text-bone-100 mb-2">
-                  {m.tournament_standings()}
-                  {#if tournament.standings_mode !== "Public"}
-                    <span class="text-xs text-ash-500 font-normal ml-1">({tournament.standings_mode})</span>
-                  {/if}
-                </h3>
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="text-ash-500 text-xs">
-                      <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
-                      <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
-                      <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each playerStandings as entry, idx}
-                      <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
-                        <td class="py-1 pr-2 text-ash-500">{entry.rank}</td>
-                        <td class="py-1 pr-2">
-                          <span class="inline-flex items-center gap-1">
-                            {seatDisplay(entry.user_uid)}
-                            <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
-                            {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
-                          </span>
-                        </td>
-                        <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            {/if}
-            <!-- Finals table for player view -->
-            {#if isFinals && tournament.finals}
-              <div class="bg-ash-900/50 rounded-lg p-4">
-                <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_heading()}</h3>
-                <div class="divide-y divide-ash-800">
-                  {#each tournament.finals.seating as seat, j}
-                    {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-                    {@const tGws = computeGwLocal(tVps)}
-                    {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
-                    {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
-                    {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
-                    <div class="py-1.5 flex items-center justify-between text-sm">
-                      <div>
-                        <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                        <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-ash-400 text-xs">VP:</span>
-                        <select
-                          class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
-                          disabled={scoreSaving === -1}
-                          value={seat.result.vp}
-                          onchange={(e) => setFinalsVp(seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), tournament!.finals!.seating)}
-                        >
-                          {#each vpOptions(tournament.finals.seating.length, false) as v}
-                            <option value={v}>{v}</option>
-                          {/each}
-                        </select>
-                        <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0 && tournament.rounds![tournament.rounds!.length - 1]}
-              {@const currentRound = tournament.rounds![tournament.rounds!.length - 1]!}
-              {@const myTableIdx = currentRound.findIndex(t => t.seating.some(s => s.player_uid === auth.user?.uid))}
-              {#if myTableIdx >= 0 && currentRound[myTableIdx]}
-                {@const myTable = currentRound[myTableIdx]!}
-                <div class="bg-ash-900/50 rounded-lg p-4">
-                  <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-medium text-bone-100">{m.tournament_your_table({ n: String(myTableIdx + 1) })}</h3>
-                    <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
-                      {myTable.state}
-                    </span>
-                  </div>
-                  <div class="divide-y divide-ash-800">
-                    {#each myTable.seating as seat, j}
-                      {@const tVps = myTable.seating.map(s => s.result.vp)}
-                      {@const tGws = computeGwLocal(tVps)}
-                      {@const tTps = computeTpLocal(myTable.seating.length, tVps)}
-                      <div class="py-1.5 flex items-center justify-between text-sm">
-                        <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                        <div class="flex items-center gap-2">
-                          <span class="text-ash-400 text-xs">VP:</span>
-                          <select
-                            class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
-                            disabled={scoreSaving === myTableIdx}
-                            value={seat.result.vp}
-                            onchange={(e) => setVp(myTableIdx, seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), myTable.seating)}
-                          >
-                            {#each vpOptions(myTable.seating.length, false) as v}
-                              <option value={v}>{v}</option>
-                            {/each}
-                          </select>
-                          <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
-            {/if}
-          {:else}
-            <p class="text-ash-400 text-sm">{m.tournament_registration_not_open()}</p>
-          {/if}
-
-          <!-- Registered players list (player view, Planned/Registration) -->
-          {#if (tournament.state === "Planned" || tournament.state === "Registration") && (tournament.players?.length ?? 0) > 0}
-            {@const registered = tournament.players!.filter(p => p.state === "Registered")}
-            {#if registered.length > 0}
-              <div class="mt-4">
-                <button
-                  onclick={() => showRegisteredPlayers = !showRegisteredPlayers}
-                  class="text-sm text-ash-400 hover:text-ash-200 transition-colors flex items-center gap-1"
-                >
-                  {#if showRegisteredPlayers}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-                  {m.tournament_registered_players({ count: String(registered.length) })}
-                </button>
-                {#if showRegisteredPlayers}
-                  <div class="mt-2 flex flex-wrap gap-2">
-                    {#each registered as player}
-                      {@const puid = player.user_uid ?? ""}
-                      <span class="px-2 py-1 text-sm bg-ash-800 rounded text-ash-200">
-                        {seatDisplay(puid)}
-                      </span>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            {/if}
-          {/if}
-
-          <!-- Player deck section -->
-          {#if currentPlayerEntry || (tournament.state === 'Finished' && tournament.decklists_mode)}
-            <div class="mt-4">
-              <DecksTab
-                {tournament}
-                {playerInfo}
-                isOrganizer={false}
-              />
-            </div>
-          {/if}
-        </div>
-      {/if}
-
-      <!-- Finished tournament results (VEKN members only) -->
-      {#if !showOrganizerView && tournament.state === "Finished" && auth.user?.vekn_id}
-        {@const hasFinals = standings.some(e => e.finals)}
-        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
-          {#if tournament.winner}
-            <div class="banner-emerald border rounded-lg p-4">
-              <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
-              <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
-            </div>
-          {/if}
-          {#if standings.length > 0}
-            <div class="bg-ash-900/50 rounded-lg p-4">
-              <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_standings()}</h3>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="text-ash-500 text-xs">
-                      <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
-                      <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
-                      <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
-                      {#if hasFinals}
-                        <th class="text-right py-1 px-2">{m.tournament_col_finals()}</th>
-                      {/if}
-                      {#if isFinished}
-                        <th class="text-right py-1 px-2">{m.tournament_col_rating()}</th>
-                      {/if}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each standings as entry, idx}
-                      <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
-                        <td class="py-1 pr-2 text-ash-500">{entry.rank}</td>
-                        <td class="py-1 pr-2">
-                          <span class="inline-flex items-center gap-1">
-                            {seatDisplay(entry.user_uid)}
-                            <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
-                            {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
-                          </span>
-                        </td>
-                        <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
-                        {#if hasFinals}
-                          <td class="text-right py-1 px-2">{entry.finals ?? ""}</td>
-                        {/if}
-                        {#if isFinished}
-                          <td class="text-right py-1 px-2 text-ash-400">{getRatingPts(entry)}</td>
-                        {/if}
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          {/if}
-          {#if tournament.finals}
-            <div class="bg-ash-900/50 rounded-lg p-4">
-              <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_table()}</h3>
-              <div class="divide-y divide-ash-800">
-                {#each tournament.finals.seating as seat, j}
-                  {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-                  {@const tGws = computeGwLocal(tVps)}
-                  {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
-                  {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
-                  {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
-                  <div class="py-1.5 flex items-center justify-between text-sm">
-                    <div>
-                      <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                      <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
-                    </div>
-                    <span class="text-ash-500 text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {/if}
-        </div>
+        <PlayerView
+          {tournament}
+          {playerInfo}
+          {standings}
+          {currentPlayerEntry}
+          {playerStandings}
+          {cutoffScore}
+          {isFinals}
+          {isFinished}
+          {playerHasValidDeck}
+          userUid={auth.user?.uid ?? ""}
+          userVeknId={auth.user?.vekn_id ?? null}
+          {actionLoading}
+          {scoreSaving}
+          {doAction}
+          {dropPlayer}
+          {setVp}
+          {setFinalsVp}
+          {tournamentSanctions}
+        />
       {/if}
       {/if}<!-- end isMinimalView else -->
     {/if}
   </div>
 </div>
 
-<!-- Delete Tournament Confirmation Modal -->
-{#if showDeleteConfirm}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-    role="presentation"
-    onclick={() => (showDeleteConfirm = false)}
-    onkeydown={(e) => { if (e.key === 'Escape') showDeleteConfirm = false; }}
-  >
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-    >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-crimson-400">{m.tournament_delete_title()}</h2>
-      </div>
-      <div class="p-6">
-        <p class="text-ash-300 mb-6">
-          {m.tournament_delete_msg()}
-        </p>
-        <div class="flex gap-2">
-          <button
-            onclick={handleDelete}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded font-medium transition-colors"
-          >{m.common_delete()}</button>
-          <button
-            onclick={() => (showDeleteConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- Go Offline Confirmation Modal -->
-{#if showGoOfflineConfirm}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-    role="presentation"
-    onclick={() => (showGoOfflineConfirm = false)}
-    onkeydown={(e) => { if (e.key === 'Escape') showGoOfflineConfirm = false; }}
-  >
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-    >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-amber-400">{m.offline_go_offline_title()}</h2>
-      </div>
-      <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.offline_go_offline_msg()}</p>
-        <div class="flex gap-2">
-          <button
-            onclick={handleGoOffline}
-            disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-amber disabled:bg-ash-700 rounded font-medium transition-colors"
-          >{offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}</button>
-          <button
-            onclick={() => (showGoOfflineConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- Go Online Confirmation Modal -->
-{#if showGoOnlineConfirm}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-    role="presentation"
-    onclick={() => (showGoOnlineConfirm = false)}
-    onkeydown={(e) => { if (e.key === 'Escape') showGoOnlineConfirm = false; }}
-  >
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-    >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-emerald-400">{m.offline_go_online_title()}</h2>
-      </div>
-      <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.offline_go_online_msg()}</p>
-        <div class="flex gap-2">
-          <button
-            onclick={handleGoOnline}
-            disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-emerald disabled:bg-ash-700 rounded font-medium transition-colors"
-          >{offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}</button>
-          <button
-            onclick={() => (showGoOnlineConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- Force Takeover Confirmation Modal -->
-{#if showForceTakeoverConfirm}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-    role="presentation"
-    onclick={() => (showForceTakeoverConfirm = false)}
-    onkeydown={(e) => { if (e.key === 'Escape') showForceTakeoverConfirm = false; }}
-  >
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-    >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-amber-400">{m.offline_force_takeover_title()}</h2>
-      </div>
-      <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.offline_force_takeover_msg()}</p>
-        <div class="flex gap-2">
-          <button
-            onclick={handleForceTakeover}
-            disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-amber disabled:bg-ash-700 rounded font-medium transition-colors"
-          >{offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}</button>
-          <button
-            onclick={() => (showForceTakeoverConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
+<TournamentModals
+  bind:showDeleteConfirm
+  bind:showGoOfflineConfirm
+  bind:showGoOnlineConfirm
+  bind:showForceTakeoverConfirm
+  {offlineActionLoading}
+  onDelete={handleDelete}
+  onGoOffline={handleGoOffline}
+  onGoOnline={handleGoOnline}
+  onForceTakeover={handleForceTakeover}
+/>
