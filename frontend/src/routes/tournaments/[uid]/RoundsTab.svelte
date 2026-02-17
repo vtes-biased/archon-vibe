@@ -118,6 +118,10 @@
   }
 
   // Organizer can swap/seat on last round in Playing or Finished
+  const hasR1Issue = $derived(
+    Array.from(playerIssues.values()).some(i => i.level === 0)
+  );
+
   const canEditSeating = $derived(
     isOrganizer && tournament.rounds!.length > 0
     && (tournament.state === "Playing" || tournament.state === "Finished" || tournament.state === "Waiting")
@@ -146,6 +150,7 @@
     alterTables = [];
     alterRoundIdx = -1;
     playerIssues = new Map();
+    computeSeatingScore();
   }
 
   async function saveAlterSeating() {
@@ -157,6 +162,7 @@
     const allRounds = tournament.rounds!.map((round, r) =>
       r === alterRoundIdx ? alterTables : round.map(t => t.seating.map(s => s.player_uid))
     );
+    seatingScore = scoreSeatingSync(allRounds);
     const issues = computePlayerIssuesSync(allRounds);
     if (!issues) { playerIssues = new Map(); return; }
     // Build per-player map keeping highest-priority issue (lowest rule number)
@@ -390,6 +396,9 @@
             {#if alterMode && r === alterRoundIdx}
               <!-- In-place alter seating mode -->
               <p class="text-sm text-ash-300">{m.rounds_alter_hint()}</p>
+              {#if round.some(t => t.seating.some(s => s.result.vp > 0))}
+                <p class="text-sm text-amber-400">{m.rounds_alter_scores_warning()}</p>
+              {/if}
               <SeatingSortable
                 bind:tables={alterTables}
                 {playerInfo}
@@ -397,10 +406,13 @@
                 isFinals={false}
                 onchange={recomputeIssues}
               />
+              {#if hasR1Issue}
+                <p class="text-sm text-crimson-400">{m.rounds_alter_r1_error()}</p>
+              {/if}
               <div class="flex gap-2">
                 <button
                   onclick={saveAlterSeating}
-                  disabled={actionLoading}
+                  disabled={actionLoading || hasR1Issue}
                   class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
                 >{m.rounds_save_seating()}</button>
                 <button

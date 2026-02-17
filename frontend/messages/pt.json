@@ -622,6 +622,8 @@
   "rounds_seat_player": "Alocar um jogador",
   "rounds_remove_empty_table": "Remover mesa vazia",
   "rounds_error_save": "Falha ao salvar pontuações",
+  "rounds_alter_r1_error": "Não é possível salvar: repetição predador-presa (violação R1).",
+  "rounds_alter_scores_warning": "Mover jogadores entre mesas redefinirá suas pontuações.",
 
   "override_judge_comment": "Comentário do juiz (obrigatório)",
   "override_placeholder": "Explique por que o resultado desta mesa está sendo substituído...",

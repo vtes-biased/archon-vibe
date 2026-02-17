@@ -2,7 +2,6 @@
   import type { Tournament } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/api";
-  import { computePlayerIssuesSync } from "$lib/engine";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import { GripVertical, ShieldCheck } from "lucide-svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, type StandingEntry } from "$lib/tournament-utils";
@@ -32,7 +31,6 @@
   // Alter seating mode
   let alterMode = $state(false);
   let alterSeating = $state<string[]>([]);
-  let playerIssues = $state<Map<string, { level: number; message: string }>>(new Map());
 
   const canEditSeating = $derived(
     isOrganizer && (tournament.state === "Playing" || tournament.state === "Finished" || tournament.state === "Waiting")
@@ -42,14 +40,12 @@
     alterSeating = tournament.finals!.seating.map(s => s.player_uid);
     alterTables = [alterSeating];
     alterMode = true;
-    recomputeIssues();
   }
 
   function cancelAlterMode() {
     alterMode = false;
     alterSeating = [];
     alterTables = [];
-    playerIssues = new Map();
   }
 
   async function saveAlterSeating() {
@@ -59,31 +55,6 @@
 
   // Wrapper to expose single table as tables array for SeatingSortable
   let alterTables = $state<string[][]>([]);
-
-  function recomputeIssues() {
-    alterSeating = alterTables[0] ?? [];
-    const allRounds = tournament.rounds!.map(round =>
-      round.map(t => t.seating.map(s => s.player_uid))
-    );
-    // Add finals as extra round
-    allRounds.push([alterSeating]);
-    const issues = computePlayerIssuesSync(allRounds);
-    if (!issues) { playerIssues = new Map(); return; }
-    const map = new Map<string, { level: number; message: string }>();
-    const ruleLabels = [
-      m.rounds_r1(), m.rounds_r2(), m.rounds_r3(), m.rounds_r4(), m.rounds_r5(),
-      m.rounds_r6(), m.rounds_r7(), m.rounds_r8(), m.rounds_r9(),
-    ];
-    for (const issue of issues) {
-      for (const uid of issue.players) {
-        const existing = map.get(uid);
-        if (!existing || issue.rule < existing.level) {
-          map.set(uid, { level: issue.rule, message: ruleLabels[issue.rule] ?? `R${issue.rule + 1}` });
-        }
-      }
-    }
-    playerIssues = map;
-  }
   let overrideTable_ = $state<number | null>(null);
   let overrideComment = $state("");
   let overrideSaving = $state(false);
@@ -150,9 +121,9 @@
         <SeatingSortable
           bind:tables={alterTables}
           {playerInfo}
-          {playerIssues}
+          playerIssues={new Map()}
           isFinals={true}
-          onchange={() => { alterSeating = alterTables[0] ?? []; recomputeIssues(); }}
+          onchange={() => { alterSeating = alterTables[0] ?? []; }}
         />
         <div class="flex gap-2 mt-3">
           <button

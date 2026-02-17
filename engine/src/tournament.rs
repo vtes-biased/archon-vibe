@@ -1252,18 +1252,20 @@ fn apply_event(
                 if *round >= rounds_len {
                     return Err("Invalid round number".to_string());
                 }
-                let round_data = &mut tournament["rounds"][*round];
-                if seating.len() != round_data.len() {
+
+                // Validation phase (immutable borrows)
+                let table_count = tournament["rounds"][*round].len();
+                if seating.len() != table_count {
                     return Err("Table count mismatch".to_string());
                 }
 
                 // Build map: player_uid -> (old_table, old_result, judge_uid) from current state
                 let mut old_results: std::collections::HashMap<String, (usize, JsonValue, String)> = std::collections::HashMap::new();
-                for t in 0..round_data.len() {
-                    for s in 0..round_data[t]["seating"].len() {
-                        let uid = round_data[t]["seating"][s]["player_uid"].as_str().unwrap_or("").to_string();
-                        let result = round_data[t]["seating"][s]["result"].clone();
-                        let judge = round_data[t]["seating"][s]["judge_uid"].as_str().unwrap_or("").to_string();
+                for t in 0..table_count {
+                    for s in 0..tournament["rounds"][*round][t]["seating"].len() {
+                        let uid = tournament["rounds"][*round][t]["seating"][s]["player_uid"].as_str().unwrap_or("").to_string();
+                        let result = tournament["rounds"][*round][t]["seating"][s]["result"].clone();
+                        let judge = tournament["rounds"][*round][t]["seating"][s]["judge_uid"].as_str().unwrap_or("").to_string();
                         old_results.insert(uid, (t, result, judge));
                     }
                 }
@@ -1273,6 +1275,34 @@ fn apply_event(
                 if new_total != old_results.len() {
                     return Err("Player count mismatch".to_string());
                 }
+
+                // R1 check: reject predator-prey repeats
+                {
+                    let mut check_rounds: Vec<Vec<Vec<String>>> = Vec::new();
+                    for r in 0..rounds_len {
+                        if r == *round {
+                            check_rounds.push(seating.clone());
+                        } else {
+                            let rd = &tournament["rounds"][r];
+                            let mut tables = Vec::new();
+                            for t in 0..rd.len() {
+                                let mut tbl = Vec::new();
+                                for s in 0..rd[t]["seating"].len() {
+                                    tbl.push(rd[t]["seating"][s]["player_uid"].as_str().unwrap_or("").to_string());
+                                }
+                                tables.push(tbl);
+                            }
+                            check_rounds.push(tables);
+                        }
+                    }
+                    let issues = seating::compute_player_issues(&check_rounds);
+                    if issues.iter().any(|i| i.rule == 0) {
+                        return Err("Seating violates R1 (predator-prey repeat)".to_string());
+                    }
+                }
+
+                // Mutation phase (mutable borrow)
+                let round_data = &mut tournament["rounds"][*round];
 
                 // Rebuild each table's seating
                 for t in 0..seating.len() {

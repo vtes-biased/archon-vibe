@@ -622,6 +622,8 @@
   "rounds_seat_player": "Fai sedere un giocatore",
   "rounds_remove_empty_table": "Rimuovi tavolo vuoto",
   "rounds_error_save": "Salvataggio punteggi fallito",
+  "rounds_alter_r1_error": "Impossibile salvare: ripetizione predatore-preda (violazione R1).",
+  "rounds_alter_scores_warning": "Spostare giocatori tra i tavoli azzererà i loro punteggi.",
 
   "override_judge_comment": "Commento del giudice (obbligatorio)",
   "override_placeholder": "Spiega perché il risultato di questo tavolo viene sovrascritto...",

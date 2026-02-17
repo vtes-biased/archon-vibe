@@ -136,8 +136,9 @@
           <span class="flex-1 text-ash-300">{seatDisplay(uid)}</span>
           <!-- Issue indicator -->
           {#if issue}
-            <span class="{issueColor(issue.level)}" title={issue.message}>
-              <CircleAlert class="w-4 h-4" />
+            <span class="inline-flex items-center gap-1 {issueColor(issue.level)}" title={issue.message}>
+              <CircleAlert class="w-4 h-4 shrink-0" />
+              <span class="text-xs">{issue.message}</span>
             </span>
           {/if}
         </div>

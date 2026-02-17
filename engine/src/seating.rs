@@ -940,8 +940,10 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
         for j in 0..i {
             let opponent_count = total.get(i, j, 0);
             if opponent_count > 1 {
-                // R4: Opponent twice
-                issues.push(SeatingIssue { rule: 3, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                // R4: Opponent twice (only meaningful for larger tournaments)
+                if playing > 20 {
+                    issues.push(SeatingIssue { rule: 3, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                }
                 // R2: Opponent all rounds (only when rounds > 2)
                 if opponent_count >= rounds_count as i32 && rounds_count > 2 {
                     issues.push(SeatingIssue { rule: 1, players: vec![reverse[i].clone(), reverse[j].clone()] });
@@ -957,10 +959,12 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
                         }
                     }
                 }
-                // R9: Same position group (neighbour/non-neighbour)
-                for k in 6..8 {
-                    if total.get(i, j, k) > 1 {
-                        issues.push(SeatingIssue { rule: 8, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                // R9: Same position group (neighbour/non-neighbour, only meaningful for larger tournaments)
+                if playing > 20 {
+                    for k in 6..8 {
+                        if total.get(i, j, k) > 1 {
+                            issues.push(SeatingIssue { rule: 8, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                        }
                     }
                 }
             }
@@ -1766,13 +1770,9 @@ mod tests {
         // For 4 players with identical seating, each adjacent pair has prey/pred repeat
         assert!(r1_issues.len() >= 2, "Should have multiple R1 violations for identical 4-player table");
 
-        // Check R4 (rule index 3) -- opponent twice
+        // Check R4 (rule index 3) -- opponent twice (suppressed for playing <= 20)
         let r4_issues: Vec<_> = issues.iter().filter(|i| i.rule == 3).collect();
-        assert_eq!(r4_issues.len(), 6, "C(4,2)=6 pairs should all repeat as opponents");
-        // Each issue should reference exactly 2 players
-        for issue in &r4_issues {
-            assert_eq!(issue.players.len(), 2);
-        }
+        assert_eq!(r4_issues.len(), 0, "R4 should be suppressed for small tournaments (<=20 players)");
 
         // Check R7 (rule index 6) -- same seat twice
         let r7_issues: Vec<_> = issues.iter().filter(|i| i.rule == 6).collect();

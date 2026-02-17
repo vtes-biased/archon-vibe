@@ -622,6 +622,8 @@
   "rounds_seat_player": "Seat a player",
   "rounds_remove_empty_table": "Remove empty table",
   "rounds_error_save": "Failed to save scores",
+  "rounds_alter_r1_error": "Cannot save: predator-prey repeat (R1 violation).",
+  "rounds_alter_scores_warning": "Moving players between tables will reset their scores.",
 
   "override_judge_comment": "Judge comment (required)",
   "override_placeholder": "Explain why this table result is being overridden...",

@@ -622,6 +622,8 @@
   "rounds_seat_player": "Placer un joueur",
   "rounds_remove_empty_table": "Retirer la table vide",
   "rounds_error_save": "Échec de l'enregistrement des scores",
+  "rounds_alter_r1_error": "Impossible d'enregistrer : répétition prédateur-proie (violation R1).",
+  "rounds_alter_scores_warning": "Déplacer des joueurs entre les tables réinitialisera leurs scores.",
 
   "override_judge_comment": "Commentaire de l'arbitre (requis)",
   "override_placeholder": "Expliquez pourquoi le résultat de cette table est modifié...",

@@ -379,7 +379,8 @@ export function computePlayerIssuesSync(
   try {
     const resultJson = engine.computePlayerIssues(JSON.stringify({ rounds }));
     return JSON.parse(resultJson);
-  } catch {
+  } catch (e) {
+    console.error('computePlayerIssues failed:', e);
     return null;
   }
 }
