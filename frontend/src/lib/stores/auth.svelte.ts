@@ -7,6 +7,7 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 import type { User } from "$lib/types";
+import { syncManager } from "$lib/sync";
 
 const ACCESS_TOKEN_KEY = "archon_access_token";
 const REFRESH_TOKEN_KEY = "archon_refresh_token";
@@ -355,8 +356,9 @@ export async function login(email: string, password: string): Promise<boolean> {
 /**
  * Logout the current user.
  */
-export function logout(): void {
+export async function logout(): Promise<void> {
   clearTokens();
+  await syncManager.reset();
   setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
 }
 

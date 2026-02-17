@@ -256,6 +256,14 @@ class SyncManager {
   }
 
   /**
+   * Reset: disconnect and clear all local data (used on logout).
+   */
+  async reset(): Promise<void> {
+    await this.disconnect();
+    await this.clearAllStores();
+  }
+
+  /**
    * Perform a full refresh: clear local data and resync everything.
    */
   async refresh(): Promise<void> {
