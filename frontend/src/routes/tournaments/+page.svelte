@@ -6,7 +6,7 @@
   import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
   import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass } from "$lib/tournament-utils";
-  import { Loader2, Trophy, Calendar, Copy, Check, ChevronDown, ChevronUp } from "lucide-svelte";
+  import { Loader2, Trophy, Calendar, Copy, Check } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -36,12 +36,8 @@
   let includeOnline = $state(true);
 
   // Calendar
-  let calendarExpanded = $state(false);
-  let calendarUrl = $state<string | null>(null);
   let calendarLoading = $state(false);
   let copied = $state(false);
-  let calendarFeedType = $state<"personal" | "country" | "all">("personal");
-  let calendarOnline = $state(true);
 
   // Pagination
   let page = $state(0);
@@ -141,30 +137,28 @@
   });
 
   // Calendar helpers
+  const calendarUrl = $derived.by(() => {
+    if (viewMode === "agenda" && auth.user?.calendar_token) {
+      return `${API_BASE}/api/calendar/tournaments.ics?token=${auth.user.calendar_token}`;
+    }
+    const params = new URLSearchParams();
+    if (selectedCountry && selectedCountry !== "all") {
+      params.set("country", selectedCountry);
+    }
+    if (!includeOnline) {
+      params.set("online", "false");
+    }
+    const qs = params.toString();
+    return `${API_BASE}/api/calendar/tournaments.ics${qs ? '?' + qs : ''}`;
+  });
+
   async function handleGenerateCalendarToken() {
     calendarLoading = true;
     try {
-      const result = await generateCalendarToken();
-      if (result) {
-        calendarUrl = result.calendar_url;
-      }
+      await generateCalendarToken();
     } finally {
       calendarLoading = false;
     }
-  }
-
-  function getCalendarUrl(): string {
-    if (calendarFeedType === "personal" && calendarUrl) {
-      return calendarOnline ? calendarUrl : `${calendarUrl}&online=false`;
-    }
-    const params = new URLSearchParams();
-    if (calendarFeedType === "country" && selectedCountry && selectedCountry !== "all") {
-      params.set("country", selectedCountry);
-    }
-    if (!calendarOnline) {
-      params.set("online", "false");
-    }
-    return `${API_BASE}/api/calendar/tournaments.ics${params.toString() ? '?' + params.toString() : ''}`;
   }
 
   async function copyToClipboard(url: string) {
@@ -174,13 +168,6 @@
       setTimeout(() => { copied = false; }, 2000);
     } catch { /* noop */ }
   }
-
-  // Init calendar URL from existing token
-  $effect(() => {
-    if (auth.user?.calendar_token) {
-      calendarUrl = `${API_BASE}/api/calendar/tournaments.ics?token=${auth.user.calendar_token}`;
-    }
-  });
 </script>
 
 <svelte:head>
@@ -292,100 +279,41 @@
       </div>
     </div>
 
-    <!-- Calendar Subscribe Card -->
+    <!-- Calendar Subscribe -->
     {#if auth.isAuthenticated}
-      <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6">
-        <button
-          onclick={() => calendarExpanded = !calendarExpanded}
-          class="w-full flex items-center justify-between px-4 py-3 text-sm text-ash-300 hover:text-ash-100 transition-colors"
-        >
-          <span class="flex items-center gap-2">
-            <Calendar class="h-4 w-4" />
-            {m.tournaments_calendar_subscribe()}
-          </span>
-          {#if calendarExpanded}
-            <ChevronUp class="h-4 w-4" />
-          {:else}
-            <ChevronDown class="h-4 w-4" />
-          {/if}
-        </button>
-
-        {#if calendarExpanded}
-          <div class="px-4 pb-4 border-t border-ash-800 pt-3 space-y-3">
-            <p class="text-xs text-ash-500">{m.tournaments_calendar_description()}</p>
-
-            <!-- Feed type selector -->
-            <div class="flex flex-wrap gap-2">
-              {#if canUseAgenda}
-                <button
-                  onclick={() => calendarFeedType = "personal"}
-                  class="px-3 py-1.5 text-xs rounded-md transition-colors {calendarFeedType === 'personal' ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:text-ash-100'}"
-                >{m.tournaments_calendar_personal()}</button>
-              {/if}
-              <button
-                onclick={() => calendarFeedType = "country"}
-                class="px-3 py-1.5 text-xs rounded-md transition-colors {calendarFeedType === 'country' ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:text-ash-100'}"
-              >{m.tournaments_calendar_by_country()}</button>
-              <button
-                onclick={() => calendarFeedType = "all"}
-                class="px-3 py-1.5 text-xs rounded-md transition-colors {calendarFeedType === 'all' ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:text-ash-100'}"
-              >{m.tournaments_calendar_all()}</button>
-            </div>
-
-            <!-- Online toggle for calendar feed -->
-            <label class="inline-flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" bind:checked={calendarOnline} class="sr-only peer" />
-              <div class="relative w-9 h-5 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
-                <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform" class:translate-x-4={calendarOnline}></div>
-              </div>
-              <span class="text-xs text-ash-400">{m.tournaments_include_online()}</span>
-            </label>
-
-            <!-- Personal: generate token if needed -->
-            {#if calendarFeedType === "personal" && !calendarUrl}
-              <button
-                onclick={handleGenerateCalendarToken}
-                disabled={calendarLoading}
-                class="px-4 py-2 text-sm rounded bg-crimson-700 hover:bg-crimson-600 text-white disabled:opacity-50 transition-colors"
-              >
-                {#if calendarLoading}
-                  <Loader2 class="inline h-4 w-4 animate-spin mr-1" />
-                {/if}
-                {m.tournaments_calendar_generate()}
-              </button>
-            {:else}
-              <!-- URL display + copy -->
-              <div class="flex gap-2">
-                <input
-                  type="text"
-                  readonly
-                  value={getCalendarUrl()}
-                  class="flex-1 px-3 py-1.5 text-xs border border-ash-600 rounded bg-dusk-950 text-ash-400 select-all"
-                />
-                <button
-                  onclick={() => copyToClipboard(getCalendarUrl())}
-                  class="px-3 py-1.5 text-xs rounded bg-ash-800 hover:bg-ash-700 text-ash-200 flex items-center gap-1"
-                >
-                  {#if copied}
-                    <Check class="h-3 w-3" />
-                    {m.tournaments_calendar_copied()}
-                  {:else}
-                    <Copy class="h-3 w-3" />
-                    {m.tournaments_calendar_copy()}
-                  {/if}
-                </button>
-                {#if calendarFeedType === "personal" && calendarUrl}
-                  <button
-                    onclick={handleGenerateCalendarToken}
-                    disabled={calendarLoading}
-                    class="px-3 py-1.5 text-xs rounded bg-ash-800 hover:bg-ash-700 text-ash-200 disabled:opacity-50"
-                  >
-                    {m.tournaments_calendar_regenerate()}
-                  </button>
-                {/if}
-              </div>
+      <div class="flex items-center gap-2 flex-wrap mb-6 px-1">
+        <Calendar class="h-4 w-4 text-ash-500 shrink-0" />
+        <span class="text-xs text-ash-500">{m.tournaments_calendar_subscribe()}:</span>
+        {#if viewMode === "agenda" && !auth.user?.calendar_token}
+          <button
+            onclick={handleGenerateCalendarToken}
+            disabled={calendarLoading}
+            class="px-3 py-1.5 text-xs rounded bg-crimson-700 hover:bg-crimson-600 text-white disabled:opacity-50 transition-colors"
+          >
+            {#if calendarLoading}
+              <Loader2 class="inline h-3 w-3 animate-spin mr-1" />
             {/if}
-          </div>
+            {m.tournaments_calendar_generate()}
+          </button>
+        {:else}
+          <input
+            type="text"
+            readonly
+            value={calendarUrl}
+            class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-ash-700 rounded bg-dusk-950 text-ash-400 select-all"
+          />
+          <button
+            onclick={() => copyToClipboard(calendarUrl)}
+            class="px-2 py-1.5 text-xs rounded bg-ash-800 hover:bg-ash-700 text-ash-200 flex items-center gap-1 shrink-0"
+          >
+            {#if copied}
+              <Check class="h-3 w-3" />
+              {m.tournaments_calendar_copied()}
+            {:else}
+              <Copy class="h-3 w-3" />
+              {m.tournaments_calendar_copy()}
+            {/if}
+          </button>
         {/if}
       </div>
     {/if}
