@@ -714,6 +714,12 @@
   "organizers_added": "Organizer added",
   "organizers_removed": "Organizer removed",
 
+  "share_results_image": "Share Image",
+  "share_results_text": "Copy Text",
+  "share_results_copied": "Results copied to clipboard",
+  "share_results_downloaded": "Image downloaded",
+  "share_results_error": "Failed to share results",
+
   "offline_add_new_player": "Add New Player (Offline)",
   "offline_player_name": "Player name",
   "offline_player_vekn_id": "VEKN ID (optional)",

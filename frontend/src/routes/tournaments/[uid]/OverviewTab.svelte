@@ -4,7 +4,11 @@
   import { computeRatingPoints } from "$lib/engine";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, translateTournamentState, type StandingEntry } from "$lib/tournament-utils";
   import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
+  import { showToast } from "$lib/stores/toast.svelte";
+  import { generateResultsCard } from "$lib/social-card";
+  import { generateResultsText } from "$lib/social-text";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
+  import { Share2, ClipboardCopy } from "lucide-svelte";
 
   import * as m from '$lib/paraglide/messages.js';
 
@@ -28,6 +32,43 @@
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
   const hasFinals = $derived(standings.some(e => e.finals));
   const isFinished = $derived(tournament.state === "Finished");
+
+  let sharingImage = $state(false);
+
+  async function shareImage() {
+    sharingImage = true;
+    try {
+      const blob = await generateResultsCard(tournament, playerInfo, standings);
+      const file = new File([blob], `${tournament.name.replace(/[^a-z0-9]/gi, "_")}.png`, { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] });
+      } else {
+        // Desktop fallback: download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast({ type: "success", message: m.share_results_downloaded() });
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return; // user cancelled share sheet
+      showToast({ type: "error", message: m.share_results_error() });
+    } finally {
+      sharingImage = false;
+    }
+  }
+
+  async function copyText() {
+    try {
+      const text = await generateResultsText(tournament, playerInfo, standings);
+      await navigator.clipboard.writeText(text);
+      showToast({ type: "success", message: m.share_results_copied() });
+    } catch {
+      showToast({ type: "error", message: m.share_results_error() });
+    }
+  }
 
   function getRatingPts(entry: StandingEntry): number {
     if (!isFinished) return 0;
@@ -59,6 +100,22 @@
     <div class="banner-emerald border rounded-lg p-4">
       <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
       <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
+    </div>
+  {/if}
+
+  <!-- Share buttons (finished tournaments with standings) -->
+  {#if isFinished && standings.length > 0}
+    <div class="flex gap-2">
+      <button onclick={shareImage} disabled={sharingImage}
+        class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors disabled:opacity-50">
+        <Share2 class="w-4 h-4" />
+        {sharingImage ? m.common_loading() : m.share_results_image()}
+      </button>
+      <button onclick={copyText}
+        class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors">
+        <ClipboardCopy class="w-4 h-4" />
+        {m.share_results_text()}
+      </button>
     </div>
   {/if}
 
