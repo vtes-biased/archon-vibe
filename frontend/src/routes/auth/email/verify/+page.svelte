@@ -91,8 +91,8 @@
       {:else if error}
         <!-- ERROR -->
         <div class="space-y-4 text-center">
-          <div class="w-16 h-16 mx-auto bg-red-900/30 rounded-full flex items-center justify-center">
-            <X class="w-8 h-8 text-red-400" />
+          <div class="w-16 h-16 mx-auto banner-red border rounded-full flex items-center justify-center">
+            <X class="w-8 h-8" />
           </div>
           <h2 class="text-lg font-medium text-bone-100">{m.auth_verify_link_invalid()}</h2>
           <p class="text-ash-400 text-sm">{error}</p>
@@ -112,7 +112,7 @@
         <div class="space-y-4">
           <h2 class="text-lg font-medium text-bone-100 text-center">{heading}</h2>
             {#if passwordError}
-            <div class="p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">
+            <div class="p-3 banner-red border rounded-lg text-sm">
               {passwordError}
             </div>
           {/if}

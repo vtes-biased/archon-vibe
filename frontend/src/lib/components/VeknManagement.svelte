@@ -101,7 +101,7 @@
         <button
           type="button"
           onclick={() => showSponsorConfirm = true}
-          class="px-3 py-1.5 text-sm bg-emerald-800 hover:bg-emerald-700 text-white rounded transition-colors"
+          class="px-3 py-1.5 text-sm btn-emerald rounded transition-colors"
           title={m.vekn_sponsor_title()}
         >
           <UserPlus class="inline w-3.5 h-3.5 mr-1" />
@@ -167,7 +167,7 @@
           <button
             onclick={handleSponsor}
             disabled={processingAction}
-            class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 btn-emerald disabled:bg-ash-700 rounded font-medium transition-colors disabled:cursor-not-allowed"
           >
             {processingAction ? m.vekn_sponsoring() : m.vekn_sponsor()}
           </button>

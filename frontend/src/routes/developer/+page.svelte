@@ -284,9 +284,9 @@
               <div class="flex items-center gap-2">
                 <h3 class="text-bone-100 font-medium">{client.name}</h3>
                 {#if client.active}
-                  <span class="px-2 py-0.5 bg-green-900/30 text-green-400 text-xs rounded-full">{m.developer_status_active()}</span>
+                  <span class="px-2 py-0.5 badge-emerald text-xs rounded-full">{m.developer_status_active()}</span>
                 {:else}
-                  <span class="px-2 py-0.5 bg-red-900/30 text-red-400 text-xs rounded-full">{m.developer_status_inactive()}</span>
+                  <span class="px-2 py-0.5 badge-red text-xs rounded-full">{m.developer_status_inactive()}</span>
                 {/if}
               </div>
               <div class="mt-2 space-y-1">
@@ -386,7 +386,7 @@
             </button>
             <button
               onclick={() => handleDeactivate(confirmAction!.clientId)}
-              class="flex-1 py-2 bg-red-700 hover:bg-red-600 text-bone-100 rounded-lg text-sm transition-colors"
+              class="flex-1 py-2 btn-red rounded-lg text-sm transition-colors"
             >
               {m.developer_deactivate_btn()}
             </button>

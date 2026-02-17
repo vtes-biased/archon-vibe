@@ -150,14 +150,14 @@
           onclick={finishFinals}
           disabled={actionLoading || tournament.finals.state !== "Finished"}
           title={tournament.finals.state !== "Finished" ? m.finals_finish_hint_not_ready() : m.finals_finish_hint_ready()}
-          class="px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+          class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
         >{m.finals_finish()}</button>
       </div>
     {/if}
 
     {#if swapSource}
-      <div class="bg-amber-900/20 border border-amber-800 rounded-lg p-3 flex items-center justify-between">
-        <p class="text-amber-300 text-sm">
+      <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
+        <p class="text-sm">
           {m.rounds_swap_hint({ name: seatDisplay(swapSource.playerUid) })}
         </p>
         <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">{m.common_cancel()}</button>
@@ -168,7 +168,7 @@
     <div class="bg-ash-900/50 rounded-lg p-4">
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-sm font-medium text-bone-100">{m.finals_table()}</h3>
-        <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'bg-emerald-900/60 text-emerald-300' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'bg-amber-900/60 text-amber-300'}">
+        <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-emerald' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
           {tournament.finals.state}
         </span>
       </div>
@@ -240,7 +240,7 @@
                   } catch (e) { error = e instanceof Error ? e.message : m.override_error(); } finally { overrideSaving = false; }
                 }}
                 disabled={overrideSaving || !overrideComment.trim()}
-                class="px-3 py-1 text-xs font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
+                class="px-3 py-1 text-xs font-medium btn-amber disabled:bg-ash-700 rounded transition-colors"
               >{overrideSaving ? m.common_saving() : m.override_save()}</button>
             </div>
           </div>

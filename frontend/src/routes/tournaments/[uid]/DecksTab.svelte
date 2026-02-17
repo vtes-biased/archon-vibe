@@ -91,7 +91,7 @@
 
   <!-- Decklist required reminder -->
   {#if tournament.decklist_required && (tournament.state === 'Registration' || tournament.state === 'Waiting')}
-    <div class="bg-amber-900/30 border border-amber-700/50 rounded-lg p-3 text-sm text-amber-200">
+    <div class="banner-amber border rounded-lg p-3 text-sm">
       {#if isOrganizer}
         {m.decks_required_organizer_hint()}
       {:else if isPlayer && myDecks.length === 0}
@@ -111,7 +111,7 @@
         {m.decks_winner_nudge_self()}
       </div>
     {:else if isOrganizer}
-      <div class="bg-amber-900/30 border border-amber-700/50 rounded-lg p-3 text-sm text-amber-200">
+      <div class="banner-amber border rounded-lg p-3 text-sm">
         {m.decks_winner_nudge_organizer({ name: playerInfo[winnerUid]?.name ?? 'the winner' })}
       </div>
     {/if}

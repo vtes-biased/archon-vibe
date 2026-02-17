@@ -99,7 +99,7 @@
 <div class="max-w-4xl mx-auto p-4 sm:p-8">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold text-ash-100">{m.rankings_page_title()}</h1>
-    <a href="/halloffame" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-900/40 text-amber-300 hover:bg-amber-900/60 transition-colors text-sm font-medium">
+    <a href="/halloffame" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg badge-amber hover:opacity-80 transition-colors text-sm font-medium">
       <Trophy class="w-4 h-4" />
       {m.rankings_hall_of_fame_link()}
     </a>

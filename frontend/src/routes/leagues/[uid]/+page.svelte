@@ -232,7 +232,7 @@
           <div>
             <h1 class="text-3xl font-light text-crimson-500">{league.name}</h1>
             <div class="flex gap-2 mt-1 text-sm text-ash-400">
-              <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'bg-emerald-900/50 text-emerald-300' : 'bg-ash-800 text-ash-400'}">
+              <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-emerald' : 'bg-ash-800 text-ash-400'}">
                 {isActive() ? "Active" : "Finished"}
               </span>
               <span>{standingsModeLabel(league.standings_mode)}</span>
@@ -292,7 +292,7 @@
           </label>
           <div class="flex gap-3 justify-end">
             <button onclick={() => editing = false} class="px-4 py-2 text-sm text-ash-400 hover:text-bone-100">Cancel</button>
-            <button onclick={saveEdit} class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 rounded-lg">Save</button>
+            <button onclick={saveEdit} class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">Save</button>
           </div>
         </div>
       {/if}
@@ -377,7 +377,7 @@
                         · {t.format}
                       </div>
                     </div>
-                    <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-ash-800 text-ash-400' : 'bg-emerald-900/50 text-emerald-300'}">
+                    <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-ash-800 text-ash-400' : 'badge-emerald'}">
                       {t.state}
                     </span>
                   </div>

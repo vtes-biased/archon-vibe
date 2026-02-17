@@ -279,7 +279,7 @@
               {@const expected = scoreExpectedCount()}
               <button
                 onclick={() => showScoreDetails = !showScoreDetails}
-                class="px-2 py-0.5 text-xs rounded-full {issues === 0 ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'}"
+                class="px-2 py-0.5 text-xs rounded-full {issues === 0 ? 'badge-emerald' : 'badge-amber'}"
               >
                 {#if issues === 0 && expected === 0}{m.rounds_seating_perfect()}
                 {:else if issues === 0}{m.rounds_seating_ok({ count: String(expected) })}
@@ -305,7 +305,7 @@
             onclick={() => doAction("FinishRound")}
             disabled={actionLoading || !allTablesFinished}
             title={allTablesFinished ? m.rounds_end_round_ready() : m.rounds_end_round_hint()}
-            class="px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+            class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
           >{m.rounds_end_round()}</button>
         </div>
       </div>
@@ -371,8 +371,8 @@
 
     <!-- Swap hint -->
     {#if swapSource}
-      <div class="bg-amber-900/20 border border-amber-800 rounded-lg p-3 flex items-center justify-between">
-        <p class="text-amber-300 text-sm">
+      <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
+        <p class="text-sm">
           {m.rounds_swap_hint({ name: seatDisplay(swapSource.playerUid) })}
         </p>
         <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">{m.common_cancel()}</button>
@@ -381,8 +381,8 @@
 
     <!-- Not seated players (outside header, visible in Playing and Finished) -->
     {#if unseatedPlayers.length > 0}
-      <div class="bg-amber-900/10 border border-amber-800/50 rounded-lg p-3">
-        <p class="text-xs text-amber-400 mb-2">{m.rounds_not_seated()}</p>
+      <div class="banner-amber border rounded-lg p-3">
+        <p class="text-xs mb-2">{m.rounds_not_seated()}</p>
         <div class="flex flex-wrap gap-2">
           {#each unseatedPlayers as player}
             {@const puid = player.user_uid ?? ""}
@@ -409,7 +409,7 @@
               {m.rounds_round_n({ n: String(r + 1) })}
             </span>
             {#if tournament.state === "Playing" && isCurrent}
-              <span class="text-xs px-2 py-0.5 rounded bg-amber-900/60 text-amber-300">{m.rounds_in_progress()}</span>
+              <span class="text-xs px-2 py-0.5 rounded badge-amber">{m.rounds_in_progress()}</span>
             {/if}
           </div>
           <span class="text-xs text-ash-500">{m.rounds_table_count({ count: String(round.length) })}</span>
@@ -427,7 +427,7 @@
                     {/if}
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'bg-emerald-900/60 text-emerald-300' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'bg-amber-900/60 text-amber-300'}">
+                    <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-emerald' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
                       {table.state}
                     </span>
                     {#if isEditable && r === tournament.rounds!.length - 1 && table.seating.length === 0}
@@ -524,7 +524,7 @@
                         <button
                           onclick={() => submitOverride(r, i)}
                           disabled={overrideSaving || !overrideComment.trim()}
-                          class="px-3 py-1 text-xs font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded transition-colors"
+                          class="px-3 py-1 text-xs font-medium btn-amber disabled:bg-ash-700 rounded transition-colors"
                         >{overrideSaving ? m.common_saving() : m.override_save()}</button>
                       </div>
                     </div>

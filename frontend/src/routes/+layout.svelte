@@ -103,7 +103,7 @@
 <div class="min-h-screen bg-bone-950 pb-16 sm:pb-0">
   <!-- Status bar (shows sync/offline status) -->
   {#if !isOnline || syncError}
-    <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm {!isOnline ? 'bg-amber-900/90 text-amber-100' : 'bg-crimson-900/90 text-crimson-100'}">
+    <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-crimson-900/90 text-crimson-100'}">
       {#if !isOnline}
         <span class="inline-flex items-center gap-2">
           <WifiOff class="w-4 h-4" />
@@ -117,7 +117,7 @@
 
   <!-- Update available banner -->
   {#if getUpdateAvailable()}
-    <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm bg-indigo-900/90 text-indigo-100" class:top-10={!isOnline || syncError}>
+    <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm status-update" class:top-10={!isOnline || syncError}>
       <span class="inline-flex items-center gap-2">
         <Download class="w-4 h-4" />
         {m.update_available()}

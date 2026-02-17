@@ -152,7 +152,7 @@
       {/if}
 
       {#if auth.error || oauthError}
-        <div class="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">
+        <div class="mb-4 p-3 banner-red border rounded-lg text-sm">
           {auth.error || oauthError}
         </div>
       {/if}

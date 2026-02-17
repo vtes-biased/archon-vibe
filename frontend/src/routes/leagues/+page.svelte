@@ -113,7 +113,7 @@
       {#if canCreate}
         <a
           href="/leagues/new"
-          class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors shadow-md"
+          class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
         >
           {m.league_new_btn()}
         </a>
@@ -189,7 +189,7 @@
                       {formatDateRange(league)}
                     </div>
                   </div>
-                  <span class="px-2 py-1 rounded text-xs font-medium {isActive(league) ? 'bg-emerald-900/50 text-emerald-300' : 'bg-ash-800 text-ash-400'}">
+                  <span class="px-2 py-1 rounded text-xs font-medium {isActive(league) ? 'badge-emerald' : 'bg-ash-800 text-ash-400'}">
                     {isActive(league) ? m.league_status_active() : m.league_status_finished()}
                   </span>
                 </div>

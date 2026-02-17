@@ -306,7 +306,7 @@
             id="new-user-button"
             onclick={toggleCreateForm}
             disabled={!isOnline}
-            class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg disabled:cursor-not-allowed"
+            class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg disabled:cursor-not-allowed"
           >
             {showCreateForm ? m.common_cancel() : m.user_list_new_user()}
           </button>

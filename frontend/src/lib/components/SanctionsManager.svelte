@@ -389,7 +389,7 @@
         <div class="flex items-center justify-between">
           <h2 id="edit-sanction-modal-title" class="text-xl font-medium text-bone-100">{m.sanction_mgr_edit_title()}</h2>
           {#if editingSanction.lifted_at}
-            <span class="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">{m.sanction_lifted()}</span>
+            <span class="text-xs badge-emerald px-2 py-1 rounded">{m.sanction_lifted()}</span>
           {/if}
         </div>
         <p class="mt-1 text-xs text-ash-500">
@@ -483,7 +483,7 @@
                 type="button"
                 onclick={handleLiftSanction}
                 disabled={processingSanctionAction}
-                class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
+                class="flex-1 px-4 py-2 btn-emerald disabled:bg-ash-700 rounded font-medium transition-colors disabled:cursor-not-allowed"
               >
                 <CircleCheck class="inline w-4 h-4 mr-1" />
                 {processingSanctionAction ? m.sanction_mgr_lifting() : m.sanction_mgr_lift()}

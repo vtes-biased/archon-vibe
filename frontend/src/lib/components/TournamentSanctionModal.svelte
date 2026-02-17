@@ -202,8 +202,8 @@
     >
       <!-- Escalation hint -->
       {#if activePriorCount > 0}
-        <div class="p-3 rounded bg-amber-900/30 border border-amber-800/50 text-sm">
-          <div class="flex items-center gap-2 text-amber-300">
+        <div class="p-3 rounded banner-amber border text-sm">
+          <div class="flex items-center gap-2">
             <TriangleAlert class="w-4 h-4 shrink-0" />
             {m.sanction_escalation_hint({ count: String(activePriorCount), suggested: levelLabel(suggestedLevel) })}
           </div>

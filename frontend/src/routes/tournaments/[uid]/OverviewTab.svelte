@@ -92,7 +92,7 @@
 
   <!-- Winner display -->
   {#if tournament.winner}
-    <div class="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4">
+    <div class="banner-emerald border rounded-lg p-4">
       <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
       <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
     </div>
@@ -107,7 +107,7 @@
         <button
           onclick={() => doAction("OpenRegistration")}
           disabled={actionLoading}
-          class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+          class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
         >{actionLoading ? "..." : m.overview_open_registration()}</button>
 
       {:else if tournament.state === "Registration"}
@@ -115,7 +115,7 @@
           <button
             onclick={() => doAction("CloseRegistration")}
             disabled={actionLoading}
-            class="px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 rounded-lg transition-colors"
+            class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 rounded-lg transition-colors"
           >{m.overview_close_registration()}</button>
           <button
             onclick={() => doAction("CancelRegistration")}
@@ -167,21 +167,21 @@
             <button
               onclick={() => doAction("StartRound")}
               disabled={actionLoading || checkedInCount < 4}
-              class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+              class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
             >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
             {#if finalsReady}
               <button
                 onclick={() => doAction("StartFinals")}
                 disabled={actionLoading}
-                class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+                class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
               >{m.overview_start_finals()}</button>
             {/if}
           </div>
 
           <!-- Seating warnings -->
           {#if [6, 7, 11].includes(checkedInCount)}
-            <div class="bg-amber-900/20 border border-amber-800 rounded-lg p-3">
-              <p class="text-amber-300 text-sm">{m.overview_seating_warning({ count: String(checkedInCount) })}</p>
+            <div class="banner-amber border rounded-lg p-3">
+              <p class="text-sm">{m.overview_seating_warning({ count: String(checkedInCount) })}</p>
             </div>
           {/if}
 

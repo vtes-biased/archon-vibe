@@ -1,57 +1,22 @@
 import type { Role } from '$lib/types';
 
-export interface RoleConfig {
-  bg: string;
-  text: string;
-}
-
 // Gothic-inspired muted role colors - see DESIGN.md
-export const ROLE_COLORS: Record<Role, RoleConfig> = {
-  IC: {
-    bg: 'bg-purple-900/60',
-    text: 'text-purple-200',
-  },
-  NC: {
-    bg: 'bg-blue-900/60',
-    text: 'text-blue-200',
-  },
-  Prince: {
-    bg: 'bg-crimson-800/60',
-    text: 'text-crimson-200',
-  },
-  Ethics: {
-    bg: 'bg-emerald-900/60',
-    text: 'text-emerald-200',
-  },
-  PTC: {
-    bg: 'bg-cyan-900/60',
-    text: 'text-cyan-200',
-  },
-  PT: {
-    bg: 'bg-teal-900/60',
-    text: 'text-teal-200',
-  },
-  Rulemonger: {
-    bg: 'bg-amber-900/60',
-    text: 'text-amber-200',
-  },
-  Judge: {
-    bg: 'bg-indigo-900/60',
-    text: 'text-indigo-200',
-  },
-  Judgekin: {
-    bg: 'bg-slate-800/60',
-    text: 'text-slate-200',
-  },
-  DEV: {
-    bg: 'bg-lime-900/60',
-    text: 'text-lime-200',
-  },
+// Uses semantic badge-* classes from app.css for light/dark mode support
+const ROLE_CLASSES: Record<Role, string> = {
+  IC: 'badge-purple',
+  NC: 'badge-blue',
+  Prince: 'bg-crimson-800/60 text-crimson-200', // crimson uses custom palette
+  Ethics: 'badge-emerald',
+  PTC: 'badge-cyan',
+  PT: 'badge-teal',
+  Rulemonger: 'badge-amber',
+  Judge: 'badge-indigo',
+  Judgekin: 'badge-slate',
+  DEV: 'badge-lime',
 };
 
 export function getRoleClasses(role: Role): string {
-  const config = ROLE_COLORS[role];
-  return `${config.bg} ${config.text}`;
+  return ROLE_CLASSES[role];
 }
 
 /**

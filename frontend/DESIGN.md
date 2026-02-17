@@ -14,6 +14,27 @@ VTES / Vampire: the Masquerade inspired. Gothic horror, pale and muted, with dar
 
 Role badges use distinct colors but remain muted/dusty to fit the gothic aesthetic.
 
+### Semantic Color Classes
+
+Standard Tailwind colors (emerald, amber, red, etc.) are **not** covered by the scale inversion. For colored UI elements that must look correct in both modes, use the semantic CSS classes defined in `app.css`:
+
+| Class | Usage | Dark mode | Light mode |
+|-------|-------|-----------|------------|
+| `badge-{color}` | Status pills, role tags | Dark tinted bg + light text | Light tinted bg + dark text |
+| `btn-{color}` | Action buttons | Saturated bg + white text | Darker bg + white text |
+| `banner-{color}` | Alert/info boxes | Dark bg 20% + border | Light tint bg + soft border |
+| `toast-{color}` | Toast notifications | Dark bg + light text | Light bg + dark text |
+| `status-offline` | Offline status bar | Amber bg + light text | Dark amber bg + white text |
+| `status-update` | Update available bar | Indigo bg + light text | Dark indigo bg + white text |
+
+Available colors: `emerald`, `amber`, `red`, `yellow`, `orange`, `purple`, `blue`, `indigo`, `cyan`, `teal`, `lime`, `slate`, `rose`.
+
+**When to use what:**
+- `badge-*` — for any small status indicator or tag
+- `btn-*` — for solid action buttons (combine with `disabled:bg-ash-700`, `rounded-lg`, etc.)
+- `banner-*` — for info/warning boxes (add `border rounded-lg p-3` etc.)
+- Crimson palette classes (`bg-crimson-*`, `text-crimson-*`) — already handled by scale inversion, use directly
+
 ### Light Theme — Scale Inversion
 
 Light mode is implemented via **CSS variable overrides** under `html.light` in `app.css`. The technique is called *scale inversion*: dark shade numbers (900/950) are reassigned to light color values and vice versa. This means all existing Tailwind classes (`bg-dusk-950`, `text-ash-300`, etc.) automatically resolve to appropriate light-mode colors with zero component changes.

@@ -196,7 +196,7 @@
       {#if canCreate}
         <a
           href="/tournaments/new"
-          class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors shadow-md"
+          class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
         >
           {m.tournaments_new_btn()}
         </a>

@@ -16,32 +16,14 @@
   );
   const isInactive = $derived(isLifted || isExpired());
 
-  // Gothic-inspired muted sanction colors
-  const SANCTION_COLORS: Record<SanctionLevel, { bg: string; text: string }> = {
-    caution: {
-      bg: "bg-yellow-900/60",
-      text: "text-yellow-200",
-    },
-    warning: {
-      bg: "bg-orange-900/60",
-      text: "text-orange-200",
-    },
-    standings_adjustment: {
-      bg: "bg-purple-900/60",
-      text: "text-purple-200",
-    },
-    disqualification: {
-      bg: "bg-red-900/60",
-      text: "text-red-200",
-    },
-    suspension: {
-      bg: "bg-crimson-900/80",
-      text: "text-crimson-200",
-    },
-    probation: {
-      bg: "bg-rose-900/60",
-      text: "text-rose-200",
-    },
+  // Gothic-inspired muted sanction colors — uses semantic badge-* classes from app.css
+  const SANCTION_CLASSES: Record<SanctionLevel, string> = {
+    caution: "badge-yellow",
+    warning: "badge-orange",
+    standings_adjustment: "badge-purple",
+    disqualification: "badge-red",
+    suspension: "bg-crimson-900/80 text-crimson-200", // crimson uses custom palette
+    probation: "badge-rose",
   };
 
   const levelLabelFns: Record<SanctionLevel, () => string> = {
@@ -53,7 +35,7 @@
     probation: () => m.sanction_level_probation(),
   };
 
-  const colors = $derived(SANCTION_COLORS[sanction.level]);
+  const badgeClass = $derived(SANCTION_CLASSES[sanction.level]);
   const label = $derived(levelLabelFns[sanction.level]());
 
   // Format date for tooltip
@@ -77,7 +59,7 @@
 </script>
 
 <span
-  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium {colors.bg} {colors.text} {isInactive
+  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium {badgeClass} {isInactive
     ? 'line-through opacity-60'
     : ''}"
   title={tooltipText()}

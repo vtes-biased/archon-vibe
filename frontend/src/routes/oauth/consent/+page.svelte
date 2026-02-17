@@ -171,8 +171,8 @@
         </div>
       {:else if error}
         <div class="text-center space-y-4">
-          <div class="w-16 h-16 mx-auto bg-red-900/30 rounded-full flex items-center justify-center">
-            <CircleAlert class="w-8 h-8 text-red-400" />
+          <div class="w-16 h-16 mx-auto banner-red border rounded-full flex items-center justify-center">
+            <CircleAlert class="w-8 h-8" />
           </div>
           <p class="text-red-300 text-sm">{error}</p>
           <button

@@ -12,7 +12,7 @@
   import { formatScore } from "$lib/utils";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight } from "lucide-svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -286,9 +286,18 @@
     const mode = tournament?.standings_mode ?? "Private";
     if (tournament?.state === "Finished") return standings;
     if (mode === "Private") return [];
-    if (mode === "Cutoff") return standings.slice(0, 5);
+    if (mode === "Cutoff") return [];
     if (mode === "Top 10") return standings.slice(0, 10);
     return standings;
+  });
+
+  // Cutoff score: 5th player's score threshold for finals selection
+  const cutoffScore = $derived.by(() => {
+    if (tournament?.state === "Finished") return null;
+    if ((tournament?.standings_mode ?? "Private") !== "Cutoff") return null;
+    const entry = standings[4];
+    if (!entry) return null;
+    return { gw: entry.gw, vp: entry.vp, tp: entry.tp };
   });
 
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
@@ -536,9 +545,9 @@
     {:else if tournament}
       <!-- Offline mode banner (this device has lock) -->
       {#if tournamentIsOffline}
-        <div class="bg-amber-900/30 border border-amber-700 rounded-lg p-4 mb-4 flex items-center justify-between gap-4">
+        <div class="banner-amber border rounded-lg p-4 mb-4 flex items-center justify-between gap-4">
           <div class="flex items-center gap-2 min-w-0">
-            <WifiOff class="w-5 h-5 text-amber-400 shrink-0" />
+            <WifiOff class="w-5 h-5 shrink-0" />
             <div class="min-w-0">
               <span class="text-amber-200 font-medium text-sm">{m.offline_mode_banner()}</span>
               {#if lastSync}
@@ -551,7 +560,7 @@
           <button
             onclick={() => showGoOnlineConfirm = true}
             disabled={offlineActionLoading}
-            class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors shrink-0"
+            class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors shrink-0"
           >
             <Wifi class="w-4 h-4 inline mr-1" />
             {m.offline_go_online()}
@@ -638,7 +647,20 @@
               {:else if tournament.country}
                 {getCountryFlag(tournament.country)} {countries[tournament.country]?.name ?? tournament.country}
                 {#if tournament.venue}
-                  <br /><span class="text-ash-400">{tournament.venue}</span>
+                  <br />
+                  {#if tournament.venue_url}
+                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-ash-400 hover:text-ember-400 inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" /></a>
+                  {:else}
+                    <span class="text-ash-400">{tournament.venue}</span>
+                  {/if}
+                {/if}
+                {#if tournament.address}
+                  <br />
+                  {#if tournament.map_url}
+                    <a href={tournament.map_url} target="_blank" rel="noopener" class="text-ash-500 hover:text-ember-400 text-xs inline-flex items-center gap-1"><MapPin class="w-3 h-3" /> {tournament.address}</a>
+                  {:else}
+                    <span class="text-ash-500 text-xs"><MapPin class="w-3 h-3 inline" /> {tournament.address}</span>
+                  {/if}
                 {/if}
               {:else}
                 —
@@ -749,12 +771,12 @@
 
       <!-- Player View (non-organizer) -->
       {#if !showOrganizerView && auth.isAuthenticated}
-        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6">
+        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
           {#if tournament.state === "Registration" && !currentPlayerEntry}
             <button
               onclick={() => doAction("Register", { user_uid: auth.user?.uid })}
               disabled={actionLoading}
-              class="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 rounded-lg transition-colors"
+              class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
             >{m.tournament_register_btn()}</button>
           {:else if tournament.state === "Registration" && currentPlayerEntry}
             <div class="text-sm mb-3 flex items-center justify-between">
@@ -802,13 +824,25 @@
                 >{m.tournament_drop_out_btn()}</button>
               {/if}
             </div>
+            <!-- Cutoff score threshold for players -->
+            {#if cutoffScore}
+              <div class="bg-ash-900/50 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-bone-100 mb-2">
+                  {m.tournament_standings()}
+                  <span class="text-xs text-ash-500 font-normal ml-1">({m.tournament_standings_cutoff()})</span>
+                </h3>
+                <p class="text-sm text-ash-300">
+                  {m.tournament_cutoff_threshold()} <span class="text-bone-100 font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
+                </p>
+              </div>
+            {/if}
             <!-- Standings for players -->
             {#if tournament.state !== "Finished" && playerStandings.length > 0}
               <div class="bg-ash-900/50 rounded-lg p-4">
                 <h3 class="text-sm font-medium text-bone-100 mb-2">
                   {m.tournament_standings()}
                   {#if tournament.standings_mode !== "Public"}
-                    <span class="text-xs text-ash-500 font-normal ml-1">({tournament.standings_mode === "Cutoff" ? m.tournament_standings_top5() : tournament.standings_mode})</span>
+                    <span class="text-xs text-ash-500 font-normal ml-1">({tournament.standings_mode})</span>
                   {/if}
                 </h3>
                 <table class="w-full text-sm">
@@ -879,7 +913,7 @@
                 <div class="bg-ash-900/50 rounded-lg p-4">
                   <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-medium text-bone-100">{m.tournament_your_table({ n: String(myTableIdx + 1) })}</h3>
-                    <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'bg-emerald-900/60 text-emerald-300' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'bg-amber-900/60 text-amber-300'}">
+                    <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
                       {myTable.state}
                     </span>
                   </div>
@@ -958,7 +992,7 @@
         {@const hasFinals = standings.some(e => e.finals)}
         <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
           {#if tournament.winner}
-            <div class="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4">
+            <div class="banner-emerald border rounded-lg p-4">
               <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
               <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
             </div>
@@ -1101,7 +1135,7 @@
           <button
             onclick={handleGoOffline}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 btn-amber disabled:bg-ash-700 rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}</button>
           <button
             onclick={() => (showGoOfflineConfirm = false)}
@@ -1140,7 +1174,7 @@
           <button
             onclick={handleGoOnline}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 btn-emerald disabled:bg-ash-700 rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}</button>
           <button
             onclick={() => (showGoOnlineConfirm = false)}
@@ -1179,7 +1213,7 @@
           <button
             onclick={handleForceTakeover}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 btn-amber disabled:bg-ash-700 rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}</button>
           <button
             onclick={() => (showForceTakeoverConfirm = false)}

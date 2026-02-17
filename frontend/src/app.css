@@ -157,3 +157,79 @@
         --color-mist-dark: #9B9590;
     }
 }
+
+/*
+ * Semantic color classes for badges, buttons, and banners.
+ * Correct contrast in both dark and light mode.
+ * Dark mode = default values; light mode = overrides below.
+ */
+
+/* ── Badges (status pills, role tags) ── */
+.badge-emerald { background: rgb(6 78 59 / 0.6);   color: #6ee7b7; }
+.badge-amber   { background: rgb(120 53 15 / 0.6);  color: #fcd34d; }
+.badge-red     { background: rgb(127 29 29 / 0.6);  color: #fca5a5; }
+.badge-yellow  { background: rgb(113 63 18 / 0.6);  color: #fde047; }
+.badge-orange  { background: rgb(124 45 18 / 0.6);  color: #fdba74; }
+.badge-purple  { background: rgb(88 28 135 / 0.6);  color: #e9d5ff; }
+.badge-blue    { background: rgb(30 58 138 / 0.6);  color: #bfdbfe; }
+.badge-indigo  { background: rgb(49 46 129 / 0.6);  color: #c7d2fe; }
+.badge-cyan    { background: rgb(22 78 99 / 0.6);   color: #a5f3fc; }
+.badge-teal    { background: rgb(19 78 74 / 0.6);   color: #99f6e4; }
+.badge-lime    { background: rgb(54 83 20 / 0.6);   color: #d9f99d; }
+.badge-slate   { background: rgb(30 41 59 / 0.6);   color: #e2e8f0; }
+.badge-rose    { background: rgb(136 19 55 / 0.6);  color: #fecdd3; }
+
+/* ── Buttons (solid action buttons) ── */
+.btn-emerald       { background-color: #047857; color: white; }
+.btn-emerald:hover { background-color: #059669; }
+.btn-amber         { background-color: #b45309; color: white; }
+.btn-amber:hover   { background-color: #d97706; }
+.btn-red           { background-color: #b91c1c; color: white; }
+.btn-red:hover     { background-color: #dc2626; }
+
+/* ── Banners (alert/info boxes) ── */
+.banner-emerald { background: rgb(6 78 59 / 0.2);  border-color: #065f46; }
+.banner-amber   { background: rgb(120 53 15 / 0.2); border-color: #92400e; }
+.banner-red     { background: rgb(127 29 29 / 0.2); border-color: #991b1b; }
+
+/* ── Toasts ── */
+.toast-emerald { background: rgb(6 78 59 / 0.9);   border-color: #047857; color: #d1fae5; }
+.toast-amber   { background: rgb(120 53 15 / 0.9); border-color: #b45309; color: #fef3c7; }
+
+/* ── Status bars ── */
+.status-offline { background: rgb(120 53 15 / 0.9); color: #fef3c7; }
+.status-update  { background: rgb(49 46 129 / 0.9); color: #e0e7ff; }
+
+/* ── Light mode overrides ── */
+html.light {
+    .badge-emerald { background: #ecfdf5; color: #065f46; }
+    .badge-amber   { background: #fffbeb; color: #92400e; }
+    .badge-red     { background: #fef2f2; color: #991b1b; }
+    .badge-yellow  { background: #fefce8; color: #854d0e; }
+    .badge-orange  { background: #fff7ed; color: #9a3412; }
+    .badge-purple  { background: #faf5ff; color: #6b21a8; }
+    .badge-blue    { background: #eff6ff; color: #1e40af; }
+    .badge-indigo  { background: #eef2ff; color: #3730a3; }
+    .badge-cyan    { background: #ecfeff; color: #155e75; }
+    .badge-teal    { background: #f0fdfa; color: #115e59; }
+    .badge-lime    { background: #f7fee7; color: #3f6212; }
+    .badge-slate   { background: #f1f5f9; color: #334155; }
+    .badge-rose    { background: #fff1f2; color: #9f1239; }
+
+    .btn-emerald       { background-color: #065f46; }
+    .btn-emerald:hover { background-color: #047857; }
+    .btn-amber         { background-color: #92400e; }
+    .btn-amber:hover   { background-color: #b45309; }
+    .btn-red           { background-color: #991b1b; }
+    .btn-red:hover     { background-color: #b91c1c; }
+
+    .banner-emerald { background: #ecfdf5; border-color: #a7f3d0; }
+    .banner-amber   { background: #fffbeb; border-color: #fde68a; }
+    .banner-red     { background: #fef2f2; border-color: #fecaca; }
+
+    .toast-emerald { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .toast-amber   { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+
+    .status-offline { background: #92400e; color: white; }
+    .status-update  { background: #3730a3; color: white; }
+}

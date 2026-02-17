@@ -21,11 +21,11 @@
   function getStyles(type: Toast['type']): string {
     switch (type) {
       case 'success':
-        return 'bg-emerald-900/90 border-emerald-700 text-emerald-100';
+        return 'toast-emerald';
       case 'error':
-        return 'bg-crimson-900/90 border-crimson-700 text-crimson-100';
+        return 'bg-crimson-900/90 border-crimson-700 text-crimson-100'; // crimson uses custom palette
       case 'warning':
-        return 'bg-amber-900/90 border-amber-700 text-amber-100';
+        return 'toast-amber';
       case 'info':
         return 'bg-dusk-900/90 border-ash-600 text-bone-100';
     }
