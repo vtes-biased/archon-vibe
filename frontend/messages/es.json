@@ -445,6 +445,7 @@
   "tournaments_calendar_personal": "Agenda personal",
   "tournaments_calendar_by_country": "Por país",
   "tournaments_calendar_all": "Todos los torneos",
+  "tournaments_calendar_select_country": "Seleccione un país arriba para obtener la URL del calendario.",
 
   "tournament_new_page_title": "Nuevo torneo",
   "tournament_new_title": "Nuevo torneo",
@@ -623,6 +624,7 @@
   "rounds_remove_empty_table": "Eliminar mesa vacía",
   "rounds_error_save": "Error al guardar puntuaciones",
   "rounds_alter_r1_error": "No se puede guardar: repetición depredador-presa (violación R1).",
+  "rounds_print_seating": "Imprimir la disposición",
   "rounds_alter_scores_warning": "Mover jugadores entre mesas restablecerá sus puntuaciones.",
 
   "override_judge_comment": "Comentario del juez (obligatorio)",

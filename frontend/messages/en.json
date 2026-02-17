@@ -445,6 +445,7 @@
   "tournaments_calendar_personal": "Personal agenda",
   "tournaments_calendar_by_country": "By country",
   "tournaments_calendar_all": "All tournaments",
+  "tournaments_calendar_select_country": "Select a country above to get the calendar URL.",
 
   "tournament_new_page_title": "New Tournament",
   "tournament_new_title": "New Tournament",
@@ -623,6 +624,7 @@
   "rounds_remove_empty_table": "Remove empty table",
   "rounds_error_save": "Failed to save scores",
   "rounds_alter_r1_error": "Cannot save: predator-prey repeat (R1 violation).",
+  "rounds_print_seating": "Print seating",
   "rounds_alter_scores_warning": "Moving players between tables will reset their scores.",
 
   "override_judge_comment": "Judge comment (required)",

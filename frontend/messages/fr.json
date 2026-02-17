@@ -445,6 +445,7 @@
   "tournaments_calendar_personal": "Agenda personnel",
   "tournaments_calendar_by_country": "Par pays",
   "tournaments_calendar_all": "Tous les tournois",
+  "tournaments_calendar_select_country": "Sélectionnez un pays ci-dessus pour obtenir l'URL du calendrier.",
 
   "tournament_new_page_title": "Nouveau tournoi",
   "tournament_new_title": "Nouveau tournoi",
@@ -623,6 +624,7 @@
   "rounds_remove_empty_table": "Retirer la table vide",
   "rounds_error_save": "Échec de l'enregistrement des scores",
   "rounds_alter_r1_error": "Impossible d'enregistrer : répétition prédateur-proie (violation R1).",
+  "rounds_print_seating": "Imprimer le placement",
   "rounds_alter_scores_warning": "Déplacer des joueurs entre les tables réinitialisera leurs scores.",
 
   "override_judge_comment": "Commentaire de l'arbitre (requis)",

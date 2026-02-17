@@ -445,6 +445,7 @@
   "tournaments_calendar_personal": "Agenda personale",
   "tournaments_calendar_by_country": "Per nazione",
   "tournaments_calendar_all": "Tutti i tornei",
+  "tournaments_calendar_select_country": "Seleziona un paese sopra per ottenere l'URL del calendario.",
 
   "tournament_new_page_title": "Nuovo Torneo",
   "tournament_new_title": "Nuovo Torneo",
@@ -623,6 +624,7 @@
   "rounds_remove_empty_table": "Rimuovi tavolo vuoto",
   "rounds_error_save": "Salvataggio punteggi fallito",
   "rounds_alter_r1_error": "Impossibile salvare: ripetizione predatore-preda (violazione R1).",
+  "rounds_print_seating": "Stampa la disposizione",
   "rounds_alter_scores_warning": "Spostare giocatori tra i tavoli azzererà i loro punteggi.",
 
   "override_judge_comment": "Commento del giudice (obbligatorio)",

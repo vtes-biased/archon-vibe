@@ -5,7 +5,7 @@
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus } from "lucide-svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer } from "lucide-svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -240,6 +240,51 @@
     doAction("CancelRound");
   }
 
+  function esc(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function printSeatHtml(uid: string): string {
+    const info = playerInfo[uid];
+    if (!info) return esc(uid);
+    const name = esc(info.nickname || info.name);
+    return info.vekn
+      ? `${name} <span style="color:#888;font-size:10pt">(${esc(info.vekn)})</span>`
+      : name;
+  }
+
+  function printRound(r: number) {
+    const round = tournament.rounds![r]!;
+    const title = esc(tournament.name || m.tournament_fallback_title());
+    const roundLabel = esc(m.rounds_round_n({ n: String(r + 1) }));
+    let tablesHtml = '';
+    for (let i = 0; i < round.length; i++) {
+      const table = round[i]!;
+      let rows = '';
+      for (let j = 0; j < table.seating.length; j++) {
+        const s = table.seating[j]!;
+        const bg = j % 2 === 0 ? '#f5f5f5' : 'transparent';
+        rows += `<div style="padding:3px 8px 3px 12px;background:${bg};border-bottom:1px solid #ddd"><span style="display:inline-block;width:20px;text-align:right;font-weight:bold;margin-right:6px">${j + 1}.</span>${printSeatHtml(s.player_uid)}</div>`;
+      }
+      tablesHtml += `<div style="break-inside:avoid;display:inline-block;width:100%;margin-bottom:16px"><div style="font-size:14pt;font-weight:bold;background:#e8e8e8;padding:4px 8px">${esc(m.rounds_table_n({ n: String(i + 1) }))}</div>${rows}</div>`;
+    }
+    const css = [
+      `body{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;font-size:12pt;color:#000;margin:0;padding:0;line-height:1.4}`,
+      `@page{margin:15mm}`,
+      `.cols{column-count:2;column-gap:24px}`,
+      `.footer{position:fixed;bottom:0;width:100%;text-align:right;font-size:9pt;color:#999}`,
+    ].join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} — ${roundLabel}</title><style>${css}</style></head><body>`
+      + `<div style="font-size:20pt;font-weight:bold">${title}</div>`
+      + `<div style="font-size:16pt;color:#444;margin-top:4px">${roundLabel}</div>`
+      + `<hr style="border:none;border-top:2px solid #000;margin:8px 0 16px">`
+      + `<div class="cols">${tablesHtml}</div>`
+      + `<div class="footer">${title}</div>`
+      + `<script>window.onload=()=>window.print()<\/script></body></html>`;
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+  }
+
   function isCurrentRound(idx: number): boolean {
     return idx === currentRoundIdx;
   }
@@ -375,21 +420,32 @@
       {@const isEditable = canEditSeating}
       {@const isExpanded = expandedRounds.has(r)}
       <div class="bg-ash-900/30 rounded-lg border border-ash-800">
-        <button
-          onclick={() => toggleRound(r)}
-          class="w-full px-4 py-3 flex items-center justify-between text-left"
-        >
-          <div class="flex items-center gap-2">
-            {#if isExpanded}<ChevronDown class="w-4 h-4 text-ash-500" />{:else}<ChevronRight class="w-4 h-4 text-ash-500" />{/if}
-            <span class="text-sm font-medium {isCurrent ? 'text-bone-100' : 'text-ash-300'}">
-              {m.rounds_round_n({ n: String(r + 1) })}
-            </span>
-            {#if tournament.state === "Playing" && isCurrent}
-              <span class="text-xs px-2 py-0.5 rounded badge-amber">{m.rounds_in_progress()}</span>
-            {/if}
-          </div>
-          <span class="text-xs text-ash-500">{m.rounds_table_count({ count: String(round.length) })}</span>
-        </button>
+        <div class="flex items-center">
+          <button
+            onclick={() => toggleRound(r)}
+            class="flex-1 px-4 py-3 flex items-center justify-between text-left"
+          >
+            <div class="flex items-center gap-2">
+              {#if isExpanded}<ChevronDown class="w-4 h-4 text-ash-500" />{:else}<ChevronRight class="w-4 h-4 text-ash-500" />{/if}
+              <span class="text-sm font-medium {isCurrent ? 'text-bone-100' : 'text-ash-300'}">
+                {m.rounds_round_n({ n: String(r + 1) })}
+              </span>
+              {#if tournament.state === "Playing" && isCurrent}
+                <span class="text-xs px-2 py-0.5 rounded badge-amber">{m.rounds_in_progress()}</span>
+              {/if}
+            </div>
+            <span class="text-xs text-ash-500">{m.rounds_table_count({ count: String(round.length) })}</span>
+          </button>
+          {#if isOrganizer && round.length > 0}
+            <button
+              onclick={() => printRound(r)}
+              class="px-3 py-3 text-ash-500 hover:text-bone-100 transition-colors"
+              title={m.rounds_print_seating()}
+            >
+              <Printer class="w-4 h-4" />
+            </button>
+          {/if}
+        </div>
 
         {#if isExpanded}
           <div class="px-4 pb-4 space-y-3">
