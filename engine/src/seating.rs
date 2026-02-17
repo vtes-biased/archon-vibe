@@ -846,6 +846,130 @@ fn clear_table_from_measure_idx(measure: &mut Measure, table: &[usize], _n: usiz
     }
 }
 
+/// Per-player seating issue
+#[derive(Debug, Clone)]
+pub struct SeatingIssue {
+    pub rule: usize,          // 0-8 (R1-R9)
+    pub players: Vec<String>, // involved player UIDs
+}
+
+impl SeatingIssue {
+    pub fn to_json(&self) -> json::JsonValue {
+        json::object! {
+            rule: self.rule,
+            players: self.players.iter().map(|p| p.as_str().into()).collect::<Vec<json::JsonValue>>(),
+        }
+    }
+}
+
+/// Compute per-player seating issues (which players violate which rules).
+/// Returns a list of SeatingIssue, each identifying a rule and the involved player UIDs.
+/// Ported from legacy Evaluator.issues().
+pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
+    if rounds.is_empty() {
+        return vec![];
+    }
+    let mapping = build_mapping(rounds);
+    let n = mapping.len();
+    if n == 0 {
+        return vec![];
+    }
+    // Build reverse mapping
+    let mut reverse: Vec<String> = vec![String::new(); n];
+    for (name, &idx) in &mapping {
+        reverse[idx] = name.clone();
+    }
+    // Compute total measure
+    let total = rounds.iter().fold(Measure::new(n), |mut acc, r| {
+        acc.add(&measure_round(&mapping, r));
+        acc
+    });
+    let rounds_count = rounds.len();
+
+    let mut issues = Vec::new();
+
+    // Compute global values
+    let mut mean_vps = 0.0_f64;
+    let mut mean_trs = 0.0_f64;
+    let mut playing = 0_usize;
+
+    for i in 0..n {
+        let rounds_played = total.get(i, i, 0);
+        if rounds_played > 0 {
+            mean_vps += total.get(i, i, 1) as f64 / rounds_played as f64;
+            mean_trs += total.get(i, i, 2) as f64 / rounds_played as f64;
+            playing += 1;
+        }
+    }
+    if playing == 0 {
+        return vec![];
+    }
+    mean_vps /= playing as f64;
+    mean_trs /= playing as f64;
+
+    // Diagonal checks (per-player)
+    for i in 0..n {
+        let rounds_played = total.get(i, i, 0);
+        if rounds_played == 0 {
+            continue;
+        }
+        let rp = rounds_played as f64;
+
+        // R3: VP distribution
+        if (mean_vps - total.get(i, i, 1) as f64 / rp).abs() > 1.0 / rp {
+            issues.push(SeatingIssue { rule: 2, players: vec![reverse[i].clone()] });
+        }
+        // R8: Transfer distribution
+        if (mean_trs - total.get(i, i, 2) as f64 / rp).abs() > 2.0 / rp {
+            issues.push(SeatingIssue { rule: 7, players: vec![reverse[i].clone()] });
+        }
+        // R5: Fifth seat twice, R7: Same seat twice
+        for seat in 3..8 {
+            let count = total.get(i, i, seat);
+            if count > 1 {
+                issues.push(SeatingIssue { rule: 6, players: vec![reverse[i].clone()] }); // R7
+                if seat == 7 {
+                    issues.push(SeatingIssue { rule: 4, players: vec![reverse[i].clone()] }); // R5
+                }
+            }
+        }
+    }
+
+    // Off-diagonal checks (pair-wise)
+    for i in 0..n {
+        for j in 0..i {
+            let opponent_count = total.get(i, j, 0);
+            if opponent_count > 1 {
+                // R4: Opponent twice
+                issues.push(SeatingIssue { rule: 3, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                // R2: Opponent all rounds (only when rounds > 2)
+                if opponent_count >= rounds_count as i32 && rounds_count > 2 {
+                    issues.push(SeatingIssue { rule: 1, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                }
+                // Check specific relationships
+                for k in 1..6 {
+                    if total.get(i, j, k) > 1 {
+                        // R6: Same position
+                        issues.push(SeatingIssue { rule: 5, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                        // R1: Predator-prey repeat (prey=1, pred=4)
+                        if k == 1 || k == 4 {
+                            issues.push(SeatingIssue { rule: 0, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                        }
+                    }
+                }
+                // R9: Same position group (neighbour/non-neighbour)
+                for k in 6..8 {
+                    if total.get(i, j, k) > 1 {
+                        issues.push(SeatingIssue { rule: 8, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                    }
+                }
+            }
+        }
+    }
+
+    issues
+}
+
 /// Get initial rounds for staggered player counts (6, 7, 11)
 pub fn get_staggered_rounds(players: &[String], rounds_count: usize) -> Vec<Vec<Vec<String>>> {
     let players_count = players.len();
@@ -1599,5 +1723,113 @@ mod tests {
 
         // total pair-slots = 3 * 12 = 36; C(8,2) = 28; excess = 8; min_R4 = ceil(8/2) = 4
         assert_eq!(mins[3], 4.0, "R4 min should be 4 for 8 players, 3 rounds");
+    }
+
+    // ================================================================
+    // compute_player_issues tests
+    // ================================================================
+
+    #[test]
+    fn test_player_issues_empty_rounds() {
+        let issues = compute_player_issues(&[]);
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_player_issues_single_round_no_issues() {
+        // Single round: no repeats possible, no issues expected
+        let rounds = vec![vec![
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec!["E".into(), "F".into(), "G".into(), "H".into()],
+        ]];
+        let issues = compute_player_issues(&rounds);
+        assert!(issues.is_empty(), "Single round should produce no issues");
+    }
+
+    #[test]
+    fn test_player_issues_identical_seating_detects_violations() {
+        // Identical seating across 2 rounds forces every violation
+        let table = vec!["A".into(), "B".into(), "C".into(), "D".into()];
+        let rounds = vec![vec![table.clone()], vec![table.clone()]];
+        let issues = compute_player_issues(&rounds);
+
+        // Should have issues: R1 (pred-prey repeat), R4 (opponent twice),
+        // R5 won't fire (no 5th seat), R6 (same position), R7 (same seat),
+        // R9 (same position group)
+        assert!(!issues.is_empty(), "Identical seating should produce issues");
+
+        // Check R1 (rule index 0) -- predator-prey repeat
+        let r1_issues: Vec<_> = issues.iter().filter(|i| i.rule == 0).collect();
+        assert!(!r1_issues.is_empty(), "Should detect predator-prey repeats (R1)");
+        // Each pair direction: A->B prey, B->C prey, C->D prey, D->A prey
+        // In the measure, prey (k=1) and pred (k=4) are tracked per ordered pair
+        // For 4 players with identical seating, each adjacent pair has prey/pred repeat
+        assert!(r1_issues.len() >= 2, "Should have multiple R1 violations for identical 4-player table");
+
+        // Check R4 (rule index 3) -- opponent twice
+        let r4_issues: Vec<_> = issues.iter().filter(|i| i.rule == 3).collect();
+        assert_eq!(r4_issues.len(), 6, "C(4,2)=6 pairs should all repeat as opponents");
+        // Each issue should reference exactly 2 players
+        for issue in &r4_issues {
+            assert_eq!(issue.players.len(), 2);
+        }
+
+        // Check R7 (rule index 6) -- same seat twice
+        let r7_issues: Vec<_> = issues.iter().filter(|i| i.rule == 6).collect();
+        assert!(!r7_issues.is_empty(), "Should detect same-seat repeats (R7)");
+        // Each player sat in the same seat twice, so each of the 4 players triggers R7
+        assert_eq!(r7_issues.len(), 4, "All 4 players should have seat repeats");
+    }
+
+    #[test]
+    fn test_player_issues_r2_requires_more_than_2_rounds() {
+        // R2 (opponent all rounds) only fires when rounds > 2
+        let table = vec!["A".into(), "B".into(), "C".into(), "D".into()];
+        // 2 identical rounds: all 6 pairs meet in all rounds, but R2 should NOT fire
+        let rounds_2 = vec![vec![table.clone()], vec![table.clone()]];
+        let issues_2 = compute_player_issues(&rounds_2);
+        let r2_count = issues_2.iter().filter(|i| i.rule == 1).count();
+        assert_eq!(r2_count, 0, "R2 should not fire with only 2 rounds");
+
+        // 3 identical rounds: R2 SHOULD fire
+        let rounds_3 = vec![vec![table.clone()], vec![table.clone()], vec![table.clone()]];
+        let issues_3 = compute_player_issues(&rounds_3);
+        let r2_count = issues_3.iter().filter(|i| i.rule == 1).count();
+        assert_eq!(r2_count, 6, "R2 should fire for all C(4,2)=6 pairs with 3 identical rounds");
+    }
+
+    #[test]
+    fn test_player_issues_optimal_seating_no_issues() {
+        // Use precomputed optimal seating for 8 players -- should have zero issues
+        let players = make_players(8);
+        let (rounds, score) = compute_seating(&players, 3, None).unwrap();
+        // Precomputed seatings for 8 players are known optimal
+        assert_eq!(score.rules[0], 0.0, "Optimal seating should have no R1 violations");
+        let issues = compute_player_issues(&rounds);
+        // Optimal seating may still have unavoidable R4 violations (pigeonhole),
+        // but should have no hard constraint violations (R1, R2)
+        let r1 = issues.iter().filter(|i| i.rule == 0).count();
+        let r2 = issues.iter().filter(|i| i.rule == 1).count();
+        assert_eq!(r1, 0, "Optimal 8-player seating should have no R1 issues");
+        assert_eq!(r2, 0, "Optimal 8-player seating should have no R2 issues");
+    }
+
+    #[test]
+    fn test_player_issues_json_roundtrip() {
+        // Verify to_json() produces correct structure
+        let table = vec!["P1".into(), "P2".into(), "P3".into(), "P4".into()];
+        let rounds = vec![vec![table.clone()], vec![table.clone()]];
+        let issues = compute_player_issues(&rounds);
+
+        for issue in &issues {
+            let j = issue.to_json();
+            assert!(j["rule"].is_number(), "rule should be a number");
+            assert!(j["players"].is_array(), "players should be an array");
+            let rule = j["rule"].as_usize().unwrap();
+            assert!(rule <= 8, "rule index should be 0-8, got {}", rule);
+            for p in j["players"].members() {
+                assert!(p.is_string(), "each player should be a string");
+            }
+        }
     }
 }

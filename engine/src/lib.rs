@@ -261,6 +261,17 @@ mod shared {
     pub fn compute_league_standings_json(config_json: &str) -> Result<String, String> {
         league::compute_league_standings(config_json)
     }
+
+    pub fn compute_player_issues_json(config_json: &str) -> Result<String, String> {
+        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+        let rounds: Vec<Vec<Vec<String>>> = config["rounds"].members().map(|r| {
+            r.members().map(|t| {
+                t.members().filter_map(|p| p.as_str().map(|s| s.to_string())).collect()
+            }).collect()
+        }).collect();
+        let issues = seating::compute_player_issues(&rounds);
+        Ok(JsonValue::Array(issues.iter().map(|i| i.to_json()).collect()).dump())
+    }
 }
 
 // ============================================================================
@@ -348,6 +359,11 @@ mod wasm {
         pub fn compute_league_standings(&self, config_json: &str) -> Result<String, String> {
             compute_league_standings_json(config_json)
         }
+
+        #[wasm_bindgen(js_name = computePlayerIssues)]
+        pub fn compute_player_issues(&self, config_json: &str) -> Result<String, String> {
+            compute_player_issues_json(config_json)
+        }
     }
 }
 
@@ -429,6 +445,10 @@ mod python {
 
         fn compute_league_standings(&self, config_json: &str) -> PyResult<String> {
             py_str(compute_league_standings_json(config_json))
+        }
+
+        fn compute_player_issues(&self, config_json: &str) -> PyResult<String> {
+            py_str(compute_player_issues_json(config_json))
         }
 
         fn export_twda(

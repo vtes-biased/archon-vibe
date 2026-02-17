@@ -98,6 +98,7 @@ export type TournamentEventType =
   | 'FinishRound'
   | 'CancelRound'
   | 'SwapSeats'
+  | 'AlterSeating'
   | 'SeatPlayer'
   | 'UnseatPlayer'
   | 'AddTable'
@@ -131,6 +132,7 @@ export interface TournamentEvent {
   comment?: string;
   toss?: number;
   status?: string;
+  seating?: string[][];
   deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
   multideck?: boolean;
 }
@@ -363,6 +365,23 @@ export async function computeLeagueStandings(
   const config = { standings_mode: standingsMode, tournaments };
   const resultJson = engine.computeLeagueStandings(JSON.stringify(config));
   return JSON.parse(resultJson);
+}
+
+/**
+ * Compute per-player seating issues synchronously.
+ * Returns null if engine not initialized.
+ */
+export function computePlayerIssuesSync(
+  rounds: string[][][]
+): { rule: number; players: string[] }[] | null {
+  const engine = getEngineSync();
+  if (!engine) return null;
+  try {
+    const resultJson = engine.computePlayerIssues(JSON.stringify({ rounds }));
+    return JSON.parse(resultJson);
+  } catch {
+    return null;
+  }
 }
 
 /**

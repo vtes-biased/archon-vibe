@@ -174,6 +174,12 @@ pub enum TournamentEvent {
     StartFinals,
     FinishFinals,
 
+    // Seating alteration (batch)
+    AlterSeating {
+        round: usize,
+        seating: Vec<Vec<String>>, // table -> player UIDs in order
+    },
+
     // Deck management
     UploadDeck {
         player_uid: String,
@@ -505,6 +511,13 @@ impl TournamentEvent {
             "RandomToss" => Ok(Self::RandomToss),
             "StartFinals" => Ok(Self::StartFinals),
             "FinishFinals" => Ok(Self::FinishFinals),
+            "AlterSeating" => {
+                let round = value["round"].as_usize().ok_or("round required")?;
+                let seating: Vec<Vec<String>> = value["seating"].members().map(|t| {
+                    t.members().filter_map(|p| p.as_str().map(|s| s.to_string())).collect()
+                }).collect();
+                Ok(Self::AlterSeating { round, seating })
+            }
             "UploadDeck" => {
                 let player_uid = value["player_uid"]
                     .as_str()
@@ -1190,6 +1203,110 @@ fn apply_event(
                     .to_string();
                 round_tables[*table1]["seating"][*seat1]["player_uid"] = uid2.as_str().into();
                 round_tables[*table2]["seating"][*seat2]["player_uid"] = uid1.as_str().into();
+            }
+
+            Ok(())
+        }
+
+        TournamentEvent::AlterSeating { round, seating } => {
+            require_organizer(actor)?;
+            if state != TournamentState::Playing && state != TournamentState::Finished && state != TournamentState::Waiting {
+                return Err("Cannot alter seating in this state".to_string());
+            }
+
+            let rounds_len = tournament["rounds"].len();
+            let is_finals = *round == rounds_len && !tournament["finals"].is_null();
+
+            // Validate no duplicate players in new seating
+            {
+                let all_uids: Vec<&String> = seating.iter().flat_map(|t| t.iter()).collect();
+                let unique: std::collections::HashSet<&String> = all_uids.iter().copied().collect();
+                if all_uids.len() != unique.len() {
+                    return Err("Duplicate player in seating".to_string());
+                }
+            }
+
+            if is_finals {
+                // Replace finals seating player UIDs
+                let finals = &mut tournament["finals"]["seating"];
+                if seating.len() != 1 {
+                    return Err("Finals expects exactly one table".to_string());
+                }
+                let new_players = &seating[0];
+                if new_players.len() != finals.len() {
+                    return Err("Finals player count mismatch".to_string());
+                }
+                // Verify same set of players
+                let old_set: std::collections::HashSet<String> = (0..finals.len())
+                    .map(|i| finals[i]["player_uid"].as_str().unwrap_or("").to_string())
+                    .collect();
+                let new_set: std::collections::HashSet<&String> = new_players.iter().collect();
+                if old_set.len() != new_set.len() || !new_players.iter().all(|uid| old_set.contains(uid)) {
+                    return Err("Finals player set mismatch".to_string());
+                }
+                for (i, uid) in new_players.iter().enumerate() {
+                    finals[i]["player_uid"] = uid.as_str().into();
+                }
+            } else {
+                // Round seating
+                if *round >= rounds_len {
+                    return Err("Invalid round number".to_string());
+                }
+                let round_data = &mut tournament["rounds"][*round];
+                if seating.len() != round_data.len() {
+                    return Err("Table count mismatch".to_string());
+                }
+
+                // Build map: player_uid -> (old_table, old_result, judge_uid) from current state
+                let mut old_results: std::collections::HashMap<String, (usize, JsonValue, String)> = std::collections::HashMap::new();
+                for t in 0..round_data.len() {
+                    for s in 0..round_data[t]["seating"].len() {
+                        let uid = round_data[t]["seating"][s]["player_uid"].as_str().unwrap_or("").to_string();
+                        let result = round_data[t]["seating"][s]["result"].clone();
+                        let judge = round_data[t]["seating"][s]["judge_uid"].as_str().unwrap_or("").to_string();
+                        old_results.insert(uid, (t, result, judge));
+                    }
+                }
+
+                // Validate new seating has exact same player set
+                let new_total: usize = seating.iter().map(|t| t.len()).sum();
+                if new_total != old_results.len() {
+                    return Err("Player count mismatch".to_string());
+                }
+
+                // Rebuild each table's seating
+                for t in 0..seating.len() {
+                    let new_players = &seating[t];
+                    let mut new_seating = Vec::new();
+                    for uid in new_players {
+                        let (old_table, old_result, old_judge) = old_results.get(uid)
+                            .ok_or_else(|| format!("Player {} not found in current round seating", uid))?;
+                        // Preserve result and judge_uid if player stays in same table, reset otherwise
+                        let (result, judge) = if *old_table == t {
+                            (old_result.clone(), old_judge.as_str())
+                        } else {
+                            (json::object! { gw: 0, vp: 0.0, tp: 0 }, "")
+                        };
+                        new_seating.push(json::object! {
+                            player_uid: uid.as_str(),
+                            result: result,
+                            judge_uid: judge,
+                        });
+                    }
+                    round_data[t]["seating"] = JsonValue::Array(new_seating);
+
+                    // Recompute table state: if all VPs are 0, it's "In Progress"
+                    let vps: Vec<f64> = (0..round_data[t]["seating"].len())
+                        .map(|s| round_data[t]["seating"][s]["result"]["vp"].as_f64().unwrap_or(0.0))
+                        .collect();
+                    if round_data[t]["override"].is_null() {
+                        let all_zero = vps.iter().all(|&v| v == 0.0);
+                        if all_zero {
+                            round_data[t]["state"] = "In Progress".into();
+                        }
+                        // If not all zero, keep existing state (scores were preserved for same-table)
+                    }
+                }
             }
 
             Ok(())
@@ -2333,5 +2450,172 @@ mod tests {
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
         assert_eq!(updated["players"][1]["state"].as_str(), Some("Disqualified")); // preserved
+    }
+
+    // --- AlterSeating tests ---
+
+    /// Build a tournament in Playing state with one round of 2 tables of 4
+    fn tournament_with_round() -> JsonValue {
+        let mut t = make_tournament();
+        t["state"] = "Playing".into();
+        t["players"] = json::array![
+            { user_uid: "p1", state: "Playing", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Playing", payment_status: "Pending", toss: 0 },
+            { user_uid: "p3", state: "Playing", payment_status: "Pending", toss: 0 },
+            { user_uid: "p4", state: "Playing", payment_status: "Pending", toss: 0 },
+            { user_uid: "p5", state: "Playing", payment_status: "Pending", toss: 0 },
+            { user_uid: "p6", state: "Playing", payment_status: "Pending", toss: 0 },
+            { user_uid: "p7", state: "Playing", payment_status: "Pending", toss: 0 },
+            { user_uid: "p8", state: "Playing", payment_status: "Pending", toss: 0 },
+        ];
+        t["rounds"] = json::array![
+            [
+                {
+                    seating: [
+                        { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 48 }, judge_uid: "" },
+                        { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 24 }, judge_uid: "" },
+                        { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 12 }, judge_uid: "" },
+                        { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 12 }, judge_uid: "" },
+                    ],
+                    state: "Finished",
+                    override: json::Null,
+                },
+                {
+                    seating: [
+                        { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                        { player_uid: "p6", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                        { player_uid: "p7", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                        { player_uid: "p8", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                    ],
+                    state: "In Progress",
+                    override: json::Null,
+                },
+            ]
+        ];
+        t
+    }
+
+    #[test]
+    fn test_alter_seating_swap_within_same_table_preserves_results() {
+        let tournament = tournament_with_round();
+        // Swap p1 and p2 within table 0, keep table 1 unchanged
+        let event = json::object! {
+            type: "AlterSeating",
+            round: 0,
+            seating: [["p2", "p1", "p3", "p4"], ["p5", "p6", "p7", "p8"]],
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+
+        // p2 stays in table 0 -> result preserved
+        assert_eq!(
+            updated["rounds"][0][0]["seating"][0]["player_uid"].as_str(),
+            Some("p2")
+        );
+        assert_eq!(
+            updated["rounds"][0][0]["seating"][0]["result"]["vp"].as_f64(),
+            Some(1.0)
+        );
+        // p1 stays in table 0 -> result preserved
+        assert_eq!(
+            updated["rounds"][0][0]["seating"][1]["result"]["vp"].as_f64(),
+            Some(2.0)
+        );
+    }
+
+    #[test]
+    fn test_alter_seating_cross_table_swap_resets_results() {
+        let tournament = tournament_with_round();
+        // Move p1 (table 0, has results) to table 1, move p5 (table 1) to table 0
+        let event = json::object! {
+            type: "AlterSeating",
+            round: 0,
+            seating: [["p5", "p2", "p3", "p4"], ["p1", "p6", "p7", "p8"]],
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+
+        // p5 moved from table 1 to table 0 -> result reset
+        assert_eq!(
+            updated["rounds"][0][0]["seating"][0]["result"]["vp"].as_f64(),
+            Some(0.0)
+        );
+        // p2 stayed in table 0 -> result preserved
+        assert_eq!(
+            updated["rounds"][0][0]["seating"][1]["result"]["vp"].as_f64(),
+            Some(1.0)
+        );
+        // p1 moved from table 0 to table 1 -> result reset
+        assert_eq!(
+            updated["rounds"][0][1]["seating"][0]["result"]["vp"].as_f64(),
+            Some(0.0)
+        );
+        // Table 0 now has mixed zero/non-zero results; table 1 has all zeros -> "In Progress"
+        assert_eq!(
+            updated["rounds"][0][1]["state"].as_str(),
+            Some("In Progress")
+        );
+    }
+
+    #[test]
+    fn test_alter_seating_wrong_table_count_fails() {
+        let tournament = tournament_with_round();
+        // Provide 3 tables instead of 2
+        let event = json::object! {
+            type: "AlterSeating",
+            round: 0,
+            seating: [["p1", "p2", "p3", "p4"], ["p5", "p6"], ["p7", "p8"]],
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Table count mismatch"));
+    }
+
+    #[test]
+    fn test_alter_seating_unknown_player_fails() {
+        let tournament = tournament_with_round();
+        let event = json::object! {
+            type: "AlterSeating",
+            round: 0,
+            seating: [["p1", "p2", "p3", "UNKNOWN"], ["p5", "p6", "p7", "p8"]],
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_alter_seating_requires_organizer() {
+        let tournament = tournament_with_round();
+        let event = json::object! {
+            type: "AlterSeating",
+            round: 0,
+            seating: [["p1", "p2", "p3", "p4"], ["p5", "p6", "p7", "p8"]],
+        };
+        let actor = make_player("p1");
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("organizers"));
+    }
+
+    #[test]
+    fn test_alter_seating_invalid_state_fails() {
+        let mut tournament = tournament_with_round();
+        tournament["state"] = "Registration".into();
+        let event = json::object! {
+            type: "AlterSeating",
+            round: 0,
+            seating: [["p1", "p2", "p3", "p4"], ["p5", "p6", "p7", "p8"]],
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Cannot alter seating"));
     }
 }

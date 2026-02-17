@@ -669,6 +669,7 @@ class TournamentActionRequest(BaseModel):
     comment: str | None = None  # For Override
     toss: int | None = None  # For SetToss
     status: str | None = None  # For SetPaymentStatus
+    seating: list[list[str]] | None = None  # For AlterSeating
 
 
 @router.post("/{uid}/action")
@@ -717,6 +718,8 @@ async def tournament_action(
         event_data["toss"] = request.toss
     if request.status:
         event_data["status"] = request.status
+    if request.seating:
+        event_data["seating"] = request.seating
 
     # SELECT FOR UPDATE: serialize concurrent writes to this tournament
     async with tournament_transaction(uid) as (tournament, tx_conn):

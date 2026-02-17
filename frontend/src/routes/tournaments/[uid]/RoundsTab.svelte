@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction, setTableScore } from "$lib/api";
-  import { scoreSeatingSync } from "$lib/engine";
+  import { scoreSeatingSync, computePlayerIssuesSync } from "$lib/engine";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowLeftRight, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus } from "lucide-svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus } from "lucide-svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -39,8 +40,13 @@
   });
 
   let error = $state<string | null>(null);
-  let swapSource: { round: number; table: number; seat: number; playerUid: string } | null = $state(null);
   let showCancelConfirm = $state(false);
+
+  // Alter seating mode
+  let alterMode = $state(false);
+  let alterTables = $state<string[][]>([]);
+  let alterRoundIdx = $state(-1);
+  let playerIssues = $state<Map<string, { level: number; message: string }>>(new Map());
   let showScoreDetails = $state(false);
   let scoreSaving = $state<number | null>(null);
   let overrideTable_ = $state<number | null>(null);
@@ -114,7 +120,7 @@
   // Organizer can swap/seat on last round in Playing or Finished
   const canEditSeating = $derived(
     isOrganizer && tournament.rounds!.length > 0
-    && (tournament.state === "Playing" || tournament.state === "Finished")
+    && (tournament.state === "Playing" || tournament.state === "Finished" || tournament.state === "Waiting")
   );
 
   const unseatedPlayers = $derived(
@@ -127,21 +133,47 @@
     return seatDisplayUtil(uid, playerInfo);
   }
 
-  function startSwap(round: number, table: number, seat: number, playerUid: string) {
-    if (swapSource && swapSource.round === round && swapSource.table === table && swapSource.seat === seat) {
-      swapSource = null;
-    } else if (swapSource && swapSource.round === round) {
-      doAction("SwapSeats", {
-        round,
-        table1: swapSource.table,
-        seat1: swapSource.seat,
-        table2: table,
-        seat2: seat,
-      });
-      swapSource = null;
-    } else {
-      swapSource = { round, table, seat, playerUid };
+  function enterAlterMode(roundIdx: number) {
+    const round = tournament.rounds![roundIdx]!;
+    alterTables = round.map(t => t.seating.map(s => s.player_uid));
+    alterRoundIdx = roundIdx;
+    alterMode = true;
+    recomputeIssues();
+  }
+
+  function cancelAlterMode() {
+    alterMode = false;
+    alterTables = [];
+    alterRoundIdx = -1;
+    playerIssues = new Map();
+  }
+
+  async function saveAlterSeating() {
+    await doAction("AlterSeating", { round: alterRoundIdx, seating: alterTables });
+    cancelAlterMode();
+  }
+
+  function recomputeIssues() {
+    const allRounds = tournament.rounds!.map((round, r) =>
+      r === alterRoundIdx ? alterTables : round.map(t => t.seating.map(s => s.player_uid))
+    );
+    const issues = computePlayerIssuesSync(allRounds);
+    if (!issues) { playerIssues = new Map(); return; }
+    // Build per-player map keeping highest-priority issue (lowest rule number)
+    const map = new Map<string, { level: number; message: string }>();
+    const ruleLabels = [
+      m.rounds_r1(), m.rounds_r2(), m.rounds_r3(), m.rounds_r4(), m.rounds_r5(),
+      m.rounds_r6(), m.rounds_r7(), m.rounds_r8(), m.rounds_r9(),
+    ];
+    for (const issue of issues) {
+      for (const uid of issue.players) {
+        const existing = map.get(uid);
+        if (!existing || issue.rule < existing.level) {
+          map.set(uid, { level: issue.rule, message: ruleLabels[issue.rule] ?? `R${issue.rule + 1}` });
+        }
+      }
     }
+    playerIssues = map;
   }
 
   async function setVp(roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
@@ -317,16 +349,6 @@
 
     {/if}
 
-    <!-- Swap hint -->
-    {#if swapSource}
-      <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
-        <p class="text-sm">
-          {m.rounds_swap_hint({ name: seatDisplay(swapSource.playerUid) })}
-        </p>
-        <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">{m.common_cancel()}</button>
-      </div>
-    {/if}
-
     <!-- Not seated players (outside header, visible in Playing and Finished) -->
     {#if unseatedPlayers.length > 0}
       <div class="banner-amber border rounded-lg p-3">
@@ -365,6 +387,28 @@
 
         {#if isExpanded}
           <div class="px-4 pb-4 space-y-3">
+            {#if alterMode && r === alterRoundIdx}
+              <!-- In-place alter seating mode -->
+              <p class="text-sm text-ash-300">{m.rounds_alter_hint()}</p>
+              <SeatingSortable
+                bind:tables={alterTables}
+                {playerInfo}
+                {playerIssues}
+                isFinals={false}
+                onchange={recomputeIssues}
+              />
+              <div class="flex gap-2">
+                <button
+                  onclick={saveAlterSeating}
+                  disabled={actionLoading}
+                  class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+                >{m.rounds_save_seating()}</button>
+                <button
+                  onclick={cancelAlterMode}
+                  class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                >{m.common_cancel()}</button>
+              </div>
+            {:else}
             {#each round as table, i}
               <div class="bg-ash-900/50 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-2">
@@ -391,31 +435,16 @@
                 </div>
                 <div class="divide-y divide-ash-800">
                   {#each table.seating as seat, j}
-                    {@const isSwapSource = isEditable && swapSource?.round === r && swapSource?.table === i && swapSource?.seat === j}
                     {@const tVps = table.seating.map(s => s.result.vp)}
                     {@const tGws = computeGwLocal(tVps)}
                     {@const tTps = computeTpLocal(table.seating.length, tVps)}
                     <div class="py-1.5 flex items-center justify-between text-sm">
-                      {#if isEditable}
-                        <button
-                          onclick={() => startSwap(r, i, j, seat.player_uid)}
-                          class="text-left transition-colors {isSwapSource ? 'text-amber-300 font-medium' : 'text-ash-300 hover:text-ash-100'}"
-                          title={isSwapSource ? "Click to deselect" : "Click to swap this player"}
-                        >
-                          {#if isSwapSource}<ArrowLeftRight class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />{:else}<GripVertical class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />{/if}
-                          {seatDisplay(seat.player_uid)}
-                          {#if playerSanctionsMap[seat.player_uid]?.length}
-                            <SanctionIndicator sanctions={playerSanctionsMap[seat.player_uid]!} />
-                          {/if}
-                        </button>
-                      {:else}
-                        <span class="text-ash-300 inline-flex items-center gap-1">
-                          {seatDisplay(seat.player_uid)}
-                          {#if playerSanctionsMap[seat.player_uid]?.length}
-                            <SanctionIndicator sanctions={playerSanctionsMap[seat.player_uid]!} />
-                          {/if}
-                        </span>
-                      {/if}
+                      <span class="text-ash-300 inline-flex items-center gap-1">
+                        {seatDisplay(seat.player_uid)}
+                        {#if playerSanctionsMap[seat.player_uid]?.length}
+                          <SanctionIndicator sanctions={playerSanctionsMap[seat.player_uid]!} />
+                        {/if}
+                      </span>
                       <div class="flex items-center gap-2">
                         <span class="text-ash-400 text-xs">VP:</span>
                         {#if isOrganizer}
@@ -527,14 +556,26 @@
                 {/if}
               </div>
             {/each}
-            {#if isEditable && r === tournament.rounds!.length - 1}
-              <button
-                onclick={() => doAction("AddTable")}
-                disabled={actionLoading}
-                class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-              >
-                <SquarePlus class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
-              </button>
+            <div class="flex gap-2 flex-wrap">
+              {#if isEditable && r === tournament.rounds!.length - 1}
+                <button
+                  onclick={() => doAction("AddTable")}
+                  disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                >
+                  <SquarePlus class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
+                </button>
+              {/if}
+              {#if isEditable && !alterMode}
+                <button
+                  onclick={() => enterAlterMode(r)}
+                  disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                >
+                  <GripVertical class="w-4 h-4 inline mr-1" />{m.rounds_alter_seating()}
+                </button>
+              {/if}
+            </div>
             {/if}
           </div>
         {/if}

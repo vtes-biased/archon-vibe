@@ -28,6 +28,9 @@ sw.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
+  // Only handle http(s) requests — chrome-extension:// etc. can't be cached
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
+
   // Skip API calls and SSE stream — these are mutations/live connections
   if (url.pathname.startsWith('/api') || url.pathname === '/stream') return;
 

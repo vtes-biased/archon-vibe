@@ -25,6 +25,7 @@
     "vite": "^6.0.0"
   },
   "dependencies": {
+    "@dragdroptouch/drag-drop-touch": "^2.0.3",
     "@inlang/paraglide-js": "^2.11.0",
     "@tailwindcss/typography": "^0.5.19",
     "dompurify": "^3.3.1",

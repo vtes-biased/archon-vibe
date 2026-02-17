@@ -2,7 +2,9 @@
   import type { Tournament } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/api";
-  import { ArrowLeftRight, GripVertical, ShieldCheck } from "lucide-svelte";
+  import { computePlayerIssuesSync } from "$lib/engine";
+  import SeatingSortable from "$lib/components/SeatingSortable.svelte";
+  import { GripVertical, ShieldCheck } from "lucide-svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -26,27 +28,61 @@
 
   let error = $state<string | null>(null);
   let scoreSaving = $state<number | null>(null);
-  let swapSource: { seat: number; playerUid: string } | null = $state(null);
+
+  // Alter seating mode
+  let alterMode = $state(false);
+  let alterSeating = $state<string[]>([]);
+  let playerIssues = $state<Map<string, { level: number; message: string }>>(new Map());
 
   const canEditSeating = $derived(
-    isOrganizer && (tournament.state === "Playing" || tournament.state === "Finished")
+    isOrganizer && (tournament.state === "Playing" || tournament.state === "Finished" || tournament.state === "Waiting")
   );
 
-  function startSwap(seat: number, playerUid: string) {
-    if (swapSource && swapSource.seat === seat) {
-      swapSource = null;
-    } else if (swapSource) {
-      doAction("SwapSeats", {
-        round: tournament.rounds!.length,
-        table1: 0,
-        seat1: swapSource.seat,
-        table2: 0,
-        seat2: seat,
-      });
-      swapSource = null;
-    } else {
-      swapSource = { seat, playerUid };
+  function enterAlterMode() {
+    alterSeating = tournament.finals!.seating.map(s => s.player_uid);
+    alterTables = [alterSeating];
+    alterMode = true;
+    recomputeIssues();
+  }
+
+  function cancelAlterMode() {
+    alterMode = false;
+    alterSeating = [];
+    alterTables = [];
+    playerIssues = new Map();
+  }
+
+  async function saveAlterSeating() {
+    await doAction("AlterSeating", { round: tournament.rounds!.length, seating: [alterTables[0]] });
+    cancelAlterMode();
+  }
+
+  // Wrapper to expose single table as tables array for SeatingSortable
+  let alterTables = $state<string[][]>([]);
+
+  function recomputeIssues() {
+    alterSeating = alterTables[0] ?? [];
+    const allRounds = tournament.rounds!.map(round =>
+      round.map(t => t.seating.map(s => s.player_uid))
+    );
+    // Add finals as extra round
+    allRounds.push([alterSeating]);
+    const issues = computePlayerIssuesSync(allRounds);
+    if (!issues) { playerIssues = new Map(); return; }
+    const map = new Map<string, { level: number; message: string }>();
+    const ruleLabels = [
+      m.rounds_r1(), m.rounds_r2(), m.rounds_r3(), m.rounds_r4(), m.rounds_r5(),
+      m.rounds_r6(), m.rounds_r7(), m.rounds_r8(), m.rounds_r9(),
+    ];
+    for (const issue of issues) {
+      for (const uid of issue.players) {
+        const existing = map.get(uid);
+        if (!existing || issue.rule < existing.level) {
+          map.set(uid, { level: issue.rule, message: ruleLabels[issue.rule] ?? `R${issue.rule + 1}` });
+        }
+      }
     }
+    playerIssues = map;
   }
   let overrideTable_ = $state<number | null>(null);
   let overrideComment = $state("");
@@ -90,23 +126,46 @@
   {:else}
     <h3 class="text-lg font-medium text-bone-100">{m.finals_title()}</h3>
 
-    {#if swapSource}
-      <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
-        <p class="text-sm">
-          {m.rounds_swap_hint({ name: seatDisplay(swapSource.playerUid) })}
-        </p>
-        <button onclick={() => swapSource = null} class="text-ash-400 hover:text-ash-200 text-sm">{m.common_cancel()}</button>
-      </div>
-    {/if}
-
     <!-- Finals table -->
     <div class="bg-ash-900/50 rounded-lg p-4">
       <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium text-bone-100">{m.finals_table()}</h3>
+        <div class="flex items-center gap-2">
+          <h3 class="text-sm font-medium text-bone-100">{m.finals_table()}</h3>
+          {#if canEditSeating && !alterMode}
+            <button
+              onclick={enterAlterMode}
+              class="px-2 py-1 text-xs text-ash-300 bg-ash-800 hover:bg-ash-700 rounded transition-colors"
+            >
+              <GripVertical class="w-3.5 h-3.5 inline mr-0.5" />{m.rounds_alter_seating()}
+            </button>
+          {/if}
+        </div>
         <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-emerald' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
           {translateTableState(tournament.finals.state)}
         </span>
       </div>
+      {#if alterMode}
+        <!-- In-place alter seating mode -->
+        <p class="text-sm text-ash-300 mb-2">{m.rounds_alter_hint()}</p>
+        <SeatingSortable
+          bind:tables={alterTables}
+          {playerInfo}
+          {playerIssues}
+          isFinals={true}
+          onchange={() => { alterSeating = alterTables[0] ?? []; recomputeIssues(); }}
+        />
+        <div class="flex gap-2 mt-3">
+          <button
+            onclick={saveAlterSeating}
+            disabled={actionLoading}
+            class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+          >{m.rounds_save_seating()}</button>
+          <button
+            onclick={cancelAlterMode}
+            class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+          >{m.common_cancel()}</button>
+        </div>
+      {:else}
       <div class="divide-y divide-ash-800">
         {#each tournament.finals.seating as seat, j}
           {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
@@ -114,21 +173,9 @@
           {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
           {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
           {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
-          {@const isSwapSource = canEditSeating && swapSource?.seat === j}
           <div class="py-1.5 flex items-center justify-between text-sm">
             <div>
-              {#if canEditSeating}
-                <button
-                  onclick={() => startSwap(j, seat.player_uid)}
-                  class="text-left transition-colors {isSwapSource ? 'text-amber-300 font-medium' : 'text-ash-300 hover:text-ash-100'}"
-                  title={isSwapSource ? "Click to deselect" : "Click to swap this player"}
-                >
-                  {#if isSwapSource}<ArrowLeftRight class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />{:else}<GripVertical class="w-3.5 h-3.5 inline mr-1.5 text-ash-500" />{/if}
-                  {seatDisplay(seat.player_uid)}
-                </button>
-              {:else}
-                <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-              {/if}
+              <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
               <div class="text-xs text-ash-500">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
             </div>
             <div class="flex items-center gap-2">
@@ -148,6 +195,7 @@
           </div>
         {/each}
       </div>
+      {/if}
 
       <!-- Override controls -->
       {#if isOrganizer && (tournament.finals.state === 'Invalid' || tournament.finals.state === 'In Progress')}

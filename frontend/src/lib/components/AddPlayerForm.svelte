@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { User, Tournament } from "$lib/types";
   import { getFilteredUsers } from "$lib/db";
+  import { getCountryFlag } from "$lib/geonames";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -70,7 +71,7 @@
           onclick={() => selectUser(user)}
           class="w-full px-3 py-2 text-left text-sm text-ash-200 transition-colors {i === selectedIndex ? 'bg-ash-700' : 'hover:bg-ash-800'}"
         >
-          {user.name}
+          {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
           {#if user.vekn_id}
             <span class="text-ash-500 ml-2">({user.vekn_id})</span>
           {/if}
