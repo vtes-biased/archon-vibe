@@ -1,10 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { createLeague } from "$lib/api";
-  import { saveLeague } from "$lib/db";
+  import { saveLeague, getAllLeagues } from "$lib/db";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import type { LeagueKind, LeagueStandingsMode } from "$lib/types";
+  import type { League, LeagueKind, LeagueStandingsMode } from "$lib/types";
   import { ArrowLeft } from "lucide-svelte";
 
   const canCreate = $derived(hasAnyRole("IC", "NC"));
@@ -21,6 +21,20 @@
   let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
   let description = $state("");
   let allowNoFinals = $state(false);
+  let parentUid = $state("");
+
+  let metaLeagues = $state<League[]>([]);
+
+  $effect(() => {
+    getAllLeagues().then(all => {
+      metaLeagues = all.filter(l => l.kind === "Meta-League" && !l.deleted_at);
+    });
+  });
+
+  // Reset parent when switching to Meta-League
+  $effect(() => {
+    if (kind === "Meta-League") parentUid = "";
+  });
 
   let isSubmitting = $state(false);
   let error = $state<string | null>(null);
@@ -44,6 +58,7 @@
         finish: finishDate || null,
         timezone,
         description,
+        parent_uid: parentUid || null,
         allow_no_finals: allowNoFinals,
       });
       await saveLeague(league);
@@ -101,6 +116,21 @@
               <p class="text-xs text-ash-500 mt-1">A meta-league groups child leagues. Add children after creation.</p>
             {/if}
           </div>
+
+          <!-- Parent league (only for regular leagues) -->
+          {#if kind === "League" && metaLeagues.length > 0}
+            <div>
+              <label for="parent" class="block text-sm font-medium text-ash-400 mb-1">Parent League</label>
+              <select id="parent" bind:value={parentUid}
+                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200">
+                <option value="">None</option>
+                {#each metaLeagues as ml (ml.uid)}
+                  <option value={ml.uid}>{ml.name}</option>
+                {/each}
+              </select>
+              <p class="text-xs text-ash-500 mt-1">Optionally attach this league to a meta-league.</p>
+            </div>
+          {/if}
 
           <!-- Standings mode -->
           <div>

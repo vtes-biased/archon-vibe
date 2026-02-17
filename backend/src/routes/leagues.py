@@ -64,6 +64,7 @@ class LeagueUpdate(BaseModel):
     timezone: str | None = None
     description: str | None = None
     allow_no_finals: bool | None = None
+    parent_uid: str | None = None
 
 
 def _can_manage_leagues(user) -> bool:
@@ -162,8 +163,25 @@ async def update_league_endpoint(
     if not _can_edit_league(user, league):
         raise HTTPException(403, "Not authorized to edit this league")
 
+    # Validate parent_uid if provided
+    updates = body.model_dump(exclude_unset=True)
+    if "parent_uid" in updates:
+        new_parent = updates["parent_uid"]
+        if league.kind == LeagueKind.META:
+            raise HTTPException(400, "Meta-League cannot have a parent")
+        if new_parent:
+            if new_parent == uid:
+                raise HTTPException(400, "League cannot be its own parent")
+            parent = await get_league_by_uid(new_parent)
+            if not parent:
+                raise HTTPException(400, "Parent league not found")
+            if parent.kind != LeagueKind.META:
+                raise HTTPException(400, "Parent must be a Meta-League")
+            if parent.parent_uid:
+                raise HTTPException(400, "Cannot nest more than 2 levels")
+
     # Apply updates
-    for field, value in body.model_dump(exclude_unset=True).items():
+    for field, value in updates.items():
         setattr(league, field, value)
 
     league.modified = datetime.now(UTC)

@@ -10,7 +10,7 @@
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { computeLeagueStandings } from "$lib/engine";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
-  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2 } from "lucide-svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X } from "lucide-svelte";
 
   const uid = $derived(page.params.uid);
   const countries = getCountries();
@@ -19,6 +19,8 @@
   let league = $state<League | null>(null);
   let leagueTournaments = $state<Tournament[]>([]);
   let childLeagues = $state<League[]>([]);
+  let orphanLeagues = $state<League[]>([]);
+  let addChildUid = $state("");
   let organizerNames = $state<Record<string, string>>({});
   let loaded = $state(false);
   let editing = $state(false);
@@ -88,6 +90,9 @@
       childLeagues = allLeagues
         .filter(cl => cl.parent_uid === uid && !cl.deleted_at)
         .sort((a, b) => (a.name).localeCompare(b.name));
+      orphanLeagues = allLeagues
+        .filter(cl => cl.kind === "League" && !cl.parent_uid && !cl.deleted_at && cl.uid !== uid)
+        .sort((a, b) => (a.name).localeCompare(b.name));
       // Also include child league tournaments
       const childUids = childLeagues.map(cl => cl.uid);
       const childTournaments = allTournaments.filter(
@@ -95,6 +100,9 @@
       );
       leagueTournaments = [...leagueTournaments, ...childTournaments]
         .sort((a, b) => (b.start || b.modified).localeCompare(a.start || a.modified));
+    } else {
+      childLeagues = [];
+      orphanLeagues = [];
     }
 
     // Load organizer names
@@ -185,6 +193,28 @@
       goto("/leagues");
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to delete";
+    }
+  }
+
+  async function addChildLeague() {
+    if (!addChildUid) return;
+    error = null;
+    try {
+      await updateLeague(addChildUid, { parent_uid: uid });
+      addChildUid = "";
+      await loadLeague();
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to add child league";
+    }
+  }
+
+  async function removeChildLeague(childUid: string) {
+    error = null;
+    try {
+      await updateLeague(childUid, { parent_uid: null });
+      await loadLeague();
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to remove child league";
     }
   }
 
@@ -338,21 +368,50 @@
       {/if}
 
       <!-- Child leagues (meta-league) -->
-      {#if league.kind === "Meta-League" && childLeagues.length > 0}
+      {#if league.kind === "Meta-League"}
         <div class="mb-6">
           <h2 class="text-xl font-medium text-bone-100 mb-3">Child Leagues</h2>
-          <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
-            <div class="divide-y divide-ash-800">
-              {#each childLeagues as child (child.uid)}
-                <a href="/leagues/{child.uid}" class="block px-6 py-3 hover:bg-ash-900/50 transition-colors">
-                  <div class="font-semibold text-bone-100">{child.name}</div>
-                  {#if child.country}
-                    <div class="text-sm text-ash-400">{getCountryFlag(child.country)} {countries[child.country]?.name}</div>
-                  {/if}
-                </a>
-              {/each}
+          {#if isOrganizer && orphanLeagues.length > 0}
+            <div class="flex gap-2 mb-3">
+              <select bind:value={addChildUid}
+                class="flex-1 px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 text-sm">
+                <option value="">Select a league to add...</option>
+                {#each orphanLeagues as ol (ol.uid)}
+                  <option value={ol.uid}>{ol.name}</option>
+                {/each}
+              </select>
+              <button onclick={addChildLeague} disabled={!addChildUid}
+                class="px-3 py-2 text-sm font-medium btn-emerald rounded-lg disabled:opacity-50">
+                <Plus class="w-4 h-4 inline -mt-0.5" /> Add
+              </button>
             </div>
-          </div>
+          {/if}
+          {#if childLeagues.length > 0}
+            <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
+              <div class="divide-y divide-ash-800">
+                {#each childLeagues as child (child.uid)}
+                  <div class="flex items-center justify-between px-6 py-3 hover:bg-ash-900/50 transition-colors">
+                    <a href="/leagues/{child.uid}" class="flex-1">
+                      <div class="font-semibold text-bone-100">{child.name}</div>
+                      {#if child.country}
+                        <div class="text-sm text-ash-400">{getCountryFlag(child.country)} {countries[child.country]?.name}</div>
+                      {/if}
+                    </a>
+                    {#if isOrganizer}
+                      <button onclick={() => removeChildLeague(child.uid)}
+                        class="ml-2 p-1 text-ash-500 hover:text-crimson-400 transition-colors" title="Remove from meta-league">
+                        <X class="w-4 h-4" />
+                      </button>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {:else}
+            <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
+              <p class="text-ash-400">No child leagues yet.</p>
+            </div>
+          {/if}
         </div>
       {/if}
 
