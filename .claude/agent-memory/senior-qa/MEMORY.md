@@ -24,6 +24,15 @@
 - `test_users.py` requires running test PostgreSQL on port 5433 -- always skip with `--ignore=backend/tests/test_users.py` if DB unavailable
 - Frontend `svelte-check` has ~58 pre-existing TS errors from optional Tournament fields (`rounds?`, `players?`, etc.)
 
+## Visual QA Notes
+- **Global cursor bug**: ALL buttons across tournament pages have `cursor: default` instead of `cursor: pointer`. Zero buttons in the app use pointer cursor. Links (`<a>`) are fine.
+- **Touch targets**: Filter pill buttons (Standings/Name/VEKN/All/Pending/Paid) are 24px tall -- well below 44px minimum. Toss number inputs are 48x22px, Set buttons are 33x22px. Action buttons (Reset Check-In, etc.) are 36px tall.
+- **Tab buttons**: Overview/Players/Rounds/Config tabs are 46px tall -- above minimum, OK.
+- **Pluralization bug**: English `overview_round_count` says "{count} rounds" always -- shows "1 rounds" for single round. All languages affected.
+- **Players table mobile**: Horizontal scroll works, but table is clipped with no visual affordance (e.g., fade/shadow) indicating more content to the right.
+- **Bottom nav**: 6-7 items -- "Developer" and last item may crowd at narrow widths.
+- **Tournament list mobile**: Correctly switches from table to card layout.
+
 ## Architecture Notes for Testing
 - SSE filter functions (`_filter_user`, `_filter_tournament`, `_filter_sanction`, `_filter_rating`) in `backend/src/main.py` are pure functions -- ideal for unit testing
 - Tournament offline fields (`offline_mode`, `offline_device_id`, etc.) are NOT copied in member-level or non-member SSE filter -- only full-access viewers see them

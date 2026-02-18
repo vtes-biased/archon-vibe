@@ -1,134 +1,6 @@
-# Vampire: Elder Kindred Network **Tournament Conduct & Infraction Guide**
+# Tournament Conduct & Infraction Guide
 
-**Table of Contents**
-
-[**Introduction	3**](#introduction)
-
-[**1\. General Philosophy	3**](#1.-general-philosophy)
-
-[1.1. Definition of Penalties	4](#1.1.-definition-of-penalties)
-
-[1.1.1. Caution	4](#1.1.1.-caution)
-
-[1.1.2. Warning	5](#1.1.2.-warning)
-
-[1.1.3. Standings Adjustment	5](#1.1.3.-standings-adjustment)
-
-[Purpose of a Standings Adjustment	6](#purpose-of-a-standings-adjustment)
-
-[Effect of the Penalty	6](#effect-of-the-penalty)
-
-[Communication and Tracking	6](#communication-and-tracking)
-
-[Additional Considerations	7](#additional-considerations)
-
-[1.1.4. Disqualification	7](#1.1.4.-disqualification)
-
-[Key Details	7](#key-details)
-
-[DQ Effects	7](#dq-effects)
-
-[Game State Adjustment After a Disqualification	8](#game-state-adjustment-after-a-disqualification)
-
-[1.2. Applying Penalties	9](#1.2.-applying-penalties)
-
-[1.2.1. Escalation of Penalties	9](#1.2.1.-escalation-of-penalties)
-
-[1.2.2. Issuing Significant Penalties	10](#1.2.2.-issuing-significant-penalties)
-
-[1.2.3. Communication and Transparency	11](#1.2.3.-communication-and-transparency)
-
-[1.2.4. Guidelines for Applying Time Extensions	11](#1.2.4.-guidelines-for-applying-time-extensions)
-
-[1.2.5. Consistency and Protection Against Bias	13](#1.2.5.-consistency-and-protection-against-bias)
-
-[1.2.6. Handling Linked Infractions	13](#1.2.6.-handling-linked-infractions)
-
-[1.2.7. Assessing Intent	14](#1.2.7.-assessing-intent)
-
-[1.3. Randomizing a Library	15](#1.3.-randomizing-a-library)
-
-[1.4. Game State Corrections	15](#1.4.-game-state-corrections)
-
-[1.4.1. Rolling Back the Game State	15](#1.4.1.-rolling-back-the-game-state)
-
-[1.4.2. Partial Game State Corrections	17](#1.4.2.-partial-game-state-corrections)
-
-[**2\. Procedural Errors	18**](#2.-procedural-errors)
-
-[2.1. Procedural Error — Missed Mandatory Effect	18](#2.1.-procedural-error-—-missed-mandatory-effect)
-
-[2.2. Procedural Error — Card Access Error	19](#2.2.-procedural-error-—-card-access-error)
-
-[2.3. Procedural Error — Game Rule Violation	20](#2.3.-procedural-error-—-game-rule-violation)
-
-[2.4. Procedural Error — Failure to Maintain Game State	22](#2.4.-procedural-error-—-failure-to-maintain-game-state)
-
-[**3\. Tournament Errors	23**](#3.-tournament-errors)
-
-[3.1. Tournament Errors — Deck Problems	23](#3.1.-tournament-errors-—-deck-problems)
-
-[3.1.1. Deck Problem — Illegal Decklist	23](#3.1.1.-deck-problem-—-illegal-decklist)
-
-[3.1.2. Deck Problem — Illegal Main Deck (Legal Decklist)	25](#3.1.2.-deck-problem-—-illegal-main-deck-\(legal-decklist\))
-
-[3.1.3. Deck Problem — Illegal Main Deck (No Decklists Used)	26](#3.1.3.-deck-problem-—-illegal-main-deck-\(no-decklists-used\))
-
-[3.2. Tournament Error — Outside Assistance	28](#3.2.-tournament-error-—-outside-assistance)
-
-[3.3. Tournament Error — Slow Play	30](#3.3.-tournament-error-—-slow-play)
-
-[3.4. Tournament Error — Limited Procedure Violation	31](#3.4.-tournament-error-—-limited-procedure-violation)
-
-[3.5. Tournament Error — Public Information Miscommunication	32](#3.5.-tournament-error-—-public-information-miscommunication)
-
-[3.6. Tournament Error — Obscuring Game State	33](#3.6.-tournament-error-—-obscuring-game-state)
-
-[3.7. Tournament Error — Marked Cards	34](#3.7.-tournament-error-—-marked-cards)
-
-[3.8. Tournament Error — Insufficient Shuffling	35](#3.8.-tournament-error-—-insufficient-shuffling)
-
-[**4\. Unsportsmanlike Conduct	37**](#4.-unsportsmanlike-conduct)
-
-[4.1. Unsportsmanlike Conduct — Minor	37](#4.1.-unsportsmanlike-conduct-—-minor)
-
-[4.2. Unsportsmanlike Conduct — Major	38](#4.2.-unsportsmanlike-conduct-—-major)
-
-[4.3. Unsportsmanlike Conduct — Aggressive Behaviour	40](#4.3.-unsportsmanlike-conduct-—-aggressive-behaviour)
-
-[4.4. Unsportsmanlike Conduct — Bribery and Wagering	41](#4.4.-unsportsmanlike-conduct-—-bribery-and-wagering)
-
-[4.5. Unsportsmanlike Conduct — Theft of Tournament Material	42](#4.5.-unsportsmanlike-conduct-—-theft-of-tournament-material)
-
-[4.6. Unsportsmanlike Conduct — Stalling	43](#4.6.-unsportsmanlike-conduct-—-stalling)
-
-[4.7. Unsportsmanlike Conduct — Cheating	44](#4.7.-unsportsmanlike-conduct-—-cheating)
-
-[4.8. Unsportsmanlike Conduct — Fraud	45](#4.8.-unsportsmanlike-conduct-—-fraud)
-
-[4.9. Unsportsmanlike Conduct — Collusion	46](#4.9.-unsportsmanlike-conduct-—-collusion)
-
-[4.10. Unsportsmanlike Conduct — Health & Safety Disruption	47](#4.10.-unsportsmanlike-conduct-—-health-&-safety-disruption)
-
-[4.11. Unsportsmanlike Conduct — Rage-Quitting	48](#4.11.-unsportsmanlike-conduct-—-rage-quitting)
-
-[4.12. Unsportsmanlike Conduct — Failure to Play to Win	49](#4.12.-unsportsmanlike-conduct-—-failure-to-play-to-win)
-
-[**5\. Event Organization	51**](#5.-event-organization)
-
-[5.1. Event Organization — Unexpected Drop	51](#5.1.-event-organization-—-unexpected-drop)
-
-[5.2. Event Organization — Venue Interference	51](#5.2.-event-organization-—-venue-interference)
-
-[5.3. Event Organization — Force Majeure and Emergency Termination	52](#5.3.-event-organization-—-force-majeure-and-emergency-termination)
-
-[5.4. Event Organization — Organizer’s / Judge’s Recommended Supplies	53](#5.4.-event-organization-—-organizer’s-/-judge’s-recommended-supplies)
-
-[**APPENDIX I — Penalty Summary	56**](#appendix-i-—-penalty-summary)
-
-# 
-
-# **Introduction** {#introduction}
+## Introduction
 
 The Tournament Conduct & Infraction Guide for Vampire: The Eternal Struggle establishes how judges should respond to rules violations that arise during VTES tournaments. Its purpose is twofold: to safeguard players from actions that could compromise fair play, and to protect the competitive integrity of the event as a whole. In an environment where precision and consistency matter, most violations must carry an appropriate consequence—without clear penalties, the rules cannot be meaningfully enforced.
 
@@ -147,7 +19,7 @@ Players and judges who need additional clarity about terminology should consult 
 
 This guide may appear in languages other than English. In cases where a translation differs from the English version, the English version must be treated as definitive when resolving questions of interpretation.
 
-# **1\. General Philosophy** {#1.-general-philosophy}
+## 1. General Philosophy
 
 In tournaments of Vampire: The Eternal Struggle, judges act as impartial overseers whose task is to maintain order, ensure fair competition, and apply the rules consistently. Their involvement in a game should be limited to moments when a player explicitly seeks help, when a potential breach of the rules is observed, or when a developing situation needs to be calmed before it disrupts the event. Judges are not expected to anticipate every mistake or prevent players from committing them; instead, they respond to issues once they occur, determine how to correct them, and guide participants through the process with professionalism and clear communication. They may, however, intervene proactively in matters outside active play—such as registration, deck checks, or card legality questions—where early action prevents avoidable problems.
 
@@ -161,9 +33,9 @@ Judges themselves are not exempt from error. When a ruling is made incorrectly o
 
 This document outlines the principles and procedures used to identify, address, and resolve rule violations in VTES tournaments. By applying these guidelines consistently, judges help ensure that every contest within Vampire: The Eternal Struggle remains fair, orderly, and enjoyable for all who take part.
 
-## **1.1. Definition of Penalties** {#1.1.-definition-of-penalties}
+### 1.1. Definition of Penalties
 
-### **1.1.1. Caution** {#1.1.1.-caution}
+#### 1.1.1. Caution
 
 A **Caution** is the lightest penalty available to a judge. It is used for very minor infractions that are immediately fixable, cause no lasting disruption, and do not create strategic advantage (e.g., a player who controls no ready Tremere plays the Chantry, a card requiring a ready Tremere, and has not replaced it yet). A caution is purely verbal. A caution must include:
 
@@ -175,7 +47,7 @@ Cautions do not need to be recorded in the official penalty system, but the floo
 
 This penalty encourages education without escalation and is appropriate when a simple clarification is enough to restore proper play.
 
-### **1.1.2. Warning** {#1.1.2.-warning}
+#### 1.1.2. Warning
 
 A Warning is a formally tracked penalty issued when incorrect play or a procedural problem has occurred and requires some time to fix (e.g., a player performs only a single riffle shuffle of their library after searching for a card before offering it to be cut), or when a minor issue has escalated into something that does affect the game state.
 
@@ -194,28 +66,28 @@ Warnings must be:
 
 If the resolution of the issue takes longer than a minute, judges may grant a time extension (see 1.2.4. Guidelines for Applying Time Extensions), so the penalized table does not lose tournament time due to a ruling.
 
-### **1.1.3. Standings Adjustment** {#1.1.3.-standings-adjustment}
+#### 1.1.3. Standings Adjustment
 
 A Standings Adjustment is a severe, formally tracked penalty issued when a player’s infraction warrants consequences beyond a Warning but does not justify removing the player from the tournament (see Disqualification).
 
 Instead of altering the game state a Standings Adjustment imposes tournament-level scoring consequences that meaningfully affect standings while preserving the integrity of the multiplayer game.
 
-#### **Purpose of a Standings Adjustment** {#purpose-of-a-standings-adjustment}
+##### Purpose of a Standings Adjustment
 
 The purposes of an Standings Adjustment are:
 
 * to apply a significant consequence that impacts the player’s ranking without distorting the ongoing table dynamics,  
 * to ensure that serious infractions have measurable effects on tournament progression.
 
-#### **Effect of the Penalty** {#effect-of-the-penalty}
+##### Effect of the Penalty
 
-When a player receives a Standings Adjustment **during an ongoing game**, the –1 VP penalty applies to that same game.
+* When a player receives a Standings Adjustment **during an ongoing game**, the –1 VP penalty applies to that same game.
 
-When a player receives a Standings Adjustment **between preliminary rounds**, or between the last preliminary round and the final), the –1 VP penalty applies to the next game they play.
+* When a player receives a Standings Adjustment **between preliminary rounds**, or between the last preliminary round and the final), the –1 VP penalty applies to the next game they play.
 
-When a player receives a Standings Adjustment **after the last preliminary round**, the –1 VP penalty applies to the previous game they played.
+* When a player receives a Standings Adjustment **after the last preliminary round**, the –1 VP penalty applies to the previous game they played.
 
-When a player receives a Standings Adjustment **before round 1 pairings are announced**, the –1 VP penalty applies to round 1\.
+* When a player receives a Standings Adjustment **before round 1 pairings are announced**, the –1 VP penalty applies to round 1\.
 
 Standings Adjustments always affect the player’s standings for the event and may influence qualification, seeding, or placement, because this penalty modifies VP totals, which may in turn alter Game Win (GW) determination and Tournament Points (TP) derived from that round.
 
@@ -223,15 +95,13 @@ Standings Adjustments always affect the player’s standings for the event and m
 * However, because a GW is awarded to the player with the highest VP total at the table, the –1 VP penalty may change who receives the GW.  
 * Any change in VP status will naturally change the TPs awarded for that round, following the standard Tournament Rules.
 
-**Example 1:**  
-If a player wins 3–2 and receives a –1 VP penalty, their final VP becomes 2\.  
-If this causes a tie for highest VP, the result becomes a 2–2 tie (no GW).  
-TPs are then awarded according to the Tournament Rules for a 2–2 tie.
+> **Example 1:**  
+> If a player wins 3–2 and receives a –1 VP penalty, their final VP becomes 2. If this causes a tie for highest VP, the result becomes a 2–2 tie (no GW). TPs are then awarded according to the Tournament Rules for a 2–2 tie.
 
-Example 2:  
-Player A sweeps a 5-player table and therefore gets 5 VP and the GW. Player E, who scored 0 VP received a Standings Adjustment during this game, and now has –1 VP. Player A receives the full 60 TP for first place. The three players tied for 2nd–4th receive the average of the Tournament Points for those positions—(48 \+ 36 \+ 24\) / 3 \= 36 TP each. The penalized player, now solely in 5th place, receives 12 TP.
+> **Example 2:**
+> Player A sweeps a 5-player table and therefore gets 5 VP and the GW. Player E, who scored 0 VP received a Standings Adjustment during this game, and now has –1 VP. Player A receives the full 60 TP for first place. The three players tied for 2nd–4th receive the average of the Tournament Points for those positions — (48 + 36 + 24) / 3 = 36 TP each. The penalized player, now solely in 5th place, receives 12 TP.
 
-#### **Communication and Tracking** {#communication-and-tracking}
+##### Communication and Tracking
 
 Standings Adjustment must be:
 
@@ -240,15 +110,13 @@ Standings Adjustment must be:
 * reported immediately to the Head Judge, and  
 * submitted to the V:EKN Penalty Database as part of the permanent disciplinary record.
 
-#### **Additional Considerations** {#additional-considerations}
+##### Additional Considerations
 
 If the judge’s investigation or communication takes more than a minute, a time extension may be granted so the affected table does not lose tournament time due to the ruling (see 1.2.4. Guidelines for Applying Time Extensions).
 
-### **1.1.4. Disqualification** {#1.1.4.-disqualification}
+#### 1.1.4. Disqualification
 
-A Disqualification (DQ) is the most serious tournament penalty. A DQ always includes a Warning and results in the player being removed from the event.
-
-A Disqualification may be issued for:
+A Disqualification (DQ) is the most serious tournament penalty. A DQ always includes a Warning and results in the player being removed from the event. A Disqualification may be issued for:
 
 * deliberate cheating,  
 * activity that threatens the competitive integrity of the tournament,  
@@ -256,7 +124,7 @@ A Disqualification may be issued for:
 * obstructive or abusive behavior,  
 * actions that endanger others or disrupt the event beyond repair.
 
-#### **Key Details** {#key-details}
+##### Key Details
 
 * The penalized player loses their current round and is dropped from the tournament.  
 * Prizes are reassigned according to final standings.  
@@ -267,33 +135,33 @@ A Disqualification may be issued for:
 * Disqualifications must be submitted to the designated penalty database.  
 * Disqualifications arising from intentional acts that compromise competitive integrity or player safety must be reported to the VEKN Ethics Committee. Disqualifications used solely as a tournament control measure, including those resulting from accumulated unintentional infractions or non-malicious safety concerns, do not require escalation.
 
-#### **DQ Effects** {#dq-effects}
+##### DQ Effects
 
 * The disqualified player is removed from standings entirely.  
 * Remaining players move up in rank and receive any additional prizes or qualifications associated with their new placement.
 
-#### **Game State Adjustment After a Disqualification** {#game-state-adjustment-after-a-disqualification}
+##### Game State Adjustment After a Disqualification
 
 When a player is disqualified during an ongoing game, the judge must update the game state in a way that is fair, minimally disruptive, and consistent with VTES ousting rules. A DQ is not an oust and must not award Victory Points or pool as if an oust had occurred.
 
-**1\. Remove the Player Immediately**
+**1. Remove the Player Immediately**
 
 * The disqualified player’s turn ends immediately.  
 * All of their minions, cards in play, uncontrolled region, pool, hand, and any other game materials are removed from the table.  
 * Ongoing effects controlled by that player end instantly unless the card explicitly states otherwise when its controller leaves play.
 
-**2\. No Victory Points Are Awarded**
+**2. No Victory Points Are Awarded**
 
 * The predator of the disqualified player does not gain a Victory Point.  
 * No pool is gained for “ousting” the DQ’d player, because a DQ is not a game action or game result—it is an administrative removal.
 
-**3\. Table Position Adjustments**
+**3. Table Position Adjustments**
 
 * The predator and prey of the removed player become adjacent.  
 * The game continues from the next legal opportunity as if the DQ’d player had never been seated between them.  
 * Effects depending on seating order (e.g., The Coven) adapt to this new adjacency.
 
-**4\. Restarting the Table**  
+**4. Restarting the Table**  
 Restarting the round is allowed but strongly discouraged, and should only be used during **five-player games** when:
 
 * The DQ occurs very early (e.g., before or during the first round of turns).  
@@ -307,26 +175,26 @@ If restarted:
   * The DQ’d player does not participate.  
 * **During a Final Round:** If a restart is required during a five-player final, the procedure differs because finals must always consist of five players. In this case, the next highest-ranked player on the premises from the overall standings (e.g., the first player who did not originally make the final) is seated into the game. That player assumes the seat appropriate to their ranking under standard final-round seating rules, as do the other four players, and the entire pre-final seating process (e.g. crypt display and in-order seat selection) must be conducted again.
 
-**5\. Handling Edge Cases**
+**5. Handling Edge Cases**
 
 * If a player gained pool or other benefits explicitly caused by an action involving the now-disqualified player (e.g., effects that triggered earlier that turn), those results remain unless they were themselves illegal or corrupted by the infraction that led to the DQ.  
 * Judges should avoid cascading corrections unless a clear unfair advantage exists.  
 * If the DQ occurred because of a corrupted game state (e.g., cheating that affected previous turns), the Head Judge may roll back or partially repair the game state following the rules in Section 1.4.
 
-**6\. Judge Discretion**  
+**6. Judge Discretion**  
 The Head Judge may deviate from the above if:
 
 * The standard fix produces a clearly inequitable result, or  
 * The timing of the DQ interacts disastrously with multiplayer dynamics.  
 * Any deviation must be explained to the table and reported in the final written DQ report.
 
-## **1.2. Applying Penalties** {#1.2.-applying-penalties}
+### 1.2. Applying Penalties
 
 The Tournament Conduct & Infraction Guide applies to all sanctioned VTES events. However, certain infractions may not be relevant to every tournament. For instance, events without decklists will naturally exclude decklist-related violations. When an infraction is discovered—whether by a player, a judge, or any tournament official—the appropriate penalty should be applied as soon as possible, ideally during the same round in which the infraction occurred. If a decklist problem or an illegal card is noticed during play, the judge should intervene immediately.
 
 Once a tournament has been concluded and officially approved, infractions that were not identified and ruled upon during the event are not subject to retroactive penalties or standings adjustments, except in cases of proven intentional misconduct handled by the VEKN Ethics Committee.
 
-### **1.2.1. Escalation of Penalties** {#1.2.1.-escalation-of-penalties}
+#### 1.2.1. Escalation of Penalties
 
 Each infraction lists a recommended penalty for the first offense. Repeated offenses of the same infraction should escalate according to the following order:
 
@@ -370,7 +238,7 @@ If a player demonstrates a consistent pattern of the same infraction across mult
 
 Disqualifications resulting solely from penalty accumulation must be based on infractions committed within the same event.
 
-### **1.2.2. Issuing Significant Penalties** {#1.2.2.-issuing-significant-penalties}
+#### 1.2.2. Issuing Significant Penalties
 
 Any Standings Adjustment or Disqualification should be communicated to the Head Judge. It is strongly recommended that only the Head Judge issue penalties of this magnitude, except in clear decklist errors. The Head Judge is also responsible for approving any deviation from the default procedures.
 
@@ -378,7 +246,7 @@ A player does not need to be registered in the tournament to receive a penalty. 
 
 Penalties remain valid even if the penalized individual drops or withdraws before the penalty would otherwise take effect.
 
-### **1.2.3. Communication and Transparency** {#1.2.3.-communication-and-transparency}
+#### 1.2.3. Communication and Transparency
 
 Whenever a penalty is issued, the judge must clearly explain three things to all involved players:
 
@@ -388,7 +256,7 @@ Whenever a penalty is issued, the judge must clearly explain three things to all
 
 If the Head Judge decides to deviate from the standard Tournament Conduct & Infraction Guide, they must explain both the standard remedy and the reason why the deviation is justified.
 
-### **1.2.4. Guidelines for Applying Time Extensions** {#1.2.4.-guidelines-for-applying-time-extensions}
+#### 1.2.4. Guidelines for Applying Time Extensions
 
 Time extensions exist to ensure that players are not disadvantaged because a judge had to intervene, investigate, or explain a ruling. They do not compensate for time lost due to normal game discussion or table talk—only for time lost specifically because of judge action.
 
@@ -469,17 +337,17 @@ A player asks whether an effect is optional. Judge answers in 20 seconds.
 Two different rulings during the round: \+3 minutes and \+2 minutes.  
 Total \= \+5 minutes.
 
-### **1.2.5. Consistency and Protection Against Bias** {#1.2.5.-consistency-and-protection-against-bias}
+#### 1.2.5. Consistency and Protection Against Bias
 
 Some infractions include mandatory remedies beyond the base penalty. These additional procedures exist to shield tournament officials from accusations of bias, favoritism, or inconsistency. As long as judges follow the written procedures, any dissatisfaction from players is directed toward the policy itself rather than toward the integrity of the judge.
 
 Because of this, judges should not attempt to “improve” or “optimize” a penalty’s effect based on the current game state, seating order, strategic balance, or perceived fairness. Even small deviations—especially when attempting to repair complicated states—create risk of unintentional favoritism or overlooked consequences. Adhering to consistent, text-based procedures preserves the integrity of the tournament.
 
-### **1.2.6. Handling Linked Infractions** {#1.2.6.-handling-linked-infractions}
+#### 1.2.6. Handling Linked Infractions
 
 If a single error results in multiple related infractions, judges should issue only the infraction with the most severe penalty. This prevents unnecessary duplicate penalties and ensures clarity for both players and judges.
 
-### **1.2.7. Assessing Intent** {#1.2.7.-assessing-intent}
+#### 1.2.7. Assessing Intent
 
 VTES is a highly political and asymmetrical game in which suboptimal, indirect, or counterintuitive plays are often strategically valid. Players may sacrifice short-term advantage, assist another player temporarily, or choose conservative lines of play for long-term survival. For this reason, outcome alone is never sufficient to determine intent.
 
@@ -518,7 +386,7 @@ When intent is unclear:
 
 Only when intent is reasonably established should judges apply penalties that rely on intentional misconduct, especially Standings Adjustments or Disqualifications.
 
-## **1.3. Randomizing a Library** {#1.3.-randomizing-a-library}
+### 1.3. Randomizing a Library
 
 Several corrective procedures in this document require the judge to re-randomize the library. Before doing so, the judge must determine whether any part of the library is currently known or arranged in a non-random order. Players should be consulted to confirm whether such manipulation has occurred. In addition, the judge should review the cards in the ash heap, the cards removed from the game, and any cards in play that may have influenced the order of the library.
 
@@ -526,9 +394,9 @@ Once the randomized portion has been identified and separated, the judge may shu
 
 Shuffles carried out by a judge for the purpose of a ruling or infraction remedy do not count as game shuffles and cannot trigger any card effects.
 
-## **1.4. Game State Corrections** {#1.4.-game-state-corrections}
+### 1.4. Game State Corrections
 
-### **1.4.1. Rolling Back the Game State** {#1.4.1.-rolling-back-the-game-state}
+#### 1.4.1. Rolling Back the Game State
 
 Occasionally, correcting an infraction may involve considering whether the game state should be reversed to a point before the mistake occurred. Because VTES involves hidden information, triggered effects, and complex action sequences (particularly during blocks, combat, or reaction timing). A roll-back must return the game to the exact moment immediately before the erroneous action; a “selective” or “incomplete” roll-back is never permitted.
 
@@ -552,7 +420,7 @@ Some infractions allow a simple roll-back, meaning the judge reverses only the m
 
 If a roll-back would require reconstructing multiple branching decisions, involve heavy randomization, unwind several turns of play, or meaningfully alter decisions based on now-public information, then a strict roll-back is not appropriate. In such cases, the judge must instead apply a Partial Game State Correction (see Section 1.4.2), which modifies the current game state without attempting full reconstruction.
 
-### **1.4.2. Partial Game State Corrections** {#1.4.2.-partial-game-state-corrections}
+#### 1.4.2. Partial Game State Corrections
 
 In some cases, an illegal game state is discovered long after the original error occurred, making a full roll-back infeasible. Partial game state corrections exist solely to prevent an illegal state from persisting when it is no longer possible to restore the game to a prior point without causing further disruption, randomization, or distortion.
 
@@ -578,7 +446,7 @@ A judge applying a partial correction should follow these principles:
 5. **Consult the Head Judge**  
    Partial corrections must be approved by the Head Judge whenever possible, as they require significant judgment and can materially affect game outcomes.
 
-# **2\. Procedural Errors** {#2.-procedural-errors}
+## 2. Procedural Errors
 
 This category covers mistakes arising from incorrect or imprecise execution of game procedures or rules—essentially, anything that disrupts proper play of VTES but does not fall under cheating or unsportsmanlike conduct. 
 
@@ -586,7 +454,7 @@ Given that there are many ways a game procedure can be carried out incorrectly, 
 
 Because deceitful players can exploit procedural errors to gain an advantage or mislead opponents, this category has a strict escalation policy. 
 
-## **2.1. Procedural Error — Missed Mandatory Effect** {#2.1.-procedural-error-—-missed-mandatory-effect}
+### 2.1. Procedural Error — Missed Mandatory Effect
 
 **Definition:**  
 A player commits this infraction when they fail to demonstrate awareness of a mandatory effect generated by a card or game effect under their control before that effect should visibly impact the game.
@@ -610,7 +478,7 @@ If the mandatory effect is detrimental to the controlling player, or missing it 
 **Additional Remedy:**  
 If the missed mandatory effect can still be resolved without major disruption, the judge may instruct the player to apply it immediately. Otherwise, the game continues with the current state.
 
-## **2.2. Procedural Error — Card Access Error** {#2.2.-procedural-error-—-card-access-error}
+### 2.2. Procedural Error — Card Access Error
 
 **Definition:**  
 A Card Access Error occurs when a player gains access to cards they were not entitled to see or draw, or fails to access cards they were required to draw, at any point during the game.  
@@ -654,7 +522,7 @@ The judge should do the following:
 
 If any fix requires additional clarification or unusual correction, the Head Judge makes the final determination.
 
-## **2.3. Procedural Error — Game Rule Violation** {#2.3.-procedural-error-—-game-rule-violation}
+### 2.3. Procedural Error — Game Rule Violation
 
 **Definition:**  
 This infraction covers most situations in which a player violates the rules of VTES or performs a game procedure incorrectly, when the error is not covered by another specific category.
@@ -710,7 +578,7 @@ The judge should attempt to correct the game state with the least disruptive opt
 
 If the opponent(s) could reasonably have noticed the error but failed to do so, they may also receive a **Procedural Error — Failure to Maintain Game State**.
 
-## **2.4. Procedural Error — Failure to Maintain Game State** {#2.4.-procedural-error-—-failure-to-maintain-game-state}
+### 2.4. Procedural Error — Failure to Maintain Game State
 
 **Definition:**  
 A player fails to assist in maintaining an accurate and legal game state when they notice a visible, relevant, and ongoing Game Rule Violation and reasonably have the opportunity to speak up, but do not do so.
@@ -737,13 +605,13 @@ This penalty exists to reinforce the cooperative nature of game-state maintenanc
 **Standings Adjustment**.  
 Repeated offenses in Procedural Error — Failure to Maintain Game State will never escalate in severity. 
 
-# **3\. Tournament Errors** {#3.-tournament-errors}
+## 3. Tournament Errors
 
-## **3.1. Tournament Errors — Deck Problems** {#3.1.-tournament-errors-—-deck-problems}
+### 3.1. Tournament Errors — Deck Problems
 
 This section addresses issues involving deck construction and deck integrity at both Constructed and Limited events. The primary purpose of deck checks and decklist use is to ensure that decks remain legal and unaltered for the duration of the tournament.
 
-### **3.1.1. Deck Problem — Illegal Decklist** {#3.1.1.-deck-problem-—-illegal-decklist}
+#### 3.1.1. Deck Problem — Illegal Decklist
 
 **Definition:**  
 This infraction only applies at tournaments where decklists are required. 
@@ -796,7 +664,7 @@ Decklist errors found outside a game (e.g., during routine deck counting) are no
     * If a fair correction is not possible, the judge may require the vampire to be removed from play.  
   * All corrections must aim to restore legality while preserving competitive integrity and avoiding retroactive optimization.
 
-### **3.1.2. Deck Problem — Illegal Main Deck (Legal Decklist)** {#3.1.2.-deck-problem-—-illegal-main-deck-(legal-decklist)}
+#### 3.1.2. Deck Problem — Illegal Main Deck (Legal Decklist)
 
 **Definition:**  
 This infraction applies only when decklists are in use.
@@ -835,7 +703,7 @@ After the penalty, the player must adjust the deck to match the list (or vice ve
 * If more cards are being removed than added, remove non-library cards first; if replacements still exceed removals, replace cards using random cards from the library.  
 * If the missing card came from another player’s deck, issue penalties to both players.
 
-### **3.1.3. Deck Problem — Illegal Main Deck (No Decklists Used)** {#3.1.3.-deck-problem-—-illegal-main-deck-(no-decklists-used)}
+#### 3.1.3. Deck Problem — Illegal Main Deck (No Decklists Used)
 
 **Definition:**  
 This applies at events where decklists are not used (e.g., some storyline events, small store events).
@@ -886,7 +754,7 @@ Players should be warned before the event begins about the consequences of prese
     * If a fair correction is not possible, the judge may require the vampire to be removed from play.  
   * All corrections must aim to restore legality while preserving competitive integrity and avoiding retroactive optimization.
 
-## **3.2. Tournament Error — Outside Assistance** {#3.2.-tournament-error-—-outside-assistance}
+### 3.2. Tournament Error — Outside Assistance
 
 **Definition:**  
 A player, spectator, or other tournament participant commits Outside Assistance if, after a game has started, they provide or receive strategic, tactical, or hidden-information input that could influence decisions in an ongoing game, or if they reference pre-prepared strategic materials while the round is in progress.
@@ -938,7 +806,7 @@ When Outside Assistance occurs, responsibility is assigned based on each partici
 
 **Standings Adjustment.** The penalty is applied to the offending party or parties as determined under Responsibility above.
 
-## **3.3. Tournament Error — Slow Play** {#3.3.-tournament-error-—-slow-play}
+### 3.3. Tournament Error — Slow Play
 
 **Definition:**  
 A player is committing Slow Play when they take significantly more time than is reasonably necessary to perform game actions, make decisions, or maintain the natural pace of the table.  
@@ -969,7 +837,7 @@ A Caution is issued when a player’s pace of play is excessively slow and has r
 **Additional Remedy:**  
 If Slow Play has consumed significant round time, the judge may issue a time extension to the table (see 1.2.4. Guidelines for Applying Time Extensions) so players are not disadvantaged by the ruling process.
 
-## **3.4. Tournament Error — Limited Procedure Violation** {#3.4.-tournament-error-—-limited-procedure-violation}
+### 3.4. Tournament Error — Limited Procedure Violation
 
 **Definition:**  
 A Limited Procedure Violation occurs when a player makes a technical or procedural mistake during a VTES draft portion of an event.
@@ -1009,7 +877,7 @@ The judge should:
 * Provide a brief reminder of draft procedures to the pod if needed.  
 * Apply a time extension (see 1.2.4. Guidelines for Applying Time Extensions) only when the judge’s intervention has meaningfully slowed the pod.
 
-## **3.5. Tournament Error — Public Information Miscommunication** {#3.5.-tournament-error-—-public-information-miscommunication}
+### 3.5. Tournament Error — Public Information Miscommunication
 
 **Definition:**  
 A Public Information Miscommunication occurs when a player provides incorrect, misleading, or incomplete information about publicly available game elements.  
@@ -1035,7 +903,7 @@ The player receives a Warning, which is logged and tracked. Repeated violations 
 **Additional Remedy:**  
 If the faulty communication directly led to a specific in-game action (or clear non-action), the judge may consider a roll-back to the point of the affected action, not to the moment when the incorrect communication occurred. Roll-backs should be used carefully to avoid revealing information that could alter decision-making.
 
-## **3.6. Tournament Error — Obscuring Game State** {#3.6.-tournament-error-—-obscuring-game-state}
+### 3.6. Tournament Error — Obscuring Game State
 
 **Definition:**  
 A player creates or maintains an ambiguous, confusing, or misleading physical game layout that obscures public information or makes it difficult for others to correctly interpret the game state. This infraction applies only when the issue is caused by unclear presentation rather than incorrect verbal communication (which is covered under 3.5. Tournament Error — Public Information Miscommunication).
@@ -1060,7 +928,7 @@ This infraction exists to ensure the physical layout remains readable and standa
 **Additional Remedies:**  
 The judge instructs the player to immediately reorganize the play area into a clear, conventional layout, separating minions, attachments, locked states, and areas as appropriate. If necessary, the judge may physically assist in reorganizing the cards (with player consent) to restore clarity.
 
-## **3.7. Tournament Error — Marked Cards** {#3.7.-tournament-error-—-marked-cards}
+### 3.7. Tournament Error — Marked Cards
 
 **Definition:**  
 A player’s cards or sleeves show physical inconsistencies that could allow the player (or an opponent) to identify specific cards or groups of cards while they are in the library, crypt, or hand.
@@ -1106,7 +974,7 @@ This infraction assumes the markings were created unintentionally unless there i
   * If a player cannot bring their deck into a legal, unmarked, and uniform state within a reasonable timeframe, and no replacement sleeves can be procured by either the player or tournament staff, the player must be removed from the event.  
 * If the deck must be modified because certain cards cannot be replaced, the penalty is upgraded to a Standings Adjustment, and the decklist is updated to match the new configuration. This modification may be reverted later if suitable replacements are found.
 
-## **3.8. Tournament Error — Insufficient Shuffling** {#3.8.-tournament-error-—-insufficient-shuffling}
+### 3.8. Tournament Error — Insufficient Shuffling
 
 **Definition:**  
 A player unintentionally fails to sufficiently shuffle their library or crypt, or a portion of either, before presenting it for additional randomization by another player.
@@ -1143,9 +1011,9 @@ If the judge believes the player is manipulating the deck intentionally to contr
 Thoroughly shuffle the affected portion of the deck (library or crypt).  
 If only a subset of cards became unrandomized, only that portion needs to be shuffled, but the judge may require a full shuffle if deemed necessary for game integrity.
 
-# **4\. Unsportsmanlike Conduct** {#4.-unsportsmanlike-conduct}
+## 4. Unsportsmanlike Conduct
 
-## **4.1. Unsportsmanlike Conduct — Minor** {#4.1.-unsportsmanlike-conduct-—-minor}
+### 4.1. Unsportsmanlike Conduct — Minor
 
 **Definition:**  
 This conduct refers to behavior that is disruptive, disrespectful, or emotionally charged, but does not target a specific individual with the intent or effect of harassment, intimidation, or coercion. 
@@ -1179,7 +1047,7 @@ VTES tournaments rely heavily on social interaction, negotiation, and a cooperat
 **Additional Remedy:**  
 The player must immediately correct the disruptive behavior.
 
-## **4.2. Unsportsmanlike Conduct — Major** {#4.2.-unsportsmanlike-conduct-—-major}
+### 4.2. Unsportsmanlike Conduct — Major
 
 **Definition:**  
 This conduct involves targeted, aggressive, or coercive actions directed at another player, judge, or participant in a way that creates a hostile, unsafe, or intimidating environment.
@@ -1225,7 +1093,7 @@ The player must correct the behavior immediately, and a written report of the in
 **Upgrade:**  
 If the behavior was committed with malicious intent, the player shows no remorse, or the offense occurs again at a later time, the penalty is **Disqualification** and removal from the venue, and the behaviour must be reported to the VEKN Ethics Committee.
 
-## **4.3. Unsportsmanlike Conduct — Aggressive Behaviour** {#4.3.-unsportsmanlike-conduct-—-aggressive-behaviour}
+### 4.3. Unsportsmanlike Conduct — Aggressive Behaviour
 
 **Definition:**  
 A player engages in behavior that is physically threatening, violent, or intentionally damaging toward another person, their belongings, or tournament property.  
@@ -1260,7 +1128,7 @@ This infraction requires immediate removal of the offending individual to protec
   * Judges should take reasonable steps to avoid penalizing the remaining players for the disruption. This may include awarding a time extension, adjusting seating if the round must be restarted, or applying tournament-level remedies defined for irrecoverable game interruptions.  
   * The incident and all remedial actions must be documented in the tournament report, including whether the game was resumed, terminated, or otherwise adjusted.
 
-## **4.4. Unsportsmanlike Conduct — Bribery and Wagering** {#4.4.-unsportsmanlike-conduct-—-bribery-and-wagering}
+### 4.4. Unsportsmanlike Conduct — Bribery and Wagering
 
 **Definition:**  
 A player offers, requests, hints at, or accepts any out-of-game incentive intended to influence the outcome of a game or match—such as encouraging an opponent to concede, intentionally alter their play, agree to a particular oust order, or manipulate victory point distribution.
@@ -1287,7 +1155,7 @@ Any attempt to influence tournament results through incentives, rewards, or outs
 
 **Disqualification**. A written report of the incident should be submitted to the VEKN Ethics Committee.
 
-## **4.5. Unsportsmanlike Conduct — Theft of Tournament Material** {#4.5.-unsportsmanlike-conduct-—-theft-of-tournament-material}
+### 4.5. Unsportsmanlike Conduct — Theft of Tournament Material
 
 **Definition:**  
 A player takes, conceals, or intentionally retains materials that do not belong to them and that are part of the tournament environment. This includes cards, tokens, counters, seating materials, or any equipment provided by the event or belonging to other participants.
@@ -1311,7 +1179,7 @@ Theft of non-tournament personal property is primarily the responsibility of the
 **Additional Remedy:**  
 The Tournament Organizer must require the offender to leave the venue immediately. Further reporting to the VEKN Ethics Committee may be warranted depending on the severity of the incident.
 
-## **4.6. Unsportsmanlike Conduct — Stalling** {#4.6.-unsportsmanlike-conduct-—-stalling}
+### 4.6. Unsportsmanlike Conduct — Stalling
 
 **Definition:**  
 A player intentionally delays the progress of the game—through inaction, excessively slow decision-making, or unnecessary procedural delays—in order to take advantage of the round time limit.
@@ -1344,7 +1212,7 @@ Stalling is a severe infraction and is always treated as an intentional act. Jud
 **Additional Remedy:**  
 The player must leave the venue if instructed by the Tournament Organizer. Judges should document the incident thoroughly for reporting purposes.
 
-## **4.7. Unsportsmanlike Conduct — Cheating** {#4.7.-unsportsmanlike-conduct-—-cheating}
+### 4.7. Unsportsmanlike Conduct — Cheating
 
 **Definition:**  
 A person intentionally violates the rules or tournament policies, lies to a tournament official, or becomes aware of a significant offense occurring in their game (or their teammate’s game in team formats) and chooses not to report it.
@@ -1385,7 +1253,7 @@ Judges must investigate potential cheating carefully, separating genuine mistake
 The offender should be removed from the venue at the Tournament Organizer’s discretion.  
 A written report of the incident should be submitted to the VEKN Ethics Committee.
 
-## **4.8. Unsportsmanlike Conduct — Fraud** {#4.8.-unsportsmanlike-conduct-—-fraud}
+### 4.8. Unsportsmanlike Conduct — Fraud
 
 **Definition:**  
 A player intentionally misrepresents rules, procedures, personal information, or any other information relevant to the tournament.
@@ -1407,7 +1275,7 @@ Fraud undermines the integrity of the tournament and the trust of the community.
 
 **Disqualification**. A written report of the case should be submitted to the VEKN Ethics Committee.
 
-## **4.9. Unsportsmanlike Conduct — Collusion** {#4.9.-unsportsmanlike-conduct-—-collusion}
+### 4.9. Unsportsmanlike Conduct — Collusion
 
 **Definition:**  
 Players deliberately agree to alter, predetermine, or otherwise illegally establish the outcome of a game or match.  
@@ -1435,7 +1303,7 @@ If an agreement or behavior violates any of these conditions, it ceases to be ac
 
 **Disqualification**. A written report of the case should be submitted to the VEKN Ethics Committee.
 
-## **4.10. Unsportsmanlike Conduct — Health & Safety Disruption** {#4.10.-unsportsmanlike-conduct-—-health-&-safety-disruption}
+### 4.10. Unsportsmanlike Conduct — Health & Safety Disruption
 
 **Definition:**  
 A player commits a Health & Safety Disruption infraction when their physical condition or behavior creates an unsafe, unsanitary, or severely uncomfortable environment for other participants, or when it prevents them from reasonably participating in the event.
@@ -1462,7 +1330,7 @@ If the problem cannot be corrected quickly or is severe, the proper remedy is re
 * Medical conditions must be handled sensitively; if in doubt, default to accommodation rather than punishment.  
 * Alcohol and substance policies must follow the venue’s legal rules.
 
-## **4.11. Unsportsmanlike Conduct — Rage-Quitting** {#4.11.-unsportsmanlike-conduct-—-rage-quitting}
+### 4.11. Unsportsmanlike Conduct — Rage-Quitting
 
 **Definition:**  
 A player commits Rage-Quitting when they intentionally abandon an ongoing game in anger or frustration—by leaving the table, refusing to continue play, or otherwise making it impossible for the game to proceed—without judge authorization and outside of legitimate event procedures (e.g., medical emergency).
@@ -1488,7 +1356,7 @@ VTES tournaments rely on all players remaining engaged until the game ends throu
 * The judge may issue a time extension to the table if the disruption consumed significant round time.  
 * Additional sanctions may be considered if the behavior is aggressive or disruptive to staff or players.
 
-## **4.12. Unsportsmanlike Conduct — Failure to Play to Win** {#4.12.-unsportsmanlike-conduct-—-failure-to-play-to-win}
+### 4.12. Unsportsmanlike Conduct — Failure to Play to Win
 
 **Definition:**  
 A player commits Failure to Play to Win when they intentionally play in a way that does not pursue their own best possible game result, thereby distorting the natural outcome of the game.
@@ -1535,11 +1403,11 @@ Judges must exercise caution and restraint when applying this infraction. Disagr
 
 In particularly clear or disruptive cases—especially those involving explicit statements, deliberate game throwing, or repeated behavior across events—a **Standings Adjustment** may be appropriate.
 
-# **5\. Event Organization** {#5.-event-organization}
+## 5. Event Organization
 
 This section generally deals with organizational issues relating to the practical functions of running a tournament.
 
-## **5.1. Event Organization — Unexpected Drop** {#5.1.-event-organization-—-unexpected-drop}
+### 5.1. Event Organization — Unexpected Drop
 
 **Description:**
 
@@ -1554,7 +1422,7 @@ A player leaves the tournament unexpectedly and can no longer continue playing.
 * If the drop happens before the first round begins and legal tables cannot be formed: The event is unsanctioned, and no official VEKN or publisher prize support should be distributed.  
 * If the event becomes unsanctioned due to drops during the tournament: Prize support may still be distributed normally. Submit the Archon or event report as usual and note what happened. The event will appear as unsanctioned and will not affect player ratings.
 
-## **5.2. Event Organization — Venue Interference** {#5.2.-event-organization-—-venue-interference}
+### 5.2. Event Organization — Venue Interference
 
 **Description:**  
 The venue imposes constraints that require changing round times.
@@ -1568,7 +1436,7 @@ The venue imposes constraints that require changing round times.
 * If a round shorter than 2 hours finishes with no tables reaching the time limit, the event remains sanctioned.  
 * Add notes about venue problems in the event report. As long as the event can be completed, prize support may be distributed normally.
 
-## **5.3. Event Organization — Force Majeure and Emergency Termination** {#5.3.-event-organization-—-force-majeure-and-emergency-termination}
+### 5.3. Event Organization — Force Majeure and Emergency Termination
 
 **Definition:**  
 A Force Majeure situation is any unexpected external event that makes it unsafe or impossible to continue a sanctioned tournament. Examples include (but are not limited to):
@@ -1623,7 +1491,7 @@ If abuse or interference from venue employees or management threatens player saf
 
 If relocation is not possible, the tournament must be terminated and scored as described in Section A.
 
-## **5.4. Event Organization — Organizer’s / Judge’s Recommended Supplies** {#5.4.-event-organization-—-organizer’s-/-judge’s-recommended-supplies}
+### 5.4. Event Organization — Organizer’s / Judge’s Recommended Supplies
 
 Tournament organizers and judges are strongly encouraged to carry a small set of standardized supplies to resolve common issues quickly, fairly, and with minimal disruption to play. Having these materials readily available reduces unnecessary penalties, avoids forced drops, and helps maintain tournament flow.
 
@@ -1678,7 +1546,7 @@ The following items are recommended:
 
 Copyright © 2026 Paradox Interactive AB. www.paradoxinteractive.com. All rights reserved. Vampire: The Eternal Struggle and Vampire: The Masquerade® are trademarks and/or registered trademarks of Paradox Interactive AB. All rights reserved.
 
-# **APPENDIX I — Penalty Summary** {#appendix-i-—-penalty-summary}
+# APPENDIX I — Penalty Summary
 
 | PROCEDURAL ERRORS |  |
 | ----- | :---- |

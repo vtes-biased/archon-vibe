@@ -185,25 +185,20 @@ Reference: [Sanctions categories document](https://docs.google.com/document/d/1N
 
 ---
 
-## Phase 4: Ratings & Hall of Fame
+## Phase 4: Ratings & Hall of Fame ✅
 
-### 4.1 Ratings in Tournament Standings
+### 4.1 Ratings in Tournament Standings ✅
 
-> Ratings computation already works. This adds visibility.
+- RP (rating points) earned displayed in finished tournament standings (PlayersTab)
+- Ratings page with top 500 globally, country filters, date sort, bulk-load rankings
+- Suspended players hidden from rankings page
+- Rating cutoff uses exact 18 calendar months
 
-- Display RP (rating points) earned in the finished tournament standings page
-- Important for top competitors tracking their worldwide ladder position
-- Ratings page already shows top 500 globally with country filters (top 100 per country)
+### 4.2 Hall of Fame ✅
 
-**Done when:** RP visible per player in finished tournament standings.
-
-### 4.2 Hall of Fame
-
-- New section listing all players with 5+ tournament wins
-- Display: player name, avatar (if available), star per win, sorted by decreasing wins
-- Tier ranks based on win count (propose tiers during implementation)
-
-**Done when:** Hall of Fame page displays with tiered ranks.
+- Hall of Fame page listing players with 5+ tournament wins
+- Player name, star per win, sorted by decreasing wins
+- Integrated with ratings navigation
 
 ---
 
@@ -243,10 +238,9 @@ Players check in via QR code shown/printed by organizers.
 
 ## Phase 7: Printable Round Seating & Table Labels
 
-### Printable Seating
+### Printable Seating ✅
 
-- Generate a print-optimized HTML page of round seating using proper print CSS (`@media print`, page breaks)
-- Easy to print on any printer
+- Print-optimized HTML page of round seating with proper print CSS (`@media print`, page breaks)
 
 ### Table Labels
 
@@ -254,7 +248,7 @@ Two modes (keep it lean):
 - **Custom names:** organizer provides freeform table names
 - **Rooms:** configure named spaces with table counts (e.g., "Lobby: 5 tables, Center room: 15 tables, Garden: 6 tables")
 
-**Done when:** Seating sheet prints cleanly; table labeling works in both modes.
+**Done when:** Table labeling works in both modes.
 
 ---
 

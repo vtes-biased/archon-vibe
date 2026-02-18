@@ -13,15 +13,15 @@ export const DISCIPLINE_ICONS: Record<string, string> = {
   san: 'g', thn: 'h', ani: 'i', pro: 'j', chi: 'k', val: 'l',
   mel: 'm', nec: 'n', obf: 'o', pot: 'p', qui: 'q', pre: 'r',
   ser: 's', tha: 't', vis: 'u', vic: 'v', abo: 'w', myt: 'x',
-  dai: 'y', spi: 'z', tem: '?', str: 'à', obt: '$', mal: 'â',
-  obl: 'n', // oblivion uses same glyph as necromancy
+  dai: 'y', spi: 'z', tem: '?', str: '+', obt: '$', mal: '<',
+  obl: 'ø',
   // Superior (uppercase trigrams)
   AUS: 'A', OBE: 'B', CEL: 'C', DOM: 'D', DEM: 'E', FOR: 'F',
   SAN: 'G', THN: 'H', ANI: 'I', PRO: 'J', CHI: 'K', VAL: 'L',
   MEL: 'M', NEC: 'N', OBF: 'O', POT: 'P', QUI: 'Q', PRE: 'R',
   SER: 'S', THA: 'T', VIS: 'U', VIC: 'V', ABO: 'W', MYT: 'X',
-  DAI: 'Y', SPI: 'Z', TEM: '!', STR: 'á', OBT: '£', MAL: 'ã',
-  OBL: 'N',
+  DAI: 'Y', SPI: 'Z', TEM: '!', STR: '=', OBT: '£', MAL: '>',
+  OBL: 'Ø',
   // Virtues (Imbued)
   inn: '#', def: '@', mar: '&', jud: '%', ven: '(', vin: ')', red: '*',
   viz: ')',
@@ -42,6 +42,8 @@ export const TYPE_ICONS: Record<string, string> = {
   'Master': '9',
   'Conviction': '¤',
   'Power': '§',
+  'Flight': '^',
+  'Merged': 'µ',
 };
 
 /** Clan name → VTES Clans font character (modern icons preferred) */
@@ -65,6 +67,21 @@ export const CLAN_ICONS: Record<string, string> = {
   'True Brujah': 'j', 'Tzimisce': 'k',
   'Ventrue': 'v', 'Ventrue antitribu': 'm',
   'Hecata': 'O', 'The Ministry': 'r',
+};
+
+/** Full discipline name → lowercase trigram (for lookups) */
+export const DISCIPLINE_NAME_TO_TRIGRAM: Record<string, string> = {
+  'Abombwe': 'abo', 'Animalism': 'ani', 'Auspex': 'aus',
+  'Blood Sorcery': 'tha', 'Celerity': 'cel', 'Chimerstry': 'chi',
+  'Daimoinon': 'dai', 'Dementation': 'dem', 'Dominate': 'dom',
+  'Fortitude': 'for', 'Maleficia': 'mal', 'Melpominee': 'mel',
+  'Mytherceria': 'myt', 'Necromancy': 'nec', 'Obeah': 'obe',
+  'Obfuscate': 'obf', 'Oblivion': 'obl', 'Obtenebration': 'obt',
+  'Potence': 'pot', 'Presence': 'pre', 'Protean': 'pro',
+  'Quietus': 'qui', 'Sanguinus': 'san', 'Serpentis': 'ser',
+  'Spiritus': 'spi', 'Striga': 'str', 'Temporis': 'tem',
+  'Thanatosis': 'thn', 'Thaumaturgy': 'tha', 'Valeren': 'val',
+  'Vicissitude': 'vic', 'Visceratika': 'vis',
 };
 
 /**

@@ -80,6 +80,15 @@ When Rust engine capabilities change:
 
 ## Recent Changes
 
+**Session 2026-02-16: Calendar System, Tournament List Rework**
+- ARCHITECTURE.md: added Calendar System section documenting iCal feed endpoint, calendar token, agenda matching, frontend integration
+- SYNC.md: documented `calendar_token` stripped from `_filter_user()` in Per-Type Filtering section
+- New backend endpoint: `GET /api/calendar/tournaments.ics` with personal/country/global feed types
+- `calendar_token` field on User model (nullable, generated on demand via `POST /auth/me/calendar-token`)
+- Frontend: `getAgendaTournaments()` and simplified `getFilteredTournaments()` in db.ts
+- Tournament list: removed sort/state dropdowns, added "My Agenda" toggle for members, "Include online" toggle
+- Continent helpers: `getContinent()` / `getCountriesOnContinent()` in frontend/backend geonames
+
 **Session 2026-02-15: League system, keyset pagination, i18n**
 - Added League object type (full SSE sync support)
 - ARCHITECTURE.md: added League System section

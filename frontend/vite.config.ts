@@ -36,6 +36,10 @@ export default defineConfig({
 					if (id.includes('cities.json')) {
 						return 'geonames-cities';
 					}
+					// Bundle help/reference docs separately to avoid bloating main chunk
+					if (id.includes('judges-guide') || id.includes('tournament-rules') || id.includes('vtes-rules') || id.includes('code-of-ethics') || id.includes('help-content') || id.includes('help-docs')) {
+						return 'help-docs';
+					}
 				}
 			}
 		}

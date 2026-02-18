@@ -2,17 +2,16 @@
   import '../app.css';
   import { page } from '$app/stores';
   import { syncManager } from '$lib/sync';
-  import { initAuth, hasAnyRole } from '$lib/stores/auth.svelte';
+  import { initAuth } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine';
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState } from '$lib/stores/offline.svelte';
   import { onMount } from 'svelte';
-  import { WifiOff, Download, Trophy, BarChart3, Medal, Users, User, Code2, Monitor, Sun, Moon } from 'lucide-svelte';
+  import { WifiOff, Download, Trophy, BarChart3, Medal, Users, User, BookOpen } from 'lucide-svelte';
   import Toast from '$lib/components/Toast.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
-  import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
-  import { getTheme, cycleTheme, initTheme } from '$lib/stores/theme.svelte';
+  import { initTheme } from '$lib/stores/theme.svelte';
 
   let { children } = $props();
 
@@ -21,19 +20,15 @@
   let isSyncing = $state(true);
   let syncError = $state<string | null>(null);
 
-  // Navigation items - use message keys, resolve labels reactively
-  const baseNavItems = [
+  // Navigation items - fixed 6 items, no conditional developer
+  const navItems = [
     { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: 'trophy' },
     { href: '/leagues', labelFn: () => m.nav_leagues(), icon: 'chart' },
     { href: '/rankings', labelFn: () => m.nav_rankings(), icon: 'ranking' },
     { href: '/users', labelFn: () => m.nav_users(), icon: 'users' },
+    { href: '/help', labelFn: () => m.nav_help(), icon: 'help' },
     { href: '/profile', labelFn: () => m.nav_profile(), icon: 'user' },
   ];
-  const navItems = $derived(
-    hasAnyRole('DEV', 'IC')
-      ? [...baseNavItems, { href: '/developer', labelFn: () => m.nav_developer(), icon: 'code' }]
-      : baseNavItems
-  );
 
   function isActive(href: string, currentPath: string): boolean {
     if (href === '/') return currentPath === '/';
@@ -100,6 +95,22 @@
   });
 </script>
 
+{#snippet navIcon(icon: string, size: string)}
+  {#if icon === 'trophy'}
+    <Trophy class={size} />
+  {:else if icon === 'chart'}
+    <BarChart3 class={size} />
+  {:else if icon === 'ranking'}
+    <Medal class={size} />
+  {:else if icon === 'users'}
+    <Users class={size} />
+  {:else if icon === 'help'}
+    <BookOpen class={size} />
+  {:else if icon === 'user'}
+    <User class={size} />
+  {/if}
+{/snippet}
+
 <div class="min-h-screen bg-bone-950 pb-16 sm:pb-0">
   <!-- Status bar (shows sync/offline status) -->
   {#if !isOnline || syncError}
@@ -138,39 +149,12 @@
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
           href={item.href}
-          class="flex flex-col items-center py-3 px-3 min-w-[64px] {active ? 'text-crimson-500' : 'text-ash-400 hover:text-ash-200'}"
+          class="flex flex-col items-center py-2 px-1 min-w-0 flex-1 {active ? 'text-crimson-500' : 'text-ash-400 hover:text-ash-200'}"
         >
-          {#if item.icon === 'trophy'}
-            <Trophy class="w-6 h-6" />
-          {:else if item.icon === 'chart'}
-            <BarChart3 class="w-6 h-6" />
-          {:else if item.icon === 'ranking'}
-            <Medal class="w-6 h-6" />
-          {:else if item.icon === 'users'}
-            <Users class="w-6 h-6" />
-          {:else if item.icon === 'user'}
-            <User class="w-6 h-6" />
-          {:else if item.icon === 'code'}
-            <Code2 class="w-6 h-6" />
-          {/if}
-          <span class="text-xs mt-1">{item.labelFn()}</span>
+          {@render navIcon(item.icon, 'w-5 h-5')}
+          <span class="text-[10px] mt-0.5 truncate">{item.labelFn()}</span>
         </a>
       {/each}
-      <button
-        onclick={cycleTheme}
-        class="flex flex-col items-center py-3 px-3 min-w-[64px] text-ash-400 hover:text-ash-200"
-      >
-        {#if getTheme() === 'system'}
-          <Monitor class="w-6 h-6" />
-        {:else if getTheme() === 'light'}
-          <Sun class="w-6 h-6" />
-        {:else}
-          <Moon class="w-6 h-6" />
-        {/if}
-        <span class="text-xs mt-1">
-          {#if getTheme() === 'system'}{m.theme_system()}{:else if getTheme() === 'light'}{m.theme_light()}{:else}{m.theme_dark()}{/if}
-        </span>
-      </button>
     </div>
   </nav>
 
@@ -189,48 +173,14 @@
           class="flex flex-col items-center py-3 px-2 rounded-lg transition-colors {active ? 'bg-crimson-900/50 text-crimson-400' : 'text-ash-400 hover:text-ash-200 hover:bg-ash-800/50'}"
           title={item.labelFn()}
         >
-          {#if item.icon === 'trophy'}
-            <Trophy class="w-6 h-6" />
-          {:else if item.icon === 'chart'}
-            <BarChart3 class="w-6 h-6" />
-          {:else if item.icon === 'ranking'}
-            <Medal class="w-6 h-6" />
-          {:else if item.icon === 'users'}
-            <Users class="w-6 h-6" />
-          {:else if item.icon === 'user'}
-            <User class="w-6 h-6" />
-          {:else if item.icon === 'code'}
-            <Code2 class="w-6 h-6" />
-          {/if}
+          {@render navIcon(item.icon, 'w-6 h-6')}
           <span class="text-xs mt-1">{item.labelFn()}</span>
         </a>
       {/each}
     </div>
 
-    <!-- Theme toggle -->
-    <div class="mt-auto pt-4">
-      <button
-        onclick={cycleTheme}
-        class="flex flex-col items-center text-ash-400 hover:text-ash-200 transition-colors"
-        title={getTheme() === 'system' ? 'System theme' : getTheme() === 'light' ? 'Light theme' : 'Dark theme'}
-      >
-        {#if getTheme() === 'system'}
-          <Monitor class="w-5 h-5" />
-        {:else if getTheme() === 'light'}
-          <Sun class="w-5 h-5" />
-        {:else}
-          <Moon class="w-5 h-5" />
-        {/if}
-      </button>
-    </div>
-
-    <!-- Locale switcher -->
-    <div class="pt-2">
-      <LocaleSwitcher />
-    </div>
-
     <!-- Connection status indicator -->
-    <div class="pt-2">
+    <div class="mt-auto pt-4">
       <div class="flex flex-col items-center gap-1">
         <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-crimson-500'}"></div>
         <span class="text-[10px] text-ash-500">{isOnline ? (isSyncing ? m.status_syncing() : m.status_online()) : m.status_offline()}</span>

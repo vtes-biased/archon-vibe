@@ -276,6 +276,24 @@ Three data levels control what each connected client sees:
 - Player ratings computed server-side, updated on tournament finish or modification
 - Rankings page
 
+**Organizer UX**:
+- Mobile-first organizer console
+- Drag-and-drop seating editor with per-player issue indicators
+- Printable round seating (print-optimized CSS)
+- Payment tracking (paid/unpaid toggle per player)
+- Multiple organizers management (add/remove co-organizers)
+- IC implicit organizer access on all tournaments
+
+**Social & Discovery**:
+- Social sharing for finished tournaments (PNG card + text with decklist)
+- iCal calendar feed (personal agenda, country, global; with online toggle)
+- Tournament list with "My Agenda" view
+
+**Ratings & Hall of Fame**:
+- RP display in finished tournament standings
+- Rankings page (top 500 global, country filters, date sort)
+- Hall of Fame (players with 5+ wins)
+
 **Infrastructure**:
 - Offline-first PWA with service workers
 - IndexedDB for all read operations
@@ -286,13 +304,7 @@ Three data levels control what each connected client sees:
 
 ### 5.2 Not Yet Implemented / Planned
 
-Prioritized features are marked with **[HIGH]**. See `development-plan.md` for implementation phasing.
-
-#### High Priority
-
-- **Payment tracking** [HIGH]: Simple paid/unpaid toggle per player. Filterable list for organizers. No external payment platform integration initially.
-- **Events calendar subscription** [HIGH]: iCal feed for regional tournaments, filterable by country with option to include/exclude online events. Improves tournament discovery and player engagement.
-- **Export results for social posting** [HIGH]: Shareable tournament results (image/text) for social media. Standings, winners, event summary.
+See `development-plan.md` for implementation phasing.
 
 #### Tournament Features
 
@@ -302,7 +314,7 @@ Prioritized features are marked with **[HIGH]**. See `development-plan.md` for i
 - **Raffle**: Random draw from configurable player pools (round winners, non-finalists, non-winners, all players, etc.) for prize attribution
 - **Staggered seatings**: Bye rotation for impossible player counts (6, 7, 11). Each round, some players sit out; over multiple rounds everyone plays equally. Round-by-round seating engine handles this naturally.
 - **Finals seating UI** (manual procedure; organizer inputs the result after physical card-drawing)
-- **Multiple organizers** (add/remove co-organizers for an event, all equal permissions)
+- **Table labels**: Custom names or room-based layout (e.g., "Lobby: 5 tables, Center room: 15 tables")
 - **Tournament logs**: Audit trail of organizer actions during an event (#49)
 - **Player view live updates**: SSE-driven real-time updates on the player's tournament view (#91)
 

@@ -30,11 +30,12 @@
 - User.svelte: multi-mode (view/edit/create), auto-save with debounce in edit mode
 
 ### Key File Sizes (watch for splitting)
-- tournaments/[uid]/+page.svelte: 928 lines (near 1000-line limit)
+- tournaments/[uid]/+page.svelte: 1227 lines (OVER limit, has 4 modals + player view inline)
 - profile/+page.svelte: 719 lines (growing -- has 3 modals inline)
 - UserList.svelte: 667 lines
 - User.svelte: 601 lines
-- RoundsTab.svelte: 569 lines
+- RoundsTab.svelte: 607 lines
+- PlayersTab.svelte: 553 lines
 - SanctionsManager.svelte: 498 lines
 
 ### Known Patterns
@@ -59,3 +60,18 @@
 ### Mobile Touch Target Concerns
 - DeckDisplay +/- edit buttons: w-5 h-5 (20px, well below 44px minimum)
 - League detail edit/delete buttons: py-1.5 (approx 32px, below 44px)
+- RoundsTab unseat/sanction buttons: p-0.5 with w-3.5 icons (~18px)
+- VP select elements: py-0.5 (~24px height)
+
+### Tournament Console UX Issues (found 2026-02-17)
+- Player table uses <table> that doesn't reflow on mobile — needs card layout
+- No cursor:pointer globally on <button> elements
+- Tournament description not collapsible (can be 500+ lines, pushes controls below fold)
+- Description inside info card grid should be separate collapsible section
+- Controls scattered across Overview/Rounds/Finals tabs — needs persistent action bar
+- No step-by-step organizer guidance for tournament lifecycle states
+- Raw enum states not translated: tournament.state, player.state, table.state
+- Utility functions (computeGwLocal, computeTpLocal, vpOptions) duplicated in 4 files
+- Toss column shows spurious "--" for non-tied players
+- AddPlayerForm dropdown lacks click-outside dismiss
+- Tab content padding p-6 too generous on mobile (should be p-3 sm:p-6)

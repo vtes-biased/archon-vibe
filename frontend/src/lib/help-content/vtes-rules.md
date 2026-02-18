@@ -235,9 +235,9 @@ Some library cards have multiple Discipline symbols on the attribute bar
 > crypt. An advanced card looks just like a regular crypt card except
 > that it has an Advanced icon under the clan icon. The advanced card
 > is a vampire card in all respects, so it can be influenced in the
-> normal manner (see [**Advanced**](#advanced)).
-
-![](/help/rules/image13.png)
+> normal manner (see [**Advanced**](#advanced-merge)).
+>
+> ![](/help/rules/image13.png)
 
 
 
@@ -588,10 +588,8 @@ card does not lock the minion playing it.
 > \
 > A minion can play a reflex card to cancel a specified kind of card
 > played against them as it is played (see [**Playing a Card**](#playing-a-card)).
-
-
-![](/help/rules/image28.png)
-
+>
+> ![](/help/rules/image28.png)
 
 > **ADVANCED RULES**\
 > \
@@ -602,9 +600,8 @@ card does not lock the minion playing it.
 > discard phase action to put an event card in play. Each event can
 > only be played once in a game. An event card is controlled by the
 > Methuselah who played it.
-
-
-![](/help/rules/image29.png)
+>
+> ![](/help/rules/image29.png)
 
 # **3. Playing the Game**
 
@@ -745,7 +742,7 @@ If you have the Edge, you may gain 1 pool from the blood bank.
 
 > **ADVANCED RULES**\
 > \
-> Some cards have a burn option icon.\
+> Some cards have a burn option <span class="vtes-d">~</span> icon.\
 > \
 > This icon means that a Methuselah who does not control a minion who
 > meets the requirements of this card or is not a legal target, may discard it during ANY
@@ -2049,6 +2046,8 @@ the influence phase. Other types of crypt cards are handled similarly.
 > region.*
 
 
+<span id="advanced-merge"></span>
+
 > **ADVANCED RULES**\
 > **Advanced**\
 > An advanced card is a type of vampire card for your
@@ -2221,30 +2220,6 @@ vampire who claims the title of prince, archbishop, or baron of the same
 city. If a baron changes sect, they lose the benefit of the title until
 they become Anarch again, as usual for titles.
 
-**Independent**
-
-Any vampire not aligned with any of the major sects is an Independent
-vampire. These vampires are identified simply as "Independent" in card
-text. Some Independent vampires may start with votes, as listed on card
-text. Treat these vampires as if they had titles of their own. These titles are not tied to a sect.
-
-# **7. Legacy Sets**
-
-
-
-The rules detailed below in "Other Vampire Sects" and "Traits" relate to
-cards released in sets prior to Vampire: The Eternal Struggle Fifth
-Edition.
-
-These card sets are completely compatible with Vampire: The Eternal
-Struggle Fifth Edition, but many of the stories told with those cards
-are in the past of the World of Darkness as Kindred face new threats and
-allegiances change.
-
-
-
-## **OTHER VAMPIRE SECTS**
-
 **Sabbat**
 
 Only Sabbat vampires can hold the Sabbat titles bishop, archbishop,
@@ -2277,6 +2252,27 @@ prisci block of 3 votes might shift between "for", "against", and
 "abstain" (as the majority in the subreferendum changes). A vampire must
 cast all of their votes and ballots in agreement.
 
+**Paths of Enlightenment:** Only Sabbat vampires can follow one of the
+four Paths of Enlightenment ("Path" for short):
+
+- <span class="vtes-c">#</span> Path of Caine
+- <span class="vtes-c">$</span> Path of Cathari
+- <span class="vtes-c">%</span> Path of Death and the Soul
+- <span class="vtes-c">&amp;</span> Path of Power and the Inner Voice
+
+A vampire can only follow one Path. If a vampire follows a new Path,
+they no longer follow their old Path but follow the new Path instead. A
+vampire must be Sabbat to receive the benefits of the above Paths. If a
+Sabbat vampire following a Sabbat Path changes their sect, they lose the
+benefit of the Path until they change their sect back to Sabbat.
+
+Some vampires have a Path already printed on them. During your influence
+phase, each of your Sabbat vampires not following a Path can burn 1
+blood to follow a Sabbat Path from the above list.
+
+Following a Path does not change a vampire's clan, nor does it prevent
+that vampire from meeting the requirements for their clan's cards.
+
 For the purpose of these rules, the antitribu clans are distinct from
 their non-antitribu counterparts. A vampire of one of the antitribu
 clans does not qualify to play a card that requires the counterpart, and
@@ -2287,7 +2283,28 @@ For example, a Malkavian that becomes Sabbat via Into the Fire is still
 a Malkavian, not a Malkavian antitribu. A Lasombra who becomes Camarilla
 is a Camarilla Lasombra.
 
+**Independent**
 
+Any vampire not aligned with any of the major sects is an Independent
+vampire. These vampires are identified simply as "Independent" in card
+text. Some Independent vampires may start with votes, as listed on card
+text. Treat these vampires as if they had titles of their own. These titles are not tied to a sect.
+
+# **7. Legacy Sets**
+
+
+
+The rules detailed below relate to cards released in sets prior to
+Vampire: The Eternal Struggle Fifth Edition.
+
+These card sets are completely compatible with Vampire: The Eternal
+Struggle Fifth Edition, but many of the stories told with those cards
+are in the past of the World of Darkness as Kindred face new threats and
+allegiances change.
+
+
+
+## **OTHER VAMPIRE SECTS**
 
 **Laibon**
 
@@ -2425,8 +2442,8 @@ There may be other Traits that allow vampires and minions to play cards.
 ## **Legacy Symbols**
 
 <div class="vtes-icon-grid">
-<span class="vtes-ref"><img src="/help/rules/legacy-blood.gif" class="inline-icon" alt="Blood Cost" /> Blood Cost</span>
-<span class="vtes-ref"><img src="/help/rules/legacy-pool.gif" class="inline-icon" alt="Pool Cost" /> Pool Cost</span>
+<span class="vtes-ref"><img src="/help/rules/legacy-blood.png" class="inline-icon" alt="Blood Cost" /> Blood Cost</span>
+<span class="vtes-ref"><img src="/help/rules/legacy-pool.png" class="inline-icon" alt="Pool Cost" /> Pool Cost</span>
 </div>
 
 # **8.Glossaries**

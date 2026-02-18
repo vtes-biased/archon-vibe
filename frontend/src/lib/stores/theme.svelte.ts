@@ -1,4 +1,4 @@
-type ThemePref = 'light' | 'dark' | 'system';
+export type ThemePref = 'light' | 'dark' | 'system';
 
 let pref = $state<ThemePref>(
   (typeof localStorage !== 'undefined' && localStorage.getItem('theme') as ThemePref) || 'system'
@@ -24,11 +24,15 @@ export function getTheme(): ThemePref {
   return pref;
 }
 
+export function setTheme(p: ThemePref) {
+  pref = p;
+  localStorage.setItem('theme', p);
+  apply(p);
+}
+
 export function cycleTheme() {
   const next: ThemePref = pref === 'system' ? 'light' : pref === 'light' ? 'dark' : 'system';
-  pref = next;
-  localStorage.setItem('theme', next);
-  apply(next);
+  setTheme(next);
 }
 
 export function initTheme() {
