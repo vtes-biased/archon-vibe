@@ -141,21 +141,32 @@
   function computeStandings(): StandingEntry[] {
     if (!tournament || !tournament.players) return [];
 
-    // VEKN-synced tournaments: no rounds, use player.result directly
+    // VEKN-synced tournaments: no rounds, use tournament.standings directly
     if (!tournament.rounds || tournament.rounds.length < 1) {
       const finalistUids = new Set(
         tournament.players.filter(p => p.finalist && p.user_uid).map(p => p.user_uid!)
       );
-      const entries: StandingEntry[] = tournament.players
-        .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
-        .map(p => ({
-          user_uid: p.user_uid!,
-          gw: p.result.gw ?? 0,
-          vp: p.result.vp ?? 0,
-          tp: p.result.tp ?? 0,
-          toss: p.toss ?? 0,
-          rank: 0,
-        }));
+      // Prefer tournament.standings (populated by VEKN import), fall back to player.result
+      const entries: StandingEntry[] = (tournament.standings?.length
+        ? tournament.standings.map(s => ({
+            user_uid: s.user_uid,
+            gw: s.gw ?? 0,
+            vp: s.vp ?? 0,
+            tp: s.tp ?? 0,
+            toss: s.toss ?? 0,
+            rank: 0,
+          }))
+        : tournament.players
+          .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
+          .map(p => ({
+            user_uid: p.user_uid!,
+            gw: p.result.gw ?? 0,
+            vp: p.result.vp ?? 0,
+            tp: p.result.tp ?? 0,
+            toss: p.toss ?? 0,
+            rank: 0,
+          }))
+      );
       // Sort: winner first, then other finalists, then by score
       entries.sort((a, b) => {
         const aW = a.user_uid === tournament!.winner ? 2 : finalistUids.has(a.user_uid) ? 1 : 0;

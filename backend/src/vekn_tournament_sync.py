@@ -17,6 +17,7 @@ from .models import (
     Player,
     PlayerState,
     PaymentStatus,
+    Score,
     Standing,
     Tournament,
     TournamentFormat,
@@ -131,6 +132,7 @@ def _map_vekn_to_tournament(
                 state=PlayerState.FINISHED,
                 payment_status=PaymentStatus.PAID,
                 toss=toss,
+                result=Score(gw=gw, vp=vp, tp=tp),
                 finalist=is_finalist,
             ))
             standings.append(Standing(
