@@ -232,7 +232,7 @@
       <span class="text-ash-400">{m.deck_upload_attribution()}:</span>
       <label class="flex items-center gap-1 text-ash-200">
         <input type="radio" bind:group={attribution} value="self" class="accent-crimson-500" />
-        {playerName ? m.deck_upload_attr_player({ name: playerName }) : m.deck_upload_attr_self()}
+        {playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self()}
       </label>
       <label class="flex items-center gap-1 text-ash-200">
         <input type="radio" bind:group={attribution} value="anonymous" class="accent-crimson-500" />
