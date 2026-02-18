@@ -12,7 +12,7 @@
   import { formatScore } from "$lib/utils";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, type StandingEntry } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin } from "lucide-svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin, QrCode } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -29,6 +29,7 @@
   import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
 
   const countries = getCountries();
 
@@ -56,6 +57,7 @@
   const isLockedByOtherDevice = $derived(
     tournament?.offline_mode === true && tournament?.offline_device_id !== deviceId
   );
+  let showQrCode = $state(false);
   let showGoOfflineConfirm = $state(false);
   let showGoOnlineConfirm = $state(false);
   let showForceTakeoverConfirm = $state(false);
@@ -758,6 +760,14 @@
                 <button onclick={() => doAction("CancelRegistration")} disabled={actionLoading}
                   class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
                 >{m.overview_back_to_planning()}</button>
+                {#if tournament.checkin_code}
+                  <button onclick={() => showQrCode = !showQrCode}
+                    class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors flex items-center gap-1.5"
+                  >
+                    <QrCode class="w-4 h-4" />
+                    {showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code()}
+                  </button>
+                {/if}
 
               {:else if tournament.state === "Waiting"}
                 <button onclick={() => doAction("StartRound")} disabled={actionLoading || checkedInCount < 4}
@@ -779,6 +789,14 @@
                   <button onclick={() => doAction("ResetCheckIn")} disabled={actionLoading}
                     class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
                   >{m.overview_reset_checkin()}</button>
+                {/if}
+                {#if tournament.checkin_code}
+                  <button onclick={() => showQrCode = !showQrCode}
+                    class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors flex items-center gap-1.5"
+                  >
+                    <QrCode class="w-4 h-4" />
+                    {showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code()}
+                  </button>
                 {/if}
                 <!-- Seating warning -->
                 {#if [6, 7, 11].includes(checkedInCount)}
@@ -812,6 +830,13 @@
                 <button onclick={() => doAction("ReopenRegistration")} disabled={actionLoading}
                   class="px-3 py-1.5 text-sm text-ash-500 hover:text-ash-300 transition-colors"
                 >{m.overview_reopen_registration()}</button>
+              </div>
+            {/if}
+
+            <!-- QR Check-in display -->
+            {#if showQrCode && (tournament.state === "Registration" || tournament.state === "Waiting") && tournament.checkin_code}
+              <div class="pt-3 border-t border-ash-800">
+                <QrCheckinDisplay code={tournament.checkin_code} tournamentUid={tournament.uid} tournamentName={tournament.name} />
               </div>
             {/if}
           </div>

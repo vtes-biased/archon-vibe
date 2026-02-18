@@ -430,6 +430,34 @@ class TestFilterTournament:
         result = _filter_tournament(t, viewer)
         assert result.finals is not None
 
+    # checkin_code visibility (QR check-in security)
+    def test_full_access_sees_checkin_code(self):
+        """Organizers/IC need checkin_code to display the QR code."""
+        t = _make_tournament(checkin_code="secret-code-123")
+        viewer = _make_viewer(roles=[Role.IC])
+        result = _filter_tournament(t, viewer)
+        assert result.checkin_code == "secret-code-123"
+
+    def test_member_cannot_see_checkin_code(self):
+        """Members must NOT receive checkin_code — otherwise they could
+        self-check-in remotely without being at the venue."""
+        t = _make_tournament(checkin_code="secret-code-123")
+        viewer = _make_viewer()
+        result = _filter_tournament(t, viewer)
+        # checkin_code should be the default (freshly generated), not the original
+        assert result.checkin_code != "secret-code-123"
+
+    def test_nonmember_cannot_see_checkin_code(self):
+        t = _make_tournament(checkin_code="secret-code-123")
+        viewer = _make_viewer(vekn_id=None)
+        result = _filter_tournament(t, viewer)
+        assert result.checkin_code != "secret-code-123"
+
+    def test_no_viewer_cannot_see_checkin_code(self):
+        t = _make_tournament(checkin_code="secret-code-123")
+        result = _filter_tournament(t, None)
+        assert result.checkin_code != "secret-code-123"
+
 
 # ============================================================================
 # _filter_rating tests

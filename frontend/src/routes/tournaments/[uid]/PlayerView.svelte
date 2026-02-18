@@ -4,8 +4,9 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translatePlayerState, translateTableState } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight } from "lucide-svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode } from "lucide-svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import DecksTab from "./DecksTab.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -50,6 +51,7 @@
   } = $props();
 
   let showRegisteredPlayers = $state(false);
+  let showQrScanner = $state(false);
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo);
@@ -104,6 +106,15 @@
           <TriangleAlert class="w-4 h-4" />
           {m.tournament_upload_valid_deck()}
         </div>
+      {:else if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
+        <button
+          onclick={() => showQrScanner = !showQrScanner}
+          disabled={actionLoading}
+          class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors flex items-center gap-1.5"
+        >
+          <QrCode class="w-4 h-4" />
+          {m.checkin_qr_scan_btn()}
+        </button>
       {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
         {#if !playerHasValidDeck}
           <div class="flex items-center gap-2 text-amber-400 text-sm">
@@ -125,6 +136,10 @@
         >{m.tournament_drop_out_btn()}</button>
       {/if}
     </div>
+    <!-- QR Check-in scanner -->
+    {#if showQrScanner}
+      <QrCheckinScanner tournamentUid={tournament.uid} onclose={() => showQrScanner = false} />
+    {/if}
     <!-- Cutoff score threshold for players -->
     {#if cutoffScore}
       <div class="bg-ash-900/50 rounded-lg p-4">
@@ -173,7 +188,7 @@
       </div>
     {/if}
     <!-- Finals table for player view -->
-    {#if isFinals && tournament.finals}
+    {#if isFinals && !isFinished && tournament.finals}
       <div class="bg-ash-900/50 rounded-lg p-4">
         <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_heading()}</h3>
         <div class="divide-y divide-ash-800">

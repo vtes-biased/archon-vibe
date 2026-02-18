@@ -534,6 +534,19 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
   });
 }
 
+/**
+ * Self check-in via QR code (server-only, no optimistic path).
+ */
+export async function qrCheckin(tournamentUid: string, code: string): Promise<Tournament> {
+  if (!isOnline()) {
+    throw new Error('Cannot check in while offline.');
+  }
+  return apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/qr-checkin`, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
 export async function setTableScore(
   tournamentUid: string,
   round: number,

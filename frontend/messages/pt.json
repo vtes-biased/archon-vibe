@@ -9,11 +9,9 @@
   "status_offline": "Offline",
   "status_syncing": "Sincronizando",
   "status_offline_banner": "Offline - As alterações serão sincronizadas quando reconectar",
-
   "theme_system": "Auto",
   "theme_light": "Claro",
   "theme_dark": "Escuro",
-
   "common_loading": "Carregando...",
   "common_tagline": "Gerenciamento de Torneios VEKN",
   "common_email": "E-mail",
@@ -39,7 +37,6 @@
   "common_description": "Descrição",
   "common_level": "Nível",
   "common_category": "Categoria",
-
   "login_page_title": "Bem-vindo",
   "login_tab_login": "Entrar",
   "login_tab_signup": "Cadastrar",
@@ -75,7 +72,6 @@
   "login_placeholder_email": "voce@exemplo.com",
   "login_placeholder_password": "Digite sua senha",
   "login_placeholder_signup_email": "Digite seu e-mail",
-
   "auth_verify_title_signup": "Completar Cadastro",
   "auth_verify_title_reset": "Redefinir Senha",
   "auth_verify_verifying": "Verificando link...",
@@ -92,7 +88,6 @@
   "auth_verify_error_missing_token": "Token de verificação ausente",
   "auth_verify_error_password_length": "A senha deve ter no mínimo 8 caracteres",
   "auth_verify_error_session_expired": "Sessão expirada. Por favor, solicite um novo link.",
-
   "oauth_page_title": "Autorizar Aplicativo",
   "oauth_subtitle": "Solicitação de Autorização",
   "oauth_error_not_authenticated": "Não autenticado",
@@ -103,7 +98,6 @@
   "oauth_deny": "Negar",
   "oauth_approve": "Aprovar",
   "oauth_logged_in_as": "Conectado como {name}",
-
   "leagues_title": "Ligas",
   "league_new_btn": "+ Nova Liga",
   "league_search_placeholder": "Buscar por nome...",
@@ -125,20 +119,15 @@
   "league_adjust_filters": "Tente ajustar seus filtros.",
   "league_no_active": "Nenhuma liga ativa. Tente ativar \"Mostrar ligas encerradas\".",
   "league_none_yet": "Nenhuma liga foi criada ainda.",
-
   "toast_dismiss": "Dispensar",
-
   "card_search_placeholder": "Buscar cartas...",
-
   "city_select_country_first": "Selecione um país primeiro",
   "city_search_placeholder": "Comece a digitar o nome da cidade...",
   "city_population": "População: {population}",
-
   "deck_by_author": "por {author}",
   "deck_crypt_count": "Cripta ({count})",
   "deck_library_count": "Biblioteca ({count})",
   "deck_card_image_alt": "Carta",
-
   "deck_upload_paste": "Colar Deck",
   "deck_upload_from_url": "De URL",
   "deck_upload_name_placeholder": "Nome do deck (opcional)",
@@ -159,19 +148,16 @@
   "deck_edit": "Editar deck",
   "deck_edit_search_hint": "Pesquise e selecione uma carta para adicionar ao deck",
   "deck_save_changes": "Salvar alterações",
-
   "add_player_search_label": "Buscar por nome",
   "add_player_search_placeholder": "Digite um nome ou VEKN ID...",
   "add_player_more_results": "Mais {count} — refine sua busca",
   "add_player_or_separator": "— ou —",
   "add_player_vekn_id_label": "VEKN ID",
-
   "avatar_title": "Atualizar Avatar",
   "avatar_select_image": "Clique para selecionar uma imagem",
   "avatar_drag_reposition": "Arraste para reposicionar",
   "avatar_select_image_file": "Por favor, selecione um arquivo de imagem",
   "avatar_save_failed": "Falha ao salvar avatar",
-
   "sanction_level_caution": "Advertência",
   "sanction_level_warning": "Aviso",
   "sanction_level_sa": "SA",
@@ -198,11 +184,9 @@
   "error_dq_cannot_checkin": "Jogadores desqualificados não podem fazer check-in",
   "error_suspended_cannot_checkin": "Jogadores suspensos não podem fazer check-in",
   "error_league_dq": "O jogador está desqualificado de um torneio de liga",
-
   "sanction_cat_procedural_error": "Erro de Procedimento",
   "sanction_cat_tournament_error": "Erro de Torneio",
   "sanction_cat_unsportsmanlike_conduct": "Conduta Antidesportiva",
-
   "sanction_subcategory": "Subcategoria",
   "sanction_sub_missed_mandatory_effect": "Efeito Obrigatório Perdido",
   "sanction_sub_card_access_error": "Erro de Acesso a Cartas",
@@ -230,14 +214,12 @@
   "sanction_sub_health_and_safety_disruption": "Perturbação de Saúde e Segurança",
   "sanction_sub_rage_quitting": "Desistência por Raiva",
   "sanction_sub_failure_to_play_to_win": "Falha em Jogar para Vencer",
-
   "sanction_round": "Rodada",
   "sanction_round_label": "Rodada {round}",
   "sanction_baseline_hint": "Penalidade base: {level}",
   "sanction_escalation_hint": "{count} sanção/ões anterior/es — nível sugerido: {suggested}",
   "sanction_downgrade_warning": "O nível selecionado é inferior à sanção {existing} existente",
   "sanction_tournament_issue_title": "Emitir Sanção de Torneio",
-
   "sanction_mgr_title": "Sanções",
   "sanction_mgr_issue_btn": "Emitir Sanção",
   "sanction_mgr_issue_to": "Emitir uma sanção para {name}",
@@ -254,7 +236,6 @@
   "sanction_mgr_save_changes": "Salvar Alterações",
   "sanction_mgr_lift": "Remover",
   "sanction_mgr_lifting": "Removendo...",
-
   "user_saving": "Salvando",
   "user_name_label": "Nome",
   "user_email_label": "E-mail (opcional)",
@@ -273,7 +254,6 @@
   "user_error_name_country_required": "Nome e país são obrigatórios",
   "user_toggle_role": "Alternar {role}",
   "user_cannot_change_role": "Você não pode alterar {role}",
-
   "user_list_new_user": "+ Novo Usuário",
   "user_list_search_placeholder": "Buscar por nome ou VEKN ID...",
   "user_list_all_countries": "Todos os Países",
@@ -286,7 +266,6 @@
   "user_list_no_users": "Nenhum usuário encontrado",
   "user_list_adjust_filters": "Tente ajustar seus filtros.",
   "user_list_no_users_yet": "Ainda não há usuários no sistema.",
-
   "vekn_title": "VEKN",
   "vekn_id_display": "ID: {id}",
   "vekn_no_id": "Sem VEKN ID",
@@ -310,7 +289,6 @@
   "vekn_merge_uid_label": "UID do usuário para mesclar (será excluído)",
   "vekn_merge_uid_placeholder": "UID do Usuário",
   "vekn_merging": "Mesclando...",
-
   "profile_page_title": "Perfil",
   "profile_sign_in_required": "Login Necessário",
   "profile_sign_in_msg": "Por favor, faça login para ver seu perfil.",
@@ -353,7 +331,6 @@
   "profile_abandoning": "Abandonando...",
   "profile_abandon_btn": "Abandonar",
   "profile_abandon_vekn_tooltip": "Abandonar VEKN ID",
-
   "rankings_page_title": "Classificações",
   "rankings_hall_of_fame_link": "Hall da Fama",
   "rankings_cat_constructed": "Constructed",
@@ -368,7 +345,6 @@
   "rankings_col_points": "Pontos",
   "rankings_unknown_player": "Desconhecido",
   "rankings_page_info": "{current} / {total}",
-
   "hof_page_title": "Hall da Fama",
   "hof_description": "Jogadores com 5 ou mais vitórias em torneios. Jogadores sancionados são excluídos.",
   "hof_back_to_rankings": "Voltar para Classificações",
@@ -376,7 +352,6 @@
   "hof_loading": "Carregando Hall da Fama...",
   "hof_no_results": "Nenhum jogador encontrado que corresponda aos seus critérios.",
   "hof_col_wins": "Vitórias",
-
   "developer_page_title": "Portal do Desenvolvedor",
   "developer_title": "Portal do Desenvolvedor",
   "developer_subtitle": "Gerencie seus aplicativos OAuth",
@@ -411,7 +386,6 @@
   "developer_secret_regenerated": "Secret regenerado",
   "developer_client_deactivated": "Cliente desativado",
   "developer_copied": "Copiado para a área de transferência",
-
   "tournaments_page_title": "Torneios",
   "tournaments_new_btn": "+ Novo Torneio",
   "tournaments_search_placeholder": "Buscar por nome...",
@@ -440,14 +414,12 @@
   "tournaments_calendar_generate": "Gerar link",
   "tournaments_calendar_copy": "Copiar",
   "tournaments_calendar_copied": "Copiado!",
-
   "tournament_new_page_title": "Novo Torneio",
   "tournament_new_title": "Novo Torneio",
   "tournament_new_no_permission": "Apenas IC, NC, ou Prince podem criar torneios.",
   "tournament_new_error_name_required": "Nome é obrigatório",
   "tournament_new_creating": "Criando...",
   "tournament_new_create_btn": "Criar Torneio",
-
   "tfield_name_label": "Nome *",
   "tfield_name_placeholder": "Nome do torneio",
   "tfield_format": "Formato",
@@ -477,7 +449,6 @@
   "tfield_decklist_required": "Lista de Deck Obrigatória",
   "tfield_league": "Liga",
   "tfield_league_not_organizer": "não é organizador",
-
   "tournament_fallback_title": "Torneio",
   "tournament_tab_overview": "Visão Geral",
   "tournament_tab_players": "Jogadores",
@@ -527,7 +498,6 @@
   "tournament_error_load": "Falha ao carregar torneio",
   "tournament_error_action": "Ação falhou",
   "tournament_error_delete": "Exclusão falhou",
-
   "overview_player_count": "{count} jogadores",
   "overview_round_count": "{count} rodadas",
   "overview_finals_in_progress": "Finais em andamento",
@@ -553,7 +523,6 @@
   "overview_tournament_finished": "Torneio finalizado.",
   "overview_reopen_tournament": "Reabrir Torneio",
   "overview_top_standings": "Melhores Classificações",
-
   "action_bar_planned": "Configure as definições e depois abra as inscrições.",
   "action_bar_registration": "{count} jogadores inscritos. Feche as inscrições quando estiver pronto.",
   "action_bar_waiting_initial": "Faça o check-in dos jogadores. {checked}/{total} registrados.",
@@ -562,7 +531,6 @@
   "action_bar_playing_round": "Rodada {n} em andamento. {done}/{total} mesas terminadas.",
   "action_bar_playing_finals": "Final em andamento. Defina as pontuações na aba Final.",
   "action_bar_finished": "Torneio finalizado.",
-
   "players_count": "{count} jogadores",
   "players_add": "Adicionar Jogador",
   "players_random_toss": "Toss Aleatório",
@@ -578,7 +546,6 @@
   "players_replace_deck": "Substituir deck",
   "players_no_deck": "Nenhum deck enviado",
   "players_view_deck": "Ver deck",
-
   "rounds_no_rounds": "Nenhuma rodada jogada ainda.",
   "rounds_round_in_progress": "Rodada {n} em andamento",
   "rounds_seating_invalid": "Alocação Inválida",
@@ -620,7 +587,6 @@
   "rounds_alter_r1_error": "Não é possível salvar: repetição predador-presa (violação R1).",
   "rounds_print_seating": "Imprimir disposição",
   "rounds_alter_scores_warning": "Mover jogadores entre mesas redefinirá suas pontuações.",
-
   "override_judge_comment": "Comentário do juiz (obrigatório)",
   "override_placeholder": "Explique por que o resultado desta mesa está sendo substituído...",
   "override_save": "Substituir → Finalizado",
@@ -629,7 +595,6 @@
   "override_btn": "Substituir",
   "override_error": "Falha ao substituir",
   "override_remove_error": "Falha ao remover substituição",
-
   "decks_my_deck": "Meu Deck",
   "decks_replace": "Substituir deck",
   "decks_no_deck_yet": "Nenhum deck enviado ainda",
@@ -648,7 +613,6 @@
   "decks_winner_nudge_self": "Parabéns pela vitória! Sua decklist está faltando — por favor envie-a para que fique registrada nos arquivos do torneio.",
   "decks_winner_nudge_organizer": "A decklist do vencedor está faltando. Lembre {name} de enviar seu deck.",
   "decks_missing": "Faltando!",
-
   "finals_require_rounds": "Finais requerem pelo menos 2 rodadas e 5 jogadores com resultados.",
   "finals_not_started": "As finais ainda não começaram. Inicie as finais na aba Visão Geral.",
   "finals_title": "Finais",
@@ -658,11 +622,9 @@
   "finals_table": "Mesa Final",
   "finals_seed": "Seed #{n}",
   "finals_error_save": "Falha ao salvar pontuações das finais",
-
   "config_no_permission": "Apenas organizadores podem editar as configurações do torneio.",
   "config_saving": "Salvando...",
   "config_error_save": "Falha ao salvar",
-
   "user_detail_fallback_title": "Usuário",
   "user_detail_vekn": "VEKN #{id}",
   "user_detail_ratings": "Ratings",
@@ -671,7 +633,6 @@
   "user_detail_col_gw": "GW",
   "user_detail_col_pts": "Pts",
   "user_detail_no_rating": "Nenhum dado de rating disponível.",
-
   "payment_column": "Pagamento",
   "payment_pending": "Pendente",
   "payment_paid": "Pago",
@@ -680,10 +641,8 @@
   "payment_mark_all_paid": "Marcar todos como pagos",
   "payment_filter_all": "Todos",
   "payment_summary": "{paid}/{total} pago(s)",
-
   "update_available": "Uma nova versão está disponível.",
   "update_refresh": "Atualizar",
-
   "offline_mode_banner": "MODO OFFLINE — As alterações são armazenadas localmente",
   "offline_last_sync": "Última sincronização: {time}",
   "offline_not_synced": "Ainda não salvo no servidor",
@@ -722,5 +681,15 @@
   "offline_player_name": "Nome do jogador",
   "offline_player_vekn_id": "ID VEKN (opcional)",
   "offline_player_email": "Email (opcional)",
-  "offline_player_add": "Adicionar jogador"
+  "offline_player_add": "Adicionar jogador",
+  "checkin_qr_scan_btn": "Escanear QR para check-in",
+  "checkin_qr_hint": "Aponte sua câmera para o código QR do organizador",
+  "checkin_qr_success": "Check-in realizado!",
+  "checkin_qr_error": "Código de check-in inválido",
+  "checkin_qr_camera_error": "Erro ao acessar a câmera",
+  "checkin_qr_show_code": "Mostrar código QR de check-in",
+  "checkin_qr_hide_code": "Ocultar código QR",
+  "checkin_qr_organizer_hint": "Mostre este código QR para os jogadores fazerem check-in",
+  "checkin_qr_print": "Imprimir",
+  "checkin_qr_scan_instruction": "Escaneie com o aplicativo Archon para fazer check-in"
 }

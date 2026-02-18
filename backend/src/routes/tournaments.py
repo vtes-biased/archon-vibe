@@ -922,6 +922,32 @@ async def checkin_player(
     )
 
 
+class QrCheckinRequest(BaseModel):
+    code: str
+
+
+@router.post("/{uid}/qr-checkin")
+async def qr_checkin(
+    uid: str,
+    request: QrCheckinRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Self check-in via QR code scanned at the venue."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if request.code != tournament.checkin_code:
+        raise HTTPException(status_code=403, detail="Invalid check-in code")
+    return await tournament_action(
+        uid,
+        TournamentActionRequest(type="CheckIn", player_uid=current_user.uid),
+        authorization,
+    )
+
+
 @router.post("/{uid}/checkin-all")
 async def checkin_all(
     uid: str,
