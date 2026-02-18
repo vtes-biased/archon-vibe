@@ -744,3 +744,41 @@ export async function addOfflineSanctionUid(tournamentUid: string, sanctionUid: 
   uids.push(sanctionUid);
   await setMetadata(`offline_sanctions:${tournamentUid}`, JSON.stringify(uids));
 }
+
+// Venue autocomplete from tournament history
+
+export interface VenueInfo {
+  venue: string;
+  venue_url: string;
+  address: string;
+  map_url: string;
+}
+
+export async function getVenuesByCountry(country: string): Promise<VenueInfo[]> {
+  if (!country) return [];
+  const db = await getDB();
+  const tournaments = await db.getAllFromIndex('tournaments', 'by-country', country);
+
+  // Keep most recent tournament's data per venue name
+  const venueMap = new Map<string, { info: VenueInfo; modified: string }>();
+  for (const t of tournaments) {
+    if (t.deleted_at || !t.venue?.trim()) continue;
+    const key = normalizeSearch(t.venue).replace(/\s+/g, '');
+    const existing = venueMap.get(key);
+    if (!existing || t.modified > existing.modified) {
+      venueMap.set(key, {
+        info: {
+          venue: t.venue.trim(),
+          venue_url: t.venue_url ?? '',
+          address: t.address ?? '',
+          map_url: t.map_url ?? '',
+        },
+        modified: t.modified,
+      });
+    }
+  }
+
+  return [...venueMap.values()]
+    .map(v => v.info)
+    .sort((a, b) => a.venue.localeCompare(b.venue));
+}

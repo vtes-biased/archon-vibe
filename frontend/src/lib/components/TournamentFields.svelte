@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "$lib/types";
+  import type { VenueInfo } from "$lib/db";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAllLeagues } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import VenueAutocomplete from "./VenueAutocomplete.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   export interface TournamentFieldValues {
@@ -32,12 +34,14 @@
   let {
     values = $bindable(),
     onchange,
+    onvenueselect,
     disabled = false,
     disabledFields = new Set<string>(),
     idPrefix = "",
   }: {
     values: TournamentFieldValues;
     onchange?: (field: string, value: any) => void;
+    onvenueselect?: (fields: Record<string, string>) => void;
     disabled?: boolean;
     disabledFields?: Set<string>;
     idPrefix?: string;
@@ -72,6 +76,19 @@
   function handleInput(field: string, value: any) {
     (values as any)[field] = value;
     onchange?.(field, value);
+  }
+
+  function handleVenueSelect(venue: VenueInfo) {
+    values.venue = venue.venue;
+    values.venue_url = venue.venue_url;
+    values.address = venue.address;
+    values.map_url = venue.map_url;
+    onvenueselect?.({
+      venue: venue.venue,
+      venue_url: venue.venue_url,
+      address: venue.address,
+      map_url: venue.map_url,
+    });
   }
 </script>
 
@@ -257,14 +274,13 @@
 <!-- Venue (always shown) -->
 <div>
   <label class="block text-sm text-ash-400 mb-1" for={id("venue")}>{m.tfield_venue()}</label>
-  <input
+  <VenueAutocomplete
     id={id("venue")}
-    type="text"
-    value={values.venue}
+    bind:value={values.venue}
+    country={values.country}
     {disabled}
-    oninput={(e) => handleInput("venue", (e.target as HTMLInputElement).value)}
-    class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
-    placeholder={m.tfield_venue_placeholder()}
+    onselect={handleVenueSelect}
+    oninput={() => onchange?.("venue", values.venue)}
   />
 </div>
 

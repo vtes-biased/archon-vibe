@@ -165,7 +165,13 @@
     <p class="text-ash-400">{m.config_no_permission()}</p>
   {:else}
     <div class="space-y-4">
-      <TournamentFields bind:values={fieldValues} onchange={handleFieldChange} {disabledFields} idPrefix="cfg" />
+      <TournamentFields
+        bind:values={fieldValues}
+        onchange={handleFieldChange}
+        onvenueselect={(fields) => saveMultiple(fields)}
+        {disabledFields}
+        idPrefix="cfg"
+      />
     </div>
 
     {#if saving}
