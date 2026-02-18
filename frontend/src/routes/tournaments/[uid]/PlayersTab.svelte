@@ -426,7 +426,7 @@
                 <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
               {/if}
               {#if isOrganizer && (uploadingFor === puid || !playerDeck)}
-                <DeckUpload tournamentUid={tournament.uid} playerUid={puid} onuploaded={onUploaded} />
+                <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
               {/if}
             </div>
           {/if}
@@ -597,7 +597,7 @@
                       <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
                     {/if}
                     {#if isOrganizer && (uploadingFor === puid || !playerDeck)}
-                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} onuploaded={onUploaded} />
+                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
                     {/if}
                   </div>
                 </td>
