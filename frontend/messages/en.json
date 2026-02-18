@@ -614,6 +614,10 @@
   "decks_winner_nudge_self": "Congratulations on your win! Your decklist is missing — please upload it so it can be preserved in the tournament records.",
   "decks_winner_nudge_organizer": "Winner's decklist is missing. Please remind {name} to upload their deck.",
   "decks_missing": "Missing!",
+  "decks_visible_heading": "Decklists",
+  "decks_unnamed": "Unnamed deck",
+  "decks_expand_all": "Expand all",
+  "decks_collapse_all": "Collapse all",
   "finals_require_rounds": "Finals require at least 2 rounds and 5 players with results.",
   "finals_not_started": "Finals have not started yet. Start finals from the Overview tab.",
   "finals_title": "Finals",
@@ -692,5 +696,16 @@
   "checkin_qr_hide_code": "Hide QR Code",
   "checkin_qr_organizer_hint": "Show this QR code for players to scan and check in",
   "checkin_qr_print": "Print",
-  "checkin_qr_scan_instruction": "Scan with the Archon app to check in"
+  "checkin_qr_scan_instruction": "Scan with the Archon app to check in",
+  "nav_help": "Help",
+  "profile_settings": "Settings",
+  "profile_theme_label": "Theme",
+  "profile_language_label": "Language",
+  "profile_developer_section": "Developer",
+  "profile_open_developer": "Developer Portal",
+  "help_page_title": "Help & Documentation",
+  "help_reference_docs": "Reference Documents",
+  "help_user_guides": "User Guides",
+  "help_toc_title": "Contents",
+  "help_back_to_list": "Back to Help"
 }

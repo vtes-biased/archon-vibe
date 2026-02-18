@@ -782,12 +782,17 @@ fn apply_event(
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
             tournament["state"] = "Waiting".into();
+            // Clear finals and winner so organizer can redo finals
+            tournament["finals"] = json::Null;
+            tournament["winner"] = json::Null;
             // Reset Finished players back to Checked-in (DQ'd stay DQ'd)
+            // Also clear finalist flag so new finals can be started cleanly
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Finished") {
                     players[i]["state"] = "Checked-in".into();
                 }
+                players[i]["finalist"] = false.into();
                 // Disqualified players stay Disqualified (no reset)
             }
             update_standings(tournament, sanctions);
@@ -1798,10 +1803,11 @@ fn apply_event(
                 seed_order: JsonValue::Array(seed_order),
             };
 
-            // Mark top 5 players as Playing
+            // Mark top 5 players as Playing and finalist
             for s in &top5 {
                 if let Some(idx) = find_player_index(&tournament["players"], &s.user_uid) {
                     tournament["players"][idx]["state"] = "Playing".into();
+                    tournament["players"][idx]["finalist"] = true.into();
                 }
             }
 

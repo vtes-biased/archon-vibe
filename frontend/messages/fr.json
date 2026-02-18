@@ -692,5 +692,20 @@
   "checkin_qr_hide_code": "Masquer le QR Code",
   "checkin_qr_organizer_hint": "Affichez ce QR code pour que les joueurs s'enregistrent",
   "checkin_qr_print": "Imprimer",
-  "checkin_qr_scan_instruction": "Scannez avec l'application Archon pour vous enregistrer"
+  "checkin_qr_scan_instruction": "Scannez avec l'application Archon pour vous enregistrer",
+  "nav_help": "Aide",
+  "profile_settings": "Paramètres",
+  "profile_theme_label": "Thème",
+  "profile_language_label": "Langue",
+  "profile_developer_section": "Développeur",
+  "profile_open_developer": "Portail développeur",
+  "help_page_title": "Aide et documentation",
+  "help_reference_docs": "Documents de référence",
+  "help_user_guides": "Guides utilisateur",
+  "help_toc_title": "Sommaire",
+  "help_back_to_list": "Retour à l'aide",
+  "decks_visible_heading": "Decklists",
+  "decks_unnamed": "Deck sans nom",
+  "decks_expand_all": "Tout développer",
+  "decks_collapse_all": "Tout réduire"
 }

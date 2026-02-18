@@ -1,8 +1,11 @@
 <script lang="ts">
-  import type { Tournament, Deck } from "$lib/types";
+  import type { Tournament, Deck, VtesCard } from "$lib/types";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import { getCards } from "$lib/cards";
+  import { ChevronDown, ChevronRight } from "lucide-svelte";
+  import { slide } from "svelte/transition";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -22,6 +25,25 @@
 
   let uploadingFor = $state<string | null>(null);
   let expandedPlayer = $state<string | null>(null);
+  let expandedDecks = $state<Set<string>>(new Set());
+  let cardsDb = $state<Map<number, VtesCard>>(new Map());
+
+  $effect(() => { getCards().then(c => cardsDb = c); });
+
+  function toggleDeck(key: string) {
+    const next = new Set(expandedDecks);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    expandedDecks = next;
+  }
+
+  function deckCounts(deck: Deck): { crypt: number; library: number } {
+    let crypt = 0, library = 0;
+    for (const [idStr, count] of Object.entries(deck.cards)) {
+      const card = cardsDb.get(parseInt(idStr));
+      if (card?.kind === 'crypt') crypt += count; else library += count;
+    }
+    return { crypt, library };
+  }
 
   function onUploaded() {
     uploadingFor = null;
@@ -117,16 +139,38 @@
     {/if}
   {/if}
 
-  <!-- Player's own deck upload -->
+  <!-- Player's own deck -->
   {#if isPlayer && !isOrganizer}
-    <div class="bg-ash-900/50 rounded-lg p-4">
-      <h3 class="text-sm font-semibold text-bone-200 mb-3">{m.decks_my_deck()}</h3>
-      {#if canPlayerUpload && (uploadingFor === myUid || myDecks.length === 0)}
-        <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
-      {:else if myDecks.length > 0 && myDecks[0]}
-        <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} />
+    <div class="bg-ash-900/50 rounded-lg">
+      {#if myDecks.length > 0 && myDecks[0] && !canPlayerUpload && uploadingFor !== myUid}
+        <!-- Collapsible when deck exists and not editing -->
+        <button
+          class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
+          onclick={() => { const next = new Set(expandedDecks); if (next.has('my')) next.delete('my'); else next.add('my'); expandedDecks = next; }}
+          aria-expanded={expandedDecks.has('my')}
+        >
+          <span class="text-ash-400 shrink-0">
+            {#if expandedDecks.has('my')}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+          </span>
+          <span class="text-sm font-semibold text-bone-200">{m.decks_my_deck()}</span>
+        </button>
+        {#if expandedDecks.has('my')}
+          <div class="px-3 pb-3 sm:px-4 sm:pb-4" transition:slide={{ duration: 150 }}>
+            <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} />
+          </div>
+        {/if}
       {:else}
-        <p class="text-sm text-ash-400 mb-3">{m.decks_no_deck_yet()}</p>
+        <!-- Always expanded when uploading or no deck yet -->
+        <div class="p-3 sm:p-4">
+          <h3 class="text-sm font-semibold text-bone-200 mb-3">{m.decks_my_deck()}</h3>
+          {#if canPlayerUpload && (uploadingFor === myUid || myDecks.length === 0)}
+            <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
+          {:else if myDecks.length > 0 && myDecks[0]}
+            <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} />
+          {:else}
+            <p class="text-sm text-ash-400">{m.decks_no_deck_yet()}</p>
+          {/if}
+        </div>
       {/if}
     </div>
   {/if}
@@ -178,29 +222,69 @@
     </div>
   {/if}
 
-  <!-- Visible decks (post-tournament or own) -->
+  <!-- Visible decks (post-tournament, collapsible) -->
   {#if !isOrganizer}
-    {#each Object.entries(visibleDecks) as [uid, decks]}
-      {#if uid !== myUid}
-        {#if tournament.decklists_mode === 'All'}
-          <!-- All mode: anonymous — show decks without player identity -->
-          {#each decks as deck}
-            <div class="bg-ash-900/50 rounded-lg p-4">
-              <DeckDisplay {deck} />
+    {@const deckEntries = Object.entries(visibleDecks).filter(([uid]) => uid !== myUid)}
+    {@const totalDecks = deckEntries.reduce((n, [, d]) => n + d.length, 0)}
+    {#if deckEntries.length > 0}
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-bone-200">{m.decks_visible_heading()}</h3>
+          {#if totalDecks >= 5}
+            <button
+              class="text-xs text-ash-400 hover:text-ash-200 transition-colors"
+              onclick={() => {
+                if (expandedDecks.size >= totalDecks) {
+                  expandedDecks = new Set();
+                } else {
+                  const all = new Set<string>();
+                  for (const [uid, decks] of deckEntries) {
+                    for (let i = 0; i < decks.length; i++) all.add(`${uid}-${i}`);
+                  }
+                  expandedDecks = all;
+                }
+              }}
+            >
+              {expandedDecks.size >= totalDecks ? m.decks_collapse_all() : m.decks_expand_all()}
+            </button>
+          {/if}
+        </div>
+        {#each deckEntries as [uid, decks]}
+          {#each decks as deck, i}
+            {@const key = `${uid}-${i}`}
+            {@const expanded = expandedDecks.has(key)}
+            {@const counts = deckCounts(deck)}
+            {@const showIdentity = tournament.decklists_mode !== 'All'}
+            <div class="bg-ash-900/50 rounded-lg">
+              <button
+                class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
+                onclick={() => toggleDeck(key)}
+                aria-expanded={expanded}
+              >
+                <span class="text-ash-400 shrink-0">
+                  {#if expanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+                </span>
+                <div class="flex-1 min-w-0">
+                  {#if showIdentity}
+                    <span class="text-sm text-ash-200 truncate block">{playerInfo[uid]?.name ?? uid}</span>
+                  {/if}
+                  <span class="text-ash-400 truncate block {showIdentity ? 'text-xs' : 'text-sm'}">
+                    {deck.name || m.decks_unnamed()}
+                  </span>
+                </div>
+                <span class="text-xs text-ash-500 shrink-0 whitespace-nowrap">
+                  {counts.crypt}/{counts.library}
+                </span>
+              </button>
+              {#if expanded}
+                <div class="px-3 pb-3 sm:px-4 sm:pb-4" transition:slide={{ duration: 150 }}>
+                  <DeckDisplay {deck} />
+                </div>
+              {/if}
             </div>
           {/each}
-        {:else}
-          <!-- Winner/Finalists mode: player identity is public -->
-          <div class="bg-ash-900/50 rounded-lg p-4">
-            <h3 class="text-sm font-semibold text-bone-200 mb-2">
-              {m.decks_player_deck({ name: playerInfo[uid]?.name ?? uid })}
-            </h3>
-            {#each decks as deck}
-              <DeckDisplay {deck} />
-            {/each}
-          </div>
-        {/if}
-      {/if}
-    {/each}
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div>
