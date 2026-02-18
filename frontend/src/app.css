@@ -240,3 +240,109 @@ html.light {
 /* ── Drag & drop seating ── */
 .drag-handle { cursor: grab; touch-action: none; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .drag-handle:active { cursor: grabbing; }
+
+/* ── Help/Documentation ── */
+
+/* Callout boxes for rulebook inserts */
+.callout {
+    border-left: 4px solid var(--color-crimson-500);
+    background: rgb(164 15 45 / 0.08);
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    border-radius: 0 0.5rem 0.5rem 0;
+}
+.callout-title {
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-crimson-400);
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+.callout > p:first-child {
+    margin-top: 0;
+}
+
+/* Mathematical formulas */
+.formula {
+    text-align: center;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 1.15em;
+    font-style: italic;
+    letter-spacing: 0.02em;
+    padding: 0.75rem 1rem;
+    margin: 1.25rem 0;
+    color: var(--color-bone-200);
+}
+
+/* Document prose — uses palette variables so it works in both themes */
+.doc-prose {
+    --tw-prose-body: var(--color-ash-300);
+    --tw-prose-headings: var(--color-bone-100);
+    --tw-prose-links: var(--color-crimson-400);
+    --tw-prose-bold: var(--color-bone-200);
+    --tw-prose-counters: var(--color-ash-400);
+    --tw-prose-bullets: var(--color-ash-500);
+    --tw-prose-hr: var(--color-ash-800);
+    --tw-prose-quotes: var(--color-ash-400);
+    --tw-prose-quote-borders: var(--color-ash-700);
+    --tw-prose-code: var(--color-crimson-300);
+    --tw-prose-th-borders: var(--color-ash-700);
+    --tw-prose-td-borders: var(--color-ash-800);
+}
+.doc-prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+    background: var(--color-ash-900);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+}
+.doc-prose :where(a):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+    text-decoration: none;
+}
+.doc-prose :where(a):not(:where([class~="not-prose"],[class~="not-prose"] *)):hover {
+    text-decoration: underline;
+}
+
+/* Heading anchor links — hover-reveal on desktop, always visible on touch */
+.heading-anchor { position: relative; }
+.heading-anchor .anchor-link { opacity: 0; transition: opacity 0.15s; margin-left: 0.25rem; font-size: 0.8em; text-decoration: none; color: var(--color-ash-500); }
+@media (hover: hover) {
+    .heading-anchor:hover .anchor-link { opacity: 0.5; }
+    .heading-anchor .anchor-link:hover { opacity: 1; }
+}
+@media (hover: none) {
+    .heading-anchor .anchor-link { opacity: 0.4; }
+}
+
+/* Document images: constrained, not full-width */
+.doc-img { max-width: min(100%, 32rem); height: auto; }
+
+/* VTES reference icon grid */
+.vtes-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 0.25rem 1rem;
+    margin: 1rem 0;
+}
+.vtes-icon-grid-2col {
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+}
+.vtes-ref {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0;
+    white-space: nowrap;
+}
+.inline-icon { height: 1.25em; vertical-align: middle; }
+.vtes-d { /* discipline/symbol icon (Ankha VTES font) */
+    font-family: "Ankha VTES";
+    font-size: 1.25em;
+    vertical-align: middle;
+    line-height: 1;
+}
+.vtes-c { /* clan/creed icon (VTES Clans font) */
+    font-family: "VTES Clans";
+    font-size: 1.25em;
+    vertical-align: middle;
+    line-height: 1;
+}
