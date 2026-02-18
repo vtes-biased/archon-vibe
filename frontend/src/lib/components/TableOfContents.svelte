@@ -1,5 +1,6 @@
 <script lang="ts">
   import { List, X } from "lucide-svelte";
+  import { replaceState } from "$app/navigation";
   import type { TocEntry } from "$lib/help-docs";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -16,7 +17,7 @@
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: "smooth" });
-      history.replaceState(null, "", `#${id}`);
+      replaceState(`#${id}`, {});
     }
   }
 </script>
