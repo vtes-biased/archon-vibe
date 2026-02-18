@@ -1,10 +1,10 @@
 import { renderDocument } from "$lib/markdown";
 
 // Import markdown files as raw strings (bundled into JS, works offline)
-import vtesRulesRaw from "../../../reference/vtes-rules.md?raw";
-import tournamentRulesRaw from "../../../reference/tournament-rules.md?raw";
-import judgesGuideRaw from "../../../reference/judges-guide-v2.md?raw";
-import codeOfEthicsRaw from "../../../reference/code-of-ethics.md?raw";
+import vtesRulesRaw from "$lib/help-content/vtes-rules.md?raw";
+import tournamentRulesRaw from "$lib/help-content/tournament-rules.md?raw";
+import judgesGuideRaw from "$lib/help-content/judges-guide.md?raw";
+import codeOfEthicsRaw from "$lib/help-content/code-of-ethics.md?raw";
 import playerGuideRaw from "$lib/help-content/player-guide.md?raw";
 import organizerGuideRaw from "$lib/help-content/organizer-guide.md?raw";
 
