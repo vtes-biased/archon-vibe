@@ -169,7 +169,7 @@
                 >{m.decks_upload()}</button>
               {/if}
               {#if uploadingFor === uid}
-                <DeckUpload tournamentUid={tournament.uid} playerUid={uid} onuploaded={onUploaded} />
+                <DeckUpload tournamentUid={tournament.uid} playerUid={uid} playerName={info?.name} playerVekn={info?.vekn ?? undefined} onuploaded={onUploaded} />
               {/if}
             </div>
           {/if}
@@ -182,14 +182,24 @@
   {#if !isOrganizer}
     {#each Object.entries(visibleDecks) as [uid, decks]}
       {#if uid !== myUid}
-        <div class="bg-ash-900/50 rounded-lg p-4">
-          <h3 class="text-sm font-semibold text-bone-200 mb-2">
-            {m.decks_player_deck({ name: playerInfo[uid]?.name ?? uid })}
-          </h3>
+        {#if tournament.decklists_mode === 'All'}
+          <!-- All mode: anonymous — show decks without player identity -->
           {#each decks as deck}
-            <DeckDisplay {deck} />
+            <div class="bg-ash-900/50 rounded-lg p-4">
+              <DeckDisplay {deck} />
+            </div>
           {/each}
-        </div>
+        {:else}
+          <!-- Winner/Finalists mode: player identity is public -->
+          <div class="bg-ash-900/50 rounded-lg p-4">
+            <h3 class="text-sm font-semibold text-bone-200 mb-2">
+              {m.decks_player_deck({ name: playerInfo[uid]?.name ?? uid })}
+            </h3>
+            {#each decks as deck}
+              <DeckDisplay {deck} />
+            {/each}
+          </div>
+        {/if}
       {/if}
     {/each}
   {/if}

@@ -142,6 +142,7 @@
   "deck_upload_qr_hint": "Point camera at a VDB deck QR code",
   "deck_upload_attribution": "Attribution",
   "deck_upload_attr_self": "My deck",
+  "deck_upload_attr_player": "{name}'s deck",
   "deck_upload_attr_anonymous": "Anonymous",
   "deck_upload_attr_other": "Other",
   "deck_upload_attr_other_placeholder": "VEKN ID or name of deck author",
