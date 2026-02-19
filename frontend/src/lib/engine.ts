@@ -112,7 +112,8 @@ export type TournamentEventType =
   | 'SetToss'
   | 'RandomToss'
   | 'StartFinals'
-  | 'FinishFinals';
+  | 'FinishFinals'
+  | 'UpdateConfig';
 
 export interface TournamentEvent {
   type: TournamentEventType;
@@ -135,6 +136,7 @@ export interface TournamentEvent {
   seating?: string[][];
   deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
   multideck?: boolean;
+  config?: Record<string, unknown>;
 }
 
 export interface ActorContext {

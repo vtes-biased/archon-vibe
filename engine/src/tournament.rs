@@ -193,6 +193,11 @@ pub enum TournamentEvent {
     DeleteDeck {
         player_uid: String,
     },
+
+    // Config update (partial fields)
+    UpdateConfig {
+        config: JsonValue,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -547,6 +552,13 @@ impl TournamentEvent {
                     .ok_or("player_uid required")?
                     .to_string(),
             }),
+            "UpdateConfig" => {
+                let config = value["config"].clone();
+                if config.is_null() || !config.is_object() {
+                    return Err("config object required".to_string());
+                }
+                Ok(Self::UpdateConfig { config })
+            }
             _ => Err(format!("Unknown event type: {}", event_type)),
         }
     }
@@ -1976,6 +1988,60 @@ fn apply_event(
             }
             Ok(())
         }
+
+        TournamentEvent::UpdateConfig { config } => {
+            require_organizer(actor)?;
+
+            // Validate before applying
+            if let Some(f) = config["format"].as_str() {
+                validate_enum(f, &["Standard", "V5", "Limited"], "format")?;
+            }
+            if let Some(r) = config["rank"].as_str() {
+                validate_enum(r, &[
+                    "", "National Championship", "Continental Championship",
+                ], "rank")?;
+            }
+            if let Some(s) = config["standings_mode"].as_str() {
+                validate_enum(s, &["Private", "Cutoff", "Top 10", "Public"], "standings_mode")?;
+            }
+            if let Some(d) = config["decklists_mode"].as_str() {
+                validate_enum(d, &["Winner", "Finalists", "All"], "decklists_mode")?;
+            }
+            if config.has_key("name") {
+                if let Some(n) = config["name"].as_str() {
+                    if n.trim().is_empty() {
+                        return Err("name cannot be empty".to_string());
+                    }
+                }
+            }
+            if let Some(mr) = config["max_rounds"].as_usize() {
+                if mr != 0 {
+                    let completed = count_completed_rounds(tournament);
+                    if mr < completed {
+                        return Err(format!(
+                            "max_rounds ({}) cannot be less than completed rounds ({})",
+                            mr, completed
+                        ));
+                    }
+                }
+            }
+
+            // Apply config fields (key present = apply, even if null)
+            let config_fields = [
+                "name", "format", "rank", "online", "start", "finish", "timezone",
+                "country", "venue", "venue_url", "address", "map_url",
+                "proxies", "multideck", "decklist_required", "description",
+                "standings_mode", "decklists_mode", "max_rounds", "table_rooms",
+                "league_uid",
+            ];
+            for field in config_fields {
+                if config.has_key(field) {
+                    tournament[field] = config[field].clone();
+                }
+            }
+
+            Ok(())
+        }
     }
 }
 
@@ -2022,6 +2088,26 @@ fn find_player_index(players: &JsonValue, user_uid: &str) -> Option<usize> {
     players
         .members()
         .position(|p| p["user_uid"].as_str() == Some(user_uid))
+}
+
+fn validate_enum(value: &str, valid: &[&str], field: &str) -> Result<(), String> {
+    if !valid.contains(&value) {
+        return Err(format!("Invalid {}: {}", field, value));
+    }
+    Ok(())
+}
+
+fn count_completed_rounds(tournament: &JsonValue) -> usize {
+    let total = tournament["rounds"].len();
+    if total == 0 {
+        return 0;
+    }
+    // Check if the last round is still in progress (has "In Progress" tables)
+    let last_round = &tournament["rounds"][total - 1];
+    let has_in_progress = last_round.members().any(|table| {
+        table["state"].as_str() == Some("In Progress")
+    });
+    if has_in_progress { total - 1 } else { total }
 }
 
 #[cfg(test)]
@@ -2653,5 +2739,114 @@ mod tests {
         let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Cannot alter seating"));
+    }
+
+    #[test]
+    fn test_update_config_basic() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: {
+                name: "New Name",
+                format: "V5",
+                max_rounds: 4,
+            },
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["name"].as_str(), Some("New Name"));
+        assert_eq!(updated["format"].as_str(), Some("V5"));
+        assert_eq!(updated["max_rounds"].as_usize(), Some(4));
+    }
+
+    #[test]
+    fn test_update_config_null_country() {
+        let mut tournament = make_tournament();
+        tournament["country"] = "France".into();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: {
+                country: json::Null,
+            },
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert!(updated["country"].is_null());
+    }
+
+    #[test]
+    fn test_update_config_invalid_format() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { format: "Invalid" },
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid format"));
+    }
+
+    #[test]
+    fn test_update_config_max_rounds_too_low() {
+        let mut tournament = tournament_with_round();
+        // Finish the round so it counts as completed
+        tournament["rounds"][0][0]["state"] = "Finished".into();
+        tournament["rounds"][0][1]["state"] = "Finished".into();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { max_rounds: 0 },
+        };
+        let actor = make_organizer();
+        // max_rounds=0 means unlimited, should succeed
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_update_config_non_organizer_fails() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { name: "Hacked" },
+        };
+        let actor = make_player("player-1");
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("organizers"));
+    }
+
+    #[test]
+    fn test_update_config_empty_name_fails() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { name: "" },
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("name cannot be empty"));
+    }
+
+    #[test]
+    fn test_update_config_partial_update() {
+        let mut tournament = make_tournament();
+        tournament["venue"] = "Old Venue".into();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { description: "New desc" },
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["description"].as_str(), Some("New desc"));
+        // venue should remain unchanged
+        assert_eq!(updated["venue"].as_str(), Some("Old Venue"));
     }
 }

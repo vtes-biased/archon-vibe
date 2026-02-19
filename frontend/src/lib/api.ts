@@ -2,7 +2,7 @@
  * API client for backend communication.
  */
 
-import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, TournamentConfig, League } from '$lib/types';
+import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League } from '$lib/types';
 import { getAllUsers, getTournament, saveTournament, saveLeague, logChange, getSanctionsForTournament } from './db';
 import { processTournamentEvent, buildActorContext } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
@@ -446,20 +446,6 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
   await markOffline(uid);
 
   return tournament;
-}
-
-export async function updateTournament(uid: string, data: Partial<CreateTournamentData>): Promise<Tournament> {
-  if (!isOnline()) {
-    throw new Error('Cannot update tournament while offline.');
-  }
-  const updated = await apiRequest<Tournament>(`/api/tournaments/${uid}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-  // Save to IndexedDB immediately so other pages see the update
-  // without waiting for the SSE event
-  await saveTournament(updated);
-  return updated;
 }
 
 export async function deleteTournamentApi(uid: string): Promise<{ message: string }> {

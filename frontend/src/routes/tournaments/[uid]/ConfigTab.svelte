@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
-  import { updateTournament } from "$lib/api";
+  import { tournamentAction } from "$lib/api";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { RefreshCw } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -80,7 +80,7 @@
     saving = true;
     error = null;
     try {
-      tournament = await updateTournament(tournament.uid, { [field]: value });
+      tournament = await tournamentAction(tournament.uid, 'UpdateConfig', { config: { [field]: value } });
     } catch (e) {
       error = e instanceof Error ? e.message : m.config_error_save();
     } finally {
@@ -93,7 +93,7 @@
     saving = true;
     error = null;
     try {
-      tournament = await updateTournament(tournament.uid, fields);
+      tournament = await tournamentAction(tournament.uid, 'UpdateConfig', { config: fields });
     } catch (e) {
       error = e instanceof Error ? e.message : m.config_error_save();
     } finally {

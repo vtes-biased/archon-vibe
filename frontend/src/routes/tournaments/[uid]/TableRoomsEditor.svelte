@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
-  import { updateTournament } from "$lib/api";
+  import { tournamentAction } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { Plus, X, ChevronUp, ChevronDown } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -32,7 +32,7 @@
     saving = true;
     try {
       const cleaned = rooms.map(r => ({ name: r.name.trim(), count: r.count }));
-      const updated = await updateTournament(tournamentUid, { table_rooms: cleaned });
+      const updated = await tournamentAction(tournamentUid, 'UpdateConfig', { config: { table_rooms: cleaned } });
       onupdate(updated);
     } catch {
       showToast({ type: "error", message: "Failed to save rooms" });

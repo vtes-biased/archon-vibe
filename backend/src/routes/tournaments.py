@@ -394,29 +394,6 @@ class CreateTournamentRequest(BaseModel):
     league_uid: str | None = None
 
 
-class UpdateTournamentRequest(BaseModel):
-    name: str | None = None
-    format: str | None = None
-    rank: str | None = None
-    online: bool | None = None
-    start: str | None = None
-    finish: str | None = None
-    timezone: str | None = None
-    country: str | None = None
-    venue: str | None = None
-    venue_url: str | None = None
-    address: str | None = None
-    map_url: str | None = None
-    proxies: bool | None = None
-    multideck: bool | None = None
-    decklist_required: bool | None = None
-    description: str | None = None
-    standings_mode: str | None = None
-    decklists_mode: str | None = None
-    max_rounds: int | None = None
-    table_rooms: list[dict] | None = None
-    league_uid: str | None = None
-
 
 def _parse_datetime(s: str | None) -> datetime | None:
     if not s:
@@ -577,97 +554,6 @@ async def get_tournament(
     )
 
 
-@router.put("/{uid}")
-async def update_tournament_endpoint(
-    uid: str,
-    request: UpdateTournamentRequest,
-    authorization: str | None = Header(default=None),
-) -> Response:
-    """Update tournament config (organizers only)."""
-    current_user = await _get_current_user(authorization)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    if not _is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can update this tournament"
-        )
-
-    # VEKN_PUSH: max_rounds is immutable once pushed to VEKN
-    if request.max_rounds is not None and tournament.external_ids.get("vekn"):
-        if request.max_rounds != tournament.max_rounds:
-            raise HTTPException(
-                status_code=409,
-                detail="max_rounds cannot be changed after tournament is pushed to VEKN",
-            )
-
-    # Validate max_rounds: must be 0 (unlimited) or >= completed rounds
-    if request.max_rounds is not None and request.max_rounds != 0:
-        completed_rounds = len(tournament.rounds)
-        if tournament.state == TournamentState.PLAYING:
-            # Current round is in progress, don't count it
-            completed_rounds = max(0, completed_rounds - 1)
-        if request.max_rounds < completed_rounds:
-            raise HTTPException(
-                status_code=400,
-                detail=f"max_rounds ({request.max_rounds}) cannot be less than completed rounds ({completed_rounds})",
-            )
-
-    # Apply updates via dict merge
-    data = msgspec.to_builtins(tournament)
-    updates = request.model_dump(exclude_none=True)
-
-    # Validate enums if provided
-    if "format" in updates:
-        try:
-            updates["format"] = TournamentFormat(updates["format"]).value
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail="Invalid format") from e
-    if "rank" in updates:
-        try:
-            updates["rank"] = TournamentRank(updates["rank"]).value
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail="Invalid rank") from e
-    if "standings_mode" in updates:
-        try:
-            updates["standings_mode"] = StandingsMode(updates["standings_mode"]).value
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail="Invalid standings_mode") from e
-    if "decklists_mode" in updates:
-        try:
-            updates["decklists_mode"] = DeckListsMode(updates["decklists_mode"]).value
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail="Invalid decklists_mode") from e
-
-    # Parse datetime strings
-    if "start" in updates and updates["start"]:
-        updates["start"] = _parse_datetime(updates["start"])
-    if "finish" in updates and updates["finish"]:
-        updates["finish"] = _parse_datetime(updates["finish"])
-
-    # Normalize empty league_uid to None
-    if "league_uid" in updates and not updates["league_uid"]:
-        updates["league_uid"] = None
-
-    data.update(updates)
-    data["modified"] = datetime.now(UTC)
-
-    updated = msgspec.convert(data, Tournament)
-    await update_tournament(updated)
-
-    if broadcast_tournament_event:
-        await broadcast_tournament_event(updated)
-
-    return Response(
-        content=encoder.encode(updated),
-        media_type="application/json",
-    )
-
-
 @router.delete("/{uid}")
 async def delete_tournament_endpoint(
     uid: str,
@@ -726,6 +612,7 @@ class TournamentActionRequest(BaseModel):
     toss: int | None = None  # For SetToss
     status: str | None = None  # For SetPaymentStatus
     seating: list[list[str]] | None = None  # For AlterSeating
+    config: dict | None = None  # For UpdateConfig: partial config fields
 
 
 @router.post("/{uid}/action")
@@ -776,11 +663,30 @@ async def tournament_action(
         event_data["status"] = request.status
     if request.seating:
         event_data["seating"] = request.seating
+    if request.config is not None:
+        event_data["config"] = request.config
 
     # SELECT FOR UPDATE: serialize concurrent writes to this tournament
     async with tournament_transaction(uid) as (tournament, tx_conn):
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
+
+        # VEKN_PUSH: max_rounds immutable once pushed to VEKN
+        if request.type == "UpdateConfig" and request.config and "max_rounds" in request.config:
+            if tournament.external_ids.get("vekn"):
+                if request.config["max_rounds"] != tournament.max_rounds:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="max_rounds cannot be changed after tournament is pushed to VEKN",
+                    )
+            vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
+            if vekn_push and request.config["max_rounds"] is not None:
+                mr = request.config["max_rounds"]
+                if mr != 0 and (mr < 2 or mr > 4):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="max_rounds must be 2, 3, or 4 when VEKN push is enabled",
+                    )
 
         # Reject actions on offline-locked tournaments
         if tournament.offline_mode:
@@ -843,21 +749,26 @@ async def tournament_action(
         await broadcast_tournament_event(updated)
 
     # Recompute ratings when tournament enters/leaves Finished state,
-    # or when data changes on a finished tournament (e.g. SetScore)
+    # or when data changes on a finished tournament (e.g. SetScore, UpdateConfig)
     was_finished = pre_state == TournamentState.FINISHED
     is_finished = updated.state == TournamentState.FINISHED
     if was_finished != is_finished or is_finished:
         try:
-            from ..ratings import recompute_ratings_for_players
+            from ..ratings import rating_category_for_tournament, recompute_ratings_for_players
 
-            player_uids = {p.user_uid for p in tournament.players if p.user_uid}
-            from ..ratings import rating_category_for_tournament
-
-            category = rating_category_for_tournament(tournament)
+            player_uids = {p.user_uid for p in updated.players if p.user_uid}
+            category = rating_category_for_tournament(updated)
             ratings = await recompute_ratings_for_players(player_uids, category)
             if broadcast_rating_event:
                 for rating in ratings:
                     await broadcast_rating_event(rating)
+            # If category changed (format/online toggle), also recompute old category
+            old_category = rating_category_for_tournament(tournament)
+            if old_category != category:
+                old_ratings = await recompute_ratings_for_players(player_uids, old_category)
+                if broadcast_rating_event:
+                    for rating in old_ratings:
+                        await broadcast_rating_event(rating)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
