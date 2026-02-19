@@ -499,6 +499,7 @@ def _filter_tournament(t: Tournament, viewer: User | None) -> Tournament | None:
             standings_mode=t.standings_mode,
             decklists_mode=t.decklists_mode,
             max_rounds=t.max_rounds,
+            table_rooms=t.table_rooms,
             external_ids=t.external_ids,
             players=players,
             decks=decks,

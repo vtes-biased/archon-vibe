@@ -1,6 +1,6 @@
 <script lang="ts">
   import { GripVertical, CircleAlert } from "lucide-svelte";
-  import { seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, resolveTableLabel } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { onMount } from 'svelte';
 
@@ -9,12 +9,14 @@
     playerInfo,
     playerIssues,
     isFinals = false,
+    tableRooms,
     onchange,
   }: {
     tables: string[][];
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
     playerIssues: Map<string, { level: number; message: string }>;
     isFinals: boolean;
+    tableRooms?: { name: string; count: number }[];
     onchange: () => void;
   } = $props();
 
@@ -111,7 +113,7 @@
 {#each tables as table, t}
   <div class="bg-ash-900/50 rounded-lg p-4">
     <h3 class="text-sm font-medium text-bone-100 mb-2">
-      {isFinals ? m.finals_table() : m.rounds_table_n({ n: String(t + 1) })}
+      {isFinals ? m.finals_table() : resolveTableLabel(tableRooms, t) ?? m.rounds_table_n({ n: String(t + 1) })}
     </h3>
     <div class="divide-y divide-ash-800">
       {#each table as uid, s (uid)}

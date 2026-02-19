@@ -8,12 +8,13 @@
   import { generateResultsCard } from "$lib/social-card";
   import { generateResultsText } from "$lib/social-text";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
+  import TableRoomsEditor from "./TableRoomsEditor.svelte";
   import { Share2, ClipboardCopy } from "lucide-svelte";
 
   import * as m from '$lib/paraglide/messages.js';
 
   let {
-    tournament,
+    tournament = $bindable(),
     playerInfo,
     standings,
     isOrganizer,
@@ -126,6 +127,13 @@
         organizerUids={tournament.organizers_uids ?? []}
         onadd={async (userUid) => { await addTournamentOrganizer(tournament.uid, userUid); }}
         onremove={async (userUid) => { await removeTournamentOrganizer(tournament.uid, userUid); }}
+      />
+    </div>
+    <div class="bg-ash-900/30 rounded-lg p-4">
+      <TableRoomsEditor
+        tournamentUid={tournament.uid}
+        tableRooms={tournament.table_rooms ?? []}
+        onupdate={(t) => { tournament = t; }}
       />
     </div>
   {:else if tournament.organizers_uids?.length}

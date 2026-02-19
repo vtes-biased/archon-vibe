@@ -419,6 +419,7 @@
   "tournament_new_title": "Nuevo torneo",
   "tournament_new_no_permission": "Solo IC, NC o Prince pueden crear torneos.",
   "tournament_new_error_name_required": "El nombre es obligatorio",
+  "tournament_new_error_max_rounds": "El número máximo de rondas debe ser 2, 3 o 4",
   "tournament_new_creating": "Creando...",
   "tournament_new_create_btn": "Crear torneo",
   "tfield_name_label": "Nombre *",
@@ -477,7 +478,7 @@
   "tournament_finals_heading": "Finales",
   "tournament_finals_table": "Mesa de finales",
   "tournament_seed": "Semilla #{n}",
-  "tournament_your_table": "Su mesa (Mesa {n})",
+  "tournament_your_table": "Su mesa ({label})",
   "tournament_registration_not_open": "El registro no está abierto.",
   "tournament_registered_players": "Jugadores registrados ({count})",
   "tournament_winner": "Ganador",
@@ -706,5 +707,11 @@
   "decks_visible_heading": "Decklists",
   "decks_unnamed": "Deck sin nombre",
   "decks_expand_all": "Expandir todo",
-  "decks_collapse_all": "Contraer todo"
+  "decks_collapse_all": "Contraer todo",
+  "rooms_title": "Salas",
+  "rooms_total": "{count} mesas",
+  "rooms_add": "Añadir sala",
+  "rooms_hint": "Las mesas llenan las salas en orden",
+  "rooms_name": "Nombre de la sala",
+  "rooms_count": "Mesas"
 }

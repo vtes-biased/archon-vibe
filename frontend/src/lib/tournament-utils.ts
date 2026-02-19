@@ -124,6 +124,22 @@ export function translatePlayerState(state: string): string {
   }
 }
 
+export function resolveTableLabel(
+  tableRooms: { name: string; count: number }[] | undefined,
+  tableIndex: number,
+): string | null {
+  if (!tableRooms?.length) return null;
+  let offset = 0;
+  for (const room of tableRooms) {
+    if (tableIndex < offset + room.count) {
+      const localIndex = tableIndex - offset + 1;
+      return room.count === 1 ? room.name : `${room.name} ${localIndex}`;
+    }
+    offset += room.count;
+  }
+  return null;
+}
+
 export function translateTableState(state: string): string {
   switch (state) {
     case "In Progress": return m.table_state_in_progress();

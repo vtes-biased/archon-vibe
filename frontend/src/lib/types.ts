@@ -312,9 +312,11 @@ export interface Tournament extends BaseObject {
   standings_mode?: StandingsMode;
   decklists_mode?: DeckListsMode;
   max_rounds?: number;
+  table_rooms?: { name: string; count: number }[];
 
   // Full data (varies by level)
   external_ids?: Record<string, string>;
+  vekn_pushed_at?: string | null;
   checkin_code?: string;
   players?: Player[];
   decks?: Record<string, Deck[]>;

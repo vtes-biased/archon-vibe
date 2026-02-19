@@ -419,6 +419,7 @@
   "tournament_new_title": "New Tournament",
   "tournament_new_no_permission": "Only IC, NC, or Prince can create tournaments.",
   "tournament_new_error_name_required": "Name is required",
+  "tournament_new_error_max_rounds": "Max rounds must be 2, 3, or 4",
   "tournament_new_creating": "Creating...",
   "tournament_new_create_btn": "Create Tournament",
   "tfield_name_label": "Name *",
@@ -477,7 +478,7 @@
   "tournament_finals_heading": "Finals",
   "tournament_finals_table": "Finals Table",
   "tournament_seed": "Seed #{n}",
-  "tournament_your_table": "Your Table (Table {n})",
+  "tournament_your_table": "Your Table ({label})",
   "tournament_registration_not_open": "Registration is not open.",
   "tournament_registered_players": "Registered players ({count})",
   "tournament_winner": "Winner",
@@ -706,5 +707,11 @@
   "help_reference_docs": "Reference Documents",
   "help_user_guides": "User Guides",
   "help_toc_title": "Contents",
-  "help_back_to_list": "Back to Help"
+  "help_back_to_list": "Back to Help",
+  "rooms_title": "Table Rooms",
+  "rooms_total": "{count} tables",
+  "rooms_add": "Add Room",
+  "rooms_hint": "Tables fill rooms in order",
+  "rooms_name": "Room name",
+  "rooms_count": "Tables"
 }

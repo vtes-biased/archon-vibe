@@ -6,7 +6,7 @@
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer } from "lucide-svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -266,7 +266,7 @@
         const bg = j % 2 === 0 ? '#f5f5f5' : 'transparent';
         rows += `<div style="padding:3px 8px 3px 12px;background:${bg};border-bottom:1px solid #ddd"><span style="display:inline-block;width:20px;text-align:right;font-weight:bold;margin-right:6px">${j + 1}.</span>${printSeatHtml(s.player_uid)}</div>`;
       }
-      tablesHtml += `<div style="break-inside:avoid;display:inline-block;width:100%;margin-bottom:16px"><div style="font-size:14pt;font-weight:bold;background:#e8e8e8;padding:4px 8px">${esc(m.rounds_table_n({ n: String(i + 1) }))}</div>${rows}</div>`;
+      tablesHtml += `<div style="break-inside:avoid;display:inline-block;width:100%;margin-bottom:16px"><div style="font-size:14pt;font-weight:bold;background:#e8e8e8;padding:4px 8px">${esc(resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) }))}</div>${rows}</div>`;
     }
     const css = [
       `body{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;font-size:12pt;color:#000;margin:0;padding:0;line-height:1.4}`,
@@ -460,6 +460,7 @@
                 {playerInfo}
                 {playerIssues}
                 isFinals={false}
+                tableRooms={tournament.table_rooms}
                 onchange={recomputeIssues}
               />
               {#if hasR1Issue}
@@ -481,7 +482,7 @@
               <div class="bg-ash-900/50 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
-                    <h3 class="text-sm font-medium text-bone-100">{m.rounds_table_n({ n: String(i + 1) })}</h3>
+                    <h3 class="text-sm font-medium text-bone-100">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
                     {#if table.seating.length < 4 || table.seating.length > 5}
                       <span class="text-xs text-amber-400">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
                     {/if}

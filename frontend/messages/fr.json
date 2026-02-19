@@ -419,6 +419,7 @@
   "tournament_new_title": "Nouveau tournoi",
   "tournament_new_no_permission": "Seuls les IC, NC ou Prince peuvent créer des tournois.",
   "tournament_new_error_name_required": "Le nom est requis",
+  "tournament_new_error_max_rounds": "Le nombre maximum de rondes doit être 2, 3 ou 4",
   "tournament_new_creating": "Création...",
   "tournament_new_create_btn": "Créer le tournoi",
   "tfield_name_label": "Nom *",
@@ -477,7 +478,7 @@
   "tournament_finals_heading": "Finale",
   "tournament_finals_table": "Table de finale",
   "tournament_seed": "Tête de série #{n}",
-  "tournament_your_table": "Votre table (Table {n})",
+  "tournament_your_table": "Votre table ({label})",
   "tournament_registration_not_open": "Les inscriptions ne sont pas ouvertes.",
   "tournament_registered_players": "Joueurs inscrits ({count})",
   "tournament_winner": "Vainqueur",
@@ -706,5 +707,11 @@
   "decks_visible_heading": "Decklists",
   "decks_unnamed": "Deck sans nom",
   "decks_expand_all": "Tout développer",
-  "decks_collapse_all": "Tout réduire"
+  "decks_collapse_all": "Tout réduire",
+  "rooms_title": "Salles",
+  "rooms_total": "{count} tables",
+  "rooms_add": "Ajouter une salle",
+  "rooms_hint": "Les tables remplissent les salles dans l'ordre",
+  "rooms_name": "Nom de la salle",
+  "rooms_count": "Tables"
 }

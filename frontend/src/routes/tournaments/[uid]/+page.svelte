@@ -856,7 +856,7 @@
           <div class="p-3 sm:p-6">
             {#if activeTab === 'overview'}
               <OverviewTab
-                {tournament}
+                bind:tournament={tournament}
                 {playerInfo}
                 {standings}
                 isOrganizer={true}

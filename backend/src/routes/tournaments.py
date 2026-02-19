@@ -379,6 +379,7 @@ class UpdateTournamentRequest(BaseModel):
     standings_mode: str | None = None
     decklists_mode: str | None = None
     max_rounds: int | None = None
+    table_rooms: list[dict] | None = None
     league_uid: str | None = None
 
 

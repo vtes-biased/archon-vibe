@@ -419,6 +419,7 @@
   "tournament_new_title": "Nuovo Torneo",
   "tournament_new_no_permission": "Solo IC, NC, o Prince possono creare tornei.",
   "tournament_new_error_name_required": "Il nome è obbligatorio",
+  "tournament_new_error_max_rounds": "Il numero massimo di round deve essere 2, 3 o 4",
   "tournament_new_creating": "Creazione...",
   "tournament_new_create_btn": "Crea Torneo",
   "tfield_name_label": "Nome *",
@@ -477,7 +478,7 @@
   "tournament_finals_heading": "Finali",
   "tournament_finals_table": "Tavolo Finale",
   "tournament_seed": "Seed #{n}",
-  "tournament_your_table": "Il Tuo Tavolo (Tavolo {n})",
+  "tournament_your_table": "Il Tuo Tavolo ({label})",
   "tournament_registration_not_open": "La registrazione non è aperta.",
   "tournament_registered_players": "Giocatori registrati ({count})",
   "tournament_winner": "Vincitore",
@@ -706,5 +707,11 @@
   "decks_visible_heading": "Decklist",
   "decks_unnamed": "Deck senza nome",
   "decks_expand_all": "Espandi tutto",
-  "decks_collapse_all": "Comprimi tutto"
+  "decks_collapse_all": "Comprimi tutto",
+  "rooms_title": "Sale",
+  "rooms_total": "{count} tavoli",
+  "rooms_add": "Aggiungi sala",
+  "rooms_hint": "I tavoli riempiono le sale in ordine",
+  "rooms_name": "Nome della sala",
+  "rooms_count": "Tavoli"
 }

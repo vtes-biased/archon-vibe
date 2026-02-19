@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction } from "$lib/types";
   import type { StandingEntry } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translatePlayerState, translateTableState } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translatePlayerState, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode } from "lucide-svelte";
@@ -228,7 +228,7 @@
         {@const myTable = currentRound[myTableIdx]!}
         <div class="bg-ash-900/50 rounded-lg p-4">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-medium text-bone-100">{m.tournament_your_table({ n: String(myTableIdx + 1) })}</h3>
+            <h3 class="text-sm font-medium text-bone-100">{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}</h3>
             <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
               {translateTableState(myTable.state)}
             </span>

@@ -382,6 +382,7 @@ export interface CreateTournamentData {
   proxies?: boolean;
   multideck?: boolean;
   decklist_required?: boolean;
+  table_rooms?: { name: string; count: number }[];
   league_uid?: string | null;
 }
 

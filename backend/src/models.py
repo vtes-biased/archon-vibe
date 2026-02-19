@@ -373,6 +373,11 @@ class DeckListsMode(StrEnum):
     ALL = "All"
 
 
+class Room(msgspec.Struct, kw_only=True):
+    name: str
+    count: int
+
+
 class TournamentConfig(TournamentMinimal, kw_only=True):
     organizers_uids: list[str] = msgspec.field(default_factory=list)  # FK → users
     venue: str = ""
@@ -386,6 +391,7 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     standings_mode: StandingsMode = StandingsMode.PRIVATE
     decklists_mode: DeckListsMode = DeckListsMode.WINNER
     max_rounds: int = 0
+    table_rooms: list[Room] = msgspec.field(default_factory=list)
 
 
 class PlayerState(StrEnum):
@@ -477,6 +483,8 @@ class Tournament(TournamentConfig, kw_only=True):
     # Per-viewer field: tables where the viewer sat (populated during SSE filtering,
     # NOT stored in DB)
     my_tables: list[Table] = msgspec.field(default_factory=list)
+    # VEKN push tracking
+    vekn_pushed_at: datetime | None = None  # When results were pushed to vekn.net
     # Offline mode: device-level locking for offline tournament management
     offline_mode: bool = False
     offline_device_id: str = ""  # Device identifier (localStorage UUID) that holds the lock
