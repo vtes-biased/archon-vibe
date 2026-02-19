@@ -50,6 +50,7 @@
   const countries = getCountries();
   const timezones = Intl.supportedValuesOf("timeZone");
   const auth = $derived(getAuthState());
+  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
 
   let allActiveLeagues = $state<League[]>([]);
   $effect(() => {
@@ -160,45 +161,63 @@
   </div>
 {/if}
 
-<!-- Open Rounds -->
-<div>
-  <label class="flex items-center gap-3 cursor-pointer">
-    <input
-      type="checkbox"
-      checked={values.open_rounds}
-      disabled={disabled || disabledFields.has("open_rounds")}
-      onchange={(e) => {
-        const checked = (e.target as HTMLInputElement).checked;
-        handleInput("open_rounds", checked);
-        if (!checked) {
-          handleInput("max_rounds", 0);
-        }
-      }}
-      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
-    />
-    <span class="text-sm text-ash-200">{m.tfield_open_rounds()}</span>
-  </label>
-  <p class="text-xs text-ash-500 mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
-  {#if values.open_rounds}
-    <div class="mt-2 ml-8">
-      <label class="block text-sm text-ash-400 mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
-      <select
-        id={id("max-rounds")}
-        value={String(values.max_rounds)}
-        disabled={disabled || disabledFields.has("max_rounds")}
-        onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
-        class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
-      >
-        <option value="0">{m.tfield_max_rounds_no_limit()}</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-      </select>
-    </div>
-  {/if}
-</div>
+<!-- Open Rounds / Max Rounds -->
+{#if veknPush}
+  <!-- VEKN push mode: max_rounds is always visible and required (2-4) -->
+  <div>
+    <label class="block text-sm text-ash-400 mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
+    <select
+      id={id("max-rounds")}
+      value={String(values.max_rounds)}
+      disabled={disabled || disabledFields.has("max_rounds")}
+      onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
+      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+    >
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+{:else}
+  <div>
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={values.open_rounds}
+        disabled={disabled || disabledFields.has("open_rounds")}
+        onchange={(e) => {
+          const checked = (e.target as HTMLInputElement).checked;
+          handleInput("open_rounds", checked);
+          if (!checked) {
+            handleInput("max_rounds", 0);
+          }
+        }}
+        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
+      />
+      <span class="text-sm text-ash-200">{m.tfield_open_rounds()}</span>
+    </label>
+    <p class="text-xs text-ash-500 mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
+    {#if values.open_rounds}
+      <div class="mt-2 ml-8">
+        <label class="block text-sm text-ash-400 mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
+        <select
+          id={id("max-rounds")}
+          value={String(values.max_rounds)}
+          disabled={disabled || disabledFields.has("max_rounds")}
+          onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
+          class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+        >
+          <option value="0">{m.tfield_max_rounds_no_limit()}</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </div>
+    {/if}
+  </div>
+{/if}
 
 <!-- Dates & Timezone -->
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

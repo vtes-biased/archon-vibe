@@ -104,8 +104,9 @@
   const started = $derived(
     tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished"
   );
+  const pushedToVekn = $derived(!!tournament.external_ids?.vekn);
   const disabledFields = $derived(
-    started ? new Set(["open_rounds", "max_rounds"]) : new Set<string>()
+    started || pushedToVekn ? new Set(["open_rounds", "max_rounds"]) : new Set<string>()
   );
 
   // Debounced save for text inputs

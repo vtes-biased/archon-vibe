@@ -1,6 +1,7 @@
 """Tournament API endpoints."""
 
 import logging
+import os
 from datetime import UTC, datetime
 
 import msgspec
@@ -128,6 +129,40 @@ async def _process_engine_event(
         await broadcast_tournament_event(updated)
 
     return updated
+
+
+async def _maybe_push_vekn(tournament: Tournament) -> None:
+    """Push tournament results to VEKN if VEKN_PUSH is enabled."""
+    if os.getenv("VEKN_PUSH", "").lower() != "true":
+        return
+    try:
+        from ..vekn_api import VEKNAPIClient
+        from ..vekn_push import push_tournament_results
+
+        client = VEKNAPIClient()
+        try:
+            await push_tournament_results(client, tournament)
+        finally:
+            await client.close()
+    except Exception:
+        logger.exception("Failed to push VEKN results")
+
+
+async def _maybe_push_vekn_event(tournament: Tournament) -> None:
+    """Create VEKN calendar event if VEKN_PUSH is enabled."""
+    if os.getenv("VEKN_PUSH", "").lower() != "true":
+        return
+    try:
+        from ..vekn_api import VEKNAPIClient
+        from ..vekn_push import push_tournament_event
+
+        client = VEKNAPIClient()
+        try:
+            await push_tournament_event(client, tournament)
+        finally:
+            await client.close()
+    except Exception:
+        logger.exception("Failed to push VEKN event")
 
 
 async def _maybe_submit_twda(tournament: Tournament) -> None:
@@ -418,6 +453,15 @@ async def create_tournament(
             status_code=400, detail=f"Invalid rank: {request.rank}"
         ) from e
 
+    # VEKN_PUSH: validate max_rounds is 2-4
+    vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
+    if vekn_push:
+        if request.max_rounds < 2 or request.max_rounds > 4:
+            raise HTTPException(
+                status_code=400,
+                detail="max_rounds must be 2, 3, or 4 when VEKN push is enabled",
+            )
+
     try:
         standings = StandingsMode(request.standings_mode)
     except ValueError as e:
@@ -460,6 +504,9 @@ async def create_tournament(
 
     if broadcast_tournament_event:
         await broadcast_tournament_event(tournament)
+
+    # VEKN push: create calendar event
+    await _maybe_push_vekn_event(tournament)
 
     return Response(
         content=encoder.encode(tournament),
@@ -549,6 +596,14 @@ async def update_tournament_endpoint(
         raise HTTPException(
             status_code=403, detail="Only organizers can update this tournament"
         )
+
+    # VEKN_PUSH: max_rounds is immutable once pushed to VEKN
+    if request.max_rounds is not None and tournament.external_ids.get("vekn"):
+        if request.max_rounds != tournament.max_rounds:
+            raise HTTPException(
+                status_code=409,
+                detail="max_rounds cannot be changed after tournament is pushed to VEKN",
+            )
 
     # Validate max_rounds: must be 0 (unlimited) or >= completed rounds
     if request.max_rounds is not None and request.max_rounds != 0:
@@ -806,9 +861,10 @@ async def tournament_action(
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
-    # TWDA auto-PR: trigger when tournament finishes with winner's deck
+    # TWDA auto-PR + VEKN push: trigger when tournament finishes
     if is_finished and not was_finished:
         await _maybe_submit_twda(updated)
+        await _maybe_push_vekn(updated)
 
     return Response(
         content=encoder.encode(updated),

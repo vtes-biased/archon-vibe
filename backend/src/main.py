@@ -184,6 +184,25 @@ async def run_rating_recompute() -> None:
         logger.error(f"Error during rating recompute: {e}", exc_info=True)
 
 
+async def run_vekn_push() -> None:
+    """Run VEKN push batch (scheduled task)."""
+    if os.getenv("VEKN_PUSH", "").lower() != "true":
+        return
+    try:
+        from .vekn_api import VEKNAPIClient
+        from .vekn_push import batch_push
+
+        logger.info("Starting VEKN batch push")
+        client = VEKNAPIClient()
+        try:
+            stats = await batch_push(client)
+            logger.info(f"VEKN batch push complete: {stats}")
+        finally:
+            await client.close()
+    except Exception as e:
+        logger.error(f"Error during VEKN batch push: {e}", exc_info=True)
+
+
 async def run_oauth_cleanup() -> None:
     """Clean up expired OAuth authorization codes, revoked tokens, and transient tokens."""
     try:
@@ -263,6 +282,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         replace_existing=True,
     )
     logger.info("Rating recompute scheduled daily (initial run after VEKN sync)")
+
+    # Schedule VEKN push batch (runs hourly if VEKN_PUSH enabled)
+    if os.getenv("VEKN_PUSH", "").lower() == "true":
+        push_interval = int(os.getenv("VEKN_PUSH_INTERVAL_HOURS", "1"))
+        _scheduler.add_job(
+            run_vekn_push,
+            trigger=IntervalTrigger(hours=push_interval),
+            id="vekn_push",
+            name="VEKN Push",
+            replace_existing=True,
+        )
+        logger.info(f"VEKN push scheduled every {push_interval} hours")
 
     # Schedule OAuth token/code cleanup (runs every hour)
     _scheduler.add_job(

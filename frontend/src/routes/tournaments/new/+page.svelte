@@ -9,12 +9,14 @@
 
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
 
+  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
+
   let values = $state<TournamentFieldValues>({
     name: "",
     format: "Standard",
     rank: "",
-    open_rounds: false,
-    max_rounds: 0,
+    open_rounds: !veknPush ? false : true,
+    max_rounds: veknPush ? 3 : 0,
     online: false,
     country: "",
     venue: "",
@@ -39,6 +41,10 @@
   async function handleSubmit() {
     if (!values.name.trim()) {
       error = m.tournament_new_error_name_required();
+      return;
+    }
+    if (veknPush && (values.max_rounds < 2 || values.max_rounds > 4)) {
+      error = m.tournament_new_error_max_rounds();
       return;
     }
 

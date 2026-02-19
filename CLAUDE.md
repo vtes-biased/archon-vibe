@@ -50,6 +50,8 @@ CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
 
 **Object Types**: User, Sanction, Tournament, Rating, League (all synced via SSE). VtesCard (static data, loaded into IndexedDB).
 
+**Tournament extra fields**: `external_ids` (dict, e.g. `{"vekn": "<event_id>"}`), `vekn_pushed_at` (datetime|None — set when results uploaded to VEKN).
+
 ## Events
 
 ### Business Events

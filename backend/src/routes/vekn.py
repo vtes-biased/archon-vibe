@@ -1,6 +1,7 @@
 """VEKN ID management API endpoints."""
 
 import logging
+import os
 from datetime import UTC, datetime
 
 import msgspec
@@ -266,6 +267,20 @@ async def sponsor_new_member(
     logger.info(f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}")
     if broadcast_resync:
         await broadcast_resync(updated.uid)
+
+    # Push new member to VEKN registry
+    if os.getenv("VEKN_PUSH", "").lower() == "true":
+        try:
+            from ..vekn_api import VEKNAPIClient
+            from ..vekn_push import push_member
+
+            client = VEKNAPIClient()
+            try:
+                await push_member(client, updated)
+            finally:
+                await client.close()
+        except Exception:
+            logger.exception("Failed to push new member to VEKN")
 
     return Response(
         content=encoder.encode({

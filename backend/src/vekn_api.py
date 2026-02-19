@@ -191,6 +191,149 @@ class VEKNAPIClient:
         except aiohttp.ClientError as e:
             raise VEKNAPIError(f"HTTP error searching players: {e}") from e
 
+    # -------------------------------------------------------------------------
+    # Push methods (VEKN down-sync: push data TO vekn.net)
+    # -------------------------------------------------------------------------
+
+    async def create_event(
+        self,
+        *,
+        name: str,
+        event_type: int,
+        startdate: str,
+        enddate: str,
+        rounds: int,
+        final: int,
+        organizer_vekn_id: str,
+        online: bool = False,
+        venueid: int = 0,
+        timelimit: int = 120,
+        multideck: bool = False,
+        proxies: bool = False,
+        website: str = "",
+        description: str = "",
+    ) -> str:
+        """Create a VEKN calendar event. Returns the event ID."""
+        await self._ensure_authenticated()
+        session = self._get_session()
+
+        form_data = {
+            "name": name,
+            "type": event_type,
+            "startdate": startdate,
+            "enddate": enddate,
+            "rounds": rounds,
+            "final": final,
+            "online": 1 if online else 0,
+            "timelimit": timelimit,
+            "multideck": 1 if multideck else 0,
+            "proxies": 1 if proxies else 0,
+        }
+        if venueid:
+            form_data["venueid"] = venueid
+        if website:
+            form_data["website"] = website
+        if description:
+            form_data["description"] = description
+
+        headers: dict[str, str] = {}
+        if self._auth_token:
+            headers["Authorization"] = f"Bearer {self._auth_token}"
+        # Impersonate organizer so the event is created under their name
+        headers["Vekn-Id"] = organizer_vekn_id
+
+        try:
+            async with session.post(
+                f"{self.base_url}/index.php",
+                params={"app": "vekn", "resource": "event", "format": "raw"},
+                data=form_data,
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
+                inner = data.get("data", {})
+                self._check_vekn_error(inner, "Create event failed")
+                event_id = inner.get("id")
+                if not event_id:
+                    raise VEKNAPIError(f"No event ID in response: {data}")
+                logger.info(f"Created VEKN event {event_id}: {name}")
+                return str(event_id)
+        except aiohttp.ClientError as e:
+            raise VEKNAPIError(f"HTTP error creating event: {e}") from e
+
+    async def upload_results(self, vekn_event_id: str, archondata: str) -> None:
+        """Upload archon data (results) for a VEKN event."""
+        await self._ensure_authenticated()
+        session = self._get_session()
+
+        headers: dict[str, str] = {}
+        if self._auth_token:
+            headers["Authorization"] = f"Bearer {self._auth_token}"
+
+        try:
+            async with session.post(
+                f"{self.base_url}/index.php",
+                params={
+                    "app": "vekn",
+                    "resource": "archon",
+                    "format": "raw",
+                    "id": vekn_event_id,
+                },
+                data={"archondata": archondata},
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
+                inner = data.get("data", {})
+                self._check_vekn_error(inner, "Upload results failed")
+                logger.info(f"Uploaded archon data for VEKN event {vekn_event_id}")
+        except aiohttp.ClientError as e:
+            raise VEKNAPIError(f"HTTP error uploading results: {e}") from e
+
+    async def create_member(
+        self,
+        *,
+        veknid: str,
+        firstname: str,
+        lastname: str,
+        email: str,
+        country: str,
+        state: str = "",
+        city: str = "",
+    ) -> None:
+        """Register a new member in the VEKN registry."""
+        await self._ensure_authenticated()
+        session = self._get_session()
+
+        headers: dict[str, str] = {}
+        if self._auth_token:
+            headers["Authorization"] = f"Bearer {self._auth_token}"
+
+        form_data = {
+            "veknid": veknid,
+            "firstname": firstname,
+            "lastname": lastname,
+            "email": email,
+            "country": country,
+            "state": state,
+            "city": city,
+        }
+
+        try:
+            async with session.post(
+                f"{self.base_url}/index.php",
+                params={"app": "vekn", "resource": "registry", "format": "raw"},
+                data=form_data,
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
+                inner = data.get("data", {})
+                self._check_vekn_error(inner, "Create member failed")
+                logger.info(f"Created VEKN member {veknid}: {firstname} {lastname}")
+        except aiohttp.ClientError as e:
+            raise VEKNAPIError(f"HTTP error creating member: {e}") from e
+
     async def fetch_event(self, event_id: int) -> dict | None:
         """Fetch a single event by ID. Returns event dict or None if not found.
 
