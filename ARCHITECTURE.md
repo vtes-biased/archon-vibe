@@ -77,6 +77,14 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 - **Payload**: Contains full object data, including `uid` and `modified` fields
 - **Flow**: Database change → CRUD event → SSE/reconciliation → IndexedDB sync
 
+### 3. Ephemeral SSE Events
+- **Purpose**: Real-time notifications not requiring persistent storage
+- **NOT stored in DB; NOT written to IndexedDB**
+- **`judge_call`**: Player requests judge assistance. Broadcast to organizers and IC users only.
+  - Payload: `{ tournament_uid, table, table_label, player_name }`
+  - Auto-dismissed client-side after 120s; plays audio chime on receipt
+  - Available online-only (`offline_mode` and non-playing tournaments rejected)
+
 ## Online Mode
 
 ```
@@ -355,6 +363,66 @@ For objects that need sync support after deletion:
 5. Backend cleanup job hard-deletes after 30 days
 
 This ensures clients that were offline during deletion still receive the delete event on reconnect.
+
+## Shared Timer
+
+Online-only feature. State stored on the `Tournament` object and synced via normal SSE (CRUD event on save). Clients compute the countdown locally — no per-second server broadcasts.
+
+### Data Model
+
+```python
+class TimerState(msgspec.Struct):
+    started_at: datetime | None = None        # UTC, when timer was started/resumed
+    elapsed_before_pause: float = 0.0         # seconds accumulated before last pause
+    paused: bool = True
+
+class TimeExtensionPolicy(StrEnum):
+    ADDITIONS  = "additions"   # +N min per table
+    CLOCK_STOP = "clock_stop"  # per-table clock pause/resume
+    BOTH       = "both"        # both mechanisms available
+```
+
+**Tournament fields** (timer state):
+- `timer: TimerState` — global round timer
+- `table_extra_time: dict[str, int]` — table_idx → extra seconds
+- `table_paused_at: dict[str, str]` — table_idx → ISO datetime of clock-stop
+
+**TournamentConfig fields**:
+- `round_time: int` — round duration in seconds (0 = no timer)
+- `finals_time: int` — finals override (0 = use round_time)
+- `time_extension_policy: TimeExtensionPolicy`
+
+### Sync Pattern
+
+Server updates `tournament.timer` / `table_extra_time` / `table_paused_at` and broadcasts the full Tournament CRUD event via SSE. Clients receive the state update and recompute the countdown from `started_at` + `elapsed_before_pause` using a local `setInterval(1000)`. No streaming of individual tick values.
+
+### Endpoints (organizer-only, online-only, tournament must be in Playing state)
+
+| Method | Path | Effect |
+|--------|------|--------|
+| POST | `/{uid}/timer/start` | Resume/start global timer |
+| POST | `/{uid}/timer/pause` | Pause global timer |
+| POST | `/{uid}/timer/reset` | Reset timer + clear all table extensions |
+| POST | `/{uid}/timer/add-time` | Add extra seconds to one table (max 600s total, policy must allow) |
+| POST | `/{uid}/timer/clock-stop` | Pause a table's clock (clock-stop) |
+| POST | `/{uid}/timer/clock-resume` | Resume table clock (converts pause duration → extra_time) |
+
+All timer endpoints save-and-broadcast the updated tournament object.
+
+### Frontend Components
+
+- `TimerDisplay.svelte` — renders countdown, warning (<5 min), expired state; includes organizer controls for global and per-table actions
+- `JudgeCallBanner.svelte` — receives `judge_call` SSE events; stacks dismissible alert banners with audio chime
+
+## Call for Judge
+
+Player-initiated request for judge assistance at their table. Online-only.
+
+**Endpoint**: `POST /{uid}/call-judge` — `{ table: int }`
+
+**Constraints**: Player must be authenticated and seated at the specified table in the current round. Tournament must be in Playing state and not in offline mode.
+
+**Broadcast**: Ephemeral `judge_call` SSE event to organizers and IC users only (not stored, not IndexedDB-synced). See [Ephemeral SSE Events](#3-ephemeral-sse-events).
 
 ## VEKN Push Sync
 

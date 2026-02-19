@@ -54,6 +54,21 @@ for stream_fn, event_type, filter_fn in _stream_specs:
         yield SSE(type=event_type, data=filtered)
 ```
 
+### Ephemeral SSE Events
+
+Not all SSE events are CRUD events. Ephemeral events are broadcast directly to specific connections without DB storage or IndexedDB writes.
+
+| Event type | Target | Stored | IndexedDB | Purpose |
+|------------|--------|--------|-----------|---------|
+| `judge_call` | organizers + IC | No | No | Player calls for judge at table |
+
+`judge_call` payload:
+```json
+{ "tournament_uid": "...", "table": 2, "table_label": "Table 3", "player_name": "..." }
+```
+
+Frontend handles in `JudgeCallBanner.svelte` — accumulates calls in component state, auto-dismisses after 120s, plays audio chime.
+
 ### Resync Mechanism
 
 Triggered when a viewer's data level changes (role or vekn_id change).

@@ -63,6 +63,9 @@ export async function apiRequest<T>(
     throw new ApiError(message, response.status, detail);
   }
 
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return undefined as T;
+  }
   return response.json();
 }
 
@@ -619,6 +622,50 @@ export async function addTournamentOrganizer(uid: string, userUid: string): Prom
 export async function removeTournamentOrganizer(uid: string, organizerUid: string): Promise<Tournament> {
   return apiRequest<Tournament>(`/api/tournaments/${uid}/organizers/${organizerUid}`, {
     method: 'DELETE',
+  });
+}
+
+// Timer API
+
+export async function timerStart(uid: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/timer/start`, { method: 'POST' });
+}
+
+export async function timerPause(uid: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/timer/pause`, { method: 'POST' });
+}
+
+export async function timerReset(uid: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/timer/reset`, { method: 'POST' });
+}
+
+export async function timerAddTime(uid: string, table: string, seconds: number): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/timer/add-time`, {
+    method: 'POST',
+    body: JSON.stringify({ table, seconds }),
+  });
+}
+
+export async function timerClockStop(uid: string, table: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/timer/clock-stop`, {
+    method: 'POST',
+    body: JSON.stringify({ table }),
+  });
+}
+
+export async function timerClockResume(uid: string, table: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/timer/clock-resume`, {
+    method: 'POST',
+    body: JSON.stringify({ table }),
+  });
+}
+
+// Judge call API
+
+export async function callJudge(uid: string, table: number): Promise<void> {
+  await apiRequest<void>(`/api/tournaments/${uid}/call-judge`, {
+    method: 'POST',
+    body: JSON.stringify({ table }),
   });
 }
 

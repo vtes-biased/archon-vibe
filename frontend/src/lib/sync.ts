@@ -35,11 +35,18 @@ import { isOffline, getOfflineTournamentUids } from '$lib/stores/offline.svelte'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'rating' | 'league' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
+type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'rating' | 'league' | 'judge_call' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
+
+export interface JudgeCallData {
+  tournament_uid: string;
+  table: number;
+  table_label: string;
+  player_name: string;
+}
 
 interface SyncEvent {
   type: SyncEventType;
-  data?: User | Sanction | Tournament | Rating | League;
+  data?: User | Sanction | Tournament | Rating | League | JudgeCallData;
   timestamp?: string | null;
   error?: string;
 }
@@ -115,6 +122,12 @@ class SyncManager {
           try { if (message.timestamp) await setLastSyncTimestamp(message.timestamp); } catch (e) { console.error('Save timestamp failed:', e); }
           this.isSynced = true;
           this.emit({ type: 'sync_complete', timestamp: message.timestamp });
+          return;
+        }
+
+        // Judge call: ephemeral pass-through (no IndexedDB storage)
+        if (message.type === 'judge_call') {
+          this.emit({ type: 'judge_call', data: message.data });
           return;
         }
 

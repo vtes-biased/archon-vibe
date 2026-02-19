@@ -52,6 +52,13 @@ CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
 
 **Tournament extra fields**: `external_ids` (dict, e.g. `{"vekn": "<event_id>"}`), `vekn_pushed_at` (datetime|None — set when results uploaded to VEKN).
 
+**Timer fields** (on Tournament, online-only):
+- `timer`: `TimerState` — `{started_at, elapsed_before_pause, paused}`. Clients compute countdown locally.
+- `table_extra_time`: `dict[str, int]` — table index → extra seconds granted
+- `table_paused_at`: `dict[str, str]` — table index → ISO datetime of clock-stop start
+
+**TournamentConfig timer fields**: `round_time` (int, seconds), `finals_time` (int, seconds, 0 = use round_time), `time_extension_policy` (`additions` | `clock_stop` | `both`).
+
 ## Events
 
 ### Business Events
@@ -63,6 +70,10 @@ CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
 - Sync database state (Create/Update/Delete)
 - Payload: full object with `uid` + `modified`
 - Used for SSE streaming and reconciliation
+
+### Ephemeral SSE Events
+- Not stored in DB; no IndexedDB update
+- `judge_call`: broadcast to organizers + IC only; payload `{tournament_uid, table, table_label, player_name}`
 
 ## Modes
 

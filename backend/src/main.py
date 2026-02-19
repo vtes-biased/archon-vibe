@@ -538,6 +538,13 @@ def _filter_tournament(t: Tournament, viewer: User | None) -> Tournament | None:
             winner=t.winner,
             standings=standings,
             my_tables=my_tables,
+            # Timer fields: visible to all members (players need the countdown)
+            round_time=t.round_time,
+            finals_time=t.finals_time,
+            time_extension_policy=t.time_extension_policy,
+            timer=t.timer,
+            table_extra_time=t.table_extra_time,
+            table_paused_at=t.table_paused_at,
         )
 
     # Non-member: minimal
@@ -610,6 +617,34 @@ async def broadcast_league_event(league: League) -> None:
     await _broadcast("league", league, _filter_league)
 
 
+async def broadcast_judge_call(
+    *, tournament_uid: str, table: int, table_label: str, player_name: str,
+    organizer_uids: list[str] | None = None,
+) -> None:
+    """Broadcast judge call to organizers and IC users only."""
+    event_data = {
+        "type": "judge_call",
+        "data": {
+            "tournament_uid": tournament_uid,
+            "table": table,
+            "table_label": table_label,
+            "player_name": player_name,
+        },
+    }
+    message = f"data: {encoder.encode(event_data).decode('utf-8')}\n\n"
+    org_set = set(organizer_uids or [])
+    disconnected: set[SSEConnection] = set()
+    for conn in _sse_connections:
+        if not conn.user:
+            continue
+        if Role.IC in conn.user.roles or conn.user.uid in org_set:
+            try:
+                conn.queue.put_nowait(message)
+            except asyncio.QueueFull:
+                disconnected.add(conn)
+    _sse_connections.difference_update(disconnected)
+
+
 async def broadcast_resync(user_uid: str) -> None:
     """Push a resync event to a specific user's SSE connection(s)."""
     event_data = {"type": "resync"}
@@ -630,6 +665,7 @@ tournaments.broadcast_tournament_event = broadcast_tournament_event
 tournaments.broadcast_rating_event = broadcast_rating_event
 tournaments.broadcast_user_event = broadcast_user_event
 tournaments.broadcast_sanction_event = broadcast_sanction_event
+tournaments.broadcast_judge_call = broadcast_judge_call
 leagues.broadcast_league_event = broadcast_league_event
 users.broadcast_resync = broadcast_resync
 vekn.broadcast_resync = broadcast_resync

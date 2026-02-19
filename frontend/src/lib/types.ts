@@ -222,6 +222,13 @@ export type TournamentFormat = "Standard" | "V5" | "Limited";
 export type TournamentRank = "" | "National Championship" | "Continental Championship";
 export type StandingsMode = "Private" | "Cutoff" | "Top 10" | "Public";
 export type DeckListsMode = "Winner" | "Finalists" | "All";
+export type TimeExtensionPolicy = "additions" | "clock_stop" | "both";
+
+export interface TimerState {
+  started_at: string | null;     // ISO datetime
+  elapsed_before_pause: number;  // seconds
+  paused: boolean;
+}
 export type PlayerState = "Registered" | "Checked-in" | "Playing" | "Finished" | "Disqualified";
 export type PaymentStatus = "Pending" | "Paid" | "Refunded" | "Cancelled";
 export type TableState = "Finished" | "In Progress" | "Invalid";
@@ -331,6 +338,14 @@ export interface Tournament extends BaseObject {
   offline_device_id?: string;
   offline_user_uid?: string;
   offline_since?: string | null;
+
+  // Timer (online-only)
+  round_time?: number;
+  finals_time?: number;
+  time_extension_policy?: TimeExtensionPolicy;
+  timer?: TimerState;
+  table_extra_time?: Record<string, number>;  // table_idx → extra seconds
+  table_paused_at?: Record<string, string>;   // table_idx → ISO datetime
 }
 
 /** Player added during offline mode, pending reconciliation with server. */

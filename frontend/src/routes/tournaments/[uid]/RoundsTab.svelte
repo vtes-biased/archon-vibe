@@ -6,6 +6,7 @@
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer } from "lucide-svelte";
+  import TimerDisplay from "./TimerDisplay.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -297,6 +298,13 @@
     </div>
   {/if}
 
+  <!-- Global Timer -->
+  {#if (tournament.round_time ?? 0) > 0 && tournament.state === "Playing"}
+    <div class="bg-ash-900/50 rounded-lg p-4 flex justify-center">
+      <TimerDisplay {tournament} {isOrganizer} />
+    </div>
+  {/if}
+
   {#if tournament.rounds!.length === 0}
     <p class="text-ash-400">{m.rounds_no_rounds()}</p>
   {:else}
@@ -502,6 +510,12 @@
                     {/if}
                   </div>
                 </div>
+                <!-- Per-table timer (organizer controls) -->
+                {#if (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
+                  <div class="mb-2">
+                    <TimerDisplay {tournament} {isOrganizer} tableIndex={i} />
+                  </div>
+                {/if}
                 <div class="divide-y divide-ash-800">
                   {#each table.seating as seat, j}
                     {@const tVps = table.seating.map(s => s.result.vp)}

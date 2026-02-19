@@ -28,8 +28,10 @@
   import DecksTab from "./DecksTab.svelte"; // Used in player view only
   import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
+  import JudgeCallBanner from "./JudgeCallBanner.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
+  import type { JudgeCallData } from "$lib/sync";
 
   const countries = getCountries();
 
@@ -57,6 +59,7 @@
   const isLockedByOtherDevice = $derived(
     tournament?.offline_mode === true && tournament?.offline_device_id !== deviceId
   );
+  let judgeCallBanner = $state<ReturnType<typeof JudgeCallBanner> | null>(null);
   let showQrCode = $state(false);
   let showGoOfflineConfirm = $state(false);
   let showGoOnlineConfirm = $state(false);
@@ -496,10 +499,13 @@
     const _currentUid = uid; // explicit dependency on uid
     untrack(() => load());
 
-    const handleSync = (event: { type: string }) => {
+    const handleSync = (event: { type: string; data?: any }) => {
       if (event.type === "tournament") untrack(() => load());
       if (event.type === "sanction") {
         getSanctionsForTournament(uid).then(s => { tournamentSanctions = s; });
+      }
+      if (event.type === "judge_call" && event.data) {
+        judgeCallBanner?.addCall(event.data as JudgeCallData);
       }
     };
     syncManager.addEventListener(handleSync);
@@ -704,6 +710,11 @@
             {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
           </button>
         </div>
+      {/if}
+
+      <!-- Judge Call Banner (organizer only) -->
+      {#if showOrganizerView && tournament.state === "Playing"}
+        <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
       {/if}
 
       <!-- Organizer Console with Tabs -->

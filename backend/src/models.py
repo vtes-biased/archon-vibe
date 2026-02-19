@@ -166,6 +166,22 @@ BASELINE_PENALTIES: dict[SanctionSubcategory, SanctionLevel] = {
 }
 
 
+class TimeExtensionPolicy(StrEnum):
+    """Time extension method per VEKN Judges Guide v2 section 1.2.4."""
+
+    ADDITIONS = "additions"  # Manual +N min per table
+    CLOCK_STOP = "clock_stop"  # Pause/resume per table
+    BOTH = "both"  # Both mechanisms available
+
+
+class TimerState(msgspec.Struct, kw_only=True):
+    """Global round timer state. Clients compute countdown locally."""
+
+    started_at: datetime | None = None  # When timer was started/resumed (UTC)
+    elapsed_before_pause: float = 0.0  # Seconds accumulated in prior running periods
+    paused: bool = True  # True = not running
+
+
 class BaseObject(msgspec.Struct, kw_only=True):
     """Base object structure for all domain objects."""
 
@@ -392,6 +408,10 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     decklists_mode: DeckListsMode = DeckListsMode.WINNER
     max_rounds: int = 0
     table_rooms: list[Room] = msgspec.field(default_factory=list)
+    # Timer config
+    round_time: int = 0  # Round duration in seconds (0 = no timer)
+    finals_time: int = 0  # Finals duration in seconds (0 = use round_time)
+    time_extension_policy: TimeExtensionPolicy = TimeExtensionPolicy.ADDITIONS
 
 
 class PlayerState(StrEnum):
@@ -490,6 +510,10 @@ class Tournament(TournamentConfig, kw_only=True):
     offline_device_id: str = ""  # Device identifier (localStorage UUID) that holds the lock
     offline_user_uid: str = ""  # User UID of organizer who locked it (for display)
     offline_since: datetime | None = None  # When tournament went offline
+    # Timer state (online-only, not processed by Rust engine)
+    timer: TimerState = msgspec.field(default_factory=TimerState)
+    table_extra_time: dict[str, int] = msgspec.field(default_factory=dict)  # table_idx → extra seconds
+    table_paused_at: dict[str, str] = msgspec.field(default_factory=dict)  # table_idx → ISO datetime
 
 
 # OAuth 2.0 models

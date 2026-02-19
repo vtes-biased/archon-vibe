@@ -31,6 +31,8 @@ from ..models import (
     Sanction,
     SanctionLevel,
     StandingsMode,
+    TimeExtensionPolicy,
+    TimerState,
     Tournament,
     TournamentFormat,
     TournamentMinimal,
@@ -734,6 +736,22 @@ async def tournament_action(
         # Parse result — modified is set by DB trigger (CURRENT_TIMESTAMP)
         updated = decoder.decode(result_json.encode("utf-8"))
         updated.modified = datetime.now(UTC)
+
+        # Timer lifecycle hooks (online-only, not handled by Rust engine)
+        if request.type in ("StartRound", "StartFinals"):
+            updated.timer = TimerState()  # Fresh paused timer
+            updated.table_extra_time = {}
+            updated.table_paused_at = {}
+        elif request.type in ("FinishRound", "CancelRound", "FinishTournament"):
+            if not updated.timer.paused and updated.timer.started_at:
+                # Accumulate elapsed time before pausing
+                elapsed = (datetime.now(UTC) - updated.timer.started_at).total_seconds()
+                updated.timer = TimerState(
+                    elapsed_before_pause=updated.timer.elapsed_before_pause + elapsed,
+                    paused=True,
+                )
+            updated.table_extra_time = {}
+            updated.table_paused_at = {}
 
         # Save within the same transaction (row is still locked)
         await tx_conn.execute(
@@ -1509,6 +1527,260 @@ async def tournament_report(
         media_type="text/plain",
         headers={"Content-Disposition": f'attachment; filename="{uid}-report.txt"'},
     )
+
+
+# ============================================================================
+# Timer endpoints (online-only, not processed by Rust engine)
+# ============================================================================
+
+
+async def _check_organizer(authorization: str | None):
+    """Auth check for timer endpoints. Returns user."""
+    user = await _get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user
+
+
+def _validate_timer_tournament(user, tournament: Tournament | None):
+    """Validate tournament state for timer operations (inside transaction)."""
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if not _is_organizer(user, tournament):
+        raise HTTPException(status_code=403, detail="Organizer access required")
+    if tournament.offline_mode:
+        raise HTTPException(status_code=423, detail="Tournament is in offline mode")
+    if tournament.state != TournamentState.PLAYING:
+        raise HTTPException(status_code=400, detail="Tournament is not playing")
+
+
+async def _save_timer_tx(tournament: Tournament, tx_conn):
+    """Save within transaction and broadcast after."""
+    tournament.modified = datetime.now(UTC)
+    await tx_conn.execute(
+        "UPDATE tournaments SET data = %s WHERE uid = %s",
+        (encode_json(tournament), tournament.uid),
+    )
+    return tournament
+
+
+@router.post("/{uid}/timer/start")
+async def timer_start(
+    uid: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Start or resume the global timer."""
+    user = await _check_organizer(authorization)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_timer_tournament(user, tournament)
+        if not tournament.timer.paused:
+            raise HTTPException(status_code=400, detail="Timer is already running")
+        tournament.timer = TimerState(
+            started_at=datetime.now(UTC),
+            elapsed_before_pause=tournament.timer.elapsed_before_pause,
+            paused=False,
+        )
+        await _save_timer_tx(tournament, tx_conn)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+@router.post("/{uid}/timer/pause")
+async def timer_pause(
+    uid: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Pause the global timer."""
+    user = await _check_organizer(authorization)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_timer_tournament(user, tournament)
+        if tournament.timer.paused:
+            raise HTTPException(status_code=400, detail="Timer is already paused")
+        elapsed = 0.0
+        if tournament.timer.started_at:
+            elapsed = (datetime.now(UTC) - tournament.timer.started_at).total_seconds()
+        tournament.timer = TimerState(
+            elapsed_before_pause=tournament.timer.elapsed_before_pause + elapsed,
+            paused=True,
+        )
+        await _save_timer_tx(tournament, tx_conn)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+@router.post("/{uid}/timer/reset")
+async def timer_reset(
+    uid: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Reset the global timer to fresh paused state."""
+    user = await _check_organizer(authorization)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_timer_tournament(user, tournament)
+        tournament.timer = TimerState()
+        tournament.table_extra_time = {}
+        tournament.table_paused_at = {}
+        await _save_timer_tx(tournament, tx_conn)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+class AddTimeRequest(BaseModel):
+    table: str  # table index as string key
+    seconds: int
+
+
+@router.post("/{uid}/timer/add-time")
+async def timer_add_time(
+    uid: str,
+    request: AddTimeRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Add extra time to a specific table."""
+    user = await _check_organizer(authorization)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_timer_tournament(user, tournament)
+        if tournament.time_extension_policy not in (
+            TimeExtensionPolicy.ADDITIONS,
+            TimeExtensionPolicy.BOTH,
+        ):
+            raise HTTPException(status_code=400, detail="Time additions not allowed by policy")
+        if request.seconds <= 0:
+            raise HTTPException(status_code=400, detail="Seconds must be positive")
+        current = tournament.table_extra_time.get(request.table, 0)
+        if current + request.seconds > 600:
+            raise HTTPException(status_code=400, detail="Max 600s (10 min) extra time per table")
+        tournament.table_extra_time[request.table] = current + request.seconds
+        await _save_timer_tx(tournament, tx_conn)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+class ClockStopRequest(BaseModel):
+    table: str
+
+
+@router.post("/{uid}/timer/clock-stop")
+async def timer_clock_stop(
+    uid: str,
+    request: ClockStopRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Pause a table's clock (clock-stop)."""
+    user = await _check_organizer(authorization)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_timer_tournament(user, tournament)
+        if tournament.time_extension_policy not in (
+            TimeExtensionPolicy.CLOCK_STOP,
+            TimeExtensionPolicy.BOTH,
+        ):
+            raise HTTPException(status_code=400, detail="Clock stops not allowed by policy")
+        if request.table in tournament.table_paused_at:
+            raise HTTPException(status_code=400, detail="Table clock is already stopped")
+        tournament.table_paused_at[request.table] = datetime.now(UTC).isoformat()
+        await _save_timer_tx(tournament, tx_conn)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+@router.post("/{uid}/timer/clock-resume")
+async def timer_clock_resume(
+    uid: str,
+    request: ClockStopRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Resume a table's clock (converts pause duration to extra_time)."""
+    user = await _check_organizer(authorization)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_timer_tournament(user, tournament)
+        if tournament.time_extension_policy not in (
+            TimeExtensionPolicy.CLOCK_STOP,
+            TimeExtensionPolicy.BOTH,
+        ):
+            raise HTTPException(status_code=400, detail="Clock stops not allowed by policy")
+        paused_at_str = tournament.table_paused_at.get(request.table)
+        if not paused_at_str:
+            raise HTTPException(status_code=400, detail="Table clock is not stopped")
+        paused_at = datetime.fromisoformat(paused_at_str)
+        pause_duration = int((datetime.now(UTC) - paused_at).total_seconds())
+        current_extra = tournament.table_extra_time.get(request.table, 0)
+        tournament.table_extra_time[request.table] = current_extra + pause_duration
+        del tournament.table_paused_at[request.table]
+        await _save_timer_tx(tournament, tx_conn)
+    if broadcast_tournament_event:
+        await broadcast_tournament_event(tournament)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+# ============================================================================
+# Judge call endpoint (online-only)
+# ============================================================================
+
+# Broadcast function set by main.py
+broadcast_judge_call = None
+
+
+class JudgeCallRequest(BaseModel):
+    table: int
+
+
+@router.post("/{uid}/call-judge", status_code=204)
+async def call_judge(
+    uid: str,
+    request: JudgeCallRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Player calls for judge assistance at their table."""
+    user = await _get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if tournament.state != TournamentState.PLAYING:
+        raise HTTPException(status_code=400, detail="Tournament is not playing")
+    if tournament.offline_mode:
+        raise HTTPException(status_code=423, detail="Tournament is in offline mode")
+    # Verify player is seated at the specified table in current round
+    if not tournament.rounds:
+        raise HTTPException(status_code=400, detail="No active round")
+    current_round = tournament.rounds[-1]
+    if request.table < 0 or request.table >= len(current_round):
+        raise HTTPException(status_code=400, detail="Invalid table index")
+    table = current_round[request.table]
+    if not any(s.player_uid == user.uid for s in table.seating):
+        raise HTTPException(status_code=403, detail="You are not seated at this table")
+    # Build table label
+    from ..models import Room
+    table_label = resolveTableLabelPy(tournament.table_rooms, request.table)
+    # Broadcast to organizers
+    if broadcast_judge_call:
+        await broadcast_judge_call(
+            tournament_uid=tournament.uid,
+            table=request.table,
+            table_label=table_label,
+            player_name=user.name,
+            organizer_uids=tournament.organizers_uids,
+        )
+    return Response(status_code=204)
+
+
+def resolveTableLabelPy(rooms: list, table_idx: int) -> str:
+    """Resolve table label from rooms config (Python equivalent of frontend util)."""
+    if not rooms:
+        return f"Table {table_idx + 1}"
+    offset = 0
+    for room in rooms:
+        if table_idx < offset + room.count:
+            local = table_idx - offset + 1
+            return f"{room.name} T{local}"
+        offset += room.count
+    return f"Table {table_idx + 1}"
 
 
 # ============================================================================

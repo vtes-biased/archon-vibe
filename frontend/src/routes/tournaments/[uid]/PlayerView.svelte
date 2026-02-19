@@ -4,10 +4,13 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translatePlayerState, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode } from "lucide-svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel } from "lucide-svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
+  import TimerDisplay from "./TimerDisplay.svelte";
   import DecksTab from "./DecksTab.svelte";
+  import { callJudge } from "$lib/api";
+  import { isOnline } from "$lib/api";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -52,6 +55,16 @@
 
   let showRegisteredPlayers = $state(false);
   let showQrScanner = $state(false);
+  let judgeCallCooldown = $state(false);
+
+  async function handleCallJudge(tableIdx: number) {
+    if (judgeCallCooldown) return;
+    try {
+      await callJudge(tournament.uid, tableIdx);
+      judgeCallCooldown = true;
+      setTimeout(() => { judgeCallCooldown = false; }, 30_000);
+    } catch {}
+  }
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo);
@@ -229,10 +242,29 @@
         <div class="bg-ash-900/50 rounded-lg p-4">
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-medium text-bone-100">{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}</h3>
-            <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
-              {translateTableState(myTable.state)}
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
+                {translateTableState(myTable.state)}
+              </span>
+              {#if !tournament.offline_mode && isOnline()}
+                <button
+                  onclick={() => handleCallJudge(myTableIdx)}
+                  disabled={judgeCallCooldown}
+                  class="px-2 py-1 text-xs {judgeCallCooldown ? 'text-ash-500 border-ash-700' : 'text-amber-400 hover:text-amber-300 border-amber-800 hover:border-amber-700'} border rounded-lg transition-colors flex items-center gap-1"
+                  title={judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
+                >
+                  <Gavel class="w-3 h-3" />
+                  {judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
+                </button>
+              {/if}
+            </div>
           </div>
+          <!-- Timer for player's table -->
+          {#if (tournament.round_time ?? 0) > 0}
+            <div class="mb-2">
+              <TimerDisplay {tournament} tableIndex={myTableIdx} />
+            </div>
+          {/if}
           <div class="divide-y divide-ash-800">
             {#each myTable.seating as seat, j}
               {@const tVps = myTable.seating.map(s => s.result.vp)}

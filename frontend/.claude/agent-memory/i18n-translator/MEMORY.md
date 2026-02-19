@@ -37,6 +37,23 @@
 | Deck | Deck | Mazo (but "deck" used in context) | Deck | Mazzo (but "deck" used) |
 
 Note: "Ronde" is used in fr for round (not "Round"). PT uses "Rodada" for round in some contexts.
+IT: "round" is kept as loanword (not "turno"). IT finals = "Finali" (plural) for section headings, "finale" (singular) for time-config labels.
+
+## Judge Terminology (tournament context)
+| Lang | Term | Note |
+|------|------|-------|
+| fr | arbitre | established in override_judge_comment and judge_call_* |
+| es | juez | established in override_judge_comment and judge_call_* |
+| pt | juiz | established in override_judge_comment and judge_call_* |
+| it | giudice | established in override_judge_comment; do NOT use "arbitro" |
+
+## Clock Stop (tournament procedure)
+| Lang | timer_clock_stop | timer_policy_clock_stop |
+|------|-----------------|------------------------|
+| fr | Arrêt d'horloge | Arrêt d'horloge |
+| es | Parar reloj | Parada de reloj |
+| pt | Parar relógio | Parada de relógio |
+| it | Ferma orologio | Arresto orologio |
 
 ## Developer Portal
 - fr: "Portail développeur" (matches existing `developer_page_title`)
