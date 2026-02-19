@@ -43,7 +43,7 @@ These appear on member profiles but do not grant additional powers in tournament
 
 **Needs**:
 - Register for upcoming tournaments
-- Check in (including via QR code — planned)
+- Check in (including via QR code)
 - View table assignment and seat position each round
 - Report table results (VP scores) — players at a table can set scores; organizer override locks them
 - View standings during and after the event
@@ -280,6 +280,8 @@ Three data levels control what each connected client sees:
 - Mobile-first organizer console
 - Drag-and-drop seating editor with per-player issue indicators
 - Printable round seating (print-optimized CSS)
+- QR code check-in (organizer displays QR; players scan from app to check in)
+- Venue autocomplete (country-scoped suggestions from tournament history: name, address, city, URL, map URL)
 - Payment tracking (paid/unpaid toggle per player)
 - Multiple organizers management (add/remove co-organizers)
 - IC implicit organizer access on all tournaments
@@ -288,6 +290,16 @@ Three data levels control what each connected client sees:
 - Social sharing for finished tournaments (PNG card + text with decklist)
 - iCal calendar feed (personal agenda, country, global; with online toggle)
 - Tournament list with "My Agenda" view
+
+**Deck Management UX**:
+- Collapsible decklists in player view
+- Deck attribution improvements (autocomplete author, correct display)
+- Deck upload/replace UX refinements
+
+**Help & Reference**:
+- In-app help pages: VTES rulebook, VEKN tournament rules, Judges Guide (v1+v2), Code of Ethics
+- Player guide and organizer guide served as help content
+- Paginated help viewer with table of contents
 
 **Ratings & Hall of Fame**:
 - RP display in finished tournament standings
@@ -300,6 +312,9 @@ Three data levels control what each connected client sees:
 - SSE real-time sync with role-based filtering
 - Optimistic updates via WASM engine
 - Resync mechanism on role/VEKN ID changes
+- Full offline tournament mode: primary device ownership, force-takeover, opportunistic sync, go-online reconciliation
+- Offline member creation with temp UIDs remapped on sync
+- IC emergency force-unlock for offline-locked tournaments
 - Internationalization support (EN, FR, ES, PT-BR, IT)
 
 ### 5.2 Not Yet Implemented / Planned
@@ -308,7 +323,6 @@ See `development-plan.md` for implementation phasing.
 
 #### Tournament Features
 
-- **QR code self-check-in** (planned Phase 5; basic self-check-in button exists but no QR generation/scanning)
 - **Round timer**: Organizer-controlled countdown (start/pause/reset), visible to all players via SSE. Shared per round or per table.
 - **Ask for a Judge button**: Player sends notification from table view to organizers (push notification + on-screen alert)
 - **Raffle**: Random draw from configurable player pools (round winners, non-finalists, non-winners, all players, etc.) for prize attribution
@@ -343,7 +357,6 @@ See `development-plan.md` for implementation phasing.
 #### API & Integration
 
 - **OAuth2 for third-party clients**: Client registration, authorization flow, token management
-- **Venue autocomplete**: Country-scoped suggestions from historical tournament data (name, address, city, URL, map URL)
 
 #### Discord Integration
 
@@ -454,6 +467,7 @@ Player removed from rankings after 12 months of inactivity; rating preserved ind
 | Archon Help | `reference/archon-help.md` | User-facing help text for the Archon platform |
 | Game Terms | `reference/game_terms.json` | Official VTES game terminology translations (EN/FR/ES/PT-BR/IT/JP/LATIN) |
 | Rulebooks | `reference/rulebooks/` | Official VTES rulebook PDFs in multiple languages |
+| Help Content | `frontend/src/lib/help-content/` | Frontend-served help pages (VTES rules, tournament rules, judges guide, ethics, player/organizer guides) |
 | Architecture | `ARCHITECTURE.md` | Technical architecture reference |
 | Sync | `SYNC.md` | SSE streaming and IndexedDB sync patterns |
 | Tournaments | `TOURNAMENTS.md` | Tournament system implementation details |

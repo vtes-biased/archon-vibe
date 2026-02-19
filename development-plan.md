@@ -202,15 +202,9 @@ Reference: [Sanctions categories document](https://docs.google.com/document/d/1N
 
 ---
 
-## Phase 5: QR Code Check-in
+## Phase 5: QR Code Check-in ✅
 
-Players check in via QR code shown/printed by organizers.
-
-**Challenge:** Ensure players are physically at the venue. GPS is unreliable and not universally available.
-
-**Proposed approach:** QR code encodes a non-URL payload (e.g., a signed token). Players must scan it from within the app — sharing a photo and using it remotely is cumbersome enough to deter abuse without being bulletproof. Trade-off: slightly worse UX (can't scan from camera app) but reasonable venue-presence assurance.
-
-> Open design question: explore alternatives. The goal is "inconvenient enough to deter remote check-in" if not fully secure.
+Players check in via QR code displayed by organizers. The organizer's tournament page shows a QR code; players scan it from within the Archon app to check in. The QR encodes a check-in token scoped to the tournament, providing reasonable venue-presence assurance (sharing a photo and scanning remotely is cumbersome enough to deter abuse).
 
 **Done when:** QR check-in works from the app with reasonable venue-presence assurance.
 
@@ -252,7 +246,7 @@ Two modes (keep it lean):
 
 ---
 
-## Phase 8: Offline Mode (Full)
+## Phase 8: Offline Mode (Full) ✅
 
 > Basic offline CRUD already works (IndexedDB + WASM engine + changes log). This phase adds ownership and conflict resolution.
 
@@ -292,41 +286,50 @@ Two modes (keep it lean):
 
 ## Phase 9: Entry Fee & Pretix Integration
 
-- Simple paid/unpaid flag per registered player
+### Payment Tracking ✅
+
+- Simple paid/unpaid flag per registered player (SetPaymentStatus action)
+- Organizers can toggle payment status; visible in registration list
+
+### Pretix Integration
+
 - Players cannot self-check-in if not flagged as paid; organizers can check in anyone
 - Optional: link tournament to a Pretix event via [Pretix API](https://docs.pretix.eu) to auto-track payment status
 
-**Done when:** Payment tracking works; Pretix integration optional but functional.
+**Done when:** Payment tracking works (✅); Pretix integration optional but functional.
 
 ---
 
 ## Phase 10: Venue Completion
 
-- VEKN sync imports venue information via VEKN API
+### Venue Autocomplete ✅
+
 - Tournament creation/edit: auto-complete venue name (country-scoped), auto-fill address, map, URL from last known data for that venue name
 - No separate venue table — dynamic in-memory completion from existing tournament data
 
-**Done when:** Venue auto-complete works during tournament creation.
+### VEKN Venue Import
+
+- VEKN sync imports venue information via VEKN API to seed autocomplete data for countries with historical tournaments
+
+**Done when:** Venue auto-complete works during tournament creation (✅) and VEKN venue data is imported.
 
 ---
 
-## Phase 11: Help & Documentation
+## Phase 11: Help & Documentation ✅
 
-### Reference Documents (HTML)
+### Reference Documents ✅
 
 - VTES rules extracted from [rulebook repository](https://github.com/GiottoVerducci/rulebook2024) main branch
 - VEKN tournament rules
-- Judge's guide — update to [new version](https://docs.google.com/document/d/1Nw3EkVtyXSvgDK2MZ040xcDBVuE3FWfS6LLwGGuhRfM/edit?tab=t.0#heading=h.1yc5szj1lpa5)
-- Ethics guide
+- Judge's guide (v1 and v2)
+- Code of Ethics
+- All served as in-app help pages at `/help` with paginated viewer and table of contents
+- Source markdown in `frontend/src/lib/help-content/`; reference copies remain in `reference/`
 
-Previous versions in [archon](../archon).
+### User Guides ✅
 
-### User Guides
-
-- Player guide and organizer guide (separate documents)
-- Clear, minimal — the shorter the better
-- The app UX should provide enough in-context guidance that documentation is rarely needed
-- Iterate on content and organization for ease of use
+- Player guide and organizer guide (separate documents in `frontend/src/lib/help-content/`)
+- Accessible from the help pages navigation
 
 **Done when:** All reference docs converted to clean HTML; guides drafted and reviewed.
 

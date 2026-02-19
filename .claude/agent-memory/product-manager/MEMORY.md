@@ -36,26 +36,41 @@
 - All business logic in shared Rust engine (not Python or TypeScript)
 - Server always wins conflicts in sync
 
-## Phase Status (as of 2026-02-17)
+## Phase Status (as of 2026-02-18)
 - Phase 1 (Decklists): COMPLETE including TWDA integration (twda.py exists with GitHub App PR creation)
 - Phase 2 (Leagues): COMPLETE
 - Phase 3 (Sanctions Enhancement): COMPLETE (v2 categories, SA adjustments, DQ barring, lifting)
 - Phase 4 (Ratings/Hall of Fame): COMPLETE (4-cat ratings, rankings page, HoF on rankings page, RP in PlayersTab)
-- Phases 5-12: NOT STARTED
+- Phase 5 (QR Code Check-in): COMPLETE (QrCheckinDisplay + QrCheckinScanner components)
+- Phase 6 (Online Features): NOT STARTED (Call for Judge, Shared Timer)
+- Phase 7 (Printable Seating & Table Labels): PARTIAL (Printable seating done, table labels not)
+- Phase 8 (Full Offline Mode): NOT STARTED
+- Phase 9 (Entry Fee & Pretix): PARTIAL (payment tracking done, Pretix not)
+- Phase 10 (Venue Completion): PARTIAL (autocomplete done via TournamentFields.svelte + db.ts, VEKN venue import not)
+- Phase 11 (Help & Documentation): COMPLETE (help-content/ has all reference docs + player/organizer guides, /help route)
+- Phase 12 (Discord Bot): NOT STARTED
 - Payment tracking: IMPLEMENTED (SetPaymentStatus action)
 - Organizer management: IMPLEMENTED (add/remove co-organizers)
 - iCal feed: IMPLEMENTED (backend/src/routes/calendar.py — personal + public feeds)
 - Tournament list rework: IMPLEMENTED (My Agenda view)
 - Staggered seating: IMPLEMENTED in engine (engine/src/seating.rs — 6/7/11 player counts)
 - Drag-and-drop seating alteration: IMPLEMENTED (R1 enforcement, issue indicators)
-- Social export: NOT IMPLEMENTED
-- Printable seating/table labels: NOT IMPLEMENTED
+- Social export: IMPLEMENTED (social-card.ts PNG + social-text.ts for finished tournaments)
+- Printable seating: IMPLEMENTED (print-optimized CSS)
+- Venue autocomplete: IMPLEMENTED (country-scoped, from tournament history)
+- Help pages: IMPLEMENTED (rulebook, tournament rules, judges guide v1+v2, ethics, player/organizer guides)
+- Deck UX improvements: IMPLEMENTED (collapsible decklists, attribution fixes, replace UX)
 - Round timer: NOT IMPLEMENTED
-- QR check-in: NOT IMPLEMENTED
 - VEKN results reporting (push): NOT IMPLEMENTED (pull/import exists via vekn_tournament_sync.py)
 - Full offline mode (ownership model): NOT IMPLEMENTED
 
 ## Recently Shipped (Jan-Feb 2026)
+- QR code check-in (QrCheckinDisplay + QrCheckinScanner)
+- Venue autocomplete (country-scoped from tournament history)
+- Help pages (rulebook, tournament rules, judges guides, ethics, player/organizer guides)
+- Social sharing for finished tournaments (PNG card + text with decklist)
+- Printable round seating (print-optimized CSS)
+- Collapsible decklists, deck attribution fixes, replace deck UX
 - Drag-and-drop seating with per-player issue indicators + R1/live score guards
 - Tournament organizer console mobile-first overhaul
 - Tournament list rework with My Agenda view and iCal calendar feed
@@ -65,6 +80,8 @@
 - Leagues full phase, Payment tracking, Light theme
 - Diacritics-insensitive search, Organizer management
 - Parent league hierarchy UI
+- Fix data leakage on logout (clear IndexedDB before account switch)
+- Fix VEKN-imported tournaments showing all players as dropped
 
 ## Phase 2: Leagues — Key Decisions
 - Standings modes: RTP, Score, GP
