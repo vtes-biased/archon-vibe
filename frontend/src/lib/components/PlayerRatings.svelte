@@ -69,9 +69,9 @@
               <thead>
                 <tr class="text-ash-500 text-xs">
                   <th class="py-1 text-left">{m.user_detail_col_tournament()}</th>
-                  <th class="py-1 text-right">{m.user_detail_col_vp()}</th>
-                  <th class="py-1 text-right">{m.user_detail_col_gw()}</th>
-                  <th class="py-1 text-right">{m.user_detail_col_pts()}</th>
+                  <th class="py-1 pl-3 text-right">{m.user_detail_col_vp()}</th>
+                  <th class="py-1 pl-3 text-right">{m.user_detail_col_gw()}</th>
+                  <th class="py-1 pl-3 text-right">{m.user_detail_col_pts()}</th>
                 </tr>
               </thead>
               <tbody>
@@ -93,9 +93,9 @@
                         <Medal class="w-3 h-3 inline text-ash-400 ml-1" />
                       {/if}
                     </td>
-                    <td class="py-1 text-right">{entry.vp}</td>
-                    <td class="py-1 text-right">{entry.gw}</td>
-                    <td class="py-1 text-right font-medium">{entry.points}</td>
+                    <td class="py-1 pl-3 text-right">{entry.vp}</td>
+                    <td class="py-1 pl-3 text-right">{entry.gw}</td>
+                    <td class="py-1 pl-3 text-right font-medium">{entry.points}</td>
                   </tr>
                 {/each}
               </tbody>
