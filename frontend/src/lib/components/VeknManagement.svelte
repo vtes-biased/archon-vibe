@@ -120,7 +120,7 @@
         <button
           type="button"
           onclick={() => showForceAbandonConfirm = true}
-          class="px-3 py-1.5 text-sm bg-crimson-800 hover:bg-crimson-700 text-white rounded transition-colors"
+          class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded transition-colors"
           title={m.vekn_abandon_title()}
         >
           <Unlink class="inline w-3.5 h-3.5 mr-1" />
