@@ -735,5 +735,18 @@
   "timer_extension_policy_desc": "Comment les arbitres gèrent les extensions de temps pendant les rondes",
   "timer_policy_additions": "Additions (+N minutes)",
   "timer_policy_clock_stop": "Arrêt d'horloge",
-  "timer_policy_both": "Les deux"
+  "timer_policy_both": "Les deux",
+  "raffle_title": "Tirage au sort",
+  "raffle_label_placeholder": "Nom du prix",
+  "raffle_pool_all_players": "Tous les joueurs",
+  "raffle_pool_non_finalists": "Non-finalistes",
+  "raffle_pool_game_winners": "Vainqueurs de partie",
+  "raffle_pool_no_game_win": "Sans victoire de partie",
+  "raffle_pool_no_victory_point": "Sans point de victoire",
+  "raffle_exclude_drawn": "Exclure les gagnants précédents",
+  "raffle_winners": "Gagnants",
+  "raffle_draw": "Tirer",
+  "raffle_undo": "Annuler",
+  "raffle_clear": "Tout effacer",
+  "raffle_clear_confirm": "Effacer tous les tirages au sort ?"
 }

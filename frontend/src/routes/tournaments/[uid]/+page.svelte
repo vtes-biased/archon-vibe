@@ -879,6 +879,8 @@
                 {playerInfo}
                 {standings}
                 isOrganizer={true}
+                {doAction}
+                {actionLoading}
               />
             {:else if activeTab === 'players'}
               <PlayersTab

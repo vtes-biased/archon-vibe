@@ -615,6 +615,12 @@ class TournamentActionRequest(BaseModel):
     status: str | None = None  # For SetPaymentStatus
     seating: list[list[str]] | None = None  # For AlterSeating
     config: dict | None = None  # For UpdateConfig: partial config fields
+    # Raffle
+    label: str | None = None
+    pool: str | None = None
+    exclude_drawn: bool | None = None
+    count: int | None = None
+    seed: int | None = None
 
 
 @router.post("/{uid}/action")
@@ -667,6 +673,16 @@ async def tournament_action(
         event_data["seating"] = request.seating
     if request.config is not None:
         event_data["config"] = request.config
+    if request.label:
+        event_data["label"] = request.label
+    if request.pool:
+        event_data["pool"] = request.pool
+    if request.exclude_drawn is not None:
+        event_data["exclude_drawn"] = request.exclude_drawn
+    if request.count is not None:
+        event_data["count"] = request.count
+    if request.seed is not None:
+        event_data["seed"] = request.seed
 
     # SELECT FOR UPDATE: serialize concurrent writes to this tournament
     async with tournament_transaction(uid) as (tournament, tx_conn):

@@ -194,6 +194,17 @@ pub enum TournamentEvent {
         player_uid: String,
     },
 
+    // Raffle
+    RaffleDraw {
+        label: String,
+        pool: String,
+        exclude_drawn: bool,
+        count: usize,
+        seed: u64,
+    },
+    RaffleUndo,
+    RaffleClear,
+
     // Config update (partial fields)
     UpdateConfig {
         config: JsonValue,
@@ -552,6 +563,16 @@ impl TournamentEvent {
                     .ok_or("player_uid required")?
                     .to_string(),
             }),
+            "RaffleDraw" => {
+                let label = value["label"].as_str().ok_or("label required")?.to_string();
+                let pool = value["pool"].as_str().ok_or("pool required")?.to_string();
+                let exclude_drawn = value["exclude_drawn"].as_bool().unwrap_or(true);
+                let count = value["count"].as_usize().ok_or("count required")?;
+                let seed = value["seed"].as_u64().ok_or("seed required")?;
+                Ok(Self::RaffleDraw { label, pool, exclude_drawn, count, seed })
+            }
+            "RaffleUndo" => Ok(Self::RaffleUndo),
+            "RaffleClear" => Ok(Self::RaffleClear),
             "UpdateConfig" => {
                 let config = value["config"].clone();
                 if config.is_null() || !config.is_object() {
@@ -742,6 +763,81 @@ fn top5_has_ties(standings: &[Standing]) -> bool {
         }
     }
     false
+}
+
+/// Get the set of player UIDs who appeared in any round seating.
+/// Get the set of player UIDs who appeared in any round seating (sorted for determinism).
+fn get_played_uids(tournament: &JsonValue) -> Vec<String> {
+    let mut played = std::collections::HashSet::new();
+    for round in tournament["rounds"].members() {
+        for table in round.members() {
+            for seat in table["seating"].members() {
+                if let Some(uid) = seat["player_uid"].as_str() {
+                    if !uid.is_empty() {
+                        played.insert(uid.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let mut result: Vec<String> = played.into_iter().collect();
+    result.sort();
+    result
+}
+
+/// Filter raffle pool based on pool type and exclude_drawn flag.
+/// NOTE: Pool filtering logic duplicated in frontend RaffleSection.svelte eligibleForPool()
+fn get_raffle_pool(tournament: &JsonValue, pool: &str, exclude_drawn: bool) -> Result<Vec<String>, String> {
+    let played = get_played_uids(tournament);
+    if played.is_empty() {
+        return Err("No players have played yet".to_string());
+    }
+
+    // Build standings map: uid -> (gw, vp)
+    let mut standings_map: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+    for s in tournament["standings"].members() {
+        if let Some(uid) = s["user_uid"].as_str() {
+            let gw = s["gw"].as_f64().unwrap_or(0.0);
+            let vp = s["vp"].as_f64().unwrap_or(0.0);
+            standings_map.insert(uid.to_string(), (gw, vp));
+        }
+    }
+
+    // Finalists set
+    let finalists: std::collections::HashSet<String> = if !tournament["finals"].is_null() {
+        tournament["finals"]["seating"].members()
+            .filter_map(|s| s["player_uid"].as_str().map(|u| u.to_string()))
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
+    let mut eligible: Vec<String> = match pool {
+        "AllPlayers" => played.clone(),
+        "NonFinalists" => played.iter()
+            .filter(|uid| !finalists.contains(*uid))
+            .cloned().collect(),
+        "GameWinners" => played.iter()
+            .filter(|uid| standings_map.get(*uid).map_or(false, |(gw, _)| *gw > 0.0))
+            .cloned().collect(),
+        "NoGameWin" => played.iter()
+            .filter(|uid| standings_map.get(*uid).map_or(true, |(gw, _)| *gw == 0.0))
+            .cloned().collect(),
+        "NoVictoryPoint" => played.iter()
+            .filter(|uid| standings_map.get(*uid).map_or(true, |(_, vp)| *vp == 0.0))
+            .cloned().collect(),
+        _ => return Err(format!("Unknown pool: {}", pool)),
+    };
+
+    if exclude_drawn {
+        let drawn: std::collections::HashSet<String> = tournament["raffles"].members()
+            .flat_map(|d| d["winners"].members())
+            .filter_map(|w| w.as_str().map(|s| s.to_string()))
+            .collect();
+        eligible.retain(|uid| !drawn.contains(uid));
+    }
+
+    Ok(eligible)
 }
 
 fn apply_event(
@@ -1986,6 +2082,57 @@ fn apply_event(
             if !tournament["decks"].is_null() && !tournament["decks"][pk].is_null() {
                 tournament["decks"].remove(pk);
             }
+            Ok(())
+        }
+
+        TournamentEvent::RaffleDraw { label, pool, exclude_drawn, count, seed } => {
+            require_organizer(actor)?;
+            if state != TournamentState::Waiting && state != TournamentState::Playing && state != TournamentState::Finished {
+                return Err("Raffle requires tournament in Waiting, Playing, or Finished state".to_string());
+            }
+            if *count == 0 {
+                return Err("count must be at least 1".to_string());
+            }
+            let mut eligible = get_raffle_pool(tournament, pool, *exclude_drawn)?;
+            if eligible.is_empty() {
+                return Err("No eligible players in pool".to_string());
+            }
+            // Fisher-Yates shuffle with caller-provided seed (same LCG as RandomToss)
+            let mut rng = *seed;
+            for k in (1..eligible.len()).rev() {
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let swap_idx = (rng >> 33) as usize % (k + 1);
+                eligible.swap(k, swap_idx);
+            }
+            let winners: Vec<JsonValue> = eligible.into_iter()
+                .take(*count)
+                .map(|uid| uid.into())
+                .collect();
+            let draw = json::object! {
+                "label" => label.as_str(),
+                "pool" => pool.as_str(),
+                "winners" => JsonValue::Array(winners),
+            };
+            if tournament["raffles"].is_null() {
+                tournament["raffles"] = JsonValue::new_array();
+            }
+            tournament["raffles"].push(draw).map_err(|e| e.to_string())?;
+            Ok(())
+        }
+
+        TournamentEvent::RaffleUndo => {
+            require_organizer(actor)?;
+            if tournament["raffles"].is_null() || tournament["raffles"].len() == 0 {
+                return Err("No raffle draws to undo".to_string());
+            }
+            let last = tournament["raffles"].len() - 1;
+            tournament["raffles"].array_remove(last);
+            Ok(())
+        }
+
+        TournamentEvent::RaffleClear => {
+            require_organizer(actor)?;
+            tournament["raffles"] = JsonValue::new_array();
             Ok(())
         }
 

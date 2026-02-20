@@ -257,6 +257,14 @@ export interface Standing {
   finalist: boolean;
 }
 
+export type RafflePool = "AllPlayers" | "NonFinalists" | "GameWinners" | "NoGameWin" | "NoVictoryPoint";
+
+export interface RaffleDraw {
+  label: string;
+  pool: RafflePool;
+  winners: string[];
+}
+
 export interface Seat {
   player_uid: string;
   result: Score;
@@ -331,6 +339,7 @@ export interface Tournament extends BaseObject {
   finals?: FinalsTable | null;
   winner?: string;
   standings?: Standing[];
+  raffles?: RaffleDraw[];
   my_tables?: Table[]; // Per-viewer: tables where the viewer sat (NOT stored in DB)
 
   // Offline mode

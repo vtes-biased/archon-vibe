@@ -735,5 +735,18 @@
   "timer_extension_policy_desc": "Come i giudici gestiscono le estensioni di tempo durante i round",
   "timer_policy_additions": "Aggiunte (+N minuti)",
   "timer_policy_clock_stop": "Arresto orologio",
-  "timer_policy_both": "Entrambi"
+  "timer_policy_both": "Entrambi",
+  "raffle_title": "Estrazione",
+  "raffle_label_placeholder": "Nome del premio",
+  "raffle_pool_all_players": "Tutti i giocatori",
+  "raffle_pool_non_finalists": "Non finalisti",
+  "raffle_pool_game_winners": "Vincitori di partita",
+  "raffle_pool_no_game_win": "Senza vittoria di partita",
+  "raffle_pool_no_victory_point": "Senza punto vittoria",
+  "raffle_exclude_drawn": "Escludi vincitori precedenti",
+  "raffle_winners": "Vincitori",
+  "raffle_draw": "Estrai",
+  "raffle_undo": "Annulla",
+  "raffle_clear": "Cancella tutto",
+  "raffle_clear_confirm": "Cancellare tutte le estrazioni?"
 }

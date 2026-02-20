@@ -735,5 +735,18 @@
   "timer_extension_policy_desc": "Como os juízes gerenciam as extensões de tempo durante as rodadas",
   "timer_policy_additions": "Adições (+N minutos)",
   "timer_policy_clock_stop": "Parada de relógio",
-  "timer_policy_both": "Ambos"
+  "timer_policy_both": "Ambos",
+  "raffle_title": "Sorteio",
+  "raffle_label_placeholder": "Nome do prêmio",
+  "raffle_pool_all_players": "Todos os jogadores",
+  "raffle_pool_non_finalists": "Não finalistas",
+  "raffle_pool_game_winners": "Vencedores de partida",
+  "raffle_pool_no_game_win": "Sem vitória de partida",
+  "raffle_pool_no_victory_point": "Sem ponto de vitória",
+  "raffle_exclude_drawn": "Excluir vencedores anteriores",
+  "raffle_winners": "Vencedores",
+  "raffle_draw": "Sortear",
+  "raffle_undo": "Desfazer",
+  "raffle_clear": "Limpar tudo",
+  "raffle_clear_confirm": "Limpar todos os sorteios?"
 }

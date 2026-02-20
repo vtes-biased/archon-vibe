@@ -9,6 +9,7 @@
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import DecksTab from "./DecksTab.svelte";
+  import RaffleSection from "./RaffleSection.svelte";
   import { callJudge } from "$lib/api";
   import { isOnline } from "$lib/api";
   import * as m from '$lib/paraglide/messages.js';
@@ -333,6 +334,18 @@
     </div>
   {/if}
 </div>
+
+<!-- Raffle results (visible to all players) -->
+{#if (tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished") && (tournament.raffles?.length ?? 0) > 0}
+  <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6">
+    <RaffleSection
+      {tournament}
+      {playerInfo}
+      standings={tournament.standings ?? []}
+      isOrganizer={false}
+    />
+  </div>
+{/if}
 
 <!-- Finished tournament results (VEKN members only) -->
 {#if tournament.state === "Finished" && userVeknId}

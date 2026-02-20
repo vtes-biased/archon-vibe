@@ -545,6 +545,7 @@ def _filter_tournament(t: Tournament, viewer: User | None) -> Tournament | None:
             timer=t.timer,
             table_extra_time=t.table_extra_time,
             table_paused_at=t.table_paused_at,
+            raffles=t.raffles,
         )
 
     # Non-member: minimal

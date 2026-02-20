@@ -9,6 +9,7 @@
   import { generateResultsText } from "$lib/social-text";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
+  import RaffleSection from "./RaffleSection.svelte";
   import { Share2, ClipboardCopy } from "lucide-svelte";
 
   import * as m from '$lib/paraglide/messages.js';
@@ -18,11 +19,15 @@
     playerInfo,
     standings,
     isOrganizer,
+    doAction,
+    actionLoading,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
     standings: StandingEntry[];
     isOrganizer: boolean;
+    doAction?: (action: string, body?: any) => Promise<void>;
+    actionLoading?: boolean;
   } = $props();
 
   function seatDisplay(uid: string): string {
@@ -182,5 +187,17 @@
         </tbody>
       </table>
     </div>
+  {/if}
+
+  <!-- Raffle section (Waiting, Playing, or Finished) -->
+  {#if tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished"}
+    <RaffleSection
+      {tournament}
+      {playerInfo}
+      standings={tournament.standings ?? []}
+      {isOrganizer}
+      {doAction}
+      {actionLoading}
+    />
   {/if}
 </div>

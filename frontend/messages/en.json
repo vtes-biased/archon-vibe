@@ -735,5 +735,18 @@
   "timer_extension_policy_desc": "How judges handle time extensions during rounds",
   "timer_policy_additions": "Additions (+N minutes)",
   "timer_policy_clock_stop": "Clock stop",
-  "timer_policy_both": "Both"
+  "timer_policy_both": "Both",
+  "raffle_title": "Raffle",
+  "raffle_label_placeholder": "Prize name",
+  "raffle_pool_all_players": "All players",
+  "raffle_pool_non_finalists": "Non-finalists",
+  "raffle_pool_game_winners": "Game winners",
+  "raffle_pool_no_game_win": "No game win",
+  "raffle_pool_no_victory_point": "No victory point",
+  "raffle_exclude_drawn": "Exclude previous winners",
+  "raffle_winners": "Winners",
+  "raffle_draw": "Draw",
+  "raffle_undo": "Undo",
+  "raffle_clear": "Clear all",
+  "raffle_clear_confirm": "Clear all raffle draws?"
 }

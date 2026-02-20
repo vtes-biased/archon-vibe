@@ -113,6 +113,9 @@ export type TournamentEventType =
   | 'RandomToss'
   | 'StartFinals'
   | 'FinishFinals'
+  | 'RaffleDraw'
+  | 'RaffleUndo'
+  | 'RaffleClear'
   | 'UpdateConfig';
 
 export interface TournamentEvent {
@@ -137,6 +140,12 @@ export interface TournamentEvent {
   deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
   multideck?: boolean;
   config?: Record<string, unknown>;
+  // Raffle
+  label?: string;
+  pool?: string;
+  exclude_drawn?: boolean;
+  count?: number;
+  seed?: number;
 }
 
 export interface ActorContext {

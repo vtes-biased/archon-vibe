@@ -487,6 +487,20 @@ class Standing(msgspec.Struct, kw_only=True, frozen=True):
     finalist: bool = False
 
 
+class RafflePool(StrEnum):
+    ALL_PLAYERS = "AllPlayers"
+    NON_FINALISTS = "NonFinalists"
+    GAME_WINNERS = "GameWinners"
+    NO_GAME_WIN = "NoGameWin"
+    NO_VICTORY_POINT = "NoVictoryPoint"
+
+
+class RaffleDraw(msgspec.Struct, kw_only=True):
+    label: str
+    pool: RafflePool
+    winners: list[str] = msgspec.field(default_factory=list)
+
+
 class Tournament(TournamentConfig, kw_only=True):
     external_ids: dict[str, str] = msgspec.field(default_factory=dict)  # platform: id
     checkin_code: str = msgspec.field(default_factory=lambda: secrets.token_urlsafe(16))
@@ -500,6 +514,7 @@ class Tournament(TournamentConfig, kw_only=True):
     # Aggregated standings — computed by engine on FinishRound/FinishTournament,
     # or populated by VEKN sync. NOT cleared if rounds are empty.
     standings: list[Standing] = msgspec.field(default_factory=list)
+    raffles: list[RaffleDraw] = msgspec.field(default_factory=list)
     # Per-viewer field: tables where the viewer sat (populated during SSE filtering,
     # NOT stored in DB)
     my_tables: list[Table] = msgspec.field(default_factory=list)
