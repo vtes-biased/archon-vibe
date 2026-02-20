@@ -226,6 +226,7 @@
     <input
       id={id("start")}
       type="datetime-local"
+      step="900"
       value={values.start}
       {disabled}
       onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
@@ -237,6 +238,7 @@
     <input
       id={id("finish")}
       type="datetime-local"
+      step="900"
       value={values.finish}
       {disabled}
       onchange={(e) => handleInput("finish", (e.target as HTMLInputElement).value)}
