@@ -2172,6 +2172,9 @@ fn apply_event(
                     }
                 }
             }
+            if let Some(p) = config["time_extension_policy"].as_str() {
+                validate_enum(p, &["additions", "clock_stop", "both"], "time_extension_policy")?;
+            }
 
             // Apply config fields (key present = apply, even if null)
             let config_fields = [
@@ -2179,7 +2182,7 @@ fn apply_event(
                 "country", "venue", "venue_url", "address", "map_url",
                 "proxies", "multideck", "decklist_required", "description",
                 "standings_mode", "decklists_mode", "max_rounds", "table_rooms",
-                "league_uid",
+                "league_uid", "round_time", "finals_time", "time_extension_policy",
             ];
             for field in config_fields {
                 if config.has_key(field) {
@@ -2978,6 +2981,39 @@ mod tests {
         let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("name cannot be empty"));
+    }
+
+    #[test]
+    fn test_update_config_timer_fields() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: {
+                round_time: 7200,
+                finals_time: 9000,
+                time_extension_policy: "clock_stop",
+            },
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["round_time"].as_i64(), Some(7200));
+        assert_eq!(updated["finals_time"].as_i64(), Some(9000));
+        assert_eq!(updated["time_extension_policy"].as_str(), Some("clock_stop"));
+    }
+
+    #[test]
+    fn test_update_config_invalid_extension_policy() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { time_extension_policy: "invalid" },
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid time_extension_policy"));
     }
 
     #[test]
