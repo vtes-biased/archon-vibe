@@ -187,11 +187,11 @@
               class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
             >
               <option value="0">{m.timer_no_timer()}</option>
-              <option value="3600">60 min</option>
-              <option value="4500">75 min</option>
-              <option value="5400">90 min</option>
-              <option value="6300">105 min</option>
-              <option value="7200">120 min</option>
+              <option value="7200">2h</option>
+              <option value="8100">2h15</option>
+              <option value="9000">2h30</option>
+              <option value="9900">2h45</option>
+              <option value="10800">3h</option>
             </select>
           </div>
           <div>
@@ -203,11 +203,11 @@
               class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
             >
               <option value="0">{m.timer_same_as_round()}</option>
-              <option value="3600">60 min</option>
-              <option value="4500">75 min</option>
-              <option value="5400">90 min</option>
-              <option value="6300">105 min</option>
-              <option value="7200">120 min</option>
+              <option value="7200">2h</option>
+              <option value="8100">2h15</option>
+              <option value="9000">2h30</option>
+              <option value="9900">2h45</option>
+              <option value="10800">3h</option>
             </select>
           </div>
         </div>
