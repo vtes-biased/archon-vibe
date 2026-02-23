@@ -2,30 +2,30 @@
 
 Recomputes player ratings when tournaments finish.
 Uses the Rust engine for per-tournament point calculation.
+
+New sync: ratings are embedded into User objects (no separate Rating table).
 """
 
 import calendar
 import logging
 from datetime import UTC, datetime
 
-from uuid6 import uuid7
-
 from .db import (
+    decode_json,
     get_finished_tournaments_for_category,
-    get_rating_by_user_uid,
     get_sanctions_for_tournament,
     get_tournament_wins_for_users,
     get_user_by_uid,
-    stream_objects,
-    upsert_rating,
+    stream_objects_new,
+    update_user,
 )
 from .models import (
     CategoryRating,
-    Rating,
     RatingCategory,
     SanctionLevel,
     Tournament,
     TournamentRatingEntry,
+    User,
 )
 
 logger = logging.getLogger(__name__)
@@ -183,10 +183,10 @@ async def _compute_entry(t: Tournament, user_uid: str) -> TournamentRatingEntry:
 
 async def recompute_ratings_for_players(
     player_uids: set[str], category: RatingCategory
-) -> list[Rating]:
+) -> list[User]:
     """Recompute ratings for an explicit set of players in a category.
 
-    Used when a tournament enters or leaves Finished state.
+    Embeds rating data directly into User objects. Returns updated users.
     """
     if not player_uids:
         return []
@@ -216,9 +216,13 @@ async def recompute_ratings_for_players(
     # Fetch wins for all players in batch
     wins_map = await get_tournament_wins_for_users(player_uids)
 
-    updated_ratings: list[Rating] = []
+    updated_users: list[User] = []
 
     for user_uid in player_uids:
+        user = await get_user_by_uid(user_uid)
+        if not user:
+            continue
+
         entries: list[TournamentRatingEntry] = []
         for t in all_tournaments:
             played = _players_with_rounds(t)
@@ -229,50 +233,37 @@ async def recompute_ratings_for_players(
         top_entries = entries[:TOP_N]
         total = sum(e.points for e in top_entries)
 
-        existing = await get_rating_by_user_uid(user_uid)
-        rating_uid = existing.uid if existing else str(uuid7())
-
-        user = await get_user_by_uid(user_uid)
-
-        country = user.country if user else None
-
         cat_rating = CategoryRating(total=total, tournaments=entries)
-        rating = Rating(
-            uid=rating_uid,
-            modified=now,
-            user_uid=user_uid,
-            country=country,
-            constructed_online=existing.constructed_online if existing else None,
-            constructed_offline=existing.constructed_offline if existing else None,
-            limited_online=existing.limited_online if existing else None,
-            limited_offline=existing.limited_offline if existing else None,
-            wins=wins_map.get(user_uid, []),
-        )
-        setattr(rating, category.value, cat_rating)
-        await upsert_rating(rating)
-        updated_ratings.append(rating)
+
+        # Embed rating into user
+        setattr(user, category.value, cat_rating)
+        user.wins = wins_map.get(user_uid, [])
+        user.modified = now
+
+        await update_user(user)
+        updated_users.append(user)
 
     logger.info(
-        f"Recomputed {len(updated_ratings)} ratings for {category.value}"
+        f"Recomputed {len(updated_users)} ratings for {category.value}"
     )
-    return updated_ratings
+    return updated_users
 
 
-async def recompute_all_ratings() -> list[Rating]:
+async def recompute_all_ratings() -> list[User]:
     """Full recomputation of all ratings and wins. Called daily for consistency.
 
     Lightweight first pass collects player UIDs per category (streaming tournaments
-    in batches). Then reuses recompute_ratings_for_players() per category — same
-    code path as the normal per-tournament trigger, one player at a time.
+    in batches). Then reuses recompute_ratings_for_players() per category.
+    Returns updated User objects.
     """
     # Pass 1: stream tournaments to collect player sets per category
-    # Only loads minimal data per batch (discarded after processing)
     players_by_category: dict[RatingCategory, set[str]] = {
         cat: set() for cat in RatingCategory
     }
 
-    async for batch, _ in stream_objects("tournaments", Tournament, batch_size=100):
-        for t in batch:
+    async for json_batch, _ in stream_objects_new("tournament", "full", batch_size=100):
+        for json_str in json_batch:
+            t = decode_json(json_str, Tournament)
             if t.state != "Finished" or t.deleted_at:
                 continue
             category = rating_category_for_tournament(t)
@@ -280,12 +271,12 @@ async def recompute_all_ratings() -> list[Rating]:
             players_by_category[category].update(players)
 
     # Pass 2: recompute per category using the normal code path
-    all_updated: list[Rating] = []
+    all_updated: list[User] = []
     for category, player_uids in players_by_category.items():
         if not player_uids:
             continue
-        ratings = await recompute_ratings_for_players(player_uids, category)
-        all_updated.extend(ratings)
+        users = await recompute_ratings_for_players(player_uids, category)
+        all_updated.extend(users)
 
-    logger.info(f"Full rating recompute: {len(all_updated)} ratings updated")
+    logger.info(f"Full rating recompute: {len(all_updated)} users updated")
     return all_updated

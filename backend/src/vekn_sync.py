@@ -493,9 +493,9 @@ class VEKNSyncService:
         async with get_connection() as conn:
             result = await conn.execute(
                 """
-                SELECT uid, modified, data
-                FROM users
-                WHERE data->>'vekn_id' = %s
+                SELECT "full"
+                FROM objects
+                WHERE type = 'user' AND "full"->>'vekn_id' = %s
                 LIMIT 1
                 """,
                 (vekn_id,),
@@ -504,8 +504,7 @@ class VEKNSyncService:
             if not row:
                 return None
 
-            user_data = row[2]
-            return decode_json(user_data, User)
+            return decode_json(row[0], User)
 
     async def _create_user(self, vekn_data: dict[str, Any]) -> User:
         """

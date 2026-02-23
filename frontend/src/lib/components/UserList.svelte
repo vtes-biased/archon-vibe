@@ -16,6 +16,13 @@
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true); // True until sync_complete received from backend
   let hasLoadedOnce = $state(false); // True after first successful IndexedDB load
+  let showSyncing = $state(false);
+  // Delay showing syncing spinner to avoid flash on fast IDB reads
+  $effect(() => {
+    if (hasLoadedOnce || !isSyncing) { showSyncing = false; return; }
+    const timer = setTimeout(() => { showSyncing = true; }, 200);
+    return () => clearTimeout(timer);
+  });
 
   // Create user form
   let showCreateForm = $state(false);
@@ -570,9 +577,9 @@
     {/if}
 
     <!-- Empty State -->
-    {#if !error && filteredUsers.length === 0}
+    {#if !error && filteredUsers.length === 0 && (hasLoadedOnce || showSyncing)}
       <div class="text-center py-12">
-        {#if isSyncing}
+        {#if showSyncing}
           <!-- Syncing state -->
           <div class="text-ash-500 mb-4">
             <RefreshCw class="mx-auto h-12 w-12 animate-spin" />

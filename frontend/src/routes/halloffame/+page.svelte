@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { getAllRatings, getUser, getSanctionsForUser } from "$lib/db";
+  import { getAllUsers, getSanctionsForUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import type { Rating, Sanction } from "$lib/types";
+  import type { User, Sanction } from "$lib/types";
   import { ArrowLeft, Loader2, Trophy, ChevronLeft, ChevronRight } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  let ratings = $state<Rating[]>([]);
-  let userNames = $state<Map<string, string>>(new Map());
+  let users = $state<User[]>([]);
   let excludedUids = $state<Set<string>>(new Set());
   let isSyncing = $state(!syncManager.isSynced);
 
@@ -30,10 +29,10 @@
   }
 
   let filtered = $derived(() => {
-    let result = ratings.filter(r => {
-      if ((r.wins?.length ?? 0) < 5) return false;
-      if (excludedUids.has(r.user_uid)) return false;
-      if (selectedCountry !== "all" && r.country !== selectedCountry) return false;
+    let result = users.filter(u => {
+      if ((u.wins?.length ?? 0) < 5) return false;
+      if (excludedUids.has(u.uid)) return false;
+      if (selectedCountry !== "all" && u.country !== selectedCountry) return false;
       return true;
     });
     result.sort((a, b) => (b.wins?.length ?? 0) - (a.wins?.length ?? 0));
@@ -44,25 +43,18 @@
   let paged = $derived(filtered().slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE));
 
   async function loadData() {
-    ratings = await getAllRatings();
+    const allUsers = await getAllUsers();
+    // Only keep users with 5+ wins for sanction checking
+    users = allUsers;
 
-    // Resolve names and check sanctions
-    const names = new Map<string, string>();
     const excluded = new Set<string>();
-
-    for (const r of ratings) {
-      if ((r.wins?.length ?? 0) < 5) continue;
-      if (!names.has(r.user_uid)) {
-        const u = await getUser(r.user_uid);
-        if (u) names.set(r.user_uid, u.name);
-      }
-      // Check sanctions
-      const sanctions = await getSanctionsForUser(r.user_uid);
+    for (const u of allUsers) {
+      if ((u.wins?.length ?? 0) < 5) continue;
+      const sanctions = await getSanctionsForUser(u.uid);
       if (sanctions.some(isActiveSanction)) {
-        excluded.add(r.user_uid);
+        excluded.add(u.uid);
       }
     }
-    userNames = names;
     excludedUids = excluded;
   }
 
@@ -75,7 +67,7 @@
     loadData();
 
     const handleSyncEvent = (event: { type: string }) => {
-      if (event.type === "rating" || event.type === "sanction" || event.type === "sync_complete") {
+      if (event.type === "user" || event.type === "sanction" || event.type === "sync_complete") {
         loadData();
         if (event.type === "sync_complete") isSyncing = false;
       }
@@ -115,7 +107,7 @@
     </select>
   </div>
 
-  {#if isSyncing && ratings.length === 0}
+  {#if isSyncing && users.length === 0}
     <div class="text-center text-ash-400 py-8">
       <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.hof_loading()}</span>
@@ -134,20 +126,20 @@
           </tr>
         </thead>
         <tbody>
-          {#each paged as rating, i}
+          {#each paged as user, i}
             {@const rank = page * PAGE_SIZE + i + 1}
-            {@const winsCount = rating.wins?.length ?? 0}
+            {@const winsCount = user.wins?.length ?? 0}
             <tr class="border-b border-ash-800/50 hover:bg-ash-800/20">
               <td class="py-2 px-3 text-ash-400">{rank}</td>
               <td class="py-2 px-3">
-                <a href="/users/{rating.user_uid}" class="text-ash-100 hover:text-crimson-400">
-                  {userNames.get(rating.user_uid) ?? m.rankings_unknown_player()}
+                <a href="/users/{user.uid}" class="text-ash-100 hover:text-crimson-400">
+                  {user.name}
                 </a>
               </td>
               <td class="py-2 px-3 text-ash-300">
-                {#if rating.country}
-                  {getCountryFlag(rating.country)}
-                  {countries[rating.country]?.name ?? rating.country}
+                {#if user.country}
+                  {getCountryFlag(user.country)}
+                  {countries[user.country]?.name ?? user.country}
                 {/if}
               </td>
               <td class="py-2 px-3 text-right font-medium text-ash-100">

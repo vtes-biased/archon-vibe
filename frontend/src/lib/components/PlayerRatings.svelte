@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Rating, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
+  import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
   import { ChevronDown, Crown, Medal } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  let { rating }: { rating: Rating | undefined } = $props();
+  let { user }: { user: User | undefined } = $props();
 
   let expandedCategories = $state<Set<RatingCategory>>(new Set());
 
@@ -22,7 +22,7 @@
   ];
 
   let availableCategories = $derived(
-    allCategories.filter(c => rating?.[c] && (rating[c] as CategoryRating).total > 0)
+    allCategories.filter(c => user?.[c] && (user[c] as CategoryRating).total > 0)
   );
 
   function sortedByDate(entries: TournamentRatingEntry[]): TournamentRatingEntry[] {
@@ -45,7 +45,7 @@
   <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.user_detail_ratings()}</h2>
   <div class="space-y-2">
     {#each availableCategories as cat}
-      {@const catRating = rating?.[cat] as CategoryRating}
+      {@const catRating = user?.[cat] as CategoryRating}
       {@const isExpanded = expandedCategories.has(cat)}
       <div class="bg-dusk-950 border border-ash-800 rounded-lg overflow-hidden">
         <button
@@ -105,8 +105,8 @@
       </div>
     {/each}
   </div>
-{:else if rating === undefined}
-  <!-- Still loading or no rating data -->
+{:else if user === undefined}
+  <!-- Still loading -->
 {:else}
   <p class="text-ash-500 text-sm">{m.user_detail_no_rating()}</p>
 {/if}

@@ -1,12 +1,13 @@
 /**
  * Plain text generation for sharing tournament results via clipboard.
  */
-import type { Tournament, Deck, VtesCard } from "$lib/types";
+import type { Tournament, Deck, DeckObject, VtesCard } from "$lib/types";
 import type { StandingEntry } from "$lib/tournament-utils";
 import { seatDisplay } from "$lib/tournament-utils";
 import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
 import { getCards } from "$lib/cards";
+import { getDecksByTournamentGrouped } from "$lib/db";
 
 // Standard TWDA library type ordering (from krcg config, matches DeckDisplay.svelte)
 const LIBRARY_TYPE_ORDER = [
@@ -121,9 +122,10 @@ export async function generateResultsText(
     lines.push("");
   }
 
-  // Winner's decklist
-  if (tournament.winner && tournament.decks) {
-    const winnerDecks = tournament.decks[tournament.winner];
+  // Winner's decklist (loaded from IDB decks store)
+  if (tournament.winner) {
+    const decksByUser = await getDecksByTournamentGrouped(tournament.uid);
+    const winnerDecks = decksByUser[tournament.winner];
     if (winnerDecks?.length) {
       const deck = winnerDecks[winnerDecks.length - 1]!;
       if (Object.keys(deck.cards).length > 0) {

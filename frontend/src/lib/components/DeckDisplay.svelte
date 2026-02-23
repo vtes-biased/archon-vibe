@@ -68,36 +68,19 @@
     saving = true;
     saveError = null;
     try {
-      const token = (await import('$lib/stores/auth.svelte')).getAccessToken();
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const endpoint = playerUid
-        ? `${API_URL}/api/tournaments/${tournamentUid}/decks/${playerUid}?deck_index=${deckIndex}`
-        : `${API_URL}/api/tournaments/${tournamentUid}/decks`;
-      const method = playerUid ? 'PUT' : 'POST';
+      const { tournamentAction } = await import('$lib/api');
+      const targetUid = playerUid || (await import('$lib/stores/auth.svelte')).getAuthState().user?.uid;
 
-      const resp = await fetch(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
+      await tournamentAction(tournamentUid, 'UpsertDeck', {
+        player_uid: targetUid,
+        deck: {
           name: deck.name,
           author: deck.author,
           comments: deck.comments,
-          text: Object.entries(editedCards)
-            .map(([id, count]) => {
-              const card = cards.get(parseInt(id));
-              return `${count}x ${card?.name ?? id}`;
-            })
-            .join('\n'),
-        }),
+          cards: editedCards,
+        },
+        multideck: false,
       });
-
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        throw new Error(data.detail || `Save failed (${resp.status})`);
-      }
 
       editing = false;
       editedCards = {};

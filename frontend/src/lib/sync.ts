@@ -1,9 +1,13 @@
 /**
- * SSE sync manager for real-time user updates.
- * Generic spec-based approach for all object types.
+ * SSE sync manager with snapshot-based initial load.
+ *
+ * Flow:
+ * 1. First connect (no last_sync_timestamp): fetch gzip snapshot, load into IDB
+ * 2. Connect SSE with since=<timestamp> for catch-up + real-time updates
+ * 3. On resync: re-fetch snapshot, reconnect SSE
  */
 
-import type { User, Sanction, Tournament, Rating, League } from '$lib/types';
+import type { User, Sanction, Tournament, DeckObject, League } from '$lib/types';
 import {
   saveUser,
   saveUsersBatch,
@@ -13,21 +17,20 @@ import {
   saveTournament,
   saveTournamentsBatch,
   deleteTournament,
-  saveRating,
-  saveRatingsBatch,
+  saveDeck,
+  saveDecksBatch,
+  deleteDeck,
   saveLeague,
   saveLeaguesBatch,
   deleteLeague,
-  clearAllRatings,
   clearAllUsers,
   clearAllSanctions,
   clearAllTournaments,
+  clearAllDecks,
   clearAllLeagues,
   setLastSyncTimestamp,
   getLastSyncTimestamp,
   clearLastSyncTimestamp,
-  clearChanges,
-  clearChangeForUid,
   getTournament,
 } from './db';
 import { getAccessToken } from '$lib/stores/auth.svelte';
@@ -35,7 +38,7 @@ import { isOffline, getOfflineTournamentUids } from '$lib/stores/offline.svelte'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'rating' | 'league' | 'judge_call' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
+type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'deck' | 'league' | 'judge_call' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
 
 export interface JudgeCallData {
   tournament_uid: string;
@@ -46,7 +49,7 @@ export interface JudgeCallData {
 
 interface SyncEvent {
   type: SyncEventType;
-  data?: User | Sanction | Tournament | Rating | League | JudgeCallData;
+  data?: User | Sanction | Tournament | DeckObject | League | JudgeCallData;
   timestamp?: string | null;
   error?: string;
 }
@@ -55,8 +58,8 @@ type SyncEventCallback = (event: SyncEvent) => void;
 
 /** Spec for a synced object type */
 interface ObjectSpec<T> {
-  batchType: string;     // "users", "sanctions", "tournaments", "ratings"
-  singleType: string;    // "user", "sanction", "tournament", "rating"
+  batchType: string;     // "users", "sanctions", "tournaments", "decks", "leagues"
+  singleType: string;    // "user", "sanction", "tournament", "deck", "league"
   save: (item: T) => Promise<void>;
   saveBatch: (items: T[]) => Promise<void>;
   del: (uid: string) => Promise<void>;
@@ -66,7 +69,7 @@ const SPECS: ObjectSpec<any>[] = [
   { batchType: 'users', singleType: 'user', save: saveUser, saveBatch: saveUsersBatch, del: async () => { /* users not deleted via SSE currently */ } },
   { batchType: 'sanctions', singleType: 'sanction', save: saveSanction, saveBatch: saveSanctionsBatch, del: deleteSanction },
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
-  { batchType: 'ratings', singleType: 'rating', save: saveRating, saveBatch: saveRatingsBatch, del: async () => { /* ratings not deleted via SSE currently */ } },
+  { batchType: 'decks', singleType: 'deck', save: saveDeck, saveBatch: saveDecksBatch, del: deleteDeck },
   { batchType: 'leagues', singleType: 'league', save: saveLeague, saveBatch: saveLeaguesBatch, del: deleteLeague },
 ];
 
@@ -83,13 +86,90 @@ class SyncManager {
   public isSynced = false;
 
   /**
-   * Start syncing with the backend SSE stream.
+   * Fetch and load a gzip snapshot from the server.
+   * Returns the snapshot timestamp, or null on failure.
+   */
+  private async fetchSnapshot(): Promise<string | null> {
+    const token = getAccessToken();
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    const qs = params.toString();
+    const url = qs ? `${API_URL}/snapshot?${qs}` : `${API_URL}/snapshot`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Snapshot fetch failed: ${response.status}`);
+        return null;
+      }
+
+      // Browser may auto-decompress gzip via Content-Encoding header.
+      // If not, detect gzip magic bytes and decompress manually.
+      const arrayBuffer = await response.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let text: string;
+
+      if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        // Still gzipped — decompress with DecompressionStream
+        const ds = new DecompressionStream('gzip');
+        const decompressedStream = new Blob([arrayBuffer]).stream().pipeThrough(ds);
+        text = await new Response(decompressedStream).text();
+      } else {
+        text = new TextDecoder().decode(bytes);
+      }
+
+      const sections = JSON.parse(text) as { type: string; data?: any[]; timestamp?: string }[];
+
+      // Clear stores before loading (preserve offline tournaments)
+      await this.clearAllStores();
+
+      // Load each section into IDB
+      let timestamp: string | null = null;
+      for (const section of sections) {
+        if (section.type === 'meta') {
+          timestamp = section.timestamp || null;
+          continue;
+        }
+        // Find matching spec by singleType (snapshot uses singular: "user", "tournament", etc.)
+        const spec = SPECS.find(s => s.singleType === section.type);
+        if (spec && section.data && section.data.length > 0) {
+          let items = section.data;
+          // Skip offline tournaments
+          if (spec.batchType === 'tournaments') {
+            items = items.filter((t: any) => !isOffline(t.uid));
+          }
+          if (items.length > 0) await spec.saveBatch(items);
+        }
+      }
+
+      if (timestamp) {
+        await setLastSyncTimestamp(timestamp);
+      }
+
+      return timestamp;
+    } catch (e) {
+      console.error('Snapshot fetch/load failed:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Start syncing with the backend.
+   * First connect: fetch snapshot, then connect SSE for catch-up + real-time.
+   * Subsequent connects: SSE only with since= parameter.
    */
   async connect(): Promise<void> {
     await this.disconnect();
     this.isSynced = false;
 
-    const lastSync = await getLastSyncTimestamp();
+    let lastSync = await getLastSyncTimestamp();
+
+    // If no sync timestamp, fetch snapshot first
+    if (!lastSync) {
+      lastSync = await this.fetchSnapshot();
+      // If snapshot failed, fall back to full SSE sync (no since param)
+    }
+
     const params = new URLSearchParams();
     if (lastSync) params.set('since', lastSync);
     const token = getAccessToken();
@@ -109,9 +189,15 @@ class SyncManager {
       try {
         const message = JSON.parse(event.data);
 
-        // Handle resync: clear all stores and let full stream follow
+        // Handle resync: server says data is too stale — re-fetch snapshot
         if (message.type === 'resync') {
           await this.clearAllStores();
+          const ts = await this.fetchSnapshot();
+          if (ts) {
+            // Reconnect SSE with new timestamp
+            await this.disconnect();
+            void this.connect();
+          }
           this.emit({ type: 'resync' });
           return;
         }
@@ -133,7 +219,7 @@ class SyncManager {
 
         // Generic handling: find matching spec
         for (const spec of SPECS) {
-          // Batch event (initial sync)
+          // Batch event (catch-up after snapshot)
           if (message.type === spec.batchType) {
             const items = message.data as any[];
             const buf = this.buffers.get(spec.batchType) || [];
@@ -145,7 +231,7 @@ class SyncManager {
           // Single event (real-time update)
           if (message.type === spec.singleType) {
             const item = message.data as any;
-            // Skip SSE updates for tournaments that are in local offline mode
+            // Skip SSE updates for tournaments in local offline mode
             if (spec.singleType === 'tournament' && isOffline(item.uid)) {
               return;
             }
@@ -154,7 +240,6 @@ class SyncManager {
             } else {
               await spec.save(item);
             }
-            await clearChangeForUid(item.uid);
             this.emit({ type: spec.singleType as SyncEventType, data: item });
             return;
           }
@@ -216,9 +301,8 @@ class SyncManager {
     await clearAllUsers();
     await clearAllSanctions();
     await clearAllTournaments();
-    await clearAllRatings();
+    await clearAllDecks();
     await clearAllLeagues();
-    await clearChanges();
     await clearLastSyncTimestamp();
 
     // Restore offline tournaments

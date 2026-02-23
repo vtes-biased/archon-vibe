@@ -33,13 +33,13 @@ async def test_db() -> AsyncIterator[None]:
     
     # Clean existing data
     async with db.get_connection() as conn:
-        await conn.execute("DELETE FROM users")
-    
+        await conn.execute("DELETE FROM objects WHERE type = 'user'")
+
     yield
-    
+
     # Clean up after test
     async with db.get_connection() as conn:
-        await conn.execute("DELETE FROM users")
+        await conn.execute("DELETE FROM objects WHERE type = 'user'")
     
     await db.close_db()
 

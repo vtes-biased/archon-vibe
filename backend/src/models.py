@@ -182,6 +182,30 @@ class TimerState(msgspec.Struct, kw_only=True):
     paused: bool = True  # True = not running
 
 
+class RatingCategory(StrEnum):
+    CONSTRUCTED_ONLINE = "constructed_online"
+    CONSTRUCTED_OFFLINE = "constructed_offline"
+    LIMITED_ONLINE = "limited_online"
+    LIMITED_OFFLINE = "limited_offline"
+
+
+class TournamentRatingEntry(msgspec.Struct, kw_only=True, frozen=True):
+    tournament_uid: str
+    tournament_name: str
+    date: str  # ISO date
+    player_count: int
+    rank: str  # TournamentRank value
+    vp: float
+    gw: int
+    finalist_position: int  # 0=none, 1=winner, 2=runner-up
+    points: int  # computed rating points
+
+
+class CategoryRating(msgspec.Struct, kw_only=True):
+    total: int = 0
+    tournaments: list[TournamentRatingEntry] = msgspec.field(default_factory=list)
+
+
 class BaseObject(msgspec.Struct, kw_only=True):
     """Base object structure for all domain objects."""
 
@@ -248,6 +272,13 @@ class User(BaseObject, kw_only=True):
     # Calendar feed: URL-safe token for iCal subscription authentication
     calendar_token: str | None = None
 
+    # Embedded rating data (merged from separate Rating objects)
+    constructed_online: CategoryRating | None = None
+    constructed_offline: CategoryRating | None = None
+    limited_online: CategoryRating | None = None
+    limited_offline: CategoryRating | None = None
+    wins: list[str] = msgspec.field(default_factory=list)  # All-time tournament UIDs won
+
 
 class Score(msgspec.Struct, kw_only=True, frozen=True):
     gw: int = 0
@@ -278,30 +309,6 @@ class Sanction(BaseObject, kw_only=True):
     expires_at: datetime | None = None  # For suspensions/probation (None = permanent)
     lifted_at: datetime | None = None
     lifted_by_uid: str | None = None
-
-
-class RatingCategory(StrEnum):
-    CONSTRUCTED_ONLINE = "constructed_online"
-    CONSTRUCTED_OFFLINE = "constructed_offline"
-    LIMITED_ONLINE = "limited_online"
-    LIMITED_OFFLINE = "limited_offline"
-
-
-class TournamentRatingEntry(msgspec.Struct, kw_only=True, frozen=True):
-    tournament_uid: str
-    tournament_name: str
-    date: str  # ISO date
-    player_count: int
-    rank: str  # TournamentRank value
-    vp: float
-    gw: int
-    finalist_position: int  # 0=none, 1=winner, 2=runner-up
-    points: int  # computed rating points
-
-
-class CategoryRating(msgspec.Struct, kw_only=True):
-    total: int = 0
-    tournaments: list[TournamentRatingEntry] = msgspec.field(default_factory=list)
 
 
 class Rating(BaseObject, kw_only=True):
@@ -475,6 +482,20 @@ class Deck(msgspec.Struct, kw_only=True):
     attribution: str | None = None  # None = anonymous, vekn_id = attributed to member
 
 
+class DeckObject(BaseObject, kw_only=True):
+    """Standalone deck object extracted from Tournament.decks for separate sync."""
+
+    tournament_uid: str
+    user_uid: str
+    round: int | None = None
+    name: str = ""
+    author: str = ""
+    comments: str = ""
+    cards: dict[str, int] = msgspec.field(default_factory=dict)
+    attribution: str | None = None
+    public: bool = False  # Visible to non-owner members (set by engine based on decklists_mode)
+
+
 class Standing(msgspec.Struct, kw_only=True, frozen=True):
     """Aggregated standings entry. Computed by Rust engine on FinishRound/FinishTournament.
     Also populated directly by VEKN sync (no rounds data in that case)."""
@@ -505,9 +526,6 @@ class Tournament(TournamentConfig, kw_only=True):
     external_ids: dict[str, str] = msgspec.field(default_factory=dict)  # platform: id
     checkin_code: str = msgspec.field(default_factory=lambda: secrets.token_urlsafe(16))
     players: list[Player] = msgspec.field(default_factory=list)
-    decks: dict[str, list[Deck]] = msgspec.field(
-        default_factory=dict
-    )  # player_uid: list[Deck]
     rounds: list[list[Table]] = msgspec.field(default_factory=list)
     finals: FinalsTable | None = None
     winner: str = ""
@@ -515,8 +533,7 @@ class Tournament(TournamentConfig, kw_only=True):
     # or populated by VEKN sync. NOT cleared if rounds are empty.
     standings: list[Standing] = msgspec.field(default_factory=list)
     raffles: list[RaffleDraw] = msgspec.field(default_factory=list)
-    # Per-viewer field: tables where the viewer sat (populated during SSE filtering,
-    # NOT stored in DB)
+    # DEPRECATED: will be removed in Phase 5. Frontend computes locally.
     my_tables: list[Table] = msgspec.field(default_factory=list)
     # VEKN push tracking
     vekn_pushed_at: datetime | None = None  # When results were pushed to vekn.net

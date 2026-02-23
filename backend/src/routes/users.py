@@ -160,7 +160,9 @@ async def list_users() -> Response:
     """List all users."""
     async with get_connection() as conn:
         cursor = await conn.execute(
-            "SELECT data FROM users WHERE data->>'name' IS NOT NULL ORDER BY modified DESC"
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND "full"->>'name' IS NOT NULL
+            ORDER BY modified_at DESC"""
         )
         rows = await cursor.fetchall()
 
@@ -174,17 +176,10 @@ async def list_users() -> Response:
 @router.get("/{uid}")
 async def get_user(uid: str) -> Response:
     """Get a specific user by UID."""
-    async with get_connection() as conn:
-        cursor = await conn.execute(
-            "SELECT data FROM users WHERE uid = %s",
-            (uid,),
-        )
-        row = await cursor.fetchone()
-
-    if not row:
+    user = await get_user_by_uid(uid)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user = decode_json(row[0], User)
     return Response(
         content=encoder.encode(user),
         media_type="application/json",
@@ -210,17 +205,9 @@ async def update_user(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     # Fetch existing user
-    async with get_connection() as conn:
-        cursor = await conn.execute(
-            "SELECT data FROM users WHERE uid = %s",
-            (uid,),
-        )
-        row = await cursor.fetchone()
-
-    if not row:
+    user = await get_user_by_uid(uid)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    user = decode_json(row[0], User)
     old_roles = set(user.roles)
     old_vekn_id = user.vekn_id
 

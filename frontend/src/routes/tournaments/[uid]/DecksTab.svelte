@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Tournament, Deck, VtesCard } from "$lib/types";
+  import type { Tournament, DeckObject, VtesCard } from "$lib/types";
+  import { getDecksByTournamentGrouped } from "$lib/db";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -20,7 +21,18 @@
 
   const auth = $derived(getAuthState());
   const myUid = $derived(auth.user?.uid ?? '');
-  const myDecks = $derived(tournament.decks?.[myUid] ?? []);
+
+  // Load decks from IDB (separate store, not tournament.decks)
+  let decksByUser = $state<Record<string, DeckObject[]>>({});
+
+  $effect(() => {
+    const tUid = tournament.uid;
+    getDecksByTournamentGrouped(tUid).then(grouped => {
+      decksByUser = grouped;
+    });
+  });
+
+  const myDecks = $derived(decksByUser[myUid] ?? []);
   const isPlayer = $derived(tournament.players?.some(p => p.user_uid === myUid) ?? false);
   const isMultideck = $derived(!!tournament.multideck);
   const roundCount = $derived(tournament.rounds?.length ?? 0);
@@ -48,7 +60,7 @@
     expandedDecks = next;
   }
 
-  function deckCounts(deck: Deck): { crypt: number; library: number } {
+  function deckCounts(deck: DeckObject): { crypt: number; library: number } {
     let crypt = 0, library = 0;
     for (const [idStr, count] of Object.entries(deck.cards)) {
       const card = cardsDb.get(parseInt(idStr));
@@ -59,6 +71,10 @@
 
   function onUploaded() {
     uploadingFor = null;
+    // Reload decks from IDB after upload
+    getDecksByTournamentGrouped(tournament.uid).then(grouped => {
+      decksByUser = grouped;
+    });
   }
 
   function isDeckLocked(index: number): boolean {
@@ -118,20 +134,21 @@
   // Winner info for nudges
   const winnerUid = $derived(tournament.winner ?? '');
   const winnerHasDeck = $derived(
-    !!winnerUid && !!(tournament.decks?.[winnerUid]?.length)
+    !!winnerUid && !!(decksByUser[winnerUid]?.length)
   );
   const isWinner = $derived(myUid === winnerUid);
 
   // Determine which decks are visible
   const visibleDecks = $derived.by(() => {
-    if (!tournament.decks) return {};
-    if (isOrganizer) return tournament.decks;
-    const result: Record<string, (Deck | null)[]> = {};
-    if (myUid && tournament.decks[myUid]) {
-      result[myUid] = tournament.decks[myUid];
+    if (Object.keys(decksByUser).length === 0) return {};
+    if (isOrganizer) return decksByUser;
+    // Players see their own deck always
+    const result: Record<string, DeckObject[]> = {};
+    if (myUid && decksByUser[myUid]) {
+      result[myUid] = decksByUser[myUid];
     }
     if (tournament.state === 'Finished' && tournament.decklists_mode) {
-      for (const [uid, decks] of Object.entries(tournament.decks)) {
+      for (const [uid, decks] of Object.entries(decksByUser)) {
         if (uid === myUid) continue;
         if (tournament.decklists_mode === 'All') {
           result[uid] = decks;
@@ -276,13 +293,13 @@
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-semibold text-bone-200">{m.decks_player_decks()}</h3>
         <span class="text-xs text-ash-500">
-          {m.decks_submitted_count({ submitted: String(Object.keys(tournament.decks ?? {}).length), total: String(tournament.players?.length ?? 0) })}
+          {m.decks_submitted_count({ submitted: String(Object.keys(decksByUser).length), total: String(tournament.players?.length ?? 0) })}
         </span>
       </div>
 
       {#each tournament.players ?? [] as player}
         {@const uid = player.user_uid ?? ''}
-        {@const decks = tournament.decks?.[uid] ?? []}
+        {@const decks = decksByUser[uid] ?? []}
         {@const info = playerInfo[uid]}
         <div class="bg-ash-900/50 rounded-lg p-3">
           <button

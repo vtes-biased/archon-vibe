@@ -181,15 +181,10 @@ pub enum TournamentEvent {
     },
 
     // Deck management
-    UploadDeck {
+    UpsertDeck {
         player_uid: String,
         deck: JsonValue,
         multideck: bool,
-    },
-    UpdateDeck {
-        player_uid: String,
-        deck: JsonValue,
-        deck_index: usize,
     },
     DeleteDeck {
         player_uid: String,
@@ -537,7 +532,7 @@ impl TournamentEvent {
                 }).collect();
                 Ok(Self::AlterSeating { round, seating })
             }
-            "UploadDeck" => {
+            "UpsertDeck" | "UploadDeck" | "UpdateDeck" => {
                 let player_uid = value["player_uid"]
                     .as_str()
                     .ok_or("player_uid required")?
@@ -547,19 +542,7 @@ impl TournamentEvent {
                     return Err("deck required".to_string());
                 }
                 let multideck = value["multideck"].as_bool().unwrap_or(false);
-                Ok(Self::UploadDeck { player_uid, deck, multideck })
-            }
-            "UpdateDeck" => {
-                let player_uid = value["player_uid"]
-                    .as_str()
-                    .ok_or("player_uid required")?
-                    .to_string();
-                let deck = value["deck"].clone();
-                if deck.is_null() {
-                    return Err("deck required".to_string());
-                }
-                let deck_index = value["deck_index"].as_usize().unwrap_or(0);
-                Ok(Self::UpdateDeck { player_uid, deck, deck_index })
+                Ok(Self::UpsertDeck { player_uid, deck, multideck })
             }
             "DeleteDeck" => {
                 let player_uid = value["player_uid"]
@@ -626,35 +609,43 @@ impl ActorContext {
 // TOURNAMENT ENGINE
 // ============================================================================
 
-/// Process a tournament event and return the updated tournament JSON.
+/// Process a tournament event and return updated tournament + deck side-effects.
 ///
 /// # Arguments
 /// * `tournament_json` - Current tournament state as JSON
 /// * `event_json` - Event to process
 /// * `actor_json` - Actor performing the action
 /// * `sanctions_json` - Array of sanctions: [{user_uid, level, round_number, lifted_at, deleted_at}]
+/// * `decks_json` - Array of existing deck metadata: [{user_uid, round, uid}]
 ///
 /// # Returns
-/// * Updated tournament JSON on success
+/// * JSON: `{"tournament": {...}, "deck_ops": [...]}`
 /// * Error message on failure
 pub fn process_tournament_event(
     tournament_json: &str,
     event_json: &str,
     actor_json: &str,
     sanctions_json: &str,
+    decks_json: &str,
 ) -> Result<String, String> {
     let mut tournament = json::parse(tournament_json).map_err(|e| e.to_string())?;
     let event_value = json::parse(event_json).map_err(|e| e.to_string())?;
     let actor_value = json::parse(actor_json).map_err(|e| e.to_string())?;
     let sanctions = json::parse(sanctions_json).map_err(|e| e.to_string())?;
+    let decks = json::parse(decks_json).map_err(|e| e.to_string())?;
 
     let event = TournamentEvent::from_json(&event_value)?;
     let actor = ActorContext::from_json(&actor_value)?;
 
     // Process the event
-    apply_event(&mut tournament, &event, &actor, &sanctions)?;
+    let mut deck_ops = JsonValue::new_array();
+    apply_event(&mut tournament, &event, &actor, &sanctions, &decks, &mut deck_ops)?;
 
-    Ok(tournament.dump())
+    let result = json::object! {
+        "tournament" => tournament,
+        "deck_ops" => deck_ops,
+    };
+    Ok(result.dump())
 }
 
 /// Player standing: (user_uid, gw, vp, tp, toss, finalist)
@@ -847,11 +838,34 @@ fn get_raffle_pool(tournament: &JsonValue, pool: &str, exclude_drawn: bool) -> R
     Ok(eligible)
 }
 
+/// Compute whether a deck should be public based on tournament state and decklists_mode.
+fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> bool {
+    let state = tournament["state"].as_str().unwrap_or("");
+    if state != "Finished" {
+        return false;
+    }
+    let mode = tournament["decklists_mode"].as_str().unwrap_or("Winner");
+    match mode {
+        "All" => true,
+        "Finalists" => {
+            // Check if player is a finalist or winner
+            tournament["winner"].as_str() == Some(player_uid)
+                || tournament["players"].members().any(|p| {
+                    p["user_uid"].as_str() == Some(player_uid)
+                        && p["finalist"].as_bool().unwrap_or(false)
+                })
+        }
+        "Winner" | _ => tournament["winner"].as_str() == Some(player_uid),
+    }
+}
+
 fn apply_event(
     tournament: &mut JsonValue,
     event: &TournamentEvent,
     actor: &ActorContext,
     sanctions: &JsonValue,
+    decks: &JsonValue,
+    deck_ops: &mut JsonValue,
 ) -> Result<(), String> {
     let state = TournamentState::from_str(
         tournament["state"].as_str().unwrap_or("Planned")
@@ -911,6 +925,18 @@ fn apply_event(
                 // Disqualified players stay Disqualified (no reset)
             }
             update_standings(tournament, sanctions);
+            // Reset all deck public flags since tournament is no longer finished
+            for d in decks.members() {
+                let deck_uid = d["uid"].as_str().unwrap_or("");
+                if !deck_uid.is_empty() {
+                    let op = json::object! {
+                        "op" => "set_public",
+                        "deck_uid" => deck_uid,
+                        "public" => false,
+                    };
+                    let _ = deck_ops.push(op);
+                }
+            }
             Ok(())
         }
 
@@ -1037,12 +1063,10 @@ fn apply_event(
                 return Err("Player is suspended and cannot check in".to_string());
             }
 
-            // Check for missing decklist when required (before mutable borrow)
+            // Check for missing decklist when required (uses decks parameter)
             let missing_decklist = tournament["decklist_required"].as_bool().unwrap_or(false) && {
                 let pk = player_uid.as_str();
-                tournament["decks"].is_null()
-                    || tournament["decks"][pk].is_null()
-                    || tournament["decks"][pk].len() == 0
+                !decks.members().any(|d| d["user_uid"].as_str() == Some(pk))
             };
 
             tournament["players"][idx]["state"] = "Checked-in".into();
@@ -1998,10 +2022,25 @@ fn apply_event(
             }
 
             update_standings(tournament, sanctions);
+
+            // Emit deck_ops to flip public on qualifying decks
+            for d in decks.members() {
+                let user_uid = d["user_uid"].as_str().unwrap_or("");
+                if user_uid.is_empty() { continue; }
+                let is_public = compute_deck_public(tournament, user_uid);
+                if is_public {
+                    let op = json::object! {
+                        "op" => "set_public",
+                        "deck_uid" => d["uid"].as_str().unwrap_or(""),
+                        "public" => true,
+                    };
+                    let _ = deck_ops.push(op);
+                }
+            }
             Ok(())
         }
 
-        TournamentEvent::UploadDeck { player_uid, deck, multideck } => {
+        TournamentEvent::UpsertDeck { player_uid, deck, multideck } => {
             // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err("Only organizers or the player can upload a deck".to_string());
@@ -2014,17 +2053,14 @@ fn apply_event(
             }
             // Lifecycle: non-organizers restricted by tournament state
             if !actor.is_organizer {
-                let existing_count = if !tournament["decks"].is_null()
-                    && !tournament["decks"][player_uid.as_str()].is_null() {
-                    tournament["decks"][player_uid.as_str()].len()
-                } else {
-                    0
-                };
+                let existing_count = decks.members()
+                    .filter(|d| d["user_uid"].as_str() == Some(player_uid.as_str()))
+                    .count();
                 match state {
                     TournamentState::Playing => {
                         if *multideck {
                             // Multideck: new deck goes at index == existing_count
-                            // Block if that index's round has already been played
+                            // Block if that round has already been played
                             if is_deck_locked(tournament, existing_count) {
                                 return Err("Cannot upload deck for a round that has already started".to_string());
                             }
@@ -2033,7 +2069,6 @@ fn apply_event(
                         }
                     }
                     TournamentState::Finished => {
-                        // Allow uploading a missing deck after tournament finishes (recovery)
                         if existing_count > 0 {
                             return Err("Cannot modify deck after tournament is finished".to_string());
                         }
@@ -2041,64 +2076,19 @@ fn apply_event(
                     _ => {} // Planned, Registration, Waiting: always allowed
                 }
             }
-            // Initialize decks object if needed
-            if tournament["decks"].is_null() {
-                tournament["decks"] = json::object! {};
-            }
-            let pk = player_uid.as_str();
-            if *multideck {
-                // Append to existing decks
-                if tournament["decks"][pk].is_null() {
-                    tournament["decks"][pk] = JsonValue::new_array();
-                }
-                let _ = tournament["decks"][pk].push(deck.clone());
-            } else {
-                // Replace with single deck
-                let mut arr = JsonValue::new_array();
-                let _ = arr.push(deck.clone());
-                tournament["decks"][pk] = arr;
-            }
-            Ok(())
-        }
-
-        TournamentEvent::UpdateDeck { player_uid, deck, deck_index } => {
-            // Auth: organizer or self
-            if !actor.is_organizer && actor.uid != *player_uid {
-                return Err("Only organizers or the player can update a deck".to_string());
-            }
-            // Lifecycle: non-organizers restricted during Playing/Finished
-            if !actor.is_organizer {
-                match state {
-                    TournamentState::Playing => {
-                        let is_multideck = tournament["multideck"].as_bool().unwrap_or(false);
-                        if is_multideck {
-                            if is_deck_locked(tournament, *deck_index) {
-                                return Err("Cannot modify a deck whose round has already started".to_string());
-                            }
-                        } else {
-                            return Err("Cannot modify deck while tournament is in progress".to_string());
-                        }
-                    }
-                    TournamentState::Finished => {
-                        return Err("Cannot modify deck after tournament is finished".to_string());
-                    }
-                    _ => {} // Planned, Registration, Waiting: always allowed
-                }
-            }
-            if tournament["decks"].is_null() {
-                tournament["decks"] = json::object! {};
-            }
-            let pk = player_uid.as_str();
-            // Ensure decks array exists
-            if tournament["decks"][pk].is_null() {
-                tournament["decks"][pk] = JsonValue::new_array();
-            }
-            let decks_arr = &mut tournament["decks"][pk];
-            if *deck_index < decks_arr.len() {
-                decks_arr[*deck_index] = deck.clone();
-            } else {
-                return Err(format!("Deck index {} out of range", deck_index));
-            }
+            // Compute public flag
+            let is_public = compute_deck_public(tournament, player_uid);
+            // Build deck data with public flag
+            let mut deck_data = deck.clone();
+            deck_data["public"] = is_public.into();
+            // Emit deck_ops upsert (tournament unchanged for deck events)
+            let op = json::object! {
+                "op" => "upsert",
+                "player_uid" => player_uid.as_str(),
+                "deck" => deck_data,
+                "multideck" => *multideck,
+            };
+            let _ = deck_ops.push(op);
             Ok(())
         }
 
@@ -2129,37 +2119,14 @@ fn apply_event(
                     _ => {} // Planned, Registration, Waiting: always allowed
                 }
             }
-            let pk = player_uid.as_str();
-            if tournament["decks"].is_null() || tournament["decks"][pk].is_null() {
-                return Ok(()); // nothing to delete
-            }
-            if *multideck {
-                let idx = deck_index.unwrap_or(0);
-                let arr_len = tournament["decks"][pk].len();
-                if idx >= arr_len {
-                    return Err(format!("Deck index {} out of range", idx));
-                }
-                if idx == arr_len - 1 {
-                    // Last element: pop it
-                    let _ = tournament["decks"][pk].array_remove(idx);
-                } else {
-                    // Middle element: set to null sentinel
-                    tournament["decks"][pk][idx] = JsonValue::Null;
-                }
-                // Trim trailing nulls
-                while tournament["decks"][pk].len() > 0
-                    && tournament["decks"][pk][tournament["decks"][pk].len() - 1].is_null()
-                {
-                    let last = tournament["decks"][pk].len() - 1;
-                    let _ = tournament["decks"][pk].array_remove(last);
-                }
-                // Remove entry if empty
-                if tournament["decks"][pk].len() == 0 {
-                    tournament["decks"].remove(pk);
-                }
-            } else {
-                tournament["decks"].remove(pk);
-            }
+            // Emit deck_ops delete
+            let op = json::object! {
+                "op" => "delete",
+                "player_uid" => player_uid.as_str(),
+                "deck_index" => match deck_index { Some(i) => JsonValue::from(*i), None => JsonValue::Null },
+                "multideck" => *multideck,
+            };
+            let _ = deck_ops.push(op);
             Ok(())
         }
 
@@ -2254,6 +2221,10 @@ fn apply_event(
                 validate_enum(p, &["additions", "clock_stop", "both"], "time_extension_policy")?;
             }
 
+            // Check if decklists_mode is changing on a Finished tournament
+            let decklists_mode_changing = config.has_key("decklists_mode")
+                && state == TournamentState::Finished;
+
             // Apply config fields (key present = apply, even if null)
             let config_fields = [
                 "name", "format", "rank", "online", "start", "finish", "timezone",
@@ -2265,6 +2236,22 @@ fn apply_event(
             for field in config_fields {
                 if config.has_key(field) {
                     tournament[field] = config[field].clone();
+                }
+            }
+
+            // Recompute deck public flags if decklists_mode changed on Finished tournament
+            if decklists_mode_changing {
+                for d in decks.members() {
+                    let user_uid = d["user_uid"].as_str().unwrap_or("");
+                    let deck_uid = d["uid"].as_str().unwrap_or("");
+                    if user_uid.is_empty() || deck_uid.is_empty() { continue; }
+                    let is_public = compute_deck_public(tournament, user_uid);
+                    let op = json::object! {
+                        "op" => "set_public",
+                        "deck_uid" => deck_uid,
+                        "public" => is_public,
+                    };
+                    let _ = deck_ops.push(op);
                 }
             }
 
@@ -2383,9 +2370,28 @@ mod tests {
         "[]".to_string()
     }
 
-    /// Helper to run a tournament event with empty sanctions
+    fn no_decks() -> String {
+        "[]".to_string()
+    }
+
+    /// Helper to run a tournament event with empty sanctions and no decks
     fn run_event(tournament: &JsonValue, event: &JsonValue, actor: &JsonValue) -> Result<String, String> {
-        process_tournament_event(&tournament.dump(), &event.dump(), &actor.dump(), &no_sanctions())
+        let raw = process_tournament_event(
+            &tournament.dump(), &event.dump(), &actor.dump(), &no_sanctions(), &no_decks(),
+        )?;
+        let parsed = json::parse(&raw).unwrap();
+        Ok(parsed["tournament"].dump())
+    }
+
+    /// Helper to run a tournament event with existing decks metadata
+    fn run_event_with_decks(
+        tournament: &JsonValue, event: &JsonValue, actor: &JsonValue, decks_json: &str,
+    ) -> Result<(String, JsonValue), String> {
+        let raw = process_tournament_event(
+            &tournament.dump(), &event.dump(), &actor.dump(), &no_sanctions(), decks_json,
+        )?;
+        let parsed = json::parse(&raw).unwrap();
+        Ok((parsed["tournament"].dump(), parsed["deck_ops"].clone()))
     }
 
     #[test]
@@ -2482,99 +2488,95 @@ mod tests {
     }
 
     #[test]
-    fn test_player_upload_deck_before_playing() {
+    fn test_player_upsert_deck_before_playing() {
         let tournament = tournament_with_player("Waiting");
         let event = json::object! {
-            type: "UploadDeck",
+            type: "UpsertDeck",
             player_uid: "player-1",
             deck: { name: "Test", author: "", comments: "", cards: {} },
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = run_event(&tournament, &event, &actor);
-        assert!(result.is_ok());
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("upsert"));
+        assert_eq!(deck_ops[0]["deck"]["public"].as_bool(), Some(false));
     }
 
     #[test]
     fn test_player_blocked_during_playing_with_existing_deck() {
-        let mut tournament = tournament_with_player("Playing");
-        tournament["decks"] = json::object! {
-            "player-1": [{ name: "Old", author: "", comments: "", cards: {} }]
-        };
+        let tournament = tournament_with_player("Playing");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
         let event = json::object! {
-            type: "UploadDeck",
+            type: "UpsertDeck",
             player_uid: "player-1",
             deck: { name: "New", author: "", comments: "", cards: {} },
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = run_event(&tournament, &event, &actor);
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("in progress"));
     }
 
     #[test]
-    fn test_organizer_can_upload_during_playing() {
-        let mut tournament = tournament_with_player("Playing");
-        tournament["decks"] = json::object! {
-            "player-1": [{ name: "Old", author: "", comments: "", cards: {} }]
-        };
+    fn test_organizer_can_upsert_during_playing() {
+        let tournament = tournament_with_player("Playing");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
         let event = json::object! {
-            type: "UploadDeck",
+            type: "UpsertDeck",
             player_uid: "player-1",
             deck: { name: "New", author: "", comments: "", cards: {} },
             multideck: false,
         };
         let actor = make_organizer();
-        let result = run_event(&tournament, &event, &actor);
-        assert!(result.is_ok());
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("upsert"));
     }
 
     #[test]
     fn test_player_can_upload_missing_deck_after_finish() {
         let tournament = tournament_with_player("Finished");
         let event = json::object! {
-            type: "UploadDeck",
+            type: "UpsertDeck",
             player_uid: "player-1",
             deck: { name: "Recovery", author: "", comments: "", cards: {} },
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = run_event(&tournament, &event, &actor);
-        assert!(result.is_ok());
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
+        assert_eq!(deck_ops.len(), 1);
     }
 
     #[test]
     fn test_player_cannot_replace_deck_after_finish() {
-        let mut tournament = tournament_with_player("Finished");
-        tournament["decks"] = json::object! {
-            "player-1": [{ name: "Old", author: "", comments: "", cards: {} }]
-        };
+        let tournament = tournament_with_player("Finished");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
         let event = json::object! {
-            type: "UploadDeck",
+            type: "UpsertDeck",
             player_uid: "player-1",
             deck: { name: "New", author: "", comments: "", cards: {} },
             multideck: false,
         };
         let actor = make_player("player-1");
-        let result = run_event(&tournament, &event, &actor);
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("finished"));
     }
 
     #[test]
-    fn test_player_blocked_update_during_playing() {
-        let mut tournament = tournament_with_player("Playing");
-        tournament["decks"] = json::object! {
-            "player-1": [{ name: "Old", author: "", comments: "", cards: {} }]
-        };
+    fn test_player_blocked_upsert_during_playing() {
+        let tournament = tournament_with_player("Playing");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
         let event = json::object! {
-            type: "UpdateDeck",
+            type: "UpsertDeck",
             player_uid: "player-1",
             deck: { name: "New", author: "", comments: "", cards: {} },
+            multideck: false,
         };
         let actor = make_player("player-1");
-        let result = run_event(&tournament, &event, &actor);
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("in progress"));
     }
@@ -2583,14 +2585,13 @@ mod tests {
     fn test_checkin_missing_decklist_warning() {
         let mut tournament = tournament_with_player("Waiting");
         tournament["decklist_required"] = true.into();
-        // Player has no deck — state is "Registered" so we can check them in
         tournament["players"][0]["state"] = "Registered".into();
 
         let event = json::object! { type: "CheckIn", player_uid: "player-1" };
         let actor = make_organizer();
-        let result = run_event(&tournament, &event, &actor);
-        assert!(result.is_ok());
-        let updated = json::parse(&result.unwrap()).unwrap();
+        // No decks passed — should flag missing_decklist
+        let (raw, _) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
+        let updated = json::parse(&raw).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
         assert_eq!(updated["players"][0]["missing_decklist"].as_bool(), Some(true));
     }
@@ -2600,15 +2601,12 @@ mod tests {
         let mut tournament = tournament_with_player("Waiting");
         tournament["decklist_required"] = true.into();
         tournament["players"][0]["state"] = "Registered".into();
-        tournament["decks"] = json::object! {
-            "player-1": [{ name: "My Deck", author: "", comments: "", cards: {} }]
-        };
 
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
         let event = json::object! { type: "CheckIn", player_uid: "player-1" };
         let actor = make_organizer();
-        let result = run_event(&tournament, &event, &actor);
-        assert!(result.is_ok());
-        let updated = json::parse(&result.unwrap()).unwrap();
+        let (raw, _) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+        let updated = json::parse(&raw).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
         assert!(updated["players"][0]["missing_decklist"].is_null());
     }
@@ -2730,7 +2728,7 @@ mod tests {
             { user_uid: "p1", level: "disqualification", round_number: json::Null, lifted_at: json::Null, deleted_at: json::Null }
         ];
         let result = process_tournament_event(
-            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump()
+            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump(), &no_decks(),
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("disqualification"));
@@ -2749,7 +2747,7 @@ mod tests {
             { user_uid: "p1", level: "suspension", round_number: json::Null, lifted_at: json::Null, deleted_at: json::Null }
         ];
         let result = process_tournament_event(
-            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump()
+            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump(), &no_decks(),
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("suspended"));

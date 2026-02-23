@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { getAllRatings, getAllUsers, getSuspendedUserUids } from "$lib/db";
+  import { getAllUsers, getSuspendedUserUids } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import type { Rating, RatingCategory } from "$lib/types";
+  import type { User, RatingCategory } from "$lib/types";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  let ratings = $state<Rating[]>([]);
-  let userNames = $state<Map<string, string>>(new Map());
+  let users = $state<User[]>([]);
   let suspendedUids = $state<Set<string>>(new Set());
   let isSyncing = $state(!syncManager.isSynced);
 
@@ -32,14 +31,14 @@
   );
 
   let filtered = $derived(() => {
-    let result = ratings.filter(r => {
-      if (suspendedUids.has(r.user_uid)) return false;
-      const cat = r[selectedCategory];
+    let result = users.filter(u => {
+      if (suspendedUids.has(u.uid)) return false;
+      const cat = u[selectedCategory];
       return cat && cat.total > 0;
     });
 
     if (selectedCountry !== "all") {
-      result = result.filter(r => r.country === selectedCountry);
+      result = result.filter(u => u.country === selectedCountry);
     }
 
     // Sort by total desc
@@ -55,19 +54,13 @@
   let totalPages = $derived(Math.ceil(filtered().length / PAGE_SIZE));
   let paged = $derived(filtered().slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE));
 
-  async function loadRatings() {
-    const [allRatings, allUsers, suspended] = await Promise.all([
-      getAllRatings(),
+  async function loadData() {
+    const [allUsers, suspended] = await Promise.all([
       getAllUsers(),
       getSuspendedUserUids(),
     ]);
-    const names = new Map<string, string>();
-    for (const u of allUsers) {
-      names.set(u.uid, u.name);
-    }
-    ratings = allRatings;
+    users = allUsers;
     suspendedUids = suspended;
-    userNames = names;
   }
 
   // Reset page on filter change
@@ -78,11 +71,11 @@
   });
 
   $effect(() => {
-    loadRatings();
+    loadData();
 
     const handleSyncEvent = (event: { type: string }) => {
-      if (event.type === "rating" || event.type === "sanction" || event.type === "sync_complete") {
-        loadRatings();
+      if (event.type === "user" || event.type === "sanction" || event.type === "sync_complete") {
+        loadData();
         if (event.type === "sync_complete") isSyncing = false;
       }
     };
@@ -136,7 +129,7 @@
   </div>
 
   <!-- Table -->
-  {#if isSyncing && ratings.length === 0}
+  {#if isSyncing && users.length === 0}
     <div class="text-center text-ash-400 py-8">
       <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.rankings_loading()}</span>
@@ -155,20 +148,20 @@
           </tr>
         </thead>
         <tbody>
-          {#each paged as rating, i}
+          {#each paged as user, i}
             {@const rank = page * PAGE_SIZE + i + 1}
-            {@const total = rating[selectedCategory]?.total ?? 0}
+            {@const total = user[selectedCategory]?.total ?? 0}
             <tr class="border-b border-ash-800/50 hover:bg-ash-800/20">
               <td class="py-2 px-3 text-ash-400">{rank}</td>
               <td class="py-2 px-3">
-                <a href="/users/{rating.user_uid}" class="text-ash-100 hover:text-crimson-400">
-                  {userNames.get(rating.user_uid) ?? m.rankings_unknown_player()}
+                <a href="/users/{user.uid}" class="text-ash-100 hover:text-crimson-400">
+                  {user.name}
                 </a>
               </td>
               <td class="py-2 px-3 text-ash-300">
-                {#if rating.country}
-                  {getCountryFlag(rating.country)}
-                  {countries[rating.country]?.name ?? rating.country}
+                {#if user.country}
+                  {getCountryFlag(user.country)}
+                  {countries[user.country]?.name ?? user.country}
                 {/if}
               </td>
               <td class="py-2 px-3 text-right font-medium text-ash-100">{total}</td>

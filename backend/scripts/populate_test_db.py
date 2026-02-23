@@ -82,7 +82,7 @@ async def main():
 
     # Clean existing users
     async with db.get_connection() as conn:
-        await conn.execute("DELETE FROM users")
+        await conn.execute("DELETE FROM objects WHERE type = 'user'")
 
     # Generate and insert mock users
     users = generate_mock_users(300)

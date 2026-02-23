@@ -4,7 +4,7 @@
  */
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { User, Role, Sanction, Tournament, Rating, League, VtesCard, OfflinePlayer } from '$lib/types';
+import type { User, Role, Sanction, Tournament, DeckObject, League, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch } from './utils';
 
@@ -45,12 +45,12 @@ interface ArchonDB extends DBSchema {
       'by-format': string;
     };
   };
-  ratings: {
+  decks: {
     key: string;  // uid
-    value: Rating;
+    value: DeckObject;
     indexes: {
+      'by-tournament': string;
       'by-user': string;
-      'by-country': string;
     };
   };
   leagues: {
@@ -65,18 +65,6 @@ interface ArchonDB extends DBSchema {
     key: number; // card id
     value: VtesCard;
   };
-  changes: {
-    key: number;  // auto-increment
-    value: {
-      id?: number;
-      store: string;        // "users" | "sanctions" | "tournaments" | "ratings"
-      type: 'create' | 'update' | 'delete';
-      uid: string;
-      timestamp: string;
-      event?: unknown;      // business event payload (for tournament actions)
-      data?: unknown;       // full object snapshot (for CRUD)
-    };
-  };
   metadata: {
     key: string;
     value: string;
@@ -85,8 +73,8 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-// Version 14: added by-tournament index on sanctions
-const DB_VERSION = 14;
+// Version 15: new sync — replace ratings with decks store, remove changes store
+const DB_VERSION = 15;
 
 export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
   if (dbPromise) {
@@ -94,6 +82,14 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
   }
 
   dbPromise = openDB<ArchonDB>('archon-db', DB_VERSION, {
+    blocked() {
+      // Another connection (old tab, service worker) is blocking the upgrade.
+      console.warn('[IDB] Upgrade blocked by another connection. Close other tabs.');
+    },
+    terminated() {
+      // Connection was abnormally closed — reset so next getDB() retries.
+      dbPromise = null;
+    },
     upgrade(db, oldVersion, _newVersion, transaction) {
 
       // On ANY version upgrade: delete all existing stores and recreate fresh.
@@ -119,10 +115,10 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       tournamentStore.createIndex('by-country', 'country');
       tournamentStore.createIndex('by-format', 'format');
 
-      // Ratings store
-      const ratingStore = db.createObjectStore('ratings', { keyPath: 'uid' });
-      ratingStore.createIndex('by-user', 'user_uid');
-      ratingStore.createIndex('by-country', 'country');
+      // Decks store (standalone deck objects, extracted from tournaments)
+      const deckStore = db.createObjectStore('decks', { keyPath: 'uid' });
+      deckStore.createIndex('by-tournament', 'tournament_uid');
+      deckStore.createIndex('by-user', 'user_uid');
 
       // Leagues store
       const leagueStore = db.createObjectStore('leagues', { keyPath: 'uid' });
@@ -131,9 +127,6 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
 
       // Cards store (VTES card database, keyed by card ID)
       db.createObjectStore('cards', { keyPath: 'id' });
-
-      // Changes log (generalized for all object types)
-      db.createObjectStore('changes', { keyPath: 'id', autoIncrement: true });
 
       // Metadata store for sync state
       db.createObjectStore('metadata');
@@ -256,47 +249,6 @@ export async function getFilteredUsers(
 export async function clearAllUsers(): Promise<void> {
   const db = await getDB();
   await db.clear('users');
-}
-
-// Change log operations
-export async function logChange(
-  store: string,
-  type: 'create' | 'update' | 'delete',
-  uid: string,
-  options?: { event?: unknown; data?: unknown }
-): Promise<void> {
-  const db = await getDB();
-  await db.add('changes', {
-    store,
-    type,
-    uid,
-    timestamp: new Date().toISOString(),
-    event: options?.event,
-    data: options?.data,
-  });
-}
-
-export async function getChanges(): Promise<ArchonDB['changes']['value'][]> {
-  const db = await getDB();
-  return db.getAll('changes');
-}
-
-export async function clearChanges(): Promise<void> {
-  const db = await getDB();
-  await db.clear('changes');
-}
-
-export async function clearChangeForUid(uid: string): Promise<void> {
-  const db = await getDB();
-  const tx = db.transaction('changes', 'readwrite');
-  let cursor = await tx.store.openCursor();
-  while (cursor) {
-    if (cursor.value.uid === uid) {
-      await cursor.delete();
-    }
-    cursor = await cursor.continue();
-  }
-  await tx.done;
 }
 
 // Metadata operations
@@ -602,46 +554,65 @@ export async function getAgendaTournaments(
   return { items: items.slice(start, start + pageSize), total };
 }
 
-// Rating operations
-export async function getRating(uid: string): Promise<Rating | undefined> {
+// Deck operations (standalone DeckObject, extracted from tournaments)
+export async function getDeck(uid: string): Promise<DeckObject | undefined> {
   const db = await getDB();
-  return db.get('ratings', uid);
+  return db.get('decks', uid);
 }
 
-export async function getRatingByUserUid(userUid: string): Promise<Rating | undefined> {
+export async function getDecksByTournament(tournamentUid: string): Promise<DeckObject[]> {
   const db = await getDB();
-  const ratings = await db.getAllFromIndex('ratings', 'by-user', userUid);
-  return ratings[0];
+  return db.getAllFromIndex('decks', 'by-tournament', tournamentUid);
 }
 
-export async function getAllRatings(): Promise<Rating[]> {
-  const db = await getDB();
-  return db.getAll('ratings');
+/** Get decks for a tournament, grouped by user_uid (same shape as old tournament.decks). */
+export async function getDecksByTournamentGrouped(tournamentUid: string): Promise<Record<string, DeckObject[]>> {
+  const decks = await getDecksByTournament(tournamentUid);
+  const grouped: Record<string, DeckObject[]> = {};
+  for (const d of decks) {
+    (grouped[d.user_uid] ??= []).push(d);
+  }
+  return grouped;
 }
 
-export async function saveRating(rating: Rating): Promise<void> {
+export async function getDecksByUser(userUid: string): Promise<DeckObject[]> {
   const db = await getDB();
-  await db.put('ratings', rating);
+  return db.getAllFromIndex('decks', 'by-user', userUid);
 }
 
-export async function saveRatingsBatch(ratings: Rating[]): Promise<void> {
-  if (ratings.length === 0) return;
+export async function saveDeck(deck: DeckObject): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction('ratings', 'readwrite');
-  for (const r of ratings) {
-    tx.store.put(r);
+  const tx = db.transaction('decks', 'readwrite');
+  // Deduplicate: remove any deck with same (tournament_uid, user_uid, round) but different uid
+  // This cleans up optimistic decks when authoritative SSE arrives
+  const existing = await tx.store.index('by-tournament').getAll(deck.tournament_uid);
+  for (const d of existing) {
+    if (d.uid !== deck.uid && d.user_uid === deck.user_uid && d.round === deck.round) {
+      tx.store.delete(d.uid);
+    }
+  }
+  tx.store.put(deck);
+  await tx.done;
+}
+
+export async function saveDecksBatch(decks: DeckObject[]): Promise<void> {
+  if (decks.length === 0) return;
+  const db = await getDB();
+  const tx = db.transaction('decks', 'readwrite');
+  for (const d of decks) {
+    tx.store.put(d);
   }
   await tx.done;
 }
 
-export async function deleteRating(uid: string): Promise<void> {
+export async function deleteDeck(uid: string): Promise<void> {
   const db = await getDB();
-  await db.delete('ratings', uid);
+  await db.delete('decks', uid);
 }
 
-export async function clearAllRatings(): Promise<void> {
+export async function clearAllDecks(): Promise<void> {
   const db = await getDB();
-  await db.clear('ratings');
+  await db.clear('decks');
 }
 
 // League operations
@@ -743,6 +714,18 @@ export async function addOfflineSanctionUid(tournamentUid: string, sanctionUid: 
   const uids = await getOfflineSanctionUids(tournamentUid);
   uids.push(sanctionUid);
   await setMetadata(`offline_sanctions:${tournamentUid}`, JSON.stringify(uids));
+}
+
+export async function getOfflineDeckUids(tournamentUid: string): Promise<string[]> {
+  const raw = await getMetadata(`offline_decks:${tournamentUid}`);
+  if (!raw) return [];
+  return JSON.parse(raw);
+}
+
+export async function addOfflineDeckUid(tournamentUid: string, deckUid: string): Promise<void> {
+  const uids = await getOfflineDeckUids(tournamentUid);
+  uids.push(deckUid);
+  await setMetadata(`offline_decks:${tournamentUid}`, JSON.stringify(uids));
 }
 
 // Venue autocomplete from tournament history

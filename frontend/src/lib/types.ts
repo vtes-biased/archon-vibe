@@ -177,6 +177,13 @@ export interface User extends BaseObject {
 
   // Calendar feed token (private, only visible via /auth/me)
   calendar_token?: string | null;
+
+  // Embedded rating data (merged from separate Rating objects)
+  constructed_online?: CategoryRating | null;
+  constructed_offline?: CategoryRating | null;
+  limited_online?: CategoryRating | null;
+  limited_offline?: CategoryRating | null;
+  wins?: string[]; // All-time tournament UIDs won
 }
 
 export interface Sanction extends BaseObject {
@@ -296,11 +303,11 @@ export interface Deck {
 }
 
 /**
- * Unified Tournament type. Fields are optional based on the data level
- * received from the backend:
+ * Unified Tournament type. Fields are optional based on the data level:
  * - public: uid, modified, name, format, rank, online, start, finish, timezone, country, state
- * - member: adds config fields, players, standings, my_tables, decks (filtered)
- * - full: everything including rounds, finals, checkin_code
+ * - member: everything except checkin_code, vekn_pushed_at
+ * - full: everything
+ * Decks are now separate DeckObject entities (not embedded in tournament).
  */
 export interface Tournament extends BaseObject {
   name: string;
@@ -334,7 +341,6 @@ export interface Tournament extends BaseObject {
   vekn_pushed_at?: string | null;
   checkin_code?: string;
   players?: Player[];
-  decks?: Record<string, (Deck | null)[]>;
   rounds?: Table[][];
   finals?: FinalsTable | null;
   winner?: string;
@@ -392,6 +398,19 @@ export interface TournamentConfig {
   standings_mode: StandingsMode;
   decklists_mode: DeckListsMode;
   max_rounds: number;
+}
+
+// Standalone deck object (synced separately from tournament)
+export interface DeckObject extends BaseObject {
+  tournament_uid: string;
+  user_uid: string;
+  round: number | null;
+  name: string;
+  author: string;
+  comments: string;
+  cards: Record<string, number>;
+  attribution?: string | null;
+  public: boolean;
 }
 
 // Rating types

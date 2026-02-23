@@ -6,8 +6,8 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
-  import { getUser, getUserByVeknId, getTournament, getSanctionsForTournament, getDeviceId } from "$lib/db";
-  import type { Tournament, TournamentState, User, Sanction } from "$lib/types";
+  import { getUser, getUserByVeknId, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped } from "$lib/db";
+  import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
   import { formatScore } from "$lib/utils";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, type StandingEntry } from "$lib/tournament-utils";
@@ -70,9 +70,19 @@
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
 
+  // Decks loaded from IDB (separate store)
+  let decksByUser = $state<Record<string, DeckObject[]>>({});
+
+  $effect(() => {
+    if (!tournament?.uid) return;
+    getDecksByTournamentGrouped(tournament.uid).then(grouped => {
+      decksByUser = grouped;
+    });
+  });
+
   // Player's deck and validation status
   const myDeck = $derived(
-    (auth.user?.uid && tournament?.decks?.[auth.user.uid]?.[0]) ?? null
+    (auth.user?.uid && decksByUser[auth.user.uid]?.[0]) ?? null
   );
   const playerHasValidDeck = $derived(
     !tournament?.decklist_required || (myDeck !== null && !myDeckErrors.some(e => e.severity === 'error'))

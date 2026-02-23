@@ -8,7 +8,7 @@ from httpx import AsyncClient
 async def test_create_user(test_client: AsyncClient):
     """Test creating a new user."""
     response = await test_client.post(
-        "/users/",
+        "/api/users/",
         params={
             "name": "Test User",
             "country": "US",
@@ -33,7 +33,7 @@ async def test_create_user(test_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_list_users(test_client: AsyncClient, populated_db):
     """Test listing users with pagination."""
-    response = await test_client.get("/users/")
+    response = await test_client.get("/api/users/")
     
     assert response.status_code == 200
     users = response.json()
@@ -54,7 +54,7 @@ async def test_get_user(test_client: AsyncClient, populated_db):
     # Use the first user from populated data
     test_uid = populated_db[0].uid
     
-    response = await test_client.get(f"/users/{test_uid}")
+    response = await test_client.get(f"/api/users/{test_uid}")
     
     assert response.status_code == 200
     user = response.json()
@@ -70,13 +70,13 @@ async def test_update_user(test_client: AsyncClient, populated_db):
     test_uid = populated_db[0].uid
     
     # First get the user
-    response = await test_client.get(f"/users/{test_uid}")
+    response = await test_client.get(f"/api/users/{test_uid}")
     assert response.status_code == 200
     original_user = response.json()
     
     # Update the user
     response = await test_client.put(
-        f"/users/{test_uid}",
+        f"/api/users/{test_uid}",
         params={
             "name": "Updated Name",
             "country": "CA",

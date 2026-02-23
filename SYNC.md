@@ -14,44 +14,51 @@ Three access levels determine what data each SSE viewer receives:
 
 ## Backend Streaming
 
-### Generic `stream_objects()`
+### Unified `stream_objects_new()`
 
-Single generic function using keyset pagination:
+Single generic function reading pre-computed access-level columns:
 
 ```python
 # backend/src/db.py
-async def stream_objects[T](
-    table: str, type_: type[T], since: str | None = None, batch_size: int = 1000
-) -> AsyncIterator[tuple[list[T], str | None]]:
+async def stream_objects_new(
+    obj_type: str | None = None,
+    level: str = "full",          # "public" | "member" | "full"
+    since: str | None = None,
+    batch_size: int = 1000,
+) -> AsyncIterator[tuple[list[str], str]]:
+    # Yields (batch_of_raw_json_strings, max_modified_at)
 ```
 
-**Keyset pagination**: Uses `WHERE (modified, uid) > (%s, %s)` to page through results. DB connections acquired/released per batch (not held for entire stream). Prevents connection pool exhaustion during long SSE streams.
+**Keyset pagination**: Uses `WHERE (modified_at, uid) > (%s, %s)`. DB connections acquired/released per batch. Yields raw JSONB text strings — no Python deserialization.
 
-### Per-Type Filtering
+### Access-Level Projections (computed at write time)
 
-Each object type has a filter function applied per-viewer during both initial sync and real-time broadcast:
+`backend/src/access_levels.py` computes three projections per object at **write time**:
 
-- `_filter_user()` — strips contact info for members, skips non-Prince/NC users for public. **Always strips `calendar_token`** (private to user, only visible via `/auth/me`)
-- `_filter_sanction()` — members+ only
-- `_filter_tournament()` — full/member/minimal based on access level, `standings_mode`, `decklists_mode`
-- `_filter_rating()` — public (no filtering)
-- `_filter_league()` — public (no filtering currently)
+| Type | `public` | `member` | `full` |
+|------|----------|----------|--------|
+| user | NC/Prince only (with contact) | all users (no contact) | everything except `calendar_token` |
+| tournament | minimal fields | all except `checkin_code`, `vekn_pushed_at` | everything |
+| sanction | `None` | full data | full data |
+| deck | `None` | full data if `public=true`, else `None` | full data |
+| league | full data | full data | full data |
 
-### SSE Endpoint (spec-based loop)
+`None` means column is NULL in DB — object invisible at that level.
+
+### SSE Endpoint
 
 ```python
-_stream_specs = [
-    (stream_users, "users", _filter_user),
-    (stream_sanctions, "sanctions", _filter_sanction),
-    (stream_tournaments, "tournaments", _filter_tournament),
-    (stream_ratings, "ratings", _filter_rating),
-    (stream_leagues, "leagues", _filter_league),
-]
+_STREAM_TYPES = ["user", "tournament", "sanction", "deck", "league"]
 
-for stream_fn, event_type, filter_fn in _stream_specs:
-    async for batch, batch_max in stream_fn(since=effective_since):
-        filtered = [filter_fn(item, viewer) for item in batch if filter_fn(item, viewer) is not None]
-        yield SSE(type=event_type, data=filtered)
+for obj_type in _STREAM_TYPES:
+    async for json_strings, batch_max in stream_objects_new(
+        obj_type=obj_type, level=level.value, since=effective_since
+    ):
+        joined = ",".join(json_strings)
+        yield f'data: {{"type":"{obj_type}s","data":[{joined}]}}\n\n'
+```
+
+No per-viewer filtering at read time — projections are pre-computed. After the catch-up phase, a **personal overlay** sends `full`-level data for the viewer's own objects and role-based full-access objects (NC/Prince same country, organizers).
 ```
 
 ### Ephemeral SSE Events
@@ -105,9 +112,9 @@ Minimal indexes only:
 | Store | Indexes |
 |-------|---------|
 | users | `by-name`, `by-country-name` |
-| sanctions | `by-user` |
+| sanctions | `by-user`, `by-tournament` |
 | tournaments | `by-state`, `by-start`, `by-country`, `by-format` |
-| ratings | `by-user`, `by-country` |
+| decks | `by-tournament`, `by-user` |
 | leagues | `by-country`, `by-start` |
 
 ### Changes Log (Offline-Ready)
@@ -116,7 +123,7 @@ Generalized for all object types:
 
 ```typescript
 changes: {
-  store: string;        // "users" | "sanctions" | "tournaments" | "ratings" | "leagues"
+  store: string;        // "users" | "sanctions" | "tournaments" | "decks" | "ratings" | "leagues"
   type: 'create' | 'update' | 'delete';
   uid: string;
   timestamp: string;
@@ -138,7 +145,7 @@ const SPECS = [
   { batchType: 'users', singleType: 'user', save, saveBatch, del },
   { batchType: 'sanctions', singleType: 'sanction', save, saveBatch, del },
   { batchType: 'tournaments', singleType: 'tournament', save, saveBatch, del },
-  { batchType: 'ratings', singleType: 'rating', save, saveBatch, del },
+  { batchType: 'decks', singleType: 'deck', save, saveBatch, del },
   { batchType: 'leagues', singleType: 'league', save, saveBatch, del },
 ];
 ```
@@ -155,19 +162,21 @@ Single `isSynced` flag (no separate `isInitialSync`).
 
 ### Tournament Actions (WASM Engine)
 
-1. Load current tournament from IndexedDB
-2. Process via WASM `processTournamentEvent()` → save to IndexedDB → UI reacts
+1. Load current tournament + decks from IndexedDB
+2. Process via WASM `processTournamentEvent()` → returns `{tournament, deck_ops}` → save both to IndexedDB → UI reacts
 3. Send to backend async
-4. SSE delivers authoritative state → overwrites IndexedDB
+4. SSE delivers authoritative state (tournament + deck objects) → overwrites IndexedDB
 
 ```typescript
 export async function tournamentAction(uid, action, data) {
   const current = await getTournament(uid);
-  const updated = await processTournamentEvent(current, event, actor);
-  await saveTournament(updated);
+  const result = await processTournamentEvent(current, event, actor, sanctions, decks);
+  // result: { tournament, deck_ops }
+  await saveTournament(result.tournament);
+  // apply deck_ops to IndexedDB
   await logChange('tournaments', 'update', uid, { event });
   apiRequest(...).catch(() => { /* SSE will correct */ });
-  return updated;
+  return result.tournament;
 }
 ```
 
@@ -183,7 +192,6 @@ Apply to IndexedDB optimistically → send to server → SSE corrects if needed.
 | organizers_uids | ✓ | ✓ | ✓ |
 | players | ✓ (full) | ✓ (no per-player results) | ✓ (no per-player results) |
 | standings | ✓ | Per `standings_mode` | Per `standings_mode` |
-| decks | Per `decklists_mode` | ✗ | ✗ |
 | finals | ✓ | ✗ | ✗ |
 | my_tables | ✓ | ✓ | N/A |
 | rounds | ✗ | ✗ | ✗ |
@@ -194,11 +202,12 @@ Apply to IndexedDB optimistically → send to server → SSE corrects if needed.
 
 ## Adding a New Object Type
 
-1. **Backend model** in `models.py` (extend `BaseObject` for `deleted_at`)
-2. **DB table** + thin wrapper: `stream_<type>()` using `stream_objects()`
-3. **Filter function** in `main.py`: `_filter_<type>(obj, viewer) -> obj | None`
-4. **Add to `_stream_specs`** in SSE endpoint
-5. **Broadcast function** using `_broadcast()`
-6. **Frontend type** in `types.ts`
-7. **IndexedDB store** in `db.ts` (bump version → full clear)
-8. **Add to `SPECS`** in `sync.ts`
+1. **Backend model** in `models.py` (extend `BaseObject`)
+2. **Projection functions** in `access_levels.py`: `compute_<type>_public/member/full()` + add to dispatch dicts
+3. **CRUD wrappers** in `db.py`: thin wrappers calling `save_object_from_model("<type>", obj)` and `get_object_full(uid, Type)`
+4. **Add to `_STREAM_TYPES`** in `main.py` (SSE catch-up loop)
+5. **Add to `OBJECT_TYPES`** in `snapshots.py`
+6. **Broadcast** via `_broadcast()` after mutations
+7. **Frontend type** in `types.ts`
+8. **IndexedDB store** in `db.ts` (bump version → full clear)
+9. **Add to `SPECS`** in `sync.ts`

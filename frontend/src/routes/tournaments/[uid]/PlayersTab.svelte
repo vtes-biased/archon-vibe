@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Tournament, User, Player, Deck, Sanction } from "$lib/types";
+  import type { Tournament, User, Player, DeckObject, Sanction } from "$lib/types";
+  import { getDecksByTournamentGrouped } from "$lib/db";
   import { formatScore } from "$lib/utils";
   import AddPlayerForm from "$lib/components/AddPlayerForm.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -64,6 +65,15 @@
   let expandedPlayer = $state<string | null>(null);
   let uploadingFor = $state<string | null>(null);
   let validationCache = $state<Record<string, ValidationError[]>>({});
+  let decksByUser = $state<Record<string, DeckObject[]>>({});
+
+  // Load decks from IDB (separate store)
+  $effect(() => {
+    const tUid = tournament.uid;
+    getDecksByTournamentGrouped(tUid).then(grouped => {
+      decksByUser = grouped;
+    });
+  });
 
   function togglePlayer(uid: string) {
     expandedPlayer = expandedPlayer === uid ? null : uid;
@@ -72,11 +82,14 @@
 
   function onUploaded() {
     uploadingFor = null;
+    getDecksByTournamentGrouped(tournament.uid).then(grouped => {
+      decksByUser = grouped;
+    });
   }
 
   // Get player's deck
-  function getPlayerDeck(uid: string): Deck | null {
-    const decks = tournament.decks?.[uid];
+  function getPlayerDeck(uid: string): DeckObject | null {
+    const decks = decksByUser[uid];
     return decks?.[0] ?? null;
   }
 
@@ -96,13 +109,12 @@
 
   // Validate decks when they change
   $effect(() => {
-    const decks = tournament.decks;
+    const decks = decksByUser;
     const format = tournament.format;
-    if (!decks) return;
+    if (!Object.keys(decks).length) return;
 
     for (const [uid, playerDecks] of Object.entries(decks)) {
       if (playerDecks.length > 0 && playerDecks[0] && !validationCache[uid]) {
-        // Validate asynchronously
         validateDeck(playerDecks[0], format).then(errors => {
           validationCache = { ...validationCache, [uid]: errors };
         });

@@ -3,13 +3,14 @@
  * Tracks which tournaments are in local offline mode, persisted in IndexedDB metadata.
  */
 
-import type { Tournament, Sanction, OfflinePlayer } from '$lib/types';
+import type { Tournament, Sanction, DeckObject, OfflinePlayer } from '$lib/types';
 import {
   getMetadata, setMetadata, deleteMetadata, getMetadataByPrefix,
-  getDeviceId, getTournament, saveTournament, logChange,
+  getDeviceId, getTournament, saveTournament,
   getOfflinePlayers, addOfflinePlayer as dbAddOfflinePlayer,
   setOfflinePlayers, getOfflineSanctionUids, addOfflineSanctionUid,
-  getSanction, saveUser,
+  getOfflineDeckUids, getDeck,
+  getSanction, saveUser, deleteUser,
 } from '$lib/db';
 import { apiRequest } from '$lib/api';
 
@@ -67,6 +68,7 @@ export async function clearOfflineState(tournamentUid: string): Promise<void> {
   await deleteMetadata(`offline_tournament:${tournamentUid}`);
   await deleteMetadata(`offline_players:${tournamentUid}`);
   await deleteMetadata(`offline_sanctions:${tournamentUid}`);
+  await deleteMetadata(`offline_decks:${tournamentUid}`);
   await deleteMetadata(`offline_last_sync:${tournamentUid}`);
 
   const newSet = new Set(offlineTournamentUids);
@@ -111,6 +113,14 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
     if (s) offlineSanctions.push(s);
   }
 
+  // Gather offline decks
+  const deckUids = await getOfflineDeckUids(tournamentUid);
+  const offlineDecks: DeckObject[] = [];
+  for (const uid of deckUids) {
+    const d = await getDeck(uid);
+    if (d) offlineDecks.push(d);
+  }
+
   const result = await apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/go-online`, {
     method: 'POST',
     body: JSON.stringify({
@@ -118,8 +128,14 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
       tournament,
       offline_players: offlinePlayers,
       offline_sanctions: offlineSanctions,
+      offline_decks: offlineDecks,
     }),
   });
+
+  // Clean up temp user stubs (server created real users with uuid7 UIDs)
+  for (const p of offlinePlayers) {
+    await deleteUser(p.temp_uid);
+  }
 
   // Update local state with server-reconciled version
   await saveTournament(result);

@@ -118,51 +118,57 @@
 
   onDestroy(() => stopQrScanner());
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
   async function upload() {
     loading = true;
     error = null;
     success = false;
 
     try {
-      const token = (await import('$lib/stores/auth.svelte')).getAccessToken();
-      const endpoint = playerUid
-        ? `${API_URL}/api/tournaments/${tournamentUid}/decks/${playerUid}`
-        : `${API_URL}/api/tournaments/${tournamentUid}/decks`;
-      const method = playerUid ? 'PUT' : 'POST';
+      const { tournamentAction } = await import('$lib/api');
+      const { fetchDeckFromUrl, parseDeckText } = await import('$lib/deck-fetch');
 
-      const body: Record<string, string | null> = { name: deckName };
-      if (mode === 'text') body.text = deckText;
-      else body.url = deckUrl;
+      // Parse deck (URL fetch or text parse via WASM)
+      let deck: { name: string; author: string; comments: string; cards: Record<string, number> };
+      if (mode === 'text') {
+        deck = await parseDeckText(deckText);
+      } else {
+        deck = await fetchDeckFromUrl(deckUrl);
+      }
 
-      // Attribution: set both attribution (structured VEKN/name) and author (display name)
+      // Override name if provided
+      if (deckName) deck.name = deckName;
+
+      // Build attribution
+      let attrValue: string | null | undefined = undefined;
+      let authorValue = deck.author;
       if (attribution === 'anonymous') {
-        body.attribution = null;
+        attrValue = null;
       } else if (attribution === 'self' && playerUid) {
-        body.attribution = playerVekn || playerName || null;
-        if (playerName) body.author = playerName;
+        attrValue = playerVekn || playerName || null;
+        if (playerName) authorValue = playerName;
       } else if (attribution === 'other') {
         const val = attributionVekn.trim() || attributionSearch.trim();
         if (val) {
-          body.attribution = val;
-          body.author = attributionName || attributionSearch.trim();
+          attrValue = val;
+          authorValue = attributionName || attributionSearch.trim();
         }
       }
 
-      const resp = await fetch(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body),
-      });
+      const deckData: Record<string, unknown> = {
+        name: deck.name,
+        author: authorValue,
+        comments: deck.comments,
+        cards: deck.cards,
+      };
+      if (attrValue !== undefined) deckData.attribution = attrValue;
 
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        throw new Error(data.detail || `Upload failed (${resp.status})`);
-      }
+      // Route through engine action
+      const targetUid = playerUid || (await import('$lib/stores/auth.svelte')).getAuthState().user?.uid;
+      await tournamentAction(tournamentUid, 'UpsertDeck', {
+        player_uid: targetUid,
+        deck: deckData,
+        multideck: false,
+      });
 
       success = true;
       deckText = '';

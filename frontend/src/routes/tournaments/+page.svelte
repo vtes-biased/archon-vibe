@@ -14,6 +14,13 @@
   let tournaments = $state<Tournament[]>([]);
   let totalCount = $state(0);
   let loaded = $state(false);
+  let showLoading = $state(false);
+  // Delay showing spinner to avoid flash on fast IDB reads
+  $effect(() => {
+    if (loaded) { showLoading = false; return; }
+    const timer = setTimeout(() => { showLoading = true; }, 200);
+    return () => clearTimeout(timer);
+  });
   let error = $state<string | null>(null);
 
   // View mode
@@ -423,13 +430,15 @@
         {/if}
       </div>
     {:else if !loaded}
-      <div class="text-center py-12">
-        <div class="text-ash-500 mb-4">
-          <Loader2 class="mx-auto h-12 w-12 animate-spin" />
+      {#if showLoading}
+        <div class="text-center py-12">
+          <div class="text-ash-500 mb-4">
+            <Loader2 class="mx-auto h-12 w-12 animate-spin" />
+          </div>
+          <h3 class="text-lg font-medium text-bone-100 mb-2">{m.common_loading()}</h3>
+          <p class="text-ash-400">{m.tournaments_loading_from_storage()}</p>
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.common_loading()}</h3>
-        <p class="text-ash-400">{m.tournaments_loading_from_storage()}</p>
-      </div>
+      {/if}
     {:else}
       <div class="text-center py-12">
         <div class="text-ash-600 mb-4">

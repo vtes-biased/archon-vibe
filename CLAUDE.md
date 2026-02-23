@@ -41,14 +41,25 @@ All objects have (via `BaseObject`):
 - `deleted_at`: soft-delete timestamp (nullable)
 - Model-specific fields
 
-**DB Storage**: Single JSONB column in PostgreSQL. Full object serialized with msgspec.
+**DB Storage**: Unified `objects` table with pre-computed access-level columns:
 ```sql
-CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
+CREATE TABLE objects (
+    uid TEXT PRIMARY KEY, type TEXT NOT NULL,
+    modified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
+    "public" JSONB, "member" JSONB, "full" JSONB NOT NULL
+);
 ```
+Access projections computed by `access_levels.py` at write time. No per-viewer filtering at read time.
 
 **Card/Deck Support**: VTES card database loaded into IndexedDB (`cards` store). Deck validation in Rust engine, integrated into tournament player workflow.
 
-**Object Types**: User, Sanction, Tournament, Rating, League (all synced via SSE). VtesCard (static data, loaded into IndexedDB).
+**Object Types**: User, Sanction, Tournament, DeckObject, League (all synced via SSE). VtesCard (static data, loaded into IndexedDB).
+
+**DeckObject fields**: `tournament_uid`, `user_uid`, `round`, `name`, `author`, `comments`, `cards` (dict card_id→count), `attribution`, `public` (bool — engine-managed, drives member-level visibility).
+- No deck REST endpoints. All mutations go through `POST /{uid}/action` (engine `deck_ops` side-effects).
+- `deck_ops` ops: `upsert` (create/update deck), `delete` (remove deck), `set_public` (flip public flag on existing deck by uid).
+- Engine `process_tournament_event` signature: `(tournament_json, event_json, actor_json, sanctions_json, decks_json) → {"tournament": {...}, "deck_ops": [...]}`
 
 **Tournament extra fields**: `external_ids` (dict, e.g. `{"vekn": "<event_id>"}`), `vekn_pushed_at` (datetime|None — set when results uploaded to VEKN).
 
@@ -93,17 +104,19 @@ CREATE TABLE objects (uid UUID PRIMARY KEY, modified TIMESTAMP, data JSONB);
 
 ## Access Model (Data Levels)
 
-Three SSE data levels applied to ALL object types (see SYNC.md for details):
+Three pre-computed JSONB columns per object (see SYNC.md for field details):
 
-- **public**: no token or no vekn_id. Only Prince/NC users, minimal tournaments, no sanctions
-- **member**: has vekn_id. All users (no contact info), sanctions, tournaments with standings/my_tables/filtered decks
-- **full**: IC, NC/Prince (same country), or organizer. Everything
+- **public**: no token or no vekn_id. Only Prince/NC users, minimal tournaments, no sanctions, no decks
+- **member**: has vekn_id. All users (no contact info), sanctions, most tournament fields, decks where `public=true` (own decks via personal overlay)
+- **full**: base level for all viewers; personal overlay sends full data for own objects + role-based access (IC, NC/Prince same country, organizer)
+
+Projections computed by `access_levels.py` at write time. SSE reads the matching column directly.
 
 ## Mutation Pipeline
 
 Tournament actions use optimistic updates via WASM engine:
-1. WASM processes locally → IndexedDB updated → UI reacts immediately
-2. Server request sent async → SSE delivers authoritative state → overwrites if different
+1. WASM processes locally → returns `{tournament, deck_ops}` → IndexedDB updated → UI reacts immediately
+2. Server request sent async → SSE delivers authoritative state (tournament + deck objects) → overwrites if different
 
 Resync triggered when roles or vekn_id change (`resync_after` on User).
 

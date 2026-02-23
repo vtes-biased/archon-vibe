@@ -23,26 +23,16 @@ from .db import (
     get_expired_sanctions,
     get_sanctions_for_cleanup,
     init_db,
-    stream_leagues,
-    stream_ratings,
-    stream_sanctions,
-    stream_tournaments,
-    stream_users,
     update_sanction,
 )
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .models import (
     DataLevel,
-    DeckListsMode,
     League,
-    Player,
-    Rating,
     Role,
     Sanction,
     SanctionLevel,
-    StandingsMode,
     Tournament,
-    TournamentState,
     User,
 )
 from .routes import admin, auth, calendar, cards, leagues, oauth, sanctions, tournaments, users, vekn
@@ -114,6 +104,9 @@ async def run_vekn_sync() -> None:
     # Recompute ratings after tournaments are up to date
     await run_rating_recompute()
 
+    # Generate snapshot after all data is up to date
+    await run_snapshot_generation()
+
 
 async def run_sanction_cleanup() -> None:
     """Run sanction cleanup (scheduled task).
@@ -171,15 +164,18 @@ async def run_sanction_cleanup() -> None:
 
 
 async def run_rating_recompute() -> None:
-    """Full recomputation of all ratings and wins (scheduled daily)."""
+    """Full recomputation of all ratings and wins (scheduled daily).
+
+    Ratings are now embedded in User objects, so we broadcast user events.
+    """
     try:
         from .ratings import recompute_all_ratings
 
         logger.info("Starting daily rating recompute")
-        ratings = await recompute_all_ratings()
-        for rating in ratings:
-            await broadcast_rating_event(rating)
-        logger.info(f"Daily rating recompute complete: {len(ratings)} ratings")
+        users = await recompute_all_ratings()
+        for user in users:
+            await broadcast_user_event(user)
+        logger.info(f"Daily rating recompute complete: {len(users)} users updated")
     except Exception as e:
         logger.error(f"Error during rating recompute: {e}", exc_info=True)
 
@@ -201,6 +197,29 @@ async def run_vekn_push() -> None:
             await client.close()
     except Exception as e:
         logger.error(f"Error during VEKN batch push: {e}", exc_info=True)
+
+
+async def run_snapshot_generation() -> None:
+    """Generate access-level snapshots (scheduled every 15 minutes)."""
+    try:
+        from .snapshots import generate_snapshots
+
+        stats = await generate_snapshots()
+        logger.info(f"Snapshots generated: {stats}")
+    except Exception as e:
+        logger.error(f"Error generating snapshots: {e}", exc_info=True)
+
+
+async def run_purge_deleted_objects() -> None:
+    """Hard-delete objects that were soft-deleted more than 30 days ago."""
+    try:
+        from .db import purge_deleted_objects
+
+        count = await purge_deleted_objects(days=30)
+        if count:
+            logger.info(f"Purged {count} soft-deleted objects")
+    except Exception as e:
+        logger.error(f"Error purging deleted objects: {e}", exc_info=True)
 
 
 async def run_oauth_cleanup() -> None:
@@ -305,6 +324,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("OAuth cleanup scheduled hourly")
 
+    # Schedule snapshot generation (every 15 minutes)
+    _scheduler.add_job(
+        run_snapshot_generation,
+        trigger=IntervalTrigger(minutes=15),
+        id="snapshot_gen",
+        name="Snapshot Generation",
+        replace_existing=True,
+    )
+    logger.info("Snapshot generation scheduled every 15 minutes")
+
+    # Schedule purge of soft-deleted objects (runs daily)
+    _scheduler.add_job(
+        run_purge_deleted_objects,
+        trigger=IntervalTrigger(hours=24),
+        id="purge_deleted",
+        name="Purge Deleted Objects",
+        replace_existing=True,
+    )
+    logger.info("Purge of deleted objects scheduled daily")
+
+    # Generate initial snapshot (if VEKN sync disabled; otherwise run_vekn_sync handles it)
+    if not sync_enabled:
+        asyncio.create_task(run_snapshot_generation())
+
     _scheduler.start()
 
     yield
@@ -378,252 +421,95 @@ def _viewer_level(viewer: User | None) -> DataLevel:
     return DataLevel.PUBLIC
 
 
-def _has_full_access(viewer: User | None, *, country: str | None = None, organizers_uids: list[str] | None = None) -> bool:
-    """Check if viewer has full access (IC, NC/Prince same country, or organizer)."""
-    if not viewer:
-        return False
-    if Role.IC in viewer.roles:
-        return True
-    if (Role.NC in viewer.roles or Role.PRINCE in viewer.roles) and viewer.country and country and viewer.country == country:
-        return True
-    if organizers_uids and viewer.uid in organizers_uids:
-        return True
-    return False
-
-
 # ---------------------------------------------------------------------------
-# Per-type filter functions
+# New sync: broadcast reads pre-computed columns from objects table
 # ---------------------------------------------------------------------------
 
-def _filter_user(user: User, viewer: User | None) -> User | None:
-    """Filter a User for a given viewer. Returns None to skip entirely."""
-    if _has_full_access(viewer, country=user.country):
-        # Strip calendar_token — private to the user, only visible via /auth/me
-        if user.calendar_token:
-            return User(
-                uid=user.uid, modified=user.modified, deleted_at=user.deleted_at,
-                name=user.name, country=user.country, vekn_id=user.vekn_id,
-                city=user.city, state=user.state, nickname=user.nickname,
-                roles=user.roles, avatar_path=user.avatar_path,
-                contact_email=user.contact_email, contact_discord=user.contact_discord,
-                contact_phone=user.contact_phone, coopted_by=user.coopted_by,
-                coopted_at=user.coopted_at, vekn_synced=user.vekn_synced,
-                vekn_synced_at=user.vekn_synced_at,
-                local_modifications=user.local_modifications,
-                vekn_prefix=user.vekn_prefix, resync_after=user.resync_after,
-            )
-        return user
-    if viewer and viewer.vekn_id:
-        # Member: name, nickname, country, vekn_id, roles, city, state — no contact info
-        return User(
-            uid=user.uid,
-            modified=user.modified,
-            deleted_at=user.deleted_at,
-            name=user.name,
-            country=user.country,
-            vekn_id=user.vekn_id,
-            city=user.city,
-            state=user.state,
-            nickname=user.nickname,
-            roles=user.roles,
-            avatar_path=user.avatar_path,
-        )
-    # Non-member: only Prince/NC users with contact info
-    if Role.NC in user.roles or Role.PRINCE in user.roles:
-        return User(
-            uid=user.uid,
-            modified=user.modified,
-            deleted_at=user.deleted_at,
-            name=user.name,
-            country=user.country,
-            roles=user.roles,
-            vekn_prefix=user.vekn_prefix,
-            contact_email=user.contact_email,
-            contact_discord=user.contact_discord,
-            contact_phone=user.contact_phone,
-        )
-    return None  # Skip non-notable users for non-members
+async def broadcast_object(uid: str, obj_type: str) -> None:
+    """Broadcast an object update to all SSE connections.
 
-
-def _filter_sanction(sanction: Sanction, viewer: User | None) -> Sanction | None:
-    """Filter a Sanction based on viewer's access level.
-
-    All sanctions (including cautions) are visible to members.
-    Caution display scoping is handled in the frontend.
-    Non-members see nothing.
+    Reads pre-computed public/member/full columns from objects table.
+    Each connection gets the appropriate level based on their access.
+    Personal overlay rules apply for member-level connections.
     """
-    if not viewer or not viewer.vekn_id:
-        return None
-    return sanction
+    from .db import get_connection as _get_conn
 
+    async with _get_conn() as conn:
+        row = await (await conn.execute(
+            """SELECT "public"::text, "member"::text, \"full\"::text,
+                      \"full\"->'organizers_uids' as org_uids,
+                      \"full\"->>'country' as country,
+                      \"full\"->>'user_uid' as obj_user_uid
+               FROM objects WHERE uid = %s""",
+            (uid,),
+        )).fetchone()
 
-def _filter_tournament(t: Tournament, viewer: User | None) -> Tournament | None:
-    """Filter a Tournament for a given viewer's access level."""
-    # Full access: IC, NC/Prince same country, organizer
-    if _has_full_access(viewer, country=t.country, organizers_uids=t.organizers_uids):
-        return t
+    if not row:
+        return
 
-    # Member level
-    if viewer and viewer.vekn_id:
-        viewer_uid = viewer.uid
-        is_player = any(p.user_uid == viewer_uid for p in t.players)
+    pub_json, mem_json, full_json = row[0], row[1], row[2]
+    org_uids = row[3] or []
+    country = row[4]
+    obj_user_uid = row[5]  # For decks: the deck author
 
-        # my_tables: tables where viewer sat (across all rounds)
-        my_tables = []
-        if is_player:
-            for rnd in t.rounds:
-                for table in rnd:
-                    if any(s.player_uid == viewer_uid for s in table.seating):
-                        my_tables.append(table)
+    # Pre-build SSE messages for each level
+    def _make_msg(json_str: str) -> str:
+        return f'data: {{"type":"{obj_type}","data":{json_str}}}\n\n'
 
-        # Standings visibility
-        standings = t.standings
-        if t.state != TournamentState.FINISHED:
-            if t.standings_mode == StandingsMode.PRIVATE:
-                standings = []
+    pub_msg = _make_msg(pub_json) if pub_json else None
+    mem_msg = _make_msg(mem_json) if mem_json else None
+    full_msg = _make_msg(full_json) if full_json else None
 
-        # Decks visibility: own deck always, others post-tournament per mode
-        decks: dict[str, list] = {}
-        if t.decks:
-            # Player always sees their own deck
-            if is_player and viewer_uid in t.decks:
-                decks[viewer_uid] = t.decks[viewer_uid]
-            # Post-tournament: other players' decks per decklists_mode
-            if t.state == TournamentState.FINISHED:
-                if t.decklists_mode == DeckListsMode.ALL:
-                    decks = {**decks, **t.decks}
-                elif t.decklists_mode == DeckListsMode.FINALISTS:
-                    for uid, d in t.decks.items():
-                        if uid not in decks and any(
-                            p.user_uid == uid and p.finalist for p in t.players
-                        ):
-                            decks[uid] = d
-                else:  # WINNER
-                    if t.winner and t.winner in t.decks:
-                        decks[t.winner] = t.decks[t.winner]
-
-        # Players: strip per-player results for ongoing tournaments
-        players = t.players
-        if t.state != TournamentState.FINISHED:
-            players = [Player(
-                user_uid=p.user_uid,
-                state=p.state,
-                payment_status=p.payment_status,
-                finalist=p.finalist,
-            ) for p in t.players]
-
-        return Tournament(
-            uid=t.uid,
-            modified=t.modified,
-            deleted_at=t.deleted_at,
-            name=t.name,
-            format=t.format,
-            rank=t.rank,
-            online=t.online,
-            start=t.start,
-            finish=t.finish,
-            timezone=t.timezone,
-            country=t.country,
-            league_uid=t.league_uid,
-            state=t.state,
-            organizers_uids=t.organizers_uids,
-            venue=t.venue,
-            venue_url=t.venue_url,
-            address=t.address,
-            map_url=t.map_url,
-            proxies=t.proxies,
-            multideck=t.multideck,
-            decklist_required=t.decklist_required,
-            description=t.description,
-            standings_mode=t.standings_mode,
-            decklists_mode=t.decklists_mode,
-            max_rounds=t.max_rounds,
-            table_rooms=t.table_rooms,
-            external_ids=t.external_ids,
-            players=players,
-            decks=decks,
-            finals=t.finals if t.state == TournamentState.FINISHED else None,
-            winner=t.winner,
-            standings=standings,
-            my_tables=my_tables,
-            # Timer fields: visible to all members (players need the countdown)
-            round_time=t.round_time,
-            finals_time=t.finals_time,
-            time_extension_policy=t.time_extension_policy,
-            timer=t.timer,
-            table_extra_time=t.table_extra_time,
-            table_paused_at=t.table_paused_at,
-            raffles=t.raffles,
-        )
-
-    # Non-member: minimal
-    return Tournament(
-        uid=t.uid,
-        modified=t.modified,
-        deleted_at=t.deleted_at,
-        name=t.name,
-        format=t.format,
-        rank=t.rank,
-        online=t.online,
-        start=t.start,
-        finish=t.finish,
-        timezone=t.timezone,
-        country=t.country,
-        league_uid=t.league_uid,
-        state=t.state,
-    )
-
-
-def _filter_rating(rating: Rating, viewer: User | None) -> Rating | None:
-    """Ratings are public."""
-    return rating
-
-
-def _filter_league(league: League, viewer: User | None) -> League | None:
-    """Leagues are public."""
-    return league
-
-
-# ---------------------------------------------------------------------------
-# Generic broadcast
-# ---------------------------------------------------------------------------
-
-async def _broadcast(event_type: str, obj: object, filter_fn=None) -> None:
-    """Broadcast an object to all SSE connections, optionally filtering per-viewer."""
     disconnected: set[SSEConnection] = set()
-    for conn in _sse_connections:
+    for sse_conn in _sse_connections:
         try:
-            data = obj
-            if filter_fn:
-                data = filter_fn(obj, conn.user)
-                if data is None:
-                    continue
-            event_data = {"type": event_type, "data": msgspec.to_builtins(data)}
-            message = f"data: {encoder.encode(event_data).decode('utf-8')}\n\n"
-            conn.queue.put_nowait(message)
+            viewer = sse_conn.user
+            msg = None
+
+            if not viewer:
+                msg = pub_msg
+            elif Role.IC in viewer.roles:
+                msg = full_msg
+            elif (Role.NC in viewer.roles or Role.PRINCE in viewer.roles) and viewer.country and country and viewer.country == country:
+                msg = full_msg
+            elif isinstance(org_uids, list) and viewer.uid in org_uids:
+                msg = full_msg
+            elif viewer.vekn_id:
+                # Member level — but check personal overlay
+                if obj_type == "user" and uid == viewer.uid:
+                    msg = full_msg  # Own profile
+                elif obj_type == "deck" and obj_user_uid == viewer.uid:
+                    msg = full_msg  # Own deck
+                else:
+                    msg = mem_msg
+            else:
+                msg = pub_msg
+
+            if msg:
+                sse_conn.queue.put_nowait(msg)
         except asyncio.QueueFull:
-            disconnected.add(conn)
+            disconnected.add(sse_conn)
     _sse_connections.difference_update(disconnected)
 
 
 async def broadcast_user_event(user: User) -> None:
-    await _broadcast("user", user, _filter_user)
+    """Broadcast user update via SSE. Caller must save first."""
+    await broadcast_object(user.uid, "user")
 
 
 async def broadcast_sanction_event(sanction: Sanction) -> None:
-    await _broadcast("sanction", sanction, _filter_sanction)
+    """Broadcast sanction update via SSE. Caller must save first."""
+    await broadcast_object(sanction.uid, "sanction")
 
 
 async def broadcast_tournament_event(tournament: Tournament) -> None:
-    await _broadcast("tournament", tournament, _filter_tournament)
-
-
-async def broadcast_rating_event(rating: Rating) -> None:
-    await _broadcast("rating", rating, _filter_rating)
+    """Broadcast tournament update via SSE. Caller must save first."""
+    await broadcast_object(tournament.uid, "tournament")
 
 
 async def broadcast_league_event(league: League) -> None:
-    await _broadcast("league", league, _filter_league)
+    """Broadcast league update via SSE. Caller must save first."""
+    await broadcast_object(league.uid, "league")
 
 
 async def broadcast_judge_call(
@@ -671,9 +557,9 @@ users.broadcast_user_event = broadcast_user_event
 sanctions.broadcast_sanction_event = broadcast_sanction_event
 sanctions.broadcast_tournament_event = broadcast_tournament_event
 tournaments.broadcast_tournament_event = broadcast_tournament_event
-tournaments.broadcast_rating_event = broadcast_rating_event
 tournaments.broadcast_user_event = broadcast_user_event
 tournaments.broadcast_sanction_event = broadcast_sanction_event
+tournaments.broadcast_deck_event = lambda uid: broadcast_object(uid, "deck")
 tournaments.broadcast_judge_call = broadcast_judge_call
 leagues.broadcast_league_event = broadcast_league_event
 users.broadcast_resync = broadcast_resync
@@ -683,6 +569,19 @@ vekn.broadcast_resync = broadcast_resync
 @app.options("/stream")
 async def stream_options() -> Response:
     """Handle CORS preflight for SSE endpoint."""
+    return Response(
+        content="",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        },
+    )
+
+
+@app.options("/snapshot")
+async def snapshot_options() -> Response:
+    """Handle CORS preflight for snapshot endpoint."""
     return Response(
         content="",
         headers={
@@ -711,22 +610,69 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
         return None
 
 
+@app.get("/snapshot")
+async def get_snapshot(token: str | None = None) -> Response:
+    """Serve pre-computed gzip snapshot for the viewer's access level.
+
+    In dev: reads file from disk and streams directly.
+    In prod: would use X-Accel-Redirect for nginx to serve the file.
+    """
+    from .snapshots import get_snapshot_path
+
+    viewer = await _resolve_user_from_token(token)
+    level = _viewer_level(viewer)
+
+    snapshot_path = get_snapshot_path(level.value)
+    if not snapshot_path:
+        return Response(
+            content='{"error":"snapshot not available yet"}',
+            status_code=503,
+            media_type="application/json",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Retry-After": "60",
+            },
+        )
+
+    # Read and serve the gzip file directly
+    data = snapshot_path.read_bytes()
+    return Response(
+        content=data,
+        media_type="application/json",
+        headers={
+            "Content-Encoding": "gzip",
+            "Cache-Control": "no-cache",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# SSE stream types for catch-up
+# ---------------------------------------------------------------------------
+_STREAM_TYPES = ["user", "tournament", "sanction", "deck", "league"]
+
+
 @app.get("/stream")
 async def stream_updates(
     since: str | None = None, token: str | None = None
 ) -> StreamingResponse:
-    """Stream object updates via SSE.
+    """Stream object updates via SSE (new sync architecture).
 
-    Uses server-side cursor for true DB->HTTP streaming with minimal memory.
-    Accepts optional token query param for user-aware data filtering.
+    Reads pre-computed access level columns — no per-item filtering.
+    Personal overlay sends full-level data for own objects and
+    role-based full access (NC/Prince same country, organizer).
     """
+    from .db import _pool, stream_objects_new
 
-    # Resolve user outside the generator so it's available immediately
     stream_user = await _resolve_user_from_token(token)
     if stream_user:
         logger.info(f"SSE connection authenticated as user {stream_user.uid}")
 
-    # Resync detection: check if client's `since` is stale
+    # Determine base level
+    level = _viewer_level(stream_user)
+
+    # Resync detection
     effective_since = since
     force_resync = False
     threshold_parts = [MINIMUM_SYNC_EPOCH]
@@ -735,63 +681,148 @@ async def stream_updates(
     threshold = max(threshold_parts)
     if since and threshold > since:
         force_resync = True
-        effective_since = None  # Stream everything
+        effective_since = None
 
-    # Stream specs: (stream_fn, batch_event_type, filter_fn)
-    _stream_specs: list[tuple] = [
-        (stream_users, "users", _filter_user),
-        (stream_sanctions, "sanctions", _filter_sanction),
-        (stream_tournaments, "tournaments", _filter_tournament),
-        (stream_ratings, "ratings", _filter_rating),
-        (stream_leagues, "leagues", _filter_league),
-    ]
+    # Stale SSE prevention: if since is older than 29 days, force resync
+    if since:
+        from datetime import UTC, datetime, timedelta
+        try:
+            since_dt = datetime.fromisoformat(since)
+            if since_dt.tzinfo is None:
+                since_dt = since_dt.replace(tzinfo=UTC)
+            if datetime.now(UTC) - since_dt > timedelta(days=29):
+                force_resync = True
+                effective_since = None
+        except (ValueError, TypeError):
+            pass
 
     async def event_generator():
-        """Generate SSE events streaming directly from PostgreSQL."""
+        """Generate SSE events from pre-computed columns."""
         conn = SSEConnection(user=stream_user)
         _sse_connections.add(conn)
 
         try:
             yield ": connected\n\n"
 
-            # If resync needed, tell client to clear stores first
             if force_resync:
-                resync_msg = {"type": "resync"}
-                yield f"data: {encoder.encode(resync_msg).decode('utf-8')}\n\n"
+                yield f'data: {{"type":"resync"}}\n\n'
 
             import time
             start_time = time.time()
             last_timestamp: str | None = None
             totals: dict[str, int] = {}
 
-            for stream_fn, event_type, filter_fn in _stream_specs:
+            # Catch-up phase: stream from objects table
+            for obj_type in _STREAM_TYPES:
                 count = 0
+                batch_type = obj_type + "s"  # "users", "tournaments", etc.
                 try:
-                    async for batch, batch_max in stream_fn(since=effective_since, batch_size=1000):
+                    async for json_strings, batch_max in stream_objects_new(
+                        obj_type=obj_type,
+                        level=level.value,
+                        since=effective_since,
+                        batch_size=1000,
+                    ):
                         if _shutdown_event and _shutdown_event.is_set():
                             return
 
-                        # Apply per-item filter
-                        filtered = []
-                        for item in batch:
-                            out = filter_fn(item, stream_user)
-                            if out is not None:
-                                filtered.append(out)
-
-                        count += len(filtered)
+                        count += len(json_strings)
                         if batch_max and (last_timestamp is None or batch_max > last_timestamp):
                             last_timestamp = batch_max
 
-                        if filtered:
-                            event_data = {
-                                "type": event_type,
-                                "data": [msgspec.to_builtins(x) for x in filtered],
-                            }
-                            yield f"data: {encoder.encode(event_data).decode('utf-8')}\n\n"
+                        if json_strings:
+                            joined = ",".join(json_strings)
+                            yield f'data: {{"type":"{batch_type}","data":[{joined}]}}\n\n'
                 except Exception as e:
-                    logger.error(f"Error streaming {event_type} (non-fatal): {e}")
+                    logger.error(f"Error streaming {obj_type} (non-fatal): {e}")
 
-                totals[event_type] = count
+                totals[obj_type] = count
+
+            # Personal overlay phase: send full-level data for own objects
+            if stream_user and level == DataLevel.MEMBER and _pool:
+                overlay_count = 0
+                try:
+                    async with _pool.connection() as db_conn:
+                        # Own user profile at full level
+                        row = await (await db_conn.execute(
+                            "SELECT \"full\"::text FROM objects WHERE uid = %s AND type = 'user'",
+                            (stream_user.uid,),
+                        )).fetchone()
+                        if row and row[0]:
+                            yield f'data: {{"type":"user","data":{row[0]}}}\n\n'
+                            overlay_count += 1
+
+                        # Own decks at full level (even if member=null)
+                        rows = await (await db_conn.execute(
+                            "SELECT \"full\"::text FROM objects WHERE type = 'deck' "
+                            "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
+                            (stream_user.uid,),
+                        )).fetchall()
+                        if rows:
+                            decks_json = ",".join(r[0] for r in rows)
+                            yield f'data: {{"type":"decks","data":[{decks_json}]}}\n\n'
+                            overlay_count += len(rows)
+
+                        # NC/Prince: full for same-country users + tournaments
+                        if stream_user.country and (
+                            Role.NC in stream_user.roles or Role.PRINCE in stream_user.roles
+                        ):
+                            # Same-country users
+                            rows = await (await db_conn.execute(
+                                "SELECT \"full\"::text FROM objects WHERE type = 'user' "
+                                "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
+                                (stream_user.country,),
+                            )).fetchall()
+                            if rows:
+                                for i in range(0, len(rows), 500):
+                                    batch = rows[i : i + 500]
+                                    joined = ",".join(r[0] for r in batch)
+                                    yield f'data: {{"type":"users","data":[{joined}]}}\n\n'
+                                overlay_count += len(rows)
+
+                            # Same-country tournaments
+                            rows = await (await db_conn.execute(
+                                "SELECT \"full\"::text FROM objects WHERE type = 'tournament' "
+                                "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
+                                (stream_user.country,),
+                            )).fetchall()
+                            if rows:
+                                for i in range(0, len(rows), 100):
+                                    batch = rows[i : i + 100]
+                                    joined = ",".join(r[0] for r in batch)
+                                    yield f'data: {{"type":"tournaments","data":[{joined}]}}\n\n'
+                                overlay_count += len(rows)
+
+                        # Organizer: full for organized tournaments + their decks
+                        rows = await (await db_conn.execute(
+                            "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
+                            "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
+                            (stream_user.uid,),
+                        )).fetchall()
+                        if rows:
+                            t_uids = [r[0] for r in rows]
+                            for i in range(0, len(rows), 100):
+                                batch = rows[i : i + 100]
+                                joined = ",".join(r[1] for r in batch)
+                                yield f'data: {{"type":"tournaments","data":[{joined}]}}\n\n'
+                            overlay_count += len(rows)
+
+                            # Decks for organized tournaments
+                            for t_uid in t_uids:
+                                deck_rows = await (await db_conn.execute(
+                                    "SELECT \"full\"::text FROM objects WHERE type = 'deck' "
+                                    "AND \"full\"->>'tournament_uid' = %s AND deleted_at IS NULL",
+                                    (t_uid,),
+                                )).fetchall()
+                                if deck_rows:
+                                    joined = ",".join(r[0] for r in deck_rows)
+                                    yield f'data: {{"type":"decks","data":[{joined}]}}\n\n'
+                                    overlay_count += len(deck_rows)
+
+                    if overlay_count:
+                        logger.info(f"Personal overlay: {overlay_count} objects for {stream_user.uid}")
+                except Exception as e:
+                    logger.error(f"Error in personal overlay: {e}", exc_info=True)
 
             total_time = time.time() - start_time
             parts = ", ".join(f"{v} {k}" for k, v in totals.items())

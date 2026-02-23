@@ -2,12 +2,13 @@
  * API client for backend communication.
  */
 
-import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League } from '$lib/types';
-import { getAllUsers, getTournament, saveTournament, saveLeague, logChange, getSanctionsForTournament } from './db';
-import { processTournamentEvent, buildActorContext } from './engine';
+import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, DeckObject, League } from '$lib/types';
+import { getAllUsers, getTournament, saveTournament, saveLeague, getSanctionsForTournament, getDecksByTournament, saveDeck, deleteDeck } from './db';
+import { processTournamentEvent, buildActorContext, type DeckOp } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
 import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
+import { addOfflineDeckUid } from '$lib/db';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -433,7 +434,6 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
     max_rounds: data.max_rounds || 0,
     league_uid: data.league_uid || null,
     players: [],
-    decks: {},
     rounds: [],
     finals: null,
     winner: '',
@@ -445,7 +445,6 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
   };
 
   await saveTournament(tournament);
-  await logChange('tournaments', 'create', uid, { data: tournament });
   await markOffline(uid);
 
   return tournament;
@@ -486,14 +485,20 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
     try {
       const actor = buildActorContext(getAuthState().user ?? null, current);
       const sanctions = await getSanctionsForTournament(uid);
-      const updated = await processTournamentEvent(current, event, actor, sanctions);
-      await saveTournament(updated);
-      await logChange('tournaments', 'update', uid, { event });
+      const decks = await getDecksByTournament(uid);
+      const result = await processTournamentEvent(current, event, actor, sanctions, decks);
+      await saveTournament(result.tournament);
 
-      // If tournament is in offline mode, skip server POST entirely
+      // Handle deck side-effects in IDB
+      const affectedDeckUids = await applyDeckOps(result.deckOps, uid, decks);
+
+      // If tournament is in offline mode, track deck UIDs and skip server POST
       if (isOffline(uid)) {
+        for (const deckUid of affectedDeckUids) {
+          await addOfflineDeckUid(uid, deckUid);
+        }
         scheduleSyncOffline(uid);
-        return updated;
+        return result.tournament;
       }
 
       // Queue server POST (serialized per tournament, prevents concurrent races)
@@ -508,7 +513,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
         }
       });
 
-      return updated;
+      return result.tournament;
     } catch {
       // WASM engine failed (unknown action, etc.) — fall through to server-only
     }
@@ -522,6 +527,51 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
     method: 'POST',
     body: JSON.stringify(event),
   });
+}
+
+/**
+ * Apply deck operations from engine result to IndexedDB.
+ * In online mode, SSE will deliver authoritative state and overwrite.
+ * Returns UIDs of affected decks (for offline tracking).
+ */
+async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDecks: DeckObject[]): Promise<string[]> {
+  const affectedUids: string[] = [];
+  for (const op of deckOps) {
+    if (op.op === 'upsert' && op.deck && op.player_uid) {
+      const existing = existingDecks.find(
+        d => d.user_uid === op.player_uid && d.round === (op.deck!.round ?? null)
+      );
+      const deckObj: DeckObject = {
+        uid: existing?.uid || crypto.randomUUID(),
+        modified: new Date().toISOString(),
+        tournament_uid: tournamentUid,
+        user_uid: op.player_uid,
+        round: op.deck.round ?? null,
+        name: op.deck.name || '',
+        author: op.deck.author || '',
+        comments: op.deck.comments || '',
+        cards: op.deck.cards || {},
+        public: op.deck.public || false,
+      };
+      await saveDeck(deckObj);
+      affectedUids.push(deckObj.uid);
+    } else if (op.op === 'delete' && op.player_uid) {
+      for (const d of existingDecks) {
+        if (d.user_uid === op.player_uid) {
+          await deleteDeck(d.uid);
+        }
+      }
+    } else if (op.op === 'set_public' && op.deck_uid) {
+      const target = existingDecks.find(d => d.uid === op.deck_uid);
+      if (target) {
+        target.public = op.public ?? false;
+        target.modified = new Date().toISOString();
+        await saveDeck(target);
+        affectedUids.push(target.uid);
+      }
+    }
+  }
+  return affectedUids;
 }
 
 /**

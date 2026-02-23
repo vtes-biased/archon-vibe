@@ -6,13 +6,11 @@ from contextlib import asynccontextmanager
 
 import msgspec
 import psycopg
-from psycopg import sql
 from psycopg_pool import AsyncConnectionPool
 
 from .models import (
     AuthMethod,
     League,
-    Rating,
     Sanction,
     Tournament,
     User,
@@ -44,29 +42,6 @@ async def init_db() -> None:
 
     # Create schema if not exists
     async with _pool.connection() as conn:
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                uid TEXT PRIMARY KEY,
-                modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                data JSONB NOT NULL
-            );
-        """)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_users_modified ON users(modified);
-        """)
-        # Unique constraint on vekn_id (partial index - only for non-null values)
-        await conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_vekn_id
-            ON users((data->>'vekn_id'))
-            WHERE data->>'vekn_id' IS NOT NULL AND data->>'vekn_id' != '';
-        """)
-        # Partial index for calendar token lookup
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_users_calendar_token
-            ON users((data->>'calendar_token'))
-            WHERE data->>'calendar_token' IS NOT NULL;
-        """)
-
         # Create trigger function to auto-update modified timestamp
         await conn.execute("""
             CREATE OR REPLACE FUNCTION update_modified_column()
@@ -76,17 +51,6 @@ async def init_db() -> None:
                 RETURN NEW;
             END;
             $$ LANGUAGE plpgsql;
-        """)
-
-        # Create trigger for users table
-        await conn.execute("""
-            DROP TRIGGER IF EXISTS users_modified_trigger ON users;
-        """)
-        await conn.execute("""
-            CREATE TRIGGER users_modified_trigger
-            BEFORE INSERT OR UPDATE ON users
-            FOR EACH ROW
-            EXECUTE FUNCTION update_modified_column();
         """)
 
         # Auth methods table
@@ -117,107 +81,6 @@ async def init_db() -> None:
         await conn.execute("""
             CREATE TRIGGER auth_methods_modified_trigger
             BEFORE INSERT OR UPDATE ON auth_methods
-            FOR EACH ROW
-            EXECUTE FUNCTION update_modified_column();
-        """)
-
-        # Sanctions table
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS sanctions (
-                uid TEXT PRIMARY KEY,
-                modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                data JSONB NOT NULL
-            );
-        """)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_sanctions_modified
-            ON sanctions(modified);
-        """)
-        # Index on user_uid for efficient lookups (who received the sanction)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_sanctions_user_uid
-            ON sanctions((data->>'user_uid'));
-        """)
-        await conn.execute("""
-            DROP TRIGGER IF EXISTS sanctions_modified_trigger ON sanctions;
-        """)
-        await conn.execute("""
-            CREATE TRIGGER sanctions_modified_trigger
-            BEFORE INSERT OR UPDATE ON sanctions
-            FOR EACH ROW
-            EXECUTE FUNCTION update_modified_column();
-        """)
-
-        # Tournaments table
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS tournaments (
-                uid TEXT PRIMARY KEY,
-                modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                data JSONB NOT NULL
-            );
-        """)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_tournaments_modified
-            ON tournaments(modified);
-        """)
-        # Index for external_ids lookups (VEKN sync)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_tournaments_external_vekn
-            ON tournaments((data->'external_ids'->>'vekn'))
-            WHERE data->'external_ids'->>'vekn' IS NOT NULL;
-        """)
-        await conn.execute("""
-            DROP TRIGGER IF EXISTS tournaments_modified_trigger ON tournaments;
-        """)
-        await conn.execute("""
-            CREATE TRIGGER tournaments_modified_trigger
-            BEFORE INSERT OR UPDATE ON tournaments
-            FOR EACH ROW
-            EXECUTE FUNCTION update_modified_column();
-        """)
-
-        # Ratings table
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS ratings (
-                uid TEXT PRIMARY KEY,
-                modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                data JSONB NOT NULL
-            );
-        """)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_ratings_modified ON ratings(modified);
-        """)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_ratings_user_uid
-            ON ratings((data->>'user_uid'));
-        """)
-        await conn.execute("""
-            DROP TRIGGER IF EXISTS ratings_modified_trigger ON ratings;
-        """)
-        await conn.execute("""
-            CREATE TRIGGER ratings_modified_trigger
-            BEFORE INSERT OR UPDATE ON ratings
-            FOR EACH ROW
-            EXECUTE FUNCTION update_modified_column();
-        """)
-
-        # Leagues table
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS leagues (
-                uid TEXT PRIMARY KEY,
-                modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                data JSONB NOT NULL
-            );
-        """)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_leagues_modified ON leagues(modified);
-        """)
-        await conn.execute("""
-            DROP TRIGGER IF EXISTS leagues_modified_trigger ON leagues;
-        """)
-        await conn.execute("""
-            CREATE TRIGGER leagues_modified_trigger
-            BEFORE INSERT OR UPDATE ON leagues
             FOR EACH ROW
             EXECUTE FUNCTION update_modified_column();
         """)
@@ -334,6 +197,90 @@ async def init_db() -> None:
             ON transient_tokens(expires_at);
         """)
 
+        # ---------------------------------------------------------------
+        # Unified objects table (users, tournaments, sanctions, leagues, etc.)
+        # ---------------------------------------------------------------
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS objects (
+                uid TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                modified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP,
+                "public" JSONB,
+                "member" JSONB,
+                "full" JSONB NOT NULL
+            );
+        """)
+        # Composite index for SSE catch-up queries (type + modified_at + uid)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_type_modified
+            ON objects(type, modified_at, uid);
+        """)
+        # Type filter for non-deleted objects
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_type
+            ON objects(type) WHERE deleted_at IS NULL;
+        """)
+        # User-specific lookups
+        await conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_objects_user_vekn_id
+            ON objects(("full"->>'vekn_id'))
+            WHERE type = 'user' AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != '';
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_user_calendar_token
+            ON objects(("full"->>'calendar_token'))
+            WHERE type = 'user' AND "full"->>'calendar_token' IS NOT NULL;
+        """)
+        # Tournament VEKN external ID lookup
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_tournament_vekn
+            ON objects(("full"->'external_ids'->>'vekn'))
+            WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' IS NOT NULL;
+        """)
+        # Deck lookups by tournament and user
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_deck_tournament
+            ON objects(("full"->>'tournament_uid'))
+            WHERE type = 'deck';
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_deck_user
+            ON objects(("full"->>'user_uid'))
+            WHERE type = 'deck';
+        """)
+        # Sanction lookup by user
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_sanction_user
+            ON objects(("full"->>'user_uid'))
+            WHERE type = 'sanction';
+        """)
+        # Sanction lookup by tournament
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_objects_sanction_tournament
+            ON objects(("full"->>'tournament_uid'))
+            WHERE type = 'sanction';
+        """)
+        # Trigger function for objects table (uses modified_at, not modified)
+        await conn.execute("""
+            CREATE OR REPLACE FUNCTION update_objects_modified_at()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.modified_at = CURRENT_TIMESTAMP;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """)
+        await conn.execute("""
+            DROP TRIGGER IF EXISTS objects_modified_trigger ON objects;
+        """)
+        await conn.execute("""
+            CREATE TRIGGER objects_modified_trigger
+            BEFORE INSERT OR UPDATE ON objects
+            FOR EACH ROW
+            EXECUTE FUNCTION update_objects_modified_at();
+        """)
+
         # Note: vekn_id_counter table is no longer used.
         # VEKN IDs are now allocated by finding the first gap >= 1000000.
 
@@ -371,7 +318,7 @@ async def tournament_transaction(
     async with _pool.connection() as conn:
         async with conn.transaction():
             result = await conn.execute(
-                "SELECT data FROM tournaments WHERE uid = %s FOR UPDATE",
+                'SELECT "full" FROM objects WHERE uid = %s FOR UPDATE',
                 (uid,),
             )
             row = await result.fetchone()
@@ -398,100 +345,392 @@ def decode_json[T](data: str | dict, type_: type[T]) -> T:
     return decoder.decode(data)
 
 
+# ---------------------------------------------------------------------------
+# Unified objects table operations
+# ---------------------------------------------------------------------------
+
+from .access_levels import compute_full, compute_member, compute_public  # noqa: E402
+from .models import DeckObject  # noqa: E402
+
+
+async def get_decks_for_tournament(tournament_uid: str) -> list[DeckObject]:
+    """Get all DeckObjects for a tournament (uses idx_objects_deck_tournament)."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full"::text FROM objects WHERE type = 'deck' AND "full"->>'tournament_uid' = %s""",
+            (tournament_uid,),
+        )
+        rows = await result.fetchall()
+    return [msgspec.json.decode(row[0].encode(), type=DeckObject) for row in rows]
+
+
+async def save_object(
+    obj_type: str,
+    uid: str,
+    full_data: dict,
+    *,
+    conn: psycopg.AsyncConnection | None = None,
+    deleted_at: str | None = None,
+) -> None:
+    """Save an object to the unified objects table.
+
+    Computes public/member/full projections and upserts.
+    If conn is provided, uses that connection (for transactions).
+    """
+    pub = compute_public(obj_type, full_data)
+    mem = compute_member(obj_type, full_data)
+    full = compute_full(obj_type, full_data)
+
+    # Serialize to JSON strings for JSONB columns
+    pub_json = _encoder.encode(pub).decode("utf-8") if pub is not None else None
+    mem_json = _encoder.encode(mem).decode("utf-8") if mem is not None else None
+    full_json = _encoder.encode(full).decode("utf-8")
+
+    query = """
+        INSERT INTO objects (uid, type, deleted_at, "public", "member", "full")
+        VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb)
+        ON CONFLICT (uid) DO UPDATE SET
+            type = EXCLUDED.type,
+            deleted_at = EXCLUDED.deleted_at,
+            "public" = EXCLUDED."public",
+            "member" = EXCLUDED."member",
+            "full" = EXCLUDED."full"
+    """
+    params = (uid, obj_type, deleted_at, pub_json, mem_json, full_json)
+
+    if conn:
+        await conn.execute(query, params)
+    else:
+        async with get_connection() as c:
+            await c.execute(query, params)
+
+
+async def save_object_from_model(
+    obj_type: str,
+    obj: msgspec.Struct,
+) -> None:
+    """Save a msgspec model to the objects table."""
+    full_data = msgspec.to_builtins(obj)
+    deleted_at = full_data.get("deleted_at")
+    # Convert deleted_at to string if it's not None
+    if deleted_at is not None and not isinstance(deleted_at, str):
+        deleted_at = deleted_at.isoformat() if hasattr(deleted_at, "isoformat") else str(deleted_at)
+    await save_object(obj_type, obj.uid, full_data, deleted_at=deleted_at)
+
+
+async def delete_object(uid: str, *, conn: psycopg.AsyncConnection | None = None) -> None:
+    """Hard delete an object from the objects table."""
+    query = "DELETE FROM objects WHERE uid = %s"
+    if conn:
+        await conn.execute(query, (uid,))
+    else:
+        async with get_connection() as c:
+            await c.execute(query, (uid,))
+
+
+def _level_col(level: str) -> str:
+    """Map access level name to quoted SQL column name."""
+    return {"public": '"public"', "member": '"member"', "full": '"full"'}.get(level, '"full"')
+
+
+async def get_object(
+    uid: str, *, level: str = "full"
+) -> dict | None:
+    """Get an object from the objects table at a given access level.
+
+    Returns the raw dict (parsed from JSONB), or None if not found
+    or not visible at the requested level.
+    """
+    col = _level_col(level)
+    async with get_connection() as conn:
+        result = await conn.execute(
+            f"SELECT {col} FROM objects WHERE uid = %s",
+            (uid,),
+        )
+        row = await result.fetchone()
+        if row and row[0] is not None:
+            return row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
+        return None
+
+
+async def get_object_full[T](uid: str, type_: type[T]) -> T | None:
+    """Get an object from the objects table, decoded into a typed model."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            'SELECT "full" FROM objects WHERE uid = %s',
+            (uid,),
+        )
+        row = await result.fetchone()
+        if row and row[0] is not None:
+            return decode_json(row[0], type_)
+        return None
+
+
+async def get_objects_by_type(
+    obj_type: str, *, level: str = "full", where: str = "", params: tuple = ()
+) -> list[dict]:
+    """Query objects table by type. Returns list of dicts at the given level."""
+    col = _level_col(level)
+    query = f"SELECT {col} FROM objects WHERE type = %s AND {col} IS NOT NULL"
+    if where:
+        query += f" AND {where}"
+    all_params = (obj_type, *params)
+    async with get_connection() as conn:
+        result = await conn.execute(query, all_params)
+        rows = await result.fetchall()
+        return [
+            row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
+            for row in rows
+        ]
+
+
+async def stream_objects_new(
+    obj_type: str | None = None,
+    level: str = "full",
+    since: str | None = None,
+    batch_size: int = 1000,
+) -> AsyncIterator[tuple[list[str], str]]:
+    """Stream pre-serialized JSON strings from objects table.
+
+    Yields (batch_of_json_strings, max_modified_at) tuples.
+    Each string is the raw JSONB text — no Python deserialization needed.
+    """
+    if not _pool:
+        raise RuntimeError("Database not initialized")
+
+    col = _level_col(level)
+    cursor_modified: str | None = since
+    cursor_uid: str | None = None
+
+    while True:
+        async with _pool.connection() as conn:
+            conditions = [f"{col} IS NOT NULL"]
+            bind_params: list = []
+
+            if obj_type:
+                conditions.append("type = %s")
+                bind_params.append(obj_type)
+
+            if cursor_uid is not None:
+                conditions.append("(modified_at, uid) > (%s, %s)")
+                bind_params.extend([cursor_modified, cursor_uid])
+            elif cursor_modified:
+                conditions.append("modified_at > %s")
+                bind_params.append(cursor_modified)
+
+            where = " AND ".join(conditions)
+            bind_params.append(batch_size)
+
+            rows = await (await conn.execute(
+                f"SELECT {col}::text, modified_at, uid FROM objects "
+                f"WHERE {where} ORDER BY modified_at ASC, uid ASC LIMIT %s",
+                tuple(bind_params),
+            )).fetchall()
+
+        if not rows:
+            break
+
+        json_strings = [row[0] for row in rows]
+        cursor_modified = rows[-1][1].isoformat()
+        cursor_uid = rows[-1][2]
+
+        yield json_strings, cursor_modified
+
+        if len(rows) < batch_size:
+            break
+
+
+async def purge_deleted_objects(days: int = 30) -> int:
+    """Hard-delete objects that were soft-deleted more than `days` ago."""
+    if not _pool:
+        raise RuntimeError("Database not initialized")
+    async with _pool.connection() as conn:
+        result = await conn.execute(
+            "DELETE FROM objects WHERE deleted_at < NOW() - make_interval(days => %s)",
+            (days,),
+        )
+        return result.rowcount or 0
+
+
+# ---------------------------------------------------------------------------
+# User CRUD (thin wrappers around objects table)
+# ---------------------------------------------------------------------------
+
+
 async def insert_user(user: User) -> None:
     """Insert a new user into the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "INSERT INTO users (uid, data) VALUES (%s, %s)",
-            (user.uid, encode_json(user)),
-        )
+    await save_object_from_model("user", user)
 
 
 async def update_user(user: User) -> None:
     """Update an existing user in the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "UPDATE users SET data = %s WHERE uid = %s",
-            (encode_json(user), user.uid),
-        )
+    await save_object_from_model("user", user)
+
+
+async def get_user_by_uid(uid: str) -> User | None:
+    """Get a user by UID."""
+    return await get_object_full(uid, User)
 
 
 async def set_user_resync_after(user_uid: str) -> None:
     """Set resync_after to now() on a user, triggering full resync on next SSE connect."""
     from datetime import UTC, datetime
 
-    now_iso = datetime.now(UTC).isoformat()
+    user = await get_user_by_uid(user_uid)
+    if not user:
+        return
+    user.resync_after = datetime.now(UTC)
+    await update_user(user)
+
+
+async def delete_user(uid: str) -> None:
+    """Delete a user from the database (hard delete)."""
+    await delete_object(uid)
+
+
+async def soft_delete_user(uid: str) -> User | None:
+    """Soft-delete a user by setting deleted_at. Returns updated user for SSE."""
+    from datetime import UTC, datetime
+
+    user = await get_user_by_uid(uid)
+    if not user:
+        return None
+    now = datetime.now(UTC)
+    user.deleted_at = now
+    user.modified = now
+    await update_user(user)
+    return user
+
+
+async def get_user_by_contact_email(email: str) -> User | None:
+    """Find a user by contact_email for account merging."""
     async with get_connection() as conn:
-        await conn.execute(
-            "UPDATE users SET data = jsonb_set(data, '{resync_after}', to_jsonb(%s::text)) WHERE uid = %s",
-            (now_iso, user_uid),
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND LOWER("full"->>'contact_email') = LOWER(%s)""",
+            (email,),
         )
+        row = await result.fetchone()
+        if row:
+            return decode_json(row[0], User)
+        return None
 
 
-async def stream_objects[T](
-    table: str, type_: type[T], since: str | None = None, batch_size: int = 1000
-) -> AsyncIterator[tuple[list[T], str | None]]:
-    """Stream objects in batches using keyset pagination.
+async def get_user_by_calendar_token(token: str) -> User | None:
+    """Lookup user by calendar subscription token."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND "full"->>'calendar_token' = %s LIMIT 1""",
+            (token,),
+        )
+        row = await result.fetchone()
+        if row:
+            return decode_json(row[0], User)
+        return None
 
-    Yields (batch, max_modified) tuples. Each batch query acquires and
-    releases a DB connection immediately, so connections are not held
-    during downstream filtering, serialization, or HTTP writes.
-    Memory bounded to one batch at a time.
+
+async def get_user_by_vekn_id(vekn_id: str) -> User | None:
+    """Get a user by VEKN ID."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND "full"->>'vekn_id' = %s LIMIT 1""",
+            (vekn_id,),
+        )
+        row = await result.fetchone()
+        if row:
+            return decode_json(row[0], User)
+        return None
+
+
+async def is_vekn_id_claimed(vekn_id: str) -> bool:
+    """Check if a VEKN ID is claimed (has auth_methods linked)."""
+    user = await get_user_by_vekn_id(vekn_id)
+    if not user:
+        return False
+    auth_methods = await get_auth_methods_for_user(user.uid)
+    return len(auth_methods) > 0
+
+
+async def get_users_by_vekn_prefix(prefix: str) -> list[User]:
+    """Get users whose VEKN ID starts with a given prefix."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND "full"->>'vekn_id' LIKE %s || '%%'""",
+            (prefix,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], User) for row in rows]
+
+
+async def get_princes_and_ncs() -> list[User]:
+    """Get all users with Prince or NC roles who have a vekn_prefix."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'user'
+              AND "full"->>'vekn_prefix' IS NOT NULL
+              AND "full"->>'vekn_prefix' != ''"""
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], User) for row in rows]
+
+
+async def allocate_next_vekn_id() -> str:
+    """Atomically allocate the next available VEKN ID.
+
+    Finds the first gap in existing VEKN IDs starting from 1000000.
+    Uses advisory lock to ensure atomic allocation across concurrent requests.
+    Returns the allocated VEKN ID as a string (7 digits).
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
 
-    tbl = sql.Identifier(table)
-    # Keyset cursor: track (modified, uid) of last row seen
-    cursor_modified = since
-    cursor_uid: str | None = None
+    # Minimum VEKN ID to avoid leading zeros (7 digits)
+    min_vekn_id = 1000000
 
-    while True:
-        # Acquire connection, fetch one batch, release immediately
-        async with _pool.connection() as conn:
-            if cursor_uid is not None:
-                # Keyset pagination: continue after last seen (modified, uid)
-                rows = await (await conn.execute(
-                    sql.SQL("SELECT data, modified, uid FROM {} "
-                            "WHERE (modified, uid) > (%s, %s) "
-                            "ORDER BY modified ASC, uid ASC LIMIT %s").format(tbl),
-                    (cursor_modified, cursor_uid, batch_size),
-                )).fetchall()
-            elif cursor_modified:
-                # First batch with a since filter (no uid tiebreaker needed)
-                rows = await (await conn.execute(
-                    sql.SQL("SELECT data, modified, uid FROM {} "
-                            "WHERE modified > %s "
-                            "ORDER BY modified ASC, uid ASC LIMIT %s").format(tbl),
-                    (cursor_modified, batch_size),
-                )).fetchall()
+    conn = await _pool.getconn()
+    try:
+        await conn.execute("BEGIN")
+        try:
+            # Advisory lock to prevent concurrent allocations
+            await conn.execute("SELECT pg_advisory_xact_lock(1)")
+
+            result = await conn.execute(
+                """
+                WITH used_ids AS (
+                    SELECT ("full"->>'vekn_id')::integer AS vekn_id
+                    FROM objects
+                    WHERE type = 'user'
+                      AND "full"->>'vekn_id' IS NOT NULL
+                      AND "full"->>'vekn_id' ~ '^[0-9]+$'
+                      AND ("full"->>'vekn_id')::integer >= %s
+                ),
+                candidates AS (
+                    SELECT generate_series(%s, COALESCE((SELECT MAX(vekn_id) FROM used_ids), %s) + 1) AS candidate
+                )
+                SELECT MIN(candidate) AS next_id
+                FROM candidates
+                WHERE candidate NOT IN (SELECT vekn_id FROM used_ids)
+                """,
+                (min_vekn_id, min_vekn_id, min_vekn_id),
+            )
+            row = await result.fetchone()
+
+            if not row or row[0] is None:
+                next_id = min_vekn_id
             else:
-                # Full table scan (initial sync, no since)
-                rows = await (await conn.execute(
-                    sql.SQL("SELECT data, modified, uid FROM {} "
-                            "ORDER BY modified ASC, uid ASC LIMIT %s").format(tbl),
-                    (batch_size,),
-                )).fetchall()
-        # Connection returned to pool here
+                next_id = row[0]
 
-        if not rows:
-            break
-
-        batch = [decode_json(row[0], type_) for row in rows]
-        cursor_modified = rows[-1][1].isoformat()
-        cursor_uid = rows[-1][2]
-
-        yield batch, cursor_modified
-
-        if len(rows) < batch_size:
-            break
-
-
-def stream_users(
-    since: str | None = None, batch_size: int = 1000
-) -> AsyncIterator[tuple[list[User], str | None]]:
-    """Stream users from DB."""
-    return stream_objects("users", User, since=since, batch_size=batch_size)
+            await conn.execute("COMMIT")
+            return str(next_id)
+        except Exception:
+            await conn.execute("ROLLBACK")
+            raise
+    finally:
+        await _pool.putconn(conn)
 
 
 # Auth methods CRUD
@@ -542,100 +781,6 @@ async def get_auth_methods_for_user(user_uid: str) -> list[AuthMethod]:
         return [decode_json(row[0], AuthMethod) for row in rows]
 
 
-async def get_user_by_uid(uid: str) -> User | None:
-    """Get a user by UID."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM users WHERE uid = %s",
-            (uid,),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], User)
-        return None
-
-
-# Sanctions CRUD
-async def insert_sanction(sanction: Sanction) -> None:
-    """Insert a new sanction into the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "INSERT INTO sanctions (uid, data) VALUES (%s, %s)",
-            (sanction.uid, encode_json(sanction)),
-        )
-
-
-async def update_sanction(sanction: Sanction) -> None:
-    """Update an existing sanction in the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "UPDATE sanctions SET data = %s WHERE uid = %s",
-            (encode_json(sanction), sanction.uid),
-        )
-
-
-async def get_sanctions_for_user(user_uid: str) -> list[Sanction]:
-    """Get all sanctions for a user."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM sanctions WHERE data->>'user_uid' = %s ORDER BY data->>'issued_at' DESC",
-            (user_uid,),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], Sanction) for row in rows]
-
-
-async def get_sanctions_for_tournament(tournament_uid: str) -> list[Sanction]:
-    """Get all non-deleted sanctions for a tournament."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM sanctions WHERE data->>'tournament_uid' = %s AND data->>'deleted_at' IS NULL",
-            (tournament_uid,),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], Sanction) for row in rows]
-
-
-async def delete_user(uid: str) -> None:
-    """Delete a user from the database (hard delete)."""
-    async with get_connection() as conn:
-        await conn.execute("DELETE FROM users WHERE uid = %s", (uid,))
-
-
-async def soft_delete_user(uid: str) -> User | None:
-    """Soft-delete a user by setting deleted_at. Returns updated user for SSE."""
-    from datetime import UTC, datetime
-
-    user = await get_user_by_uid(uid)
-    if not user:
-        return None
-    now = datetime.now(UTC)
-    deleted = User(
-        uid=user.uid,
-        modified=now,
-        name=user.name,
-        country=user.country,
-        vekn_id=user.vekn_id,
-        city=user.city,
-        state=user.state,
-        nickname=user.nickname,
-        roles=user.roles,
-        avatar_path=user.avatar_path,
-        contact_email=user.contact_email,
-        contact_discord=user.contact_discord,
-        contact_phone=user.contact_phone,
-        coopted_by=user.coopted_by,
-        coopted_at=user.coopted_at,
-        vekn_synced=user.vekn_synced,
-        vekn_synced_at=user.vekn_synced_at,
-        local_modifications=user.local_modifications,
-        vekn_prefix=user.vekn_prefix,
-        deleted_at=now,
-    )
-    await update_user(deleted)
-    return deleted
-
-
 async def delete_auth_method(uid: str) -> None:
     """Delete an auth method from the database."""
     async with get_connection() as conn:
@@ -645,7 +790,6 @@ async def delete_auth_method(uid: str) -> None:
 async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
     """Reassign all auth methods from one user to another. Returns count updated."""
     async with get_connection() as conn:
-        # Get all auth methods for the source user
         result = await conn.execute(
             "SELECT data FROM auth_methods WHERE data->>'user_uid' = %s",
             (from_user_uid,),
@@ -655,7 +799,6 @@ async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
         count = 0
         for row in rows:
             auth_method = decode_json(row[0], AuthMethod)
-            # Update user_uid in the data
             updated = AuthMethod(
                 uid=auth_method.uid,
                 modified=auth_method.modified,
@@ -678,102 +821,47 @@ async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
 
 async def reassign_sanctions(from_user_uid: str, to_user_uid: str) -> int:
     """Reassign all sanctions from one user to another. Returns count updated."""
-    async with get_connection() as conn:
-        # Get all sanctions for the source user
-        result = await conn.execute(
-            "SELECT data FROM sanctions WHERE data->>'user_uid' = %s",
-            (from_user_uid,),
+    sanctions = await get_sanctions_for_user(from_user_uid)
+    count = 0
+    for sanction in sanctions:
+        updated = Sanction(
+            uid=sanction.uid,
+            modified=sanction.modified,
+            user_uid=to_user_uid,
+            issued_by_uid=sanction.issued_by_uid,
+            tournament_uid=sanction.tournament_uid,
+            level=sanction.level,
+            category=sanction.category,
+            description=sanction.description,
+            issued_at=sanction.issued_at,
+            expires_at=sanction.expires_at,
+            lifted_at=sanction.lifted_at,
+            lifted_by_uid=sanction.lifted_by_uid,
+            deleted_at=sanction.deleted_at,
         )
-        rows = await result.fetchall()
-
-        count = 0
-        for row in rows:
-            sanction = decode_json(row[0], Sanction)
-            # Update user_uid in the data
-            updated = Sanction(
-                uid=sanction.uid,
-                modified=sanction.modified,
-                user_uid=to_user_uid,
-                issued_by_uid=sanction.issued_by_uid,
-                tournament_uid=sanction.tournament_uid,
-                level=sanction.level,
-                category=sanction.category,
-                description=sanction.description,
-                issued_at=sanction.issued_at,
-                expires_at=sanction.expires_at,
-                lifted_at=sanction.lifted_at,
-                lifted_by_uid=sanction.lifted_by_uid,
-                deleted_at=sanction.deleted_at,
-            )
-            await conn.execute(
-                "UPDATE sanctions SET data = %s WHERE uid = %s",
-                (encode_json(updated), sanction.uid),
-            )
-            count += 1
-
-        return count
+        await update_sanction(updated)
+        count += 1
+    return count
 
 
 async def reassign_coopted_by_references(from_user_uid: str, to_user_uid: str) -> int:
     """Update all users whose coopted_by references from_user_uid to point to to_user_uid."""
     async with get_connection() as conn:
-        # Get all users who were coopted by the source user
         result = await conn.execute(
-            "SELECT data FROM users WHERE data->>'coopted_by' = %s",
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND "full"->>'coopted_by' = %s""",
             (from_user_uid,),
         )
         rows = await result.fetchall()
 
-        count = 0
-        for row in rows:
-            user = decode_json(row[0], User)
-            # Update coopted_by to point to the new user
-            updated = User(
-                uid=user.uid,
-                modified=user.modified,
-                name=user.name,
-                country=user.country,
-                vekn_id=user.vekn_id,
-                city=user.city,
-                state=user.state,
-                nickname=user.nickname,
-                roles=user.roles,
-                avatar_path=user.avatar_path,
-                contact_email=user.contact_email,
-                contact_discord=user.contact_discord,
-                contact_phone=user.contact_phone,
-                coopted_by=to_user_uid,
-                coopted_at=user.coopted_at,
-                vekn_synced=user.vekn_synced,
-                vekn_synced_at=user.vekn_synced_at,
-                local_modifications=user.local_modifications,
-                vekn_prefix=user.vekn_prefix,
-            )
-            await conn.execute(
-                "UPDATE users SET data = %s WHERE uid = %s",
-                (encode_json(updated), user.uid),
-            )
-            count += 1
+    count = 0
+    for row in rows:
+        user = decode_json(row[0], User)
+        user.coopted_by = to_user_uid
+        await update_user(user)
+        count += 1
 
-        return count
-
-
-async def get_user_by_contact_email(email: str) -> User | None:
-    """Find a user with DISCORD auth method whose contact_email matches.
-
-    This is used to find Discord users by their contact_email for account merging
-    when a magic link login proves ownership of that email.
-    """
-    async with get_connection() as conn:
-        # Find users with matching contact_email
-        result = await conn.execute(
-            "SELECT data FROM users WHERE LOWER(data->>'contact_email') = LOWER(%s)",
-            (email,),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], User)
-        return None
+    return count
 
 
 async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
@@ -819,115 +907,13 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         vekn_prefix=keep_user.vekn_prefix or delete_user_obj.vekn_prefix,
     )
 
-    # Update the kept user with merged data
     await update_user(merged)
-
-    # Reassign auth methods
     await reassign_auth_methods(delete_uid, keep_uid)
-
-    # Reassign sanctions received by the deleted user
     await reassign_sanctions(delete_uid, keep_uid)
-
-    # Reassign coopted_by references (users who were coopted by deleted user)
     await reassign_coopted_by_references(delete_uid, keep_uid)
-
-    # Soft-delete the duplicate user (for SSE propagation)
     await soft_delete_user(delete_uid)
 
     return merged
-
-
-async def get_user_by_calendar_token(token: str) -> User | None:
-    """Lookup user by calendar subscription token."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM users WHERE data->>'calendar_token' = %s LIMIT 1",
-            (token,),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], User)
-        return None
-
-
-async def get_user_by_vekn_id(vekn_id: str) -> User | None:
-    """Get a user by VEKN ID."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM users WHERE data->>'vekn_id' = %s LIMIT 1",
-            (vekn_id,),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], User)
-        return None
-
-
-async def is_vekn_id_claimed(vekn_id: str) -> bool:
-    """Check if a VEKN ID is claimed (has auth_methods linked)."""
-    user = await get_user_by_vekn_id(vekn_id)
-    if not user:
-        return False
-    # Check if user has any auth methods
-    auth_methods = await get_auth_methods_for_user(user.uid)
-    return len(auth_methods) > 0
-
-
-async def allocate_next_vekn_id() -> str:
-    """Atomically allocate the next available VEKN ID.
-
-    Finds the first gap in existing VEKN IDs starting from 1000000.
-    Uses advisory lock to ensure atomic allocation across concurrent requests.
-    Returns the allocated VEKN ID as a string (7 digits).
-    """
-    if not _pool:
-        raise RuntimeError("Database not initialized")
-
-    # Minimum VEKN ID to avoid leading zeros (7 digits)
-    min_vekn_id = 1000000
-
-    conn = await _pool.getconn()
-    try:
-        await conn.execute("BEGIN")
-        try:
-            # Advisory lock to prevent concurrent allocations
-            await conn.execute("SELECT pg_advisory_xact_lock(1)")
-
-            # Find the first gap in VEKN IDs starting from min_vekn_id
-            # This query finds the smallest number >= min_vekn_id that isn't used
-            result = await conn.execute(
-                """
-                WITH used_ids AS (
-                    SELECT (data->>'vekn_id')::integer AS vekn_id
-                    FROM users
-                    WHERE data->>'vekn_id' IS NOT NULL
-                      AND data->>'vekn_id' ~ '^[0-9]+$'
-                      AND (data->>'vekn_id')::integer >= %s
-                ),
-                candidates AS (
-                    SELECT generate_series(%s, COALESCE((SELECT MAX(vekn_id) FROM used_ids), %s) + 1) AS candidate
-                )
-                SELECT MIN(candidate) AS next_id
-                FROM candidates
-                WHERE candidate NOT IN (SELECT vekn_id FROM used_ids)
-                """,
-                (min_vekn_id, min_vekn_id, min_vekn_id),
-            )
-            row = await result.fetchone()
-
-            if not row or row[0] is None:
-                # No used IDs yet, start at min
-                next_id = min_vekn_id
-            else:
-                next_id = row[0]
-
-            await conn.execute("COMMIT")
-            return str(next_id)
-        except Exception:
-            await conn.execute("ROLLBACK")
-            raise
-    finally:
-        await _pool.putconn(conn)
 
 
 async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
@@ -945,7 +931,6 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
     if not user:
         return None
 
-    # Create new user for the displaced person (gets auth + contact)
     new_uid = str(uuid7())
     now = datetime.now(UTC)
     displaced = User(
@@ -957,18 +942,15 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
         city=user.city,
         state=user.state,
         nickname=user.nickname,
-        roles=[],  # No roles without vekn_id
+        roles=[],
         avatar_path=user.avatar_path,
         contact_email=user.contact_email,
         contact_discord=user.contact_discord,
         contact_phone=user.contact_phone,
     )
     await insert_user(displaced)
-
-    # Reassign auth methods to the new displaced user
     await reassign_auth_methods(user_uid, new_uid)
 
-    # Strip the VEKN user: keep identity + roles, clear contact/personal
     stripped = User(
         uid=user.uid,
         modified=now,
@@ -978,7 +960,7 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
         city=user.city,
         state=user.state,
         nickname=None,
-        roles=user.roles,  # Roles stay with VEKN user
+        roles=user.roles,
         avatar_path=None,
         contact_email=None,
         contact_discord=None,
@@ -1010,7 +992,6 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
     if not user:
         return None
 
-    # Create new user with personal data, no vekn_id
     new_uid = str(uuid7())
     now = datetime.now(UTC)
     new_user = User(
@@ -1030,7 +1011,6 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
     )
     await insert_user(new_user)
 
-    # Strip old user: clear personal data, keep vekn_id (orphaned)
     stripped = User(
         uid=user.uid,
         modified=user.modified,
@@ -1040,7 +1020,7 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
         city=user.city,
         state=user.state,
         nickname=None,
-        roles=user.roles,  # Roles follow the VEKN ID
+        roles=user.roles,
         avatar_path=None,
         contact_email=None,
         contact_discord=None,
@@ -1053,84 +1033,72 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
         vekn_prefix=None,
     )
     await update_user(stripped)
-
-    # Reassign auth methods and sanctions to new user
     await reassign_auth_methods(user_uid, new_uid)
     await reassign_sanctions(user_uid, new_uid)
 
     return new_user
 
 
-async def get_users_by_vekn_prefix(prefix: str) -> list[User]:
-    """Get users whose VEKN ID starts with a given prefix."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            """
-            SELECT data FROM users
-            WHERE data->>'vekn_id' LIKE %s || '%%'
-            """,
-            (prefix,),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], User) for row in rows]
+# ---------------------------------------------------------------------------
+# Sanction CRUD (thin wrappers around objects table)
+# ---------------------------------------------------------------------------
 
 
-async def get_princes_and_ncs() -> list[User]:
-    """Get all users with Prince or NC roles who have a vekn_prefix."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            """
-            SELECT data FROM users
-            WHERE data->>'vekn_prefix' IS NOT NULL
-              AND data->>'vekn_prefix' != ''
-            """
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], User) for row in rows]
+async def insert_sanction(sanction: Sanction) -> None:
+    """Insert a new sanction into the database."""
+    await save_object_from_model("sanction", sanction)
 
 
-# Sanction streaming and cleanup functions
-def stream_sanctions(
-    since: str | None = None, batch_size: int = 1000
-) -> AsyncIterator[tuple[list[Sanction], str | None]]:
-    """Stream sanctions from DB."""
-    return stream_objects("sanctions", Sanction, since=since, batch_size=batch_size)
+async def update_sanction(sanction: Sanction) -> None:
+    """Update an existing sanction in the database."""
+    await save_object_from_model("sanction", sanction)
 
 
 async def get_sanction_by_uid(uid: str) -> Sanction | None:
     """Get a sanction by UID."""
+    return await get_object_full(uid, Sanction)
+
+
+async def get_sanctions_for_user(user_uid: str) -> list[Sanction]:
+    """Get all sanctions for a user."""
     async with get_connection() as conn:
         result = await conn.execute(
-            "SELECT data FROM sanctions WHERE uid = %s",
-            (uid,),
+            """SELECT "full" FROM objects
+            WHERE type = 'sanction' AND "full"->>'user_uid' = %s
+            ORDER BY "full"->>'issued_at' DESC""",
+            (user_uid,),
         )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], Sanction)
-        return None
+        rows = await result.fetchall()
+        return [decode_json(row[0], Sanction) for row in rows]
+
+
+async def get_sanctions_for_tournament(tournament_uid: str) -> list[Sanction]:
+    """Get all non-deleted sanctions for a tournament."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'sanction'
+              AND "full"->>'tournament_uid' = %s
+              AND "full"->>'deleted_at' IS NULL""",
+            (tournament_uid,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], Sanction) for row in rows]
 
 
 async def get_expired_sanctions() -> list[Sanction]:
-    """Get sanctions that should be auto-expired (>18 months, not permanent, not deleted).
-
-    Excludes:
-    - Permanent bans (SUSPENSION without expires_at)
-    - Already soft-deleted sanctions
-    - Sanctions within 18 months
-    """
+    """Get sanctions that should be auto-expired (>18 months, not permanent, not deleted)."""
     async with get_connection() as conn:
-        # 18 months = ~548 days
         result = await conn.execute(
-            """
-            SELECT data FROM sanctions
-            WHERE data->>'deleted_at' IS NULL
-              AND data->>'issued_at' IS NOT NULL
-              AND (data->>'issued_at')::timestamp < NOW() - INTERVAL '18 months'
+            """SELECT "full" FROM objects
+            WHERE type = 'sanction'
+              AND "full"->>'deleted_at' IS NULL
+              AND "full"->>'issued_at' IS NOT NULL
+              AND ("full"->>'issued_at')::timestamp < NOW() - INTERVAL '18 months'
               AND NOT (
-                  data->>'level' = 'suspension'
-                  AND data->>'expires_at' IS NULL
-              )
-            """
+                  "full"->>'level' = 'suspension'
+                  AND "full"->>'expires_at' IS NULL
+              )"""
         )
         rows = await result.fetchall()
         return [decode_json(row[0], Sanction) for row in rows]
@@ -1140,11 +1108,10 @@ async def get_sanctions_for_cleanup(days: int = 30) -> list[Sanction]:
     """Get soft-deleted sanctions older than N days for hard deletion."""
     async with get_connection() as conn:
         result = await conn.execute(
-            """
-            SELECT data FROM sanctions
-            WHERE data->>'deleted_at' IS NOT NULL
-              AND (data->>'deleted_at')::timestamp < NOW() - INTERVAL '%s days'
-            """,
+            """SELECT "full" FROM objects
+            WHERE type = 'sanction'
+              AND deleted_at IS NOT NULL
+              AND deleted_at < NOW() - make_interval(days => %s)""",
             (days,),
         )
         rows = await result.fetchall()
@@ -1153,11 +1120,154 @@ async def get_sanctions_for_cleanup(days: int = 30) -> list[Sanction]:
 
 async def delete_sanction_hard(uid: str) -> None:
     """Hard delete a sanction from the database."""
+    await delete_object(uid)
+
+
+# ---------------------------------------------------------------------------
+# Tournament CRUD (thin wrappers around objects table)
+# ---------------------------------------------------------------------------
+
+
+async def insert_tournament(tournament: Tournament) -> None:
+    """Insert a new tournament into the database."""
+    await save_object_from_model("tournament", tournament)
+
+
+async def update_tournament(tournament: Tournament) -> None:
+    """Update an existing tournament in the database."""
+    await save_object_from_model("tournament", tournament)
+
+
+async def get_tournament_by_uid(uid: str) -> Tournament | None:
+    """Get a tournament by UID."""
+    return await get_object_full(uid, Tournament)
+
+
+async def delete_tournament_db(uid: str) -> None:
+    """Delete a tournament from the database."""
+    await delete_object(uid)
+
+
+async def soft_delete_tournament(uid: str) -> Tournament | None:
+    """Soft-delete a tournament by setting deleted_at. Returns updated tournament for SSE."""
+    from datetime import UTC, datetime
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        return None
+    now = datetime.now(UTC)
+    tournament.deleted_at = now
+    tournament.modified = now
+    await update_tournament(tournament)
+    return tournament
+
+
+async def get_tournament_by_external_id(platform: str, ext_id: str) -> Tournament | None:
+    """Get a tournament by external ID (e.g., platform='vekn', ext_id='123')."""
     async with get_connection() as conn:
-        await conn.execute("DELETE FROM sanctions WHERE uid = %s", (uid,))
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'tournament' AND "full"->'external_ids'->>%s = %s LIMIT 1""",
+            (platform, ext_id),
+        )
+        row = await result.fetchone()
+        if row:
+            return decode_json(row[0], Tournament)
+        return None
 
 
-# Avatar CRUD
+async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[str]]:
+    """Get all-time tournament win UIDs for multiple users at once.
+
+    Returns: {user_uid: [tournament_uid, ...]}
+    """
+    if not user_uids:
+        return {}
+    async with get_connection() as conn:
+        placeholders = ", ".join(["%s"] * len(user_uids))
+        result = await conn.execute(
+            f"""SELECT uid, "full"->>'winner' AS winner FROM objects
+            WHERE type = 'tournament'
+              AND "full"->>'state' = 'Finished'
+              AND "full"->>'winner' IN ({placeholders})
+              AND deleted_at IS NULL""",
+            tuple(user_uids),
+        )
+        rows = await result.fetchall()
+        wins: dict[str, list[str]] = {}
+        for row in rows:
+            t_uid, winner = row[0], row[1]
+            wins.setdefault(winner, []).append(t_uid)
+        return wins
+
+
+async def get_finished_tournaments_for_category(
+    format_value: str, online: bool, since_date: str
+) -> list[Tournament]:
+    """Get all FINISHED tournaments matching format/online within date window."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'tournament'
+              AND "full"->>'state' = 'Finished'
+              AND "full"->>'format' = %s
+              AND ("full"->>'online')::boolean = %s
+              AND ("full"->>'finish')::timestamp >= %s::timestamp""",
+            (format_value, online, since_date),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], Tournament) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# League CRUD (thin wrappers around objects table)
+# ---------------------------------------------------------------------------
+
+
+async def insert_league(league: League) -> None:
+    """Insert a new league into the database."""
+    await save_object_from_model("league", league)
+
+
+async def update_league(league: League) -> None:
+    """Update an existing league in the database."""
+    await save_object_from_model("league", league)
+
+
+async def get_league_by_uid(uid: str) -> League | None:
+    """Get a league by UID."""
+    return await get_object_full(uid, League)
+
+
+async def get_child_leagues(parent_uid: str) -> list[League]:
+    """Get child leagues for a meta-league."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'league' AND "full"->>'parent_uid' = %s""",
+            (parent_uid,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], League) for row in rows]
+
+
+async def get_tournaments_for_league(league_uid: str) -> list[Tournament]:
+    """Get all tournaments associated with a league."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'tournament' AND "full"->>'league_uid' = %s""",
+            (league_uid,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], Tournament) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Avatar CRUD (stays on avatars table, not a synced object)
+# ---------------------------------------------------------------------------
+
+
 async def upsert_avatar(user_uid: str, data: bytes, content_type: str = "image/webp") -> None:
     """Insert or update an avatar for a user."""
     async with get_connection() as conn:
@@ -1198,107 +1308,9 @@ async def delete_avatar(user_uid: str) -> bool:
         return row is not None
 
 
-# Tournament CRUD
-async def insert_tournament(tournament: Tournament) -> None:
-    """Insert a new tournament into the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "INSERT INTO tournaments (uid, data) VALUES (%s, %s)",
-            (tournament.uid, encode_json(tournament)),
-        )
-
-
-async def update_tournament(tournament: Tournament) -> None:
-    """Update an existing tournament in the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "UPDATE tournaments SET data = %s WHERE uid = %s",
-            (encode_json(tournament), tournament.uid),
-        )
-
-
-async def get_tournament_by_uid(uid: str) -> Tournament | None:
-    """Get a tournament by UID."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM tournaments WHERE uid = %s",
-            (uid,),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], Tournament)
-        return None
-
-
-async def delete_tournament_db(uid: str) -> None:
-    """Delete a tournament from the database."""
-    async with get_connection() as conn:
-        await conn.execute("DELETE FROM tournaments WHERE uid = %s", (uid,))
-
-
-async def soft_delete_tournament(uid: str) -> Tournament | None:
-    """Soft-delete a tournament by setting deleted_at. Returns updated tournament for SSE."""
-    from datetime import UTC, datetime
-
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        return None
-    now = datetime.now(UTC)
-    tournament.deleted_at = now
-    tournament.modified = now
-    await update_tournament(tournament)
-    return tournament
-
-
-def stream_tournaments(
-    since: str | None = None, batch_size: int = 1000
-) -> AsyncIterator[tuple[list[Tournament], str | None]]:
-    """Stream tournaments from DB."""
-    return stream_objects("tournaments", Tournament, since=since, batch_size=batch_size)
-
-
-# Rating CRUD
-
-
-async def upsert_rating(rating: Rating) -> None:
-    """Insert or update a rating."""
-    async with get_connection() as conn:
-        await conn.execute(
-            """
-            INSERT INTO ratings (uid, data) VALUES (%s, %s)
-            ON CONFLICT (uid) DO UPDATE SET data = EXCLUDED.data
-            """,
-            (rating.uid, encode_json(rating)),
-        )
-
-
-async def get_rating_by_user_uid(user_uid: str) -> Rating | None:
-    """Get a rating by user UID."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM ratings WHERE data->>'user_uid' = %s LIMIT 1",
-            (user_uid,),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], Rating)
-        return None
-
-
-async def delete_rating(uid: str) -> None:
-    """Delete a rating from the database."""
-    async with get_connection() as conn:
-        await conn.execute("DELETE FROM ratings WHERE uid = %s", (uid,))
-
-
-def stream_ratings(
-    since: str | None = None, batch_size: int = 1000
-) -> AsyncIterator[tuple[list[Rating], str | None]]:
-    """Stream ratings from DB."""
-    return stream_objects("ratings", Rating, since=since, batch_size=batch_size)
-
-
+# ---------------------------------------------------------------------------
 # Transient Token CRUD (auth challenges, magic links, discord state, etc.)
+# ---------------------------------------------------------------------------
 
 
 async def store_transient_token(key: str, data: dict, expires_at) -> None:
@@ -1341,126 +1353,3 @@ async def cleanup_expired_tokens() -> int:
         )
         rows = await result.fetchall()
         return len(rows)
-
-
-async def get_tournament_by_external_id(platform: str, ext_id: str) -> Tournament | None:
-    """Get a tournament by external ID (e.g., platform='vekn', ext_id='123')."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM tournaments WHERE data->'external_ids'->>%s = %s LIMIT 1",
-            (platform, ext_id),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], Tournament)
-        return None
-
-
-async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[str]]:
-    """Get all-time tournament win UIDs for multiple users at once.
-
-    Returns: {user_uid: [tournament_uid, ...]}
-    """
-    if not user_uids:
-        return {}
-    async with get_connection() as conn:
-        # Query finished tournaments where winner is in user_uids
-        placeholders = ", ".join(["%s"] * len(user_uids))
-        result = await conn.execute(
-            f"""
-            SELECT uid, data->>'winner' AS winner FROM tournaments
-            WHERE data->>'state' = 'Finished'
-              AND data->>'winner' IN ({placeholders})
-              AND data->>'deleted_at' IS NULL
-            """,
-            tuple(user_uids),
-        )
-        rows = await result.fetchall()
-        wins: dict[str, list[str]] = {}
-        for row in rows:
-            t_uid, winner = row[0], row[1]
-            wins.setdefault(winner, []).append(t_uid)
-        return wins
-
-
-
-async def get_finished_tournaments_for_category(
-    format_value: str, online: bool, since_date: str
-) -> list[Tournament]:
-    """Get all FINISHED tournaments matching format/online within date window."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            """
-            SELECT data FROM tournaments
-            WHERE data->>'state' = 'Finished'
-              AND data->>'format' = %s
-              AND (data->>'online')::boolean = %s
-              AND (data->>'finish')::timestamp >= %s::timestamp
-            """,
-            (format_value, online, since_date),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], Tournament) for row in rows]
-
-
-# League CRUD
-
-
-async def insert_league(league: League) -> None:
-    """Insert a new league into the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "INSERT INTO leagues (uid, data) VALUES (%s, %s)",
-            (league.uid, encode_json(league)),
-        )
-
-
-async def update_league(league: League) -> None:
-    """Update an existing league in the database."""
-    async with get_connection() as conn:
-        await conn.execute(
-            "UPDATE leagues SET data = %s WHERE uid = %s",
-            (encode_json(league), league.uid),
-        )
-
-
-async def get_league_by_uid(uid: str) -> League | None:
-    """Get a league by UID."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM leagues WHERE uid = %s",
-            (uid,),
-        )
-        row = await result.fetchone()
-        if row:
-            return decode_json(row[0], League)
-        return None
-
-
-async def get_child_leagues(parent_uid: str) -> list[League]:
-    """Get child leagues for a meta-league."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM leagues WHERE data->>'parent_uid' = %s",
-            (parent_uid,),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], League) for row in rows]
-
-
-async def get_tournaments_for_league(league_uid: str) -> list[Tournament]:
-    """Get all tournaments associated with a league."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            "SELECT data FROM tournaments WHERE data->>'league_uid' = %s",
-            (league_uid,),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], Tournament) for row in rows]
-
-
-def stream_leagues(
-    since: str | None = None, batch_size: int = 1000
-) -> AsyncIterator[tuple[list[League], str | None]]:
-    """Stream leagues from DB."""
-    return stream_objects("leagues", League, since=since, batch_size=batch_size)

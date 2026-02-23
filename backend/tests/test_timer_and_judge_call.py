@@ -9,19 +9,11 @@ Covers:
 
 from datetime import UTC, datetime
 
-from src.main import _filter_tournament, broadcast_judge_call, SSEConnection
+from src.main import broadcast_judge_call, SSEConnection
 from src.models import (
-    Player,
     Role,
     Room,
-    Seat,
-    Table,
-    TimeExtensionPolicy,
     TimerState,
-    Tournament,
-    TournamentFormat,
-    TournamentRank,
-    TournamentState,
     User,
 )
 from src.routes.tournaments import resolveTableLabelPy
@@ -35,103 +27,6 @@ def _make_user(
 ) -> User:
     return User(uid=uid, modified=NOW, name=name, country=country,
                 vekn_id=vekn_id, roles=roles or [])
-
-
-def _make_viewer(
-    uid: str = "viewer", roles: list[Role] | None = None,
-    vekn_id: str | None = "9999999", country: str = "FR",
-) -> User:
-    return _make_user(uid=uid, name="Viewer", roles=roles,
-                      vekn_id=vekn_id, country=country)
-
-
-def _make_tournament(
-    state: TournamentState = TournamentState.PLAYING,
-    organizers_uids: list[str] | None = None,
-    players: list[Player] | None = None,
-    **kwargs,
-) -> Tournament:
-    return Tournament(
-        uid="t1", modified=NOW, name="Test",
-        format=TournamentFormat.Standard, rank=TournamentRank.BASIC,
-        state=state, country="FR",
-        organizers_uids=organizers_uids or [],
-        players=players or [],
-        standings=[], decks={},
-        **kwargs,
-    )
-
-
-# ============================================================================
-# SSE filter: timer field visibility
-# ============================================================================
-
-
-class TestFilterTournamentTimerFields:
-    """Timer fields must be visible to member-level viewers (players)."""
-
-    def test_member_sees_round_time(self):
-        t = _make_tournament(round_time=5400)
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result.round_time == 5400
-
-    def test_member_sees_finals_time(self):
-        t = _make_tournament(finals_time=7200)
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result.finals_time == 7200
-
-    def test_member_sees_timer_state(self):
-        timer = TimerState(
-            started_at=NOW,
-            elapsed_before_pause=120.5,
-            paused=False,
-        )
-        t = _make_tournament(timer=timer)
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result.timer.started_at == NOW
-        assert result.timer.elapsed_before_pause == 120.5
-        assert result.timer.paused is False
-
-    def test_member_sees_table_extra_time(self):
-        t = _make_tournament(table_extra_time={"0": 60, "2": 180})
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result.table_extra_time == {"0": 60, "2": 180}
-
-    def test_member_sees_table_paused_at(self):
-        ts = NOW.isoformat()
-        t = _make_tournament(table_paused_at={"1": ts})
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result.table_paused_at == {"1": ts}
-
-    def test_member_sees_time_extension_policy(self):
-        t = _make_tournament(time_extension_policy=TimeExtensionPolicy.CLOCK_STOP)
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result.time_extension_policy == TimeExtensionPolicy.CLOCK_STOP
-
-    def test_nonmember_does_not_see_timer(self):
-        """Non-members get minimal tournament -- no timer data."""
-        t = _make_tournament(round_time=5400, timer=TimerState(paused=False, started_at=NOW))
-        viewer = _make_viewer(vekn_id=None)
-        result = _filter_tournament(t, viewer)
-        assert result.round_time == 0  # default
-        assert result.timer.paused is True  # default
-
-    def test_organizer_sees_timer(self):
-        """Organizers get full tournament object."""
-        timer = TimerState(started_at=NOW, paused=False)
-        t = _make_tournament(
-            round_time=5400, timer=timer,
-            organizers_uids=["viewer"],
-        )
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result is t  # same object, full access
 
 
 # ============================================================================

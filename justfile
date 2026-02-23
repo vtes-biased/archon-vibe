@@ -55,7 +55,7 @@ update:
 test:
     (cd engine && cargo test)
     uv run ruff check backend/
-    uv run python3 -m pytest backend/tests/test_sse_filters.py -v
+    uv run python3 -m pytest backend/tests/ -v
     (cd frontend && npx svelte-check --threshold error)
 
 # Build production (Docker images)

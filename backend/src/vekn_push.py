@@ -275,12 +275,13 @@ async def batch_push(client: VEKNAPIClient) -> dict:
     async with get_connection() as conn:
         result = await conn.execute(
             """
-            SELECT data FROM tournaments
-            WHERE data->>'state' != 'Planned'
-              AND data->>'deleted_at' IS NULL
-              AND (data->'external_ids'->>'vekn') IS NULL
-              AND data->>'name' IS NOT NULL
-              AND data->>'start' IS NOT NULL
+            SELECT "full" FROM objects
+            WHERE type = 'tournament'
+              AND "full"->>'state' != 'Planned'
+              AND deleted_at IS NULL
+              AND ("full"->'external_ids'->>'vekn') IS NULL
+              AND "full"->>'name' IS NOT NULL
+              AND "full"->>'start' IS NOT NULL
             """
         )
         rows = await result.fetchall()
@@ -299,11 +300,12 @@ async def batch_push(client: VEKNAPIClient) -> dict:
     async with get_connection() as conn:
         result = await conn.execute(
             """
-            SELECT data FROM tournaments
-            WHERE data->>'state' = 'Finished'
-              AND data->>'deleted_at' IS NULL
-              AND data->>'vekn_pushed_at' IS NULL
-              AND (data->'external_ids'->>'vekn') IS NOT NULL
+            SELECT "full" FROM objects
+            WHERE type = 'tournament'
+              AND "full"->>'state' = 'Finished'
+              AND deleted_at IS NULL
+              AND "full"->>'vekn_pushed_at' IS NULL
+              AND ("full"->'external_ids'->>'vekn') IS NOT NULL
             """
         )
         rows = await result.fetchall()
@@ -321,10 +323,11 @@ async def batch_push(client: VEKNAPIClient) -> dict:
     async with get_connection() as conn:
         result = await conn.execute(
             """
-            SELECT data FROM users
-            WHERE data->>'vekn_id' IS NOT NULL
-              AND data->>'coopted_by' IS NOT NULL
-              AND (data->>'vekn_synced')::boolean = false
+            SELECT "full" FROM objects
+            WHERE type = 'user'
+              AND "full"->>'vekn_id' IS NOT NULL
+              AND "full"->>'coopted_by' IS NOT NULL
+              AND ("full"->>'vekn_synced')::boolean = false
             """
         )
         rows = await result.fetchall()

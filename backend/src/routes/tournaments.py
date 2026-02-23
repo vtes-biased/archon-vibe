@@ -5,13 +5,14 @@ import os
 from datetime import UTC, datetime
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
 from ..db import (
-    encode_json,
+    delete_object,
     get_auth_method_by_identifier,
+    get_decks_for_tournament,
     get_sanctions_for_tournament,
     get_sanctions_for_user,
     get_tournament_by_uid,
@@ -20,12 +21,15 @@ from ..db import (
     insert_sanction,
     insert_tournament,
     insert_user,
+    save_object,
+    save_object_from_model,
     soft_delete_tournament,
     tournament_transaction,
     update_tournament,
 )
 from ..models import (
     DeckListsMode,
+    DeckObject,
     PlayerState,
     Role,
     Sanction,
@@ -49,9 +53,9 @@ decoder = msgspec.json.Decoder(Tournament)
 
 # Broadcast functions will be set by main.py
 broadcast_tournament_event = None
-broadcast_rating_event = None
 broadcast_user_event = None
 broadcast_sanction_event = None
+broadcast_deck_event = None  # async fn(deck_uid: str) -> None
 
 # Rust engine - lazy loaded
 _engine = None
@@ -91,46 +95,77 @@ def _is_organizer(user, tournament: Tournament) -> bool:
     return user.uid in tournament.organizers_uids or Role.IC in user.roles
 
 
-async def _process_engine_event(
-    user, tournament: Tournament, event_data: dict
-) -> Tournament:
-    """Process an event through the Rust engine, save, and broadcast.
+async def _build_decks_json(tournament_uid: str) -> str:
+    """Build deck metadata JSON for the engine's decks parameter."""
+    decks = await get_decks_for_tournament(tournament_uid)
+    return msgspec.json.encode([
+        {"user_uid": d.user_uid, "round": d.round, "uid": d.uid}
+        for d in decks
+    ]).decode()
 
-    Returns the updated tournament.
-    """
-    actor_data = _build_actor_context(user, tournament)
-    tournament_sanctions = await get_sanctions_for_tournament(tournament.uid)
-    sanctions_data = [
-        {
-            "user_uid": s.user_uid,
-            "level": s.level.value,
-            "round_number": s.round_number,
-            "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
-            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
-        }
-        for s in tournament_sanctions
-    ]
-    tournament_json = encoder.encode(tournament).decode("utf-8")
-    event_json = msgspec.json.encode(event_data).decode("utf-8")
-    actor_json = msgspec.json.encode(actor_data).decode("utf-8")
-    sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
 
-    engine = get_engine()
-    try:
-        result_json = engine.process_tournament_event(
-            tournament_json, event_json, actor_json, sanctions_json
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+async def _process_deck_ops(
+    deck_ops: list, tournament_uid: str, existing_decks: list[DeckObject] | None = None,
+) -> list[str]:
+    """Process deck_ops from engine result. Returns list of affected deck UIDs."""
+    if not deck_ops:
+        return []
+    if existing_decks is None:
+        existing_decks = await get_decks_for_tournament(tournament_uid)
 
-    updated = decoder.decode(result_json.encode("utf-8"))
-    updated.modified = datetime.now(UTC)
-    await update_tournament(updated)
+    affected_uids: list[str] = []
+    for op in deck_ops:
+        op_type = op.get("op")
+        if op_type == "upsert":
+            deck_data = op["deck"]
+            player_uid = op["player_uid"]
+            round_val = deck_data.get("round")
+            # Find existing deck for this (tournament, player, round)
+            existing = next(
+                (d for d in existing_decks
+                 if d.user_uid == player_uid and d.round == round_val),
+                None,
+            )
+            if existing:
+                deck_obj = existing
+                deck_obj.modified = datetime.now(UTC)
+            else:
+                deck_obj = DeckObject(
+                    uid=str(uuid7()),
+                    modified=datetime.now(UTC),
+                    tournament_uid=tournament_uid,
+                    user_uid=player_uid,
+                )
+            deck_obj.round = round_val
+            deck_obj.name = deck_data.get("name", "")
+            deck_obj.author = deck_data.get("author", "")
+            deck_obj.comments = deck_data.get("comments", "")
+            deck_obj.cards = deck_data.get("cards", {})
+            deck_obj.attribution = deck_data.get("attribution")
+            deck_obj.public = deck_data.get("public", False)
+            await save_object_from_model("deck", deck_obj)
+            affected_uids.append(deck_obj.uid)
 
-    if broadcast_tournament_event:
-        await broadcast_tournament_event(updated)
+        elif op_type == "delete":
+            player_uid = op["player_uid"]
+            for d in existing_decks:
+                if d.user_uid == player_uid:
+                    d.deleted_at = datetime.now(UTC)
+                    d.modified = datetime.now(UTC)
+                    await save_object_from_model("deck", d)
+                    affected_uids.append(d.uid)
 
-    return updated
+        elif op_type == "set_public":
+            deck_uid = op.get("deck_uid")
+            public_val = op.get("public", False)
+            target = next((d for d in existing_decks if d.uid == deck_uid), None)
+            if target:
+                target.public = public_val
+                target.modified = datetime.now(UTC)
+                await save_object_from_model("deck", target)
+                affected_uids.append(target.uid)
+
+    return affected_uids
 
 
 async def _maybe_push_vekn(tournament: Tournament) -> None:
@@ -167,31 +202,6 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
         logger.exception("Failed to push VEKN event")
 
 
-def _twda_date(dt) -> str:
-    """Format date as 'February 23rd 2026' for TWDA header."""
-    if isinstance(dt, str):
-        dt = datetime.fromisoformat(dt)
-    day = dt.day
-    if 11 <= day <= 13:
-        suffix = "th"
-    else:
-        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
-    return f"{dt.strftime('%B')} {day}{suffix} {dt.year}"
-
-
-def _twda_place(tournament: Tournament) -> str:
-    """Return TWDA place string: 'Online' if online, else country or ''."""
-    if tournament.online:
-        return "Online"
-    return tournament.country or ""
-
-
-def _twda_url(tournament: Tournament) -> str:
-    """Return URL to this tournament in the Archon app."""
-    base = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    return f"{base}/tournaments/{tournament.uid}"
-
-
 async def _maybe_submit_twda(tournament: Tournament) -> None:
     """Submit winner's deck to TWDA if conditions are met.
 
@@ -206,8 +216,11 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
     vekn_event_id = tournament.external_ids.get("vekn")
     if not vekn_event_id:
         return
-    winner_decks = tournament.decks.get(tournament.winner, [])
-    if not winner_decks:
+
+    # Find winner's deck from DeckObject store
+    decks = await get_decks_for_tournament(tournament.uid)
+    winner_deck = next((d for d in decks if d.user_uid == tournament.winner), None)
+    if not winner_deck:
         return
 
     try:
@@ -215,18 +228,18 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
 
         from ..twda import submit_twda_pr
 
-        deck = winner_decks[0]
         engine = get_engine()
         deck_json = json_mod.dumps({
-            "name": deck.name,
-            "author": deck.author,
-            "comments": deck.comments,
-            "cards": deck.cards,
+            "name": winner_deck.name,
+            "author": winner_deck.author,
+            "comments": winner_deck.comments,
+            "cards": winner_deck.cards,
         })
 
         player_user = await get_user_by_uid(tournament.winner)
         player_name = player_user.name if player_user else "Unknown"
         player_count = len(tournament.players)
+        tournament_date = tournament.start or tournament.modified.isoformat()
         rounds_count = len(tournament.rounds)
         has_finals = tournament.finals is not None
         tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
@@ -235,10 +248,10 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
             deck_json,
             _load_cards_json(),
             tournament.name,
-            _twda_date(tournament.start or tournament.modified),
-            _twda_place(tournament),
+            str(tournament_date),
+            tournament.country or "",
             tournament_format,
-            _twda_url(tournament),
+            "",  # tournament_url
             player_count,
             player_name,
         )
@@ -318,13 +331,6 @@ def _tournament_to_minimal(t: Tournament) -> TournamentMinimal:
     )
 
 
-def _strip_for_player(t: Tournament, user_uid: str) -> dict:
-    """Strip tournament data for a registered player (hide other players' details)."""
-    data = msgspec.to_builtins(t)
-    # Players can see config but not other players' decks
-    player_decks = data.get("decks", {}).get(user_uid, [])
-    data["decks"] = {user_uid: player_decks} if player_decks else {}
-    return data
 
 
 class OrganizerAction(BaseModel):
@@ -555,13 +561,12 @@ async def get_tournament(
             media_type="application/json",
         )
 
-    # Registered players get filtered view (hide other players' decks)
+    # Registered players see full tournament data (decks are separate objects)
     if current_user:
         player_uids = {p.user_uid for p in tournament.players if p.user_uid}
         if current_user.uid in player_uids:
-            data = _strip_for_player(tournament, current_user.uid)
             return Response(
-                content=encoder.encode(data),
+                content=encoder.encode(tournament),
                 media_type="application/json",
             )
 
@@ -639,6 +644,9 @@ class TournamentActionRequest(BaseModel):
     status: str | None = None  # For SetPaymentStatus
     seating: list[list[str]] | None = None  # For AlterSeating
     config: dict | None = None  # For UpdateConfig: partial config fields
+    # Deck
+    deck: dict | None = None
+    multideck: bool | None = None
     # Raffle
     label: str | None = None
     pool: str | None = None
@@ -697,6 +705,10 @@ async def tournament_action(
         event_data["seating"] = request.seating
     if request.config is not None:
         event_data["config"] = request.config
+    if request.deck is not None:
+        event_data["deck"] = request.deck
+    if request.multideck is not None:
+        event_data["multideck"] = request.multideck
     if request.label:
         event_data["label"] = request.label
     if request.pool:
@@ -758,6 +770,7 @@ async def tournament_action(
         event_json = msgspec.json.encode(event_data).decode("utf-8")
         actor_json = msgspec.json.encode(actor_data).decode("utf-8")
         sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+        decks_json = await _build_decks_json(uid)
 
         # Backend pre-checks for cross-tournament sanctions (CheckIn)
         if request.type == "CheckIn" and request.player_uid:
@@ -767,15 +780,18 @@ async def tournament_action(
         engine = get_engine()
         try:
             result_json = engine.process_tournament_event(
-                tournament_json, event_json, actor_json, sanctions_json
+                tournament_json, event_json, actor_json, sanctions_json, decks_json
             )
         except ValueError as e:
             # Rust engine returns validation errors as ValueError
             raise HTTPException(status_code=400, detail=str(e)) from e
 
-        # Parse result — modified is set by DB trigger (CURRENT_TIMESTAMP)
-        updated = decoder.decode(result_json.encode("utf-8"))
+        # Parse new result format: {"tournament": {...}, "deck_ops": [...]}
+        import json as json_mod
+        result = json_mod.loads(result_json)
+        updated = decoder.decode(msgspec.json.encode(result["tournament"]))
         updated.modified = datetime.now(UTC)
+        deck_ops = result.get("deck_ops", [])
 
         # Timer lifecycle hooks (online-only, not handled by Rust engine)
         if request.type in ("StartRound", "StartFinals"):
@@ -794,14 +810,19 @@ async def tournament_action(
             updated.table_paused_at = {}
 
         # Save within the same transaction (row is still locked)
-        await tx_conn.execute(
-            "UPDATE tournaments SET data = %s WHERE uid = %s",
-            (encode_json(updated), updated.uid),
+        await save_object(
+            "tournament", updated.uid, msgspec.to_builtins(updated), conn=tx_conn
         )
         pre_state = tournament.state
 
     # --- Transaction committed, row lock released ---
     logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
+
+    # Process deck side-effects (outside transaction)
+    affected_deck_uids = await _process_deck_ops(deck_ops, uid)
+    if broadcast_deck_event:
+        for deck_uid in affected_deck_uids:
+            await broadcast_deck_event(deck_uid)
 
     if broadcast_tournament_event:
         await broadcast_tournament_event(updated)
@@ -816,17 +837,17 @@ async def tournament_action(
 
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
-            ratings = await recompute_ratings_for_players(player_uids, category)
-            if broadcast_rating_event:
-                for rating in ratings:
-                    await broadcast_rating_event(rating)
+            users = await recompute_ratings_for_players(player_uids, category)
+            if broadcast_user_event:
+                for user in users:
+                    await broadcast_user_event(user)
             # If category changed (format/online toggle), also recompute old category
             old_category = rating_category_for_tournament(tournament)
             if old_category != category:
-                old_ratings = await recompute_ratings_for_players(player_uids, old_category)
-                if broadcast_rating_event:
-                    for rating in old_ratings:
-                        await broadcast_rating_event(rating)
+                old_users = await recompute_ratings_for_players(player_uids, old_category)
+                if broadcast_user_event:
+                    for user in old_users:
+                        await broadcast_user_event(user)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
@@ -1237,167 +1258,34 @@ def _load_cards_json() -> str:
     return _cards_json
 
 
-class DeckUploadRequest(BaseModel):
-    text: str | None = None
-    url: str | None = None
-    name: str = ""
-    author: str = ""
-    comments: str = ""
-    attribution: str | None = None  # None=use default, explicit null=anonymous
+@router.get("/fetch-deck")
+async def fetch_deck_proxy(
+    url: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Proxy to fetch deck data from external URLs (VDB, VTESDecks, Amaranth).
 
-
-async def _parse_deck_input(body: DeckUploadRequest, default_author: str) -> dict:
-    """Parse deck from URL or text, returning a dict suitable for the engine.
-
-    Keeps network I/O and text parsing in Python.
+    Read-only — no mutation. Works around CORS restrictions on external APIs.
+    Returns parsed deck: {name, author, comments, cards}.
     """
-    cards = {}
-    deck_name = body.name
-    deck_author = body.author or default_author
-    deck_comments = body.comments
+    import asyncio
 
-    if body.url:
-        from ..providers import DeckFetchError, fetch_deck_from_url
+    await _get_current_user(authorization)  # auth check
 
-        try:
-            result = fetch_deck_from_url(body.url)
-            cards = result["cards"]
-            deck_name = deck_name or result.get("name", "")
-            deck_author = deck_author or result.get("author", "")
-            deck_comments = deck_comments or result.get("comments", "")
-        except DeckFetchError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            logger.exception("Failed to fetch deck from URL")
-            raise HTTPException(status_code=400, detail=f"Failed to fetch deck: {e}")
-    elif body.text:
-        engine = get_engine()
-        import json as json_mod
+    from ..providers import DeckFetchError, fetch_deck_from_url
 
-        try:
-            result_json = engine.parse_deck(body.text, _load_cards_json())
-            result = json_mod.loads(result_json)
-            cards = result.get("cards", {})
-            deck_name = deck_name or result.get("name", "")
-            deck_author = deck_author or result.get("author", "")
-            deck_comments = deck_comments or result.get("comments", "")
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to parse deck: {e}")
-    else:
-        raise HTTPException(status_code=400, detail="Either text or url is required")
-
-    result = {
-        "name": deck_name,
-        "author": deck_author,
-        "comments": deck_comments,
-        "cards": {str(k): int(v) for k, v in cards.items()},
-    }
-    if body.attribution is not None:
-        result["attribution"] = body.attribution
-    return result
-
-
-@router.post("/{uid}/decks")
-async def upload_deck(
-    uid: str,
-    body: DeckUploadRequest,
-    authorization: str | None = Header(default=None),
-) -> Response:
-    """Upload a deck for the current player."""
-    user = await _get_current_user(authorization)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # Parse deck from URL or text (needs network/engine, stays in Python)
-    deck_data = await _parse_deck_input(body, user.name)
-
-    # Route through engine
-    event = {
-        "type": "UploadDeck",
-        "player_uid": user.uid,
-        "deck": deck_data,
-        "multideck": tournament.multideck,
-    }
-    updated = await _process_engine_event(user, tournament, event)
-
-    # TWDA: winner uploading deck after tournament finished
-    if updated.state == TournamentState.FINISHED and user.uid == updated.winner:
-        await _maybe_submit_twda(updated)
-
-    # Return the deck that was uploaded
-    return Response(
-        content=msgspec.json.encode(deck_data),
-        media_type="application/json",
-        status_code=201,
-    )
-
-
-@router.put("/{uid}/decks/{player_uid}")
-async def update_deck(
-    uid: str,
-    player_uid: str,
-    body: DeckUploadRequest,
-    authorization: str | None = Header(default=None),
-    deck_index: int = Query(default=0),
-) -> Response:
-    """Update a player's deck (organizer or self)."""
-    user = await _get_current_user(authorization)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # Parse deck from URL or text
-    deck_data = await _parse_deck_input(body, body.author or user.name)
-
-    # Route through engine (auth check happens in engine)
-    event = {
-        "type": "UpdateDeck",
-        "player_uid": player_uid,
-        "deck": deck_data,
-        "deck_index": deck_index,
-    }
-    await _process_engine_event(user, tournament, event)
+    try:
+        result = await asyncio.to_thread(fetch_deck_from_url, url)
+    except DeckFetchError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to fetch deck from URL")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch deck: {e}") from e
 
     return Response(
-        content=msgspec.json.encode(deck_data),
+        content=msgspec.json.encode(result),
         media_type="application/json",
     )
-
-
-@router.delete("/{uid}/decks/{player_uid}")
-async def delete_deck(
-    uid: str,
-    player_uid: str,
-    authorization: str | None = Header(default=None),
-    deck_index: int | None = Query(default=None),
-) -> Response:
-    """Delete a player's deck (organizer or self)."""
-    user = await _get_current_user(authorization)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # Route through engine (auth check happens in engine)
-    event: dict = {
-        "type": "DeleteDeck",
-        "player_uid": player_uid,
-        "multideck": tournament.multideck,
-    }
-    if deck_index is not None:
-        event["deck_index"] = deck_index
-    await _process_engine_event(user, tournament, event)
-
-    return Response(status_code=204)
 
 
 @router.get("/{uid}/decks/{player_uid}/twda")
@@ -1412,11 +1300,12 @@ async def export_deck_twda(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    decks = tournament.decks.get(player_uid, [])
-    if not decks:
+    # Find deck from DeckObject store
+    all_decks = await get_decks_for_tournament(uid)
+    deck = next((d for d in all_decks if d.user_uid == player_uid), None)
+    if not deck:
         raise HTTPException(status_code=404, detail="No deck found for player")
 
-    deck = decks[0]
     engine = get_engine()
     import json as json_mod
 
@@ -1431,20 +1320,24 @@ async def export_deck_twda(
     player_user = await get_user_by_uid(player_uid)
     player_name = player_user.name if player_user else "Unknown"
     player_count = len(tournament.players)
+    tournament_date = tournament.start or tournament.modified.isoformat()
 
     # Build tournament format string (e.g. "2R+F")
     rounds_count = len(tournament.rounds)
     has_finals = tournament.finals is not None
     tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
 
+    # Build tournament URL
+    tournament_url = ""  # Can be set to app URL when deployed
+
     text = engine.export_twda(
         deck_json,
         _load_cards_json(),
         tournament.name,
-        _twda_date(tournament.start or tournament.modified),
-        _twda_place(tournament),
+        str(tournament_date),
+        tournament.country or "",
         tournament_format,
-        _twda_url(tournament),
+        tournament_url,
         player_count,
         player_name,
     )
@@ -1524,25 +1417,29 @@ async def tournament_report(
         winner_mark = " *WINNER*" if s.user_uid == tournament.winner else ""
         lines.append(f"{i:>3}. {name:30} GW={s.gw:.1f} VP={s.vp:.1f} TP={s.tp}{finalist_mark}{winner_mark}")
 
-    # Winner's deck
-    winner_decks = tournament.decks.get(tournament.winner, []) if tournament.winner else []
-    if winner_decks:
+    # Winner's deck (from DeckObject store)
+    winner_deck = None
+    if tournament.winner:
+        all_decks = await get_decks_for_tournament(uid)
+        winner_deck = next((d for d in all_decks if d.user_uid == tournament.winner), None)
+
+    if winner_deck:
         lines.append("")
         lines.append("=== Winner's Decklist ===")
         try:
-            deck = winner_decks[0]
             engine = get_engine()
             import json as json_mod
 
             deck_json = json_mod.dumps({
-                "name": deck.name,
-                "author": deck.author,
-                "comments": deck.comments,
-                "cards": deck.cards,
+                "name": winner_deck.name,
+                "author": winner_deck.author,
+                "comments": winner_deck.comments,
+                "cards": winner_deck.cards,
             })
 
             player_user = await get_user_by_uid(tournament.winner)
             player_name = player_user.name if player_user else "Unknown"
+            tournament_date = tournament.start or tournament.modified.isoformat()
             rounds_count = len(tournament.rounds)
             has_finals = tournament.finals is not None
             tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
@@ -1551,10 +1448,10 @@ async def tournament_report(
                 deck_json,
                 _load_cards_json(),
                 tournament.name,
-                _twda_date(tournament.start or tournament.modified),
-                _twda_place(tournament),
+                str(tournament_date),
+                tournament.country or "",
                 tournament_format,
-                _twda_url(tournament),
+                "",
                 len(tournament.players),
                 player_name,
             )
@@ -1601,9 +1498,8 @@ def _validate_timer_tournament(user, tournament: Tournament | None):
 async def _save_timer_tx(tournament: Tournament, tx_conn):
     """Save within transaction and broadcast after."""
     tournament.modified = datetime.now(UTC)
-    await tx_conn.execute(
-        "UPDATE tournaments SET data = %s WHERE uid = %s",
-        (encode_json(tournament), tournament.uid),
+    await save_object(
+        "tournament", tournament.uid, msgspec.to_builtins(tournament), conn=tx_conn
     )
     return tournament
 
@@ -1884,6 +1780,7 @@ class GoOnlineRequest(BaseModel):
     tournament: dict  # Full tournament data from the offline device
     offline_players: list[OfflinePlayerData] = []
     offline_sanctions: list[dict] = []
+    offline_decks: list[dict] = []
     force: bool = False
 
 
@@ -2013,7 +1910,23 @@ async def go_online(
         if broadcast_sanction_event:
             await broadcast_sanction_event(sanction)
 
-    # 6. Broadcast updated tournament
+    # 6. Save offline decks with remapped UIDs
+    for deck_data in request.offline_decks:
+        if uid_map:
+            import json as json_mod
+            raw = json_mod.dumps(deck_data)
+            for temp_uid, real_uid in uid_map.items():
+                raw = raw.replace(temp_uid, real_uid)
+            deck_data = json_mod.loads(raw)
+
+        # Ensure tournament_uid is correct
+        deck_data["tournament_uid"] = uid
+        deck_obj = msgspec.convert(deck_data, DeckObject)
+        await save_object_from_model("deck", deck_obj)
+        if broadcast_deck_event:
+            await broadcast_deck_event(deck_obj.uid)
+
+    # 7. Broadcast updated tournament
     if broadcast_tournament_event:
         await broadcast_tournament_event(updated)
 

@@ -5,7 +5,7 @@
  * It enables identical business logic in browser (offline) and server (online).
  */
 
-import type { Sanction, Tournament, User } from './types';
+import type { DeckObject, Sanction, Tournament, User } from './types';
 
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
@@ -103,8 +103,7 @@ export type TournamentEventType =
   | 'UnseatPlayer'
   | 'AddTable'
   | 'RemoveTable'
-  | 'UploadDeck'
-  | 'UpdateDeck'
+  | 'UpsertDeck'
   | 'DeleteDeck'
   | 'SetScore'
   | 'Override'
@@ -172,6 +171,32 @@ export function buildSanctionsPayload(sanctions: Sanction[]): string {
   );
 }
 
+export interface DeckOp {
+  op: 'upsert' | 'delete' | 'set_public';
+  player_uid?: string;
+  deck?: { name: string; author: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean };
+  deck_uid?: string;
+  public?: boolean;
+}
+
+export interface EngineResult {
+  tournament: Tournament;
+  deckOps: DeckOp[];
+}
+
+/**
+ * Build decks metadata JSON for the engine's decks parameter.
+ */
+function buildDecksPayload(decks: DeckObject[]): string {
+  return JSON.stringify(
+    decks.map(d => ({
+      user_uid: d.user_uid,
+      round: d.round,
+      uid: d.uid,
+    }))
+  );
+}
+
 /**
  * Process a tournament event using the WASM engine.
  *
@@ -179,23 +204,30 @@ export function buildSanctionsPayload(sanctions: Sanction[]): string {
  * @param event Event to process
  * @param actor User performing the action
  * @param sanctions Sanctions for this tournament
- * @returns Updated tournament state
+ * @param decks Existing deck objects for this tournament
+ * @returns Updated tournament state and deck operations
  */
 export async function processTournamentEvent(
   tournament: Tournament,
   event: TournamentEvent,
   actor: ActorContext,
-  sanctions: Sanction[] = []
-): Promise<Tournament> {
+  sanctions: Sanction[] = [],
+  decks: DeckObject[] = []
+): Promise<EngineResult> {
   const engine = await initEngine();
 
   const tournamentJson = JSON.stringify(tournament);
   const eventJson = JSON.stringify(event);
   const actorJson = JSON.stringify(actor);
   const sanctionsJson = buildSanctionsPayload(sanctions);
+  const decksJson = buildDecksPayload(decks);
 
-  const resultJson = engine.processTournamentEvent(tournamentJson, eventJson, actorJson, sanctionsJson);
-  return JSON.parse(resultJson);
+  const resultJson = engine.processTournamentEvent(tournamentJson, eventJson, actorJson, sanctionsJson, decksJson);
+  const result = JSON.parse(resultJson);
+  return {
+    tournament: result.tournament,
+    deckOps: result.deck_ops || [],
+  };
 }
 
 /**

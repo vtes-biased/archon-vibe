@@ -1,10 +1,10 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { getUser, getRatingByUserUid } from "$lib/db";
+  import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canEditUser, canManageVekn } from "$lib/engine";
-  import type { User, Rating } from "$lib/types";
+  import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
   import VeknManagement from "$lib/components/VeknManagement.svelte";
   import SanctionsManager from "$lib/components/SanctionsManager.svelte";
@@ -13,7 +13,6 @@
   import * as m from '$lib/paraglide/messages.js';
 
   let user = $state<User | undefined>();
-  let rating = $state<Rating | undefined>();
   let isOnline = $state(navigator.onLine);
 
   const uid = $derived($page.params.uid);
@@ -48,7 +47,6 @@
   async function loadData() {
     if (!uid) return;
     user = await getUser(uid);
-    rating = await getRatingByUserUid(uid);
   }
 
   function scheduleRefresh() {
@@ -72,7 +70,7 @@
         scheduleRefresh();
       } else if (event.type === "user" && event.data?.uid === uid) {
         scheduleRefresh();
-      } else if ((event.type === "rating" || event.type === "sanction") && event.data?.user_uid === uid) {
+      } else if (event.type === "sanction" && event.data?.user_uid === uid) {
         scheduleRefresh();
       }
     };
@@ -119,7 +117,7 @@
     <SanctionsManager {user} canIssueSanctions={canIssueSanctions()} />
 
     <div class="mt-6">
-      <PlayerRatings {rating} />
+      <PlayerRatings {user} />
     </div>
   {/if}
 </div>

@@ -40,22 +40,26 @@ All other fields are model specific.
 
 ### Database Schema
 
-Objects are stored in PostgreSQL with a minimal schema:
+All synced objects share a single table with pre-computed access-level columns:
 
 ```sql
 CREATE TABLE objects (
-    uid UUID PRIMARY KEY,
-    modified TIMESTAMP NOT NULL,
-    data JSONB NOT NULL
+    uid TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    modified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
+    "public" JSONB,   -- NULL if not visible at this level
+    "member" JSONB,   -- NULL if not visible at this level
+    "full" JSONB NOT NULL
 );
 
-CREATE INDEX idx_modified ON objects(modified);
+CREATE INDEX idx_objects_type_modified ON objects(type, modified_at, uid);
 ```
 
-The entire object is serialized as JSONB in the `data` column. This approach prioritizes:
+Access-level projections (`public`/`member`/`full`) are computed by `access_levels.py` at **write time** and stored as separate JSONB columns. SSE streaming reads the appropriate column directly — no per-request filtering. This approach prioritizes:
 
 - **Simplicity**: Single table, no migrations for schema changes
-- **Performance**: msgspec for fast serialization, JSONB for PostgreSQL optimization
+- **Performance**: Pre-computed projections, zero per-viewer filtering at read time
 - **Flexibility**: Schema-less design for rapid iteration
 
 ## Event System
@@ -155,7 +159,11 @@ When the PWA is deliberately taken offline (or loses connection):
 
 **Card Database**: VTES card data loaded from JSON into IndexedDB (`cards` store, keyed by card ID). Rust engine provides card lookup and deck validation.
 
-**Deck Structure**: `Deck { round, name, author, comments, cards: Record<string, number> }`. Embedded in `Tournament.decks` (keyed by player UID). Filtered by `decklists_mode` (Winner/Finalists/All) at member data level.
+**DeckObject**: Standalone synced object (not embedded in Tournament). Fields: `tournament_uid`, `user_uid`, `round`, `name`, `author`, `comments`, `cards` (dict card_id→count), `attribution`, `public` (bool).
+- `public` flag set by engine based on `decklists_mode` + tournament state (Winner/Finalists/All).
+- No REST endpoints for decks. All mutations via `POST /{uid}/action` → engine `deck_ops` side-effects.
+- `deck_ops` ops: `upsert` (create/update), `delete`, `set_public` (flip existing deck by uid).
+- Client-side deck URL fetching; backend provides CORS proxy fallback.
 
 **Validation**: Rust engine validates deck legality (crypt/library counts, banned cards, multideck rules) before tournament actions that require decks.
 
@@ -236,7 +244,10 @@ const result = canChangeRole(actor, target, 'Prince');
 from archon_engine import PyEngine
 
 engine = PyEngine()
-result = engine.process_tournament_event(tournament_json, event_json, actor_json)
+# Returns JSON string: {"tournament": {...}, "deck_ops": [...]}
+result = engine.process_tournament_event(
+    tournament_json, event_json, actor_json, sanctions_json, decks_json
+)
 ```
 
 ### Development Workflow

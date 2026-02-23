@@ -142,11 +142,12 @@ async def tournament_calendar(
     async with get_connection() as conn:
         result = await conn.execute(
             """
-            SELECT data FROM tournaments
-            WHERE data->>'deleted_at' IS NULL
-              AND data->>'state' != 'Finished'
-              AND (data->>'start' IS NULL OR (data->>'start')::timestamp >= %s::timestamp)
-            ORDER BY data->>'start' ASC
+            SELECT "full" FROM objects
+            WHERE type = 'tournament'
+              AND deleted_at IS NULL
+              AND "full"->>'state' != 'Finished'
+              AND ("full"->>'start' IS NULL OR ("full"->>'start')::timestamp >= %s::timestamp)
+            ORDER BY "full"->>'start' ASC
             """,
             (cutoff,),
         )

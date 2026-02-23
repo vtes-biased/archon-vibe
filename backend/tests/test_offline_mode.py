@@ -2,67 +2,9 @@
 
 Focuses on:
 - UID remapping function (pure, no DB)
-- SSE filter behavior for offline fields (organizer vs member vs non-member)
 """
 
-from datetime import UTC, datetime
-
-from src.main import _filter_tournament
-from src.models import (
-    DeckListsMode,
-    Player,
-    Role,
-    StandingsMode,
-    Tournament,
-    TournamentFormat,
-    TournamentRank,
-    TournamentState,
-    User,
-)
 from src.routes.tournaments import _remap_uids_in_tournament
-
-NOW = datetime.now(UTC)
-
-
-def _make_user(
-    uid: str = "u1", name: str = "Alice", country: str = "FR",
-    vekn_id: str | None = "1000001", roles: list[Role] | None = None,
-    **kwargs,
-) -> User:
-    return User(
-        uid=uid, modified=NOW, name=name, country=country, vekn_id=vekn_id,
-        roles=roles or [], **kwargs,
-    )
-
-
-def _make_viewer(
-    uid: str = "viewer", roles: list[Role] | None = None,
-    vekn_id: str | None = "9999999", country: str = "FR",
-) -> User:
-    return _make_user(uid=uid, name="Viewer", roles=roles, vekn_id=vekn_id, country=country)
-
-
-def _make_tournament(
-    state: TournamentState = TournamentState.PLAYING,
-    country: str = "FR",
-    organizers_uids: list[str] | None = None,
-    standings_mode: StandingsMode = StandingsMode.PRIVATE,
-    decklists_mode: DeckListsMode = DeckListsMode.WINNER,
-    players: list[Player] | None = None,
-    **kwargs,
-) -> Tournament:
-    return Tournament(
-        uid="t1", modified=NOW, name="Test Tournament",
-        format=TournamentFormat.Standard, rank=TournamentRank.BASIC,
-        state=state, country=country,
-        organizers_uids=organizers_uids or [],
-        standings_mode=standings_mode,
-        decklists_mode=decklists_mode,
-        players=players or [],
-        standings=[],
-        decks={},
-        **kwargs,
-    )
 
 
 # ============================================================================
@@ -145,60 +87,3 @@ class TestRemapUids:
         assert result["players"][1]["user_uid"] == "XYZdef"
 
 
-# ============================================================================
-# SSE filter: offline field visibility tests
-# ============================================================================
-
-
-class TestFilterTournamentOfflineFields:
-    """Verify offline_mode fields are correctly passed through (or stripped)
-    at each data level."""
-
-    def _make_offline_tournament(self, organizers_uids=None):
-        return _make_tournament(
-            organizers_uids=organizers_uids or [],
-            offline_mode=True,
-            offline_device_id="device-123",
-            offline_user_uid="organizer-uid",
-            offline_since=NOW,
-        )
-
-    def test_organizer_sees_offline_fields(self):
-        """Organizer gets full access -- offline fields preserved."""
-        t = self._make_offline_tournament(organizers_uids=["viewer"])
-        viewer = _make_viewer()
-        result = _filter_tournament(t, viewer)
-        assert result is t  # same object, no filtering
-        assert result.offline_mode is True
-        assert result.offline_device_id == "device-123"
-
-    def test_ic_sees_offline_fields(self):
-        t = self._make_offline_tournament()
-        viewer = _make_viewer(roles=[Role.IC])
-        result = _filter_tournament(t, viewer)
-        assert result is t
-        assert result.offline_mode is True
-
-    def test_member_does_not_see_offline_fields(self):
-        """Members get a filtered copy -- offline fields should be defaults."""
-        t = self._make_offline_tournament()
-        viewer = _make_viewer()  # regular member
-        result = _filter_tournament(t, viewer)
-        assert result is not t  # filtered copy
-        assert result.offline_mode is False  # default
-        assert result.offline_device_id == ""  # default
-
-    def test_nonmember_does_not_see_offline_fields(self):
-        t = self._make_offline_tournament()
-        viewer = _make_viewer(vekn_id=None)
-        result = _filter_tournament(t, viewer)
-        assert result is not None
-        assert result.offline_mode is False
-
-    def test_nc_same_country_sees_offline_fields(self):
-        """NC same country gets full access."""
-        t = self._make_offline_tournament()
-        viewer = _make_viewer(roles=[Role.NC], country="FR")
-        result = _filter_tournament(t, viewer)
-        assert result is t
-        assert result.offline_mode is True

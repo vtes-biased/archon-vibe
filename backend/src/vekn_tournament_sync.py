@@ -194,7 +194,8 @@ async def _build_users_by_vekn_id() -> dict[str, User]:
     result_map: dict[str, User] = {}
     async with get_connection() as conn:
         cursor = await conn.execute(
-            "SELECT data FROM users WHERE data->>'vekn_id' IS NOT NULL AND data->>'vekn_id' != ''"
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != ''"""
         )
         rows = await cursor.fetchall()
         for row in rows:
