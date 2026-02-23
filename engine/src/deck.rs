@@ -509,16 +509,13 @@ pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
         }
     });
 
-    // Sort library by type, then name
+    // Sort library by canonical TWDA type order, then name
     library.sort_by(|a, b| {
         let type_a = a["types"][0].as_str().unwrap_or("");
         let type_b = b["types"][0].as_str().unwrap_or("");
-        let type_cmp = type_a.cmp(type_b);
-        if type_cmp == std::cmp::Ordering::Equal {
-            a["name"].as_str().cmp(&b["name"].as_str())
-        } else {
-            type_cmp
-        }
+        library_type_index(type_a)
+            .cmp(&library_type_index(type_b))
+            .then_with(|| a["name"].as_str().cmp(&b["name"].as_str()))
     });
 
     let crypt_count: u32 = crypt.iter().map(|c| c["count"].as_u32().unwrap_or(0)).sum();
@@ -542,6 +539,31 @@ pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
 // ============================================================================
 // TWDA Export
 // ============================================================================
+
+/// Canonical TWDA library type ordering.
+const LIBRARY_TYPE_ORDER: &[&str] = &[
+    "Master",
+    "Conviction",
+    "Action",
+    "Action/Combat",
+    "Action/Reaction",
+    "Ally",
+    "Equipment",
+    "Political Action",
+    "Retainer",
+    "Power",
+    "Action Modifier",
+    "Action Modifier/Combat",
+    "Action Modifier/Reaction",
+    "Reaction",
+    "Combat",
+    "Combat/Reaction",
+    "Event",
+];
+
+fn library_type_index(t: &str) -> usize {
+    LIBRARY_TYPE_ORDER.iter().position(|&x| x == t).unwrap_or(LIBRARY_TYPE_ORDER.len())
+}
 
 /// Export a deck in TWDA text format.
 ///
@@ -609,27 +631,7 @@ pub fn export_twda(
 
     let crypt_total: u32 = crypt_entries.iter().map(|(_, c)| c).sum();
 
-    // Compute crypt capacity stats
-    let (min_cap, max_cap, avg_cap) = if !crypt_entries.is_empty() {
-        let mut min = u32::MAX;
-        let mut max = 0u32;
-        let mut sum = 0u32;
-        let mut count_total = 0u32;
-        for (card, count) in &crypt_entries {
-            if card.capacity < min { min = card.capacity; }
-            if card.capacity > max { max = card.capacity; }
-            sum += card.capacity * count;
-            count_total += count;
-        }
-        let avg = if count_total > 0 { sum as f64 / count_total as f64 } else { 0.0 };
-        (min, max, avg)
-    } else {
-        (0, 0, 0.0)
-    };
-
-    lines.push(format!(
-        "Crypt ({crypt_total} cards, min={min_cap}, max={max_cap}, avg={avg_cap:.2})"
-    ));
+    lines.push(format!("Crypt ({crypt_total} cards)"));
     lines.push("-".repeat(lines.last().map(|l| l.len()).unwrap_or(0)));
 
     for (card, count) in &crypt_entries {
@@ -658,7 +660,9 @@ pub fn export_twda(
     lib_entries.sort_by(|a, b| {
         let type_a = a.0.types.first().map(|s| s.as_str()).unwrap_or("");
         let type_b = b.0.types.first().map(|s| s.as_str()).unwrap_or("");
-        type_a.cmp(type_b).then_with(|| a.0.name.cmp(&b.0.name))
+        library_type_index(type_a)
+            .cmp(&library_type_index(type_b))
+            .then_with(|| a.0.name.cmp(&b.0.name))
     });
 
     let lib_total: u32 = lib_entries.iter().map(|(_, c)| c).sum();

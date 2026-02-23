@@ -167,6 +167,31 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
         logger.exception("Failed to push VEKN event")
 
 
+def _twda_date(dt) -> str:
+    """Format date as 'February 23rd 2026' for TWDA header."""
+    if isinstance(dt, str):
+        dt = datetime.fromisoformat(dt)
+    day = dt.day
+    if 11 <= day <= 13:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{dt.strftime('%B')} {day}{suffix} {dt.year}"
+
+
+def _twda_place(tournament: Tournament) -> str:
+    """Return TWDA place string: 'Online' if online, else country or ''."""
+    if tournament.online:
+        return "Online"
+    return tournament.country or ""
+
+
+def _twda_url(tournament: Tournament) -> str:
+    """Return URL to this tournament in the Archon app."""
+    base = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    return f"{base}/tournaments/{tournament.uid}"
+
+
 async def _maybe_submit_twda(tournament: Tournament) -> None:
     """Submit winner's deck to TWDA if conditions are met.
 
@@ -202,7 +227,6 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
         player_user = await get_user_by_uid(tournament.winner)
         player_name = player_user.name if player_user else "Unknown"
         player_count = len(tournament.players)
-        tournament_date = tournament.start or tournament.modified.isoformat()
         rounds_count = len(tournament.rounds)
         has_finals = tournament.finals is not None
         tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
@@ -211,10 +235,10 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
             deck_json,
             _load_cards_json(),
             tournament.name,
-            str(tournament_date),
-            tournament.country or "",
+            _twda_date(tournament.start or tournament.modified),
+            _twda_place(tournament),
             tournament_format,
-            "",  # tournament_url
+            _twda_url(tournament),
             player_count,
             player_name,
         )
@@ -1407,24 +1431,20 @@ async def export_deck_twda(
     player_user = await get_user_by_uid(player_uid)
     player_name = player_user.name if player_user else "Unknown"
     player_count = len(tournament.players)
-    tournament_date = tournament.start or tournament.modified.isoformat()
 
     # Build tournament format string (e.g. "2R+F")
     rounds_count = len(tournament.rounds)
     has_finals = tournament.finals is not None
     tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
 
-    # Build tournament URL
-    tournament_url = ""  # Can be set to app URL when deployed
-
     text = engine.export_twda(
         deck_json,
         _load_cards_json(),
         tournament.name,
-        str(tournament_date),
-        tournament.country or "",
+        _twda_date(tournament.start or tournament.modified),
+        _twda_place(tournament),
         tournament_format,
-        tournament_url,
+        _twda_url(tournament),
         player_count,
         player_name,
     )
@@ -1523,7 +1543,6 @@ async def tournament_report(
 
             player_user = await get_user_by_uid(tournament.winner)
             player_name = player_user.name if player_user else "Unknown"
-            tournament_date = tournament.start or tournament.modified.isoformat()
             rounds_count = len(tournament.rounds)
             has_finals = tournament.finals is not None
             tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
@@ -1532,10 +1551,10 @@ async def tournament_report(
                 deck_json,
                 _load_cards_json(),
                 tournament.name,
-                str(tournament_date),
-                tournament.country or "",
+                _twda_date(tournament.start or tournament.modified),
+                _twda_place(tournament),
                 tournament_format,
-                "",
+                _twda_url(tournament),
                 len(tournament.players),
                 player_name,
             )

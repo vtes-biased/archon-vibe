@@ -127,12 +127,12 @@ async def submit_twda_pr(
         timeout=30.0,
     ) as client:
         try:
-            # 1. Get main branch SHA
+            # 1. Get master branch SHA
             resp = await client.get(
-                f"/repos/{TWDA_TARGET_REPO}/git/refs/heads/main"
+                f"/repos/{TWDA_TARGET_REPO}/git/refs/heads/master"
             )
             if resp.status_code != 200:
-                logger.error(f"Failed to get TWD main ref: {resp.status_code}")
+                logger.error(f"Failed to get TWD master ref: {resp.status_code}")
                 return None
             base_sha = resp.json()["object"]["sha"]
 
@@ -204,7 +204,7 @@ async def submit_twda_pr(
                         f"VEKN Event ID: {vekn_event_id}"
                     ),
                     "head": branch,
-                    "base": "main",
+                    "base": "master",
                 },
             )
             if pr_create.status_code == 201:
