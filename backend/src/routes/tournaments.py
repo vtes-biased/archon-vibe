@@ -5,7 +5,7 @@ import os
 from datetime import UTC, datetime
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, Header, HTTPException, Query, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
@@ -1318,6 +1318,7 @@ async def update_deck(
     player_uid: str,
     body: DeckUploadRequest,
     authorization: str | None = Header(default=None),
+    deck_index: int = Query(default=0),
 ) -> Response:
     """Update a player's deck (organizer or self)."""
     user = await _get_current_user(authorization)
@@ -1336,6 +1337,7 @@ async def update_deck(
         "type": "UpdateDeck",
         "player_uid": player_uid,
         "deck": deck_data,
+        "deck_index": deck_index,
     }
     await _process_engine_event(user, tournament, event)
 
@@ -1350,8 +1352,9 @@ async def delete_deck(
     uid: str,
     player_uid: str,
     authorization: str | None = Header(default=None),
+    deck_index: int | None = Query(default=None),
 ) -> Response:
-    """Delete a player's deck (organizer only)."""
+    """Delete a player's deck (organizer or self)."""
     user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -1361,7 +1364,13 @@ async def delete_deck(
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     # Route through engine (auth check happens in engine)
-    event = {"type": "DeleteDeck", "player_uid": player_uid}
+    event: dict = {
+        "type": "DeleteDeck",
+        "player_uid": player_uid,
+        "multideck": tournament.multideck,
+    }
+    if deck_index is not None:
+        event["deck_index"] = deck_index
     await _process_engine_event(user, tournament, event)
 
     return Response(status_code=204)

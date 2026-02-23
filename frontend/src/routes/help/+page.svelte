@@ -27,7 +27,7 @@
       <h2 class="text-lg font-medium text-bone-100 mb-4">{m.help_reference_docs()}</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {#each referenceDocs as slug}
-          {@const doc = helpDocs[slug]}
+          {@const doc = helpDocs[slug]!}
           {@const Icon = iconMap[doc.icon] || BookOpen}
           <a
             href="/help/{slug}"
@@ -52,7 +52,7 @@
       <h2 class="text-lg font-medium text-bone-100 mb-4">{m.help_user_guides()}</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {#each userGuides as slug}
-          {@const doc = helpDocs[slug]}
+          {@const doc = helpDocs[slug]!}
           {@const Icon = iconMap[doc.icon] || BookOpen}
           <a
             href="/help/{slug}"

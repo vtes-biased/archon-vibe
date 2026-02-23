@@ -189,9 +189,12 @@ pub enum TournamentEvent {
     UpdateDeck {
         player_uid: String,
         deck: JsonValue,
+        deck_index: usize,
     },
     DeleteDeck {
         player_uid: String,
+        deck_index: Option<usize>,
+        multideck: bool,
     },
 
     // Raffle
@@ -555,14 +558,18 @@ impl TournamentEvent {
                 if deck.is_null() {
                     return Err("deck required".to_string());
                 }
-                Ok(Self::UpdateDeck { player_uid, deck })
+                let deck_index = value["deck_index"].as_usize().unwrap_or(0);
+                Ok(Self::UpdateDeck { player_uid, deck, deck_index })
             }
-            "DeleteDeck" => Ok(Self::DeleteDeck {
-                player_uid: value["player_uid"]
+            "DeleteDeck" => {
+                let player_uid = value["player_uid"]
                     .as_str()
                     .ok_or("player_uid required")?
-                    .to_string(),
-            }),
+                    .to_string();
+                let deck_index = value["deck_index"].as_usize();
+                let multideck = value["multideck"].as_bool().unwrap_or(false);
+                Ok(Self::DeleteDeck { player_uid, deck_index, multideck })
+            }
             "RaffleDraw" => {
                 let label = value["label"].as_str().ok_or("label required")?.to_string();
                 let pool = value["pool"].as_str().ok_or("pool required")?.to_string();
@@ -2007,22 +2014,27 @@ fn apply_event(
             }
             // Lifecycle: non-organizers restricted by tournament state
             if !actor.is_organizer {
-                let has_deck = !tournament["decks"].is_null()
-                    && !tournament["decks"][player_uid.as_str()].is_null()
-                    && tournament["decks"][player_uid.as_str()].len() > 0;
+                let existing_count = if !tournament["decks"].is_null()
+                    && !tournament["decks"][player_uid.as_str()].is_null() {
+                    tournament["decks"][player_uid.as_str()].len()
+                } else {
+                    0
+                };
                 match state {
                     TournamentState::Playing => {
                         if *multideck {
-                            // Multideck: can upload new deck if its round hasn't started
-                            // (deck index == number of existing decks, round = index + 1)
-                            // Allow if there are more rounds to play
-                        } else if has_deck {
+                            // Multideck: new deck goes at index == existing_count
+                            // Block if that index's round has already been played
+                            if is_deck_locked(tournament, existing_count) {
+                                return Err("Cannot upload deck for a round that has already started".to_string());
+                            }
+                        } else if existing_count > 0 {
                             return Err("Cannot modify deck while tournament is in progress".to_string());
                         }
                     }
                     TournamentState::Finished => {
                         // Allow uploading a missing deck after tournament finishes (recovery)
-                        if has_deck {
+                        if existing_count > 0 {
                             return Err("Cannot modify deck after tournament is finished".to_string());
                         }
                     }
@@ -2049,7 +2061,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::UpdateDeck { player_uid, deck } => {
+        TournamentEvent::UpdateDeck { player_uid, deck, deck_index } => {
             // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err("Only organizers or the player can update a deck".to_string());
@@ -2058,28 +2070,94 @@ fn apply_event(
             if !actor.is_organizer {
                 match state {
                     TournamentState::Playing => {
-                        return Err("Cannot modify deck while tournament is in progress".to_string());
+                        let is_multideck = tournament["multideck"].as_bool().unwrap_or(false);
+                        if is_multideck {
+                            if is_deck_locked(tournament, *deck_index) {
+                                return Err("Cannot modify a deck whose round has already started".to_string());
+                            }
+                        } else {
+                            return Err("Cannot modify deck while tournament is in progress".to_string());
+                        }
                     }
                     TournamentState::Finished => {
                         return Err("Cannot modify deck after tournament is finished".to_string());
                     }
-                    _ => {}
+                    _ => {} // Planned, Registration, Waiting: always allowed
                 }
             }
             if tournament["decks"].is_null() {
                 tournament["decks"] = json::object! {};
             }
             let pk = player_uid.as_str();
-            let mut arr = JsonValue::new_array();
-            let _ = arr.push(deck.clone());
-            tournament["decks"][pk] = arr;
+            // Ensure decks array exists
+            if tournament["decks"][pk].is_null() {
+                tournament["decks"][pk] = JsonValue::new_array();
+            }
+            let decks_arr = &mut tournament["decks"][pk];
+            if *deck_index < decks_arr.len() {
+                decks_arr[*deck_index] = deck.clone();
+            } else {
+                return Err(format!("Deck index {} out of range", deck_index));
+            }
             Ok(())
         }
 
-        TournamentEvent::DeleteDeck { player_uid } => {
-            require_organizer(actor)?;
+        TournamentEvent::DeleteDeck { player_uid, deck_index, multideck } => {
+            // Auth: organizer or self
+            if !actor.is_organizer && actor.uid != *player_uid {
+                return Err("Only organizers or the player can delete a deck".to_string());
+            }
+            // Lifecycle: non-organizers restricted
+            if !actor.is_organizer {
+                match state {
+                    TournamentState::Playing => {
+                        if *multideck {
+                            if let Some(idx) = deck_index {
+                                if is_deck_locked(tournament, *idx) {
+                                    return Err("Cannot delete a deck whose round has already started".to_string());
+                                }
+                            } else {
+                                return Err("deck_index required for multideck delete".to_string());
+                            }
+                        } else {
+                            return Err("Cannot delete deck while tournament is in progress".to_string());
+                        }
+                    }
+                    TournamentState::Finished => {
+                        return Err("Cannot delete deck after tournament is finished".to_string());
+                    }
+                    _ => {} // Planned, Registration, Waiting: always allowed
+                }
+            }
             let pk = player_uid.as_str();
-            if !tournament["decks"].is_null() && !tournament["decks"][pk].is_null() {
+            if tournament["decks"].is_null() || tournament["decks"][pk].is_null() {
+                return Ok(()); // nothing to delete
+            }
+            if *multideck {
+                let idx = deck_index.unwrap_or(0);
+                let arr_len = tournament["decks"][pk].len();
+                if idx >= arr_len {
+                    return Err(format!("Deck index {} out of range", idx));
+                }
+                if idx == arr_len - 1 {
+                    // Last element: pop it
+                    let _ = tournament["decks"][pk].array_remove(idx);
+                } else {
+                    // Middle element: set to null sentinel
+                    tournament["decks"][pk][idx] = JsonValue::Null;
+                }
+                // Trim trailing nulls
+                while tournament["decks"][pk].len() > 0
+                    && tournament["decks"][pk][tournament["decks"][pk].len() - 1].is_null()
+                {
+                    let last = tournament["decks"][pk].len() - 1;
+                    let _ = tournament["decks"][pk].array_remove(last);
+                }
+                // Remove entry if empty
+                if tournament["decks"][pk].len() == 0 {
+                    tournament["decks"].remove(pk);
+                }
+            } else {
                 tournament["decks"].remove(pk);
             }
             Ok(())
@@ -2198,6 +2276,12 @@ fn apply_event(
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+/// Returns true if a deck at the given index is locked (its round has already started).
+fn is_deck_locked(tournament: &JsonValue, deck_index: usize) -> bool {
+    let rounds_played = tournament["rounds"].len();
+    deck_index < rounds_played
+}
 
 fn require_organizer(actor: &ActorContext) -> Result<(), String> {
     if !actor.is_organizer {

@@ -10,15 +10,19 @@
     editable = false,
     tournamentUid = '',
     playerUid = '',
+    deckIndex = 0,
     onsaved,
     onreplace,
+    ondelete,
   }: {
     deck: Deck;
     editable?: boolean;
     tournamentUid?: string;
     playerUid?: string;
+    deckIndex?: number;
     onsaved?: () => void;
     onreplace?: () => void;
+    ondelete?: () => void;
   } = $props();
 
   let cards = $state<Map<number, VtesCard>>(new Map());
@@ -67,7 +71,7 @@
       const token = (await import('$lib/stores/auth.svelte')).getAccessToken();
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       const endpoint = playerUid
-        ? `${API_URL}/api/tournaments/${tournamentUid}/decks/${playerUid}`
+        ? `${API_URL}/api/tournaments/${tournamentUid}/decks/${playerUid}?deck_index=${deckIndex}`
         : `${API_URL}/api/tournaments/${tournamentUid}/decks`;
       const method = playerUid ? 'PUT' : 'POST';
 
@@ -176,7 +180,7 @@
   <p class="text-xs text-ash-400 mb-2">{m.deck_by_author({ author: deck.author })}</p>
 {/if}
 
-{#if (editable || onreplace) && !editing}
+{#if (editable || onreplace || ondelete) && !editing}
   <div class="flex gap-2 mb-3">
     {#if editable}
       <button
@@ -189,6 +193,12 @@
         onclick={onreplace}
         class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
       >{m.decks_replace()}</button>
+    {/if}
+    {#if ondelete}
+      <button
+        onclick={ondelete}
+        class="px-3 py-1.5 text-sm font-medium text-crimson-400 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+      >{m.decks_delete()}</button>
     {/if}
   </div>
 {/if}

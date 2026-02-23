@@ -4,7 +4,7 @@ Reference: [krcg](../krcg) for cards/decks logic. [archon](../archon) for previo
 
 ---
 
-## Phase 1: Decklists Management
+## Phase 1: Decklists Management ✅
 
 ### 1.1 Cards Data Pipeline (CI Script)
 
@@ -64,10 +64,7 @@ Using the JSON reference file from 1.1:
 
 #### Decklist Required Mode
 - Clear reminders at registration and check-in when tournament is marked "decklist required"
-- At check-in: warn that a decklist is needed or sanctions apply
-- Allow check-in without decklist but auto-apply a WARNING sanction for missing/late decklist
-- Warn player before proceeding; don't block check-in to avoid disrupting event flow
-- Organizers can lift this warning (like all sanctions) if justified (device/network issues)
+- At check-in: remind players that a decklist is needed (no automatic sanction)
 - Organizers can manually check in players without decklist — warned about missing decklist before confirming
 
 #### Decklist Optional Mode
@@ -210,7 +207,7 @@ Players check in via QR code displayed by organizers. The organizer's tournament
 
 ---
 
-## Phase 6: Online Features
+## Phase 6: Online Features ✅
 
 ### 6.1 Call for Judge
 

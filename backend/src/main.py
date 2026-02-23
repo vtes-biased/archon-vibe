@@ -482,17 +482,25 @@ def _filter_tournament(t: Tournament, viewer: User | None) -> Tournament | None:
             if t.standings_mode == StandingsMode.PRIVATE:
                 standings = []
 
-        # Decks visibility (finished only)
+        # Decks visibility: own deck always, others post-tournament per mode
         decks: dict[str, list] = {}
-        if t.state == TournamentState.FINISHED and t.decks:
-            if t.decklists_mode == DeckListsMode.ALL:
-                decks = t.decks
-            elif t.decklists_mode == DeckListsMode.FINALISTS:
-                decks = {uid: d for uid, d in t.decks.items()
-                         if any(p.user_uid == uid and p.finalist for p in t.players)}
-            else:  # WINNER
-                if t.winner and t.winner in t.decks:
-                    decks = {t.winner: t.decks[t.winner]}
+        if t.decks:
+            # Player always sees their own deck
+            if is_player and viewer_uid in t.decks:
+                decks[viewer_uid] = t.decks[viewer_uid]
+            # Post-tournament: other players' decks per decklists_mode
+            if t.state == TournamentState.FINISHED:
+                if t.decklists_mode == DeckListsMode.ALL:
+                    decks = {**decks, **t.decks}
+                elif t.decklists_mode == DeckListsMode.FINALISTS:
+                    for uid, d in t.decks.items():
+                        if uid not in decks and any(
+                            p.user_uid == uid and p.finalist for p in t.players
+                        ):
+                            decks[uid] = d
+                else:  # WINNER
+                    if t.winner and t.winner in t.decks:
+                        decks[t.winner] = t.decks[t.winner]
 
         # Players: strip per-player results for ongoing tournaments
         players = t.players

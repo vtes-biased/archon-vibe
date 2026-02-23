@@ -7,7 +7,7 @@
   import { ArrowLeft } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  const slug = $derived($page.params.slug);
+  const slug = $derived($page.params.slug as string);
   const doc = $derived(helpDocs[slug]);
 
   // Rendered HTML and TOC entries (derived from doc)

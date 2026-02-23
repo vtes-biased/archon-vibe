@@ -334,7 +334,7 @@ export interface Tournament extends BaseObject {
   vekn_pushed_at?: string | null;
   checkin_code?: string;
   players?: Player[];
-  decks?: Record<string, Deck[]>;
+  decks?: Record<string, (Deck | null)[]>;
   rounds?: Table[][];
   finals?: FinalsTable | null;
   winner?: string;
