@@ -759,11 +759,15 @@ export async function getVenuesByCountry(country: string): Promise<VenueInfo[]> 
   const db = await getDB();
   const tournaments = await db.getAllFromIndex('tournaments', 'by-country', country);
 
+  // Only consider tournaments from the last 3 years
+  const cutoff = new Date(Date.now() - 3 * 365.25 * 24 * 3600 * 1000).toISOString();
+
   // Keep most recent tournament's data per venue name
   const venueMap = new Map<string, { info: VenueInfo; modified: string }>();
   for (const t of tournaments) {
-    if (t.deleted_at || !t.venue?.trim()) continue;
-    const key = normalizeSearch(t.venue).replace(/\s+/g, '');
+    if (t.deleted_at || !t.venue?.trim() || t.modified < cutoff) continue;
+    // Strip diacritics, punctuation, and whitespace for matching
+    const key = normalizeSearch(t.venue).replace(/[^\w]/g, '');
     const existing = venueMap.get(key);
     if (!existing || t.modified > existing.modified) {
       venueMap.set(key, {
