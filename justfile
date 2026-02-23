@@ -25,7 +25,7 @@ dev:
     echo "Database ready!"
     ENGINE_PKG=$(uv run python3 -c "import pathlib, archon_engine; print(pathlib.Path(archon_engine.__file__).parent)")
     DATABASE_URL=postgresql://archon:archon_dev_password@localhost:5433/archon \
-    nohup uv run uvicorn backend.src.main:app --reload --reload-dir backend --reload-dir "$ENGINE_PKG" --reload-delay 2 --port 8000 --timeout-graceful-shutdown 1 > backend.log 2>&1 &
+    nohup uv run uvicorn backend.src.main:app --reload --reload-dir backend --reload-dir "$ENGINE_PKG" --reload-delay 2 --host :: --port 8000 --timeout-graceful-shutdown 1 > backend.log 2>&1 &
     echo "Backend started (PID: $!). Logs: backend.log"
     (cd frontend && nohup npm run dev > ../frontend.log 2>&1 &)
     echo "Frontend started. Logs: frontend.log"
