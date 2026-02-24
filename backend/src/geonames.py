@@ -4,6 +4,8 @@ Provides access to countries and cities data from GeoNames.
 """
 
 import json
+import re
+import unicodedata
 from enum import Enum
 from functools import lru_cache
 from importlib.resources import files
@@ -143,3 +145,80 @@ def search_cities(
             results.append(city)
 
     return results
+
+
+def _strip_diacritics(s: str) -> str:
+    """Remove diacritics from a string (e.g. 'São Paulo' -> 'Sao Paulo')."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
+    )
+
+
+# Regex to strip parenthetical suffixes: "Washington (DC)" -> "Washington"
+_PAREN_RE = re.compile(r"\s*\(.*\)\s*$")
+
+
+@lru_cache(maxsize=1)
+def _build_city_index() -> (
+    tuple[
+        dict[tuple[str, str], City],
+        dict[tuple[str, str], City],
+        dict[tuple[str, str], City],
+    ]
+):
+    """Build lookup dicts for city matching.
+
+    Returns (by_name, by_ascii, by_base) where:
+    - by_name: (CC, name.lower()) -> City
+    - by_ascii: (CC, ascii_name.lower()) -> City
+    - by_base: (CC, base_name.lower()) -> City  (name with parenthetical stripped)
+
+    Cities are sorted by population desc, so setdefault keeps the largest city.
+    """
+    by_name: dict[tuple[str, str], City] = {}
+    by_ascii: dict[tuple[str, str], City] = {}
+    by_base: dict[tuple[str, str], City] = {}
+
+    for city in load_cities():
+        cc = city["country_code"].upper()
+        name_lower = city["name"].lower()
+        ascii_lower = city["ascii_name"].lower()
+
+        by_name.setdefault((cc, name_lower), city)
+        by_ascii.setdefault((cc, ascii_lower), city)
+
+        # Base name: strip parenthetical suffix
+        base = _PAREN_RE.sub("", city["name"]).strip()
+        if base != city["name"]:
+            by_base.setdefault((cc, base.lower()), city)
+
+    return by_name, by_ascii, by_base
+
+
+def match_city(name: str, country_code: str) -> City | None:
+    """Match a city name against the geonames database.
+
+    Tries exact name, ASCII name, diacritics-stripped, and base name (no parens).
+    Returns the City dict or None if no match found.
+    """
+    name = name.strip()
+    if not name:
+        return None
+    cc = country_code.upper()
+    by_name, by_ascii, by_base = _build_city_index()
+
+    # 1. Exact name match
+    if city := by_name.get((cc, name.lower())):
+        return city
+    # 2. ASCII name match
+    if city := by_ascii.get((cc, name.lower())):
+        return city
+    # 3. Strip diacritics from input, try ASCII
+    stripped = _strip_diacritics(name)
+    if stripped != name:
+        if city := by_ascii.get((cc, stripped.lower())):
+            return city
+    # 4. Base name match (handles "Washington" matching "Washington (DC)")
+    if city := by_base.get((cc, name.lower())):
+        return city
+    return None

@@ -678,6 +678,20 @@ async def get_princes_and_ncs() -> list[User]:
         return [decode_json(row[0], User) for row in rows]
 
 
+async def get_users_without_coopted_by() -> list[User]:
+    """Get users with vekn_id but no coopted_by."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'user'
+              AND "full"->>'coopted_by' IS NULL
+              AND "full"->>'vekn_id' IS NOT NULL
+              AND "full"->>'vekn_id' != ''"""
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], User) for row in rows]
+
+
 async def allocate_next_vekn_id() -> str:
     """Atomically allocate the next available VEKN ID.
 

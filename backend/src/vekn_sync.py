@@ -11,9 +11,11 @@ from .db import (
     get_connection,
     get_princes_and_ncs,
     get_users_by_vekn_prefix,
+    get_users_without_coopted_by,
     insert_user,
     update_user,
 )
+from .geonames import match_city
 from .models import Role, User
 from .vekn_api import VEKNAPIClient, VEKNAPIError
 
@@ -78,7 +80,11 @@ JUDGES: dict[str, Role] = {
 
 # City name corrections by country (VEKN database has typos/inconsistencies)
 FIX_CITIES: dict[str, dict[str, str]] = {
-    "Argentina": {"BUenos Aires": "Buenos Aires", "Buenos Aries": "Buenos Aires"},
+    "Argentina": {
+        "BUenos Aires": "Buenos Aires",
+        "Buenos Aries": "Buenos Aires",
+        "Capital Federal": "Buenos Aires",
+    },
     "Australia": {
         "Blacktown": "Sydney",
         "Castle Hill": "Sydney",
@@ -99,19 +105,20 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Wien": "Vienna",
         "Wien/Vienna": "Vienna",
     },
-    "Belarus": {"Gomel": "Homyel"},
+    "Belarus": {"Gomel": "Homyel'"},
     "Belgium": {
         "Antwerp": "Antwerpen",
         "Bruges": "Brugge",
         "Bruxelles": "Brussels",
         "Ghent": "Gent",
+        "Jodoigne": "Leuven",
         "Lige": "Liège",
         "Liege": "Liège",
     },
     "Brazil": {
         "Brasilia": "Brasília",
         "Braslia": "Brasília",
-        "Campinas": "Campinas, São Paulo",
+        "Campinas": "Campinas (Sao Paulo)",
         "Campogrande": "Campina Grande",
         "Canoas / Porto Alegre": "Canoas",
         "GUARULHOS": "Guarulhos",
@@ -131,6 +138,9 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Taguatinga": "Brasília",
         "Vitória / Vila Velha / Grande Vitória": "Vitória",
         "Vitria": "Vitória",
+        "Volta Rerdonda": "Volta Redonda",
+        "Mesquita": "São João de Meriti",
+        "Santana do Parnaiba": "Santana de Parnaíba",
     },
     "Canada": {
         "Edmaonton": "Edmonton",
@@ -150,11 +160,11 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Qubec City": "Québec",
         "Qubec": "Québec",
         "Quebec": "Québec",
-        "Scarborough": "Scarborough Village",
+        "Scarborough": "Toronto",
         "St. Albert / Edmonton": "St. Albert",
-        "St Catharines": "Sainte-Catherine, Quebec, Montérégie",
-        "St Catherines": "Sainte-Catherine, Quebec, Montérégie",
-        "St. Catherines": "Sainte-Catherine, Quebec, Montérégie",
+        "St Catharines": "Sainte-Catherine (Monteregie)",
+        "St Catherines": "Sainte-Catherine (Monteregie)",
+        "St. Catherines": "Sainte-Catherine (Monteregie)",
         "St-Eustache": "Saint-Eustache",
         "St Eustache": "Saint-Eustache",
         "St. Hubert": "Longueuil",
@@ -162,6 +172,15 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "St-Jean-sur-Richelieu": "Saint-Jean-sur-Richelieu",
         "St-Jerome": "Saint-Jérôme",
         "St-Lazare": "Saint-Lazare",
+        "Sudbury": "Greater Sudbury",
+        "Sault St. Marie": "Sault Ste. Marie",
+        "Sault Sainte Marie": "Sault Ste. Marie",
+        "Longueil": "Longueuil",
+        "Mtl": "Montréal",
+        "Fort Saskatchewan": "Edmonton",
+        "Beauport": "Québec",
+        "Sainte-Foy": "Québec",
+        "Chicoutimi": "Saguenay",
     },
     "Chile": {
         "Concepcin": "Concepción",
@@ -188,13 +207,28 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Trutnov, Mal Svatoovice": "Trutnov",
         "Vsetin": "Vsetín",
         "Zlin": "Zlín",
+        "Frýdek - Místek": "Frýdek-Místek",
+        "Esk Budjovice": "České Budějovice",
     },
-    "Denmark": {"Aarhus": "Århus", "Arhus": "Århus"},
-    "Finland": {"Hyvinkää": "Hyvinge", "Kuusankoski": "Kouvola"},
+    "Denmark": {"Aarhus": "Århus", "Arhus": "Århus", "Rhus": "Århus"},
+    "Finland": {
+        "Hyvinkää": "Hyvinge",
+        "Kauniainen": "Espoo",
+        "Kuusankoski": "Kouvola",
+        "Tikkurila": "Vantaa",
+    },
     "France": {
         "Alès ": "Alès",
         "Alès / Aix en provence": "Alès",
         "Saint Dizier": "Saint-Dizier",
+        "Saint DIizer": "Saint-Dizier",
+        "Oye Plage": "Calais",
+        "Oye-Plage": "Calais",
+        "Gravelines": "Dunkerque",
+        "Savigny le Temple": "Melun",
+        "Juvisy": "Paris",
+        "Bures-sur-Yvette": "Paris",
+        "Cévennes": "Nîmes",
     },
     "Germany": {
         "Cologne": "Köln",
@@ -202,14 +236,25 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Duesseldorf": "Düsseldorf",
         "Frankfurt": "Frankfurt am Main",
         "Gttingen": "Göttingen",
-        "Hanau": "Hanau am Main",
+        "Hanau": "Frankfurt am Main",
         "Ludwigshafen": "Ludwigshafen am Rhein",
         "Madgeburg": "Magdeburg",
         "Marburg": "Marburg an der Lahn",
         "Moerfelden": "Mörfelden-Walldorf",
-        "Seeheim": "Seeheim-Jugenheim",
+        "Seeheim": "Darmstadt",
         "Sttutgart": "Stuttgart",
         "Stuttgart / Ludwigsburg": "Ludwigsburg",
+        "Ramstein": "Kaiserslautern",
+        "Schwalbach": "Frankfurt am Main",
+        "Mhltal": "Darmstadt",
+        "Kaufungen": "Kassel",
+        "Egelsbach": "Darmstadt",
+        "Erzhausen": "Darmstadt",
+        "Huerth": "Köln",
+        "Troisdorf": "Bonn",
+        "Mnster": "Münster",
+        "Karlesruhe": "Karlsruhe",
+        "Dren": "Düren",
     },
     "Greece": {
         "Athens, Attica": "Athens",
@@ -235,8 +280,12 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Trnok": "Budapest",
         "Veszprem": "Veszprém",
         "Veszprm": "Veszprém",
+        "Pest": "Budapest",
+        "Kekcskemét": "Kecskemét",
+        "Kistarcsa": "Budapest",
+        "Tãrnok": "Budapest",
     },
-    "Iceland": {"Reykjavik": "Reykjavík", "Reykjaví­k": "Reykjavík"},
+    "Iceland": {"Reykjavik": "Reykjavík", "Reykjaví­k": "Reykjavík", "Reyjavik": "Reykjavík"},
     "Israel": {"Bat-Yam": "Bat Yam", "Tel-Aviv": "Tel Aviv"},
     "Italy": {
         "Firenze": "Florence",
@@ -244,8 +293,13 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Torino": "Turin",
         "Milano": "Milan",
         "Genova": "Genoa",
+        "Grugliasco (Torino)": "Turin",
+        "FIrenze": "Florence",
+        "Tuscany": "Florence",
+        "Val di Susa": "Turin",
+        "Massa Carrara": "Massa",
     },
-    "Japan": {"Anjo": "Anjō", "Sendai": "Sendai, Miyagi"},
+    "Japan": {"Anjo": "Anjō", "Sendai": "Sendai (Miyagi)", "Kanagawa": "Yokohama"},
     "Mexico": {
         "Ciudad de México ": "Mexico City",
         "Ciudad de México": "Mexico City",
@@ -258,18 +312,25 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Neza": "Ciudad Nezahualcoyotl",
         "Nezahualcoyotl": "Ciudad Nezahualcoyotl",
         "Nezahualcóyotl": "Ciudad Nezahualcoyotl",
-        "Puebla": "Puebla, Puebla",
-        "Puebla de Zaragoza": "Puebla, Puebla",
+        "Puebla": "Puebla (Puebla)",
+        "Puebla de Zaragoza": "Puebla (Puebla)",
         "Queretaro": "Santiago de Querétaro",
         "Toluca de Lerdo": "Toluca",
         "Toluca De Lerdo": "Toluca",
+        "Leon": "León de los Aldama",
+        "Netzahualcoyotl": "Ciudad Nezahualcoyotl",
+        "Estado de México": "Toluca",
     },
     "Netherlands": {
         "Houten": "Utrecht",
         "Krommenie": "Zaanstad",
         "Rotterdan": "Rotterdam",
+        "S-Hertogenbosch": "'s-Hertogenbosch",
+        "s-Hertogenbosch": "'s-Hertogenbosch",
+        "Almere": "Almere Stad",
+        "Haag": "The Hague",
     },
-    "New Zealand": {"WELLINGTON": "Wellington", "Plamerston North": "Palmerston North"},
+    "New Zealand": {"WELLINGTON": "Wellington", "Plamerston North": "Palmerston North", "Wellingon": "Wellington"},
     "Norway": {"Fjellhamar": "Oslo"},
     "Panama": {"Panama": "Panamá"},
     "Philippines": {
@@ -288,6 +349,13 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Quezon City, Metro Manila": "Quezon City",
         "Taguig City": "Taguig",
         "Tondo, Manila": "Manila",
+        "Pasig": "Pasig City",
+        "Pasay City": "Pasay",
+        "Pasay city": "Pasay",
+        "Calamba City": "Calamba",
+        "Las Piñas City": "Las Piñas",
+        "Muntinlupa City": "Manila",
+        "Laguna": "Calamba",
     },
     "Poland": {
         "Aleksandrow Lodzki": "Aleksandrów Łódzki",
@@ -320,8 +388,19 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Toru": "Toruń",
         "Torun": "Toruń",
         "Wroclaw": "Wrocław",
+        "Warszawa": "Warsaw",
+        "Gdask": "Gdańsk",
+        "Górnicza": "Dąbrowa Górnicza",
     },
-    "Portugal": {"Lisboa": "Lisbon", "Setubal": "Setúbal", "Setbal": "Setúbal"},
+    "Portugal": {
+        "Lisboa": "Lisbon",
+        "Setubal": "Setúbal",
+        "Setbal": "Setúbal",
+        "Agualva-Cacém": "Cacém",
+        "Sacavm": "Lisbon",
+        "Rinchoa": "Lisbon",
+        "Seixal": "Lisbon",
+    },
     "Russian Federation": {
         "Moskow": "Moscow",
         "Saint-Petersburg": "Saint Petersburg",
@@ -329,7 +408,6 @@ FIX_CITIES: dict[str, dict[str, str]] = {
     },
     "Slovakia": {
         "Banska Bystrica": "Banská Bystrica",
-        "Godollo": "Gödöllő",
         "Kosice": "Košice",
     },
     "Spain": {
@@ -353,18 +431,26 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Rentería": "Errenteria",
         "San Pedro de Alcántara": "Marbella",
         "San Sebastián": "San Sebastián de los Reyes",
-        "Sant Cugat del Vallés": "Sant Cugat",
+        "Sant Cugat del Vallés": "Sant Cugat del Vallès",
         "Sant Quirze del Vallés": "Sant Quirze del Vallès",
         "Santa Coloma de Gramanet": "Santa Coloma de Gramenet",
         "Sóller": "Palma",
         "Villafranca de Córdoba": "Córdoba",
         "Vitoria": "Gasteiz / Vitoria",
         "Vitoria-Gasteiz": "Gasteiz / Vitoria",
+        "Fernán Núñez": "Córdoba",
+        "La Corredoría": "Oviedo",
+        "Pola de Siero": "Oviedo",
+        "Badía del Vallés": "Sabadell",
+        "La Llagosta": "Mollet del Vallès",
+        "Las Rozas": "Las Rozas de Madrid",
     },
+    "South Africa": {"Johanneburg": "Johannesburg", "Kempton Park": "Johannesburg"},
     "Sweden": {
         "Malmo": "Malmö",
         "Örnsköldsviks": "Örnsköldsvik",
         "Stockholm ": "Stockholm",
+        "Gothenburg": "Göteborg",
     },
     "Switzerland": {"Geneva": "Genève", "Zurich": "Zürich"},
     "Ukraine": {"Kiev": "Kyiv"},
@@ -388,8 +474,19 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "St. Paul": "Saint Paul",
         "St Paul": "Saint Paul",
         "Saint peters": "Saint Peters",
-        "Washington": "Washington, District of Columbia",
-        "Washington, D.C.": "Washington, District of Columbia",
+        "Washington": "Washington (District of Columbia)",
+        "Washington, D.C.": "Washington (District of Columbia)",
+        "Bronx": "New York City",
+        "Winston Salem": "Winston-Salem",
+        "Tuscon": "Tucson",
+        "Minnepolis": "Minneapolis",
+        "SLC": "Salt Lake City",
+        "Virgina Beach": "Virginia Beach",
+        "Kalmazoo": "Kalamazoo",
+        "Binghaamton": "Binghamton",
+        "Grands Forks": "Grand Forks",
+        "Virginia": "Richmond (Virginia)",
+        "Texas": "Austin (Texas)",
     },
     "United Kingdom": {
         "Burton-On-Trent": "Burton upon Trent",
@@ -406,7 +503,7 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Newcastle Upon-Tyne": "Newcastle upon Tyne",
         "Newcastle Upon Tyne": "Newcastle upon Tyne",
         "Newcastle upon tyne": "Newcastle upon Tyne",
-        "Newport, South Wales": "Newport, Wales",
+        "Newport, South Wales": "Newport (Wales)",
         "Northhampton": "Northampton",
         "Notttingham": "Nottingham",
         "Rochester, Kent": "Rochester",
@@ -415,6 +512,13 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "St. Andrews": "Saint Andrews",
         "St. Helens": "St Helens",
         "St. Neots": "Saint Neots",
+        "Hull": "Kingston upon Hull",
+        "Southend": "Southend-on-Sea",
+        "West Midlands": "Birmingham",
+        "Merseyside": "Liverpool",
+        "Yorkshire": "York",
+        "Worcestershire": "Worcester",
+        "Buckinghamshire": "Aylesbury",
     },
 }
 
@@ -444,11 +548,15 @@ class VEKNSyncService:
         name = f"{vekn_player.get('firstname', '')} {vekn_player.get('lastname', '')}".strip()
         vekn_id = str(vekn_player.get("veknid", ""))
 
-        # Fix city name if needed
+        # Fix city name and validate against geonames
         city = vekn_player.get("city") or None
         country_name = vekn_player.get("countryname") or ""
+        country_code = vekn_player.get("countrycode") or ""
         if city and country_name in FIX_CITIES:
             city = FIX_CITIES[country_name].get(city, city)
+        if city and country_code:
+            matched = match_city(city, country_code)
+            city = matched["name"] if matched else None
 
         # Infer Prince/NC roles from princeid/coordinatorid presence
         roles: list[Role] = []
@@ -650,9 +758,12 @@ class VEKNSyncService:
                 f"{stats['errors']} errors, {stats['total']} total"
             )
 
-            # Infer coopted_by relationships from VEKN prefix matching
-            inferred = await self._infer_coopted_by()
-            logger.info(f"Inferred coopted_by for {inferred} users")
+            # Infer coopted_by relationships
+            inferred_prefix = await self._infer_coopted_by()
+            inferred_city = await self._infer_coopted_by_city()
+            logger.info(
+                f"Inferred coopted_by: {inferred_prefix} prefix, {inferred_city} city/country"
+            )
 
         except VEKNAPIError as e:
             logger.error(f"VEKN API error during sync: {e}")
@@ -714,5 +825,73 @@ class VEKNSyncService:
                 )
                 await update_user(updated)
                 count += 1
+
+        return count
+
+    async def _infer_coopted_by_city(self) -> int:
+        """Infer coopted_by from city (Prince) then country (NC) fallback.
+
+        Phase 1: Match users to Princes in the same city.
+        Phase 2: Match remaining users to NCs in the same country.
+        Skips ambiguous cases (multiple Princes in same city, multiple NCs in same country).
+
+        Returns the number of users updated.
+        """
+        sponsors = await get_princes_and_ncs()
+        orphans = await get_users_without_coopted_by()
+        if not sponsors or not orphans:
+            return 0
+
+        # Build lookups
+        prince_by_city: dict[tuple[str, str], str] = {}  # (country, city) -> uid
+        ambiguous_cities: set[tuple[str, str]] = set()
+        nc_by_country: dict[str, str] = {}  # country -> uid
+        ambiguous_countries: set[str] = set()
+
+        for s in sponsors:
+            if Role.PRINCE in s.roles and s.city and s.country:
+                key = (s.country, s.city)
+                if key in ambiguous_cities:
+                    continue
+                if key in prince_by_city:
+                    ambiguous_cities.add(key)
+                    del prince_by_city[key]
+                else:
+                    prince_by_city[key] = s.uid
+
+            if Role.NC in s.roles and s.country:
+                if s.country in ambiguous_countries:
+                    continue
+                if s.country in nc_by_country:
+                    ambiguous_countries.add(s.country)
+                    del nc_by_country[s.country]
+                else:
+                    nc_by_country[s.country] = s.uid
+
+        count = 0
+        now = datetime.now(UTC)
+        still_orphan: list[User] = []
+
+        # Phase 1: Prince by city
+        for user in orphans:
+            if user.city and user.country:
+                sponsor_uid = prince_by_city.get((user.country, user.city))
+                if sponsor_uid and sponsor_uid != user.uid:
+                    user.coopted_by = sponsor_uid
+                    user.modified = now
+                    await update_user(user)
+                    count += 1
+                    continue
+            still_orphan.append(user)
+
+        # Phase 2: NC by country
+        for user in still_orphan:
+            if user.country:
+                sponsor_uid = nc_by_country.get(user.country)
+                if sponsor_uid and sponsor_uid != user.uid:
+                    user.coopted_by = sponsor_uid
+                    user.modified = now
+                    await update_user(user)
+                    count += 1
 
         return count
