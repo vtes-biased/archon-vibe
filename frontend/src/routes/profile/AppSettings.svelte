@@ -27,7 +27,7 @@
 
   <!-- Theme -->
   <div class="space-y-2">
-    <label class="block text-sm text-ash-400">{m.profile_theme_label()}</label>
+    <span class="block text-sm text-ash-400">{m.profile_theme_label()}</span>
     <div class="flex gap-2">
       {#each themes as t}
         {@const active = getTheme() === t.value}
@@ -44,7 +44,7 @@
 
   <!-- Language -->
   <div class="space-y-2">
-    <label class="block text-sm text-ash-400">{m.profile_language_label()}</label>
+    <span class="block text-sm text-ash-400">{m.profile_language_label()}</span>
     <div class="flex gap-2 flex-wrap">
       {#each locales as locale}
         {@const active = getLocale() === locale}

@@ -14,13 +14,15 @@
   const countries = getCountries();
   const sortedCountries = Object.values(countries).sort((a, b) => a.name.localeCompare(b.name));
 
+  // svelte-ignore state_referenced_locally
+  const initial = { ...user };
   let saving = $state(false);
-  let editName = $state(user.name || "");
-  let editNickname = $state(user.nickname || "");
-  let editCountry = $state(user.country || "");
-  let editCity = $state(user.city || "");
-  let editContactEmail = $state(user.contact_email || "");
-  let editContactPhone = $state(user.contact_phone || "");
+  let editName = $state(initial.name || "");
+  let editNickname = $state(initial.nickname || "");
+  let editCountry = $state(initial.country || "");
+  let editCity = $state(initial.city || "");
+  let editContactEmail = $state(initial.contact_email || "");
+  let editContactPhone = $state(initial.contact_phone || "");
 
   async function handleSubmit() {
     saving = true;

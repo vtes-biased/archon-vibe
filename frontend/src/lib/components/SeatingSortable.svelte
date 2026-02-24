@@ -128,6 +128,8 @@
           <!-- Drag handle -->
           <span
             class="drag-handle flex items-center justify-center text-ash-500"
+            role="button"
+            tabindex="0"
             draggable="true"
             ondragstart={(e) => handleDragStart(e, t, s)}
             ondragend={handleDragEnd}

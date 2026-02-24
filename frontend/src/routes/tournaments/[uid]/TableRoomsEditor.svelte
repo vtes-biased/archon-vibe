@@ -15,8 +15,10 @@
     onupdate: (tournament: Tournament) => void;
   } = $props();
 
+  // svelte-ignore state_referenced_locally
+  const initialRooms = tableRooms;
   let rooms = $state<{ name: string; count: number }[]>(
-    tableRooms?.length ? tableRooms.map(r => ({ ...r })) : []
+    initialRooms?.length ? initialRooms.map(r => ({ ...r })) : []
   );
 
   const totalCount = $derived(rooms.reduce((sum, r) => sum + r.count, 0));
