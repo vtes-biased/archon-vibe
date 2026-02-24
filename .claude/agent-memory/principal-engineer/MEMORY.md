@@ -40,7 +40,8 @@
 - **FIXED**: `_filter_tournament()` Struct-per-item — function removed entirely
 - **FIXED**: Pool `max_size=20` (was 10)
 - **FIXED**: SSE connection duplication — +layout.svelte owns connect/disconnect, components only listen
-- **Remaining**: Frontend buffers ALL data until `sync_complete` — no progressive rendering
+- Snapshot path loads directly into IDB (no buffering); SSE catch-up buffer is small
+- Batch saves use single IDB transactions (data already in memory, chunking adds overhead for no benefit)
 
 ## Conventions
 - All objects: uid (UUID v7), modified timestamp, deleted_at (soft-delete)

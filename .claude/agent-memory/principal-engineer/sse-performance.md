@@ -1,7 +1,8 @@
 # SSE Sync Performance (2026-02)
 
 ## Original Problem
-Initial SSE sync took 8-16s on localhost for ~500 users and ~10k tournaments.
+Initial SSE sync took 8-16s on localhost for ~20k users and ~10k tournaments.
+(Non-authenticated users only see ~500 users: NC/Prince officials.)
 
 ## What Was Fixed
 
@@ -18,7 +19,6 @@ New: `stream_objects_new()` uses `SELECT col::text` to get raw JSON strings, pas
 ### 4. SSE connection duplication — FIXED
 `+layout.svelte` owns connect/disconnect/reconnect. Components only listen for events via addEventListener.
 
-## Remaining Issues
-
-### Frontend buffers until sync_complete
-All data buffered in JS arrays until `sync_complete` event, then flushed to IndexedDB in one batch. No progressive rendering during sync.
+## Resolved (no remaining issues)
+- Frontend buffering concern is moot: snapshot loads directly into IDB, SSE catch-up is small
+- Batch saves use simple single-transaction writes (data already in memory from snapshot/buffer, chunking adds overhead for no benefit)

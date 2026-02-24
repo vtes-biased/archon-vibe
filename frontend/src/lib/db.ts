@@ -162,19 +162,10 @@ export async function saveUser(user: User): Promise<void> {
 
 export async function saveUsersBatch(users: User[]): Promise<void> {
   if (users.length === 0) return;
-
   const db = await getDB();
-
-  // Use multiple transactions for very large batches to avoid blocking
-  const BATCH_SIZE = 5000;
-  for (let i = 0; i < users.length; i += BATCH_SIZE) {
-    const batch = users.slice(i, i + BATCH_SIZE);
-    const tx = db.transaction('users', 'readwrite');
-    for (const user of batch) {
-      tx.store.put(user);
-    }
-    await tx.done;
-  }
+  const tx = db.transaction('users', 'readwrite');
+  for (const user of users) tx.store.put(user);
+  await tx.done;
 }
 
 export async function deleteUser(uid: string): Promise<void> {
@@ -286,12 +277,9 @@ export async function saveSanction(sanction: Sanction): Promise<void> {
 
 export async function saveSanctionsBatch(sanctions: Sanction[]): Promise<void> {
   if (sanctions.length === 0) return;
-
   const db = await getDB();
   const tx = db.transaction('sanctions', 'readwrite');
-  for (const sanction of sanctions) {
-    tx.store.put(sanction);
-  }
+  for (const s of sanctions) tx.store.put(s);
   await tx.done;
 }
 
@@ -415,9 +403,7 @@ export async function saveTournamentsBatch(tournaments: Tournament[]): Promise<v
   if (tournaments.length === 0) return;
   const db = await getDB();
   const tx = db.transaction('tournaments', 'readwrite');
-  for (const t of tournaments) {
-    tx.store.put(t);
-  }
+  for (const t of tournaments) tx.store.put(t);
   await tx.done;
 }
 
@@ -599,9 +585,7 @@ export async function saveDecksBatch(decks: DeckObject[]): Promise<void> {
   if (decks.length === 0) return;
   const db = await getDB();
   const tx = db.transaction('decks', 'readwrite');
-  for (const d of decks) {
-    tx.store.put(d);
-  }
+  for (const d of decks) tx.store.put(d);
   await tx.done;
 }
 
@@ -635,9 +619,7 @@ export async function saveLeaguesBatch(leagues: League[]): Promise<void> {
   if (leagues.length === 0) return;
   const db = await getDB();
   const tx = db.transaction('leagues', 'readwrite');
-  for (const l of leagues) {
-    tx.store.put(l);
-  }
+  for (const l of leagues) tx.store.put(l);
   await tx.done;
 }
 
