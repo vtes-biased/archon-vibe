@@ -7,12 +7,19 @@ None means the object is not visible at that access level.
 
 from .models import Role
 
-
 # ---------------------------------------------------------------------------
 # User projections
 # ---------------------------------------------------------------------------
 
-_USER_PUBLIC_FIELDS = {"uid", "modified", "deleted_at", "name", "country", "roles", "vekn_prefix"}
+_USER_PUBLIC_FIELDS = {
+    "uid",
+    "modified",
+    "deleted_at",
+    "name",
+    "country",
+    "roles",
+    "vekn_prefix",
+}
 _USER_PUBLIC_CONTACT = {"contact_email", "contact_discord", "contact_phone"}
 _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
@@ -26,18 +33,15 @@ _USER_MEMBER_FIELDS = (
         "wins",
     }
 )
-_USER_FULL_EXTRA = (
-    _USER_PUBLIC_CONTACT
-    | {
-        "coopted_by",
-        "coopted_at",
-        "vekn_synced",
-        "vekn_synced_at",
-        "local_modifications",
-        "vekn_prefix",
-        "resync_after",
-    }
-)
+_USER_FULL_EXTRA = _USER_PUBLIC_CONTACT | {
+    "coopted_by",
+    "coopted_at",
+    "vekn_synced",
+    "vekn_synced_at",
+    "local_modifications",
+    "vekn_prefix",
+    "resync_after",
+}
 
 
 def _pick(d: dict, keys: set[str]) -> dict:

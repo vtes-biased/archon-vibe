@@ -438,7 +438,9 @@ class VEKNAPIClient:
                 is_future = False
                 if start_date_str:
                     try:
-                        sd = datetime.strptime(start_date_str, "%Y-%m-%d").replace(tzinfo=UTC)
+                        sd = datetime.strptime(start_date_str, "%Y-%m-%d").replace(
+                            tzinfo=UTC
+                        )
                         is_future = sd > now
                     except (ValueError, TypeError):
                         pass

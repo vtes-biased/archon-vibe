@@ -54,9 +54,27 @@ update:
 # Run all tests
 test:
     (cd engine && cargo test)
-    uv run ruff check backend/
-    uv run python3 -m pytest backend/tests/ -v
+    just lint-check
+    just test-backend
     (cd frontend && npx svelte-check --threshold error)
+
+# Run backend tests (starts DB if needed, stops it after)
+test-backend *ARGS='-v':
+    #!/usr/bin/env bash
+    set -e
+    needs_stop=false
+    if ! docker compose exec -T db pg_isready -U archon > /dev/null 2>&1; then
+        echo "Starting database..."
+        docker compose up -d db
+        for i in {1..30}; do
+            docker compose exec -T db pg_isready -U archon > /dev/null 2>&1 && break
+            sleep 1
+        done
+        needs_stop=true
+    fi
+    uv run python3 -m pytest backend/tests/ {{ ARGS }}; rc=$?
+    if $needs_stop; then docker compose stop db > /dev/null 2>&1; fi
+    exit $rc
 
 # Build production (Docker images)
 build:
@@ -70,9 +88,15 @@ build:
 # Utility
 # ============================================================================
 
+# Check linting (no changes)
+lint-check:
+    uv run ruff check .
+    uv run ruff format --check .
+    (cd engine && cargo fmt --check && cargo clippy --all-targets --all-features)
+
 # Lint and auto-fix all code
 lint:
-    uv run ruff check --fix backend/ && uv run ruff format backend/
+    uv run ruff check --fix . && uv run ruff format .
     (cd engine && cargo fmt && cargo clippy --all-targets --all-features)
 
 # Update VTES card data (downloads from krcg.org → engine/data/cards.json)

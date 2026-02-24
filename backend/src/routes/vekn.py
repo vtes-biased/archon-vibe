@@ -8,11 +8,9 @@ import msgspec
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
-from uuid6 import uuid7
 
 from ..db import (
     allocate_next_vekn_id,
-    get_auth_methods_for_user,
     get_user_by_uid,
     get_user_by_vekn_id,
     is_vekn_id_claimed,
@@ -111,16 +109,12 @@ async def claim_vekn_id(
 
     # Check current user doesn't already have a VEKN ID
     if current_user.vekn_id:
-        raise HTTPException(
-            status_code=400, detail="You already have a VEKN ID"
-        )
+        raise HTTPException(status_code=400, detail="You already have a VEKN ID")
 
     # Find the VEKN user
     vekn_user = await get_user_by_vekn_id(request.vekn_id)
     if not vekn_user:
-        raise HTTPException(
-            status_code=404, detail="VEKN ID not found"
-        )
+        raise HTTPException(status_code=404, detail="VEKN ID not found")
 
     # Check if it's claimed (has auth methods)
     if await is_vekn_id_claimed(request.vekn_id):
@@ -131,9 +125,7 @@ async def claim_vekn_id(
     # Merge: keep the VEKN user_uid (stable reference), transfer auth from current
     merged = await merge_users(vekn_user.uid, current_user.uid)
     if not merged:
-        raise HTTPException(
-            status_code=500, detail="Failed to merge accounts"
-        )
+        raise HTTPException(status_code=500, detail="Failed to merge accounts")
 
     # Trigger resync — user gained a vekn_id, data level changes
     await set_user_resync_after(merged.uid)
@@ -146,13 +138,15 @@ async def claim_vekn_id(
     refresh_token = create_refresh_token(merged.uid)
 
     return Response(
-        content=encoder.encode({
-            "user": msgspec.to_builtins(merged),
-            "message": f"Successfully claimed VEKN ID {request.vekn_id}",
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "expires_in": expires_in,
-        }),
+        content=encoder.encode(
+            {
+                "user": msgspec.to_builtins(merged),
+                "message": f"Successfully claimed VEKN ID {request.vekn_id}",
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expires_in": expires_in,
+            }
+        ),
         media_type="application/json",
     )
 
@@ -175,11 +169,11 @@ async def abandon_vekn_id(
 
     new_user = await split_user_from_vekn(current_user.uid)
     if not new_user:
-        raise HTTPException(
-            status_code=500, detail="Failed to abandon VEKN ID"
-        )
+        raise HTTPException(status_code=500, detail="Failed to abandon VEKN ID")
 
-    logger.info(f"User abandoned VEKN ID {current_user.vekn_id}: old={current_user.uid} new={new_user.uid}")
+    logger.info(
+        f"User abandoned VEKN ID {current_user.vekn_id}: old={current_user.uid} new={new_user.uid}"
+    )
     await set_user_resync_after(new_user.uid)
     if broadcast_resync:
         await broadcast_resync(new_user.uid)
@@ -189,13 +183,15 @@ async def abandon_vekn_id(
     refresh_token = create_refresh_token(new_user.uid)
 
     return Response(
-        content=encoder.encode({
-            "message": "VEKN ID abandoned successfully",
-            "user": msgspec.to_builtins(new_user),
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "expires_in": expires_in,
-        }),
+        content=encoder.encode(
+            {
+                "message": "VEKN ID abandoned successfully",
+                "user": msgspec.to_builtins(new_user),
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expires_in": expires_in,
+            }
+        ),
         media_type="application/json",
     )
 
@@ -214,7 +210,11 @@ async def sponsor_new_member(
     manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
-    if not (Role.IC in manager.roles or Role.NC in manager.roles or Role.PRINCE in manager.roles):
+    if not (
+        Role.IC in manager.roles
+        or Role.NC in manager.roles
+        or Role.PRINCE in manager.roles
+    ):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can sponsor new members"
         )
@@ -222,18 +222,14 @@ async def sponsor_new_member(
     # Get target user
     target = await get_user_by_uid(request.user_uid)
     if not target:
-        raise HTTPException(
-            status_code=404, detail="Target user not found"
-        )
+        raise HTTPException(status_code=404, detail="Target user not found")
 
     # Check manager can manage target's country
     _require_manager_for_user(manager, target)
 
     # Check target doesn't already have a VEKN ID
     if target.vekn_id:
-        raise HTTPException(
-            status_code=400, detail="User already has a VEKN ID"
-        )
+        raise HTTPException(status_code=400, detail="User already has a VEKN ID")
 
     # Allocate new VEKN ID
     new_vekn_id = await allocate_next_vekn_id()
@@ -264,7 +260,9 @@ async def sponsor_new_member(
 
     await update_user(updated)
     await set_user_resync_after(updated.uid)
-    logger.info(f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}")
+    logger.info(
+        f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}"
+    )
     if broadcast_resync:
         await broadcast_resync(updated.uid)
 
@@ -283,11 +281,13 @@ async def sponsor_new_member(
             logger.exception("Failed to push new member to VEKN")
 
     return Response(
-        content=encoder.encode({
-            "user": msgspec.to_builtins(updated),
-            "vekn_id": new_vekn_id,
-            "message": f"Sponsored user with VEKN ID {new_vekn_id}",
-        }),
+        content=encoder.encode(
+            {
+                "user": msgspec.to_builtins(updated),
+                "vekn_id": new_vekn_id,
+                "message": f"Sponsored user with VEKN ID {new_vekn_id}",
+            }
+        ),
         media_type="application/json",
     )
 
@@ -306,7 +306,11 @@ async def link_vekn_to_user(
     manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
-    if not (Role.IC in manager.roles or Role.NC in manager.roles or Role.PRINCE in manager.roles):
+    if not (
+        Role.IC in manager.roles
+        or Role.NC in manager.roles
+        or Role.PRINCE in manager.roles
+    ):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can link VEKN IDs"
         )
@@ -314,9 +318,7 @@ async def link_vekn_to_user(
     # Get target user
     target = await get_user_by_uid(request.user_uid)
     if not target:
-        raise HTTPException(
-            status_code=404, detail="Target user not found"
-        )
+        raise HTTPException(status_code=404, detail="Target user not found")
 
     # Check manager can manage target's country
     _require_manager_for_user(manager, target)
@@ -330,9 +332,7 @@ async def link_vekn_to_user(
     # Find the VEKN user
     vekn_user = await get_user_by_vekn_id(request.vekn_id)
     if not vekn_user:
-        raise HTTPException(
-            status_code=404, detail="VEKN ID not found"
-        )
+        raise HTTPException(status_code=404, detail="VEKN ID not found")
 
     # Check manager can manage VEKN user's country too
     _require_manager_for_user(manager, vekn_user)
@@ -346,17 +346,21 @@ async def link_vekn_to_user(
         result = await strip_vekn_from_user(vekn_user.uid)
         if result:
             displaced_user, _stripped_vekn = result
-            message = f"Displaced from {vekn_user.name} and linked VEKN ID {request.vekn_id}"
-            logger.info(f"Displaced user {vekn_user.uid} from VEKN ID {request.vekn_id}")
+            message = (
+                f"Displaced from {vekn_user.name} and linked VEKN ID {request.vekn_id}"
+            )
+            logger.info(
+                f"Displaced user {vekn_user.uid} from VEKN ID {request.vekn_id}"
+            )
 
     # Merge: keep the VEKN user_uid, transfer auth from target
     merged = await merge_users(vekn_user.uid, target.uid)
     if not merged:
-        raise HTTPException(
-            status_code=500, detail="Failed to link accounts"
-        )
+        raise HTTPException(status_code=500, detail="Failed to link accounts")
 
-    logger.info(f"Linked VEKN ID {request.vekn_id} to user {merged.uid} by {manager.uid}")
+    logger.info(
+        f"Linked VEKN ID {request.vekn_id} to user {merged.uid} by {manager.uid}"
+    )
 
     # Trigger resync for affected users
     await set_user_resync_after(merged.uid)
@@ -393,7 +397,11 @@ async def force_abandon_vekn_id(
     manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
-    if not (Role.IC in manager.roles or Role.NC in manager.roles or Role.PRINCE in manager.roles):
+    if not (
+        Role.IC in manager.roles
+        or Role.NC in manager.roles
+        or Role.PRINCE in manager.roles
+    ):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can force-abandon VEKN IDs"
         )
@@ -401,9 +409,7 @@ async def force_abandon_vekn_id(
     # Get target user
     target = await get_user_by_uid(request.user_uid)
     if not target:
-        raise HTTPException(
-            status_code=404, detail="Target user not found"
-        )
+        raise HTTPException(status_code=404, detail="Target user not found")
 
     # Check manager can manage target's country
     _require_manager_for_user(manager, target)
@@ -415,19 +421,21 @@ async def force_abandon_vekn_id(
 
     new_user = await split_user_from_vekn(target.uid)
     if not new_user:
-        raise HTTPException(
-            status_code=500, detail="Failed to abandon VEKN ID"
-        )
+        raise HTTPException(status_code=500, detail="Failed to abandon VEKN ID")
 
-    logger.info(f"Force-abandoned VEKN ID {target.vekn_id} for user {target.uid} by {manager.uid}")
+    logger.info(
+        f"Force-abandoned VEKN ID {target.vekn_id} for user {target.uid} by {manager.uid}"
+    )
     await set_user_resync_after(new_user.uid)
     if broadcast_resync:
         await broadcast_resync(new_user.uid)
 
     return Response(
-        content=encoder.encode({
-            "message": f"VEKN ID {target.vekn_id} abandoned for {target.name}",
-            "user": msgspec.to_builtins(new_user),
-        }),
+        content=encoder.encode(
+            {
+                "message": f"VEKN ID {target.vekn_id} abandoned for {target.name}",
+                "user": msgspec.to_builtins(new_user),
+            }
+        ),
         media_type="application/json",
     )

@@ -6,7 +6,6 @@ Focuses on:
 
 from src.routes.tournaments import _remap_uids_in_tournament
 
-
 # ============================================================================
 # _remap_uids_in_tournament tests
 # ============================================================================
@@ -85,5 +84,3 @@ class TestRemapUids:
         # "abcdef" would become "XYZdef" -- this is the expected (flawed) behavior
         assert result["players"][0]["user_uid"] == "XYZ"
         assert result["players"][1]["user_uid"] == "XYZdef"
-
-

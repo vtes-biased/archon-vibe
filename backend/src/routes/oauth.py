@@ -2,7 +2,6 @@
 
 import hashlib
 import logging
-import os
 import secrets
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
@@ -15,7 +14,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from uuid6 import uuid7
 
-from ..db import get_user_by_uid
 from ..db_oauth import (
     get_oauth_client_by_client_id,
     get_oauth_clients_by_owner,
@@ -33,13 +31,13 @@ from ..db_oauth import (
 )
 from ..middleware.auth import JWT_ALGORITHM, JWT_SECRET, CurrentUser, require_role
 from ..models import (
-    User,
     OAuthAuthorizationCode,
     OAuthClient,
     OAuthConsent,
     OAuthScope,
     OAuthToken,
     Role,
+    User,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,6 +71,7 @@ def _verify_pkce(code_verifier: str, code_challenge: str) -> bool:
     """Verify PKCE S256 challenge."""
     digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
     import base64
+
     computed = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     return computed == code_challenge
 
@@ -105,7 +104,7 @@ def _parse_scopes(scope_str: str) -> list[OAuthScope]:
         try:
             scopes.append(OAuthScope(s))
         except ValueError:
-            raise HTTPException(400, f"Invalid scope: {s}")
+            raise HTTPException(400, f"Invalid scope: {s}") from None
     return scopes
 
 
@@ -283,7 +282,7 @@ async def token_endpoint(body: dict):
     try:
         ph.verify(client.client_secret_hash, client_secret)
     except VerifyMismatchError:
-        raise HTTPException(401, "Invalid client credentials")
+        raise HTTPException(401, "Invalid client credentials") from None
 
     if grant_type == "authorization_code":
         return await _handle_authorization_code(body, client)
@@ -326,10 +325,15 @@ async def _handle_authorization_code(body: dict, client: OAuthClient) -> dict:
 
     # Mark code as used
     used_code = OAuthAuthorizationCode(
-        uid=auth_code.uid, modified=now, code=auth_code.code,
-        client_id=auth_code.client_id, user_uid=auth_code.user_uid,
-        redirect_uri=auth_code.redirect_uri, scopes=auth_code.scopes,
-        code_challenge=auth_code.code_challenge, expires_at=auth_code.expires_at,
+        uid=auth_code.uid,
+        modified=now,
+        code=auth_code.code,
+        client_id=auth_code.client_id,
+        user_uid=auth_code.user_uid,
+        redirect_uri=auth_code.redirect_uri,
+        scopes=auth_code.scopes,
+        code_challenge=auth_code.code_challenge,
+        expires_at=auth_code.expires_at,
         used=True,
     )
     await update_oauth_code(used_code)
@@ -352,9 +356,9 @@ async def _handle_refresh_token(body: dict, client: OAuthClient) -> dict:
     try:
         payload = jwt.decode(refresh_token_str, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
-        raise HTTPException(400, "Refresh token expired")
+        raise HTTPException(400, "Refresh token expired") from None
     except jwt.InvalidTokenError:
-        raise HTTPException(400, "Invalid refresh token")
+        raise HTTPException(400, "Invalid refresh token") from None
 
     if payload.get("type") != "oauth_refresh":
         raise HTTPException(400, "Invalid token type")
@@ -377,10 +381,15 @@ async def _handle_refresh_token(body: dict, client: OAuthClient) -> dict:
     # Revoke old refresh token
     now = datetime.now(UTC)
     revoked = OAuthToken(
-        uid=token_record.uid, modified=now, token_jti=token_record.token_jti,
-        client_id=token_record.client_id, user_uid=token_record.user_uid,
-        scopes=token_record.scopes, token_type=token_record.token_type,
-        expires_at=token_record.expires_at, revoked=True,
+        uid=token_record.uid,
+        modified=now,
+        token_jti=token_record.token_jti,
+        client_id=token_record.client_id,
+        user_uid=token_record.user_uid,
+        scopes=token_record.scopes,
+        token_type=token_record.token_type,
+        expires_at=token_record.expires_at,
+        revoked=True,
         parent_token_uid=token_record.parent_token_uid,
     )
     await update_oauth_token(revoked)
@@ -416,15 +425,25 @@ async def _issue_token_pair(
 
     # Record tokens for revocation tracking
     access_record = OAuthToken(
-        uid=str(uuid7()), modified=now, token_jti=access_jti,
-        client_id=client_id, user_uid=user_uid, scopes=scopes,
-        token_type="access", expires_at=now + ACCESS_TOKEN_LIFETIME,
+        uid=str(uuid7()),
+        modified=now,
+        token_jti=access_jti,
+        client_id=client_id,
+        user_uid=user_uid,
+        scopes=scopes,
+        token_type="access",
+        expires_at=now + ACCESS_TOKEN_LIFETIME,
         parent_token_uid=parent_token_uid,
     )
     refresh_record = OAuthToken(
-        uid=str(uuid7()), modified=now, token_jti=refresh_jti,
-        client_id=client_id, user_uid=user_uid, scopes=scopes,
-        token_type="refresh", expires_at=now + REFRESH_TOKEN_LIFETIME,
+        uid=str(uuid7()),
+        modified=now,
+        token_jti=refresh_jti,
+        client_id=client_id,
+        user_uid=user_uid,
+        scopes=scopes,
+        token_type="refresh",
+        expires_at=now + REFRESH_TOKEN_LIFETIME,
         parent_token_uid=parent_token_uid or access_record.uid,
     )
     await insert_oauth_token(access_record)
@@ -459,7 +478,7 @@ async def revoke_token(body: dict):
     try:
         ph.verify(client.client_secret_hash, client_secret)
     except VerifyMismatchError:
-        raise HTTPException(401, "Invalid client credentials")
+        raise HTTPException(401, "Invalid client credentials") from None
 
     token_record = await get_oauth_token_by_jti(token_jti)
     if not token_record or token_record.client_id != client.client_id:
@@ -469,10 +488,15 @@ async def revoke_token(body: dict):
     if not token_record.revoked:
         now = datetime.now(UTC)
         revoked = OAuthToken(
-            uid=token_record.uid, modified=now, token_jti=token_record.token_jti,
-            client_id=token_record.client_id, user_uid=token_record.user_uid,
-            scopes=token_record.scopes, token_type=token_record.token_type,
-            expires_at=token_record.expires_at, revoked=True,
+            uid=token_record.uid,
+            modified=now,
+            token_jti=token_record.token_jti,
+            client_id=token_record.client_id,
+            user_uid=token_record.user_uid,
+            scopes=token_record.scopes,
+            token_type=token_record.token_type,
+            expires_at=token_record.expires_at,
+            revoked=True,
             parent_token_uid=token_record.parent_token_uid,
         )
         await update_oauth_token(revoked)
@@ -536,7 +560,7 @@ async def register_client(
         try:
             scopes.append(OAuthScope(s))
         except ValueError:
-            raise HTTPException(400, f"Invalid scope: {s}")
+            raise HTTPException(400, f"Invalid scope: {s}") from None
 
     client_id = _generate_client_id()
     client_secret = _generate_client_secret()
@@ -617,10 +641,15 @@ async def regenerate_secret(
     new_secret = _generate_client_secret()
     now = datetime.now(UTC)
     updated = OAuthClient(
-        uid=client.uid, modified=now, name=client.name,
-        client_id=client.client_id, client_secret_hash=ph.hash(new_secret),
-        redirect_uris=client.redirect_uris, scopes=client.scopes,
-        created_by_uid=client.created_by_uid, active=client.active,
+        uid=client.uid,
+        modified=now,
+        name=client.name,
+        client_id=client.client_id,
+        client_secret_hash=ph.hash(new_secret),
+        redirect_uris=client.redirect_uris,
+        scopes=client.scopes,
+        created_by_uid=client.created_by_uid,
+        active=client.active,
     )
     await update_oauth_client(updated)
 
@@ -643,10 +672,15 @@ async def deactivate_client(
 
     now = datetime.now(UTC)
     updated = OAuthClient(
-        uid=client.uid, modified=now, name=client.name,
-        client_id=client.client_id, client_secret_hash=client.client_secret_hash,
-        redirect_uris=client.redirect_uris, scopes=client.scopes,
-        created_by_uid=client.created_by_uid, active=False,
+        uid=client.uid,
+        modified=now,
+        name=client.name,
+        client_id=client.client_id,
+        client_secret_hash=client.client_secret_hash,
+        redirect_uris=client.redirect_uris,
+        scopes=client.scopes,
+        created_by_uid=client.created_by_uid,
+        active=False,
     )
     await update_oauth_client(updated)
 

@@ -16,17 +16,16 @@ os.environ.setdefault(
 from datetime import UTC, datetime  # noqa: E402
 
 from argon2 import PasswordHasher  # noqa: E402
-from uuid6 import uuid7  # noqa: E402
-
 from src.db import (  # noqa: E402
     delete_object,
+    get_connection,
     init_db,
     insert_auth_method,
     insert_user,
-    get_connection,
 )
 from src.models import AuthMethod, AuthMethodType, Role, User  # noqa: E402
 from src.snapshots import generate_snapshots  # noqa: E402
+from uuid6 import uuid7  # noqa: E402
 
 ph = PasswordHasher()
 
@@ -54,16 +53,16 @@ PLAYER_COUNTRIES = ["US", "US", "FR", "DE", "US", "GB", "JP", "BR", "US", "CA"]
 # Some players have roles so they appear at the public access level
 # (public only shows NC/Prince users)
 PLAYER_ROLES: list[list[Role]] = [
-    [],                # Alice
-    [],                # Bob
-    [Role.PRINCE],     # Charlie - Prince (FR)
-    [Role.NC],         # Diana - NC (DE)
-    [],                # Eve
-    [],                # Frank
-    [],                # Grace
-    [],                # Hank
-    [],                # Ivy
-    [],                # Jack
+    [],  # Alice
+    [],  # Bob
+    [Role.PRINCE],  # Charlie - Prince (FR)
+    [Role.NC],  # Diana - NC (DE)
+    [],  # Eve
+    [],  # Frank
+    [],  # Grace
+    [],  # Hank
+    [],  # Ivy
+    [],  # Jack
 ]
 
 
@@ -108,7 +107,7 @@ async def seed() -> dict:
     # --- Players ---
     player_uids: list[str] = []
     for i, (name, country, roles) in enumerate(
-        zip(PLAYER_NAMES, PLAYER_COUNTRIES, PLAYER_ROLES)
+        zip(PLAYER_NAMES, PLAYER_COUNTRIES, PLAYER_ROLES, strict=True)
     ):
         uid = str(uuid7())
         player_uids.append(uid)

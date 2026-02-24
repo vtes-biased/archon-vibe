@@ -21,6 +21,7 @@ from .models import (
 @dataclass(slots=True)
 class BroadcastData:
     """Pre-computed broadcast data returned by save functions. No DB re-read needed."""
+
     obj_type: str
     uid: str
     pub_json: str | None
@@ -440,11 +441,17 @@ async def save_object_from_model(
     deleted_at = full_data.get("deleted_at")
     # Convert deleted_at to string if it's not None
     if deleted_at is not None and not isinstance(deleted_at, str):
-        deleted_at = deleted_at.isoformat() if hasattr(deleted_at, "isoformat") else str(deleted_at)
+        deleted_at = (
+            deleted_at.isoformat()
+            if hasattr(deleted_at, "isoformat")
+            else str(deleted_at)
+        )
     return await save_object(obj_type, obj.uid, full_data, deleted_at=deleted_at)
 
 
-async def delete_object(uid: str, *, conn: psycopg.AsyncConnection | None = None) -> None:
+async def delete_object(
+    uid: str, *, conn: psycopg.AsyncConnection | None = None
+) -> None:
     """Hard delete an object from the objects table."""
     query = "DELETE FROM objects WHERE uid = %s"
     if conn:
@@ -456,12 +463,12 @@ async def delete_object(uid: str, *, conn: psycopg.AsyncConnection | None = None
 
 def _level_col(level: str) -> str:
     """Map access level name to quoted SQL column name."""
-    return {"public": '"public"', "member": '"member"', "full": '"full"'}.get(level, '"full"')
+    return {"public": '"public"', "member": '"member"', "full": '"full"'}.get(
+        level, '"full"'
+    )
 
 
-async def get_object(
-    uid: str, *, level: str = "full"
-) -> dict | None:
+async def get_object(uid: str, *, level: str = "full") -> dict | None:
     """Get an object from the objects table at a given access level.
 
     Returns the raw dict (parsed from JSONB), or None if not found
@@ -533,11 +540,13 @@ async def stream_objects_new(
     where = " AND ".join(conditions)
 
     async with _pool.connection() as conn:
-        rows = await (await conn.execute(
-            f"SELECT {col}::text, modified_at FROM objects "
-            f"WHERE {where} ORDER BY modified_at ASC",
-            tuple(params),
-        )).fetchall()
+        rows = await (
+            await conn.execute(
+                f"SELECT {col}::text, modified_at FROM objects "
+                f"WHERE {where} ORDER BY modified_at ASC",
+                tuple(params),
+            )
+        ).fetchall()
 
     if rows:
         yield [r[0] for r in rows], rows[-1][1].isoformat()
@@ -1179,7 +1188,9 @@ async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] |
     return tournament, bd
 
 
-async def get_tournament_by_external_id(platform: str, ext_id: str) -> Tournament | None:
+async def get_tournament_by_external_id(
+    platform: str, ext_id: str
+) -> Tournament | None:
     """Get a tournament by external ID (e.g., platform='vekn', ext_id='123')."""
     async with get_connection() as conn:
         result = await conn.execute(
@@ -1285,7 +1296,9 @@ async def get_tournaments_for_league(league_uid: str) -> list[Tournament]:
 # ---------------------------------------------------------------------------
 
 
-async def upsert_avatar(user_uid: str, data: bytes, content_type: str = "image/webp") -> None:
+async def upsert_avatar(
+    user_uid: str, data: bytes, content_type: str = "image/webp"
+) -> None:
     """Insert or update an avatar for a user."""
     async with get_connection() as conn:
         await conn.execute(
@@ -1352,7 +1365,11 @@ async def get_transient_token(key: str) -> dict | None:
         )
         row = await result.fetchone()
         if row:
-            return msgspec.json.decode(row[0]) if isinstance(row[0], (str, bytes)) else row[0]
+            return (
+                msgspec.json.decode(row[0])
+                if isinstance(row[0], (str, bytes))
+                else row[0]
+            )
         return None
 
 

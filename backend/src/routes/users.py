@@ -10,7 +10,13 @@ from archon_engine import PyEngine
 from fastapi import APIRouter, Header, HTTPException, Query, Response, UploadFile
 from uuid6 import uuid7
 
-from ..db import allocate_next_vekn_id, decode_json, get_connection, get_user_by_uid, set_user_resync_after
+from ..db import (
+    allocate_next_vekn_id,
+    decode_json,
+    get_connection,
+    get_user_by_uid,
+    set_user_resync_after,
+)
 from ..db import delete_avatar as db_delete_avatar
 from ..db import get_avatar as db_get_avatar
 from ..db import insert_user as db_insert_user

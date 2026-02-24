@@ -54,8 +54,29 @@ select = [
 ]
 ignore = [
     "E501", # line too long, handled by formatter
+    "B008", # Depends() in default args is standard FastAPI
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/scripts/*" = ["E402"]  # sys.path manipulation before imports
+"backend/tests/conftest.py" = ["E402"]
+"backend/tests/test_timer_and_judge_call.py" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.ty]
+# Many rules produce false positives due to:
+# - archon_engine: Rust PyO3 module (no stubs)
+# - psycopg: LiteralString requirement for f-string queries
+# - msgspec.Struct: not recognized as dataclass
+# - Optional narrowing: ty doesn't track assert-based narrowing in tests
+[tool.ty.rules]
+invalid-argument-type = "warn"    # psycopg LiteralString + argon2 false positives
+dataclass-field-order = "ignore"  # msgspec.Struct, not dataclass
+invalid-assignment = "warn"       # module-level broadcast callback pattern
+not-subscriptable = "warn"        # dict|None narrowing in tests
+unsupported-operator = "warn"     # dict|None and datetime ops
+unresolved-attribute = "warn"     # msgspec.Struct attrs + Tournament|None narrowing
+unresolved-import = "warn"        # archon_engine is a Rust PyO3 module (no stubs)

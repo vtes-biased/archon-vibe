@@ -116,9 +116,15 @@ async def revoke_oauth_token_chain(parent_token_uid: str) -> int:
             t = decode_json(row[0], OAuthToken)
             if not t.revoked:
                 revoked = OAuthToken(
-                    uid=t.uid, modified=t.modified, token_jti=t.token_jti,
-                    client_id=t.client_id, user_uid=t.user_uid, scopes=t.scopes,
-                    token_type=t.token_type, expires_at=t.expires_at, revoked=True,
+                    uid=t.uid,
+                    modified=t.modified,
+                    token_jti=t.token_jti,
+                    client_id=t.client_id,
+                    user_uid=t.user_uid,
+                    scopes=t.scopes,
+                    token_type=t.token_type,
+                    expires_at=t.expires_at,
+                    revoked=True,
                     parent_token_uid=t.parent_token_uid,
                 )
                 await conn.execute(

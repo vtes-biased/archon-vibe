@@ -277,7 +277,9 @@ class User(BaseObject, kw_only=True):
     constructed_offline: CategoryRating | None = None
     limited_online: CategoryRating | None = None
     limited_offline: CategoryRating | None = None
-    wins: list[str] = msgspec.field(default_factory=list)  # All-time tournament UIDs won
+    wins: list[str] = msgspec.field(
+        default_factory=list
+    )  # All-time tournament UIDs won
 
 
 class Score(msgspec.Struct, kw_only=True, frozen=True):
@@ -318,7 +320,9 @@ class Rating(BaseObject, kw_only=True):
     constructed_offline: CategoryRating | None = None
     limited_online: CategoryRating | None = None
     limited_offline: CategoryRating | None = None
-    wins: list[str] = msgspec.field(default_factory=list)  # All-time tournament UIDs won
+    wins: list[str] = msgspec.field(
+        default_factory=list
+    )  # All-time tournament UIDs won
 
 
 class LeagueKind(StrEnum):
@@ -441,7 +445,9 @@ class Player(msgspec.Struct, kw_only=True):
     state: PlayerState = PlayerState.REGISTERED
     payment_status: PaymentStatus = PaymentStatus.PENDING
     toss: int = 0  # non-zero when draws for seeding finals
-    result: Score = Score()  # aggregated score (used when no round detail, e.g. VEKN sync)
+    result: Score = (
+        Score()
+    )  # aggregated score (used when no round detail, e.g. VEKN sync)
     finalist: bool = False  # true if player reached the finals table
 
 
@@ -493,7 +499,9 @@ class DeckObject(BaseObject, kw_only=True):
     comments: str = ""
     cards: dict[str, int] = msgspec.field(default_factory=dict)
     attribution: str | None = None
-    public: bool = False  # Visible to non-owner members (set by engine based on decklists_mode)
+    public: bool = (
+        False  # Visible to non-owner members (set by engine based on decklists_mode)
+    )
 
 
 class Standing(msgspec.Struct, kw_only=True, frozen=True):
@@ -537,13 +545,19 @@ class Tournament(TournamentConfig, kw_only=True):
     vekn_pushed_at: datetime | None = None  # When results were pushed to vekn.net
     # Offline mode: device-level locking for offline tournament management
     offline_mode: bool = False
-    offline_device_id: str = ""  # Device identifier (localStorage UUID) that holds the lock
+    offline_device_id: str = (
+        ""  # Device identifier (localStorage UUID) that holds the lock
+    )
     offline_user_uid: str = ""  # User UID of organizer who locked it (for display)
     offline_since: datetime | None = None  # When tournament went offline
     # Timer state (online-only, not processed by Rust engine)
     timer: TimerState = msgspec.field(default_factory=TimerState)
-    table_extra_time: dict[str, int] = msgspec.field(default_factory=dict)  # table_idx → extra seconds
-    table_paused_at: dict[str, str] = msgspec.field(default_factory=dict)  # table_idx → ISO datetime
+    table_extra_time: dict[str, int] = msgspec.field(
+        default_factory=dict
+    )  # table_idx → extra seconds
+    table_paused_at: dict[str, str] = msgspec.field(
+        default_factory=dict
+    )  # table_idx → ISO datetime
 
 
 # OAuth 2.0 models

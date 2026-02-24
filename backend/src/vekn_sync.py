@@ -285,7 +285,11 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Kistarcsa": "Budapest",
         "Tãrnok": "Budapest",
     },
-    "Iceland": {"Reykjavik": "Reykjavík", "Reykjaví­k": "Reykjavík", "Reyjavik": "Reykjavík"},
+    "Iceland": {
+        "Reykjavik": "Reykjavík",
+        "Reykjaví­k": "Reykjavík",
+        "Reyjavik": "Reykjavík",
+    },
     "Israel": {"Bat-Yam": "Bat Yam", "Tel-Aviv": "Tel Aviv"},
     "Italy": {
         "Firenze": "Florence",
@@ -330,7 +334,11 @@ FIX_CITIES: dict[str, dict[str, str]] = {
         "Almere": "Almere Stad",
         "Haag": "The Hague",
     },
-    "New Zealand": {"WELLINGTON": "Wellington", "Plamerston North": "Palmerston North", "Wellingon": "Wellington"},
+    "New Zealand": {
+        "WELLINGTON": "Wellington",
+        "Plamerston North": "Palmerston North",
+        "Wellingon": "Wellington",
+    },
     "Norway": {"Fjellhamar": "Oslo"},
     "Panama": {"Panama": "Panamá"},
     "Philippines": {
@@ -701,9 +709,7 @@ class VEKNSyncService:
         await update_user(updated_user)
         return updated_user, True
 
-    async def sync_player(
-        self, vekn_player: dict[str, Any]
-    ) -> tuple[User, str]:
+    async def sync_player(self, vekn_player: dict[str, Any]) -> tuple[User, str]:
         """
         Sync a single player from VEKN API.
 

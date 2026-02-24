@@ -7,7 +7,6 @@ from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
 import psycopg
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -35,9 +34,11 @@ def _ensure_test_db_exists() -> None:
             "SELECT 1 FROM pg_database WHERE datname = %s", (db_name,)
         ).fetchone()
         if not exists:
-            conn.execute(psycopg.sql.SQL("CREATE DATABASE {}").format(
-                psycopg.sql.Identifier(db_name)
-            ))
+            conn.execute(
+                psycopg.sql.SQL("CREATE DATABASE {}").format(
+                    psycopg.sql.Identifier(db_name)
+                )
+            )
 
 
 # Auto-create test database before any test collection
@@ -46,6 +47,7 @@ _ensure_test_db_exists()
 from src import db
 from src.main import app
 from src.routes.auth import create_access_token
+
 from tests.mock_vekn_data import generate_mock_users
 
 
@@ -60,7 +62,7 @@ async def test_db() -> AsyncIterator[None]:
     """Initialize test database and clean it up after tests."""
     # Initialize database
     await db.init_db()
-    
+
     # Clean existing data
     async with db.get_connection() as conn:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
@@ -70,7 +72,7 @@ async def test_db() -> AsyncIterator[None]:
     # Clean up after test
     async with db.get_connection() as conn:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
-    
+
     await db.close_db()
 
 
@@ -88,10 +90,9 @@ async def test_client(test_db) -> AsyncIterator[AsyncClient]:
 async def populated_db(test_db) -> list:
     """Populate database with mock users for testing."""
     users = generate_mock_users(400)
-    
+
     # Insert all users
     for user in users:
         await db.insert_user(user)
-    
-    return users
 
+    return users

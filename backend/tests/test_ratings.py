@@ -1,14 +1,7 @@
 """Tests for rating computation helpers."""
 
 import msgspec
-import pytest
-
 from src.models import (
-    FinalsTable,
-    Score,
-    Seat,
-    Standing,
-    Table,
     Tournament,
 )
 from src.ratings import _finalist_position, _player_stats
@@ -16,19 +9,19 @@ from src.ratings import _finalist_position, _player_stats
 
 def _make_tournament(**overrides) -> Tournament:
     """Minimal Tournament with sensible defaults."""
-    defaults = dict(
-        uid="t-001",
-        modified="2026-01-01T00:00:00",
-        name="Test Tournament",
-        format="Standard",
-        rank="",
-        state="Finished",
-        country="FR",
-        rounds=[],
-        finals=None,
-        standings=[],
-        winner="",
-    )
+    defaults = {
+        "uid": "t-001",
+        "modified": "2026-01-01T00:00:00",
+        "name": "Test Tournament",
+        "format": "Standard",
+        "rank": "",
+        "state": "Finished",
+        "country": "FR",
+        "rounds": [],
+        "finals": None,
+        "standings": [],
+        "winner": "",
+    }
     defaults.update(overrides)
     return msgspec.convert(defaults, Tournament)
 

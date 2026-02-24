@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 
 import msgspec
 import openpyxl
-from uuid6 import uuid7
 
 from .db import (
     get_user_by_vekn_id,
@@ -28,8 +27,8 @@ from .models import (
     Standing,
     Table,
     TableState,
-    Tournament,
     TournamentState,
+    User,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +37,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ArchonPlayer:
@@ -51,6 +51,7 @@ class ArchonPlayer:
 @dataclass
 class ArchonRoundTable:
     """A single table in a round: list of (player_number, vp) in seat order."""
+
     seats: list[tuple[int, float]]
 
 
@@ -76,6 +77,7 @@ class ImportResult:
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
+
 
 def _cell_float(val) -> float:
     """Convert cell value to float, defaulting to 0.0."""
@@ -138,13 +140,15 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
         last_name = _cell_str(ws_players.cell(row=row, column=3).value)
         city = _cell_str(ws_players.cell(row=row, column=4).value)
         vekn_id = _cell_str(ws_players.cell(row=row, column=5).value)
-        players.append(ArchonPlayer(
-            number=player_num,
-            first_name=first_name,
-            last_name=last_name,
-            city=city,
-            vekn_id=vekn_id,
-        ))
+        players.append(
+            ArchonPlayer(
+                number=player_num,
+                first_name=first_name,
+                last_name=last_name,
+                city=city,
+                vekn_id=vekn_id,
+            )
+        )
         row += 1
 
     # --- Rounds (sheet indices 4-6) ---
@@ -215,6 +219,7 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
 # Validation
 # ---------------------------------------------------------------------------
 
+
 def validate_archon_import(data: ArchonData, engine) -> list[str]:
     """Validate parsed archon data. Returns list of error strings (empty = valid)."""
     errors: list[str] = []
@@ -277,9 +282,7 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
     if data.finals:
         fsize = len(data.finals.seats)
         if fsize not in (4, 5):
-            errors.append(
-                f"Finals: invalid table size {fsize} (must be 4 or 5)"
-            )
+            errors.append(f"Finals: invalid table size {fsize} (must be 4 or 5)")
         else:
             fvps = [s[1] for s in data.finals.seats]
             vp_error = engine.check_table_vps(fvps)
@@ -292,6 +295,7 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
 # ---------------------------------------------------------------------------
 # Import
 # ---------------------------------------------------------------------------
+
 
 async def apply_archon_import(
     tournament_uid: str,
@@ -307,8 +311,7 @@ async def apply_archon_import(
     than replaying events.
     """
     # 1. Resolve all players by VEKN ID
-    player_by_number: dict[int, ArchonPlayer] = {p.number: p for p in data.players}
-    user_by_number: dict[int, object] = {}  # number → User
+    user_by_number: dict[int, User] = {}
     unmatched: list[str] = []
 
     for p in data.players:
@@ -319,9 +322,7 @@ async def apply_archon_import(
         if user:
             user_by_number[p.number] = user
         else:
-            unmatched.append(
-                f"{p.first_name} {p.last_name} (VEKN ID: {p.vekn_id})"
-            )
+            unmatched.append(f"{p.first_name} {p.last_name} (VEKN ID: {p.vekn_id})")
 
     if unmatched:
         return ImportResult(
@@ -330,9 +331,7 @@ async def apply_archon_import(
         )
 
     # Map player_number → user_uid for quick lookup
-    uid_by_number: dict[int, str] = {
-        num: u.uid for num, u in user_by_number.items()
-    }
+    uid_by_number: dict[int, str] = {num: u.uid for num, u in user_by_number.items()}
 
     # 2. Build round data
     built_rounds: list[list[Table]] = []
@@ -355,18 +354,22 @@ async def apply_archon_import(
                 user_uid = uid_by_number[player_num]
                 gw = int(gws[i])
                 tp = int(tps[i])
-                seats.append(Seat(
-                    player_uid=user_uid,
-                    result=Score(gw=gw, vp=vp, tp=tp),
-                ))
+                seats.append(
+                    Seat(
+                        player_uid=user_uid,
+                        result=Score(gw=gw, vp=vp, tp=tp),
+                    )
+                )
                 player_scores[user_uid]["gw"] += gw
                 player_scores[user_uid]["vp"] += vp
                 player_scores[user_uid]["tp"] += tp
 
-            round_tables.append(Table(
-                seating=seats,
-                state=TableState.FINISHED,
-            ))
+            round_tables.append(
+                Table(
+                    seating=seats,
+                    state=TableState.FINISHED,
+                )
+            )
         built_rounds.append(round_tables)
 
     # 3. Build finals
@@ -386,10 +389,12 @@ async def apply_archon_import(
             user_uid = uid_by_number[player_num]
             gw = int(f_gws[i])
             tp = int(f_tps[i])
-            finals_seats.append(Seat(
-                player_uid=user_uid,
-                result=Score(gw=gw, vp=vp, tp=tp),
-            ))
+            finals_seats.append(
+                Seat(
+                    player_uid=user_uid,
+                    result=Score(gw=gw, vp=vp, tp=tp),
+                )
+            )
             seed_order.append(user_uid)
             # Finals GW/VP adds to player total
             player_scores[user_uid]["gw"] += gw
@@ -412,29 +417,33 @@ async def apply_archon_import(
 
     players_list: list[Player] = []
     standings_list: list[Standing] = []
-    for player_num, user in user_by_number.items():
+    for _player_num, user in user_by_number.items():
         user_uid = user.uid
         scores = player_scores[user_uid]
-        players_list.append(Player(
-            user_uid=user_uid,
-            state=PlayerState.FINISHED,
-            payment_status=PaymentStatus.PAID,
-            toss=0,
-            result=Score(
-                gw=int(scores["gw"]),
+        players_list.append(
+            Player(
+                user_uid=user_uid,
+                state=PlayerState.FINISHED,
+                payment_status=PaymentStatus.PAID,
+                toss=0,
+                result=Score(
+                    gw=int(scores["gw"]),
+                    vp=scores["vp"],
+                    tp=int(scores["tp"]),
+                ),
+                finalist=user_uid in finalist_uids,
+            )
+        )
+        standings_list.append(
+            Standing(
+                user_uid=user_uid,
+                gw=float(scores["gw"]),
                 vp=scores["vp"],
                 tp=int(scores["tp"]),
-            ),
-            finalist=user_uid in finalist_uids,
-        ))
-        standings_list.append(Standing(
-            user_uid=user_uid,
-            gw=float(scores["gw"]),
-            vp=scores["vp"],
-            tp=int(scores["tp"]),
-            toss=0,
-            finalist=user_uid in finalist_uids,
-        ))
+                toss=0,
+                finalist=user_uid in finalist_uids,
+            )
+        )
 
     # Sort standings: GW desc, VP desc, TP desc, toss desc
     standings_list.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss))
@@ -479,7 +488,10 @@ async def apply_archon_import(
 
     # Ratings recompute
     try:
-        from .ratings import rating_category_for_tournament, recompute_ratings_for_players
+        from .ratings import (
+            rating_category_for_tournament,
+            recompute_ratings_for_players,
+        )
 
         player_uids = {p.user_uid for p in players_list if p.user_uid}
         category = rating_category_for_tournament(tournament)

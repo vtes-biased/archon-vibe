@@ -9,7 +9,7 @@ Covers:
 
 from datetime import UTC, datetime
 
-from src.main import broadcast_judge_call, SSEConnection
+from src.main import SSEConnection, broadcast_judge_call
 from src.models import (
     Role,
     Room,
@@ -22,11 +22,20 @@ NOW = datetime.now(UTC)
 
 
 def _make_user(
-    uid: str = "u1", name: str = "Alice", country: str = "FR",
-    vekn_id: str | None = "1000001", roles: list[Role] | None = None,
+    uid: str = "u1",
+    name: str = "Alice",
+    country: str = "FR",
+    vekn_id: str | None = "1000001",
+    roles: list[Role] | None = None,
 ) -> User:
-    return User(uid=uid, modified=NOW, name=name, country=country,
-                vekn_id=vekn_id, roles=roles or [])
+    return User(
+        uid=uid,
+        modified=NOW,
+        name=name,
+        country=country,
+        vekn_id=vekn_id,
+        roles=roles or [],
+    )
 
 
 # ============================================================================
@@ -73,12 +82,7 @@ class TestTimerLifecycleHooks:
 
     def test_start_round_creates_fresh_timer(self):
         """Simulating the effect of the StartRound hook."""
-        # Before: timer was running from previous round
-        old_timer = TimerState(started_at=NOW, elapsed_before_pause=300, paused=False)
-        old_extra = {"0": 60, "2": 120}
-        old_paused = {"1": NOW.isoformat()}
-
-        # The hook code:
+        # The hook code (resets timer/extra/paused from previous round):
         new_timer = TimerState()
         new_extra: dict = {}
         new_paused: dict = {}
@@ -120,7 +124,6 @@ class TestTimerLifecycleHooks:
 # ============================================================================
 
 
-import asyncio
 import pytest
 
 

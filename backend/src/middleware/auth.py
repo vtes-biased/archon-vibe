@@ -48,7 +48,9 @@ async def get_current_user(
             client_id = payload.get("client_id")
 
             if not user_uid or not jti or not client_id:
-                raise HTTPException(status_code=401, detail="Invalid OAuth token payload")
+                raise HTTPException(
+                    status_code=401, detail="Invalid OAuth token payload"
+                )
 
             # Check revocation
             token_record = await get_oauth_token_by_jti(jti)

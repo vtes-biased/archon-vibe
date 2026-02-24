@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """Compare our seating algorithm with optimal seatings from Excel."""
 
-import json
-import subprocess
-import sys
 import os
+import sys
 
 # Add parent directory for openpyxl
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import openpyxl
+
 
 def get_table_sizes(n):
     """Get VEKN table sizes for n players: 4 or 5 player tables only."""
@@ -45,9 +44,10 @@ def parse_round_cells(cells, n_players):
     tables = []
     idx = 0
     for size in sizes:
-        tables.append(players[idx:idx + size])
+        tables.append(players[idx : idx + size])
         idx += size
     return tables
+
 
 def extract_seatings_3r(sheet, max_players=50):
     """Extract 3-round seatings from Excel sheet."""
@@ -83,6 +83,7 @@ def extract_seatings_3r(sheet, max_players=50):
 
     return seatings
 
+
 def compute_score(rounds):
     """Compute score for given rounds."""
     # Find max player number
@@ -95,7 +96,7 @@ def compute_score(rounds):
     rounds_count = len(rounds)
 
     # Initialize measure matrix (n+1 x n+1 x 8) - 1-indexed
-    measure = [[[0]*8 for _ in range(n+1)] for _ in range(n+1)]
+    measure = [[[0] * 8 for _ in range(n + 1)] for _ in range(n + 1)]
 
     # Position vectors
     POSITIONS_4 = [
@@ -150,7 +151,7 @@ def compute_score(rounds):
     vps_list = []
     transfers_list = []
 
-    for i in range(1, n+1):
+    for i in range(1, n + 1):
         played = measure[i][i][0]
         if played > 0:
             vps = measure[i][i][1] / played
@@ -165,7 +166,7 @@ def compute_score(rounds):
                     if seat == 7:  # fifth seat
                         r5 += 1
 
-    for i in range(1, n+1):
+    for i in range(1, n + 1):
         for j in range(1, i):
             opp_count = measure[i][j][0]
             if opp_count > 1:
@@ -188,38 +189,34 @@ def compute_score(rounds):
     # R3, R8: standard deviations
     if vps_list:
         mean_vps = sum(vps_list) / len(vps_list)
-        r3 = (sum((v - mean_vps)**2 for v in vps_list) / len(vps_list)) ** 0.5
+        r3 = (sum((v - mean_vps) ** 2 for v in vps_list) / len(vps_list)) ** 0.5
         mean_transfers = sum(transfers_list) / len(transfers_list)
-        r8 = (sum((t - mean_transfers)**2 for t in transfers_list) / len(transfers_list)) ** 0.5
+        r8 = (
+            sum((t - mean_transfers) ** 2 for t in transfers_list) / len(transfers_list)
+        ) ** 0.5
     else:
         r3 = r8 = 0
 
     return [r1, r2, r3, r4, r5, r6, r7, r8, r9]
 
+
 def run_rust_and_get_score(n_players, rounds_count=3):
     """Run Rust seating and get score by calling cargo test."""
-    # Create a test that outputs the score
-    test_code = f'''
-    let players: Vec<String> = (1..={n_players}).map(|i| format!("P{{}}", i)).collect();
-    let (rounds, score) = seating::compute_seating(&players, {rounds_count}, None).unwrap();
-    println!("RUST_SCORE: {{:?}}", score.rules);
-    println!("RUST_ROUNDS:");
-    for (i, r) in rounds.iter().enumerate() {{
-        println!("  Round {{}}: {{:?}}", i+1, r);
-    }}
-    '''
-    # We'll use a simpler approach - just run the benchmark and parse output
+    # TODO: implement Rust benchmark parsing
     return None
+
 
 def main():
     print("Loading Excel file...")
-    wb = openpyxl.load_workbook('../INCOMING/thearchon1.5l.xlsx', data_only=True)
+    wb = openpyxl.load_workbook("../INCOMING/thearchon1.5l.xlsx", data_only=True)
 
-    sheet = wb['Optimal Seating 3R+F']
+    sheet = wb["Optimal Seating 3R+F"]
     print("\n=== Optimal Seating 3R+F ===")
 
     seatings = extract_seatings_3r(sheet, max_players=50)
-    print(f"Found optimal seatings for {len(seatings)} player counts: {sorted(seatings.keys())}")
+    print(
+        f"Found optimal seatings for {len(seatings)} player counts: {sorted(seatings.keys())}"
+    )
 
     print("\nExcel optimal scores (3 rounds):")
     print("-" * 80)
@@ -243,7 +240,9 @@ def main():
         status = "✓" if hard == 0 else "✗"
 
         results.append((n_players, score))
-        print(f"{n_players:3d}p: {status} R1={score[0]:.0f} R2={score[1]:.0f} R3={score[2]:.2f} R4={score[3]:.0f} R5={score[4]:.0f} R6={score[5]:.0f} R7={score[6]:.0f} R8={score[7]:.2f} R9={score[8]:.0f}")
+        print(
+            f"{n_players:3d}p: {status} R1={score[0]:.0f} R2={score[1]:.0f} R3={score[2]:.2f} R4={score[3]:.0f} R5={score[4]:.0f} R6={score[5]:.0f} R7={score[6]:.0f} R8={score[7]:.2f} R9={score[8]:.0f}"
+        )
 
     # Now let's compare with our Rust implementation
     # We'll output a simple comparison format
@@ -255,6 +254,7 @@ def main():
     print("\nExcel optimal data (for Rust comparison test):")
     for n_players, score in results[:15]:  # First 15 for focused comparison
         print(f"({n_players}, {score}),")
+
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))

@@ -25,7 +25,6 @@ sys.path.insert(0, ".")
 from backend.src.access_levels import compute_full, compute_member, compute_public
 from backend.src.db import (
     close_db,
-    decode_json,
     get_connection,
     init_db,
     stream_objects,
@@ -72,7 +71,14 @@ async def backfill(dry_run: bool = False) -> None:
                     deleted_at = d.get("deleted_at")
                     await conn.execute(
                         _UPSERT_SQL,
-                        (user.uid, "user", deleted_at, _json_str(pub), _json_str(mem), _json_str(full)),
+                        (
+                            user.uid,
+                            "user",
+                            deleted_at,
+                            _json_str(pub),
+                            _json_str(mem),
+                            _json_str(full),
+                        ),
                     )
                     count += 1
         stats["users"] = count
@@ -87,20 +93,33 @@ async def backfill(dry_run: bool = False) -> None:
             async with get_connection() as conn:
                 for rating in batch:
                     # Read existing user from objects table
-                    row = await (await conn.execute(
-                        'SELECT "full" FROM objects WHERE uid = %s AND type = \'user\'',
-                        (rating.user_uid,),
-                    )).fetchone()
+                    row = await (
+                        await conn.execute(
+                            "SELECT \"full\" FROM objects WHERE uid = %s AND type = 'user'",
+                            (rating.user_uid,),
+                        )
+                    ).fetchone()
                     if not row:
-                        logger.warning(f"Rating {rating.uid}: user {rating.user_uid} not found")
+                        logger.warning(
+                            f"Rating {rating.uid}: user {rating.user_uid} not found"
+                        )
                         continue
 
-                    user_data = row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
+                    user_data = (
+                        row[0]
+                        if isinstance(row[0], dict)
+                        else msgspec.json.decode(row[0])
+                    )
 
                     # Embed rating fields
                     rd = _to_dict(rating)
-                    for field in ("constructed_online", "constructed_offline",
-                                  "limited_online", "limited_offline", "wins"):
+                    for field in (
+                        "constructed_online",
+                        "constructed_offline",
+                        "limited_online",
+                        "limited_offline",
+                        "wins",
+                    ):
                         if rd.get(field) is not None:
                             user_data[field] = rd[field]
 
@@ -111,7 +130,12 @@ async def backfill(dry_run: bool = False) -> None:
                     await conn.execute(
                         """UPDATE objects SET "public"=%s::jsonb, "member"=%s::jsonb, "full"=%s::jsonb
                            WHERE uid = %s""",
-                        (_json_str(pub), _json_str(mem), _json_str(full), rating.user_uid),
+                        (
+                            _json_str(pub),
+                            _json_str(mem),
+                            _json_str(full),
+                            rating.user_uid,
+                        ),
                     )
                     rating_count += 1
         stats["ratings_embedded"] = rating_count
@@ -132,7 +156,14 @@ async def backfill(dry_run: bool = False) -> None:
                     deleted_at = d.get("deleted_at")
                     await conn.execute(
                         _UPSERT_SQL,
-                        (s.uid, "sanction", deleted_at, _json_str(pub), _json_str(mem), _json_str(full)),
+                        (
+                            s.uid,
+                            "sanction",
+                            deleted_at,
+                            _json_str(pub),
+                            _json_str(mem),
+                            _json_str(full),
+                        ),
                     )
                     count += 1
         stats["sanctions"] = count
@@ -160,7 +191,14 @@ async def backfill(dry_run: bool = False) -> None:
                     deleted_at = td.get("deleted_at")
                     await conn.execute(
                         _UPSERT_SQL,
-                        (t.uid, "tournament", deleted_at, _json_str(pub), _json_str(mem), _json_str(full)),
+                        (
+                            t.uid,
+                            "tournament",
+                            deleted_at,
+                            _json_str(pub),
+                            _json_str(mem),
+                            _json_str(full),
+                        ),
                     )
                     t_count += 1
 
@@ -194,7 +232,12 @@ async def backfill(dry_run: bool = False) -> None:
                                 """INSERT INTO objects (uid, type, deleted_at, "public", "member", "full")
                                    VALUES (%s, 'deck', NULL, %s::jsonb, %s::jsonb, %s::jsonb)
                                    ON CONFLICT (uid) DO NOTHING""",
-                                (deck_uid, _json_str(dpub), _json_str(dmem), _json_str(dfull)),
+                                (
+                                    deck_uid,
+                                    _json_str(dpub),
+                                    _json_str(dmem),
+                                    _json_str(dfull),
+                                ),
                             )
                             d_count += 1
 
@@ -217,7 +260,14 @@ async def backfill(dry_run: bool = False) -> None:
                     deleted_at = d.get("deleted_at")
                     await conn.execute(
                         _UPSERT_SQL,
-                        (lg.uid, "league", deleted_at, _json_str(pub), _json_str(mem), _json_str(full)),
+                        (
+                            lg.uid,
+                            "league",
+                            deleted_at,
+                            _json_str(pub),
+                            _json_str(mem),
+                            _json_str(full),
+                        ),
                     )
                     count += 1
         stats["leagues"] = count

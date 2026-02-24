@@ -336,11 +336,15 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
     # Generate token
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
-    await store_transient_token(f"magic:{token}", {
-        "email": email,
-        "purpose": "invite",
-        "user_uid": user_uid,
-    }, expires_at)
+    await store_transient_token(
+        f"magic:{token}",
+        {
+            "email": email,
+            "purpose": "invite",
+            "user_uid": user_uid,
+        },
+        expires_at,
+    )
 
     # Build magic link URL
     frontend_url = _get_frontend_url()
@@ -406,12 +410,16 @@ async def request_magic_link(
     # Generate token
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
-    await store_transient_token(f"magic:{token}", {
-        "email": email,
-        "purpose": purpose,
-        "discord_user_uid": discord_user_uid,
-        "user_uid": link_user_uid,
-    }, expires_at)
+    await store_transient_token(
+        f"magic:{token}",
+        {
+            "email": email,
+            "purpose": purpose,
+            "discord_user_uid": discord_user_uid,
+            "user_uid": link_user_uid,
+        },
+        expires_at,
+    )
 
     # Build magic link URL
     frontend_url = _get_frontend_url()
@@ -424,11 +432,13 @@ async def request_magic_link(
         raise HTTPException(status_code=500, detail="Failed to send email")
 
     return Response(
-        content=encoder.encode({
-            "message": "Magic link sent",
-            "email": email,
-            "purpose": purpose,
-        }),
+        content=encoder.encode(
+            {
+                "message": "Magic link sent",
+                "email": email,
+                "purpose": purpose,
+            }
+        ),
         media_type="application/json",
     )
 
@@ -450,20 +460,26 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
     # Generate a set-password token
     set_password_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=SET_PASSWORD_EXPIRE_MINUTES)
-    await store_transient_token(f"setpwd:{set_password_token}", {
-        "email": stored["email"],
-        "purpose": stored["purpose"],
-        "discord_user_uid": stored.get("discord_user_uid"),
-        "user_uid": stored.get("user_uid"),  # For invite flow
-    }, expires_at)
-
-    return Response(
-        content=encoder.encode({
-            "set_password_token": set_password_token,
+    await store_transient_token(
+        f"setpwd:{set_password_token}",
+        {
             "email": stored["email"],
             "purpose": stored["purpose"],
-            "expires_in": SET_PASSWORD_EXPIRE_MINUTES * 60,
-        }),
+            "discord_user_uid": stored.get("discord_user_uid"),
+            "user_uid": stored.get("user_uid"),  # For invite flow
+        },
+        expires_at,
+    )
+
+    return Response(
+        content=encoder.encode(
+            {
+                "set_password_token": set_password_token,
+                "email": stored["email"],
+                "purpose": stored["purpose"],
+                "expires_in": SET_PASSWORD_EXPIRE_MINUTES * 60,
+            }
+        ),
         media_type="application/json",
     )
 
@@ -616,7 +632,9 @@ async def generate_calendar_token(
 ) -> Response:
     """Generate or regenerate a calendar subscription token."""
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid authorization header"
+        )
 
     token = authorization[7:]
     user_uid = verify_token(token, expected_type="access")
@@ -635,10 +653,12 @@ async def generate_calendar_token(
     calendar_url = f"{api_base}/api/calendar/tournaments.ics?token={cal_token}"
 
     return Response(
-        content=encoder.encode({
-            "calendar_token": cal_token,
-            "calendar_url": calendar_url,
-        }),
+        content=encoder.encode(
+            {
+                "calendar_token": cal_token,
+                "calendar_url": calendar_url,
+            }
+        ),
         media_type="application/json",
     )
 
@@ -821,10 +841,14 @@ async def passkey_register_options(
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
     expires_at = datetime.now(UTC) + timedelta(minutes=5)
-    await store_transient_token(f"challenge:{challenge_b64}", {
-        "user_uid": user_uid,
-        "type": "registration",
-    }, expires_at)
+    await store_transient_token(
+        f"challenge:{challenge_b64}",
+        {
+            "user_uid": user_uid,
+            "type": "registration",
+        },
+        expires_at,
+    )
 
     return Response(
         content=options_to_json(options),
@@ -935,10 +959,14 @@ async def passkey_create_options() -> Response:
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
     expires_at = datetime.now(UTC) + timedelta(minutes=5)
-    await store_transient_token(f"challenge:{challenge_b64}", {
-        "temp_user_uid": temp_user_uid,
-        "type": "create",
-    }, expires_at)
+    await store_transient_token(
+        f"challenge:{challenge_b64}",
+        {
+            "temp_user_uid": temp_user_uid,
+            "type": "create",
+        },
+        expires_at,
+    )
 
     return Response(
         content=options_to_json(options),
@@ -1042,9 +1070,13 @@ async def passkey_login_options() -> Response:
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
     expires_at = datetime.now(UTC) + timedelta(minutes=5)
-    await store_transient_token(f"challenge:{challenge_b64}", {
-        "type": "authentication",
-    }, expires_at)
+    await store_transient_token(
+        f"challenge:{challenge_b64}",
+        {
+            "type": "authentication",
+        },
+        expires_at,
+    )
 
     return Response(
         content=options_to_json(options),

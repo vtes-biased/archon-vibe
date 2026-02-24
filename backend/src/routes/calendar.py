@@ -16,7 +16,12 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 def _escape_ical(text: str) -> str:
     """Escape text for iCal format."""
-    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+    return (
+        text.replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\n", "\\n")
+    )
 
 
 def _format_dt(dt: datetime | None) -> str:
@@ -125,8 +130,7 @@ async def tournament_calendar(
     If token is provided, returns a personalized agenda feed.
     Otherwise, returns a public feed filtered by country/online params.
     """
-    from ..db import get_connection
-    from ..db import decode_json
+    from ..db import decode_json, get_connection
 
     now = datetime.now(UTC)
     now_str = now.strftime("%Y%m%dT%H%M%SZ")
@@ -159,7 +163,8 @@ async def tournament_calendar(
     if user and user.country:
         continent_countries = get_countries_on_continent(user.country)
         tournaments = [
-            t for t in tournaments
+            t
+            for t in tournaments
             if _matches_agenda(t, user.uid, user.country, continent_countries)
         ]
     else:

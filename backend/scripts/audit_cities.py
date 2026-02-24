@@ -75,7 +75,9 @@ async def main() -> None:
             else:
                 matched += 1
         else:
-            unmatched_cities[country_name].append((city_raw if not was_fixed else f"{city_raw} -> {city}", 1))
+            unmatched_cities[country_name].append(
+                (city_raw if not was_fixed else f"{city_raw} -> {city}", 1)
+            )
 
     # Aggregate unmatched by (country, city)
     unmatched_agg: dict[str, Counter] = defaultdict(Counter)

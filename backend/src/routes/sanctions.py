@@ -20,13 +20,13 @@ from ..db import (
     update_tournament,
 )
 from ..models import (
+    SUBCATEGORIES_BY_CATEGORY,
     PlayerState,
     Role,
     Sanction,
     SanctionCategory,
     SanctionLevel,
     SanctionSubcategory,
-    SUBCATEGORIES_BY_CATEGORY,
 )
 from .auth import verify_token
 
@@ -288,7 +288,8 @@ async def create_sanction(
             expires_at = datetime(d.year, d.month, d.day, tzinfo=UTC)
         except ValueError as e:
             raise HTTPException(
-                status_code=400, detail=f"Invalid expires_at format (expected YYYY-MM-DD): {e}"
+                status_code=400,
+                detail=f"Invalid expires_at format (expected YYYY-MM-DD): {e}",
             ) from e
 
     _validate_expiry(level, expires_at, issued_at)
@@ -358,18 +359,21 @@ async def update_sanction_endpoint(
     if request.lifted is True and sanction.lifted_at is None:
         if not await _can_lift_sanction(current_user, sanction):
             raise HTTPException(
-                status_code=403, detail="You don't have permission to lift this sanction"
+                status_code=403,
+                detail="You don't have permission to lift this sanction",
             )
 
     # Check modify permission (IC/Ethics for all modifications)
-    has_modify_fields = any([
-        request.level is not None,
-        request.category is not None,
-        request.subcategory is not None,
-        request.round_number is not None,
-        request.description is not None,
-        request.expires_at is not None,
-    ])
+    has_modify_fields = any(
+        [
+            request.level is not None,
+            request.category is not None,
+            request.subcategory is not None,
+            request.round_number is not None,
+            request.description is not None,
+            request.expires_at is not None,
+        ]
+    )
     if has_modify_fields:
         if Role.IC not in current_user.roles and Role.ETHICS not in current_user.roles:
             raise HTTPException(
@@ -440,7 +444,8 @@ async def update_sanction_endpoint(
             expires_at = datetime(d.year, d.month, d.day, tzinfo=UTC)
         except ValueError as e:
             raise HTTPException(
-                status_code=400, detail=f"Invalid expires_at format (expected YYYY-MM-DD): {e}"
+                status_code=400,
+                detail=f"Invalid expires_at format (expected YYYY-MM-DD): {e}",
             ) from e
         _validate_expiry(level, expires_at, sanction.issued_at)
 

@@ -14,7 +14,12 @@ _cards_etag: str | None = None
 def _load_cards():
     global _cards_data, _cards_etag
     if _cards_data is None:
-        cards_path = Path(__file__).resolve().parent.parent.parent.parent / "engine" / "data" / "cards.json"
+        cards_path = (
+            Path(__file__).resolve().parent.parent.parent.parent
+            / "engine"
+            / "data"
+            / "cards.json"
+        )
         if not cards_path.exists():
             return None, None
         _cards_data = cards_path.read_bytes()

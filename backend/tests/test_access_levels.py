@@ -1,13 +1,12 @@
 """Tests for access level projection functions."""
 
 import pytest
-
 from src.access_levels import compute_full, compute_member, compute_public
-
 
 # ---------------------------------------------------------------------------
 # User fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_user(**overrides) -> dict:
     """Create a base user dict with sensible defaults."""
@@ -48,6 +47,7 @@ def _make_user(**overrides) -> dict:
 # ---------------------------------------------------------------------------
 # User: public level
 # ---------------------------------------------------------------------------
+
 
 class TestUserPublic:
     def test_regular_user_hidden(self):
@@ -106,6 +106,7 @@ class TestUserPublic:
 # User: member level
 # ---------------------------------------------------------------------------
 
+
 class TestUserMember:
     def test_all_users_visible(self):
         """All users are visible at member level."""
@@ -156,6 +157,7 @@ class TestUserMember:
 # User: full level
 # ---------------------------------------------------------------------------
 
+
 class TestUserFull:
     def test_includes_everything_except_calendar_token(self):
         """Full projection includes everything except calendar_token."""
@@ -176,6 +178,7 @@ class TestUserFull:
 # ---------------------------------------------------------------------------
 # Tournament fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_tournament(**overrides) -> dict:
     base = {
@@ -233,6 +236,7 @@ def _make_tournament(**overrides) -> dict:
 # Tournament: public level
 # ---------------------------------------------------------------------------
 
+
 class TestTournamentPublic:
     def test_minimal_fields_only(self):
         """Public projection only has core scheduling fields."""
@@ -259,6 +263,7 @@ class TestTournamentPublic:
 # ---------------------------------------------------------------------------
 # Tournament: member level
 # ---------------------------------------------------------------------------
+
 
 class TestTournamentMember:
     def test_includes_most_fields(self):
@@ -287,6 +292,7 @@ class TestTournamentMember:
 # Tournament: full level
 # ---------------------------------------------------------------------------
 
+
 class TestTournamentFull:
     def test_includes_everything(self):
         """Full projection includes all fields."""
@@ -300,6 +306,7 @@ class TestTournamentFull:
 # ---------------------------------------------------------------------------
 # Sanction
 # ---------------------------------------------------------------------------
+
 
 def _make_sanction(**overrides) -> dict:
     base = {
@@ -346,6 +353,7 @@ class TestSanction:
 # ---------------------------------------------------------------------------
 # Deck
 # ---------------------------------------------------------------------------
+
 
 def _make_deck(**overrides) -> dict:
     base = {
@@ -403,6 +411,7 @@ class TestDeck:
 # League
 # ---------------------------------------------------------------------------
 
+
 def _make_league(**overrides) -> dict:
     base = {
         "uid": "l-001",
@@ -446,6 +455,7 @@ class TestLeague:
 # ---------------------------------------------------------------------------
 # Dispatch / error handling
 # ---------------------------------------------------------------------------
+
 
 class TestDispatch:
     def test_unknown_type_raises(self):

@@ -3,10 +3,10 @@
 import logging
 import os
 from datetime import UTC, datetime
-
-import msgspec
 from pathlib import Path
 
+import msgspec
+from archon_engine import PyEngine
 from fastapi import APIRouter, Header, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -14,7 +14,6 @@ from uuid6 import uuid7
 
 from ..db import (
     BroadcastData,
-    delete_object,
     get_auth_method_by_identifier,
     get_decks_for_tournament,
     get_sanctions_for_tournament,
@@ -34,7 +33,6 @@ from ..db import (
 from ..models import (
     DeckListsMode,
     DeckObject,
-    PlayerState,
     Role,
     Sanction,
     SanctionLevel,
@@ -61,8 +59,6 @@ broadcast_user_event = None
 broadcast_sanction_event = None
 broadcast_deck_event = None  # async fn(deck_uid: str) -> None
 
-from archon_engine import PyEngine
-
 _engine = PyEngine()
 
 
@@ -86,14 +82,15 @@ def _is_organizer(user, tournament: Tournament) -> bool:
 async def _build_decks_json(tournament_uid: str) -> str:
     """Build deck metadata JSON for the engine's decks parameter."""
     decks = await get_decks_for_tournament(tournament_uid)
-    return msgspec.json.encode([
-        {"user_uid": d.user_uid, "round": d.round, "uid": d.uid}
-        for d in decks
-    ]).decode()
+    return msgspec.json.encode(
+        [{"user_uid": d.user_uid, "round": d.round, "uid": d.uid} for d in decks]
+    ).decode()
 
 
 async def _process_deck_ops(
-    deck_ops: list, tournament_uid: str, existing_decks: list[DeckObject] | None = None,
+    deck_ops: list,
+    tournament_uid: str,
+    existing_decks: list[DeckObject] | None = None,
 ) -> list[BroadcastData]:
     """Process deck_ops from engine result. Returns BroadcastData for each affected deck."""
     if not deck_ops:
@@ -110,8 +107,11 @@ async def _process_deck_ops(
             round_val = deck_data.get("round")
             # Find existing deck for this (tournament, player, round)
             existing = next(
-                (d for d in existing_decks
-                 if d.user_uid == player_uid and d.round == round_val),
+                (
+                    d
+                    for d in existing_decks
+                    if d.user_uid == player_uid and d.round == round_val
+                ),
                 None,
             )
             if existing:
@@ -153,7 +153,7 @@ async def _process_deck_ops(
                 bd = await save_object_from_model("deck", target)
                 affected.append(bd)
 
-    return affected_uids
+    return affected
 
 
 async def _maybe_push_vekn(tournament: Tournament) -> None:
@@ -217,12 +217,14 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
         from ..twda import submit_twda_pr
 
         engine = _engine
-        deck_json = json_mod.dumps({
-            "name": winner_deck.name,
-            "author": winner_deck.author,
-            "comments": winner_deck.comments,
-            "cards": winner_deck.cards,
-        })
+        deck_json = json_mod.dumps(
+            {
+                "name": winner_deck.name,
+                "author": winner_deck.author,
+                "comments": winner_deck.comments,
+                "cards": winner_deck.cards,
+            }
+        )
 
         player_user = await get_user_by_uid(tournament.winner)
         player_name = player_user.name if player_user else "Unknown"
@@ -319,8 +321,6 @@ def _tournament_to_minimal(t: Tournament) -> TournamentMinimal:
     )
 
 
-
-
 class OrganizerAction(BaseModel):
     user_uid: str
 
@@ -341,7 +341,9 @@ async def add_organizer(
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     if not _is_organizer(current_user, tournament):
-        raise HTTPException(status_code=403, detail="Only organizers can manage organizers")
+        raise HTTPException(
+            status_code=403, detail="Only organizers can manage organizers"
+        )
 
     if body.user_uid not in tournament.organizers_uids:
         tournament.organizers_uids.append(body.user_uid)
@@ -372,7 +374,9 @@ async def remove_organizer(
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     if not _is_organizer(current_user, tournament):
-        raise HTTPException(status_code=403, detail="Only organizers can manage organizers")
+        raise HTTPException(
+            status_code=403, detail="Only organizers can manage organizers"
+        )
 
     if organizer_uid in tournament.organizers_uids:
         if len(tournament.organizers_uids) <= 1:
@@ -412,7 +416,6 @@ class CreateTournamentRequest(BaseModel):
     decklists_mode: str = "Winner"
     max_rounds: int = 0
     league_uid: str | None = None
-
 
 
 def _parse_datetime(s: str | None) -> datetime | None:
@@ -543,7 +546,12 @@ async def get_tournament(
         )
 
     # NCs get full access to tournaments in their country
-    if current_user and Role.NC in current_user.roles and current_user.country and tournament.country == current_user.country:
+    if (
+        current_user
+        and Role.NC in current_user.roles
+        and current_user.country
+        and tournament.country == current_user.country
+    ):
         return Response(
             content=encoder.encode(tournament),
             media_type="application/json",
@@ -559,7 +567,11 @@ async def get_tournament(
             )
 
     # Members (users with vekn_id) see full data for finished tournaments
-    if current_user and current_user.vekn_id and tournament.state == TournamentState.FINISHED:
+    if (
+        current_user
+        and current_user.vekn_id
+        and tournament.state == TournamentState.FINISHED
+    ):
         return Response(
             content=encoder.encode(tournament),
             media_type="application/json",
@@ -681,8 +693,14 @@ async def archon_import(
     if errors:
         return Response(
             content=msgspec.json.encode(
-                {"success": False, "errors": errors, "warnings": [],
-                 "players_matched": 0, "rounds_imported": 0, "has_finals": False}
+                {
+                    "success": False,
+                    "errors": errors,
+                    "warnings": [],
+                    "players_matched": 0,
+                    "rounds_imported": 0,
+                    "has_finals": False,
+                }
             ).decode(),
             media_type="application/json",
             status_code=400,
@@ -701,9 +719,14 @@ async def archon_import(
     status = 200 if result.success else 400
     return Response(
         content=msgspec.json.encode(
-            {"success": result.success, "errors": result.errors,
-             "warnings": result.warnings, "players_matched": result.players_matched,
-             "rounds_imported": result.rounds_imported, "has_finals": result.has_finals}
+            {
+                "success": result.success,
+                "errors": result.errors,
+                "warnings": result.warnings,
+                "players_matched": result.players_matched,
+                "rounds_imported": result.rounds_imported,
+                "has_finals": result.has_finals,
+            }
         ).decode(),
         media_type="application/json",
         status_code=status,
@@ -814,7 +837,11 @@ async def tournament_action(
             raise HTTPException(status_code=404, detail="Tournament not found")
 
         # VEKN_PUSH: max_rounds immutable once pushed to VEKN
-        if request.type == "UpdateConfig" and request.config and "max_rounds" in request.config:
+        if (
+            request.type == "UpdateConfig"
+            and request.config
+            and "max_rounds" in request.config
+        ):
             if tournament.external_ids.get("vekn"):
                 if request.config["max_rounds"] != tournament.max_rounds:
                     raise HTTPException(
@@ -876,6 +903,7 @@ async def tournament_action(
 
         # Parse new result format: {"tournament": {...}, "deck_ops": [...]}
         import json as json_mod
+
         result = json_mod.loads(result_json)
         updated = decoder.decode(msgspec.json.encode(result["tournament"]))
         updated.modified = datetime.now(UTC)
@@ -921,7 +949,10 @@ async def tournament_action(
     is_finished = updated.state == TournamentState.FINISHED
     if was_finished != is_finished or is_finished:
         try:
-            from ..ratings import rating_category_for_tournament, recompute_ratings_for_players
+            from ..ratings import (
+                rating_category_for_tournament,
+                recompute_ratings_for_players,
+            )
 
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
@@ -932,7 +963,9 @@ async def tournament_action(
             # If category changed (format/online toggle), also recompute old category
             old_category = rating_category_for_tournament(tournament)
             if old_category != category:
-                old_results = await recompute_ratings_for_players(player_uids, old_category)
+                old_results = await recompute_ratings_for_players(
+                    player_uids, old_category
+                )
                 if broadcast_user_event:
                     for _user, bd in old_results:
                         broadcast_user_event(bd)
@@ -994,9 +1027,16 @@ def _load_cards_json() -> str:
     if _cards_json is None:
         from pathlib import Path
 
-        cards_path = Path(__file__).resolve().parent.parent.parent.parent / "engine" / "data" / "cards.json"
+        cards_path = (
+            Path(__file__).resolve().parent.parent.parent.parent
+            / "engine"
+            / "data"
+            / "cards.json"
+        )
         if not cards_path.exists():
-            raise HTTPException(status_code=503, detail="Cards data not available. Run: just cards")
+            raise HTTPException(
+                status_code=503, detail="Cards data not available. Run: just cards"
+            )
         _cards_json = cards_path.read_text(encoding="utf-8")
     return _cards_json
 
@@ -1052,12 +1092,14 @@ async def export_deck_twda(
     engine = _engine
     import json as json_mod
 
-    deck_json = json_mod.dumps({
-        "name": deck.name,
-        "author": deck.author,
-        "comments": deck.comments,
-        "cards": deck.cards,
-    })
+    deck_json = json_mod.dumps(
+        {
+            "name": deck.name,
+            "author": deck.author,
+            "comments": deck.comments,
+            "cards": deck.cards,
+        }
+    )
 
     # Get player name
     player_user = await get_user_by_uid(player_uid)
@@ -1111,7 +1153,9 @@ async def tournament_report(
 
     # Check if organizer
     if not _is_organizer(user, tournament):
-        raise HTTPException(status_code=403, detail="Only organizers can download reports")
+        raise HTTPException(
+            status_code=403, detail="Only organizers can download reports"
+        )
 
     if format == "json":
         # JSON report
@@ -1122,7 +1166,9 @@ async def tournament_report(
                 "name": tournament.name,
                 "date": str(tournament.start or tournament.modified.isoformat()),
                 "country": tournament.country,
-                "format": tournament.format.value if hasattr(tournament.format, 'value') else str(tournament.format),
+                "format": tournament.format.value
+                if hasattr(tournament.format, "value")
+                else str(tournament.format),
                 "player_count": len(tournament.players),
                 "winner": tournament.winner,
             },
@@ -1140,7 +1186,9 @@ async def tournament_report(
         return Response(
             content=json_mod.dumps(report, indent=2),
             media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="{uid}-report.json"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{uid}-report.json"'
+            },
         )
 
     # Text report
@@ -1158,13 +1206,17 @@ async def tournament_report(
         name = player_user.name if player_user else s.user_uid
         finalist_mark = " (F)" if s.finalist else ""
         winner_mark = " *WINNER*" if s.user_uid == tournament.winner else ""
-        lines.append(f"{i:>3}. {name:30} GW={s.gw:.1f} VP={s.vp:.1f} TP={s.tp}{finalist_mark}{winner_mark}")
+        lines.append(
+            f"{i:>3}. {name:30} GW={s.gw:.1f} VP={s.vp:.1f} TP={s.tp}{finalist_mark}{winner_mark}"
+        )
 
     # Winner's deck (from DeckObject store)
     winner_deck = None
     if tournament.winner:
         all_decks = await get_decks_for_tournament(uid)
-        winner_deck = next((d for d in all_decks if d.user_uid == tournament.winner), None)
+        winner_deck = next(
+            (d for d in all_decks if d.user_uid == tournament.winner), None
+        )
 
     if winner_deck:
         lines.append("")
@@ -1173,12 +1225,14 @@ async def tournament_report(
             engine = _engine
             import json as json_mod
 
-            deck_json = json_mod.dumps({
-                "name": winner_deck.name,
-                "author": winner_deck.author,
-                "comments": winner_deck.comments,
-                "cards": winner_deck.cards,
-            })
+            deck_json = json_mod.dumps(
+                {
+                    "name": winner_deck.name,
+                    "author": winner_deck.author,
+                    "comments": winner_deck.comments,
+                    "cards": winner_deck.cards,
+                }
+            )
 
             player_user = await get_user_by_uid(tournament.winner)
             player_name = player_user.name if player_user else "Unknown"
@@ -1329,12 +1383,16 @@ async def timer_add_time(
             TimeExtensionPolicy.ADDITIONS,
             TimeExtensionPolicy.BOTH,
         ):
-            raise HTTPException(status_code=400, detail="Time additions not allowed by policy")
+            raise HTTPException(
+                status_code=400, detail="Time additions not allowed by policy"
+            )
         if request.seconds <= 0:
             raise HTTPException(status_code=400, detail="Seconds must be positive")
         current = tournament.table_extra_time.get(request.table, 0)
         if current + request.seconds > 600:
-            raise HTTPException(status_code=400, detail="Max 600s (10 min) extra time per table")
+            raise HTTPException(
+                status_code=400, detail="Max 600s (10 min) extra time per table"
+            )
         tournament.table_extra_time[request.table] = current + request.seconds
         bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
@@ -1360,9 +1418,13 @@ async def timer_clock_stop(
             TimeExtensionPolicy.CLOCK_STOP,
             TimeExtensionPolicy.BOTH,
         ):
-            raise HTTPException(status_code=400, detail="Clock stops not allowed by policy")
+            raise HTTPException(
+                status_code=400, detail="Clock stops not allowed by policy"
+            )
         if request.table in tournament.table_paused_at:
-            raise HTTPException(status_code=400, detail="Table clock is already stopped")
+            raise HTTPException(
+                status_code=400, detail="Table clock is already stopped"
+            )
         tournament.table_paused_at[request.table] = datetime.now(UTC).isoformat()
         bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
@@ -1384,7 +1446,9 @@ async def timer_clock_resume(
             TimeExtensionPolicy.CLOCK_STOP,
             TimeExtensionPolicy.BOTH,
         ):
-            raise HTTPException(status_code=400, detail="Clock stops not allowed by policy")
+            raise HTTPException(
+                status_code=400, detail="Clock stops not allowed by policy"
+            )
         paused_at_str = tournament.table_paused_at.get(request.table)
         if not paused_at_str:
             raise HTTPException(status_code=400, detail="Table clock is not stopped")
@@ -1438,7 +1502,6 @@ async def call_judge(
     if not any(s.player_uid == user.uid for s in table.seating):
         raise HTTPException(status_code=403, detail="You are not seated at this table")
     # Build table label
-    from ..models import Room
     table_label = resolveTableLabelPy(tournament.table_rooms, request.table)
     # Broadcast to organizers
     if broadcast_judge_call:
@@ -1490,10 +1553,14 @@ async def go_offline(
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     if not _is_organizer(current_user, tournament):
-        raise HTTPException(status_code=403, detail="Only organizers can take a tournament offline")
+        raise HTTPException(
+            status_code=403, detail="Only organizers can take a tournament offline"
+        )
 
     if tournament.offline_mode:
-        raise HTTPException(status_code=409, detail="Tournament is already in offline mode")
+        raise HTTPException(
+            status_code=409, detail="Tournament is already in offline mode"
+        )
 
     tournament.offline_mode = True
     tournament.offline_device_id = request.device_id
@@ -1502,7 +1569,9 @@ async def go_offline(
     tournament.modified = datetime.now(UTC)
 
     bd = await update_tournament(tournament)
-    logger.info(f"Tournament {uid} went offline (device={request.device_id}, user={current_user.uid})")
+    logger.info(
+        f"Tournament {uid} went offline (device={request.device_id}, user={current_user.uid})"
+    )
 
     if broadcast_tournament_event:
         broadcast_tournament_event(bd)
@@ -1585,7 +1654,9 @@ async def go_online(
     tournament = await get_tournament_by_uid(uid)
     # Tournament might not exist on server (created offline)
     if tournament and not _is_organizer(current_user, tournament):
-        raise HTTPException(status_code=403, detail="Only organizers can bring a tournament online")
+        raise HTTPException(
+            status_code=403, detail="Only organizers can bring a tournament online"
+        )
 
     # Verify device lock
     if tournament and tournament.offline_mode:
@@ -1636,12 +1707,15 @@ async def go_online(
     else:
         tournament_bd = await insert_tournament(updated)
 
-    logger.info(f"Tournament {uid} went back online (user={current_user.uid}, remapped={len(uid_map)} players)")
+    logger.info(
+        f"Tournament {uid} went back online (user={current_user.uid}, remapped={len(uid_map)} players)"
+    )
 
     # 5. Save offline sanctions with remapped UIDs
     for sanction_data in request.offline_sanctions:
         if uid_map:
             import json as json_mod
+
             raw = json_mod.dumps(sanction_data)
             for temp_uid, real_uid in uid_map.items():
                 raw = raw.replace(temp_uid, real_uid)
@@ -1656,6 +1730,7 @@ async def go_online(
     for deck_data in request.offline_decks:
         if uid_map:
             import json as json_mod
+
             raw = json_mod.dumps(deck_data)
             for temp_uid, real_uid in uid_map.items():
                 raw = raw.replace(temp_uid, real_uid)
@@ -1695,7 +1770,9 @@ async def force_takeover(
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     if not _is_organizer(current_user, tournament):
-        raise HTTPException(status_code=403, detail="Only organizers can force-takeover")
+        raise HTTPException(
+            status_code=403, detail="Only organizers can force-takeover"
+        )
 
     if not tournament.offline_mode:
         raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
@@ -1706,7 +1783,9 @@ async def force_takeover(
     tournament.modified = datetime.now(UTC)
 
     bd = await update_tournament(tournament)
-    logger.info(f"Tournament {uid} force-takeover: {old_device} → {request.device_id} by {current_user.uid}")
+    logger.info(
+        f"Tournament {uid} force-takeover: {old_device} → {request.device_id} by {current_user.uid}"
+    )
 
     if broadcast_tournament_event:
         broadcast_tournament_event(bd)
@@ -1738,7 +1817,9 @@ async def sync_offline(
         raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
 
     if tournament.offline_device_id != request.device_id:
-        raise HTTPException(status_code=409, detail="Device does not hold the offline lock")
+        raise HTTPException(
+            status_code=409, detail="Device does not hold the offline lock"
+        )
 
     # Save tournament snapshot (keep offline_mode=True)
     tournament_data = request.tournament
@@ -1773,7 +1854,9 @@ async def force_unlock(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     if Role.IC not in current_user.roles:
-        raise HTTPException(status_code=403, detail="Only IC can force-unlock tournaments")
+        raise HTTPException(
+            status_code=403, detail="Only IC can force-unlock tournaments"
+        )
 
     tournament = await get_tournament_by_uid(uid)
     if not tournament:

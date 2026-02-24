@@ -2,7 +2,6 @@
 
 import json
 import logging
-import re
 import urllib.parse
 from urllib.request import Request, urlopen
 
@@ -63,7 +62,11 @@ def _fetch_vdb(parsed: urllib.parse.ParseResult) -> dict:
     with urlopen(req, timeout=10) as resp:
         data = json.loads(resp.read())
 
-    cards = {str(cid): int(count) for cid, count in data.get("cards", {}).items() if int(count) > 0}
+    cards = {
+        str(cid): int(count)
+        for cid, count in data.get("cards", {}).items()
+        if int(count) > 0
+    }
     return {
         "name": data.get("name", ""),
         "author": data.get("author", data.get("owner", "")),
@@ -115,7 +118,9 @@ def _fetch_amaranth(parsed: urllib.parse.ParseResult) -> dict:
     # Amaranth uses its own card IDs; we need the VEKN mapping
     # For now store as-is; the backend will need to map these
     cards = {
-        str(cid): int(count) for cid, count in result.get("cards", {}).items() if int(count) > 0
+        str(cid): int(count)
+        for cid, count in result.get("cards", {}).items()
+        if int(count) > 0
     }
     return {
         "name": result.get("title", ""),

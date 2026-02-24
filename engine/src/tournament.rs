@@ -21,6 +21,7 @@ pub enum TournamentState {
 }
 
 impl TournamentState {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "Planned" => Some(Self::Planned),
@@ -53,6 +54,7 @@ pub enum PlayerState {
 }
 
 impl PlayerState {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "Registered" => Some(Self::Registered),
@@ -83,6 +85,7 @@ pub enum TableState {
 }
 
 impl TableState {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "In Progress" => Some(Self::InProgress),
@@ -116,17 +119,32 @@ pub enum TournamentEvent {
     FinishTournament,
 
     // Player management
-    Register { user_uid: String },
-    Unregister { user_uid: String },
-    AddPlayer { user_uid: String },
-    RemovePlayer { user_uid: String },
-    DropOut { player_uid: String },
-    CheckIn { player_uid: String },
+    Register {
+        user_uid: String,
+    },
+    Unregister {
+        user_uid: String,
+    },
+    AddPlayer {
+        user_uid: String,
+    },
+    RemovePlayer {
+        user_uid: String,
+    },
+    DropOut {
+        player_uid: String,
+    },
+    CheckIn {
+        player_uid: String,
+    },
     CheckInAll,
     ResetCheckIn,
 
     // Payment
-    SetPaymentStatus { player_uid: String, status: String },
+    SetPaymentStatus {
+        player_uid: String,
+        status: String,
+    },
     MarkAllPaid,
 
     // Round management
@@ -151,7 +169,9 @@ pub enum TournamentEvent {
         player_uid: String,
     },
     AddTable,
-    RemoveTable { table: usize },
+    RemoveTable {
+        table: usize,
+    },
     SetScore {
         round: usize,
         table: usize,
@@ -223,7 +243,7 @@ pub(crate) enum VpError {
     InvalidTableSize,
     InsufficientTotal,
     ExcessiveTotal,
-    MissingVp(usize),    // seat index (0-based)
+    MissingVp(usize),          // seat index (0-based)
     MissingHalfVp(Vec<usize>), // seat indices
 }
 
@@ -232,7 +252,7 @@ pub(crate) enum VpError {
 /// Returns None if valid, Some(error) if invalid.
 pub(crate) fn check_table_vps(vps: &[f64]) -> Option<VpError> {
     let n = vps.len();
-    if n < 4 || n > 5 {
+    if !(4..=5).contains(&n) {
         return Some(VpError::InvalidTableSize);
     }
     // Check total: ceil each VP, sum must equal table size
@@ -306,8 +326,12 @@ fn is_sanction_active(s: &JsonValue) -> bool {
 fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
     let mut result = Vec::new();
     for s in sanctions.members() {
-        if !is_sanction_active(s) { continue; }
-        if s["level"].as_str() != Some("standings_adjustment") { continue; }
+        if !is_sanction_active(s) {
+            continue;
+        }
+        if s["level"].as_str() != Some("standings_adjustment") {
+            continue;
+        }
         let uid = s["user_uid"].as_str().unwrap_or("").to_string();
         let round = s["round_number"].as_usize().unwrap_or(0);
         if !uid.is_empty() {
@@ -341,10 +365,15 @@ pub(crate) fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
     if vps.is_empty() {
         return vec![];
     }
-    let adjusted: Vec<f64> = vps.iter().zip(adjustments.iter()).map(|(v, a)| v + a).collect();
+    let adjusted: Vec<f64> = vps
+        .iter()
+        .zip(adjustments.iter())
+        .map(|(v, a)| v + a)
+        .collect();
     let max_adj = adjusted.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let max_count = adjusted.iter().filter(|&&v| v == max_adj).count();
-    adjusted.iter()
+    adjusted
+        .iter()
         .map(|&v| {
             if v >= 2.0 && v == max_adj && max_count == 1 {
                 1.0
@@ -366,7 +395,11 @@ pub(crate) fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
 
     // Create indices sorted by VP descending
     let mut indices: Vec<usize> = (0..vps.len()).collect();
-    indices.sort_by(|&a, &b| vps[b].partial_cmp(&vps[a]).unwrap_or(std::cmp::Ordering::Equal));
+    indices.sort_by(|&a, &b| {
+        vps[b]
+            .partial_cmp(&vps[a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let mut result = vec![0.0; vps.len()];
     let mut i = 0;
@@ -389,9 +422,7 @@ pub(crate) fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
 
 impl TournamentEvent {
     pub fn from_json(value: &JsonValue) -> Result<Self, String> {
-        let event_type = value["type"]
-            .as_str()
-            .ok_or("event type required")?;
+        let event_type = value["type"].as_str().ok_or("event type required")?;
 
         match event_type {
             "OpenRegistration" => Ok(Self::OpenRegistration),
@@ -454,9 +485,16 @@ impl TournamentEvent {
                 let seating = if value["seating"].is_null() || !value["seating"].is_array() {
                     None
                 } else {
-                    Some(value["seating"].members().map(|t| {
-                        t.members().filter_map(|p| p.as_str().map(|s| s.to_string())).collect()
-                    }).collect())
+                    Some(
+                        value["seating"]
+                            .members()
+                            .map(|t| {
+                                t.members()
+                                    .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                                    .collect()
+                            })
+                            .collect(),
+                    )
                 };
                 Ok(Self::StartRound { seating })
             }
@@ -468,7 +506,13 @@ impl TournamentEvent {
                 let seat1 = value["seat1"].as_usize().ok_or("seat1 required")?;
                 let table2 = value["table2"].as_usize().ok_or("table2 required")?;
                 let seat2 = value["seat2"].as_usize().ok_or("seat2 required")?;
-                Ok(Self::SwapSeats { round, table1, seat1, table2, seat2 })
+                Ok(Self::SwapSeats {
+                    round,
+                    table1,
+                    seat1,
+                    table2,
+                    seat2,
+                })
             }
             "SeatPlayer" => {
                 let player_uid = value["player_uid"]
@@ -477,7 +521,11 @@ impl TournamentEvent {
                     .to_string();
                 let table = value["table"].as_usize().ok_or("table required")?;
                 let seat = value["seat"].as_usize().ok_or("seat required")?;
-                Ok(Self::SeatPlayer { player_uid, table, seat })
+                Ok(Self::SeatPlayer {
+                    player_uid,
+                    table,
+                    seat,
+                })
             }
             "UnseatPlayer" => Ok(Self::UnseatPlayer {
                 player_uid: value["player_uid"]
@@ -491,12 +539,8 @@ impl TournamentEvent {
                 Ok(Self::RemoveTable { table })
             }
             "SetScore" => {
-                let round = value["round"]
-                    .as_usize()
-                    .ok_or("round required")?;
-                let table = value["table"]
-                    .as_usize()
-                    .ok_or("table required")?;
+                let round = value["round"].as_usize().ok_or("round required")?;
+                let table = value["table"].as_usize().ok_or("table required")?;
                 let scores: Vec<SeatScore> = value["scores"]
                     .members()
                     .map(|s| {
@@ -509,7 +553,11 @@ impl TournamentEvent {
                         })
                     })
                     .collect::<Result<Vec<_>, String>>()?;
-                Ok(Self::SetScore { round, table, scores })
+                Ok(Self::SetScore {
+                    round,
+                    table,
+                    scores,
+                })
             }
             "Override" => {
                 let round = value["round"].as_usize().ok_or("round required")?;
@@ -518,7 +566,11 @@ impl TournamentEvent {
                     .as_str()
                     .ok_or("comment required")?
                     .to_string();
-                Ok(Self::Override { round, table, comment })
+                Ok(Self::Override {
+                    round,
+                    table,
+                    comment,
+                })
             }
             "Unoverride" => {
                 let round = value["round"].as_usize().ok_or("round required")?;
@@ -538,9 +590,14 @@ impl TournamentEvent {
             "FinishFinals" => Ok(Self::FinishFinals),
             "AlterSeating" => {
                 let round = value["round"].as_usize().ok_or("round required")?;
-                let seating: Vec<Vec<String>> = value["seating"].members().map(|t| {
-                    t.members().filter_map(|p| p.as_str().map(|s| s.to_string())).collect()
-                }).collect();
+                let seating: Vec<Vec<String>> = value["seating"]
+                    .members()
+                    .map(|t| {
+                        t.members()
+                            .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .collect();
                 Ok(Self::AlterSeating { round, seating })
             }
             "UpsertDeck" | "UploadDeck" | "UpdateDeck" => {
@@ -553,7 +610,11 @@ impl TournamentEvent {
                     return Err("deck required".to_string());
                 }
                 let multideck = value["multideck"].as_bool().unwrap_or(false);
-                Ok(Self::UpsertDeck { player_uid, deck, multideck })
+                Ok(Self::UpsertDeck {
+                    player_uid,
+                    deck,
+                    multideck,
+                })
             }
             "DeleteDeck" => {
                 let player_uid = value["player_uid"]
@@ -562,7 +623,11 @@ impl TournamentEvent {
                     .to_string();
                 let deck_index = value["deck_index"].as_usize();
                 let multideck = value["multideck"].as_bool().unwrap_or(false);
-                Ok(Self::DeleteDeck { player_uid, deck_index, multideck })
+                Ok(Self::DeleteDeck {
+                    player_uid,
+                    deck_index,
+                    multideck,
+                })
             }
             "RaffleDraw" => {
                 let label = value["label"].as_str().ok_or("label required")?.to_string();
@@ -570,7 +635,13 @@ impl TournamentEvent {
                 let exclude_drawn = value["exclude_drawn"].as_bool().unwrap_or(true);
                 let count = value["count"].as_usize().ok_or("count required")?;
                 let seed = value["seed"].as_u64().ok_or("seed required")?;
-                Ok(Self::RaffleDraw { label, pool, exclude_drawn, count, seed })
+                Ok(Self::RaffleDraw {
+                    label,
+                    pool,
+                    exclude_drawn,
+                    count,
+                    seed,
+                })
             }
             "RaffleUndo" => Ok(Self::RaffleUndo),
             "RaffleClear" => Ok(Self::RaffleClear),
@@ -608,11 +679,17 @@ impl ActorContext {
             .filter_map(|r| r.as_str().map(|s| s.to_string()))
             .collect();
         let is_organizer = value["is_organizer"].as_bool().unwrap_or(false);
-        Ok(Self { uid, roles, is_organizer })
+        Ok(Self {
+            uid,
+            roles,
+            is_organizer,
+        })
     }
 
     pub fn can_manage_tournaments(&self) -> bool {
-        self.roles.iter().any(|r| r == "IC" || r == "NC" || r == "Prince")
+        self.roles
+            .iter()
+            .any(|r| r == "IC" || r == "NC" || r == "Prince")
     }
 }
 
@@ -650,7 +727,14 @@ pub fn process_tournament_event(
 
     // Process the event
     let mut deck_ops = JsonValue::new_array();
-    apply_event(&mut tournament, &event, &actor, &sanctions, &decks, &mut deck_ops)?;
+    apply_event(
+        &mut tournament,
+        &event,
+        &actor,
+        &sanctions,
+        &decks,
+        &mut deck_ops,
+    )?;
 
     let result = json::object! {
         "tournament" => tournament,
@@ -673,14 +757,17 @@ struct Standing {
 /// Applies SA overflow: if a player has an SA sanction for a round where their raw VP < 1.0,
 /// the overflow (1.0 - raw_vp) is subtracted from their total VP.
 fn compute_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<Standing> {
-    let mut map: std::collections::HashMap<String, (f64, f64, f64)> = std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<String, (f64, f64, f64)> =
+        std::collections::HashMap::new();
 
     // Sum results across all rounds
     for round in tournament["rounds"].members() {
         for table in round.members() {
             for seat in table["seating"].members() {
                 let uid = seat["player_uid"].as_str().unwrap_or("").to_string();
-                if uid.is_empty() { continue; }
+                if uid.is_empty() {
+                    continue;
+                }
                 let entry = map.entry(uid).or_insert((0.0, 0.0, 0.0));
                 entry.0 += seat["result"]["gw"].as_f64().unwrap_or(0.0);
                 entry.1 += seat["result"]["vp"].as_f64().unwrap_or(0.0);
@@ -693,7 +780,9 @@ fn compute_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<Stand
     // subtract the overflow from total VP
     let sa_sanctions = get_sa_sanctions(sanctions);
     for (sa_uid, sa_round) in &sa_sanctions {
-        if *sa_round >= tournament["rounds"].len() { continue; }
+        if *sa_round >= tournament["rounds"].len() {
+            continue;
+        }
         // Find the player's raw VP in that round
         let mut round_vp = 0.0;
         for table in tournament["rounds"][*sa_round].members() {
@@ -711,16 +800,30 @@ fn compute_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<Stand
     }
 
     // Build standings with toss and finalist from player records
-    let mut standings: Vec<Standing> = map.into_iter().map(|(uid, (gw, vp, tp))| {
-        let player = tournament["players"].members()
-            .find(|p| p["user_uid"].as_str() == Some(&uid));
-        let toss = player.and_then(|p| p["toss"].as_u32()).unwrap_or(0);
-        let finalist = player.and_then(|p| p["finalist"].as_bool()).unwrap_or(false);
-        Standing { user_uid: uid, gw, vp, tp, toss, finalist }
-    }).collect();
+    let mut standings: Vec<Standing> = map
+        .into_iter()
+        .map(|(uid, (gw, vp, tp))| {
+            let player = tournament["players"]
+                .members()
+                .find(|p| p["user_uid"].as_str() == Some(&uid));
+            let toss = player.and_then(|p| p["toss"].as_u32()).unwrap_or(0);
+            let finalist = player
+                .and_then(|p| p["finalist"].as_bool())
+                .unwrap_or(false);
+            Standing {
+                user_uid: uid,
+                gw,
+                vp,
+                tp,
+                toss,
+                finalist,
+            }
+        })
+        .collect();
 
     standings.sort_by(|a, b| {
-        b.gw.partial_cmp(&a.gw).unwrap()
+        b.gw.partial_cmp(&a.gw)
+            .unwrap()
             .then(b.vp.partial_cmp(&a.vp).unwrap())
             .then(b.tp.partial_cmp(&a.tp).unwrap())
             .then(b.toss.cmp(&a.toss))
@@ -736,25 +839,30 @@ fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue) {
         return;
     }
     let standings = compute_standings(tournament, sanctions);
-    let arr: Vec<JsonValue> = standings.into_iter().map(|s| {
-        json::object! {
-            "user_uid" => s.user_uid,
-            "gw" => s.gw,
-            "vp" => s.vp,
-            "tp" => s.tp as f64,
-            "toss" => s.toss,
-            "finalist" => s.finalist,
-        }
-    }).collect();
+    let arr: Vec<JsonValue> = standings
+        .into_iter()
+        .map(|s| {
+            json::object! {
+                "user_uid" => s.user_uid,
+                "gw" => s.gw,
+                "vp" => s.vp,
+                "tp" => s.tp,
+                "toss" => s.toss,
+                "finalist" => s.finalist,
+            }
+        })
+        .collect();
     tournament["standings"] = JsonValue::Array(arr);
 }
 
 /// Check if top 5 has unbroken ties (players at the cutoff boundary with same scores and no toss differentiation)
 fn top5_has_ties(standings: &[Standing]) -> bool {
-    if standings.len() < 5 { return false; }
+    if standings.len() < 5 {
+        return false;
+    }
     // Check all pairs in top 5 for ties not broken by toss
     for i in 0..5 {
-        for j in (i+1)..5 {
+        for j in (i + 1)..5 {
             let a = &standings[i];
             let b = &standings[j];
             if a.gw == b.gw && a.vp == b.vp && a.tp == b.tp && a.toss == b.toss {
@@ -796,14 +904,19 @@ fn get_played_uids(tournament: &JsonValue) -> Vec<String> {
 
 /// Filter raffle pool based on pool type and exclude_drawn flag.
 /// NOTE: Pool filtering logic duplicated in frontend RaffleSection.svelte eligibleForPool()
-fn get_raffle_pool(tournament: &JsonValue, pool: &str, exclude_drawn: bool) -> Result<Vec<String>, String> {
+fn get_raffle_pool(
+    tournament: &JsonValue,
+    pool: &str,
+    exclude_drawn: bool,
+) -> Result<Vec<String>, String> {
     let played = get_played_uids(tournament);
     if played.is_empty() {
         return Err("No players have played yet".to_string());
     }
 
     // Build standings map: uid -> (gw, vp)
-    let mut standings_map: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+    let mut standings_map: std::collections::HashMap<String, (f64, f64)> =
+        std::collections::HashMap::new();
     for s in tournament["standings"].members() {
         if let Some(uid) = s["user_uid"].as_str() {
             let gw = s["gw"].as_f64().unwrap_or(0.0);
@@ -814,7 +927,8 @@ fn get_raffle_pool(tournament: &JsonValue, pool: &str, exclude_drawn: bool) -> R
 
     // Finalists set
     let finalists: std::collections::HashSet<String> = if !tournament["finals"].is_null() {
-        tournament["finals"]["seating"].members()
+        tournament["finals"]["seating"]
+            .members()
             .filter_map(|s| s["player_uid"].as_str().map(|u| u.to_string()))
             .collect()
     } else {
@@ -823,23 +937,32 @@ fn get_raffle_pool(tournament: &JsonValue, pool: &str, exclude_drawn: bool) -> R
 
     let mut eligible: Vec<String> = match pool {
         "AllPlayers" => played.clone(),
-        "NonFinalists" => played.iter()
+        "NonFinalists" => played
+            .iter()
             .filter(|uid| !finalists.contains(*uid))
-            .cloned().collect(),
-        "GameWinners" => played.iter()
-            .filter(|uid| standings_map.get(*uid).map_or(false, |(gw, _)| *gw > 0.0))
-            .cloned().collect(),
-        "NoGameWin" => played.iter()
-            .filter(|uid| standings_map.get(*uid).map_or(true, |(gw, _)| *gw == 0.0))
-            .cloned().collect(),
-        "NoVictoryPoint" => played.iter()
-            .filter(|uid| standings_map.get(*uid).map_or(true, |(_, vp)| *vp == 0.0))
-            .cloned().collect(),
+            .cloned()
+            .collect(),
+        "GameWinners" => played
+            .iter()
+            .filter(|uid| standings_map.get(*uid).is_some_and(|(gw, _)| *gw > 0.0))
+            .cloned()
+            .collect(),
+        "NoGameWin" => played
+            .iter()
+            .filter(|uid| standings_map.get(*uid).is_none_or(|(gw, _)| *gw == 0.0))
+            .cloned()
+            .collect(),
+        "NoVictoryPoint" => played
+            .iter()
+            .filter(|uid| standings_map.get(*uid).is_none_or(|(_, vp)| *vp == 0.0))
+            .cloned()
+            .collect(),
         _ => return Err(format!("Unknown pool: {}", pool)),
     };
 
     if exclude_drawn {
-        let drawn: std::collections::HashSet<String> = tournament["raffles"].members()
+        let drawn: std::collections::HashSet<String> = tournament["raffles"]
+            .members()
             .flat_map(|d| d["winners"].members())
             .filter_map(|w| w.as_str().map(|s| s.to_string()))
             .collect();
@@ -866,7 +989,7 @@ fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> bool {
                         && p["finalist"].as_bool().unwrap_or(false)
                 })
         }
-        "Winner" | _ => tournament["winner"].as_str() == Some(player_uid),
+        _ => tournament["winner"].as_str() == Some(player_uid),
     }
 }
 
@@ -878,9 +1001,8 @@ fn apply_event(
     decks: &JsonValue,
     deck_ops: &mut JsonValue,
 ) -> Result<(), String> {
-    let state = TournamentState::from_str(
-        tournament["state"].as_str().unwrap_or("Planned")
-    ).ok_or("Invalid tournament state")?;
+    let state = TournamentState::from_str(tournament["state"].as_str().unwrap_or("Planned"))
+        .ok_or("Invalid tournament state")?;
 
     match event {
         TournamentEvent::OpenRegistration => {
@@ -968,7 +1090,9 @@ fn apply_event(
                 result: { gw: 0, vp: 0.0, tp: 0 },
                 finalist: false,
             };
-            tournament["players"].push(player).map_err(|e| e.to_string())?;
+            tournament["players"]
+                .push(player)
+                .map_err(|e| e.to_string())?;
             Ok(())
         }
 
@@ -981,15 +1105,19 @@ fn apply_event(
             }
 
             let players = &mut tournament["players"];
-            let idx = find_player_index(players, user_uid)
-                .ok_or("Player not found")?;
+            let idx = find_player_index(players, user_uid).ok_or("Player not found")?;
             players.array_remove(idx);
             Ok(())
         }
 
         TournamentEvent::AddPlayer { user_uid } => {
             require_organizer(actor)?;
-            if state != TournamentState::Planned && state != TournamentState::Registration && state != TournamentState::Waiting && state != TournamentState::Playing && state != TournamentState::Finished {
+            if state != TournamentState::Planned
+                && state != TournamentState::Registration
+                && state != TournamentState::Waiting
+                && state != TournamentState::Playing
+                && state != TournamentState::Finished
+            {
                 return Err("Cannot add players in this state".to_string());
             }
 
@@ -1005,22 +1133,27 @@ fn apply_event(
                 result: { gw: 0, vp: 0.0, tp: 0 },
                 finalist: false,
             };
-            tournament["players"].push(player).map_err(|e| e.to_string())?;
+            tournament["players"]
+                .push(player)
+                .map_err(|e| e.to_string())?;
             Ok(())
         }
 
         TournamentEvent::RemovePlayer { user_uid } => {
             require_organizer(actor)?;
-            if state != TournamentState::Planned && state != TournamentState::Registration && state != TournamentState::Waiting && state != TournamentState::Finished {
+            if state != TournamentState::Planned
+                && state != TournamentState::Registration
+                && state != TournamentState::Waiting
+                && state != TournamentState::Finished
+            {
                 return Err("Cannot remove players in this state".to_string());
             }
-            if tournament["rounds"].len() > 0 {
+            if !tournament["rounds"].is_empty() {
                 return Err("Use DropOut for players who have played".to_string());
             }
 
             let players = &mut tournament["players"];
-            let idx = find_player_index(players, user_uid)
-                .ok_or("Player not found")?;
+            let idx = find_player_index(players, user_uid).ok_or("Player not found")?;
             players.array_remove(idx);
             Ok(())
         }
@@ -1031,11 +1164,9 @@ fn apply_event(
             }
 
             let players = &mut tournament["players"];
-            let idx = find_player_index(players, player_uid)
-                .ok_or("Player not found")?;
-            let player_state = PlayerState::from_str(
-                players[idx]["state"].as_str().unwrap_or("")
-            ).ok_or("Invalid player state")?;
+            let idx = find_player_index(players, player_uid).ok_or("Player not found")?;
+            let player_state = PlayerState::from_str(players[idx]["state"].as_str().unwrap_or(""))
+                .ok_or("Invalid player state")?;
 
             if player_state == PlayerState::Finished {
                 return Err("Player already finished".to_string());
@@ -1058,8 +1189,8 @@ fn apply_event(
                 return Err("Only organizers or the player themselves can check in".to_string());
             }
 
-            let idx = find_player_index(&tournament["players"], player_uid)
-                .ok_or("Player not found")?;
+            let idx =
+                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
 
             // Block disqualified players from checking in
             if tournament["players"][idx]["state"].as_str() == Some("Disqualified") {
@@ -1068,7 +1199,9 @@ fn apply_event(
 
             // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, player_uid) {
-                return Err("Player has a disqualification sanction and cannot check in".to_string());
+                return Err(
+                    "Player has a disqualification sanction and cannot check in".to_string()
+                );
             }
             if has_active_suspension(sanctions, player_uid) {
                 return Err("Player is suspended and cannot check in".to_string());
@@ -1095,14 +1228,14 @@ fn apply_event(
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 let ps = players[i]["state"].as_str().unwrap_or("");
-                if ps == "Disqualified" { continue; }
+                if ps == "Disqualified" {
+                    continue;
+                }
                 let uid = players[i]["user_uid"].as_str().unwrap_or("");
                 if has_dq_sanction(sanctions, uid) || has_active_suspension(sanctions, uid) {
                     continue;
                 }
-                if ps == "Registered"
-                    || (state == TournamentState::Finished && ps == "Finished")
-                {
+                if ps == "Registered" || (state == TournamentState::Finished && ps == "Finished") {
                     players[i]["state"] = "Checked-in".into();
                 }
             }
@@ -1116,7 +1249,12 @@ fn apply_event(
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Checked-in") {
-                    players[i]["state"] = if state == TournamentState::Finished { "Finished" } else { "Registered" }.into();
+                    players[i]["state"] = if state == TournamentState::Finished {
+                        "Finished"
+                    } else {
+                        "Registered"
+                    }
+                    .into();
                 }
             }
             Ok(())
@@ -1128,8 +1266,8 @@ fn apply_event(
                 "Pending" | "Paid" | "Refunded" | "Cancelled" => {}
                 _ => return Err(format!("Invalid payment status: {}", status)),
             }
-            let idx = find_player_index(&tournament["players"], player_uid)
-                .ok_or("Player not found")?;
+            let idx =
+                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
             tournament["players"][idx]["payment_status"] = status.as_str().into();
             Ok(())
         }
@@ -1145,7 +1283,9 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::StartRound { seating: submitted_seating } => {
+        TournamentEvent::StartRound {
+            seating: submitted_seating,
+        } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
 
@@ -1217,14 +1357,14 @@ fn apply_event(
                     }
                 }
                 if seen.len() != checked_in.len() {
-                    return Err("Submitted seating does not include all checked-in players".to_string());
+                    return Err(
+                        "Submitted seating does not include all checked-in players".to_string()
+                    );
                 }
                 submitted.clone()
             } else {
-                let (computed, _score) = seating::compute_next_round(
-                    &checked_in,
-                    &previous_rounds,
-                )?;
+                let (computed, _score) =
+                    seating::compute_next_round(&checked_in, &previous_rounds)?;
                 computed
             };
 
@@ -1250,7 +1390,9 @@ fn apply_event(
                 })
                 .collect();
 
-            tournament["rounds"].push(JsonValue::Array(tables)).map_err(|e| e.to_string())?;
+            tournament["rounds"]
+                .push(JsonValue::Array(tables))
+                .map_err(|e| e.to_string())?;
             if state != TournamentState::Finished {
                 tournament["state"] = "Playing".into();
             }
@@ -1290,7 +1432,11 @@ fn apply_event(
             }
 
             // Move players back
-            let target_state = if state == TournamentState::Finished { "Finished" } else { "Checked-in" };
+            let target_state = if state == TournamentState::Finished {
+                "Finished"
+            } else {
+                "Checked-in"
+            };
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Playing") {
@@ -1319,7 +1465,11 @@ fn apply_event(
             rounds.array_remove(len - 1);
 
             // Move playing players back
-            let target_state = if state == TournamentState::Finished { "Finished" } else { "Checked-in" };
+            let target_state = if state == TournamentState::Finished {
+                "Finished"
+            } else {
+                "Checked-in"
+            };
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Playing") {
@@ -1334,7 +1484,13 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::SwapSeats { round, table1, seat1, table2, seat2 } => {
+        TournamentEvent::SwapSeats {
+            round,
+            table1,
+            seat1,
+            table2,
+            seat2,
+        } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
@@ -1390,7 +1546,10 @@ fn apply_event(
 
         TournamentEvent::AlterSeating { round, seating } => {
             require_organizer(actor)?;
-            if state != TournamentState::Playing && state != TournamentState::Finished && state != TournamentState::Waiting {
+            if state != TournamentState::Playing
+                && state != TournamentState::Finished
+                && state != TournamentState::Waiting
+            {
                 return Err("Cannot alter seating in this state".to_string());
             }
 
@@ -1421,7 +1580,9 @@ fn apply_event(
                     .map(|i| finals[i]["player_uid"].as_str().unwrap_or("").to_string())
                     .collect();
                 let new_set: std::collections::HashSet<&String> = new_players.iter().collect();
-                if old_set.len() != new_set.len() || !new_players.iter().all(|uid| old_set.contains(uid)) {
+                if old_set.len() != new_set.len()
+                    || !new_players.iter().all(|uid| old_set.contains(uid))
+                {
                     return Err("Finals player set mismatch".to_string());
                 }
                 for (i, uid) in new_players.iter().enumerate() {
@@ -1440,12 +1601,20 @@ fn apply_event(
                 }
 
                 // Build map: player_uid -> (old_table, old_result, judge_uid) from current state
-                let mut old_results: std::collections::HashMap<String, (usize, JsonValue, String)> = std::collections::HashMap::new();
+                let mut old_results: std::collections::HashMap<String, (usize, JsonValue, String)> =
+                    std::collections::HashMap::new();
                 for t in 0..table_count {
                     for s in 0..tournament["rounds"][*round][t]["seating"].len() {
-                        let uid = tournament["rounds"][*round][t]["seating"][s]["player_uid"].as_str().unwrap_or("").to_string();
-                        let result = tournament["rounds"][*round][t]["seating"][s]["result"].clone();
-                        let judge = tournament["rounds"][*round][t]["seating"][s]["judge_uid"].as_str().unwrap_or("").to_string();
+                        let uid = tournament["rounds"][*round][t]["seating"][s]["player_uid"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string();
+                        let result =
+                            tournament["rounds"][*round][t]["seating"][s]["result"].clone();
+                        let judge = tournament["rounds"][*round][t]["seating"][s]["judge_uid"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string();
                         old_results.insert(uid, (t, result, judge));
                     }
                 }
@@ -1468,7 +1637,12 @@ fn apply_event(
                             for t in 0..rd.len() {
                                 let mut tbl = Vec::new();
                                 for s in 0..rd[t]["seating"].len() {
-                                    tbl.push(rd[t]["seating"][s]["player_uid"].as_str().unwrap_or("").to_string());
+                                    tbl.push(
+                                        rd[t]["seating"][s]["player_uid"]
+                                            .as_str()
+                                            .unwrap_or("")
+                                            .to_string(),
+                                    );
                                 }
                                 tables.push(tbl);
                             }
@@ -1489,8 +1663,10 @@ fn apply_event(
                     let new_players = &seating[t];
                     let mut new_seating = Vec::new();
                     for uid in new_players {
-                        let (old_table, old_result, old_judge) = old_results.get(uid)
-                            .ok_or_else(|| format!("Player {} not found in current round seating", uid))?;
+                        let (old_table, old_result, old_judge) =
+                            old_results.get(uid).ok_or_else(|| {
+                                format!("Player {} not found in current round seating", uid)
+                            })?;
                         // Preserve result and judge_uid if player stays in same table, reset otherwise
                         let (result, judge) = if *old_table == t {
                             (old_result.clone(), old_judge.as_str())
@@ -1507,7 +1683,11 @@ fn apply_event(
 
                     // Recompute table state: if all VPs are 0, it's "In Progress"
                     let vps: Vec<f64> = (0..round_data[t]["seating"].len())
-                        .map(|s| round_data[t]["seating"][s]["result"]["vp"].as_f64().unwrap_or(0.0))
+                        .map(|s| {
+                            round_data[t]["seating"][s]["result"]["vp"]
+                                .as_f64()
+                                .unwrap_or(0.0)
+                        })
                         .collect();
                     if round_data[t]["override"].is_null() {
                         let all_zero = vps.iter().all(|&v| v == 0.0);
@@ -1522,18 +1702,27 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::SeatPlayer { player_uid, table, seat } => {
+        TournamentEvent::SeatPlayer {
+            player_uid,
+            table,
+            seat,
+        } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
             // Verify player exists and is Registered
-            let player_idx = find_player_index(&tournament["players"], player_uid)
-                .ok_or("Player not found")?;
+            let player_idx =
+                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
             let player_state = tournament["players"][player_idx]["state"]
                 .as_str()
                 .unwrap_or("");
-            if player_state != "Registered" && !(state == TournamentState::Finished && player_state == "Finished") {
-                return Err(format!("Player must be Registered (currently {})", player_state));
+            if player_state != "Registered"
+                && !(state == TournamentState::Finished && player_state == "Finished")
+            {
+                return Err(format!(
+                    "Player must be Registered (currently {})",
+                    player_state
+                ));
             }
 
             // Verify table exists in current round
@@ -1549,7 +1738,11 @@ fn apply_event(
             // Insert seat entry at position
             let seating = &mut rounds[last][*table]["seating"];
             let seating_len = seating.len();
-            let insert_pos = if *seat > seating_len { seating_len } else { *seat };
+            let insert_pos = if *seat > seating_len {
+                seating_len
+            } else {
+                *seat
+            };
 
             let seat_entry = json::object! {
                 player_uid: player_uid.as_str(),
@@ -1645,14 +1838,18 @@ fn apply_event(
             if *table >= rounds[last].len() {
                 return Err("Invalid table number".to_string());
             }
-            if rounds[last][*table]["seating"].len() > 0 {
+            if !rounds[last][*table]["seating"].is_empty() {
                 return Err("Cannot remove a table with players seated".to_string());
             }
             rounds[last].array_remove(*table);
             Ok(())
         }
 
-        TournamentEvent::SetScore { round, table, scores } => {
+        TournamentEvent::SetScore {
+            round,
+            table,
+            scores,
+        } => {
             require_state_or_finished(state, TournamentState::Playing)?;
 
             // Require organizer when tournament is Finished
@@ -1697,10 +1894,10 @@ fn apply_event(
             for score in scores.iter() {
                 let vp = score.vp;
                 // Must be in [0, table_size] in 0.5 steps
-                if vp < 0.0 || vp > table_size as f64 || (vp * 2.0).fract() != 0.0 {
-                    if !actor.is_organizer {
-                        return Err(format!("Invalid VP value: {}", vp));
-                    }
+                if (vp < 0.0 || vp > table_size as f64 || (vp * 2.0).fract() != 0.0)
+                    && !actor.is_organizer
+                {
+                    return Err(format!("Invalid VP value: {}", vp));
                 }
                 // table_size - 0.5 is impossible (non-organizer blocked)
                 if !actor.is_organizer && vp == table_size as f64 - 0.5 {
@@ -1718,9 +1915,10 @@ fn apply_event(
             let mut vps: Vec<f64> = Vec::with_capacity(table_size);
             for i in 0..table_size {
                 let player_uid = t["seating"][i]["player_uid"].as_str().unwrap_or("");
-                let vp = vp_map.get(player_uid).copied().unwrap_or(
-                    t["seating"][i]["result"]["vp"].as_f64().unwrap_or(0.0),
-                );
+                let vp = vp_map
+                    .get(player_uid)
+                    .copied()
+                    .unwrap_or(t["seating"][i]["result"]["vp"].as_f64().unwrap_or(0.0));
                 vps.push(vp);
             }
 
@@ -1742,7 +1940,10 @@ fn apply_event(
 
             // Apply scores
             for i in 0..table_size {
-                let player_uid = t["seating"][i]["player_uid"].as_str().unwrap_or("").to_string();
+                let player_uid = t["seating"][i]["player_uid"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
                 if vp_map.contains_key(player_uid.as_str()) {
                     t["seating"][i]["result"]["vp"] = vps[i].into();
                     t["seating"][i]["result"]["gw"] = gws[i].into();
@@ -1765,7 +1966,8 @@ fn apply_event(
                         // Invalid oust order or other error
                         if !actor.is_organizer {
                             // Non-organizer: reject impossible oust sequences
-                            return Err("Invalid score: impossible VP combination for this table".to_string());
+                            return Err("Invalid score: impossible VP combination for this table"
+                                .to_string());
                         }
                         t["state"] = "Invalid".into();
                     }
@@ -1778,11 +1980,17 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::Override { round, table, comment } => {
+        TournamentEvent::Override {
+            round,
+            table,
+            comment,
+        } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let is_finals = *round == tournament["rounds"].len() && !tournament["finals"].is_null() && *table == 0;
+            let is_finals = *round == tournament["rounds"].len()
+                && !tournament["finals"].is_null()
+                && *table == 0;
             let t = if is_finals {
                 &mut tournament["finals"]
             } else {
@@ -1809,7 +2017,9 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let is_finals = *round == tournament["rounds"].len() && !tournament["finals"].is_null() && *table == 0;
+            let is_finals = *round == tournament["rounds"].len()
+                && !tournament["finals"].is_null()
+                && *table == 0;
             let t = if is_finals {
                 &mut tournament["finals"]
             } else {
@@ -1851,8 +2061,8 @@ fn apply_event(
             if tournament["rounds"].len() < 2 {
                 return Err("Need at least 2 rounds before setting toss".to_string());
             }
-            let idx = find_player_index(&tournament["players"], player_uid)
-                .ok_or("Player not found")?;
+            let idx =
+                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
             tournament["players"][idx]["toss"] = (*toss).into();
             Ok(())
         }
@@ -1887,8 +2097,11 @@ fn apply_event(
             let mut i = 0;
             let mut toss_counter: u32 = 1;
             // Simple deterministic shuffle using tournament uid as seed
-            let seed: u64 = tournament["uid"].as_str().unwrap_or("")
-                .bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let seed: u64 = tournament["uid"]
+                .as_str()
+                .unwrap_or("")
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
             while i < zone_end {
                 let mut j = i + 1;
@@ -1902,14 +2115,15 @@ fn apply_event(
                 // i..j is a group of players with same scores
                 if j - i > 1 {
                     // Collect those with toss == 0
-                    let mut needs_toss: Vec<usize> = (i..j)
-                        .filter(|&k| standings[k].toss == 0)
-                        .collect();
+                    let mut needs_toss: Vec<usize> =
+                        (i..j).filter(|&k| standings[k].toss == 0).collect();
                     if needs_toss.len() > 1 {
                         // Shuffle using simple Fisher-Yates with deterministic seed
                         let mut rng = seed.wrapping_add(i as u64);
                         for k in (1..needs_toss.len()).rev() {
-                            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                            rng = rng
+                                .wrapping_mul(6364136223846793005)
+                                .wrapping_add(1442695040888963407);
                             let swap_idx = (rng >> 33) as usize % (k + 1);
                             needs_toss.swap(k, swap_idx);
                         }
@@ -1942,9 +2156,11 @@ fn apply_event(
             let standings = compute_standings(tournament, sanctions);
 
             // Filter out DQ'd players from finals consideration
-            let eligible: Vec<&Standing> = standings.iter()
+            let eligible: Vec<&Standing> = standings
+                .iter()
                 .filter(|s| {
-                    let player = tournament["players"].members()
+                    let player = tournament["players"]
+                        .members()
                         .find(|p| p["user_uid"].as_str() == Some(&s.user_uid));
                     let ps = player.and_then(|p| p["state"].as_str()).unwrap_or("");
                     ps != "Disqualified"
@@ -1960,14 +2176,16 @@ fn apply_event(
 
             // Top 5 eligible players form the finals table
             let top5: Vec<&Standing> = eligible.into_iter().take(5).collect();
-            let seed_order: Vec<JsonValue> = top5.iter()
-                .map(|s| s.user_uid.as_str().into())
-                .collect();
-            let seating: Vec<JsonValue> = top5.iter()
-                .map(|s| json::object! {
-                    player_uid: s.user_uid.as_str(),
-                    result: { gw: 0, vp: 0.0, tp: 0 },
-                    judge_uid: "",
+            let seed_order: Vec<JsonValue> =
+                top5.iter().map(|s| s.user_uid.as_str().into()).collect();
+            let seating: Vec<JsonValue> = top5
+                .iter()
+                .map(|s| {
+                    json::object! {
+                        player_uid: s.user_uid.as_str(),
+                        result: { gw: 0, vp: 0.0, tp: 0 },
+                        judge_uid: "",
+                    }
                 })
                 .collect();
 
@@ -2017,7 +2235,10 @@ fn apply_event(
             for seat in seating.members() {
                 let uid = seat["player_uid"].as_str().unwrap_or("").to_string();
                 let vp = seat["result"]["vp"].as_f64().unwrap_or(0.0);
-                let seed_pos = seed_order.iter().position(|s| s == &uid).unwrap_or(usize::MAX);
+                let seed_pos = seed_order
+                    .iter()
+                    .position(|s| s == &uid)
+                    .unwrap_or(usize::MAX);
                 if vp > best_vp || (vp == best_vp && seed_pos < best_seed) {
                     best_vp = vp;
                     best_uid = uid;
@@ -2043,7 +2264,10 @@ fn apply_event(
 
         TournamentEvent::FinishTournament => {
             require_organizer(actor)?;
-            if state != TournamentState::Waiting && state != TournamentState::Playing && state != TournamentState::Finished {
+            if state != TournamentState::Waiting
+                && state != TournamentState::Playing
+                && state != TournamentState::Finished
+            {
                 return Err("Cannot finish from this state".to_string());
             }
 
@@ -2062,7 +2286,9 @@ fn apply_event(
             // Emit deck_ops to flip public on qualifying decks
             for d in decks.members() {
                 let user_uid = d["user_uid"].as_str().unwrap_or("");
-                if user_uid.is_empty() { continue; }
+                if user_uid.is_empty() {
+                    continue;
+                }
                 let is_public = compute_deck_public(tournament, user_uid);
                 if is_public {
                     let op = json::object! {
@@ -2076,20 +2302,26 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::UpsertDeck { player_uid, deck, multideck } => {
+        TournamentEvent::UpsertDeck {
+            player_uid,
+            deck,
+            multideck,
+        } => {
             // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err("Only organizers or the player can upload a deck".to_string());
             }
             // Verify player is registered
-            let is_registered = tournament["players"].members()
+            let is_registered = tournament["players"]
+                .members()
                 .any(|p| p["user_uid"].as_str() == Some(player_uid.as_str()));
             if !is_registered {
                 return Err("Player is not registered in this tournament".to_string());
             }
             // Lifecycle: non-organizers restricted by tournament state
             if !actor.is_organizer {
-                let existing_count = decks.members()
+                let existing_count = decks
+                    .members()
                     .filter(|d| d["user_uid"].as_str() == Some(player_uid.as_str()))
                     .count();
                 match state {
@@ -2098,15 +2330,22 @@ fn apply_event(
                             // Multideck: new deck goes at index == existing_count
                             // Block if that round has already been played
                             if is_deck_locked(tournament, existing_count) {
-                                return Err("Cannot upload deck for a round that has already started".to_string());
+                                return Err(
+                                    "Cannot upload deck for a round that has already started"
+                                        .to_string(),
+                                );
                             }
                         } else if existing_count > 0 {
-                            return Err("Cannot modify deck while tournament is in progress".to_string());
+                            return Err(
+                                "Cannot modify deck while tournament is in progress".to_string()
+                            );
                         }
                     }
                     TournamentState::Finished => {
                         if existing_count > 0 {
-                            return Err("Cannot modify deck after tournament is finished".to_string());
+                            return Err(
+                                "Cannot modify deck after tournament is finished".to_string()
+                            );
                         }
                     }
                     _ => {} // Planned, Registration, Waiting: always allowed
@@ -2128,7 +2367,11 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::DeleteDeck { player_uid, deck_index, multideck } => {
+        TournamentEvent::DeleteDeck {
+            player_uid,
+            deck_index,
+            multideck,
+        } => {
             // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err("Only organizers or the player can delete a deck".to_string());
@@ -2140,13 +2383,18 @@ fn apply_event(
                         if *multideck {
                             if let Some(idx) = deck_index {
                                 if is_deck_locked(tournament, *idx) {
-                                    return Err("Cannot delete a deck whose round has already started".to_string());
+                                    return Err(
+                                        "Cannot delete a deck whose round has already started"
+                                            .to_string(),
+                                    );
                                 }
                             } else {
                                 return Err("deck_index required for multideck delete".to_string());
                             }
                         } else {
-                            return Err("Cannot delete deck while tournament is in progress".to_string());
+                            return Err(
+                                "Cannot delete deck while tournament is in progress".to_string()
+                            );
                         }
                     }
                     TournamentState::Finished => {
@@ -2166,10 +2414,21 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::RaffleDraw { label, pool, exclude_drawn, count, seed } => {
+        TournamentEvent::RaffleDraw {
+            label,
+            pool,
+            exclude_drawn,
+            count,
+            seed,
+        } => {
             require_organizer(actor)?;
-            if state != TournamentState::Waiting && state != TournamentState::Playing && state != TournamentState::Finished {
-                return Err("Raffle requires tournament in Waiting, Playing, or Finished state".to_string());
+            if state != TournamentState::Waiting
+                && state != TournamentState::Playing
+                && state != TournamentState::Finished
+            {
+                return Err(
+                    "Raffle requires tournament in Waiting, Playing, or Finished state".to_string(),
+                );
             }
             if *count == 0 {
                 return Err("count must be at least 1".to_string());
@@ -2181,11 +2440,14 @@ fn apply_event(
             // Fisher-Yates shuffle with caller-provided seed (same LCG as RandomToss)
             let mut rng = *seed;
             for k in (1..eligible.len()).rev() {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let swap_idx = (rng >> 33) as usize % (k + 1);
                 eligible.swap(k, swap_idx);
             }
-            let winners: Vec<JsonValue> = eligible.into_iter()
+            let winners: Vec<JsonValue> = eligible
+                .into_iter()
                 .take(*count)
                 .map(|uid| uid.into())
                 .collect();
@@ -2197,13 +2459,15 @@ fn apply_event(
             if tournament["raffles"].is_null() {
                 tournament["raffles"] = JsonValue::new_array();
             }
-            tournament["raffles"].push(draw).map_err(|e| e.to_string())?;
+            tournament["raffles"]
+                .push(draw)
+                .map_err(|e| e.to_string())?;
             Ok(())
         }
 
         TournamentEvent::RaffleUndo => {
             require_organizer(actor)?;
-            if tournament["raffles"].is_null() || tournament["raffles"].len() == 0 {
+            if tournament["raffles"].is_null() || tournament["raffles"].is_empty() {
                 return Err("No raffle draws to undo".to_string());
             }
             let last = tournament["raffles"].len() - 1;
@@ -2225,12 +2489,18 @@ fn apply_event(
                 validate_enum(f, &["Standard", "V5", "Limited"], "format")?;
             }
             if let Some(r) = config["rank"].as_str() {
-                validate_enum(r, &[
-                    "", "National Championship", "Continental Championship",
-                ], "rank")?;
+                validate_enum(
+                    r,
+                    &["", "National Championship", "Continental Championship"],
+                    "rank",
+                )?;
             }
             if let Some(s) = config["standings_mode"].as_str() {
-                validate_enum(s, &["Private", "Cutoff", "Top 10", "Public"], "standings_mode")?;
+                validate_enum(
+                    s,
+                    &["Private", "Cutoff", "Top 10", "Public"],
+                    "standings_mode",
+                )?;
             }
             if let Some(d) = config["decklists_mode"].as_str() {
                 validate_enum(d, &["Winner", "Finalists", "All"], "decklists_mode")?;
@@ -2254,20 +2524,43 @@ fn apply_event(
                 }
             }
             if let Some(p) = config["time_extension_policy"].as_str() {
-                validate_enum(p, &["additions", "clock_stop", "both"], "time_extension_policy")?;
+                validate_enum(
+                    p,
+                    &["additions", "clock_stop", "both"],
+                    "time_extension_policy",
+                )?;
             }
 
             // Check if decklists_mode is changing on a Finished tournament
-            let decklists_mode_changing = config.has_key("decklists_mode")
-                && state == TournamentState::Finished;
+            let decklists_mode_changing =
+                config.has_key("decklists_mode") && state == TournamentState::Finished;
 
             // Apply config fields (key present = apply, even if null)
             let config_fields = [
-                "name", "format", "rank", "online", "start", "finish", "timezone",
-                "country", "venue", "venue_url", "address", "map_url",
-                "proxies", "multideck", "decklist_required", "description",
-                "standings_mode", "decklists_mode", "max_rounds", "table_rooms",
-                "league_uid", "round_time", "finals_time", "time_extension_policy",
+                "name",
+                "format",
+                "rank",
+                "online",
+                "start",
+                "finish",
+                "timezone",
+                "country",
+                "venue",
+                "venue_url",
+                "address",
+                "map_url",
+                "proxies",
+                "multideck",
+                "decklist_required",
+                "description",
+                "standings_mode",
+                "decklists_mode",
+                "max_rounds",
+                "table_rooms",
+                "league_uid",
+                "round_time",
+                "finals_time",
+                "time_extension_policy",
             ];
             for field in config_fields {
                 if config.has_key(field) {
@@ -2280,7 +2573,9 @@ fn apply_event(
                 for d in decks.members() {
                     let user_uid = d["user_uid"].as_str().unwrap_or("");
                     let deck_uid = d["uid"].as_str().unwrap_or("");
-                    if user_uid.is_empty() || deck_uid.is_empty() { continue; }
+                    if user_uid.is_empty() || deck_uid.is_empty() {
+                        continue;
+                    }
                     let is_public = compute_deck_public(tournament, user_uid);
                     let op = json::object! {
                         "op" => "set_public",
@@ -2324,7 +2619,10 @@ fn require_state(current: TournamentState, expected: TournamentState) -> Result<
     Ok(())
 }
 
-fn require_state_or_finished(current: TournamentState, expected: TournamentState) -> Result<(), String> {
+fn require_state_or_finished(
+    current: TournamentState,
+    expected: TournamentState,
+) -> Result<(), String> {
     if current != expected && current != TournamentState::Finished {
         return Err(format!(
             "Tournament must be in {} state (currently {})",
@@ -2361,10 +2659,14 @@ fn count_completed_rounds(tournament: &JsonValue) -> usize {
     }
     // Check if the last round is still in progress (has "In Progress" tables)
     let last_round = &tournament["rounds"][total - 1];
-    let has_in_progress = last_round.members().any(|table| {
-        table["state"].as_str() == Some("In Progress")
-    });
-    if has_in_progress { total - 1 } else { total }
+    let has_in_progress = last_round
+        .members()
+        .any(|table| table["state"].as_str() == Some("In Progress"));
+    if has_in_progress {
+        total - 1
+    } else {
+        total
+    }
 }
 
 #[cfg(test)]
@@ -2411,9 +2713,17 @@ mod tests {
     }
 
     /// Helper to run a tournament event with empty sanctions and no decks
-    fn run_event(tournament: &JsonValue, event: &JsonValue, actor: &JsonValue) -> Result<String, String> {
+    fn run_event(
+        tournament: &JsonValue,
+        event: &JsonValue,
+        actor: &JsonValue,
+    ) -> Result<String, String> {
         let raw = process_tournament_event(
-            &tournament.dump(), &event.dump(), &actor.dump(), &no_sanctions(), &no_decks(),
+            &tournament.dump(),
+            &event.dump(),
+            &actor.dump(),
+            &no_sanctions(),
+            &no_decks(),
         )?;
         let parsed = json::parse(&raw).unwrap();
         Ok(parsed["tournament"].dump())
@@ -2421,10 +2731,17 @@ mod tests {
 
     /// Helper to run a tournament event with existing decks metadata
     fn run_event_with_decks(
-        tournament: &JsonValue, event: &JsonValue, actor: &JsonValue, decks_json: &str,
+        tournament: &JsonValue,
+        event: &JsonValue,
+        actor: &JsonValue,
+        decks_json: &str,
     ) -> Result<(String, JsonValue), String> {
         let raw = process_tournament_event(
-            &tournament.dump(), &event.dump(), &actor.dump(), &no_sanctions(), decks_json,
+            &tournament.dump(),
+            &event.dump(),
+            &actor.dump(),
+            &no_sanctions(),
+            decks_json,
         )?;
         let parsed = json::parse(&raw).unwrap();
         Ok((parsed["tournament"].dump(), parsed["deck_ops"].clone()))
@@ -2516,7 +2833,10 @@ mod tests {
         ];
 
         // Use json::parse to build the event (same path as real JSON input)
-        let event = json::parse(r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"],["p4","p5","p6","p7"]]}"#).unwrap();
+        let event = json::parse(
+            r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"],["p4","p5","p6","p7"]]}"#,
+        )
+        .unwrap();
         let actor = make_organizer();
 
         let result = run_event(&tournament, &event, &actor);
@@ -2662,7 +2982,10 @@ mod tests {
         let (raw, _) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
         let updated = json::parse(&raw).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
-        assert_eq!(updated["players"][0]["missing_decklist"].as_bool(), Some(true));
+        assert_eq!(
+            updated["players"][0]["missing_decklist"].as_bool(),
+            Some(true)
+        );
     }
 
     #[test]
@@ -2694,7 +3017,10 @@ mod tests {
         let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
-        assert_eq!(updated["players"][0]["payment_status"].as_str(), Some("Paid"));
+        assert_eq!(
+            updated["players"][0]["payment_status"].as_str(),
+            Some("Paid")
+        );
     }
 
     #[test]
@@ -2725,9 +3051,18 @@ mod tests {
         let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
-        assert_eq!(updated["players"][0]["payment_status"].as_str(), Some("Paid"));
-        assert_eq!(updated["players"][1]["payment_status"].as_str(), Some("Paid"));
-        assert_eq!(updated["players"][2]["payment_status"].as_str(), Some("Paid"));
+        assert_eq!(
+            updated["players"][0]["payment_status"].as_str(),
+            Some("Paid")
+        );
+        assert_eq!(
+            updated["players"][1]["payment_status"].as_str(),
+            Some("Paid")
+        );
+        assert_eq!(
+            updated["players"][2]["payment_status"].as_str(),
+            Some("Paid")
+        );
     }
 
     #[test]
@@ -2797,7 +3132,11 @@ mod tests {
             { user_uid: "p1", level: "disqualification", round_number: json::Null, lifted_at: json::Null, deleted_at: json::Null }
         ];
         let result = process_tournament_event(
-            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump(), &no_decks(),
+            &tournament.dump(),
+            &event.dump(),
+            &actor.dump(),
+            &sanctions.dump(),
+            &no_decks(),
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("disqualification"));
@@ -2816,7 +3155,11 @@ mod tests {
             { user_uid: "p1", level: "suspension", round_number: json::Null, lifted_at: json::Null, deleted_at: json::Null }
         ];
         let result = process_tournament_event(
-            &tournament.dump(), &event.dump(), &actor.dump(), &sanctions.dump(), &no_decks(),
+            &tournament.dump(),
+            &event.dump(),
+            &actor.dump(),
+            &sanctions.dump(),
+            &no_decks(),
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("suspended"));
@@ -2837,7 +3180,10 @@ mod tests {
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
-        assert_eq!(updated["players"][1]["state"].as_str(), Some("Disqualified")); // stays DQ'd
+        assert_eq!(
+            updated["players"][1]["state"].as_str(),
+            Some("Disqualified")
+        ); // stays DQ'd
         assert_eq!(updated["players"][2]["state"].as_str(), Some("Checked-in"));
     }
 
@@ -2855,7 +3201,10 @@ mod tests {
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Finished"));
-        assert_eq!(updated["players"][1]["state"].as_str(), Some("Disqualified")); // preserved
+        assert_eq!(
+            updated["players"][1]["state"].as_str(),
+            Some("Disqualified")
+        ); // preserved
     }
 
     #[test]
@@ -2872,7 +3221,10 @@ mod tests {
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
-        assert_eq!(updated["players"][1]["state"].as_str(), Some("Disqualified")); // preserved
+        assert_eq!(
+            updated["players"][1]["state"].as_str(),
+            Some("Disqualified")
+        ); // preserved
     }
 
     // --- AlterSeating tests ---
@@ -3151,7 +3503,10 @@ mod tests {
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["round_time"].as_i64(), Some(7200));
         assert_eq!(updated["finals_time"].as_i64(), Some(9000));
-        assert_eq!(updated["time_extension_policy"].as_str(), Some("clock_stop"));
+        assert_eq!(
+            updated["time_extension_policy"].as_str(),
+            Some("clock_stop")
+        );
     }
 
     #[test]
@@ -3164,7 +3519,9 @@ mod tests {
         let actor = make_organizer();
         let result = run_event(&tournament, &event, &actor);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Invalid time_extension_policy"));
+        assert!(result
+            .unwrap_err()
+            .contains("Invalid time_extension_policy"));
     }
 
     #[test]

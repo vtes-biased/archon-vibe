@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 from .db import (
     get_connection,
-    get_sanctions_for_tournament,
     get_user_by_uid,
     update_tournament,
 )
@@ -25,11 +24,11 @@ logger = logging.getLogger(__name__)
 # Reverse map: (format, rank) → VEKN event type ID
 # We pick the most common type for each combination
 FORMAT_RANK_TO_VEKN_TYPE: dict[tuple[TournamentFormat, TournamentRank], int] = {
-    (TournamentFormat.Standard, TournamentRank.BASIC): 2,   # Standard Constructed
-    (TournamentFormat.Standard, TournamentRank.NC): 8,      # National Championship
-    (TournamentFormat.Standard, TournamentRank.CC): 6,      # Continental Championship
-    (TournamentFormat.Limited, TournamentRank.BASIC): 3,    # Limited
-    (TournamentFormat.V5, TournamentRank.BASIC): 16,        # V5 Constructed
+    (TournamentFormat.Standard, TournamentRank.BASIC): 2,  # Standard Constructed
+    (TournamentFormat.Standard, TournamentRank.NC): 8,  # National Championship
+    (TournamentFormat.Standard, TournamentRank.CC): 6,  # Continental Championship
+    (TournamentFormat.Limited, TournamentRank.BASIC): 3,  # Limited
+    (TournamentFormat.V5, TournamentRank.BASIC): 16,  # V5 Constructed
 }
 
 
@@ -116,7 +115,9 @@ async def push_tournament_event(
     event_type = tournament_to_vekn_type(tournament.format, tournament.rank)
 
     # Determine rounds
-    rounds = tournament.max_rounds if tournament.max_rounds >= 2 else len(tournament.rounds)
+    rounds = (
+        tournament.max_rounds if tournament.max_rounds >= 2 else len(tournament.rounds)
+    )
     if rounds < 2:
         rounds = 2  # VEKN minimum
 
@@ -221,7 +222,9 @@ async def push_tournament_results(
     tournament.vekn_pushed_at = datetime.now(UTC)
     tournament.modified = datetime.now(UTC)
     await update_tournament(tournament)
-    logger.info(f"Tournament {tournament.uid} results pushed to VEKN event {vekn_event_id}")
+    logger.info(
+        f"Tournament {tournament.uid} results pushed to VEKN event {vekn_event_id}"
+    )
     return True
 
 

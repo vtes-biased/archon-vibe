@@ -10,6 +10,8 @@ import calendar
 import logging
 from datetime import UTC, datetime
 
+from archon_engine import PyEngine
+
 from .db import (
     BroadcastData,
     decode_json,
@@ -34,9 +36,6 @@ logger = logging.getLogger(__name__)
 # Rolling window for rating computation
 RATING_WINDOW_MONTHS = 18
 TOP_N = 8
-
-
-from archon_engine import PyEngine
 
 _engine = PyEngine()
 
@@ -130,7 +129,8 @@ def _sa_overflow_penalty(
     if not t.rounds:
         return 0.0
     sa_sanctions = [
-        s for s in (sanctions or [])
+        s
+        for s in (sanctions or [])
         if s.level == SanctionLevel.STANDINGS_ADJUSTMENT
         and s.user_uid == user_uid
         and not s.lifted_at
@@ -203,11 +203,17 @@ async def recompute_ratings_for_players(
     cutoff = now.replace(year=y, month=m, day=min(now.day, max_day))
     cutoff_str = cutoff.isoformat()
 
-    if category in (RatingCategory.CONSTRUCTED_ONLINE, RatingCategory.CONSTRUCTED_OFFLINE):
+    if category in (
+        RatingCategory.CONSTRUCTED_ONLINE,
+        RatingCategory.CONSTRUCTED_OFFLINE,
+    ):
         formats = ["Standard", "V5"]
     else:
         formats = ["Limited"]
-    online = category in (RatingCategory.CONSTRUCTED_ONLINE, RatingCategory.LIMITED_ONLINE)
+    online = category in (
+        RatingCategory.CONSTRUCTED_ONLINE,
+        RatingCategory.LIMITED_ONLINE,
+    )
 
     all_tournaments: list[Tournament] = []
     for fmt in formats:
@@ -245,9 +251,7 @@ async def recompute_ratings_for_players(
         bd = await update_user(user)
         updated_users.append((user, bd))
 
-    logger.info(
-        f"Recomputed {len(updated_users)} ratings for {category.value}"
-    )
+    logger.info(f"Recomputed {len(updated_users)} ratings for {category.value}")
     return updated_users
 
 

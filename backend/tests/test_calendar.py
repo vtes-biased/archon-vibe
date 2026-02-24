@@ -6,16 +6,20 @@ Focuses on:
 - _tournament_to_vevent: event generation
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from src.models import (
     Player,
     Tournament,
     TournamentFormat,
-    TournamentRank,
     TournamentState,
 )
-from src.routes.calendar import _escape_ical, _format_dt, _matches_agenda, _tournament_to_vevent
+from src.routes.calendar import (
+    _escape_ical,
+    _format_dt,
+    _matches_agenda,
+    _tournament_to_vevent,
+)
 
 NOW = datetime.now(UTC)
 JUNE_15_10AM = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -36,9 +40,13 @@ def _make_tournament(
     **kwargs,
 ) -> Tournament:
     return Tournament(
-        uid=uid, modified=NOW, name="Test Tournament",
-        format=TournamentFormat.Standard, rank=rank,
-        state=state, country=country,
+        uid=uid,
+        modified=NOW,
+        name="Test Tournament",
+        format=TournamentFormat.Standard,
+        rank=rank,
+        state=state,
+        country=country,
         organizers_uids=organizers_uids or [],
         players=players or [],
         online=online,
@@ -178,6 +186,6 @@ class TestTournamentToVevent:
         t = _make_tournament(start=JUNE_15_10AM)
         result = _tournament_to_vevent(t, "20250101T000000Z")
         lines = result.split("\r\n")
-        url_lines = [l for l in lines if "tournaments/t1" in l]
+        url_lines = [line for line in lines if "tournaments/t1" in line]
         assert len(url_lines) == 1
         assert url_lines[0].startswith("URL;VALUE=URI:")

@@ -24,6 +24,7 @@ pub struct LexScore(pub [f64; 9]);
 impl LexScore {
     /// Compare two scores lexicographically
     /// Returns Ordering::Less if self is better (lower violations)
+    #[allow(clippy::should_implement_trait)]
     pub fn cmp(&self, other: &LexScore) -> std::cmp::Ordering {
         for i in 0..9 {
             if self.0[i] < other.0[i] {
@@ -98,6 +99,7 @@ pub struct Measure {
     data: Vec<i32>, // Flattened: [i * n * 8 + j * 8 + k]
 }
 
+#[allow(clippy::needless_range_loop)]
 impl Measure {
     pub fn new(n: usize) -> Self {
         Measure {
@@ -140,9 +142,7 @@ impl Measure {
     #[inline]
     pub fn set_vec(&mut self, i: usize, j: usize, vec: &[i32; 8]) {
         let base = self.idx(i, j, 0);
-        for k in 0..8 {
-            self.data[base + k] = vec[k];
-        }
+        self.data[base..base + 8].copy_from_slice(vec);
     }
 
     #[inline]
@@ -233,6 +233,7 @@ pub fn measure_round(mapping: &HashMap<String, usize>, round: &[Vec<String>]) ->
 }
 
 /// Measure a round with optional hints for which tables to process
+#[allow(clippy::needless_range_loop)]
 pub fn measure_round_with_hints(
     mapping: &HashMap<String, usize>,
     round: &[Vec<String>],
@@ -250,7 +251,7 @@ pub fn measure_round_with_hints(
         }
 
         let table_size = table.len();
-        if table_size < 4 || table_size > 5 {
+        if !(4..=5).contains(&table_size) {
             continue;
         }
 
@@ -280,7 +281,6 @@ pub fn measure_round_with_hints(
     }
     m
 }
-
 
 /// Compute lexicographic score for optimization
 pub fn fast_lex_score(measure: &Measure, rounds_count: usize) -> LexScore {
@@ -313,8 +313,8 @@ pub fn fast_lex_score(measure: &Measure, rounds_count: usize) -> LexScore {
     let mean_transfers = transfers_sum / playing_count as f64;
 
     // R3: VP stddev
-    let vps_variance: f64 = vps_list.iter().map(|v| (v - mean_vps).powi(2)).sum::<f64>()
-        / playing_count as f64;
+    let vps_variance: f64 =
+        vps_list.iter().map(|v| (v - mean_vps).powi(2)).sum::<f64>() / playing_count as f64;
     let r3 = vps_variance.sqrt();
 
     // R8: Transfers stddev
@@ -416,8 +416,7 @@ pub fn compute_score(measure: &Measure, rounds_count: usize) -> SeatingScore {
     };
 
     let r3 = if playing_count > 0 {
-        (vps_list.iter().map(|v| (v - mean_vps).powi(2)).sum::<f64>() / playing_count as f64)
-            .sqrt()
+        (vps_list.iter().map(|v| (v - mean_vps).powi(2)).sum::<f64>() / playing_count as f64).sqrt()
     } else {
         0.0
     };
@@ -583,10 +582,12 @@ pub fn optimize_sa(
     let rounds_count = rounds.len();
     if rounds_count == 0 || fixed_rounds >= rounds_count {
         let mapping = build_mapping(rounds);
-        let total_measure = rounds.iter().fold(Measure::new(mapping.len()), |mut acc, r| {
-            acc.add(&measure_round(&mapping, r));
-            acc
-        });
+        let total_measure = rounds
+            .iter()
+            .fold(Measure::new(mapping.len()), |mut acc, r| {
+                acc.add(&measure_round(&mapping, r));
+                acc
+            });
         return compute_score(&total_measure, rounds_count);
     }
 
@@ -862,6 +863,7 @@ impl SeatingIssue {
     }
 }
 
+#[allow(clippy::needless_range_loop)] // `i`/`j` index both matrix and `reverse` vec
 /// Compute per-player seating issues (which players violate which rules).
 /// Returns a list of SeatingIssue, each identifying a rule and the involved player UIDs.
 /// Ported from legacy Evaluator.issues().
@@ -917,19 +919,31 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
 
         // R3: VP distribution
         if (mean_vps - total.get(i, i, 1) as f64 / rp).abs() > 1.0 / rp {
-            issues.push(SeatingIssue { rule: 2, players: vec![reverse[i].clone()] });
+            issues.push(SeatingIssue {
+                rule: 2,
+                players: vec![reverse[i].clone()],
+            });
         }
         // R8: Transfer distribution
         if (mean_trs - total.get(i, i, 2) as f64 / rp).abs() > 2.0 / rp {
-            issues.push(SeatingIssue { rule: 7, players: vec![reverse[i].clone()] });
+            issues.push(SeatingIssue {
+                rule: 7,
+                players: vec![reverse[i].clone()],
+            });
         }
         // R5: Fifth seat twice, R7: Same seat twice
         for seat in 3..8 {
             let count = total.get(i, i, seat);
             if count > 1 {
-                issues.push(SeatingIssue { rule: 6, players: vec![reverse[i].clone()] }); // R7
+                issues.push(SeatingIssue {
+                    rule: 6,
+                    players: vec![reverse[i].clone()],
+                }); // R7
                 if seat == 7 {
-                    issues.push(SeatingIssue { rule: 4, players: vec![reverse[i].clone()] }); // R5
+                    issues.push(SeatingIssue {
+                        rule: 4,
+                        players: vec![reverse[i].clone()],
+                    }); // R5
                 }
             }
         }
@@ -942,20 +956,32 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
             if opponent_count > 1 {
                 // R4: Opponent twice (only meaningful for larger tournaments)
                 if playing > 20 {
-                    issues.push(SeatingIssue { rule: 3, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                    issues.push(SeatingIssue {
+                        rule: 3,
+                        players: vec![reverse[i].clone(), reverse[j].clone()],
+                    });
                 }
                 // R2: Opponent all rounds (only when rounds > 2)
                 if opponent_count >= rounds_count as i32 && rounds_count > 2 {
-                    issues.push(SeatingIssue { rule: 1, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                    issues.push(SeatingIssue {
+                        rule: 1,
+                        players: vec![reverse[i].clone(), reverse[j].clone()],
+                    });
                 }
                 // Check specific relationships
                 for k in 1..6 {
                     if total.get(i, j, k) > 1 {
                         // R6: Same position
-                        issues.push(SeatingIssue { rule: 5, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                        issues.push(SeatingIssue {
+                            rule: 5,
+                            players: vec![reverse[i].clone(), reverse[j].clone()],
+                        });
                         // R1: Predator-prey repeat (prey=1, pred=4)
                         if k == 1 || k == 4 {
-                            issues.push(SeatingIssue { rule: 0, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                            issues.push(SeatingIssue {
+                                rule: 0,
+                                players: vec![reverse[i].clone(), reverse[j].clone()],
+                            });
                         }
                     }
                 }
@@ -963,7 +989,10 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
                 if playing > 20 {
                     for k in 6..8 {
                         if total.get(i, j, k) > 1 {
-                            issues.push(SeatingIssue { rule: 8, players: vec![reverse[i].clone(), reverse[j].clone()] });
+                            issues.push(SeatingIssue {
+                                rule: 8,
+                                players: vec![reverse[i].clone(), reverse[j].clone()],
+                            });
                         }
                     }
                 }
@@ -983,9 +1012,7 @@ pub fn get_staggered_rounds(players: &[String], rounds_count: usize) -> Vec<Vec<
     }
 
     if ![6, 7, 11].contains(&players_count) {
-        return (0..rounds_count)
-            .map(|_| build_round(players))
-            .collect();
+        return (0..rounds_count).map(|_| build_round(players)).collect();
     }
 
     if rounds_count < 2 {
@@ -1001,9 +1028,7 @@ pub fn get_staggered_rounds(players: &[String], rounds_count: usize) -> Vec<Vec<
         .collect();
 
     if possible_outs.is_empty() {
-        return (0..rounds_count)
-            .map(|_| build_round(players))
-            .collect();
+        return (0..rounds_count).map(|_| build_round(players)).collect();
     }
 
     // Calculate additional rounds needed
@@ -1023,7 +1048,8 @@ pub fn get_staggered_rounds(players: &[String], rounds_count: usize) -> Vec<Vec<
         while (total_rounds - out.len()) * possible_outs[i] < excludes {
             i += 1;
         }
-        while i > 0 && excludes > possible_outs[i] && excludes - possible_outs[i] < possible_outs[0] {
+        while i > 0 && excludes > possible_outs[i] && excludes - possible_outs[i] < possible_outs[0]
+        {
             i -= 1;
         }
         out.push(possible_outs[i]);
@@ -1096,64 +1122,253 @@ fn get_precomputed_seating(n: usize) -> Option<Vec<Vec<Vec<usize>>>> {
             vec![vec![8, 12, 6, 0, 10], vec![4, 5, 9, 1], vec![2, 7, 3, 11]],
         ]),
         14 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13]],
-            vec![vec![7, 13, 6, 2, 10], vec![11, 4, 9, 12, 3], vec![8, 5, 1, 0]],
-            vec![vec![12, 10, 8, 1, 7], vec![3, 0, 13, 11, 5], vec![9, 2, 4, 6]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13],
+            ],
+            vec![
+                vec![7, 13, 6, 2, 10],
+                vec![11, 4, 9, 12, 3],
+                vec![8, 5, 1, 0],
+            ],
+            vec![
+                vec![12, 10, 8, 1, 7],
+                vec![3, 0, 13, 11, 5],
+                vec![9, 2, 4, 6],
+            ],
         ]),
         15 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13, 14]],
-            vec![vec![8, 14, 1, 10, 5], vec![12, 4, 11, 9, 0], vec![13, 3, 6, 2, 7]],
-            vec![vec![4, 2, 14, 12, 8], vec![7, 5, 0, 11, 13], vec![9, 10, 3, 1, 6]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14],
+            ],
+            vec![
+                vec![8, 14, 1, 10, 5],
+                vec![12, 4, 11, 9, 0],
+                vec![13, 3, 6, 2, 7],
+            ],
+            vec![
+                vec![4, 2, 14, 12, 8],
+                vec![7, 5, 0, 11, 13],
+                vec![9, 10, 3, 1, 6],
+            ],
         ]),
         16 => Some(vec![
-            vec![vec![0, 1, 2, 3], vec![4, 5, 6, 7], vec![8, 9, 10, 11], vec![12, 13, 14, 15]],
-            vec![vec![3, 7, 9, 14], vec![11, 6, 12, 0], vec![1, 4, 13, 8], vec![2, 15, 5, 10]],
-            vec![vec![13, 11, 7, 2], vec![5, 8, 3, 12], vec![9, 0, 15, 4], vec![10, 14, 1, 6]],
+            vec![
+                vec![0, 1, 2, 3],
+                vec![4, 5, 6, 7],
+                vec![8, 9, 10, 11],
+                vec![12, 13, 14, 15],
+            ],
+            vec![
+                vec![3, 7, 9, 14],
+                vec![11, 6, 12, 0],
+                vec![1, 4, 13, 8],
+                vec![2, 15, 5, 10],
+            ],
+            vec![
+                vec![13, 11, 7, 2],
+                vec![5, 8, 3, 12],
+                vec![9, 0, 15, 4],
+                vec![10, 14, 1, 6],
+            ],
         ]),
         17 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8], vec![9, 10, 11, 12], vec![13, 14, 15, 16]],
-            vec![vec![6, 5, 12, 10, 15], vec![16, 2, 8, 1], vec![7, 9, 14, 0], vec![4, 13, 3, 11]],
-            vec![vec![11, 8, 16, 14, 7], vec![2, 0, 10, 13], vec![3, 15, 5, 9], vec![12, 4, 1, 6]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8],
+                vec![9, 10, 11, 12],
+                vec![13, 14, 15, 16],
+            ],
+            vec![
+                vec![6, 5, 12, 10, 15],
+                vec![16, 2, 8, 1],
+                vec![7, 9, 14, 0],
+                vec![4, 13, 3, 11],
+            ],
+            vec![
+                vec![11, 8, 16, 14, 7],
+                vec![2, 0, 10, 13],
+                vec![3, 15, 5, 9],
+                vec![12, 4, 1, 6],
+            ],
         ]),
         18 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13], vec![14, 15, 16, 17]],
-            vec![vec![15, 13, 11, 5, 2], vec![4, 9, 17, 12, 14], vec![1, 16, 8, 6], vec![3, 0, 10, 7]],
-            vec![vec![6, 17, 3, 11, 16], vec![13, 7, 14, 10, 1], vec![9, 12, 5, 0], vec![8, 2, 4, 15]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13],
+                vec![14, 15, 16, 17],
+            ],
+            vec![
+                vec![15, 13, 11, 5, 2],
+                vec![4, 9, 17, 12, 14],
+                vec![1, 16, 8, 6],
+                vec![3, 0, 10, 7],
+            ],
+            vec![
+                vec![6, 17, 3, 11, 16],
+                vec![13, 7, 14, 10, 1],
+                vec![9, 12, 5, 0],
+                vec![8, 2, 4, 15],
+            ],
         ]),
         19 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13, 14], vec![15, 16, 17, 18]],
-            vec![vec![4, 18, 6, 17, 12], vec![7, 10, 16, 2, 0], vec![8, 13, 9, 15, 1], vec![3, 5, 14, 11]],
-            vec![vec![17, 3, 1, 10, 5], vec![14, 9, 18, 0, 15], vec![11, 8, 4, 16, 7], vec![12, 2, 13, 6]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14],
+                vec![15, 16, 17, 18],
+            ],
+            vec![
+                vec![4, 18, 6, 17, 12],
+                vec![7, 10, 16, 2, 0],
+                vec![8, 13, 9, 15, 1],
+                vec![3, 5, 14, 11],
+            ],
+            vec![
+                vec![17, 3, 1, 10, 5],
+                vec![14, 9, 18, 0, 15],
+                vec![11, 8, 4, 16, 7],
+                vec![12, 2, 13, 6],
+            ],
         ]),
         20 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13, 14], vec![15, 16, 17, 18, 19]],
-            vec![vec![9, 0, 18, 1, 12], vec![16, 14, 15, 7, 3], vec![13, 17, 6, 2, 11], vec![19, 4, 8, 5, 10]],
-            vec![vec![7, 18, 4, 10, 13], vec![1, 5, 14, 6, 16], vec![2, 12, 19, 9, 15], vec![3, 8, 11, 17, 0]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14],
+                vec![15, 16, 17, 18, 19],
+            ],
+            vec![
+                vec![9, 0, 18, 1, 12],
+                vec![16, 14, 15, 7, 3],
+                vec![13, 17, 6, 2, 11],
+                vec![19, 4, 8, 5, 10],
+            ],
+            vec![
+                vec![7, 18, 4, 10, 13],
+                vec![1, 5, 14, 6, 16],
+                vec![2, 12, 19, 9, 15],
+                vec![3, 8, 11, 17, 0],
+            ],
         ]),
         21 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8], vec![9, 10, 11, 12], vec![13, 14, 15, 16], vec![17, 18, 19, 20]],
-            vec![vec![7, 15, 9, 14, 19], vec![4, 17, 8, 11], vec![12, 20, 16, 0], vec![18, 3, 5, 2], vec![10, 13, 6, 1]],
-            vec![vec![20, 8, 10, 5, 13], vec![19, 16, 3, 9], vec![11, 2, 0, 7], vec![14, 4, 18, 6], vec![15, 12, 1, 17]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8],
+                vec![9, 10, 11, 12],
+                vec![13, 14, 15, 16],
+                vec![17, 18, 19, 20],
+            ],
+            vec![
+                vec![7, 15, 9, 14, 19],
+                vec![4, 17, 8, 11],
+                vec![12, 20, 16, 0],
+                vec![18, 3, 5, 2],
+                vec![10, 13, 6, 1],
+            ],
+            vec![
+                vec![20, 8, 10, 5, 13],
+                vec![19, 16, 3, 9],
+                vec![11, 2, 0, 7],
+                vec![14, 4, 18, 6],
+                vec![15, 12, 1, 17],
+            ],
         ]),
         22 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13], vec![14, 15, 16, 17], vec![18, 19, 20, 21]],
-            vec![vec![7, 16, 19, 15, 10], vec![17, 0, 18, 6, 12], vec![1, 3, 5, 14], vec![4, 20, 8, 11], vec![13, 21, 9, 2]],
-            vec![vec![21, 17, 13, 20, 5], vec![11, 9, 14, 18, 1], vec![12, 7, 4, 16], vec![3, 8, 15, 0], vec![6, 2, 10, 19]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13],
+                vec![14, 15, 16, 17],
+                vec![18, 19, 20, 21],
+            ],
+            vec![
+                vec![7, 16, 19, 15, 10],
+                vec![17, 0, 18, 6, 12],
+                vec![1, 3, 5, 14],
+                vec![4, 20, 8, 11],
+                vec![13, 21, 9, 2],
+            ],
+            vec![
+                vec![21, 17, 13, 20, 5],
+                vec![11, 9, 14, 18, 1],
+                vec![12, 7, 4, 16],
+                vec![3, 8, 15, 0],
+                vec![6, 2, 10, 19],
+            ],
         ]),
         23 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13, 14], vec![15, 16, 17, 18], vec![19, 20, 21, 22]],
-            vec![vec![21, 17, 3, 12, 19], vec![2, 8, 20, 11, 18], vec![22, 9, 16, 10, 15], vec![4, 14, 0, 6], vec![7, 5, 13, 1]],
-            vec![vec![6, 13, 19, 16, 20], vec![14, 22, 1, 17, 7], vec![18, 4, 15, 21, 5], vec![12, 10, 8, 0], vec![9, 3, 11, 2]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14],
+                vec![15, 16, 17, 18],
+                vec![19, 20, 21, 22],
+            ],
+            vec![
+                vec![21, 17, 3, 12, 19],
+                vec![2, 8, 20, 11, 18],
+                vec![22, 9, 16, 10, 15],
+                vec![4, 14, 0, 6],
+                vec![7, 5, 13, 1],
+            ],
+            vec![
+                vec![6, 13, 19, 16, 20],
+                vec![14, 22, 1, 17, 7],
+                vec![18, 4, 15, 21, 5],
+                vec![12, 10, 8, 0],
+                vec![9, 3, 11, 2],
+            ],
         ]),
         24 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13, 14], vec![15, 16, 17, 18, 19], vec![20, 21, 22, 23]],
-            vec![vec![13, 2, 23, 6, 18], vec![11, 22, 15, 4, 8], vec![3, 5, 16, 10, 20], vec![21, 12, 9, 17, 0], vec![19, 7, 14, 1]],
-            vec![vec![8, 19, 20, 12, 2], vec![6, 14, 3, 15, 21], vec![17, 23, 1, 11, 5], vec![18, 10, 0, 7, 22], vec![4, 9, 13, 16]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14],
+                vec![15, 16, 17, 18, 19],
+                vec![20, 21, 22, 23],
+            ],
+            vec![
+                vec![13, 2, 23, 6, 18],
+                vec![11, 22, 15, 4, 8],
+                vec![3, 5, 16, 10, 20],
+                vec![21, 12, 9, 17, 0],
+                vec![19, 7, 14, 1],
+            ],
+            vec![
+                vec![8, 19, 20, 12, 2],
+                vec![6, 14, 3, 15, 21],
+                vec![17, 23, 1, 11, 5],
+                vec![18, 10, 0, 7, 22],
+                vec![4, 9, 13, 16],
+            ],
         ]),
         25 => Some(vec![
-            vec![vec![0, 1, 2, 3, 4], vec![5, 6, 7, 8, 9], vec![10, 11, 12, 13, 14], vec![15, 16, 17, 18, 19], vec![20, 21, 22, 23, 24]],
-            vec![vec![14, 7, 19, 20, 0], vec![24, 12, 18, 6, 2], vec![21, 5, 1, 10, 15], vec![4, 22, 9, 17, 11], vec![13, 8, 23, 16, 3]],
-            vec![vec![8, 18, 11, 1, 20], vec![2, 17, 13, 7, 21], vec![16, 24, 14, 4, 5], vec![3, 19, 6, 22, 10], vec![9, 23, 0, 15, 12]],
+            vec![
+                vec![0, 1, 2, 3, 4],
+                vec![5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14],
+                vec![15, 16, 17, 18, 19],
+                vec![20, 21, 22, 23, 24],
+            ],
+            vec![
+                vec![14, 7, 19, 20, 0],
+                vec![24, 12, 18, 6, 2],
+                vec![21, 5, 1, 10, 15],
+                vec![4, 22, 9, 17, 11],
+                vec![13, 8, 23, 16, 3],
+            ],
+            vec![
+                vec![8, 18, 11, 1, 20],
+                vec![2, 17, 13, 7, 21],
+                vec![16, 24, 14, 4, 5],
+                vec![3, 19, 6, 22, 10],
+                vec![9, 23, 0, 15, 12],
+            ],
         ]),
         _ => None,
     }
@@ -1250,10 +1465,10 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
         if sizes.is_empty() {
             continue;
         }
-        let has_4 = sizes.iter().any(|&s| s == 4);
-        let has_5 = sizes.iter().any(|&s| s == 5);
+        let has_4 = sizes.contains(&4);
+        let has_5 = sizes.contains(&5);
         let distinct_seats = match (has_4, has_5) {
-            (true, true) => 9,  // seats 1-4 at 4-table + seats 1-5 at 5-table
+            (true, true) => 9, // seats 1-4 at 4-table + seats 1-5 at 5-table
             (true, false) => 4,
             (false, true) => 5,
             _ => sizes.len(), // shouldn't happen
@@ -1319,21 +1534,15 @@ pub fn score_rounds(rounds: &[Vec<Vec<String>>]) -> Result<SeatingScore, String>
 ///
 /// # Usage patterns
 ///
-/// ## Fresh tournament (no dropouts)
-/// ```ignore
-/// let (rounds, score) = compute_seating(&players, 3, None)?;
-/// ```
+/// Fresh tournament (no dropouts):
+///     `compute_seating(&players, 3, None)`
 ///
-/// ## Adding a round after dropouts/additions
-/// ```ignore
-/// // Round 2 with different players than round 1
-/// let (rounds, score) = compute_seating(&current_players, 2, Some(&[round1]))?;
-/// ```
+/// Adding a round after dropouts/additions:
+///     `compute_seating(&current_players, 2, Some(&[round1]))`
 ///
-/// ## Adding round 4+ to existing tournament
-/// ```ignore
-/// let (rounds, score) = compute_seating(&players, 4, Some(&prev_rounds))?;
-/// ```
+/// Adding round 4+ to existing tournament:
+///     `compute_seating(&players, 4, Some(&prev_rounds))`
+#[allow(clippy::type_complexity)]
 pub fn compute_seating(
     players: &[String],
     rounds_count: usize,
@@ -1401,10 +1610,12 @@ pub fn compute_seating(
 
     // Compute final score
     let mapping = build_mapping(&rounds);
-    let total_measure = rounds.iter().fold(Measure::new(mapping.len()), |mut acc, r| {
-        acc.add(&measure_round(&mapping, r));
-        acc
-    });
+    let total_measure = rounds
+        .iter()
+        .fold(Measure::new(mapping.len()), |mut acc, r| {
+            acc.add(&measure_round(&mapping, r));
+            acc
+        });
     let score = compute_score(&total_measure, rounds.len());
 
     Ok((rounds, score))
@@ -1427,7 +1638,8 @@ pub fn compute_next_round(
     previous_rounds: &[Vec<Vec<String>>],
 ) -> Result<(Vec<Vec<String>>, SeatingScore), String> {
     let total_rounds = previous_rounds.len() + 1;
-    let (all_rounds, score) = compute_seating(current_players, total_rounds, Some(previous_rounds))?;
+    let (all_rounds, score) =
+        compute_seating(current_players, total_rounds, Some(previous_rounds))?;
 
     // Return only the new round
     let new_round = all_rounds.into_iter().last().ok_or("No rounds generated")?;
@@ -1504,7 +1716,7 @@ mod tests {
             "C".to_string(),
             "D".to_string(),
         ]];
-        let mapping = build_mapping(&[round.clone()]);
+        let mapping = build_mapping(std::slice::from_ref(&round));
         let m = measure_round(&mapping, &round);
 
         // Check diagonal (position info)
@@ -1691,16 +1903,19 @@ mod tests {
             .into_iter()
             .map(|s| s.to_string())
             .collect();
-        let rounds = vec![
-            vec![players.clone()],
-            vec![players.clone()],
-        ];
+        let rounds = vec![vec![players.clone()], vec![players.clone()]];
         let mins = compute_minimum_violations(&rounds);
 
         // R2 (opponent all rounds): all C(4,2)=6 pairs forced to meet both rounds
-        assert_eq!(mins[1], 6.0, "R2 min should be 6 for 4 players single table");
+        assert_eq!(
+            mins[1], 6.0,
+            "R2 min should be 6 for 4 players single table"
+        );
         // R4 (opponent twice): all 6 pairs forced to repeat
-        assert_eq!(mins[3], 6.0, "R4 min should be 6 for 4 players single table");
+        assert_eq!(
+            mins[3], 6.0,
+            "R4 min should be 6 for 4 players single table"
+        );
         // R1 (predator-prey repeat): always 0 minimum
         assert_eq!(mins[0], 0.0, "R1 min always 0");
     }
@@ -1760,23 +1975,39 @@ mod tests {
         // Should have issues: R1 (pred-prey repeat), R4 (opponent twice),
         // R5 won't fire (no 5th seat), R6 (same position), R7 (same seat),
         // R9 (same position group)
-        assert!(!issues.is_empty(), "Identical seating should produce issues");
+        assert!(
+            !issues.is_empty(),
+            "Identical seating should produce issues"
+        );
 
         // Check R1 (rule index 0) -- predator-prey repeat
         let r1_issues: Vec<_> = issues.iter().filter(|i| i.rule == 0).collect();
-        assert!(!r1_issues.is_empty(), "Should detect predator-prey repeats (R1)");
+        assert!(
+            !r1_issues.is_empty(),
+            "Should detect predator-prey repeats (R1)"
+        );
         // Each pair direction: A->B prey, B->C prey, C->D prey, D->A prey
         // In the measure, prey (k=1) and pred (k=4) are tracked per ordered pair
         // For 4 players with identical seating, each adjacent pair has prey/pred repeat
-        assert!(r1_issues.len() >= 2, "Should have multiple R1 violations for identical 4-player table");
+        assert!(
+            r1_issues.len() >= 2,
+            "Should have multiple R1 violations for identical 4-player table"
+        );
 
         // Check R4 (rule index 3) -- opponent twice (suppressed for playing <= 20)
         let r4_issues: Vec<_> = issues.iter().filter(|i| i.rule == 3).collect();
-        assert_eq!(r4_issues.len(), 0, "R4 should be suppressed for small tournaments (<=20 players)");
+        assert_eq!(
+            r4_issues.len(),
+            0,
+            "R4 should be suppressed for small tournaments (<=20 players)"
+        );
 
         // Check R7 (rule index 6) -- same seat twice
         let r7_issues: Vec<_> = issues.iter().filter(|i| i.rule == 6).collect();
-        assert!(!r7_issues.is_empty(), "Should detect same-seat repeats (R7)");
+        assert!(
+            !r7_issues.is_empty(),
+            "Should detect same-seat repeats (R7)"
+        );
         // Each player sat in the same seat twice, so each of the 4 players triggers R7
         assert_eq!(r7_issues.len(), 4, "All 4 players should have seat repeats");
     }
@@ -1792,10 +2023,17 @@ mod tests {
         assert_eq!(r2_count, 0, "R2 should not fire with only 2 rounds");
 
         // 3 identical rounds: R2 SHOULD fire
-        let rounds_3 = vec![vec![table.clone()], vec![table.clone()], vec![table.clone()]];
+        let rounds_3 = vec![
+            vec![table.clone()],
+            vec![table.clone()],
+            vec![table.clone()],
+        ];
         let issues_3 = compute_player_issues(&rounds_3);
         let r2_count = issues_3.iter().filter(|i| i.rule == 1).count();
-        assert_eq!(r2_count, 6, "R2 should fire for all C(4,2)=6 pairs with 3 identical rounds");
+        assert_eq!(
+            r2_count, 6,
+            "R2 should fire for all C(4,2)=6 pairs with 3 identical rounds"
+        );
     }
 
     #[test]
@@ -1804,7 +2042,10 @@ mod tests {
         let players = make_players(8);
         let (rounds, score) = compute_seating(&players, 3, None).unwrap();
         // Precomputed seatings for 8 players are known optimal
-        assert_eq!(score.rules[0], 0.0, "Optimal seating should have no R1 violations");
+        assert_eq!(
+            score.rules[0], 0.0,
+            "Optimal seating should have no R1 violations"
+        );
         let issues = compute_player_issues(&rounds);
         // Optimal seating may still have unavoidable R4 violations (pigeonhole),
         // but should have no hard constraint violations (R1, R2)

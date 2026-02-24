@@ -9,8 +9,13 @@ Covers:
 
 from datetime import UTC, datetime
 
-from src.models import Role, Tournament, TournamentFormat, TournamentRank, TournamentState, User
-from src.routes.tournaments import _is_organizer, _build_actor_context
+from src.models import (
+    Role,
+    Tournament,
+    TournamentState,
+    User,
+)
+from src.routes.tournaments import _build_actor_context, _is_organizer
 from src.vekn_tournament_sync import _map_vekn_to_tournament
 
 NOW = datetime.now(UTC)
@@ -22,7 +27,9 @@ def _user(uid="u1", roles=None):
 
 def _tournament(organizers_uids=None):
     return Tournament(
-        uid="t1", modified=NOW, name="Test",
+        uid="t1",
+        modified=NOW,
+        name="Test",
         organizers_uids=organizers_uids or [],
     )
 
@@ -109,8 +116,24 @@ class TestVeknOrganizerMapping:
             "event_enddate": "2025-06-01",
             "organizer_veknid": "1000001",
             "players": [
-                {"veknid": "2000001", "pos": "1", "gw": 2, "vp": 5.0, "tp": 36, "tie": 0, "vpf": 1.0},
-                {"veknid": "3000001", "pos": "2", "gw": 1, "vp": 3.0, "tp": 24, "tie": 0, "vpf": 0.5},
+                {
+                    "veknid": "2000001",
+                    "pos": "1",
+                    "gw": 2,
+                    "vp": 5.0,
+                    "tp": 36,
+                    "tie": 0,
+                    "vpf": 1.0,
+                },
+                {
+                    "veknid": "3000001",
+                    "pos": "2",
+                    "gw": 1,
+                    "vp": 3.0,
+                    "tp": 24,
+                    "tie": 0,
+                    "vpf": 0.5,
+                },
             ],
         }
         t = _map_vekn_to_tournament(data, self._users_by_vekn())
@@ -126,7 +149,15 @@ class TestVeknOrganizerMapping:
             "event_startdate": "2025-06-01",
             "organizer_veknid": "9999999",
             "players": [
-                {"veknid": "2000001", "pos": "1", "gw": 1, "vp": 3.0, "tp": 24, "tie": 0, "vpf": 0},
+                {
+                    "veknid": "2000001",
+                    "pos": "1",
+                    "gw": 1,
+                    "vp": 3.0,
+                    "tp": 24,
+                    "tie": 0,
+                    "vpf": 0,
+                },
             ],
         }
         t = _map_vekn_to_tournament(data, self._users_by_vekn())

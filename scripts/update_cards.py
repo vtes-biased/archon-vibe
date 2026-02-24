@@ -5,10 +5,7 @@ Downloads vtescrypt.csv and vteslib.csv from static.krcg.org,
 parses them, and outputs a JSON file keyed by card ID.
 """
 
-import csv
-import io
 import json
-import sys
 from pathlib import Path
 from urllib.request import urlopen
 

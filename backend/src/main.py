@@ -29,14 +29,22 @@ from .db import (
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .models import (
     DataLevel,
-    League,
     Role,
     Sanction,
-    SanctionLevel,
-    Tournament,
     User,
 )
-from .routes import admin, auth, calendar, cards, leagues, oauth, sanctions, tournaments, users, vekn
+from .routes import (
+    admin,
+    auth,
+    calendar,
+    cards,
+    leagues,
+    oauth,
+    sanctions,
+    tournaments,
+    users,
+    vekn,
+)
 from .vekn_sync import VEKNSyncService
 
 # Load environment variables
@@ -411,6 +419,7 @@ MINIMUM_SYNC_EPOCH = "2026-01-31T00:00:00"
 # Data-level helpers
 # ---------------------------------------------------------------------------
 
+
 def _viewer_level(viewer: User | None) -> DataLevel:
     """Determine the viewer's base data level."""
     if not viewer:
@@ -426,8 +435,10 @@ def _viewer_level(viewer: User | None) -> DataLevel:
 # New sync: broadcast reads pre-computed columns from objects table
 # ---------------------------------------------------------------------------
 
+
 def broadcast_precomputed(bd: BroadcastData) -> None:
     """Broadcast pre-computed projections to SSE connections. No DB access."""
+
     def _make_msg(json_str: str) -> str:
         return f'data: {{"type":"{bd.obj_type}","data":{json_str}}}\n\n'
 
@@ -446,7 +457,12 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
                 msg = pub_msg
             elif Role.IC in viewer.roles:
                 msg = full_msg
-            elif (Role.NC in viewer.roles or Role.PRINCE in viewer.roles) and viewer.country and bd.country and viewer.country == bd.country:
+            elif (
+                (Role.NC in viewer.roles or Role.PRINCE in viewer.roles)
+                and viewer.country
+                and bd.country
+                and viewer.country == bd.country
+            ):
                 msg = full_msg
             elif isinstance(org_uids, list) and viewer.uid in org_uids:
                 msg = full_msg
@@ -490,7 +506,11 @@ def broadcast_league_event(bd: BroadcastData) -> None:
 
 
 async def broadcast_judge_call(
-    *, tournament_uid: str, table: int, table_label: str, player_name: str,
+    *,
+    tournament_uid: str,
+    table: int,
+    table_label: str,
+    player_name: str,
     organizer_uids: list[str] | None = None,
 ) -> None:
     """Broadcast judge call to organizers and IC users only."""
@@ -664,6 +684,7 @@ async def stream_updates(
     # Stale SSE prevention: if since is older than 3 days, force resync via snapshot
     if since:
         from datetime import UTC, datetime, timedelta
+
         try:
             since_dt = datetime.fromisoformat(since)
             if since_dt.tzinfo is None:
@@ -683,9 +704,10 @@ async def stream_updates(
             yield ": connected\n\n"
 
             if force_resync:
-                yield f'data: {{"type":"resync"}}\n\n'
+                yield 'data: {"type":"resync"}\n\n'
 
             import time
+
             start_time = time.time()
             last_timestamp: str | None = None
             totals: dict[str, int] = {}
@@ -704,7 +726,9 @@ async def stream_updates(
                             return
 
                         count += len(json_strings)
-                        if batch_max and (last_timestamp is None or batch_max > last_timestamp):
+                        if batch_max and (
+                            last_timestamp is None or batch_max > last_timestamp
+                        ):
                             last_timestamp = batch_max
 
                         if json_strings:
@@ -721,20 +745,24 @@ async def stream_updates(
                 try:
                     async with _pool.connection() as db_conn:
                         # Own user profile at full level
-                        row = await (await db_conn.execute(
-                            "SELECT \"full\"::text FROM objects WHERE uid = %s AND type = 'user'",
-                            (stream_user.uid,),
-                        )).fetchone()
+                        row = await (
+                            await db_conn.execute(
+                                "SELECT \"full\"::text FROM objects WHERE uid = %s AND type = 'user'",
+                                (stream_user.uid,),
+                            )
+                        ).fetchone()
                         if row and row[0]:
                             yield f'data: {{"type":"user","data":{row[0]}}}\n\n'
                             overlay_count += 1
 
                         # Own decks at full level (even if member=null)
-                        rows = await (await db_conn.execute(
-                            "SELECT \"full\"::text FROM objects WHERE type = 'deck' "
-                            "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
-                            (stream_user.uid,),
-                        )).fetchall()
+                        rows = await (
+                            await db_conn.execute(
+                                "SELECT \"full\"::text FROM objects WHERE type = 'deck' "
+                                "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
+                                (stream_user.uid,),
+                            )
+                        ).fetchall()
                         if rows:
                             decks_json = ",".join(r[0] for r in rows)
                             yield f'data: {{"type":"decks","data":[{decks_json}]}}\n\n'
@@ -742,14 +770,17 @@ async def stream_updates(
 
                         # NC/Prince: full for same-country users + tournaments
                         if stream_user.country and (
-                            Role.NC in stream_user.roles or Role.PRINCE in stream_user.roles
+                            Role.NC in stream_user.roles
+                            or Role.PRINCE in stream_user.roles
                         ):
                             # Same-country users
-                            rows = await (await db_conn.execute(
-                                "SELECT \"full\"::text FROM objects WHERE type = 'user' "
-                                "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                                (stream_user.country,),
-                            )).fetchall()
+                            rows = await (
+                                await db_conn.execute(
+                                    "SELECT \"full\"::text FROM objects WHERE type = 'user' "
+                                    "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
+                                    (stream_user.country,),
+                                )
+                            ).fetchall()
                             if rows:
                                 for i in range(0, len(rows), 500):
                                     batch = rows[i : i + 500]
@@ -758,11 +789,13 @@ async def stream_updates(
                                 overlay_count += len(rows)
 
                             # Same-country tournaments
-                            rows = await (await db_conn.execute(
-                                "SELECT \"full\"::text FROM objects WHERE type = 'tournament' "
-                                "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                                (stream_user.country,),
-                            )).fetchall()
+                            rows = await (
+                                await db_conn.execute(
+                                    "SELECT \"full\"::text FROM objects WHERE type = 'tournament' "
+                                    "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
+                                    (stream_user.country,),
+                                )
+                            ).fetchall()
                             if rows:
                                 for i in range(0, len(rows), 100):
                                     batch = rows[i : i + 100]
@@ -771,11 +804,13 @@ async def stream_updates(
                                 overlay_count += len(rows)
 
                         # Organizer: full for organized tournaments + their decks
-                        rows = await (await db_conn.execute(
-                            "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
-                            "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
-                            (stream_user.uid,),
-                        )).fetchall()
+                        rows = await (
+                            await db_conn.execute(
+                                "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
+                                "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
+                                (stream_user.uid,),
+                            )
+                        ).fetchall()
                         if rows:
                             t_uids = [r[0] for r in rows]
                             for i in range(0, len(rows), 100):
@@ -786,19 +821,23 @@ async def stream_updates(
 
                             # Decks for organized tournaments (single IN query)
                             placeholders = ", ".join(["%s"] * len(t_uids))
-                            deck_rows = await (await db_conn.execute(
-                                f"SELECT \"full\"::text FROM objects WHERE type = 'deck' "
-                                f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
-                                f"AND deleted_at IS NULL",
-                                tuple(t_uids),
-                            )).fetchall()
+                            deck_rows = await (
+                                await db_conn.execute(
+                                    f"SELECT \"full\"::text FROM objects WHERE type = 'deck' "
+                                    f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
+                                    f"AND deleted_at IS NULL",
+                                    tuple(t_uids),
+                                )
+                            ).fetchall()
                             if deck_rows:
                                 joined = ",".join(r[0] for r in deck_rows)
                                 yield f'data: {{"type":"decks","data":[{joined}]}}\n\n'
                                 overlay_count += len(deck_rows)
 
                     if overlay_count:
-                        logger.info(f"Personal overlay: {overlay_count} objects for {stream_user.uid}")
+                        logger.info(
+                            f"Personal overlay: {overlay_count} objects for {stream_user.uid}"
+                        )
                 except Exception as e:
                     logger.error(f"Error in personal overlay: {e}", exc_info=True)
 

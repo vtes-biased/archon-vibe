@@ -55,7 +55,9 @@ impl CardMap {
         let mut name_index = HashMap::new();
 
         for (id_str, value) in data.entries() {
-            let id: u32 = id_str.parse().map_err(|_| format!("Invalid card ID: {id_str}"))?;
+            let id: u32 = id_str
+                .parse()
+                .map_err(|_| format!("Invalid card ID: {id_str}"))?;
             let card = parse_card(id, value)?;
 
             // Index by normalized name

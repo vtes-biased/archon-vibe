@@ -4,7 +4,6 @@
 /// - **RTP**: Sum of per-tournament rating points (reuses `compute_rating_points`)
 /// - **Score**: Sum of preliminary GW/VP/TP (finals scores subtracted for finalists)
 /// - **GP**: Position-based points per tournament (25/15/10-6/3)
-
 use json::JsonValue;
 
 use crate::ratings::compute_rating_points;
@@ -42,9 +41,7 @@ struct PlayerEntry {
 /// `{ "user_uid", "gw", "vp", "tp", "points", "rank", "tournaments_count" }`
 pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
     let config = json::parse(config_json).map_err(|e| e.to_string())?;
-    let mode = config["standings_mode"]
-        .as_str()
-        .unwrap_or("RTP");
+    let mode = config["standings_mode"].as_str().unwrap_or("RTP");
 
     let mut players: std::collections::HashMap<String, PlayerEntry> =
         std::collections::HashMap::new();
@@ -109,17 +106,16 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
                         // Winner = position 0 in sorted standings among finalists
                         // Check if this is the winner (first finalist in standings)
                         let winner_uid = tournament["winner"].as_str().unwrap_or("");
-                        if uid == winner_uid { 1 } else { 2 }
+                        if uid == winner_uid {
+                            1
+                        } else {
+                            2
+                        }
                     } else {
                         0
                     };
-                    let rtp = compute_rating_points(
-                        vp,
-                        gw as i32,
-                        finalist_position,
-                        player_count,
-                        rank,
-                    );
+                    let rtp =
+                        compute_rating_points(vp, gw as i32, finalist_position, player_count, rank);
                     entry.points += rtp;
                     entry.gw += gw;
                     entry.vp += vp;
@@ -146,7 +142,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
     match mode {
         "Score" => {
             sorted.sort_by(|a, b| {
-                b.gw.partial_cmp(&a.gw).unwrap()
+                b.gw.partial_cmp(&a.gw)
+                    .unwrap()
                     .then(b.vp.partial_cmp(&a.vp).unwrap())
                     .then(b.tp.cmp(&a.tp))
             });
@@ -154,7 +151,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
         _ => {
             // RTP and GP: sort by points desc, then GW, VP, TP
             sorted.sort_by(|a, b| {
-                b.points.cmp(&a.points)
+                b.points
+                    .cmp(&a.points)
                     .then(b.gw.partial_cmp(&a.gw).unwrap())
                     .then(b.vp.partial_cmp(&a.vp).unwrap())
                     .then(b.tp.cmp(&a.tp))

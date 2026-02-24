@@ -53,7 +53,7 @@ def _create_jwt() -> str:
 
     now = int(time.time())
     payload = {
-        "iat": now - 60,   # 60s clock-drift margin
+        "iat": now - 60,  # 60s clock-drift margin
         "exp": now + 600,  # max 10 minutes
         "iss": int(TWDA_GITHUB_APP_ID),  # GitHub expects integer
     }
@@ -89,7 +89,9 @@ async def _get_installation_token() -> str:
 
 
 def _is_configured() -> bool:
-    return bool(TWDA_GITHUB_APP_ID and TWDA_GITHUB_PRIVATE_KEY and TWDA_GITHUB_INSTALLATION_ID)
+    return bool(
+        TWDA_GITHUB_APP_ID and TWDA_GITHUB_PRIVATE_KEY and TWDA_GITHUB_INSTALLATION_ID
+    )
 
 
 async def submit_twda_pr(
@@ -128,9 +130,7 @@ async def submit_twda_pr(
     ) as client:
         try:
             # 1. Get master branch SHA
-            resp = await client.get(
-                f"/repos/{TWDA_TARGET_REPO}/git/refs/heads/master"
-            )
+            resp = await client.get(f"/repos/{TWDA_TARGET_REPO}/git/refs/heads/master")
             if resp.status_code != 200:
                 logger.error(f"Failed to get TWD master ref: {resp.status_code}")
                 return None

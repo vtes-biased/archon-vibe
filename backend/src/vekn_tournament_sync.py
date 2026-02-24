@@ -7,16 +7,16 @@ from typing import Any
 from uuid6 import uuid7
 
 from .db import (
+    decode_json,
     get_connection,
     get_tournament_by_external_id,
     insert_tournament,
     update_tournament,
-    decode_json,
 )
 from .models import (
+    PaymentStatus,
     Player,
     PlayerState,
-    PaymentStatus,
     Score,
     Standing,
     Tournament,
@@ -31,22 +31,22 @@ logger = logging.getLogger(__name__)
 
 # VEKN event type → (format, rank)
 EVENT_TYPE_MAP: dict[int, tuple[TournamentFormat, TournamentRank]] = {
-    1: (TournamentFormat.Limited, TournamentRank.BASIC),     # Demo
-    2: (TournamentFormat.Standard, TournamentRank.BASIC),    # Standard Constructed
-    3: (TournamentFormat.Limited, TournamentRank.BASIC),     # Limited
-    4: (TournamentFormat.Standard, TournamentRank.BASIC),    # Mini Qualifier
-    5: (TournamentFormat.Standard, TournamentRank.BASIC),    # Continental Qualifier
-    6: (TournamentFormat.Standard, TournamentRank.CC),       # Continental Championship
-    7: (TournamentFormat.Standard, TournamentRank.BASIC),    # National Qualifier
-    8: (TournamentFormat.Standard, TournamentRank.NC),       # National Championship
-    9: (TournamentFormat.Limited, TournamentRank.BASIC),     # Storyline
-    10: (TournamentFormat.Limited, TournamentRank.BASIC),    # Launch Event
-    11: (TournamentFormat.Limited, TournamentRank.BASIC),    # BYOS
-    12: (TournamentFormat.Limited, TournamentRank.BASIC),    # Unsanctioned
-    13: (TournamentFormat.Limited, TournamentRank.BASIC),    # Limited NC
-    14: (TournamentFormat.Limited, TournamentRank.BASIC),    # Limited CC
-    15: (TournamentFormat.Standard, TournamentRank.BASIC),   # Grand Prix
-    16: (TournamentFormat.V5, TournamentRank.BASIC),         # V5 Constructed
+    1: (TournamentFormat.Limited, TournamentRank.BASIC),  # Demo
+    2: (TournamentFormat.Standard, TournamentRank.BASIC),  # Standard Constructed
+    3: (TournamentFormat.Limited, TournamentRank.BASIC),  # Limited
+    4: (TournamentFormat.Standard, TournamentRank.BASIC),  # Mini Qualifier
+    5: (TournamentFormat.Standard, TournamentRank.BASIC),  # Continental Qualifier
+    6: (TournamentFormat.Standard, TournamentRank.CC),  # Continental Championship
+    7: (TournamentFormat.Standard, TournamentRank.BASIC),  # National Qualifier
+    8: (TournamentFormat.Standard, TournamentRank.NC),  # National Championship
+    9: (TournamentFormat.Limited, TournamentRank.BASIC),  # Storyline
+    10: (TournamentFormat.Limited, TournamentRank.BASIC),  # Launch Event
+    11: (TournamentFormat.Limited, TournamentRank.BASIC),  # BYOS
+    12: (TournamentFormat.Limited, TournamentRank.BASIC),  # Unsanctioned
+    13: (TournamentFormat.Limited, TournamentRank.BASIC),  # Limited NC
+    14: (TournamentFormat.Limited, TournamentRank.BASIC),  # Limited CC
+    15: (TournamentFormat.Standard, TournamentRank.BASIC),  # Grand Prix
+    16: (TournamentFormat.V5, TournamentRank.BASIC),  # V5 Constructed
 }
 
 
@@ -82,7 +82,9 @@ def _map_vekn_to_tournament(
 
     # Event type mapping
     event_type = int(data.get("eventtype_id", 0) or 0)
-    fmt, rank = EVENT_TYPE_MAP.get(event_type, (TournamentFormat.Standard, TournamentRank.BASIC))
+    fmt, rank = EVENT_TYPE_MAP.get(
+        event_type, (TournamentFormat.Standard, TournamentRank.BASIC)
+    )
 
     name = data.get("event_name") or f"VEKN Event {event_id}"
     start = _parse_date(data.get("event_startdate"))
@@ -137,22 +139,26 @@ def _map_vekn_to_tournament(
             tp = int(vp_data.get("tp", 0) or 0)
             toss = int(vp_data.get("tie", 0) or 0)
 
-            players.append(Player(
-                user_uid=user.uid,
-                state=PlayerState.FINISHED,
-                payment_status=PaymentStatus.PAID,
-                toss=toss,
-                result=Score(gw=gw, vp=vp, tp=tp),
-                finalist=is_finalist,
-            ))
-            standings.append(Standing(
-                user_uid=user.uid,
-                gw=float(gw),
-                vp=vp,
-                tp=tp,
-                toss=toss,
-                finalist=is_finalist,
-            ))
+            players.append(
+                Player(
+                    user_uid=user.uid,
+                    state=PlayerState.FINISHED,
+                    payment_status=PaymentStatus.PAID,
+                    toss=toss,
+                    result=Score(gw=gw, vp=vp, tp=tp),
+                    finalist=is_finalist,
+                )
+            )
+            standings.append(
+                Standing(
+                    user_uid=user.uid,
+                    gw=float(gw),
+                    vp=vp,
+                    tp=tp,
+                    toss=toss,
+                    finalist=is_finalist,
+                )
+            )
 
         if not players:
             return None  # All players unknown
@@ -223,7 +229,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
     Returns stats: {created, updated, unchanged, errors, skipped, total}.
     """
     logger.info("Starting VEKN tournament sync")
-    stats = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0, "skipped": 0, "total": 0}
+    stats = {
+        "created": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "errors": 0,
+        "skipped": 0,
+        "total": 0,
+    }
 
     users_by_vekn_id = await _build_users_by_vekn_id()
     logger.info(f"Loaded {len(users_by_vekn_id)} users by VEKN ID")
@@ -270,9 +283,11 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 )
                 if changed:
                     # Merge organizers: keep existing + add VEKN organizer
-                    merged_organizers = list(dict.fromkeys(
-                        existing.organizers_uids + tournament.organizers_uids
-                    ))
+                    merged_organizers = list(
+                        dict.fromkeys(
+                            existing.organizers_uids + tournament.organizers_uids
+                        )
+                    )
                     tournament = Tournament(
                         uid=existing.uid,
                         modified=datetime.now(UTC),
@@ -306,7 +321,13 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
             stats["errors"] += 1
 
         # Progress log every 100 events
-        total = stats["created"] + stats["updated"] + stats["unchanged"] + stats["skipped"] + stats["errors"]
+        total = (
+            stats["created"]
+            + stats["updated"]
+            + stats["unchanged"]
+            + stats["skipped"]
+            + stats["errors"]
+        )
         if total % 100 == 0:
             logger.info(
                 f"VEKN tournament sync progress: {stats['created']} created, "

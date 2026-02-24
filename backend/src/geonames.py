@@ -6,13 +6,13 @@ Provides access to countries and cities data from GeoNames.
 import json
 import re
 import unicodedata
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache
 from importlib.resources import files
 from typing import TypedDict
 
 
-class Continent(str, Enum):
+class Continent(StrEnum):
     """Continent codes from GeoNames."""
 
     AF = "AF"  # Africa
@@ -159,13 +159,11 @@ _PAREN_RE = re.compile(r"\s*\(.*\)\s*$")
 
 
 @lru_cache(maxsize=1)
-def _build_city_index() -> (
-    tuple[
-        dict[tuple[str, str], City],
-        dict[tuple[str, str], City],
-        dict[tuple[str, str], City],
-    ]
-):
+def _build_city_index() -> tuple[
+    dict[tuple[str, str], City],
+    dict[tuple[str, str], City],
+    dict[tuple[str, str], City],
+]:
     """Build lookup dicts for city matching.
 
     Returns (by_name, by_ascii, by_base) where:

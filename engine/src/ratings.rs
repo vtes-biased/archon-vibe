@@ -4,7 +4,7 @@
 /// - Finalist bonus: Winner=90, Runner-up=30
 /// - coef = log15(player_count²) - 1, with +0.25 for NC, +1.0 for CC
 /// - player_count = players with ≥1 round played
-
+///
 /// Compute per-tournament rating points.
 /// - `vp`: victory points (float, e.g. 3.5)
 /// - `gw`: game wins

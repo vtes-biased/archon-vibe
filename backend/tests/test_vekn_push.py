@@ -24,10 +24,10 @@ from src.models import (
 )
 from src.vekn_push import generate_archondata, tournament_to_vekn_type
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _user(uid: str, name: str, vekn_id: str, city: str = "") -> User:
     return User(
@@ -79,6 +79,7 @@ def _fake_compute(tournament, user_uid, sanctions=None):
 # tournament_to_vekn_type
 # ---------------------------------------------------------------------------
 
+
 def test_vekn_type_standard_basic():
     assert tournament_to_vekn_type(TournamentFormat.Standard, TournamentRank.BASIC) == 2
 
@@ -108,6 +109,7 @@ def test_vekn_type_unknown_defaults_to_standard():
 # generate_archondata — format validation
 # ---------------------------------------------------------------------------
 
+
 @patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
 def test_archondata_basic_format(mock_compute):
     """Verify the basic archondata format: nrounds¤rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§"""
@@ -121,8 +123,18 @@ def test_archondata_basic_format(mock_compute):
     ]
     # 2 rounds of tables, no finals
     rounds = [
-        [Table(seating=[Seat(player_uid="u1"), Seat(player_uid="u2")], state=TableState.FINISHED)],
-        [Table(seating=[Seat(player_uid="u1"), Seat(player_uid="u2")], state=TableState.FINISHED)],
+        [
+            Table(
+                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
+                state=TableState.FINISHED,
+            )
+        ],
+        [
+            Table(
+                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
+                state=TableState.FINISHED,
+            )
+        ],
     ]
     t = _make_tournament(rounds=rounds, standings=standings)
     result = generate_archondata(t, users)
@@ -138,27 +150,27 @@ def test_archondata_basic_format(mock_compute):
     # Fields: rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§
     parts = after_nrounds.split("§")
     # Alice Smith: rank 1, first=Alice, last=Smith, city=Paris, vekn=1000001, gw=2, vp=8.5, vpf=0.0, tp=60, toss=3, rtp=10
-    assert parts[0] == "1"        # rank
-    assert parts[1] == "Alice"    # first name
-    assert parts[2] == "Smith"    # last name
-    assert parts[3] == "Paris"    # city
+    assert parts[0] == "1"  # rank
+    assert parts[1] == "Alice"  # first name
+    assert parts[2] == "Smith"  # last name
+    assert parts[3] == "Paris"  # city
     assert parts[4] == "1000001"  # vekn_id
-    assert parts[5] == "2"        # gw (int)
-    assert parts[6] == "8.5"      # vp
-    assert parts[7] == "0.0"      # vpf (no finals)
-    assert parts[8] == "60"       # tp
-    assert parts[9] == "3"        # toss
-    assert parts[10] == "10"      # rating points (mocked)
+    assert parts[5] == "2"  # gw (int)
+    assert parts[6] == "8.5"  # vp
+    assert parts[7] == "0.0"  # vpf (no finals)
+    assert parts[8] == "60"  # tp
+    assert parts[9] == "3"  # toss
+    assert parts[10] == "10"  # rating points (mocked)
 
     # Bob Jones: rank 2 (each player block is 11 fields, so Bob starts at index 11)
-    assert parts[11] == "2"       # rank
-    assert parts[12] == "Bob"     # first name
-    assert parts[13] == "Jones"   # last name
-    assert parts[14] == "Lyon"    # city
-    assert parts[15] == "1000002" # vekn_id
-    assert parts[16] == "1"       # gw
-    assert parts[17] == "5.0"     # vp
-    assert parts[22] == ""        # trailing empty after last player
+    assert parts[11] == "2"  # rank
+    assert parts[12] == "Bob"  # first name
+    assert parts[13] == "Jones"  # last name
+    assert parts[14] == "Lyon"  # city
+    assert parts[15] == "1000002"  # vekn_id
+    assert parts[16] == "1"  # gw
+    assert parts[17] == "5.0"  # vp
+    assert parts[22] == ""  # trailing empty after last player
 
 
 @patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
@@ -203,12 +215,20 @@ def test_archondata_winner_finals_gw_subtracted(mock_compute):
         state=TableState.FINISHED,
     )
     rounds = [
-        [Table(seating=[Seat(player_uid="u1"), Seat(player_uid="u2")], state=TableState.FINISHED)],
-        [Table(seating=[Seat(player_uid="u1"), Seat(player_uid="u2")], state=TableState.FINISHED)],
+        [
+            Table(
+                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
+                state=TableState.FINISHED,
+            )
+        ],
+        [
+            Table(
+                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
+                state=TableState.FINISHED,
+            )
+        ],
     ]
-    t = _make_tournament(
-        rounds=rounds, finals=finals, standings=standings, winner="u1"
-    )
+    t = _make_tournament(rounds=rounds, finals=finals, standings=standings, winner="u1")
     result = generate_archondata(t, users)
 
     after_nrounds = result.split("¤", 1)[1]
@@ -221,7 +241,7 @@ def test_archondata_winner_finals_gw_subtracted(mock_compute):
     assert parts[7] == "3.0"
 
     # Bob (non-winner): starts at index 11 (11 fields per player block)
-    assert parts[11 + 5] == "1"    # gw unchanged
+    assert parts[11 + 5] == "1"  # gw unchanged
     assert parts[11 + 7] == "1.5"  # finals VP
 
 
@@ -244,10 +264,15 @@ def test_archondata_non_winner_gw_not_subtracted(mock_compute):
         seed_order=["u1", "u2"],
         state=TableState.FINISHED,
     )
-    rounds = [[Table(seating=[Seat(player_uid="u1"), Seat(player_uid="u2")], state=TableState.FINISHED)]]
-    t = _make_tournament(
-        rounds=rounds, finals=finals, standings=standings, winner="u1"
-    )
+    rounds = [
+        [
+            Table(
+                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
+                state=TableState.FINISHED,
+            )
+        ]
+    ]
+    t = _make_tournament(rounds=rounds, finals=finals, standings=standings, winner="u1")
     result = generate_archondata(t, users)
     after_nrounds = result.split("¤", 1)[1]
     parts = after_nrounds.split("§")
@@ -287,7 +312,7 @@ def test_archondata_single_name_user(mock_compute):
     parts = result.split("¤", 1)[1].split("§")
 
     assert parts[1] == "Madonna"  # first
-    assert parts[2] == ""         # last (empty)
+    assert parts[2] == ""  # last (empty)
 
 
 @patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)

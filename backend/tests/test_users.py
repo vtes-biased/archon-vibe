@@ -2,8 +2,8 @@
 
 import pytest
 from httpx import AsyncClient
-
 from src.models import Role
+
 from tests.conftest import make_auth_header
 
 
@@ -11,7 +11,9 @@ from tests.conftest import make_auth_header
 async def test_create_user(test_client: AsyncClient, populated_db):
     """Test creating a new user (requires IC/NC/Prince auth)."""
     # Find a user with NC or Prince role to act as creator
-    admin = next(u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles)
+    admin = next(
+        u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles
+    )
 
     response = await test_client.post(
         "/api/users/",
@@ -70,7 +72,9 @@ async def test_get_user(test_client: AsyncClient, populated_db):
 async def test_update_user(test_client: AsyncClient, populated_db):
     """Test updating a user's information (requires auth)."""
     # Find an admin who can update users
-    admin = next(u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles)
+    admin = next(
+        u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles
+    )
     target = populated_db[0]
     headers = make_auth_header(admin.uid)
 

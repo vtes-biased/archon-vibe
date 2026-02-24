@@ -214,7 +214,9 @@ async def delete_league_endpoint(
         children = await get_child_leagues(uid)
         active_children = [c for c in children if not c.deleted_at]
         if active_children:
-            raise HTTPException(400, "Cannot delete Meta-League with active child leagues")
+            raise HTTPException(
+                400, "Cannot delete Meta-League with active child leagues"
+            )
 
     league.deleted_at = datetime.now(UTC)
     league.modified = datetime.now(UTC)

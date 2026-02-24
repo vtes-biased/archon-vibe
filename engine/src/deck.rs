@@ -7,24 +7,18 @@ use json::JsonValue;
 use std::collections::HashMap;
 
 /// A parsed deck: mapping of card_id → count, plus metadata.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Deck {
     pub name: String,
     pub author: String,
     pub comments: String,
-    pub cards: HashMap<u32, u32>, // card_id → count
+    pub cards: HashMap<u32, u32>,    // card_id → count
     pub attribution: Option<String>, // None = anonymous, Some(vekn_id) = attributed to member
 }
 
 impl Deck {
     pub fn new() -> Self {
-        Deck {
-            name: String::new(),
-            author: String::new(),
-            comments: String::new(),
-            cards: HashMap::new(),
-            attribution: None,
-        }
+        Self::default()
     }
 
     pub fn crypt_count(&self, card_map: &CardMap) -> u32 {
@@ -76,9 +70,22 @@ impl Deck {
 // ============================================================================
 
 const SECTION_HEADERS: &[&str] = &[
-    "crypt", "library", "master", "action", "political", "reaction", "combat",
-    "equipment", "retainer", "event", "conviction", "ally", "allies", "modifier",
-    "vote", "total",
+    "crypt",
+    "library",
+    "master",
+    "action",
+    "political",
+    "reaction",
+    "combat",
+    "equipment",
+    "retainer",
+    "event",
+    "conviction",
+    "ally",
+    "allies",
+    "modifier",
+    "vote",
+    "total",
 ];
 
 fn is_section_header(line: &str) -> bool {
@@ -86,7 +93,9 @@ fn is_section_header(line: &str) -> bool {
     let first_word = lower.split_whitespace().next().unwrap_or("");
     // Strip leading punctuation/numbers
     let cleaned = first_word.trim_matches(|c: char| !c.is_alphabetic());
-    SECTION_HEADERS.iter().any(|h| cleaned == *h || cleaned == format!("{h}s"))
+    SECTION_HEADERS
+        .iter()
+        .any(|h| cleaned == *h || cleaned == format!("{h}s"))
 }
 
 fn is_comment_line(line: &str) -> bool {
@@ -316,15 +325,26 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<Deck, String> {
             // Check for name/author headers
             let lower = line.trim().to_lowercase();
             if lower.starts_with("deck name:") || lower.starts_with("name:") {
-                deck.name = line.trim().splitn(2, ':').nth(1).unwrap_or("").trim().to_string();
+                deck.name = line
+                    .trim()
+                    .split_once(':')
+                    .map(|x| x.1)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
                 continue;
             }
             if lower.starts_with("created by:")
                 || lower.starts_with("author:")
                 || lower.starts_with("deck by:")
             {
-                deck.author =
-                    line.trim().splitn(2, ':').nth(1).unwrap_or("").trim().to_string();
+                deck.author = line
+                    .trim()
+                    .split_once(':')
+                    .map(|x| x.1)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
                 continue;
             }
         }
@@ -407,7 +427,7 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
     }
 
     // Check for banned cards
-    for (&id, _) in &deck.cards {
+    for &id in deck.cards.keys() {
         if let Some(card) = card_map.by_id(id) {
             if !card.banned.is_empty() {
                 errors.push(ValidationError {
@@ -420,7 +440,7 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
 
     // Check group rule: crypt cards must be from at most 2 consecutive groups
     let mut groups: Vec<u32> = Vec::new();
-    for (&id, _) in &deck.cards {
+    for &id in deck.cards.keys() {
         if let Some(card) = card_map.by_id(id) {
             if card.kind == CardKind::Crypt && card.group != "any" {
                 if let Ok(g) = card.group.parse::<u32>() {
@@ -449,13 +469,18 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
 
     // V5 format: only V5-legal cards
     if format == "V5" {
-        for (&id, _) in &deck.cards {
+        for &id in deck.cards.keys() {
             if let Some(card) = card_map.by_id(id) {
                 // V5 cards have V5 or newer sets
                 let has_v5_print = card.sets.iter().any(|s| {
-                    s.starts_with("V5") || s.starts_with("New Blood") || s == "Shadows of Berlin"
-                        || s.starts_with("Sabbat") || s == "Promo" || s == "Print on Demand"
-                        || s == "Fall of London" || s.starts_with("Echoes")
+                    s.starts_with("V5")
+                        || s.starts_with("New Blood")
+                        || s == "Shadows of Berlin"
+                        || s.starts_with("Sabbat")
+                        || s == "Promo"
+                        || s == "Print on Demand"
+                        || s == "Fall of London"
+                        || s.starts_with("Echoes")
                 });
                 if !has_v5_print {
                     errors.push(ValidationError {
@@ -519,7 +544,10 @@ pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
     });
 
     let crypt_count: u32 = crypt.iter().map(|c| c["count"].as_u32().unwrap_or(0)).sum();
-    let library_count: u32 = library.iter().map(|c| c["count"].as_u32().unwrap_or(0)).sum();
+    let library_count: u32 = library
+        .iter()
+        .map(|c| c["count"].as_u32().unwrap_or(0))
+        .sum();
 
     json::object! {
         name: deck.name.as_str(),
@@ -562,7 +590,10 @@ const LIBRARY_TYPE_ORDER: &[&str] = &[
 ];
 
 fn library_type_index(t: &str) -> usize {
-    LIBRARY_TYPE_ORDER.iter().position(|&x| x == t).unwrap_or(LIBRARY_TYPE_ORDER.len())
+    LIBRARY_TYPE_ORDER
+        .iter()
+        .position(|&x| x == t)
+        .unwrap_or(LIBRARY_TYPE_ORDER.len())
 }
 
 /// Export a deck in TWDA text format.
@@ -570,6 +601,7 @@ fn library_type_index(t: &str) -> usize {
 /// Parameters:
 /// - `tournament_format`: e.g. "2R+F", "3R+F"
 /// - `tournament_url`: URL to the tournament page (can be empty)
+#[allow(clippy::too_many_arguments)]
 pub fn export_twda(
     deck: &Deck,
     card_map: &CardMap,
@@ -588,7 +620,7 @@ pub fn export_twda(
     lines.push(tournament_place.to_string());
     lines.push(tournament_date.to_string());
     if !tournament_format.is_empty() {
-        lines.push(format!("{tournament_format}"));
+        lines.push(tournament_format.to_string());
     }
     lines.push(format!("{player_count} players"));
     lines.push(player_name.to_string());
@@ -739,10 +771,7 @@ mod tests {
             Some((100519, 3))
         );
         // With asterisk: "1 * 419 Operation"
-        assert_eq!(
-            parse_card_line("1 * 419 Operation", &cm),
-            Some((100002, 1))
-        );
+        assert_eq!(parse_card_line("1 * 419 Operation", &cm), Some((100002, 1)));
     }
 
     #[test]
@@ -750,25 +779,16 @@ mod tests {
         let cm = CardMap::load(test_cards_json()).unwrap();
         // "419 Operation" should NOT be parsed as count=419
         // Since 419 is 3 digits, our parser rejects it as a count
-        assert_eq!(
-            parse_card_line("2 419 Operation", &cm),
-            Some((100002, 2))
-        );
+        assert_eq!(parse_card_line("2 419 Operation", &cm), Some((100002, 2)));
         // Bare name
-        assert_eq!(
-            parse_card_line("419 Operation", &cm),
-            Some((100002, 1))
-        );
+        assert_eq!(parse_card_line("419 Operation", &cm), Some((100002, 1)));
     }
 
     #[test]
     fn test_parse_tab_separated() {
         let cm = CardMap::load(test_cards_json()).unwrap();
         // Lackey format
-        assert_eq!(
-            parse_card_line("4\t.44 Magnum", &cm),
-            Some((100001, 4))
-        );
+        assert_eq!(parse_card_line("4\t.44 Magnum", &cm), Some((100001, 4)));
     }
 
     #[test]

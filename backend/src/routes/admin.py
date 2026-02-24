@@ -112,7 +112,11 @@ async def merge_user_accounts(
     manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
-    if not (Role.IC in manager.roles or Role.NC in manager.roles or Role.PRINCE in manager.roles):
+    if not (
+        Role.IC in manager.roles
+        or Role.NC in manager.roles
+        or Role.PRINCE in manager.roles
+    ):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can merge users"
         )
@@ -146,9 +150,11 @@ async def merge_user_accounts(
     )
 
     return Response(
-        content=encoder.encode({
-            "user": msgspec.to_builtins(merged),
-            "message": "Users merged successfully",
-        }),
+        content=encoder.encode(
+            {
+                "user": msgspec.to_builtins(merged),
+                "message": "Users merged successfully",
+            }
+        ),
         media_type="application/json",
     )
