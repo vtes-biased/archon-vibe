@@ -6,8 +6,9 @@ import { test, expect, type Page } from '@playwright/test';
  */
 
 // Helper: wait for users to load via SSE
+// SSE sync + IndexedDB flush + UI render takes ~8-16s depending on load
 async function waitForUsers(page: Page) {
-  await expect(page.locator('#users-list-container')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('#users-list-container')).toBeVisible({ timeout: 25_000 });
   await expect(page.locator('.user-row').first()).toBeVisible({ timeout: 5_000 });
 }
 
@@ -342,21 +343,20 @@ test.describe('Edit user (authenticated)', () => {
 });
 
 test.describe('Sanctions (authenticated as IC)', () => {
+  // Sanctions section is on the user detail page (below User component), not in edit mode
   test('shows sanction controls for IC user', async ({ page }) => {
     await page.goto('/login');
     await loginAs(page, ['IC', 'Ethics']);
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Navigate to user detail page and enter edit mode
+    // Navigate to user detail page (view mode — sanctions are below the profile)
     await page.locator('.user-row').first().click();
     await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
-    await page.getByTitle('Edit user').click();
-    await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Country:')).toBeVisible({ timeout: 5_000 });
 
-    // Sanctions fieldset should be visible for IC/Ethics (use legend to avoid matching filter section)
-    await expect(page.locator('fieldset legend').filter({ hasText: 'Sanctions' })).toBeVisible();
+    // Sanctions section heading and issue button should be visible
+    await expect(page.getByRole('heading', { name: 'Sanctions' })).toBeVisible({ timeout: 5_000 });
     await expect(page.getByRole('button', { name: 'Issue Sanction' })).toBeVisible();
   });
 
@@ -366,12 +366,10 @@ test.describe('Sanctions (authenticated as IC)', () => {
     await page.goto('/users');
     await waitForUsers(page);
 
-    // Navigate to user detail page and enter edit mode
+    // Navigate to user detail page
     await page.locator('.user-row').first().click();
     await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
-    await page.getByTitle('Edit user').click();
-    await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByRole('heading', { name: 'Sanctions' })).toBeVisible({ timeout: 5_000 });
 
     // Open sanction modal
     await page.getByRole('button', { name: 'Issue Sanction' }).click();
@@ -396,9 +394,7 @@ test.describe('Sanctions (authenticated as IC)', () => {
     // Navigate to user detail page and open sanction modal
     await page.locator('.user-row').first().click();
     await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
-    await page.getByTitle('Edit user').click();
-    await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByRole('heading', { name: 'Sanctions' })).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: 'Issue Sanction' }).click();
     await expect(page.locator('#sanction-level')).toBeVisible({ timeout: 3_000 });
 
@@ -418,9 +414,7 @@ test.describe('Sanctions (authenticated as IC)', () => {
     // Navigate to user detail page and open sanction modal
     await page.locator('.user-row').first().click();
     await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 5_000 });
-    await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
-    await page.getByTitle('Edit user').click();
-    await expect(page.locator('#edit-name')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByRole('heading', { name: 'Sanctions' })).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: 'Issue Sanction' }).click();
     await expect(page.locator('#sanction-level')).toBeVisible({ timeout: 3_000 });
 

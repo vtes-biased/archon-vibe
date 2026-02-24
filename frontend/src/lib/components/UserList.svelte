@@ -241,24 +241,24 @@
     displayContext.setPagination(currentPage, pageSize, visibleUsers);
   }
 
-  // Initial load, SSE connection, and online/offline listeners
-  // This effect should only run on mount - use untrack to avoid re-running on filter changes
+  // Initial load and SSE event listeners
+  // SSE connection is managed by +layout.svelte — this component only listens for events
   $effect(() => {
     // Use untrack to prevent filter state from becoming dependencies
-    // These calls are for initialization only, not reactive updates
     untrack(() => {
       updateDisplayContext();
       loadUsers();
     });
 
-    // Connect to SSE stream
-    syncManager.connect();
+    // If sync already completed before mount, refresh immediately
+    if (syncManager.isSynced) {
+      isSyncing = false;
+      untrack(() => scheduleDisplayRefresh());
+    }
 
     // Listen for sync events
     const handleSyncEvent = (event: any) => {
-      if (event.type === "connected") {
-        // SSE connected
-      } else if (event.type === "user" && event.data) {
+      if (event.type === "user" && event.data) {
         handleSyncUserUpdate(event.data);
       } else if (event.type === "sync_complete") {
         // Historical sync complete - stop showing syncing spinner
@@ -276,20 +276,14 @@
 
     syncManager.addEventListener(handleSyncEvent);
 
-    const handleOnline = () => {
-      isOnline = true;
-      untrack(() => syncManager.connect());
-    };
-    const handleOffline = () => {
-      isOnline = false;
-    };
+    const handleOnline = () => { isOnline = true; };
+    const handleOffline = () => { isOnline = false; };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     return () => {
       syncManager.removeEventListener(handleSyncEvent);
-      syncManager.disconnect();
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
 
