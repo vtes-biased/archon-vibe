@@ -3,10 +3,16 @@
 import pytest
 from httpx import AsyncClient
 
+from src.models import Role
+from tests.conftest import make_auth_header
+
 
 @pytest.mark.asyncio
-async def test_create_user(test_client: AsyncClient):
-    """Test creating a new user."""
+async def test_create_user(test_client: AsyncClient, populated_db):
+    """Test creating a new user (requires IC/NC/Prince auth)."""
+    # Find a user with NC or Prince role to act as creator
+    admin = next(u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles)
+
     response = await test_client.post(
         "/api/users/",
         params={
@@ -14,18 +20,16 @@ async def test_create_user(test_client: AsyncClient):
             "country": "US",
             "city": "New York",
             "nickname": "testuser",
-            "roles": ["Judge", "Prince"],
         },
+        headers=make_auth_header(admin.uid),
     )
-    
+
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "Test User"
     assert data["country"] == "US"
     assert data["city"] == "New York"
     assert data["nickname"] == "testuser"
-    assert "Judge" in data["roles"]
-    assert "Prince" in data["roles"]
     assert "uid" in data
     assert "modified" in data
 
@@ -34,13 +38,13 @@ async def test_create_user(test_client: AsyncClient):
 async def test_list_users(test_client: AsyncClient, populated_db):
     """Test listing users with pagination."""
     response = await test_client.get("/api/users/")
-    
+
     assert response.status_code == 200
     users = response.json()
-    
+
     # Should have all 400 users
     assert len(users) == 400
-    
+
     # Check structure of first user
     first_user = users[0]
     assert "uid" in first_user
@@ -51,11 +55,10 @@ async def test_list_users(test_client: AsyncClient, populated_db):
 @pytest.mark.asyncio
 async def test_get_user(test_client: AsyncClient, populated_db):
     """Test getting a specific user by UID."""
-    # Use the first user from populated data
     test_uid = populated_db[0].uid
-    
+
     response = await test_client.get(f"/api/users/{test_uid}")
-    
+
     assert response.status_code == 200
     user = response.json()
     assert user["uid"] == test_uid
@@ -65,28 +68,50 @@ async def test_get_user(test_client: AsyncClient, populated_db):
 
 @pytest.mark.asyncio
 async def test_update_user(test_client: AsyncClient, populated_db):
-    """Test updating a user's information."""
-    # Use the first user from populated data
-    test_uid = populated_db[0].uid
-    
+    """Test updating a user's information (requires auth)."""
+    # Find an admin who can update users
+    admin = next(u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles)
+    target = populated_db[0]
+    headers = make_auth_header(admin.uid)
+
     # First get the user
-    response = await test_client.get(f"/api/users/{test_uid}")
+    response = await test_client.get(f"/api/users/{target.uid}")
     assert response.status_code == 200
     original_user = response.json()
-    
+
     # Update the user
     response = await test_client.put(
-        f"/api/users/{test_uid}",
+        f"/api/users/{target.uid}",
         params={
             "name": "Updated Name",
             "country": "CA",
         },
+        headers=headers,
     )
-    
+
     assert response.status_code == 200
     updated_user = response.json()
-    assert updated_user["uid"] == test_uid
+    assert updated_user["uid"] == target.uid
     assert updated_user["name"] == "Updated Name"
     assert updated_user["country"] == "CA"
-    assert updated_user["modified"] != original_user["modified"]  # Modified timestamp should change
+    assert updated_user["modified"] != original_user["modified"]
 
+
+@pytest.mark.asyncio
+async def test_create_user_requires_auth(test_client: AsyncClient, populated_db):
+    """Test that creating a user without auth returns 401."""
+    response = await test_client.post(
+        "/api/users/",
+        params={"name": "Test", "country": "US"},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_update_user_requires_auth(test_client: AsyncClient, populated_db):
+    """Test that updating a user without auth returns 401."""
+    response = await test_client.put(
+        f"/api/users/{populated_db[0].uid}",
+        params={"name": "Nope"},
+    )
+    assert response.status_code == 401

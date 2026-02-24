@@ -79,11 +79,11 @@ def _player_count(t: Tournament) -> int:
 
 
 def _player_stats(t: Tournament, user_uid: str) -> tuple[float, int]:
-    """Compute total VP and GW for a player across all rounds.
+    """Compute total VP and GW for a player across all rounds and finals.
 
-    For VEKN-synced tournaments (no rounds), reads from standings.
+    For VEKN-synced tournaments (no rounds/finals), reads from standings.
     """
-    if t.rounds:
+    if t.rounds or t.finals:
         total_vp = 0.0
         total_gw = 0
         for round_tables in t.rounds:
@@ -92,6 +92,11 @@ def _player_stats(t: Tournament, user_uid: str) -> tuple[float, int]:
                     if seat.player_uid == user_uid:
                         total_vp += seat.result.vp
                         total_gw += seat.result.gw
+        if t.finals:
+            for seat in t.finals.seating:
+                if seat.player_uid == user_uid:
+                    total_vp += seat.result.vp
+                    total_gw += seat.result.gw
         return total_vp, total_gw
     # VEKN-synced or rounds-less: read from standings
     for s in t.standings:
