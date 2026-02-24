@@ -34,12 +34,13 @@
 - `db.py:get_all_finished_tournaments()` loads full Tournament objects (rounds/decks/players) into memory
 - `tournaments.py` imports `_rating_category_for_tournament` (private name, cross-module use)
 
-## SSE Streaming Performance (2026-02)
-- `db.py:stream_objects()` uses server-side cursors - overkill for small datasets
-- Holds pool connection through entire SSE yield pipeline (query + filter + serialize + HTTP write)
-- Fix: replace with fetchall() + immediate connection release, then yield from memory
-- Pool `max_size=10` too small for parallel test clients; increase to 20
-- Server-side cursors only justified at 100K+ rows; current data is hundreds
+## SSE Streaming Performance (2026-02, resolved)
+- Original analysis in `sse-performance.md` (now partially obsolete)
+- **FIXED**: Double serialization — `stream_objects_new()` returns raw JSON via `SELECT col::text`, no parse/reserialize
+- **FIXED**: `_filter_tournament()` Struct-per-item — function removed entirely
+- **FIXED**: Pool `max_size=20` (was 10)
+- **FIXED**: SSE connection duplication — +layout.svelte owns connect/disconnect, components only listen
+- **Remaining**: Frontend buffers ALL data until `sync_complete` — no progressive rendering
 
 ## Conventions
 - All objects: uid (UUID v7), modified timestamp, deleted_at (soft-delete)
