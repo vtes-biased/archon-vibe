@@ -356,18 +356,32 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
 
 
 @router.post("/email/request")
-async def request_magic_link(request: MagicLinkRequest) -> Response:
+async def request_magic_link(
+    request: MagicLinkRequest,
+    authorization: str | None = Header(default=None),
+) -> Response:
     """Request a magic link email for signup or password reset.
 
     Purpose:
-    - "signup": Create new account (fails if email already registered)
+    - "signup": Create new account or link email to existing account
     - "reset": Reset password (fails if email not registered)
+
+    If Authorization header is provided with a valid Bearer token,
+    the email will be linked to the authenticated user's account.
     """
     email = request.email.lower()
     purpose = request.purpose
 
     if purpose not in ("signup", "reset"):
         raise HTTPException(status_code=400, detail="Invalid purpose")
+
+    # If authenticated, extract user_uid for account linking
+    link_user_uid = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            link_user_uid = verify_token(authorization[7:], expected_type="access")
+        except Exception:
+            pass  # Invalid token is fine — treat as unauthenticated
 
     # Check if EMAIL auth already exists
     existing_email_auth = await get_auth_method_by_identifier("email", email)
@@ -396,6 +410,7 @@ async def request_magic_link(request: MagicLinkRequest) -> Response:
         "email": email,
         "purpose": purpose,
         "discord_user_uid": discord_user_uid,
+        "user_uid": link_user_uid,
     }, expires_at)
 
     # Build magic link URL
@@ -483,7 +498,11 @@ async def set_password(request: SetPasswordRequest) -> Response:
             # Race condition: email was registered while user was setting password
             raise HTTPException(status_code=409, detail="Email already registered")
 
-        if discord_user_uid:
+        link_user_uid = stored.get("user_uid")
+        if link_user_uid:
+            # Authenticated user linking email to their existing account
+            user_uid = link_user_uid
+        elif discord_user_uid:
             # Merge into Discord user: add EMAIL auth to existing user
             user_uid = discord_user_uid
         else:

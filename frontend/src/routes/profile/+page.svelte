@@ -4,6 +4,7 @@
   import {
     getAuthState, setAuthState, getAccessToken, logout,
     updateProfile, initAuth, storeTokensFromCallback, hasAnyRole,
+    requestMagicLink,
     type ProfileUpdate,
   } from "$lib/stores/auth.svelte";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
@@ -43,6 +44,12 @@
   let avatarCacheBust = $state(0);
 
   // Derived from auth
+  const hasEmail = $derived(
+    auth.isAuthenticated && auth.authMethods.some((am) => am.type === "email")
+  );
+  const emailIdentifier = $derived(
+    auth.authMethods.find((am) => am.type === "email")?.identifier || null
+  );
   const hasPasskey = $derived(
     auth.isAuthenticated && auth.authMethods.some((am) => am.type === "passkey")
   );
@@ -98,6 +105,10 @@
     passkeyMessage = "";
     const success = await registerPasskey();
     if (success) passkeyMessage = m.profile_passkey_registered();
+  }
+
+  async function handleLinkEmail(email: string): Promise<boolean> {
+    return await requestMagicLink(email, "signup", true);
   }
 
   function handleLinkDiscord() {
@@ -192,6 +203,8 @@
             onClaimVekn={() => (showClaimModal = true)}
           />
           <LinkedAccounts
+            {hasEmail}
+            {emailIdentifier}
             {hasDiscord}
             {discordUsername}
             {hasPasskey}
@@ -199,6 +212,7 @@
             {discordError}
             {passkeyMessage}
             error={auth.error}
+            onLinkEmail={handleLinkEmail}
             onLinkDiscord={handleLinkDiscord}
             onRegisterPasskey={handleRegisterPasskey}
           />

@@ -128,7 +128,7 @@
     <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_contact()}</h3>
     {#if user.contact_email}
       <div class="flex justify-between">
-        <span class="text-ash-400">{m.common_email()}</span>
+        <span class="text-ash-400">{m.profile_contact_email()}</span>
         <a href="mailto:{user.contact_email}" class="text-crimson-500 hover:text-crimson-400">{user.contact_email}</a>
       </div>
     {/if}

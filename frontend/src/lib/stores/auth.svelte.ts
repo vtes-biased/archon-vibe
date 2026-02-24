@@ -458,14 +458,20 @@ export function hasAnyRole(...roles: string[]): boolean {
  */
 export async function requestMagicLink(
   email: string,
-  purpose: "signup" | "reset" = "signup"
+  purpose: "signup" | "reset" = "signup",
+  includeAuth = false,
 ): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (includeAuth) {
+      const token = getAccessToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    }
     const response = await fetch(`${API_BASE}/auth/email/request`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ email, purpose }),
     });
 

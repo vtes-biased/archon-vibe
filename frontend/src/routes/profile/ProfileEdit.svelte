@@ -77,7 +77,7 @@
       <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide mb-4">{m.profile_contact_info()}</h3>
       <div class="space-y-4">
         <div>
-          <label for="edit-contact-email" class="block text-sm font-medium text-ash-400 mb-1">{m.common_email()}</label>
+          <label for="edit-contact-email" class="block text-sm font-medium text-ash-400 mb-1">{m.profile_contact_email()}</label>
           <input id="edit-contact-email" type="email" bind:value={editContactEmail}
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent" />
         </div>
