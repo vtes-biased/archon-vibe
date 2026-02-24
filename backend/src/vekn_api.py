@@ -334,6 +334,36 @@ class VEKNAPIClient:
         except aiohttp.ClientError as e:
             raise VEKNAPIError(f"HTTP error creating member: {e}") from e
 
+    async def fetch_venue(self, venue_id: str) -> dict[str, str]:
+        """Fetch venue details by ID. Returns venue dict or empty dict.
+
+        VEKN API returns: data.venues = [{name, address, city, country, website, ...}]
+        """
+        if not venue_id or venue_id == "0":
+            return {}
+        await self._ensure_authenticated()
+        try:
+            session = self._get_session()
+            headers: dict[str, str] = {}
+            if self._auth_token:
+                headers["Authorization"] = f"Bearer {self._auth_token}"
+            async with session.get(
+                f"{self.base_url}/vekn/venue/{venue_id}",
+                headers=headers,
+            ) as response:
+                if response.status != 200:
+                    return {}
+                data = await response.json()
+                inner = data.get("data", {})
+                venues = inner.get("venues", [])
+                if not venues:
+                    logger.warning(f"No data for venue #{venue_id}")
+                    return {}
+                return venues[0] or {}
+        except (aiohttp.ClientError, Exception) as e:
+            logger.warning(f"Error fetching venue #{venue_id}: {e}")
+            return {}
+
     async def fetch_event(self, event_id: int) -> dict | None:
         """Fetch a single event by ID. Returns event dict or None if not found.
 

@@ -63,17 +63,22 @@ def _parse_date(s: str | None) -> datetime | None:
 def _map_vekn_to_tournament(
     data: dict[str, Any],
     users_by_vekn_id: dict[str, User],
+    venue_data: dict[str, str] | None = None,
 ) -> Tournament | None:
     """Map VEKN event data to a Tournament object.
 
     VEKN event fields:
       event_id, event_name, event_startdate, event_enddate,
       event_isonline, eventtype_id, venue_name, venue_city,
-      venue_country, players[{pos, veknid, gw, vp, tp, tie, vpf, ...}]
+      venue_country, venue_id, players[{pos, veknid, gw, vp, tp, tie, vpf, ...}]
+    venue_data (from separate /venue/<id> call):
+      name, address, city, country, website, zip, phone, email, lat, lng
     """
     event_id = data.get("event_id")
     if not event_id:
         return None
+
+    venue_data = venue_data or {}
 
     # Event type mapping
     event_type = int(data.get("eventtype_id", 0) or 0)
@@ -87,9 +92,14 @@ def _map_vekn_to_tournament(
     # Online detection
     online = str(data.get("event_isonline", "0")) == "1"
 
-    # Venue info (embedded in event response)
+    # Venue info: name from event, address/website from venue details
     venue = data.get("venue_name") or ""
-    address = data.get("venue_city") or ""
+    address = venue_data.get("address") or ""
+    if address and venue_data.get("city"):
+        address += f", {venue_data['city']}"
+    elif not address:
+        address = data.get("venue_city") or ""
+    venue_url = venue_data.get("website") or ""
 
     # Organizer
     organizer_vekn = str(data.get("organizer_veknid") or "")
@@ -162,6 +172,7 @@ def _map_vekn_to_tournament(
             country=country,
             state=state,
             venue=venue,
+            venue_url=venue_url,
             address=address,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
@@ -183,6 +194,7 @@ def _map_vekn_to_tournament(
             country=country,
             state=TournamentState.PLANNED,
             venue=venue,
+            venue_url=venue_url,
             address=address,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
@@ -216,12 +228,23 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
     users_by_vekn_id = await _build_users_by_vekn_id()
     logger.info(f"Loaded {len(users_by_vekn_id)} users by VEKN ID")
 
+    # Cache venue data to avoid repeated API calls for the same venue
+    venue_cache: dict[str, dict[str, str]] = {}
+
     async for event_data in client.fetch_all_events():
         stats["total"] += 1
         event_id = event_data.get("event_id", "?")
 
         try:
-            tournament = _map_vekn_to_tournament(event_data, users_by_vekn_id)
+            # Fetch full venue details (cached per venue_id)
+            venue_id = str(event_data.get("venue_id") or "")
+            if venue_id and venue_id not in venue_cache:
+                venue_cache[venue_id] = await client.fetch_venue(venue_id)
+            venue_data = venue_cache.get(venue_id, {})
+
+            tournament = _map_vekn_to_tournament(
+                event_data, users_by_vekn_id, venue_data
+            )
             if not tournament:
                 stats["skipped"] += 1
                 continue
@@ -240,6 +263,9 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     or existing.country != tournament.country
                     or existing.online != tournament.online
                     or existing.winner != tournament.winner
+                    or existing.venue != tournament.venue
+                    or existing.address != tournament.address
+                    or existing.venue_url != tournament.venue_url
                     or len(existing.players) != len(tournament.players)
                 )
                 if changed:
@@ -259,6 +285,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         country=tournament.country,
                         state=tournament.state,
                         venue=tournament.venue,
+                        venue_url=tournament.venue_url,
                         address=tournament.address,
                         external_ids=tournament.external_ids,
                         organizers_uids=merged_organizers,
