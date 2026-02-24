@@ -40,7 +40,7 @@ export async function loginAsOrganizer(page: Page) {
   // Wait for anonymous sync to complete (green dot = IDB stores created + data loaded)
   await expect(
     page.locator('.bg-emerald-500').first(),
-  ).toBeVisible({ timeout: 10_000 });
+  ).toBeVisible({ timeout: 8_000 });
 
   const state = getE2EState();
   await page.evaluate(

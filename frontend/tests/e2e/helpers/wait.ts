@@ -6,7 +6,7 @@
  */
 import { expect, type Page } from '@playwright/test';
 
-const DEFAULT_SYNC_TIMEOUT = 10_000;
+const DEFAULT_SYNC_TIMEOUT = 8_000;
 
 /**
  * Wait for SSE sync to complete (emerald dot in sidebar).

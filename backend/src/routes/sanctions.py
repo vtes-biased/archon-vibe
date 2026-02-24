@@ -173,9 +173,9 @@ async def _set_player_dq_state(
         return  # Player not found in tournament
 
     tournament.modified = datetime.now(UTC)
-    await update_tournament(tournament)
+    bd = await update_tournament(tournament)
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
 
 
 class CreateSanctionRequest(BaseModel):
@@ -309,7 +309,7 @@ async def create_sanction(
         expires_at=expires_at,
     )
 
-    await insert_sanction(sanction)
+    bd = await insert_sanction(sanction)
     logger.info(
         f"Sanction {sanction.uid} ({level.value}) created for user {request.user_uid} "
         f"by {current_user.uid}"
@@ -323,7 +323,7 @@ async def create_sanction(
 
     # Broadcast to SSE clients
     if broadcast_sanction_event:
-        await broadcast_sanction_event(sanction)
+        broadcast_sanction_event(bd)
 
     return Response(
         content=encoder.encode(sanction),
@@ -468,7 +468,7 @@ async def update_sanction_endpoint(
         deleted_at=sanction.deleted_at,
     )
 
-    await update_sanction(updated)
+    bd = await update_sanction(updated)
     logger.info(f"Sanction {uid} updated by {current_user.uid}")
 
     # If a DQ sanction was lifted, restore player state on the tournament
@@ -484,7 +484,7 @@ async def update_sanction_endpoint(
 
     # Broadcast to SSE clients
     if broadcast_sanction_event:
-        await broadcast_sanction_event(updated)
+        broadcast_sanction_event(bd)
 
     return Response(
         content=encoder.encode(updated),
@@ -541,12 +541,12 @@ async def delete_sanction_endpoint(
         deleted_at=now,
     )
 
-    await update_sanction(updated)
+    bd = await update_sanction(updated)
     logger.info(f"Sanction {uid} soft-deleted by {current_user.uid}")
 
     # Broadcast to SSE clients
     if broadcast_sanction_event:
-        await broadcast_sanction_event(updated)
+        broadcast_sanction_event(bd)
 
     return Response(
         content=encoder.encode({"message": "Sanction deleted"}),

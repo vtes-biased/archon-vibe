@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from uuid6 import uuid7
 
 from ..db import (
+    BroadcastData,
     delete_object,
     get_auth_method_by_identifier,
     get_decks_for_tournament,
@@ -109,14 +110,14 @@ async def _build_decks_json(tournament_uid: str) -> str:
 
 async def _process_deck_ops(
     deck_ops: list, tournament_uid: str, existing_decks: list[DeckObject] | None = None,
-) -> list[str]:
-    """Process deck_ops from engine result. Returns list of affected deck UIDs."""
+) -> list[BroadcastData]:
+    """Process deck_ops from engine result. Returns BroadcastData for each affected deck."""
     if not deck_ops:
         return []
     if existing_decks is None:
         existing_decks = await get_decks_for_tournament(tournament_uid)
 
-    affected_uids: list[str] = []
+    affected: list[BroadcastData] = []
     for op in deck_ops:
         op_type = op.get("op")
         if op_type == "upsert":
@@ -146,8 +147,8 @@ async def _process_deck_ops(
             deck_obj.cards = deck_data.get("cards", {})
             deck_obj.attribution = deck_data.get("attribution")
             deck_obj.public = deck_data.get("public", False)
-            await save_object_from_model("deck", deck_obj)
-            affected_uids.append(deck_obj.uid)
+            bd = await save_object_from_model("deck", deck_obj)
+            affected.append(bd)
 
         elif op_type == "delete":
             player_uid = op["player_uid"]
@@ -155,8 +156,8 @@ async def _process_deck_ops(
                 if d.user_uid == player_uid:
                     d.deleted_at = datetime.now(UTC)
                     d.modified = datetime.now(UTC)
-                    await save_object_from_model("deck", d)
-                    affected_uids.append(d.uid)
+                    bd = await save_object_from_model("deck", d)
+                    affected.append(bd)
 
         elif op_type == "set_public":
             deck_uid = op.get("deck_uid")
@@ -165,8 +166,8 @@ async def _process_deck_ops(
             if target:
                 target.public = public_val
                 target.modified = datetime.now(UTC)
-                await save_object_from_model("deck", target)
-                affected_uids.append(target.uid)
+                bd = await save_object_from_model("deck", target)
+                affected.append(bd)
 
     return affected_uids
 
@@ -361,9 +362,9 @@ async def add_organizer(
     if body.user_uid not in tournament.organizers_uids:
         tournament.organizers_uids.append(body.user_uid)
         tournament.modified = datetime.now(UTC)
-        await update_tournament(tournament)
+        bd = await update_tournament(tournament)
         if broadcast_tournament_event:
-            await broadcast_tournament_event(tournament)
+            broadcast_tournament_event(bd)
 
     return Response(
         content=encoder.encode(tournament),
@@ -396,9 +397,9 @@ async def remove_organizer(
             )
         tournament.organizers_uids.remove(organizer_uid)
         tournament.modified = datetime.now(UTC)
-        await update_tournament(tournament)
+        bd = await update_tournament(tournament)
         if broadcast_tournament_event:
-            await broadcast_tournament_event(tournament)
+            broadcast_tournament_event(bd)
 
     return Response(
         content=encoder.encode(tournament),
@@ -511,11 +512,11 @@ async def create_tournament(
         organizers_uids=[current_user.uid],
     )
 
-    await insert_tournament(tournament)
+    bd = await insert_tournament(tournament)
     logger.info(f"Tournament {tournament.uid} created by {current_user.uid}")
 
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
 
     # VEKN push: create calendar event
     await _maybe_push_vekn_event(tournament)
@@ -613,11 +614,11 @@ async def delete_tournament_endpoint(
             detail="Can only delete tournaments in Planned state",
         )
 
-    deleted = await soft_delete_tournament(uid)
+    result = await soft_delete_tournament(uid)
     logger.info(f"Tournament {uid} soft-deleted by {current_user.uid}")
 
-    if deleted and broadcast_tournament_event:
-        await broadcast_tournament_event(deleted)
+    if result and broadcast_tournament_event:
+        broadcast_tournament_event(result[1])
 
     return Response(
         content=encoder.encode({"message": "Tournament deleted"}),
@@ -913,7 +914,7 @@ async def tournament_action(
             updated.table_paused_at = {}
 
         # Save within the same transaction (row is still locked)
-        await save_object(
+        tournament_bd = await save_object(
             "tournament", updated.uid, msgspec.to_builtins(updated), conn=tx_conn
         )
         pre_state = tournament.state
@@ -922,13 +923,13 @@ async def tournament_action(
     logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
 
     # Process deck side-effects (outside transaction)
-    affected_deck_uids = await _process_deck_ops(deck_ops, uid)
+    deck_bds = await _process_deck_ops(deck_ops, uid)
     if broadcast_deck_event:
-        for deck_uid in affected_deck_uids:
-            await broadcast_deck_event(deck_uid)
+        for bd in deck_bds:
+            broadcast_deck_event(bd)
 
     if broadcast_tournament_event:
-        await broadcast_tournament_event(updated)
+        broadcast_tournament_event(tournament_bd)
 
     # Recompute ratings when tournament enters/leaves Finished state,
     # or when data changes on a finished tournament (e.g. SetScore, UpdateConfig)
@@ -940,17 +941,17 @@ async def tournament_action(
 
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
-            users = await recompute_ratings_for_players(player_uids, category)
+            results = await recompute_ratings_for_players(player_uids, category)
             if broadcast_user_event:
-                for user in users:
-                    await broadcast_user_event(user)
+                for _user, bd in results:
+                    broadcast_user_event(bd)
             # If category changed (format/online toggle), also recompute old category
             old_category = rating_category_for_tournament(tournament)
             if old_category != category:
-                old_users = await recompute_ratings_for_players(player_uids, old_category)
+                old_results = await recompute_ratings_for_players(player_uids, old_category)
                 if broadcast_user_event:
-                    for user in old_users:
-                        await broadcast_user_event(user)
+                    for _user, bd in old_results:
+                        broadcast_user_event(bd)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
@@ -1598,13 +1599,12 @@ def _validate_timer_tournament(user, tournament: Tournament | None):
         raise HTTPException(status_code=400, detail="Tournament is not playing")
 
 
-async def _save_timer_tx(tournament: Tournament, tx_conn):
-    """Save within transaction and broadcast after."""
+async def _save_timer_tx(tournament: Tournament, tx_conn) -> BroadcastData:
+    """Save within transaction. Returns BroadcastData for broadcasting after commit."""
     tournament.modified = datetime.now(UTC)
-    await save_object(
+    return await save_object(
         "tournament", tournament.uid, msgspec.to_builtins(tournament), conn=tx_conn
     )
-    return tournament
 
 
 @router.post("/{uid}/timer/start")
@@ -1623,9 +1623,9 @@ async def timer_start(
             elapsed_before_pause=tournament.timer.elapsed_before_pause,
             paused=False,
         )
-        await _save_timer_tx(tournament, tx_conn)
+        bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1647,9 +1647,9 @@ async def timer_pause(
             elapsed_before_pause=tournament.timer.elapsed_before_pause + elapsed,
             paused=True,
         )
-        await _save_timer_tx(tournament, tx_conn)
+        bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1665,9 +1665,9 @@ async def timer_reset(
         tournament.timer = TimerState()
         tournament.table_extra_time = {}
         tournament.table_paused_at = {}
-        await _save_timer_tx(tournament, tx_conn)
+        bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1697,9 +1697,9 @@ async def timer_add_time(
         if current + request.seconds > 600:
             raise HTTPException(status_code=400, detail="Max 600s (10 min) extra time per table")
         tournament.table_extra_time[request.table] = current + request.seconds
-        await _save_timer_tx(tournament, tx_conn)
+        bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1725,9 +1725,9 @@ async def timer_clock_stop(
         if request.table in tournament.table_paused_at:
             raise HTTPException(status_code=400, detail="Table clock is already stopped")
         tournament.table_paused_at[request.table] = datetime.now(UTC).isoformat()
-        await _save_timer_tx(tournament, tx_conn)
+        bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1754,9 +1754,9 @@ async def timer_clock_resume(
         current_extra = tournament.table_extra_time.get(request.table, 0)
         tournament.table_extra_time[request.table] = current_extra + pause_duration
         del tournament.table_paused_at[request.table]
-        await _save_timer_tx(tournament, tx_conn)
+        bd = await _save_timer_tx(tournament, tx_conn)
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1862,11 +1862,11 @@ async def go_offline(
     tournament.offline_since = datetime.now(UTC)
     tournament.modified = datetime.now(UTC)
 
-    await update_tournament(tournament)
+    bd = await update_tournament(tournament)
     logger.info(f"Tournament {uid} went offline (device={request.device_id}, user={current_user.uid})")
 
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
 
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
@@ -1913,11 +1913,11 @@ async def _resolve_or_create_offline_player(
         name=player_data.name,
         country=tournament_country,
     )
-    await insert_user(new_user)
+    bd = await insert_user(new_user)
     logger.info(f"Created user {new_user.uid} for offline player '{player_data.name}'")
 
     if broadcast_user_event:
-        await broadcast_user_event(new_user)
+        broadcast_user_event(bd)
 
     return player_data.temp_uid, new_user
 
@@ -1993,9 +1993,9 @@ async def go_online(
     updated.modified = datetime.now(UTC)
 
     if tournament:
-        await update_tournament(updated)
+        tournament_bd = await update_tournament(updated)
     else:
-        await insert_tournament(updated)
+        tournament_bd = await insert_tournament(updated)
 
     logger.info(f"Tournament {uid} went back online (user={current_user.uid}, remapped={len(uid_map)} players)")
 
@@ -2009,9 +2009,9 @@ async def go_online(
             sanction_data = json_mod.loads(raw)
 
         sanction = msgspec.convert(sanction_data, Sanction)
-        await insert_sanction(sanction)
+        bd = await insert_sanction(sanction)
         if broadcast_sanction_event:
-            await broadcast_sanction_event(sanction)
+            broadcast_sanction_event(bd)
 
     # 6. Save offline decks with remapped UIDs
     for deck_data in request.offline_decks:
@@ -2025,13 +2025,13 @@ async def go_online(
         # Ensure tournament_uid is correct
         deck_data["tournament_uid"] = uid
         deck_obj = msgspec.convert(deck_data, DeckObject)
-        await save_object_from_model("deck", deck_obj)
+        bd = await save_object_from_model("deck", deck_obj)
         if broadcast_deck_event:
-            await broadcast_deck_event(deck_obj.uid)
+            broadcast_deck_event(bd)
 
     # 7. Broadcast updated tournament
     if broadcast_tournament_event:
-        await broadcast_tournament_event(updated)
+        broadcast_tournament_event(tournament_bd)
 
     return Response(content=encoder.encode(updated), media_type="application/json")
 
@@ -2066,11 +2066,11 @@ async def force_takeover(
     tournament.offline_user_uid = current_user.uid
     tournament.modified = datetime.now(UTC)
 
-    await update_tournament(tournament)
+    bd = await update_tournament(tournament)
     logger.info(f"Tournament {uid} force-takeover: {old_device} → {request.device_id} by {current_user.uid}")
 
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
 
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
@@ -2149,10 +2149,10 @@ async def force_unlock(
     tournament.offline_since = None
     tournament.modified = datetime.now(UTC)
 
-    await update_tournament(tournament)
+    bd = await update_tournament(tournament)
     logger.info(f"Tournament {uid} force-unlocked by IC {current_user.uid}")
 
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(bd)
 
     return Response(content=encoder.encode(tournament), media_type="application/json")

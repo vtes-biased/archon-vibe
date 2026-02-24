@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from .db import (
+    BroadcastData,
     cleanup_expired_tokens,
     close_db,
     delete_sanction_hard,
@@ -142,9 +143,9 @@ async def run_sanction_cleanup() -> None:
                 lifted_by_uid=sanction.lifted_by_uid,
                 deleted_at=now,
             )
-            await update_sanction(updated)
+            bd = await update_sanction(updated)
             # Broadcast the soft-delete so clients can sync
-            await broadcast_sanction_event(updated)
+            broadcast_sanction_event(bd)
 
         if expired:
             logger.info(f"Soft-deleted {len(expired)} expired sanctions")
@@ -172,10 +173,10 @@ async def run_rating_recompute() -> None:
         from .ratings import recompute_all_ratings
 
         logger.info("Starting daily rating recompute")
-        users = await recompute_all_ratings()
-        for user in users:
-            await broadcast_user_event(user)
-        logger.info(f"Daily rating recompute complete: {len(users)} users updated")
+        results = await recompute_all_ratings()
+        for _user, bd in results:
+            broadcast_user_event(bd)
+        logger.info(f"Daily rating recompute complete: {len(results)} users updated")
     except Exception as e:
         logger.error(f"Error during rating recompute: {e}", exc_info=True)
 
@@ -425,41 +426,16 @@ def _viewer_level(viewer: User | None) -> DataLevel:
 # New sync: broadcast reads pre-computed columns from objects table
 # ---------------------------------------------------------------------------
 
-async def broadcast_object(uid: str, obj_type: str) -> None:
-    """Broadcast an object update to all SSE connections.
-
-    Reads pre-computed public/member/full columns from objects table.
-    Each connection gets the appropriate level based on their access.
-    Personal overlay rules apply for member-level connections.
-    """
-    from .db import get_connection as _get_conn
-
-    async with _get_conn() as conn:
-        row = await (await conn.execute(
-            """SELECT "public"::text, "member"::text, \"full\"::text,
-                      \"full\"->'organizers_uids' as org_uids,
-                      \"full\"->>'country' as country,
-                      \"full\"->>'user_uid' as obj_user_uid
-               FROM objects WHERE uid = %s""",
-            (uid,),
-        )).fetchone()
-
-    if not row:
-        return
-
-    pub_json, mem_json, full_json = row[0], row[1], row[2]
-    org_uids = row[3] or []
-    country = row[4]
-    obj_user_uid = row[5]  # For decks: the deck author
-
-    # Pre-build SSE messages for each level
+def broadcast_precomputed(bd: BroadcastData) -> None:
+    """Broadcast pre-computed projections to SSE connections. No DB access."""
     def _make_msg(json_str: str) -> str:
-        return f'data: {{"type":"{obj_type}","data":{json_str}}}\n\n'
+        return f'data: {{"type":"{bd.obj_type}","data":{json_str}}}\n\n'
 
-    pub_msg = _make_msg(pub_json) if pub_json else None
-    mem_msg = _make_msg(mem_json) if mem_json else None
-    full_msg = _make_msg(full_json) if full_json else None
+    pub_msg = _make_msg(bd.pub_json) if bd.pub_json else None
+    mem_msg = _make_msg(bd.mem_json) if bd.mem_json else None
+    full_msg = _make_msg(bd.full_json) if bd.full_json else None
 
+    org_uids = bd.org_uids or []
     disconnected: set[SSEConnection] = set()
     for sse_conn in _sse_connections:
         try:
@@ -470,15 +446,15 @@ async def broadcast_object(uid: str, obj_type: str) -> None:
                 msg = pub_msg
             elif Role.IC in viewer.roles:
                 msg = full_msg
-            elif (Role.NC in viewer.roles or Role.PRINCE in viewer.roles) and viewer.country and country and viewer.country == country:
+            elif (Role.NC in viewer.roles or Role.PRINCE in viewer.roles) and viewer.country and bd.country and viewer.country == bd.country:
                 msg = full_msg
             elif isinstance(org_uids, list) and viewer.uid in org_uids:
                 msg = full_msg
             elif viewer.vekn_id:
                 # Member level — but check personal overlay
-                if obj_type == "user" and uid == viewer.uid:
+                if bd.obj_type == "user" and bd.uid == viewer.uid:
                     msg = full_msg  # Own profile
-                elif obj_type == "deck" and obj_user_uid == viewer.uid:
+                elif bd.obj_type == "deck" and bd.obj_user_uid == viewer.uid:
                     msg = full_msg  # Own deck
                 else:
                     msg = mem_msg
@@ -488,28 +464,29 @@ async def broadcast_object(uid: str, obj_type: str) -> None:
             if msg:
                 sse_conn.queue.put_nowait(msg)
         except asyncio.QueueFull:
+            logger.warning("SSE queue full for connection, dropping")
             disconnected.add(sse_conn)
     _sse_connections.difference_update(disconnected)
 
 
-async def broadcast_user_event(user: User) -> None:
-    """Broadcast user update via SSE. Caller must save first."""
-    await broadcast_object(user.uid, "user")
+def broadcast_user_event(bd: BroadcastData) -> None:
+    """Broadcast user update via SSE."""
+    broadcast_precomputed(bd)
 
 
-async def broadcast_sanction_event(sanction: Sanction) -> None:
-    """Broadcast sanction update via SSE. Caller must save first."""
-    await broadcast_object(sanction.uid, "sanction")
+def broadcast_sanction_event(bd: BroadcastData) -> None:
+    """Broadcast sanction update via SSE."""
+    broadcast_precomputed(bd)
 
 
-async def broadcast_tournament_event(tournament: Tournament) -> None:
-    """Broadcast tournament update via SSE. Caller must save first."""
-    await broadcast_object(tournament.uid, "tournament")
+def broadcast_tournament_event(bd: BroadcastData) -> None:
+    """Broadcast tournament update via SSE."""
+    broadcast_precomputed(bd)
 
 
-async def broadcast_league_event(league: League) -> None:
-    """Broadcast league update via SSE. Caller must save first."""
-    await broadcast_object(league.uid, "league")
+def broadcast_league_event(bd: BroadcastData) -> None:
+    """Broadcast league update via SSE."""
+    broadcast_precomputed(bd)
 
 
 async def broadcast_judge_call(
@@ -536,6 +513,7 @@ async def broadcast_judge_call(
             try:
                 conn.queue.put_nowait(message)
             except asyncio.QueueFull:
+                logger.warning("SSE queue full for judge_call, dropping")
                 disconnected.add(conn)
     _sse_connections.difference_update(disconnected)
 
@@ -549,7 +527,7 @@ async def broadcast_resync(user_uid: str) -> None:
             try:
                 conn.queue.put_nowait(message)
             except asyncio.QueueFull:
-                pass
+                logger.warning(f"SSE queue full for resync user {user_uid}")
 
 
 # Make broadcast functions available to routes
@@ -559,7 +537,7 @@ sanctions.broadcast_tournament_event = broadcast_tournament_event
 tournaments.broadcast_tournament_event = broadcast_tournament_event
 tournaments.broadcast_user_event = broadcast_user_event
 tournaments.broadcast_sanction_event = broadcast_sanction_event
-tournaments.broadcast_deck_event = lambda uid: broadcast_object(uid, "deck")
+tournaments.broadcast_deck_event = broadcast_precomputed
 tournaments.broadcast_judge_call = broadcast_judge_call
 leagues.broadcast_league_event = broadcast_league_event
 users.broadcast_resync = broadcast_resync
@@ -683,14 +661,14 @@ async def stream_updates(
         force_resync = True
         effective_since = None
 
-    # Stale SSE prevention: if since is older than 29 days, force resync
+    # Stale SSE prevention: if since is older than 3 days, force resync via snapshot
     if since:
         from datetime import UTC, datetime, timedelta
         try:
             since_dt = datetime.fromisoformat(since)
             if since_dt.tzinfo is None:
                 since_dt = since_dt.replace(tzinfo=UTC)
-            if datetime.now(UTC) - since_dt > timedelta(days=29):
+            if datetime.now(UTC) - since_dt > timedelta(days=3):
                 force_resync = True
                 effective_since = None
         except (ValueError, TypeError):
@@ -721,7 +699,6 @@ async def stream_updates(
                         obj_type=obj_type,
                         level=level.value,
                         since=effective_since,
-                        batch_size=1000,
                     ):
                         if _shutdown_event and _shutdown_event.is_set():
                             return
@@ -807,17 +784,18 @@ async def stream_updates(
                                 yield f'data: {{"type":"tournaments","data":[{joined}]}}\n\n'
                             overlay_count += len(rows)
 
-                            # Decks for organized tournaments
-                            for t_uid in t_uids:
-                                deck_rows = await (await db_conn.execute(
-                                    "SELECT \"full\"::text FROM objects WHERE type = 'deck' "
-                                    "AND \"full\"->>'tournament_uid' = %s AND deleted_at IS NULL",
-                                    (t_uid,),
-                                )).fetchall()
-                                if deck_rows:
-                                    joined = ",".join(r[0] for r in deck_rows)
-                                    yield f'data: {{"type":"decks","data":[{joined}]}}\n\n'
-                                    overlay_count += len(deck_rows)
+                            # Decks for organized tournaments (single IN query)
+                            placeholders = ", ".join(["%s"] * len(t_uids))
+                            deck_rows = await (await db_conn.execute(
+                                f"SELECT \"full\"::text FROM objects WHERE type = 'deck' "
+                                f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
+                                f"AND deleted_at IS NULL",
+                                tuple(t_uids),
+                            )).fetchall()
+                            if deck_rows:
+                                joined = ",".join(r[0] for r in deck_rows)
+                                yield f'data: {{"type":"decks","data":[{joined}]}}\n\n'
+                                overlay_count += len(deck_rows)
 
                     if overlay_count:
                         logger.info(f"Personal overlay: {overlay_count} objects for {stream_user.uid}")

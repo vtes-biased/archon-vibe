@@ -460,7 +460,7 @@ async def apply_archon_import(
         tournament.standings = standings_list
         tournament.modified = datetime.now(UTC)
 
-        await save_object(
+        tournament_bd = await save_object(
             "tournament",
             tournament.uid,
             msgspec.to_builtins(tournament),
@@ -475,7 +475,7 @@ async def apply_archon_import(
     )
 
     if broadcast_tournament_event:
-        await broadcast_tournament_event(tournament)
+        broadcast_tournament_event(tournament_bd)
 
     # Ratings recompute
     try:
@@ -483,10 +483,10 @@ async def apply_archon_import(
 
         player_uids = {p.user_uid for p in players_list if p.user_uid}
         category = rating_category_for_tournament(tournament)
-        users = await recompute_ratings_for_players(player_uids, category)
+        results = await recompute_ratings_for_players(player_uids, category)
         if broadcast_user_event:
-            for user in users:
-                await broadcast_user_event(user)
+            for _user, bd in results:
+                broadcast_user_event(bd)
     except Exception:
         logger.exception(f"Error recomputing ratings for {tournament_uid}")
 

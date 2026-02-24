@@ -133,7 +133,7 @@ async def create_user(
                 detail=f"You don't have permission to assign the {role.value} role",
             )
 
-    await db_insert_user(user)
+    bd = await db_insert_user(user)
 
     # Send invite email if provided
     if email:
@@ -146,7 +146,7 @@ async def create_user(
 
     # Broadcast to SSE clients
     if broadcast_user_event:
-        await broadcast_user_event(user)
+        broadcast_user_event(bd)
 
     return Response(
         content=encoder.encode(user),
@@ -298,7 +298,7 @@ async def update_user(
         )
 
     # Save to database
-    await db_update_user(user)
+    bd = await db_update_user(user)
 
     # Trigger resync if roles or vekn_id changed
     if set(user.roles) != old_roles or user.vekn_id != old_vekn_id:
@@ -308,7 +308,7 @@ async def update_user(
 
     # Broadcast to SSE clients
     if broadcast_user_event:
-        await broadcast_user_event(user)
+        broadcast_user_event(bd)
 
     return Response(
         content=encoder.encode(user),
@@ -381,11 +381,11 @@ async def upload_avatar(
             local_modifications=user.local_modifications,
             vekn_prefix=user.vekn_prefix,
         )
-        await db_update_user(updated_user)
+        bd = await db_update_user(updated_user)
 
         # Broadcast user update via SSE
         if broadcast_user_event:
-            await broadcast_user_event(updated_user)
+            broadcast_user_event(bd)
 
     return Response(
         content=b'{"success": true}',
@@ -459,11 +459,11 @@ async def delete_avatar(
             local_modifications=user.local_modifications,
             vekn_prefix=user.vekn_prefix,
         )
-        await db_update_user(updated_user)
+        bd = await db_update_user(updated_user)
 
         # Broadcast user update via SSE
         if broadcast_user_event:
-            await broadcast_user_event(updated_user)
+            broadcast_user_event(bd)
 
     return Response(
         content=b'{"success": true}',

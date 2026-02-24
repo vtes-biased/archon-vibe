@@ -125,9 +125,9 @@ async def create_league(
         parent_uid=body.parent_uid,
         allow_no_finals=body.allow_no_finals,
     )
-    await insert_league(league)
+    bd = await insert_league(league)
     if broadcast_league_event:
-        await broadcast_league_event(league)
+        broadcast_league_event(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",
@@ -185,9 +185,9 @@ async def update_league_endpoint(
         setattr(league, field, value)
 
     league.modified = datetime.now(UTC)
-    await update_league(league)
+    bd = await update_league(league)
     if broadcast_league_event:
-        await broadcast_league_event(league)
+        broadcast_league_event(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",
@@ -218,9 +218,9 @@ async def delete_league_endpoint(
 
     league.deleted_at = datetime.now(UTC)
     league.modified = datetime.now(UTC)
-    await update_league(league)
+    bd = await update_league(league)
     if broadcast_league_event:
-        await broadcast_league_event(league)
+        broadcast_league_event(bd)
     return Response(status_code=204)
 
 
@@ -247,9 +247,9 @@ async def add_organizer(
     if body.user_uid not in league.organizers_uids:
         league.organizers_uids.append(body.user_uid)
         league.modified = datetime.now(UTC)
-        await update_league(league)
+        bd = await update_league(league)
         if broadcast_league_event:
-            await broadcast_league_event(league)
+            broadcast_league_event(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",
@@ -277,9 +277,9 @@ async def remove_organizer(
             raise HTTPException(400, "Cannot remove the last organizer")
         league.organizers_uids.remove(organizer_uid)
         league.modified = datetime.now(UTC)
-        await update_league(league)
+        bd = await update_league(league)
         if broadcast_league_event:
-            await broadcast_league_event(league)
+            broadcast_league_event(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",

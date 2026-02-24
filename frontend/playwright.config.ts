@@ -18,9 +18,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
-  workers: process.env.CI ? 1 : 2,
+  workers: process.env.CI ? 2 : 4,
   reporter: [['html', { outputFolder: '../playwright-report', open: 'never' }]],
-  timeout: 30_000,
+  timeout: 15_000,
 
   globalSetup: './tests/e2e/global-setup.ts',
   globalTeardown: './tests/e2e/global-teardown.ts',

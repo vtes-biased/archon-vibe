@@ -77,7 +77,7 @@ async function scoreAndEndRound(page: Page, tournamentUid: string, roundIndex: n
 }
 
 test.describe('Tournament lifecycle', () => {
-  test.setTimeout(60_000);
+  test.setTimeout(30_000);
 
   test('create, run rounds, and finish tournament', async ({ page }) => {
     const state = getE2EState();

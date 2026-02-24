@@ -3,6 +3,7 @@
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 import msgspec
 import psycopg
@@ -15,6 +16,20 @@ from .models import (
     Tournament,
     User,
 )
+
+
+@dataclass(slots=True)
+class BroadcastData:
+    """Pre-computed broadcast data returned by save functions. No DB re-read needed."""
+    obj_type: str
+    uid: str
+    pub_json: str | None
+    mem_json: str | None
+    full_json: str
+    country: str | None = None
+    org_uids: list[str] | None = None
+    obj_user_uid: str | None = None
+
 
 # Database connection string from environment
 DB_URL = os.getenv(
@@ -371,11 +386,11 @@ async def save_object(
     *,
     conn: psycopg.AsyncConnection | None = None,
     deleted_at: str | None = None,
-) -> None:
+) -> BroadcastData:
     """Save an object to the unified objects table.
 
     Computes public/member/full projections and upserts.
-    If conn is provided, uses that connection (for transactions).
+    Returns BroadcastData for broadcasting without DB re-read.
     """
     pub = compute_public(obj_type, full_data)
     mem = compute_member(obj_type, full_data)
@@ -404,18 +419,29 @@ async def save_object(
         async with get_connection() as c:
             await c.execute(query, params)
 
+    return BroadcastData(
+        obj_type=obj_type,
+        uid=uid,
+        pub_json=pub_json,
+        mem_json=mem_json,
+        full_json=full_json,
+        country=full_data.get("country"),
+        org_uids=full_data.get("organizers_uids"),
+        obj_user_uid=full_data.get("user_uid"),
+    )
+
 
 async def save_object_from_model(
     obj_type: str,
     obj: msgspec.Struct,
-) -> None:
+) -> BroadcastData:
     """Save a msgspec model to the objects table."""
     full_data = msgspec.to_builtins(obj)
     deleted_at = full_data.get("deleted_at")
     # Convert deleted_at to string if it's not None
     if deleted_at is not None and not isinstance(deleted_at, str):
         deleted_at = deleted_at.isoformat() if hasattr(deleted_at, "isoformat") else str(deleted_at)
-    await save_object(obj_type, obj.uid, full_data, deleted_at=deleted_at)
+    return await save_object(obj_type, obj.uid, full_data, deleted_at=deleted_at)
 
 
 async def delete_object(uid: str, *, conn: psycopg.AsyncConnection | None = None) -> None:
@@ -488,56 +514,33 @@ async def stream_objects_new(
     obj_type: str | None = None,
     level: str = "full",
     since: str | None = None,
-    batch_size: int = 1000,
 ) -> AsyncIterator[tuple[list[str], str]]:
-    """Stream pre-serialized JSON strings from objects table.
-
-    Yields (batch_of_json_strings, max_modified_at) tuples.
-    Each string is the raw JSONB text — no Python deserialization needed.
-    """
+    """Stream pre-serialized JSON strings. Single query, single yield."""
     if not _pool:
         raise RuntimeError("Database not initialized")
 
     col = _level_col(level)
-    cursor_modified: str | None = since
-    cursor_uid: str | None = None
+    conditions = [f"{col} IS NOT NULL"]
+    params: list = []
 
-    while True:
-        async with _pool.connection() as conn:
-            conditions = [f"{col} IS NOT NULL"]
-            bind_params: list = []
+    if obj_type:
+        conditions.append("type = %s")
+        params.append(obj_type)
+    if since:
+        conditions.append("modified_at > %s")
+        params.append(since)
 
-            if obj_type:
-                conditions.append("type = %s")
-                bind_params.append(obj_type)
+    where = " AND ".join(conditions)
 
-            if cursor_uid is not None:
-                conditions.append("(modified_at, uid) > (%s, %s)")
-                bind_params.extend([cursor_modified, cursor_uid])
-            elif cursor_modified:
-                conditions.append("modified_at > %s")
-                bind_params.append(cursor_modified)
+    async with _pool.connection() as conn:
+        rows = await (await conn.execute(
+            f"SELECT {col}::text, modified_at FROM objects "
+            f"WHERE {where} ORDER BY modified_at ASC",
+            tuple(params),
+        )).fetchall()
 
-            where = " AND ".join(conditions)
-            bind_params.append(batch_size)
-
-            rows = await (await conn.execute(
-                f"SELECT {col}::text, modified_at, uid FROM objects "
-                f"WHERE {where} ORDER BY modified_at ASC, uid ASC LIMIT %s",
-                tuple(bind_params),
-            )).fetchall()
-
-        if not rows:
-            break
-
-        json_strings = [row[0] for row in rows]
-        cursor_modified = rows[-1][1].isoformat()
-        cursor_uid = rows[-1][2]
-
-        yield json_strings, cursor_modified
-
-        if len(rows) < batch_size:
-            break
+    if rows:
+        yield [r[0] for r in rows], rows[-1][1].isoformat()
 
 
 async def purge_deleted_objects(days: int = 30) -> int:
@@ -557,14 +560,14 @@ async def purge_deleted_objects(days: int = 30) -> int:
 # ---------------------------------------------------------------------------
 
 
-async def insert_user(user: User) -> None:
+async def insert_user(user: User) -> BroadcastData:
     """Insert a new user into the database."""
-    await save_object_from_model("user", user)
+    return await save_object_from_model("user", user)
 
 
-async def update_user(user: User) -> None:
+async def update_user(user: User) -> BroadcastData:
     """Update an existing user in the database."""
-    await save_object_from_model("user", user)
+    return await save_object_from_model("user", user)
 
 
 async def get_user_by_uid(uid: str) -> User | None:
@@ -588,8 +591,8 @@ async def delete_user(uid: str) -> None:
     await delete_object(uid)
 
 
-async def soft_delete_user(uid: str) -> User | None:
-    """Soft-delete a user by setting deleted_at. Returns updated user for SSE."""
+async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
+    """Soft-delete a user by setting deleted_at. Returns (user, BroadcastData) for SSE."""
     from datetime import UTC, datetime
 
     user = await get_user_by_uid(uid)
@@ -598,8 +601,8 @@ async def soft_delete_user(uid: str) -> User | None:
     now = datetime.now(UTC)
     user.deleted_at = now
     user.modified = now
-    await update_user(user)
-    return user
+    bd = await update_user(user)
+    return user, bd
 
 
 async def get_user_by_contact_email(email: str) -> User | None:
@@ -1058,14 +1061,14 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
 # ---------------------------------------------------------------------------
 
 
-async def insert_sanction(sanction: Sanction) -> None:
+async def insert_sanction(sanction: Sanction) -> BroadcastData:
     """Insert a new sanction into the database."""
-    await save_object_from_model("sanction", sanction)
+    return await save_object_from_model("sanction", sanction)
 
 
-async def update_sanction(sanction: Sanction) -> None:
+async def update_sanction(sanction: Sanction) -> BroadcastData:
     """Update an existing sanction in the database."""
-    await save_object_from_model("sanction", sanction)
+    return await save_object_from_model("sanction", sanction)
 
 
 async def get_sanction_by_uid(uid: str) -> Sanction | None:
@@ -1142,14 +1145,14 @@ async def delete_sanction_hard(uid: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def insert_tournament(tournament: Tournament) -> None:
+async def insert_tournament(tournament: Tournament) -> BroadcastData:
     """Insert a new tournament into the database."""
-    await save_object_from_model("tournament", tournament)
+    return await save_object_from_model("tournament", tournament)
 
 
-async def update_tournament(tournament: Tournament) -> None:
+async def update_tournament(tournament: Tournament) -> BroadcastData:
     """Update an existing tournament in the database."""
-    await save_object_from_model("tournament", tournament)
+    return await save_object_from_model("tournament", tournament)
 
 
 async def get_tournament_by_uid(uid: str) -> Tournament | None:
@@ -1162,8 +1165,8 @@ async def delete_tournament_db(uid: str) -> None:
     await delete_object(uid)
 
 
-async def soft_delete_tournament(uid: str) -> Tournament | None:
-    """Soft-delete a tournament by setting deleted_at. Returns updated tournament for SSE."""
+async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] | None:
+    """Soft-delete a tournament. Returns (tournament, BroadcastData) for SSE."""
     from datetime import UTC, datetime
 
     tournament = await get_tournament_by_uid(uid)
@@ -1172,8 +1175,8 @@ async def soft_delete_tournament(uid: str) -> Tournament | None:
     now = datetime.now(UTC)
     tournament.deleted_at = now
     tournament.modified = now
-    await update_tournament(tournament)
-    return tournament
+    bd = await update_tournament(tournament)
+    return tournament, bd
 
 
 async def get_tournament_by_external_id(platform: str, ext_id: str) -> Tournament | None:
@@ -1238,14 +1241,14 @@ async def get_finished_tournaments_for_category(
 # ---------------------------------------------------------------------------
 
 
-async def insert_league(league: League) -> None:
+async def insert_league(league: League) -> BroadcastData:
     """Insert a new league into the database."""
-    await save_object_from_model("league", league)
+    return await save_object_from_model("league", league)
 
 
-async def update_league(league: League) -> None:
+async def update_league(league: League) -> BroadcastData:
     """Update an existing league in the database."""
-    await save_object_from_model("league", league)
+    return await save_object_from_model("league", league)
 
 
 async def get_league_by_uid(uid: str) -> League | None:

@@ -11,6 +11,7 @@ import logging
 from datetime import UTC, datetime
 
 from .db import (
+    BroadcastData,
     decode_json,
     get_finished_tournaments_for_category,
     get_sanctions_for_tournament,
@@ -188,10 +189,11 @@ async def _compute_entry(t: Tournament, user_uid: str) -> TournamentRatingEntry:
 
 async def recompute_ratings_for_players(
     player_uids: set[str], category: RatingCategory
-) -> list[User]:
+) -> list[tuple[User, BroadcastData]]:
     """Recompute ratings for an explicit set of players in a category.
 
-    Embeds rating data directly into User objects. Returns updated users.
+    Embeds rating data directly into User objects.
+    Returns (user, BroadcastData) tuples for broadcasting.
     """
     if not player_uids:
         return []
@@ -221,7 +223,7 @@ async def recompute_ratings_for_players(
     # Fetch wins for all players in batch
     wins_map = await get_tournament_wins_for_users(player_uids)
 
-    updated_users: list[User] = []
+    updated_users: list[tuple[User, BroadcastData]] = []
 
     for user_uid in player_uids:
         user = await get_user_by_uid(user_uid)
@@ -245,8 +247,8 @@ async def recompute_ratings_for_players(
         user.wins = wins_map.get(user_uid, [])
         user.modified = now
 
-        await update_user(user)
-        updated_users.append(user)
+        bd = await update_user(user)
+        updated_users.append((user, bd))
 
     logger.info(
         f"Recomputed {len(updated_users)} ratings for {category.value}"
@@ -254,19 +256,19 @@ async def recompute_ratings_for_players(
     return updated_users
 
 
-async def recompute_all_ratings() -> list[User]:
+async def recompute_all_ratings() -> list[tuple[User, BroadcastData]]:
     """Full recomputation of all ratings and wins. Called daily for consistency.
 
-    Lightweight first pass collects player UIDs per category (streaming tournaments
-    in batches). Then reuses recompute_ratings_for_players() per category.
-    Returns updated User objects.
+    Lightweight first pass collects player UIDs per category (streaming tournaments).
+    Then reuses recompute_ratings_for_players() per category.
+    Returns (User, BroadcastData) tuples.
     """
     # Pass 1: stream tournaments to collect player sets per category
     players_by_category: dict[RatingCategory, set[str]] = {
         cat: set() for cat in RatingCategory
     }
 
-    async for json_batch, _ in stream_objects_new("tournament", "full", batch_size=100):
+    async for json_batch, _ in stream_objects_new("tournament", "full"):
         for json_str in json_batch:
             t = decode_json(json_str, Tournament)
             if t.state != "Finished" or t.deleted_at:
@@ -276,12 +278,12 @@ async def recompute_all_ratings() -> list[User]:
             players_by_category[category].update(players)
 
     # Pass 2: recompute per category using the normal code path
-    all_updated: list[User] = []
+    all_updated: list[tuple[User, BroadcastData]] = []
     for category, player_uids in players_by_category.items():
         if not player_uids:
             continue
-        users = await recompute_ratings_for_players(player_uids, category)
-        all_updated.extend(users)
+        results = await recompute_ratings_for_players(player_uids, category)
+        all_updated.extend(results)
 
     logger.info(f"Full rating recompute: {len(all_updated)} users updated")
     return all_updated
