@@ -59,9 +59,9 @@
 - Per-type filter functions (`_filter_user`, `_filter_tournament`, `_filter_league`, etc.)
 
 **Object Types:**
-- User, Sanction, Tournament, Rating, League (synced via SSE)
+- User, Sanction, Tournament, DeckObject, League (synced via SSE)
 - VtesCard (static data, loaded into IndexedDB)
-- Deck (embedded in Tournament, not standalone)
+- DeckObject is standalone (not embedded in Tournament)
 
 ## Files That Update Together
 
@@ -105,6 +105,14 @@ When Rust engine capabilities change:
 **BaseObject Pattern:**
 - Confirmed `deleted_at` is part of BaseObject (was already documented correctly)
 - Updated ARCHITECTURE.md to explicitly list deleted_at in Object Structure section
+
+**Session 2026-02-24: StartRound seating forwarding + E2E test infrastructure**
+- ARCHITECTURE.md: added "Mutation Pipeline" section (was missing) with StartRound seating forwarding pattern
+- CLAUDE.md: added StartRound note to Mutation Pipeline section with cross-ref to ARCHITECTURE.md
+- TESTING.md: full rewrite — documents E2E infrastructure (global-setup/teardown, setup_e2e.py, auth helpers, sync helpers, tournament lifecycle test)
+- Key pattern: WASM and PyO3 use separate RNGs → frontend injects WASM-computed seating into server POST to keep optimistic update and server identical
+- E2E strategy: real auth (JWT tokens via /auth/login), real DB (truncate + seed), IDB polling to read WASM results for API scoring
+- Test spec coverage: users.spec.ts (SSE sync), tournament.spec.ts (full lifecycle with 2 rounds)
 
 **Session 2026-02-16: Icon library migration (@iconify/svelte → lucide-svelte)**
 - Replaced @iconify/svelte (runtime icon fetching from api.iconify.design) with lucide-svelte (tree-shaken, build-time bundled)
