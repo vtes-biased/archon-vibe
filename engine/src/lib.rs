@@ -459,6 +459,21 @@ mod python {
         ) -> PyResult<String> {
             py_str(export_twda_json(deck_json, cards_json, tournament_name, tournament_date, tournament_place, tournament_format, tournament_url, player_count, player_name))
         }
+
+        /// Check VP validity for a table. Returns error string or None if valid.
+        fn check_table_vps(&self, vps: Vec<f64>) -> PyResult<Option<String>> {
+            Ok(super::tournament::check_table_vps(&vps).map(|e| format!("{:?}", e)))
+        }
+
+        /// Compute game wins for each player at a table.
+        fn compute_gw(&self, vps: Vec<f64>, adjustments: Vec<f64>) -> Vec<f64> {
+            super::tournament::compute_gw(&vps, &adjustments)
+        }
+
+        /// Compute tournament points for each player at a table.
+        fn compute_tp(&self, table_size: usize, vps: Vec<f64>) -> Vec<f64> {
+            super::tournament::compute_tp(table_size, &vps)
+        }
     }
 
     #[pymodule]

@@ -217,7 +217,7 @@ pub struct SeatScore {
 
 /// VP validation error types
 #[derive(Debug, Clone, PartialEq)]
-pub enum VpError {
+pub(crate) enum VpError {
     InvalidTableSize,
     InsufficientTotal,
     ExcessiveTotal,
@@ -228,7 +228,7 @@ pub enum VpError {
 /// Check VP validity on a table, replicating archon's oust-order validation.
 /// VPs are in seating (predator-prey) order around the table.
 /// Returns None if valid, Some(error) if invalid.
-fn check_table_vps(vps: &[f64]) -> Option<VpError> {
+pub(crate) fn check_table_vps(vps: &[f64]) -> Option<VpError> {
     let n = vps.len();
     if n < 4 || n > 5 {
         return Some(VpError::InvalidTableSize);
@@ -335,7 +335,7 @@ fn has_active_suspension(sanctions: &JsonValue, player_uid: &str) -> bool {
 
 /// Compute GW for each player: 1 if adjusted_vp >= 2.0 AND strictly highest adjusted VP, else 0.
 /// `adjustments` is same length as `vps` with negative values for SA penalties.
-fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
+pub(crate) fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
     if vps.is_empty() {
         return vec![];
     }
@@ -354,7 +354,7 @@ fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
 }
 
 /// Compute TP based on VP rank within table. Ties average their positions.
-fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
+pub(crate) fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
     let base: &[f64] = match table_size {
         5 => &[60.0, 48.0, 36.0, 24.0, 12.0],
         4 => &[60.0, 48.0, 24.0, 12.0],

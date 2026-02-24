@@ -752,5 +752,16 @@
   "raffle_draw": "Draw",
   "raffle_undo": "Undo",
   "raffle_clear": "Clear all",
-  "raffle_clear_confirm": "Clear all raffle draws?"
+  "raffle_clear_confirm": "Clear all raffle draws?",
+  "common_confirm": "Confirm",
+  "archon_import_title": "Archon Import",
+  "archon_import_description": "Import results from a filled-in Archon v1.5l spreadsheet. All players must have valid VEKN IDs.",
+  "archon_download_template": "Download blank template",
+  "archon_upload_file": "Import",
+  "archon_uploading": "Importing...",
+  "archon_import_success": "Archon import successful",
+  "archon_import_error": "Import failed",
+  "archon_import_confirm_overwrite": "This tournament already has round data. Importing will replace all existing rounds, standings, and results. Continue?",
+  "archon_players_matched": "{count} players matched",
+  "archon_rounds_imported": "{count} rounds imported"
 }

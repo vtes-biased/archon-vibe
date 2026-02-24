@@ -5,7 +5,10 @@ import os
 from datetime import UTC, datetime
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException, Response
+from pathlib import Path
+
+from fastapi import APIRouter, Header, HTTPException, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from uuid6 import uuid7
 
@@ -619,6 +622,106 @@ async def delete_tournament_endpoint(
     return Response(
         content=encoder.encode({"message": "Tournament deleted"}),
         media_type="application/json",
+    )
+
+
+# --- Archon Import Endpoints ---
+
+
+@router.get("/archon-template")
+async def download_archon_template() -> FileResponse:
+    """Serve blank Archon v1.5l spreadsheet template. Public access."""
+    path = Path(__file__).parent.parent.parent / "data" / "thearchon1.5l.xlsx"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Template file not found")
+    return FileResponse(
+        path,
+        filename="thearchon1.5l.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.post("/{uid}/archon-import")
+async def archon_import(
+    uid: str,
+    file: UploadFile,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Import a filled-in Archon v1.5l spreadsheet into an existing tournament."""
+    current_user = await _get_current_user(authorization)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # Auth: organizer, IC, or NC/Prince of same country
+    if not (
+        _is_organizer(current_user, tournament)
+        or Role.NC in current_user.roles
+        and current_user.country
+        and tournament.country == current_user.country
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Only organizers, IC, or NC/Prince of the same country can import",
+        )
+
+    # File validation
+    if not file.filename or not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="File must be an .xlsx spreadsheet")
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+
+    from ..archon_import import (
+        apply_archon_import,
+        parse_archon_file,
+        validate_archon_import,
+    )
+
+    # Parse
+    try:
+        data = parse_archon_file(file_bytes)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Failed to parse spreadsheet: {e}"
+        ) from e
+
+    # Validate
+    engine = get_engine()
+    errors = validate_archon_import(data, engine)
+    if errors:
+        return Response(
+            content=msgspec.json.encode(
+                {"success": False, "errors": errors, "warnings": [],
+                 "players_matched": 0, "rounds_imported": 0, "has_finals": False}
+            ).decode(),
+            media_type="application/json",
+            status_code=400,
+        )
+
+    # Apply
+    result = await apply_archon_import(
+        tournament_uid=uid,
+        data=data,
+        actor_uid=current_user.uid,
+        engine=engine,
+        broadcast_tournament_event=broadcast_tournament_event,
+        broadcast_user_event=broadcast_user_event,
+    )
+
+    status = 200 if result.success else 400
+    return Response(
+        content=msgspec.json.encode(
+            {"success": result.success, "errors": result.errors,
+             "warnings": result.warnings, "players_matched": result.players_matched,
+             "rounds_imported": result.rounds_imported, "has_finals": result.has_finals}
+        ).decode(),
+        media_type="application/json",
+        status_code=status,
     )
 
 

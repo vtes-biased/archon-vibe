@@ -364,6 +364,41 @@ export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ succe
   return response.json();
 }
 
+// Archon Import API
+
+export interface ArchonImportResult {
+  success: boolean;
+  errors: string[];
+  warnings: string[];
+  players_matched: number;
+  rounds_imported: number;
+  has_finals: boolean;
+}
+
+export async function importArchonFile(tournamentUid: string, file: File): Promise<ArchonImportResult> {
+  if (!isOnline()) {
+    throw new Error('Cannot import while offline.');
+  }
+
+  const token = getAccessToken();
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/api/tournaments/${tournamentUid}/archon-import`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok && !data.errors) {
+    const message = data.detail || `Import failed: ${response.statusText}`;
+    showToast({ type: 'error', message });
+    throw new ApiError(message, response.status, data.detail);
+  }
+  return data;
+}
+
 // Tournament API
 
 export interface CreateTournamentData {

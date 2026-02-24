@@ -752,5 +752,16 @@
   "raffle_draw": "Sortear",
   "raffle_undo": "Deshacer",
   "raffle_clear": "Borrar todo",
-  "raffle_clear_confirm": "¿Borrar todos los sorteos?"
+  "raffle_clear_confirm": "¿Borrar todos los sorteos?",
+  "common_confirm": "Confirmar",
+  "archon_import_title": "Importar Archon",
+  "archon_import_description": "Importe resultados desde una hoja de cálculo Archon v1.5l completada. Todos los jugadores deben tener VEKN IDs válidos.",
+  "archon_download_template": "Descargar plantilla en blanco",
+  "archon_upload_file": "Importar",
+  "archon_uploading": "Importando...",
+  "archon_import_success": "Importación de Archon correcta",
+  "archon_import_error": "Error en la importación",
+  "archon_import_confirm_overwrite": "Este torneo ya tiene datos de rondas. La importación reemplazará todas las rondas, clasificaciones y resultados existentes. ¿Continuar?",
+  "archon_players_matched": "{count} jugadores encontrados",
+  "archon_rounds_imported": "{count} rondas importadas"
 }
