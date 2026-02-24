@@ -155,6 +155,34 @@ When the PWA is deliberately taken offline (or loses connection):
 - Custom resolution logic in Rust engine for complex business rules
 - Client always accepts server's reconciliation response
 
+## Mutation Pipeline
+
+Tournament actions use optimistic updates via WASM:
+1. WASM processes locally → returns `{tournament, deck_ops}` → IndexedDB updated → UI reacts immediately
+2. Server POST sent async → SSE delivers authoritative state → overwrites if different
+
+### StartRound Seating Forwarding
+
+`StartRound` accepts optional `seating: Vec<Vec<String>>` (table → ordered player UIDs). When provided, the engine validates it and uses it directly instead of computing random seating.
+
+**Problem solved**: WASM (`rand::thread_rng`) and PyO3 use separate RNG states, so an unconstrained `StartRound` produces different seatings on client and server — breaking the optimistic update.
+
+**Solution** (`tournamentAction()` in `api.ts`): after WASM processes `StartRound`, extract the computed seating from the result and inject it into the server POST:
+
+```typescript
+if (action === 'StartRound' && newRoundAdded) {
+  const newRound = result.tournament.rounds[result.tournament.rounds.length - 1]!;
+  serverEvent = { ...event, seating: newRound.map(t => t.seating.map(s => s.player_uid)) };
+}
+```
+
+**Validation** (engine, `tournament.rs`):
+- Each table must have 4–5 players
+- All checked-in players must appear exactly once
+- No duplicate player UIDs across tables
+
+The frontend is the seating source; the server validates and stores it deterministically.
+
 ## Card/Deck System
 
 **Card Database**: VTES card data loaded from JSON into IndexedDB (`cards` store, keyed by card ID). Rust engine provides card lookup and deck validation.

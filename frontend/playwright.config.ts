@@ -17,13 +17,17 @@ export default defineConfig({
   outputDir: '../test-results',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 1,
+  workers: process.env.CI ? 1 : 2,
   reporter: [['html', { outputFolder: '../playwright-report', open: 'never' }]],
   timeout: 30_000,
 
+  globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
+
   use: {
     baseURL,
+    locale: 'en-US',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

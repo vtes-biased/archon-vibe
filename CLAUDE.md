@@ -120,6 +120,8 @@ Tournament actions use optimistic updates via WASM engine:
 
 Resync triggered when roles or vekn_id change (`resync_after` on User).
 
+**StartRound seating forwarding**: `StartRound` accepts optional `seating: Vec<Vec<String>>`. WASM and PyO3 produce different random seatings; the frontend extracts the WASM result and injects it into the server POST so both sides use identical tables. Engine validates submitted seating (sizes 4–5, all checked-in players, no duplicates). See ARCHITECTURE.md for details.
+
 ## Key Constraints
 - Server always wins conflicts
 - Each PWA maintains full dataset in IndexedDB

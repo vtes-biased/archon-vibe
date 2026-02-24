@@ -130,7 +130,9 @@ pub enum TournamentEvent {
     MarkAllPaid,
 
     // Round management
-    StartRound,
+    StartRound {
+        seating: Option<Vec<Vec<String>>>,
+    },
     FinishRound,
     CancelRound,
     SwapSeats {
@@ -448,7 +450,16 @@ impl TournamentEvent {
                 Ok(Self::SetPaymentStatus { player_uid, status })
             }
             "MarkAllPaid" => Ok(Self::MarkAllPaid),
-            "StartRound" => Ok(Self::StartRound),
+            "StartRound" => {
+                let seating = if value["seating"].is_null() || !value["seating"].is_array() {
+                    None
+                } else {
+                    Some(value["seating"].members().map(|t| {
+                        t.members().filter_map(|p| p.as_str().map(|s| s.to_string())).collect()
+                    }).collect())
+                };
+                Ok(Self::StartRound { seating })
+            }
             "FinishRound" => Ok(Self::FinishRound),
             "CancelRound" => Ok(Self::CancelRound),
             "SwapSeats" => {
@@ -1134,7 +1145,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::StartRound => {
+        TournamentEvent::StartRound { seating: submitted_seating } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
 
@@ -1186,11 +1197,36 @@ fn apply_event(
                 })
                 .collect();
 
-            // Compute new seating using the seating engine
-            let (new_round, _score) = seating::compute_next_round(
-                &checked_in,
-                &previous_rounds,
-            )?;
+            // Use submitted seating if provided, otherwise compute
+            let new_round: Vec<Vec<String>> = if let Some(submitted) = submitted_seating {
+                // Validate submitted seating
+                let checked_set: std::collections::HashSet<&str> =
+                    checked_in.iter().map(|s| s.as_str()).collect();
+                let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+                for table in submitted.iter() {
+                    if table.len() < 4 || table.len() > 5 {
+                        return Err(format!("Invalid table size: {}", table.len()));
+                    }
+                    for uid in table {
+                        if !checked_set.contains(uid.as_str()) {
+                            return Err(format!("Player {} not checked in", uid));
+                        }
+                        if !seen.insert(uid.as_str()) {
+                            return Err(format!("Duplicate player {}", uid));
+                        }
+                    }
+                }
+                if seen.len() != checked_in.len() {
+                    return Err("Submitted seating does not include all checked-in players".to_string());
+                }
+                submitted.clone()
+            } else {
+                let (computed, _score) = seating::compute_next_round(
+                    &checked_in,
+                    &previous_rounds,
+                )?;
+                computed
+            };
 
             // Build tables JSON
             let tables: Vec<JsonValue> = new_round
@@ -2462,6 +2498,39 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("at least 4"));
+    }
+
+    #[test]
+    fn test_start_round_with_submitted_seating() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p0", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p4", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p5", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p6", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p7", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        ];
+
+        // Use json::parse to build the event (same path as real JSON input)
+        let event = json::parse(r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"],["p4","p5","p6","p7"]]}"#).unwrap();
+        let actor = make_organizer();
+
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok(), "StartRound failed: {:?}", result.err());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        let round = &updated["rounds"][0];
+        let t0: Vec<&str> = (0..round[0]["seating"].len())
+            .map(|i| round[0]["seating"][i]["player_uid"].as_str().unwrap())
+            .collect();
+        let t1: Vec<&str> = (0..round[1]["seating"].len())
+            .map(|i| round[1]["seating"][i]["player_uid"].as_str().unwrap())
+            .collect();
+        assert_eq!(t0, vec!["p0", "p1", "p2", "p3"]);
+        assert_eq!(t1, vec!["p4", "p5", "p6", "p7"]);
     }
 
     #[test]

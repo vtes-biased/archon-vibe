@@ -4,7 +4,7 @@
 
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, DeckObject, League } from '$lib/types';
 import { getAllUsers, getTournament, saveTournament, saveLeague, getSanctionsForTournament, getDecksByTournament, saveDeck, deleteDeck } from './db';
-import { processTournamentEvent, buildActorContext, type DeckOp } from './engine';
+import { processTournamentEvent, buildActorContext, type DeckOp, type TournamentEvent } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
 import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
@@ -536,12 +536,21 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
         return result.tournament;
       }
 
+      // For StartRound: forward WASM-computed seating so the server uses
+      // the same tables (seating computation is non-deterministic).
+      let serverEvent: TournamentEvent = event;
+      if (action === 'StartRound' && result.tournament.rounds &&
+          result.tournament.rounds.length > (current.rounds?.length ?? 0)) {
+        const newRound = result.tournament.rounds[result.tournament.rounds.length - 1]!;
+        serverEvent = { ...event, seating: newRound.map(t => t.seating.map(s => s.player_uid)) };
+      }
+
       // Queue server POST (serialized per tournament, prevents concurrent races)
       enqueueServerAction(uid, async () => {
         try {
           await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
             method: 'POST',
-            body: JSON.stringify(event),
+            body: JSON.stringify(serverEvent),
           });
         } catch (e) {
           console.error('Server rejected action, SSE will correct:', e);

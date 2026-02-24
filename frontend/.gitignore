@@ -24,3 +24,8 @@ src/lib/paraglide
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright
+test-results/
+playwright-report/
+tests/e2e/.e2e-state.json
