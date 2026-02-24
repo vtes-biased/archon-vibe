@@ -61,25 +61,9 @@ broadcast_user_event = None
 broadcast_sanction_event = None
 broadcast_deck_event = None  # async fn(deck_uid: str) -> None
 
-# Rust engine - lazy loaded
-_engine = None
+from archon_engine import PyEngine
 
-
-def get_engine():
-    """Get the Rust engine instance (lazy loaded)."""
-    global _engine
-    if _engine is None:
-        try:
-            from archon_engine import PyEngine
-
-            _engine = PyEngine()
-            logger.info("Rust tournament engine loaded")
-        except ImportError:
-            logger.warning("archon_engine not available, tournament actions disabled")
-            raise HTTPException(
-                status_code=503, detail="Tournament engine not available"
-            )
-    return _engine
+_engine = PyEngine()
 
 
 async def _get_current_user(authorization: str | None):
@@ -232,7 +216,7 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
 
         from ..twda import submit_twda_pr
 
-        engine = get_engine()
+        engine = _engine
         deck_json = json_mod.dumps({
             "name": winner_deck.name,
             "author": winner_deck.author,
@@ -692,7 +676,7 @@ async def archon_import(
         ) from e
 
     # Validate
-    engine = get_engine()
+    engine = _engine
     errors = validate_archon_import(data, engine)
     if errors:
         return Response(
@@ -881,7 +865,7 @@ async def tournament_action(
             await _check_player_barred(request.player_uid, uid, tournament)
 
         # Call Rust engine
-        engine = get_engine()
+        engine = _engine
         try:
             result_json = engine.process_tournament_event(
                 tournament_json, event_json, actor_json, sanctions_json, decks_json
@@ -1410,7 +1394,7 @@ async def export_deck_twda(
     if not deck:
         raise HTTPException(status_code=404, detail="No deck found for player")
 
-    engine = get_engine()
+    engine = _engine
     import json as json_mod
 
     deck_json = json_mod.dumps({
@@ -1531,7 +1515,7 @@ async def tournament_report(
         lines.append("")
         lines.append("=== Winner's Decklist ===")
         try:
-            engine = get_engine()
+            engine = _engine
             import json as json_mod
 
             deck_json = json_mod.dumps({

@@ -36,19 +36,14 @@ RATING_WINDOW_MONTHS = 18
 TOP_N = 8
 
 
-def _get_engine():
-    """Get Rust engine (lazy)."""
-    from archon_engine import PyEngine
+from archon_engine import PyEngine
 
-    global _engine
-    if "_engine" not in globals():
-        _engine = PyEngine()
-    return _engine
+_engine = PyEngine()
 
 
 def rating_category_for_tournament(t: Tournament) -> RatingCategory:
     """Map tournament format + online to RatingCategory."""
-    engine = _get_engine()
+    engine = _engine
     cat_str = engine.rating_category(t.format.value, t.online)
     return RatingCategory(cat_str)
 
@@ -161,7 +156,7 @@ def _compute_entry_sync(
     t: Tournament, user_uid: str, sanctions: list | None = None
 ) -> TournamentRatingEntry:
     """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions)."""
-    engine = _get_engine()
+    engine = _engine
     vp, gw = _player_stats(t, user_uid)
     overflow = _sa_overflow_penalty(t, user_uid, sanctions)
     vp -= overflow

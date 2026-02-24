@@ -101,8 +101,7 @@ def compute_tournament_public(d: dict) -> dict:
 def compute_tournament_member(d: dict) -> dict:
     """Member projection: everything except checkin_code and vekn_pushed_at.
 
-    No per-viewer filtering (my_tables removed, standings/deck visibility
-    is no longer gated at this level — all members see all data).
+    No per-viewer filtering — all members see all data.
     """
     return {k: v for k, v in d.items() if k not in _TOURNAMENT_MEMBER_EXCLUDE}
 

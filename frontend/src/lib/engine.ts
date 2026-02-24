@@ -43,25 +43,6 @@ export async function initEngine(): Promise<WasmEngine> {
  * Tournament event types for the Rust engine.
  */
 /**
- * Score an existing seating arrangement (no optimization).
- *
- * @param rounds Array of rounds, each round is array of tables, each table is array of player UIDs
- * @returns Score with rule violations, mean_vps, mean_transfers
- */
-export async function scoreSeating(
-  rounds: string[][][]
-): Promise<{
-  rules: number[];
-  minimums: number[];
-  mean_vps: number;
-  mean_transfers: number;
-}> {
-  const engine = await initEngine();
-  const resultJson = engine.scoreSeating(JSON.stringify({ rounds }));
-  return JSON.parse(resultJson);
-}
-
-/**
  * Score seating synchronously (returns null if engine not initialized).
  */
 export function scoreSeatingSync(
@@ -238,30 +219,6 @@ export async function processTournamentEvent(
  * @param previousRounds Previous rounds (for optimization)
  * @returns Computed rounds and score
  */
-export async function computeSeating(
-  players: string[],
-  roundsCount: number,
-  previousRounds?: string[][][]
-): Promise<{
-  rounds: string[][][];
-  score: {
-    rules: number[];
-    mean_vps: number;
-    mean_transfers: number;
-  };
-}> {
-  const engine = await initEngine();
-
-  const config = {
-    players,
-    rounds: roundsCount,
-    previous_rounds: previousRounds ?? null,
-  };
-
-  const resultJson = engine.computeSeating(JSON.stringify(config));
-  return JSON.parse(resultJson);
-}
-
 /**
  * Permission result from the engine.
  */
@@ -473,21 +430,3 @@ export async function validateDeck(
   }
 }
 
-/**
- * Validate a deck synchronously (returns null if engine not initialized).
- */
-export function validateDeckSync(
-  deck: { cards: Record<string, number>; name?: string },
-  cardsJson: string,
-  format: string
-): ValidationError[] | null {
-  const engine = getEngineSync();
-  if (!engine) return null;
-  try {
-    const deckJson = JSON.stringify({ name: deck.name || '', cards: deck.cards });
-    const resultJson = engine.validateDeck(deckJson, cardsJson, format);
-    return JSON.parse(resultJson);
-  } catch {
-    return null;
-  }
-}

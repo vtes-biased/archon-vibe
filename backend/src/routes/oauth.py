@@ -12,7 +12,7 @@ import msgspec
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from uuid6 import uuid7
 
 from ..db import get_user_by_uid

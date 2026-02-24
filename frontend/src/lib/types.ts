@@ -346,8 +346,6 @@ export interface Tournament extends BaseObject {
   winner?: string;
   standings?: Standing[];
   raffles?: RaffleDraw[];
-  my_tables?: Table[]; // Per-viewer: tables where the viewer sat (NOT stored in DB)
-
   // Offline mode
   offline_mode?: boolean;
   offline_device_id?: string;

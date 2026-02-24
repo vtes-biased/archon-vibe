@@ -533,8 +533,6 @@ class Tournament(TournamentConfig, kw_only=True):
     # or populated by VEKN sync. NOT cleared if rounds are empty.
     standings: list[Standing] = msgspec.field(default_factory=list)
     raffles: list[RaffleDraw] = msgspec.field(default_factory=list)
-    # DEPRECATED: will be removed in Phase 5. Frontend computes locally.
-    my_tables: list[Table] = msgspec.field(default_factory=list)
     # VEKN push tracking
     vekn_pushed_at: datetime | None = None  # When results were pushed to vekn.net
     # Offline mode: device-level locking for offline tournament management

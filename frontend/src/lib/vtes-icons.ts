@@ -46,29 +46,6 @@ export const TYPE_ICONS: Record<string, string> = {
   'Merged': 'µ',
 };
 
-/** Clan name → VTES Clans font character (modern icons preferred) */
-export const CLAN_ICONS: Record<string, string> = {
-  'Abomination': 'A', 'Ahrimane': 'B', 'Akunanse': 'C',
-  'Banu Haqim': 'n', 'Assamite': 'n',
-  'Baali': 'E', 'Blood Brother': 'F',
-  'Brujah': 'o', 'Brujah antitribu': 'H',
-  'Caitiff': 'I', 'Daughter of Cacophony': 'J',
-  'Ministry': 'r', 'Follower of Set': 'r', 'Followers of Set': 'r',
-  'Gangrel': 'p', 'Gangrel antitribu': 'M',
-  'Gargoyle': 'N', 'Giovanni': 'O', 'Guruhi': 'P',
-  'Harbinger of Skulls': 'Q', 'Ishtarri': 'R',
-  'Kiasyd': 'S', 'Lasombra': 'w',
-  'Malkavian': 'q', 'Malkavian antitribu': 'V',
-  'Nagaraja': 'W', 'Nosferatu': 's', 'Nosferatu antitribu': 'Y',
-  'Osebo': 'Z', 'Pander': 'a', 'Ravnos': 'b',
-  'Salubri': 'c', 'Salubri antitribu': 'd', 'Samedi': 'e',
-  'Toreador': 't', 'Toreador antitribu': 'g',
-  'Tremere': 'u', 'Tremere antitribu': 'i',
-  'True Brujah': 'j', 'Tzimisce': 'k',
-  'Ventrue': 'v', 'Ventrue antitribu': 'm',
-  'Hecata': 'O', 'The Ministry': 'r',
-};
-
 /** Full discipline name → lowercase trigram (for lookups) */
 export const DISCIPLINE_NAME_TO_TRIGRAM: Record<string, string> = {
   'Abombwe': 'abo', 'Animalism': 'ani', 'Auspex': 'aus',
@@ -99,9 +76,3 @@ export function typeIcon(type: string): string | undefined {
   return TYPE_ICONS[type];
 }
 
-/**
- * Get the font character for a clan.
- */
-export function clanIcon(clan: string): string | undefined {
-  return CLAN_ICONS[clan];
-}
