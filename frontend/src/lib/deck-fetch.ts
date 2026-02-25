@@ -89,7 +89,8 @@ async function fetchVdb(parsed: URL): Promise<ParsedDeck> {
     for (const item of fragment.split(';')) {
       if (!item.includes('=')) continue;
       const parts = item.split('=', 2);
-      if (parts[0] && parts[1]) cards[parts[0]] = parseInt(parts[1], 10);
+      const count = parseInt(parts[1], 10);
+      if (parts[0] && count > 0) cards[parts[0]] = count;
     }
     const params = parsed.searchParams;
     return {

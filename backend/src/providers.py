@@ -42,8 +42,10 @@ def _fetch_vdb(parsed: urllib.parse.ParseResult) -> dict:
         for item in parsed.fragment.split(";"):
             if "=" not in item:
                 continue
-            card_id, count = item.split("=", 1)
-            cards[card_id] = int(count)
+            card_id, count_str = item.split("=", 1)
+            count = int(count_str)
+            if count > 0:
+                cards[card_id] = count
         return {
             "name": params.get("name", [""])[0],
             "author": params.get("author", [""])[0],
