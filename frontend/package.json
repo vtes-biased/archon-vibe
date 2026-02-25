@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
+    "setup": "node -e \"const fs=require('fs');const s='../backend/src/data/geonames',d='src/lib/data/geonames';fs.mkdirSync(d,{recursive:true});for(const f of['countries.json','cities.json'])fs.copyFileSync(s+'/'+f,d+'/'+f)\"",
+    "dev": "npm run setup && vite dev",
+    "build": "npm run setup && vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

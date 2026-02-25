@@ -13,6 +13,7 @@ dist-ssr
 .svelte-kit
 src/lib/paraglide
 *.local
+src/lib/data/geonames/
 
 # Editor directories and files
 .vscode/*
