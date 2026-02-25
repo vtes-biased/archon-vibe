@@ -454,10 +454,7 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    # Clean up magic link token (single use)
-    await delete_transient_token(f"magic:{request.token}")
-
-    # Generate a set-password token
+    # Generate a set-password token (magic token stays valid until password is set)
     set_password_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=SET_PASSWORD_EXPIRE_MINUTES)
     await store_transient_token(
@@ -467,6 +464,7 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
             "purpose": stored["purpose"],
             "discord_user_uid": stored.get("discord_user_uid"),
             "user_uid": stored.get("user_uid"),  # For invite flow
+            "magic_token": request.token,  # To clean up when password is set
         },
         expires_at,
     )
@@ -495,8 +493,10 @@ async def set_password(request: SetPasswordRequest) -> Response:
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    # Clean up token (single use)
+    # Clean up both tokens (single use)
     await delete_transient_token(f"setpwd:{request.token}")
+    if magic_token := stored.get("magic_token"):
+        await delete_transient_token(f"magic:{magic_token}")
 
     email = stored["email"]
     purpose = stored["purpose"]
