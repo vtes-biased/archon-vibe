@@ -431,6 +431,8 @@
     try {
       tournament = await tournamentAction(uid, action, data);
       await loadPlayerNames();
+      if (action === 'StartRound') activeTab = 'rounds';
+      else if (action === 'StartFinals') activeTab = 'finals';
     } catch (e) {
       error = e instanceof Error ? e.message : m.tournament_error_action();
     } finally {
