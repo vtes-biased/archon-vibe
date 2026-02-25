@@ -705,7 +705,7 @@ class VEKNSyncService:
             "vekn_prefix": new_vekn_prefix,
         }
 
-        updated_user = User(**user_dict)
+        updated_user = User(**user_dict)  # ty: ignore[invalid-argument-type]
         await update_user(updated_user)
         return updated_user, True
 

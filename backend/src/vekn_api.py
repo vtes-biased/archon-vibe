@@ -429,7 +429,7 @@ class VEKNAPIClient:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for event_data in results:
-                if isinstance(event_data, Exception) or event_data is None:
+                if isinstance(event_data, BaseException) or event_data is None:
                     continue
 
                 players = event_data.get("players", [])

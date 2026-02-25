@@ -259,14 +259,14 @@ async def login(request: LoginRequest) -> Response:
 
     # Verify password
     try:
-        ph.verify(auth_method.credential_hash, request.password)
+        ph.verify(auth_method.credential_hash, request.password)  # ty: ignore[invalid-argument-type]
     except VerifyMismatchError as err:
         raise HTTPException(
             status_code=401, detail="Invalid email or password"
         ) from err
 
     # Check if password needs rehashing (argon2 parameter updates)
-    if ph.check_needs_rehash(auth_method.credential_hash):
+    if ph.check_needs_rehash(auth_method.credential_hash):  # ty: ignore[invalid-argument-type]
         auth_method = AuthMethod(
             uid=auth_method.uid,
             modified=datetime.now(UTC),
@@ -767,7 +767,7 @@ async def update_current_user(
         user.contact_phone = request.contact_phone if request.contact_phone else None
 
     # Update modified timestamp
-    user.modified = datetime.now(UTC).isoformat()
+    user.modified = datetime.now(UTC)
 
     await update_user(user)
 
@@ -1113,6 +1113,7 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
         raise HTTPException(status_code=400, detail="Invalid challenge type")
 
     # Verify the authentication
+    assert auth_method.credential_hash is not None
     try:
         public_key = base64.urlsafe_b64decode(auth_method.credential_hash + "==")
         verification = verify_authentication_response(

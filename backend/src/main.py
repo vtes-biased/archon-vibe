@@ -384,7 +384,7 @@ app = FastAPI(title="Archon", version="0.1.0", lifespan=lifespan)
 
 # Configure CORS - allow all origins for development
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware,  # ty: ignore[invalid-argument-type]
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -552,17 +552,17 @@ async def broadcast_resync(user_uid: str) -> None:
 
 
 # Make broadcast functions available to routes
-users.broadcast_user_event = broadcast_user_event
-sanctions.broadcast_sanction_event = broadcast_sanction_event
-sanctions.broadcast_tournament_event = broadcast_tournament_event
-tournaments.broadcast_tournament_event = broadcast_tournament_event
-tournaments.broadcast_user_event = broadcast_user_event
-tournaments.broadcast_sanction_event = broadcast_sanction_event
-tournaments.broadcast_deck_event = broadcast_precomputed
-tournaments.broadcast_judge_call = broadcast_judge_call
-leagues.broadcast_league_event = broadcast_league_event
-users.broadcast_resync = broadcast_resync
-vekn.broadcast_resync = broadcast_resync
+users.broadcast_user_event = broadcast_user_event  # ty: ignore[invalid-assignment]
+sanctions.broadcast_sanction_event = broadcast_sanction_event  # ty: ignore[invalid-assignment]
+sanctions.broadcast_tournament_event = broadcast_tournament_event  # ty: ignore[invalid-assignment]
+tournaments.broadcast_tournament_event = broadcast_tournament_event  # ty: ignore[invalid-assignment]
+tournaments.broadcast_user_event = broadcast_user_event  # ty: ignore[invalid-assignment]
+tournaments.broadcast_sanction_event = broadcast_sanction_event  # ty: ignore[invalid-assignment]
+tournaments.broadcast_deck_event = broadcast_precomputed  # ty: ignore[invalid-assignment]
+tournaments.broadcast_judge_call = broadcast_judge_call  # ty: ignore[invalid-assignment]
+leagues.broadcast_league_event = broadcast_league_event  # ty: ignore[invalid-assignment]
+users.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
+vekn.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
 
 
 @app.options("/stream")
@@ -748,7 +748,7 @@ async def stream_updates(
                         # Own user profile at full level
                         row = await (
                             await db_conn.execute(
-                                "SELECT \"full\"::text FROM objects WHERE uid = %s AND type = %s",
+                                'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s',
                                 (stream_user.uid, ObjectType.USER),
                             )
                         ).fetchone()
@@ -759,7 +759,7 @@ async def stream_updates(
                         # Own decks at full level (even if member=null)
                         rows = await (
                             await db_conn.execute(
-                                "SELECT \"full\"::text FROM objects WHERE type = %s "
+                                'SELECT "full"::text FROM objects WHERE type = %s '
                                 "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
                                 (ObjectType.DECK, stream_user.uid),
                             )
@@ -777,7 +777,7 @@ async def stream_updates(
                             # Same-country users
                             rows = await (
                                 await db_conn.execute(
-                                    "SELECT \"full\"::text FROM objects WHERE type = %s "
+                                    'SELECT "full"::text FROM objects WHERE type = %s '
                                     "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
                                     (ObjectType.USER, stream_user.country),
                                 )
@@ -792,7 +792,7 @@ async def stream_updates(
                             # Same-country tournaments
                             rows = await (
                                 await db_conn.execute(
-                                    "SELECT \"full\"::text FROM objects WHERE type = %s "
+                                    'SELECT "full"::text FROM objects WHERE type = %s '
                                     "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
                                     (ObjectType.TOURNAMENT, stream_user.country),
                                 )
@@ -807,7 +807,7 @@ async def stream_updates(
                         # Organizer: full for organized tournaments + their decks
                         rows = await (
                             await db_conn.execute(
-                                "SELECT uid, \"full\"::text FROM objects WHERE type = %s "
+                                'SELECT uid, "full"::text FROM objects WHERE type = %s '
                                 "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
                                 (ObjectType.TOURNAMENT, stream_user.uid),
                             )
@@ -824,7 +824,7 @@ async def stream_updates(
                             placeholders = ", ".join(["%s"] * len(t_uids))
                             deck_rows = await (
                                 await db_conn.execute(
-                                    f"SELECT \"full\"::text FROM objects WHERE type = %s "
+                                    f'SELECT "full"::text FROM objects WHERE type = %s '  # ty: ignore[invalid-argument-type]
                                     f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
                                     f"AND deleted_at IS NULL",
                                     (ObjectType.DECK, *t_uids),

@@ -928,7 +928,10 @@ async def tournament_action(
 
         # Save within the same transaction (row is still locked)
         tournament_bd = await save_object(
-            ObjectType.TOURNAMENT, updated.uid, msgspec.to_builtins(updated), conn=tx_conn
+            ObjectType.TOURNAMENT,
+            updated.uid,
+            msgspec.to_builtins(updated),
+            conn=tx_conn,
         )
         pre_state = tournament.state
 
@@ -1297,7 +1300,10 @@ async def _save_timer_tx(tournament: Tournament, tx_conn) -> BroadcastData:
     """Save within transaction. Returns BroadcastData for broadcasting after commit."""
     tournament.modified = datetime.now(UTC)
     return await save_object(
-        ObjectType.TOURNAMENT, tournament.uid, msgspec.to_builtins(tournament), conn=tx_conn
+        ObjectType.TOURNAMENT,
+        tournament.uid,
+        msgspec.to_builtins(tournament),
+        conn=tx_conn,
     )
 
 
@@ -1310,6 +1316,7 @@ async def timer_start(
     user = await _check_organizer(authorization)
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
+        assert tournament is not None
         if not tournament.timer.paused:
             raise HTTPException(status_code=400, detail="Timer is already running")
         tournament.timer = TimerState(
@@ -1332,6 +1339,7 @@ async def timer_pause(
     user = await _check_organizer(authorization)
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
+        assert tournament is not None
         if tournament.timer.paused:
             raise HTTPException(status_code=400, detail="Timer is already paused")
         elapsed = 0.0
@@ -1356,6 +1364,7 @@ async def timer_reset(
     user = await _check_organizer(authorization)
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
+        assert tournament is not None
         tournament.timer = TimerState()
         tournament.table_extra_time = {}
         tournament.table_paused_at = {}
@@ -1380,6 +1389,7 @@ async def timer_add_time(
     user = await _check_organizer(authorization)
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
+        assert tournament is not None
         if tournament.time_extension_policy not in (
             TimeExtensionPolicy.ADDITIONS,
             TimeExtensionPolicy.BOTH,
@@ -1415,6 +1425,7 @@ async def timer_clock_stop(
     user = await _check_organizer(authorization)
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
+        assert tournament is not None
         if tournament.time_extension_policy not in (
             TimeExtensionPolicy.CLOCK_STOP,
             TimeExtensionPolicy.BOTH,
@@ -1443,6 +1454,7 @@ async def timer_clock_resume(
     user = await _check_organizer(authorization)
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
+        assert tournament is not None
         if tournament.time_extension_policy not in (
             TimeExtensionPolicy.CLOCK_STOP,
             TimeExtensionPolicy.BOTH,

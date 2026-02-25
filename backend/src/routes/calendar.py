@@ -43,6 +43,7 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     if t.finish:
         dtend = _format_dt(t.finish)
     else:
+        assert t.start is not None
         start_dt = t.start if t.start.tzinfo else t.start.replace(tzinfo=UTC)
         dtend = (start_dt + timedelta(hours=8)).strftime("%Y%m%dT%H%M%SZ")
 

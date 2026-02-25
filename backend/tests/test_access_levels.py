@@ -82,6 +82,7 @@ class TestUserPublic:
         """Public projection should not include member-only fields."""
         user = _make_user(roles=["NC"])
         result = compute_public(ObjectType.USER, user)
+        assert result is not None
         assert "vekn_id" not in result
         assert "city" not in result
         assert "nickname" not in result
@@ -120,6 +121,7 @@ class TestUserMember:
         """Member projection includes name, country, vekn_id, city, etc."""
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
+        assert result is not None
         assert result["name"] == "Alice"
         assert result["country"] == "FR"
         assert result["vekn_id"] == "1000001"
@@ -131,6 +133,7 @@ class TestUserMember:
         """Member projection includes embedded rating data."""
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
+        assert result is not None
         assert result["constructed_online"] == {"total": 100, "tournaments": []}
         assert result["wins"] == ["t-001"]
 
@@ -138,6 +141,7 @@ class TestUserMember:
         """Member projection does not include contact info."""
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
+        assert result is not None
         assert "contact_email" not in result
         assert "contact_discord" not in result
         assert "contact_phone" not in result
@@ -146,6 +150,7 @@ class TestUserMember:
         """Member projection excludes internal sync/admin fields."""
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
+        assert result is not None
         assert "coopted_by" not in result
         assert "coopted_at" not in result
         assert "vekn_synced" not in result
@@ -243,6 +248,7 @@ class TestTournamentPublic:
         """Public projection only has core scheduling fields."""
         t = _make_tournament()
         result = compute_public(ObjectType.TOURNAMENT, t)
+        assert result is not None
         assert result["uid"] == "t-001"
         assert result["name"] == "Paris Open"
         assert result["state"] == "Playing"
@@ -252,6 +258,7 @@ class TestTournamentPublic:
         """Public projection excludes organizer details, checkin code, etc."""
         t = _make_tournament()
         result = compute_public(ObjectType.TOURNAMENT, t)
+        assert result is not None
         assert "organizers_uids" not in result
         assert "checkin_code" not in result
         assert "players" not in result
@@ -271,6 +278,7 @@ class TestTournamentMember:
         """Member projection includes nearly everything."""
         t = _make_tournament()
         result = compute_member(ObjectType.TOURNAMENT, t)
+        assert result is not None
         assert result["organizers_uids"] == ["u-org1"]
         assert result["description"] == "A fun tournament"
         assert result["players"] == []
@@ -280,12 +288,14 @@ class TestTournamentMember:
         """Member projection strips checkin_code."""
         t = _make_tournament(checkin_code="secret123")
         result = compute_member(ObjectType.TOURNAMENT, t)
+        assert result is not None
         assert "checkin_code" not in result
 
     def test_excludes_vekn_pushed_at(self):
         """Member projection strips vekn_pushed_at."""
         t = _make_tournament(vekn_pushed_at="2026-02-01T00:00:00")
         result = compute_member(ObjectType.TOURNAMENT, t)
+        assert result is not None
         assert "vekn_pushed_at" not in result
 
 
@@ -341,6 +351,7 @@ class TestSanction:
         """Members see full sanction data."""
         s = _make_sanction()
         result = compute_member(ObjectType.SANCTION, s)
+        assert result is not None
         assert result["uid"] == "s-001"
         assert result["level"] == "warning"
         assert result["description"] == "Minor rules violation"
@@ -348,7 +359,9 @@ class TestSanction:
     def test_full_same_as_member(self):
         """Full projection is identical to member for sanctions."""
         s = _make_sanction()
-        assert compute_member(ObjectType.SANCTION, s) == compute_full(ObjectType.SANCTION, s)
+        assert compute_member(ObjectType.SANCTION, s) == compute_full(
+            ObjectType.SANCTION, s
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +454,7 @@ class TestLeague:
         """Leagues are fully visible at all levels."""
         lg = _make_league()
         result = compute_public(ObjectType.LEAGUE, lg)
+        assert result is not None
         assert result["name"] == "French National League"
         assert result["organizers_uids"] == ["u-nc-fr"]
 

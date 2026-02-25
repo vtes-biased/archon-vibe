@@ -447,7 +447,7 @@ async def save_object_from_model(
             if hasattr(deleted_at, "isoformat")
             else str(deleted_at)
         )
-    return await save_object(obj_type, obj.uid, full_data, deleted_at=deleted_at)
+    return await save_object(obj_type, obj.uid, full_data, deleted_at=deleted_at)  # ty: ignore[unresolved-attribute]
 
 
 async def delete_object(
@@ -478,7 +478,7 @@ async def get_object(uid: str, *, level: str = "full") -> dict | None:
     col = _level_col(level)
     async with get_connection() as conn:
         result = await conn.execute(
-            f"SELECT {col} FROM objects WHERE uid = %s",
+            f"SELECT {col} FROM objects WHERE uid = %s",  # ty: ignore[invalid-argument-type]
             (uid,),
         )
         row = await result.fetchone()
@@ -510,7 +510,10 @@ async def get_objects_by_type(
         query += f" AND {where}"
     all_params = (obj_type, *params)
     async with get_connection() as conn:
-        result = await conn.execute(query, all_params)
+        result = await conn.execute(
+            query,  # ty: ignore[invalid-argument-type]
+            all_params,
+        )
         rows = await result.fetchall()
         return [
             row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
@@ -543,7 +546,7 @@ async def stream_objects_new(
     async with _pool.connection() as conn:
         rows = await (
             await conn.execute(
-                f"SELECT {col}::text, modified_at FROM objects "
+                f"SELECT {col}::text, modified_at FROM objects "  # ty: ignore[invalid-argument-type]
                 f"WHERE {where} ORDER BY modified_at ASC",
                 tuple(params),
             )
@@ -1215,11 +1218,11 @@ async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[s
     async with get_connection() as conn:
         placeholders = ", ".join(["%s"] * len(user_uids))
         result = await conn.execute(
-            f"""SELECT uid, "full"->>'winner' AS winner FROM objects
-            WHERE type = 'tournament'
-              AND "full"->>'state' = 'Finished'
-              AND "full"->>'winner' IN ({placeholders})
-              AND deleted_at IS NULL""",
+            f"SELECT uid, \"full\"->>'winner' AS winner FROM objects "  # ty: ignore[invalid-argument-type]
+            f"WHERE type = 'tournament' "
+            f"AND \"full\"->>'state' = 'Finished' "
+            f"AND \"full\"->>'winner' IN ({placeholders}) "
+            f"AND deleted_at IS NULL",
             tuple(user_uids),
         )
         rows = await result.fetchall()

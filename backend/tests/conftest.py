@@ -35,8 +35,8 @@ def _ensure_test_db_exists() -> None:
         ).fetchone()
         if not exists:
             conn.execute(
-                psycopg.sql.SQL("CREATE DATABASE {}").format(
-                    psycopg.sql.Identifier(db_name)
+                psycopg.sql.SQL("CREATE DATABASE {}").format(  # ty: ignore[possibly-missing-attribute]
+                    psycopg.sql.Identifier(db_name)  # ty: ignore[possibly-missing-attribute]
                 )
             )
 

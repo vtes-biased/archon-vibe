@@ -65,7 +65,7 @@ async def generate_snapshots() -> dict[str, int]:
                     col = f'"{level}"'
                     async with _pool.connection() as conn:
                         result = await conn.execute(
-                            f"SELECT {col}::text, modified_at FROM objects "
+                            f"SELECT {col}::text, modified_at FROM objects "  # ty: ignore[invalid-argument-type]
                             f"WHERE type = %s AND deleted_at IS NULL AND {col} IS NOT NULL "
                             f"ORDER BY modified_at ASC",
                             (obj_type,),

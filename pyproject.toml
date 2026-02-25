@@ -67,16 +67,9 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ty]
-# Many rules produce false positives due to:
-# - archon_engine: Rust PyO3 module (no stubs)
-# - psycopg: LiteralString requirement for f-string queries
-# - msgspec.Struct: not recognized as dataclass
-# - Optional narrowing: ty doesn't track assert-based narrowing in tests
+# engine/ contains archon_engine.pyi stub for the Rust PyO3 module
+[tool.ty.environment]
+extra-paths = ["engine"]
+# msgspec.Struct not recognized as dataclass — always false positive
 [tool.ty.rules]
-invalid-argument-type = "warn"    # psycopg LiteralString + argon2 false positives
-dataclass-field-order = "ignore"  # msgspec.Struct, not dataclass
-invalid-assignment = "warn"       # module-level broadcast callback pattern
-not-subscriptable = "warn"        # dict|None narrowing in tests
-unsupported-operator = "warn"     # dict|None and datetime ops
-unresolved-attribute = "warn"     # msgspec.Struct attrs + Tournament|None narrowing
-unresolved-import = "warn"        # archon_engine is a Rust PyO3 module (no stubs)
+dataclass-field-order = "ignore"

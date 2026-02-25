@@ -19,6 +19,7 @@ from .db import (
 )
 from .models import (
     FinalsTable,
+    ObjectType,
     PaymentStatus,
     Player,
     PlayerState,
@@ -470,7 +471,7 @@ async def apply_archon_import(
         tournament.modified = datetime.now(UTC)
 
         tournament_bd = await save_object(
-            "tournament",
+            ObjectType.TOURNAMENT,
             tournament.uid,
             msgspec.to_builtins(tournament),
             conn=tx_conn,

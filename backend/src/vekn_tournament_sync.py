@@ -215,7 +215,7 @@ async def _build_users_by_vekn_id() -> dict[str, User]:
         cursor = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = %s AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != ''""",
-            (ObjectType.USER,)
+            (ObjectType.USER,),
         )
         rows = await cursor.fetchall()
         for row in rows:

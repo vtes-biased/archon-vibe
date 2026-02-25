@@ -12,6 +12,7 @@ from src.models import (
     Player,
     Tournament,
     TournamentFormat,
+    TournamentRank,
     TournamentState,
 )
 from src.routes.calendar import (
@@ -34,7 +35,7 @@ def _make_tournament(
     organizers_uids: list[str] | None = None,
     players: list[Player] | None = None,
     online: bool = False,
-    rank: str = "Basic",
+    rank: TournamentRank = TournamentRank.BASIC,
     start: datetime | None = None,
     finish: datetime | None = None,
     **kwargs,
@@ -94,11 +95,11 @@ class TestMatchesAgenda:
 
     def test_nc_same_continent(self):
         """National Championship on same continent should match."""
-        t = _make_tournament(country="DE", rank="National Championship")
+        t = _make_tournament(country="DE", rank=TournamentRank.NC)
         assert _matches_agenda(t, "user1", "FR", ["FR", "DE", "ES"]) is True
 
     def test_cc_same_continent(self):
-        t = _make_tournament(country="DE", rank="Continental Championship")
+        t = _make_tournament(country="DE", rank=TournamentRank.CC)
         assert _matches_agenda(t, "user1", "FR", ["FR", "DE"]) is True
 
     def test_basic_different_country_no_match(self):
@@ -108,7 +109,7 @@ class TestMatchesAgenda:
 
     def test_nc_different_continent_no_match(self):
         """NC tournament on different continent should not match."""
-        t = _make_tournament(country="US", rank="National Championship")
+        t = _make_tournament(country="US", rank=TournamentRank.NC)
         assert _matches_agenda(t, "user1", "FR", ["FR", "DE"]) is False
 
     def test_no_user_country(self):

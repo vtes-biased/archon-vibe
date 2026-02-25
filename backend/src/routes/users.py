@@ -169,7 +169,7 @@ async def list_users() -> Response:
             """SELECT "full" FROM objects
             WHERE type = %s AND "full"->>'name' IS NOT NULL
             ORDER BY modified_at DESC""",
-            (ObjectType.USER,)
+            (ObjectType.USER,),
         )
         rows = await cursor.fetchall()
 
