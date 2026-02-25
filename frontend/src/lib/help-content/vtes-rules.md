@@ -336,7 +336,7 @@ Retainer cards are burned when their last life is burned, or when the minion the
 
 **Political action cards:** A political action card can be played to call a referendum as an action, or it can be burned during a referendum [to gain a vote](#political-action-cards).
 Only vampires can play political action cards.
-Political action cards can be identified through this icon <INSERT POLITICAL ACTION ICON>.
+Political action cards can be identified through this icon <span class="vtes-d">2</span>.
 
 ![](/help/rules/image25.png)
 
@@ -795,13 +795,11 @@ If the card describes a special version of a basic action, then all the rules th
 
 ## SUMMARY OF THE COURSE OF AN ACTION
 
-**1.
-Action is announced:** Play the card for the action or indicate another effect (card in play, basic bleed or hunt) used to announce the action and lock the minion who is performing the action.
+**1. Action is announced:** Play the card for the action or indicate another effect (card in play, basic bleed or hunt) used to announce the action and lock the minion who is performing the action.
 
 Some cards are played "as the action is announced”, those cards must be played before regular action modifier cards and reaction cards.
 
-**2.
-Target Methuselah(s) may try to block** the action with any of their ready unlocked minions or if the action does not target another Methuselah, or targets a card controlled by the acting Methuselah, then the minions of the prey and predator may try to block.
+**2. Target Methuselah(s) may try to block** the action with any of their ready unlocked minions or if the action does not target another Methuselah, or targets a card controlled by the acting Methuselah, then the minions of the prey and predator may try to block.
 
 - If a **block attempt is unsuccessful**, another attempt can be made.
 - If a **block attempt is successful**, then the blocking minion locks and enters combat with the acting minion.
@@ -815,8 +813,7 @@ Also remember that the same minion cannot play the same action modifier or react
 
 ![](/help/rules/image42.png)
 
-**1.
-Announce the Action**
+**1. Announce the Action**
 
 All details of the action are defined when the action is announced, including the target(s), the cost, the effects, and so on.
 Any card required for the action is played (face up) at this time, but is temporarily set aside (out of play) until the action resolves.
@@ -832,8 +829,7 @@ Some cards are played "as the action is announced”, those cards must be played
 > *After resolving that action (successful or not), Sarah decides that another of her unlocked minions, The Dowager, will recruit an ally, the Underbridge Stray, from her hand.
 > She locks The Dowager and plays the Underbridge Stray, announcing: "The Dowager recruits the Underbridge Stray at +1 stealth, costing The Dowager 1 blood." (The blood is not paid until the action succeeds.)*
 
-**2.
-Resolve Any Block Attempts**
+**2. Resolve Any Block Attempts**
 
 **Who May Attempt to Block**
 
@@ -928,8 +924,7 @@ Once all Methuselahs have declined to block, the impulse goes back to the acting
 > There is no current block attempt"
 > 3. once every Methuselah has passed, the action is successful and resolves
 
-**3.
-Resolve the Action**
+**3. Resolve the Action**
 
 If the action is successful (all block attempts were unsuccessful), then the cost of the action is paid and the effects of the successful action take place.
 
@@ -954,19 +949,16 @@ Politics come into play when a vampire performs a political action or when a blo
 If a political action is successful, its cost is paid, and the referendum is called.
 The referendum consists of three steps:
 
-**1.
-Choose the terms**, if any, of the referendum.
+**1. Choose the terms**, if any, of the referendum.
 
-**2.
-Polling:** Cards that are usable "during the polling step" but "before votes and ballots are cast" are used at this time.
+**2. Polling:** Cards that are usable "during the polling step" but "before votes and ballots are cast" are used at this time.
 Then, all Methuselahs may now cast any votes and ballots they have (see below) at this time, in any order.
 They call out their votes and ballots freely, and there is no obligation to cast votes or ballots.
 Once a vote or a ballot has been cast, however, it cannot be changed.
 The polling stage is completed only when all Methuselahs are finished casting votes and ballots.
 If you need a time limit, the Methuselahs can agree to wait 15 seconds after the last vote or ballot cast to close the polling stage.
 
-**3.
-Resolve the Referendum:** If there are more votes for the referendum than against, it passes, and the effects take place.
+**3. Resolve the Referendum:** If there are more votes for the referendum than against, it passes, and the effects take place.
 Otherwise, the referendum fails and has no effect.
 Tied referendums fail.
 
@@ -1025,39 +1017,30 @@ The two minions being involved in combat are called **combatants**; each one of 
 Combat occurs in a series of one or more rounds.
 Each round of combat has seven steps:
 
-**1.
-Before Range:** Play cards before range is chosen.
+**1. Before Range:** Play cards before range is chosen.
 
-**2.
-Determine Range:** Use maneuvers to change the range to close or long.
+**2. Determine Range:** Use maneuvers to change the range to close or long.
 
-**3.
-Before Strikes:** Play cards before strikes are chosen.
+**3. Before Strikes:** Play cards before strikes are chosen.
 
-**4.
-Strike:** Announce and resolve strikes.
+**4. Strike:** Announce and resolve strikes.
 
-**5.
-Damage Resolution:** Prevent and mend damage.
+**5. Damage Resolution:** Prevent and mend damage.
 
-**6.
-Press:** Use presses to continue into another round or to end combat.
+**6. Press:** Use presses to continue into another round or to end combat.
 
-**7.
-End of Round:** End of round cards and effects are played here.
+**7. End of Round:** End of round cards and effects are played here.
 
 The acting minion always gets first opportunity to use cards or effects before the opposing minion at every stage of combat.
 
-**1.
-Before Range**
+**1. Before Range**
 
 Some cards or effects will be played before range is determined.
 This is clearly stated upon those cards.
 
 **Note:** Effects that are played "before range is determined" must be played before the acting minion decides whether or not to play a maneuver.
 
-**2.
-Determine Range**
+**2. Determine Range**
 
 Each round of combat is fought at either close range or long range.
 Close range is the default for each round.
@@ -1087,13 +1070,11 @@ Typically, a minion that can attack at long range will want to maneuver to long 
 > However, Ayelech has another maneuver card as well, and she plays it to move back to long range.
 > Colette has no more maneuvers to play, so the range is set to long.*
 
-**3.
-Before strikes are chosen**
+**3. Before strikes are chosen**
 
 Some combat cards are only playable after range has been set but before strikes have been chosen.
 
-**4.
-Strike**
+**4. Strike**
 
 During the strike step, the minions strike each other or make an effort to avoid being struck.
 
@@ -1132,7 +1113,9 @@ This is true at any point during combat, not just during strike resolution.
 
 > **ADVANCED RULES**\
 > \
-> If a strike card is cancelled, the minion who played it must choose a strike, which might come from another strike card.\
+> If a strike card is cancelled, the minion who played it must choose a strike, which might come from another strike card.
+
+> **ADVANCED RULES**\
 > \
 > **Additional Strikes:** Some cards and effects allow a minion to make additional strikes during the current round of combat.
 > Additional strikes are announced and performed only after the first pair of strikes is completed.
@@ -1159,8 +1142,7 @@ This is true at any point during combat, not just during strike resolution.
 > Flávio Gonçalves then uses his hands one more time, and Wauneka cannot use a strike because he had only 1 additional strike.
 > Wauneka takes 1 more damage.*
 
-**5.
-Damage Resolution**
+**5. Damage Resolution**
 
 Damage resolution has two steps: prevent damage and mend damage.
 
@@ -1217,8 +1199,7 @@ They do not go through torpor first.
 
 Immune to damage: if a minion is immune to damage from a source, any unprevented damage from that source that is inflicted on the minion is inflicted unsuccessfully: the minion does not have to burn blood or life to mend the damage or to prevent destruction, nor become wounded because of damage.
 
-**6.
-Press**
+**6. Press**
 
 At the end of a round of combat, if both combatants are still ready, the combatants will either go their separate ways or one of them will give chase.
 Presses can be used to continue combat or to end combat by cancelling a press to continue.
@@ -1229,8 +1210,7 @@ A minion cannot play two presses in a row (which would effectively cancel each o
 
 If there is an uncancelled press to continue, then another round of combat begins.
 
-**7.
-End of Round**
+**7. End of Round**
 
 In this step you use the combat cards or other effects that are only usable at the end of a round of combat, after the press step.
 
@@ -1692,7 +1672,7 @@ There may be other Traits that allow vampires and minions to play cards.
 <span class="vtes-ref"><img src="/help/rules/legacy-pool.png" class="inline-icon" alt="Pool Cost" /> Pool Cost</span>
 </div>
 
-# 8.Glossaries
+# 8. Glossaries
 
 ## VAMPIRE: THE ETERNAL STRUGGLE
 
@@ -2014,7 +1994,7 @@ These Traditions are laws that protect the vampires from mortals and from one an
 
 # 9. Quick Reference
 
-**DISCIPLINES**
+## DISCIPLINES
 
 <div class="vtes-icon-grid">
 <span class="vtes-ref"><span class="vtes-d">i</span><span class="vtes-d">I</span> Animalism</span>
