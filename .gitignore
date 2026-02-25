@@ -49,6 +49,7 @@ Thumbs.db
 .env.local
 
 # Frontend
+package-lock.json
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/

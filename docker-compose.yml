@@ -58,7 +58,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: [ "sh", "-c", "uv sync --frozen --all-extras && uv run python backend/scripts/populate_test_db.py" ]
+    command: [ "sh", "-c", "uv sync --frozen --dev && uv run python backend/scripts/populate_test_db.py" ]
     profiles:
       - test
 
