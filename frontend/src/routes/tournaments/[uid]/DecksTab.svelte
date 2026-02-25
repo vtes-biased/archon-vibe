@@ -110,6 +110,9 @@
     return false;
   });
 
+  // Single-deck: player can edit before first round or after tournament ends
+  const singleDeckEditable = $derived(roundCount === 0 || tournament.state === 'Finished');
+
   // Organizer deck visibility: hide contents until the round for this deck has started
   function isDeckVisibleToOrganizer(slotIdx: number): boolean {
     if (tournament.state === 'Finished') return true;
@@ -262,7 +265,7 @@
     {:else}
       <!-- Single-deck -->
       <div class="bg-ash-900/50 rounded-lg">
-        {#if myDecks.length > 0 && myDecks[0] && !canPlayerUpload && uploadingFor !== myUid}
+        {#if myDecks.length > 0 && myDecks[0] && uploadingFor !== myUid}
           <button
             class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
             onclick={() => { const next = new Set(expandedDecks); if (next.has('my')) next.delete('my'); else next.add('my'); expandedDecks = next; }}
@@ -275,16 +278,16 @@
           </button>
           {#if expandedDecks.has('my')}
             <div class="px-3 pb-3 sm:px-4 sm:pb-4" transition:slide={{ duration: 150 }}>
-              <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} format={tournament.format} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} ondelete={canPlayerDelete ? () => deleteDeck(myUid) : undefined} />
+              <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => deleteDeck(myUid) : undefined} />
             </div>
           {/if}
         {:else}
           <div class="p-3 sm:p-4">
             <h3 class="text-sm font-semibold text-bone-200 mb-3">{m.decks_my_deck()}</h3>
-            {#if canPlayerUpload && (uploadingFor === myUid || myDecks.length === 0)}
+            {#if singleDeckEditable && (uploadingFor === myUid || myDecks.length === 0)}
               <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
             {:else if myDecks.length > 0 && myDecks[0]}
-              <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} format={tournament.format} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} ondelete={canPlayerDelete ? () => deleteDeck(myUid) : undefined} />
+              <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => deleteDeck(myUid) : undefined} />
             {:else}
               <p class="text-sm text-ash-400">{m.decks_no_deck_yet()}</p>
             {/if}
