@@ -29,6 +29,7 @@ from .db import (
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .models import (
     DataLevel,
+    ObjectType,
     Role,
     Sanction,
     User,
@@ -468,9 +469,9 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
                 msg = full_msg
             elif viewer.vekn_id:
                 # Member level — but check personal overlay
-                if bd.obj_type == "user" and bd.uid == viewer.uid:
+                if bd.obj_type == ObjectType.USER and bd.uid == viewer.uid:
                     msg = full_msg  # Own profile
-                elif bd.obj_type == "deck" and bd.obj_user_uid == viewer.uid:
+                elif bd.obj_type == ObjectType.DECK and bd.obj_user_uid == viewer.uid:
                     msg = full_msg  # Own deck
                 else:
                     msg = mem_msg
@@ -648,7 +649,7 @@ async def get_snapshot(token: str | None = None) -> Response:
 # ---------------------------------------------------------------------------
 # SSE stream types for catch-up
 # ---------------------------------------------------------------------------
-_STREAM_TYPES = ["user", "tournament", "sanction", "deck", "league"]
+_STREAM_TYPES = list(ObjectType)
 
 
 @app.get("/stream")
@@ -747,8 +748,8 @@ async def stream_updates(
                         # Own user profile at full level
                         row = await (
                             await db_conn.execute(
-                                "SELECT \"full\"::text FROM objects WHERE uid = %s AND type = 'user'",
-                                (stream_user.uid,),
+                                "SELECT \"full\"::text FROM objects WHERE uid = %s AND type = %s",
+                                (stream_user.uid, ObjectType.USER),
                             )
                         ).fetchone()
                         if row and row[0]:
@@ -758,9 +759,9 @@ async def stream_updates(
                         # Own decks at full level (even if member=null)
                         rows = await (
                             await db_conn.execute(
-                                "SELECT \"full\"::text FROM objects WHERE type = 'deck' "
+                                "SELECT \"full\"::text FROM objects WHERE type = %s "
                                 "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
-                                (stream_user.uid,),
+                                (ObjectType.DECK, stream_user.uid),
                             )
                         ).fetchall()
                         if rows:
@@ -776,9 +777,9 @@ async def stream_updates(
                             # Same-country users
                             rows = await (
                                 await db_conn.execute(
-                                    "SELECT \"full\"::text FROM objects WHERE type = 'user' "
+                                    "SELECT \"full\"::text FROM objects WHERE type = %s "
                                     "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                                    (stream_user.country,),
+                                    (ObjectType.USER, stream_user.country),
                                 )
                             ).fetchall()
                             if rows:
@@ -791,9 +792,9 @@ async def stream_updates(
                             # Same-country tournaments
                             rows = await (
                                 await db_conn.execute(
-                                    "SELECT \"full\"::text FROM objects WHERE type = 'tournament' "
+                                    "SELECT \"full\"::text FROM objects WHERE type = %s "
                                     "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                                    (stream_user.country,),
+                                    (ObjectType.TOURNAMENT, stream_user.country),
                                 )
                             ).fetchall()
                             if rows:
@@ -806,9 +807,9 @@ async def stream_updates(
                         # Organizer: full for organized tournaments + their decks
                         rows = await (
                             await db_conn.execute(
-                                "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
+                                "SELECT uid, \"full\"::text FROM objects WHERE type = %s "
                                 "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
-                                (stream_user.uid,),
+                                (ObjectType.TOURNAMENT, stream_user.uid),
                             )
                         ).fetchall()
                         if rows:
@@ -823,10 +824,10 @@ async def stream_updates(
                             placeholders = ", ".join(["%s"] * len(t_uids))
                             deck_rows = await (
                                 await db_conn.execute(
-                                    f"SELECT \"full\"::text FROM objects WHERE type = 'deck' "
+                                    f"SELECT \"full\"::text FROM objects WHERE type = %s "
                                     f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
                                     f"AND deleted_at IS NULL",
-                                    tuple(t_uids),
+                                    (ObjectType.DECK, *t_uids),
                                 )
                             ).fetchall()
                             if deck_rows:

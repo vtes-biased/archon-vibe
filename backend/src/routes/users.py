@@ -22,7 +22,7 @@ from ..db import get_avatar as db_get_avatar
 from ..db import insert_user as db_insert_user
 from ..db import update_user as db_update_user
 from ..db import upsert_avatar as db_upsert_avatar
-from ..models import Role, User
+from ..models import ObjectType, Role, User
 from .auth import send_invite_email, verify_token
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -167,8 +167,9 @@ async def list_users() -> Response:
     async with get_connection() as conn:
         cursor = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'user' AND "full"->>'name' IS NOT NULL
-            ORDER BY modified_at DESC"""
+            WHERE type = %s AND "full"->>'name' IS NOT NULL
+            ORDER BY modified_at DESC""",
+            (ObjectType.USER,)
         )
         rows = await cursor.fetchall()
 

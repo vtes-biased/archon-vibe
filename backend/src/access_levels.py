@@ -5,7 +5,7 @@ All functions take a dict (full object data) and return a dict or None.
 None means the object is not visible at that access level.
 """
 
-from .models import Role
+from .models import ObjectType, Role
 
 # ---------------------------------------------------------------------------
 # User projections
@@ -187,27 +187,27 @@ def compute_league_full(d: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 _PUBLIC_DISPATCH = {
-    "user": compute_user_public,
-    "tournament": compute_tournament_public,
-    "sanction": compute_sanction_public,
-    "deck": compute_deck_public,
-    "league": compute_league_public,
+    ObjectType.USER: compute_user_public,
+    ObjectType.TOURNAMENT: compute_tournament_public,
+    ObjectType.SANCTION: compute_sanction_public,
+    ObjectType.DECK: compute_deck_public,
+    ObjectType.LEAGUE: compute_league_public,
 }
 
 _MEMBER_DISPATCH = {
-    "user": compute_user_member,
-    "tournament": compute_tournament_member,
-    "sanction": compute_sanction_member,
-    "deck": compute_deck_member,
-    "league": compute_league_member,
+    ObjectType.USER: compute_user_member,
+    ObjectType.TOURNAMENT: compute_tournament_member,
+    ObjectType.SANCTION: compute_sanction_member,
+    ObjectType.DECK: compute_deck_member,
+    ObjectType.LEAGUE: compute_league_member,
 }
 
 _FULL_DISPATCH = {
-    "user": compute_user_full,
-    "tournament": compute_tournament_full,
-    "sanction": compute_sanction_full,
-    "deck": compute_deck_full,
-    "league": compute_league_full,
+    ObjectType.USER: compute_user_full,
+    ObjectType.TOURNAMENT: compute_tournament_full,
+    ObjectType.SANCTION: compute_sanction_full,
+    ObjectType.DECK: compute_deck_full,
+    ObjectType.LEAGUE: compute_league_full,
 }
 
 

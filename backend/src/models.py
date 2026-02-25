@@ -12,6 +12,16 @@ from enum import StrEnum
 import msgspec
 
 
+class ObjectType(StrEnum):
+    """Sync object types stored in the unified objects table."""
+
+    USER = "user"
+    SANCTION = "sanction"
+    TOURNAMENT = "tournament"
+    DECK = "deck"
+    LEAGUE = "league"
+
+
 class DataLevel(StrEnum):
     """Data filtering level for SSE streaming."""
 

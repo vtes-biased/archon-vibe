@@ -10,6 +10,7 @@ from .db import (
     update_tournament,
 )
 from .models import (
+    ObjectType,
     Tournament,
     TournamentFormat,
     TournamentRank,
@@ -279,13 +280,14 @@ async def batch_push(client: VEKNAPIClient) -> dict:
         result = await conn.execute(
             """
             SELECT "full" FROM objects
-            WHERE type = 'tournament'
+            WHERE type = %s
               AND "full"->>'state' != 'Planned'
               AND deleted_at IS NULL
               AND ("full"->'external_ids'->>'vekn') IS NULL
               AND "full"->>'name' IS NOT NULL
               AND "full"->>'start' IS NOT NULL
-            """
+            """,
+            (ObjectType.TOURNAMENT,),
         )
         rows = await result.fetchall()
 
@@ -304,12 +306,13 @@ async def batch_push(client: VEKNAPIClient) -> dict:
         result = await conn.execute(
             """
             SELECT "full" FROM objects
-            WHERE type = 'tournament'
+            WHERE type = %s
               AND "full"->>'state' = 'Finished'
               AND deleted_at IS NULL
               AND "full"->>'vekn_pushed_at' IS NULL
               AND ("full"->'external_ids'->>'vekn') IS NOT NULL
-            """
+            """,
+            (ObjectType.TOURNAMENT,),
         )
         rows = await result.fetchall()
 
@@ -327,11 +330,12 @@ async def batch_push(client: VEKNAPIClient) -> dict:
         result = await conn.execute(
             """
             SELECT "full" FROM objects
-            WHERE type = 'user'
+            WHERE type = %s
               AND "full"->>'vekn_id' IS NOT NULL
               AND "full"->>'coopted_by' IS NOT NULL
               AND ("full"->>'vekn_synced')::boolean = false
-            """
+            """,
+            (ObjectType.USER,),
         )
         rows = await result.fetchall()
 

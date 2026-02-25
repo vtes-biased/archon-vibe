@@ -33,6 +33,7 @@ from ..db import (
 from ..models import (
     DeckListsMode,
     DeckObject,
+    ObjectType,
     Role,
     Sanction,
     SanctionLevel,
@@ -131,7 +132,7 @@ async def _process_deck_ops(
             deck_obj.cards = deck_data.get("cards", {})
             deck_obj.attribution = deck_data.get("attribution")
             deck_obj.public = deck_data.get("public", False)
-            bd = await save_object_from_model("deck", deck_obj)
+            bd = await save_object_from_model(ObjectType.DECK, deck_obj)
             affected.append(bd)
 
         elif op_type == "delete":
@@ -140,7 +141,7 @@ async def _process_deck_ops(
                 if d.user_uid == player_uid:
                     d.deleted_at = datetime.now(UTC)
                     d.modified = datetime.now(UTC)
-                    bd = await save_object_from_model("deck", d)
+                    bd = await save_object_from_model(ObjectType.DECK, d)
                     affected.append(bd)
 
         elif op_type == "set_public":
@@ -150,7 +151,7 @@ async def _process_deck_ops(
             if target:
                 target.public = public_val
                 target.modified = datetime.now(UTC)
-                bd = await save_object_from_model("deck", target)
+                bd = await save_object_from_model(ObjectType.DECK, target)
                 affected.append(bd)
 
     return affected
@@ -927,7 +928,7 @@ async def tournament_action(
 
         # Save within the same transaction (row is still locked)
         tournament_bd = await save_object(
-            "tournament", updated.uid, msgspec.to_builtins(updated), conn=tx_conn
+            ObjectType.TOURNAMENT, updated.uid, msgspec.to_builtins(updated), conn=tx_conn
         )
         pre_state = tournament.state
 
@@ -1296,7 +1297,7 @@ async def _save_timer_tx(tournament: Tournament, tx_conn) -> BroadcastData:
     """Save within transaction. Returns BroadcastData for broadcasting after commit."""
     tournament.modified = datetime.now(UTC)
     return await save_object(
-        "tournament", tournament.uid, msgspec.to_builtins(tournament), conn=tx_conn
+        ObjectType.TOURNAMENT, tournament.uid, msgspec.to_builtins(tournament), conn=tx_conn
     )
 
 
@@ -1739,7 +1740,7 @@ async def go_online(
         # Ensure tournament_uid is correct
         deck_data["tournament_uid"] = uid
         deck_obj = msgspec.convert(deck_data, DeckObject)
-        bd = await save_object_from_model("deck", deck_obj)
+        bd = await save_object_from_model(ObjectType.DECK, deck_obj)
         if broadcast_deck_event:
             broadcast_deck_event(bd)
 

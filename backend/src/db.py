@@ -12,6 +12,7 @@ from psycopg_pool import AsyncConnectionPool
 from .models import (
     AuthMethod,
     League,
+    ObjectType,
     Sanction,
     Tournament,
     User,
@@ -22,7 +23,7 @@ from .models import (
 class BroadcastData:
     """Pre-computed broadcast data returned by save functions. No DB re-read needed."""
 
-    obj_type: str
+    obj_type: ObjectType
     uid: str
     pub_json: str | None
     mem_json: str | None
@@ -381,7 +382,7 @@ async def get_decks_for_tournament(tournament_uid: str) -> list[DeckObject]:
 
 
 async def save_object(
-    obj_type: str,
+    obj_type: ObjectType,
     uid: str,
     full_data: dict,
     *,
@@ -433,7 +434,7 @@ async def save_object(
 
 
 async def save_object_from_model(
-    obj_type: str,
+    obj_type: ObjectType,
     obj: msgspec.Struct,
 ) -> BroadcastData:
     """Save a msgspec model to the objects table."""
@@ -571,12 +572,12 @@ async def purge_deleted_objects(days: int = 30) -> int:
 
 async def insert_user(user: User) -> BroadcastData:
     """Insert a new user into the database."""
-    return await save_object_from_model("user", user)
+    return await save_object_from_model(ObjectType.USER, user)
 
 
 async def update_user(user: User) -> BroadcastData:
     """Update an existing user in the database."""
-    return await save_object_from_model("user", user)
+    return await save_object_from_model(ObjectType.USER, user)
 
 
 async def get_user_by_uid(uid: str) -> User | None:
@@ -1072,12 +1073,12 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
 
 async def insert_sanction(sanction: Sanction) -> BroadcastData:
     """Insert a new sanction into the database."""
-    return await save_object_from_model("sanction", sanction)
+    return await save_object_from_model(ObjectType.SANCTION, sanction)
 
 
 async def update_sanction(sanction: Sanction) -> BroadcastData:
     """Update an existing sanction in the database."""
-    return await save_object_from_model("sanction", sanction)
+    return await save_object_from_model(ObjectType.SANCTION, sanction)
 
 
 async def get_sanction_by_uid(uid: str) -> Sanction | None:
@@ -1156,12 +1157,12 @@ async def delete_sanction_hard(uid: str) -> None:
 
 async def insert_tournament(tournament: Tournament) -> BroadcastData:
     """Insert a new tournament into the database."""
-    return await save_object_from_model("tournament", tournament)
+    return await save_object_from_model(ObjectType.TOURNAMENT, tournament)
 
 
 async def update_tournament(tournament: Tournament) -> BroadcastData:
     """Update an existing tournament in the database."""
-    return await save_object_from_model("tournament", tournament)
+    return await save_object_from_model(ObjectType.TOURNAMENT, tournament)
 
 
 async def get_tournament_by_uid(uid: str) -> Tournament | None:
@@ -1254,12 +1255,12 @@ async def get_finished_tournaments_for_category(
 
 async def insert_league(league: League) -> BroadcastData:
     """Insert a new league into the database."""
-    return await save_object_from_model("league", league)
+    return await save_object_from_model(ObjectType.LEAGUE, league)
 
 
 async def update_league(league: League) -> BroadcastData:
     """Update an existing league in the database."""
-    return await save_object_from_model("league", league)
+    return await save_object_from_model(ObjectType.LEAGUE, league)
 
 
 async def get_league_by_uid(uid: str) -> League | None:

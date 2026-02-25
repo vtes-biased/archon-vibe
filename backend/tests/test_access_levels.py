@@ -2,6 +2,7 @@
 
 import pytest
 from src.access_levels import compute_full, compute_member, compute_public
+from src.models import ObjectType
 
 # ---------------------------------------------------------------------------
 # User fixtures
@@ -53,12 +54,12 @@ class TestUserPublic:
     def test_regular_user_hidden(self):
         """Regular users (no NC/Prince role) are hidden at public level."""
         user = _make_user(roles=[])
-        assert compute_public("user", user) is None
+        assert compute_public(ObjectType.USER, user) is None
 
     def test_nc_user_visible(self):
         """NC users get a public representation with contact info."""
         user = _make_user(roles=["NC"], vekn_prefix="100")
-        result = compute_public("user", user)
+        result = compute_public(ObjectType.USER, user)
         assert result is not None
         assert result["uid"] == "u-001"
         assert result["name"] == "Alice"
@@ -73,14 +74,14 @@ class TestUserPublic:
     def test_prince_user_visible(self):
         """Prince users get a public representation."""
         user = _make_user(roles=["Prince"])
-        result = compute_public("user", user)
+        result = compute_public(ObjectType.USER, user)
         assert result is not None
         assert result["roles"] == ["Prince"]
 
     def test_public_excludes_member_fields(self):
         """Public projection should not include member-only fields."""
         user = _make_user(roles=["NC"])
-        result = compute_public("user", user)
+        result = compute_public(ObjectType.USER, user)
         assert "vekn_id" not in result
         assert "city" not in result
         assert "nickname" not in result
@@ -92,12 +93,12 @@ class TestUserPublic:
     def test_ic_user_without_nc_prince_hidden(self):
         """IC user without NC/Prince role is hidden at public level."""
         user = _make_user(roles=["IC"])
-        assert compute_public("user", user) is None
+        assert compute_public(ObjectType.USER, user) is None
 
     def test_deleted_user_preserves_deleted_at(self):
         """Deleted NC user still has deleted_at in public projection."""
         user = _make_user(roles=["NC"], deleted_at="2026-02-01T00:00:00")
-        result = compute_public("user", user)
+        result = compute_public(ObjectType.USER, user)
         assert result is not None
         assert result["deleted_at"] == "2026-02-01T00:00:00"
 
@@ -111,14 +112,14 @@ class TestUserMember:
     def test_all_users_visible(self):
         """All users are visible at member level."""
         user = _make_user(roles=[])
-        result = compute_member("user", user)
+        result = compute_member(ObjectType.USER, user)
         assert result is not None
         assert result["uid"] == "u-001"
 
     def test_includes_identity_fields(self):
         """Member projection includes name, country, vekn_id, city, etc."""
         user = _make_user()
-        result = compute_member("user", user)
+        result = compute_member(ObjectType.USER, user)
         assert result["name"] == "Alice"
         assert result["country"] == "FR"
         assert result["vekn_id"] == "1000001"
@@ -129,14 +130,14 @@ class TestUserMember:
     def test_includes_rating_fields(self):
         """Member projection includes embedded rating data."""
         user = _make_user()
-        result = compute_member("user", user)
+        result = compute_member(ObjectType.USER, user)
         assert result["constructed_online"] == {"total": 100, "tournaments": []}
         assert result["wins"] == ["t-001"]
 
     def test_excludes_contact_info(self):
         """Member projection does not include contact info."""
         user = _make_user()
-        result = compute_member("user", user)
+        result = compute_member(ObjectType.USER, user)
         assert "contact_email" not in result
         assert "contact_discord" not in result
         assert "contact_phone" not in result
@@ -144,7 +145,7 @@ class TestUserMember:
     def test_excludes_internal_fields(self):
         """Member projection excludes internal sync/admin fields."""
         user = _make_user()
-        result = compute_member("user", user)
+        result = compute_member(ObjectType.USER, user)
         assert "coopted_by" not in result
         assert "coopted_at" not in result
         assert "vekn_synced" not in result
@@ -162,7 +163,7 @@ class TestUserFull:
     def test_includes_everything_except_calendar_token(self):
         """Full projection includes everything except calendar_token."""
         user = _make_user()
-        result = compute_full("user", user)
+        result = compute_full(ObjectType.USER, user)
         assert result["contact_email"] == "alice@example.com"
         assert result["coopted_by"] == "u-prince"
         assert result["resync_after"] is None
@@ -171,7 +172,7 @@ class TestUserFull:
     def test_calendar_token_stripped(self):
         """Calendar token is always stripped from full projection."""
         user = _make_user(calendar_token="secret123")
-        result = compute_full("user", user)
+        result = compute_full(ObjectType.USER, user)
         assert "calendar_token" not in result
 
 
@@ -241,7 +242,7 @@ class TestTournamentPublic:
     def test_minimal_fields_only(self):
         """Public projection only has core scheduling fields."""
         t = _make_tournament()
-        result = compute_public("tournament", t)
+        result = compute_public(ObjectType.TOURNAMENT, t)
         assert result["uid"] == "t-001"
         assert result["name"] == "Paris Open"
         assert result["state"] == "Playing"
@@ -250,7 +251,7 @@ class TestTournamentPublic:
     def test_excludes_sensitive_fields(self):
         """Public projection excludes organizer details, checkin code, etc."""
         t = _make_tournament()
-        result = compute_public("tournament", t)
+        result = compute_public(ObjectType.TOURNAMENT, t)
         assert "organizers_uids" not in result
         assert "checkin_code" not in result
         assert "players" not in result
@@ -269,7 +270,7 @@ class TestTournamentMember:
     def test_includes_most_fields(self):
         """Member projection includes nearly everything."""
         t = _make_tournament()
-        result = compute_member("tournament", t)
+        result = compute_member(ObjectType.TOURNAMENT, t)
         assert result["organizers_uids"] == ["u-org1"]
         assert result["description"] == "A fun tournament"
         assert result["players"] == []
@@ -278,13 +279,13 @@ class TestTournamentMember:
     def test_excludes_checkin_code(self):
         """Member projection strips checkin_code."""
         t = _make_tournament(checkin_code="secret123")
-        result = compute_member("tournament", t)
+        result = compute_member(ObjectType.TOURNAMENT, t)
         assert "checkin_code" not in result
 
     def test_excludes_vekn_pushed_at(self):
         """Member projection strips vekn_pushed_at."""
         t = _make_tournament(vekn_pushed_at="2026-02-01T00:00:00")
-        result = compute_member("tournament", t)
+        result = compute_member(ObjectType.TOURNAMENT, t)
         assert "vekn_pushed_at" not in result
 
 
@@ -297,7 +298,7 @@ class TestTournamentFull:
     def test_includes_everything(self):
         """Full projection includes all fields."""
         t = _make_tournament()
-        result = compute_full("tournament", t)
+        result = compute_full(ObjectType.TOURNAMENT, t)
         assert result["checkin_code"] == "secret_checkin"
         assert result["vekn_pushed_at"] == "2026-02-01T00:00:00"
         assert result["organizers_uids"] == ["u-org1"]
@@ -334,12 +335,12 @@ class TestSanction:
     def test_public_hidden(self):
         """Sanctions are not visible at public level."""
         s = _make_sanction()
-        assert compute_public("sanction", s) is None
+        assert compute_public(ObjectType.SANCTION, s) is None
 
     def test_member_sees_full(self):
         """Members see full sanction data."""
         s = _make_sanction()
-        result = compute_member("sanction", s)
+        result = compute_member(ObjectType.SANCTION, s)
         assert result["uid"] == "s-001"
         assert result["level"] == "warning"
         assert result["description"] == "Minor rules violation"
@@ -347,7 +348,7 @@ class TestSanction:
     def test_full_same_as_member(self):
         """Full projection is identical to member for sanctions."""
         s = _make_sanction()
-        assert compute_member("sanction", s) == compute_full("sanction", s)
+        assert compute_member(ObjectType.SANCTION, s) == compute_full(ObjectType.SANCTION, s)
 
 
 # ---------------------------------------------------------------------------
@@ -377,17 +378,17 @@ class TestDeck:
     def test_public_hidden(self):
         """Decks are never visible at public level."""
         d = _make_deck()
-        assert compute_public("deck", d) is None
+        assert compute_public(ObjectType.DECK, d) is None
 
     def test_member_hidden_when_not_public(self):
         """Decks without public flag are hidden at member level."""
         d = _make_deck()
-        assert compute_member("deck", d) is None
+        assert compute_member(ObjectType.DECK, d) is None
 
     def test_member_visible_when_public(self):
         """Decks with public=True are visible at member level."""
         d = _make_deck(public=True)
-        result = compute_member("deck", d)
+        result = compute_member(ObjectType.DECK, d)
         assert result is not None
         assert result["uid"] == "d-001"
         assert result["name"] == "Ventrue Lawfirm"
@@ -396,12 +397,12 @@ class TestDeck:
     def test_member_hidden_when_public_false(self):
         """Decks with explicit public=False are hidden at member level."""
         d = _make_deck(public=False)
-        assert compute_member("deck", d) is None
+        assert compute_member(ObjectType.DECK, d) is None
 
     def test_full_visible(self):
         """Full access always sees decks."""
         d = _make_deck()
-        result = compute_full("deck", d)
+        result = compute_full(ObjectType.DECK, d)
         assert result["uid"] == "d-001"
         assert result["name"] == "Ventrue Lawfirm"
         assert result["cards"] == {"100001": 4, "100002": 2}
@@ -439,16 +440,16 @@ class TestLeague:
     def test_public_full_data(self):
         """Leagues are fully visible at all levels."""
         lg = _make_league()
-        result = compute_public("league", lg)
+        result = compute_public(ObjectType.LEAGUE, lg)
         assert result["name"] == "French National League"
         assert result["organizers_uids"] == ["u-nc-fr"]
 
     def test_all_levels_identical(self):
         """All three projections return the same data for leagues."""
         lg = _make_league()
-        pub = compute_public("league", lg)
-        mem = compute_member("league", lg)
-        full = compute_full("league", lg)
+        pub = compute_public(ObjectType.LEAGUE, lg)
+        mem = compute_member(ObjectType.LEAGUE, lg)
+        full = compute_full(ObjectType.LEAGUE, lg)
         assert pub == mem == full
 
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, Response
 
 from ..db import get_user_by_calendar_token
 from ..geonames import get_countries_on_continent
-from ..models import Tournament, TournamentState
+from ..models import ObjectType, Tournament, TournamentState
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
@@ -147,13 +147,13 @@ async def tournament_calendar(
         result = await conn.execute(
             """
             SELECT "full" FROM objects
-            WHERE type = 'tournament'
+            WHERE type = %s
               AND deleted_at IS NULL
               AND "full"->>'state' != 'Finished'
               AND ("full"->>'start' IS NULL OR ("full"->>'start')::timestamp >= %s::timestamp)
             ORDER BY "full"->>'start' ASC
             """,
-            (cutoff,),
+            (ObjectType.TOURNAMENT, cutoff),
         )
         rows = await result.fetchall()
 

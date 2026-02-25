@@ -13,11 +13,13 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .models import ObjectType
+
 logger = logging.getLogger(__name__)
 
 # Directory for snapshot files
 SNAPSHOT_DIR = Path(os.getenv("SNAPSHOT_DIR", "/tmp/archon_snapshots"))
-OBJECT_TYPES = ["user", "tournament", "sanction", "deck", "league"]
+OBJECT_TYPES = list(ObjectType)
 
 
 def _snapshot_path(level: str) -> Path:

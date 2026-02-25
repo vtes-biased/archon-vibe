@@ -14,6 +14,7 @@ from .db import (
     update_tournament,
 )
 from .models import (
+    ObjectType,
     PaymentStatus,
     Player,
     PlayerState,
@@ -213,7 +214,8 @@ async def _build_users_by_vekn_id() -> dict[str, User]:
     async with get_connection() as conn:
         cursor = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'user' AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != ''"""
+            WHERE type = %s AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != ''""",
+            (ObjectType.USER,)
         )
         rows = await cursor.fetchall()
         for row in rows:

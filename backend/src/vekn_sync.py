@@ -16,7 +16,7 @@ from .db import (
     update_user,
 )
 from .geonames import match_city
-from .models import Role, User
+from .models import ObjectType, Role, User
 from .vekn_api import VEKNAPIClient, VEKNAPIError
 
 logger = logging.getLogger(__name__)
@@ -611,10 +611,10 @@ class VEKNSyncService:
                 """
                 SELECT "full"
                 FROM objects
-                WHERE type = 'user' AND "full"->>'vekn_id' = %s
+                WHERE type = %s AND "full"->>'vekn_id' = %s
                 LIMIT 1
                 """,
-                (vekn_id,),
+                (ObjectType.USER, vekn_id),
             )
             row = await result.fetchone()
             if not row:
