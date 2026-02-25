@@ -63,7 +63,8 @@
   });
 
   function focusOnMount(node: HTMLElement) {
-    node.focus();
+    const input = node.querySelector<HTMLElement>("input:not(.hidden):not([type=hidden]), textarea, select");
+    (input ?? node).focus();
   }
 
   function openSanctionModal() {
