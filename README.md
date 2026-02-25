@@ -86,8 +86,8 @@ Install these tools before setting up the project:
 ### Setup
 
 ```bash
-git clone https://github.com/lionel-panhaleux/archon-cursor.git
-cd archon-cursor
+git clone https://github.com/vtes-biased/archon-vibe.git
+cd archon-vibe
 
 # Install all dependencies (Python, Node, Rust, wasm-pack) and build the engine
 just update
@@ -149,15 +149,77 @@ The Dockerfiles automatically build the Rust engine:
 
 ## Configuration
 
-### Environment Variables
+Copy `.env.example` to `.env` and configure as needed. **Local dev works without a `.env` file** — all variables have sensible defaults. Production requires explicit configuration.
 
-Copy `.env.example` to `.env` and fill in the values. Most variables are self-explanatory; the sections below cover the ones that require external setup.
+### Core
+
+| Variable | Default (dev) | Description |
+|----------|---------------|-------------|
+| `DATABASE_URL` | `postgresql://archon:archon_dev_password@localhost:5433/archon` | PostgreSQL connection string |
+| `JWT_SECRET` | `dev-secret-change-in-production!` | JWT signing key. **In production**, generate with `openssl rand -base64 32` |
+| `ENVIRONMENT` | `development` | Set to `production` in prod (enforces JWT validation) |
+| `FRONTEND_URL` | `http://localhost:5173` | Public frontend origin. Used for OAuth redirects, calendar links, error pages |
+| `API_BASE_URL` | `http://localhost:8000` | Public backend URL. Used when the backend generates client-facing URLs (e.g. calendar feed links). In prod behind nginx, typically same as `FRONTEND_URL` if same domain |
+| `VITE_API_URL` | `http://localhost:8000` | Backend URL for frontend API calls (build-time). In prod behind nginx reverse proxy, can be empty string `""` (browser uses current origin) |
+| `SNAPSHOT_DIR` | `/tmp/archon_snapshots` | Directory for gzip-compressed sync snapshots. **In production** use a persistent path (e.g. `/var/lib/archon/snapshots`) — `/tmp` is cleared on reboot |
+
+> **Note:** `API_BASE_URL` is the backend's view of its own public address (for generating URLs in responses). `VITE_API_URL` is the frontend's view of where to reach the backend (baked at build time).
+
+### Authentication — WebAuthn (Passkeys)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WEBAUTHN_RP_ID` | `localhost` | Your domain (e.g. `archon.example.com`). Must match exactly |
+| `WEBAUTHN_RP_NAME` | `Archon` | Display name in passkey prompts |
+| `WEBAUTHN_ORIGIN` | `http://localhost:5173` | Origin for passkey validation. Must be exact protocol+domain the browser sees. In practice, same value as `FRONTEND_URL` |
+
+### Authentication — Discord OAuth
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DISCORD_CLIENTID` | _(empty)_ | From [Discord Developer Portal](https://discord.com/developers/applications) → your app |
+| `DISCORD_SECRET` | _(empty)_ | From Discord Developer Portal → your app → OAuth2 |
+| `DISCORD_REDIRECT_URI` | `http://localhost:8000/auth/discord/callback` | Callback URL. Must match what's registered in Discord Developer Portal. Pattern: `{your-backend-url}/auth/discord/callback` |
+
+Setup: Create an app at [Discord Developer Portal](https://discord.com/developers/applications), add the redirect URI under OAuth2 → Redirects.
+
+### Authentication — Email (Magic Links)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAIL_SERVER` | `localhost` | SMTP host |
+| `MAIL_PORT` | `587` | SMTP port |
+| `MAIL_USERNAME` | _(empty)_ | SMTP auth username |
+| `MAIL_PASSWORD` | _(empty)_ | SMTP auth password |
+| `MAIL_FROM` | `noreply@archon.local` | Sender address |
+| `MAIL_USE_TLS` | `true` | Enable TLS for SMTP |
+
+### VEKN Integration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VEKN_SYNC_ENABLED` | `false` | Enable periodic member sync from VEKN API |
+| `VEKN_SYNC_INTERVAL_HOURS` | `6` | Hours between sync runs |
+| `VEKN_API_BASE_URL` | `https://www.vekn.net/api` | VEKN API endpoint |
+| `VEKN_API_USERNAME` | _(none)_ | Required when sync is enabled |
+| `VEKN_API_PASSWORD` | _(none)_ | Required when sync is enabled |
+| `VEKN_PUSH` | _(none)_ | Enable pushing tournament results to VEKN |
+| `VEKN_PUSH_INTERVAL_HOURS` | `1` | Hours between push batch jobs |
+| `VITE_VEKN_PUSH` | _(none)_ | Build-time feature flag. When `"true"`, tournament creation enforces VEKN-compatible settings (mandatory round count 2–4, open rounds default on). Leave unset for non-VEKN instances |
 
 ### TWDA Auto-PR (Tournament Winning Deck Archive)
 
 When a sanctioned tournament finishes and the winner's decklist is available, Archon can automatically open a Pull Request on the [GiottoVerducci/TWD](https://github.com/GiottoVerducci/TWD) repository.
 
-This uses a **GitHub App** installed on the TWD repo. To set it up:
+Official app: [vekn-archon](https://github.com/organizations/vtes-biased/settings/apps/vekn-archon)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TWDA_GITHUB_APP_ID` | _(empty)_ | GitHub App numeric ID |
+| `TWDA_GITHUB_PRIVATE_KEY` | _(empty)_ | PEM key: file path or inline contents |
+| `TWDA_GITHUB_INSTALLATION_ID` | _(empty)_ | Installation ID on TWD repo |
+
+To set up your own GitHub App for TWDA:
 
 1. **Register a GitHub App** at https://github.com/settings/apps/new
    - **Name**: e.g. "Archon TWDA Bot"
@@ -171,19 +233,6 @@ This uses a **GitHub App** installed on the TWD repo. To set it up:
 2. **Generate a private key** on the App settings page. Download the `.pem` file.
 
 3. **Install the App** on the `GiottoVerducci/TWD` repository (or ask the repo owner to install it). Note the **Installation ID** from the URL after installation (`https://github.com/settings/installations/{INSTALLATION_ID}`).
-
-4. **Set the environment variables**:
-
-```bash
-# Numeric App ID (visible on the App settings page)
-TWDA_GITHUB_APP_ID=123456
-
-# PEM private key: either inline contents or a path to the .pem file
-TWDA_GITHUB_PRIVATE_KEY=/path/to/private-key.pem
-
-# Installation ID (numeric, from the installation URL)
-TWDA_GITHUB_INSTALLATION_ID=78901234
-```
 
 When all three variables are set, Archon will create a branch `archon/{vekn_event_id}` and open a PR with the winner's deck in TWDA format. If the decklist is updated later, the PR is automatically updated. If the variables are not set, this feature is silently skipped.
 
