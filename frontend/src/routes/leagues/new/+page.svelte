@@ -6,6 +6,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { League, LeagueKind, LeagueStandingsMode } from "$lib/types";
   import { ArrowLeft } from "lucide-svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   const canCreate = $derived(hasAnyRole("IC", "NC"));
   const countries = getCountries();
@@ -189,21 +190,24 @@
           <!-- Description -->
           <div>
             <label for="desc" class="block text-sm font-medium text-ash-400 mb-1">Description</label>
+            <span class="text-xs text-ash-500 mb-1 block">
+              {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
+            </span>
             <textarea id="desc" bind:value={description} rows={3}
               class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 resize-y"></textarea>
           </div>
 
           <!-- Options -->
           <div class="flex flex-wrap gap-6">
-            <label class="flex items-center gap-2 text-sm text-ash-400 cursor-pointer">
+            <label class="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" bind:checked={online}
-                class="rounded border-ash-600 bg-dusk-950 text-crimson-500" />
-              Online
+                class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500" />
+              <span class="text-sm text-ash-200">Online</span>
             </label>
-            <label class="flex items-center gap-2 text-sm text-ash-400 cursor-pointer">
+            <label class="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" bind:checked={allowNoFinals}
-                class="rounded border-ash-600 bg-dusk-950 text-crimson-500" />
-              Allow tournaments without finals
+                class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500" />
+              <span class="text-sm text-ash-200">Allow tournaments without finals</span>
             </label>
           </div>
         </div>

@@ -11,6 +11,7 @@
   import { computeLeagueStandings } from "$lib/engine";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X } from "lucide-svelte";
+  import { renderMarkdown } from "$lib/markdown";
 
   const uid = $derived(page.params.uid);
   const countries = getCountries();
@@ -363,7 +364,7 @@
 
       {#if league.description}
         <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800 mb-6">
-          <p class="text-ash-300 whitespace-pre-wrap">{league.description}</p>
+          <div class="prose dark:prose-invert prose-sm max-w-none">{@html renderMarkdown(league.description)}</div>
         </div>
       {/if}
 
