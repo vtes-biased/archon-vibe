@@ -347,6 +347,8 @@
                           editable={true}
                           tournamentUid={tournament.uid}
                           playerUid={uid}
+                          playerName={playerInfo[uid]?.name}
+                          playerVekn={playerInfo[uid]?.vekn ?? undefined}
                           deckIndex={slotIdx}
                           format={tournament.format}
                           onreplace={() => { uploadingFor = uid; uploadingSlot = slotIdx; }}
@@ -370,7 +372,7 @@
                 {#each decks as deck, i}
                   {#if deck}
                     {#if isDeckVisibleToOrganizer(i)}
-                      <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} deckIndex={i} format={tournament.format} onreplace={() => uploadingFor = uid} ondelete={() => deleteDeck(uid)} />
+                      <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} playerName={playerInfo[uid]?.name} playerVekn={playerInfo[uid]?.vekn ?? undefined} deckIndex={i} format={tournament.format} onreplace={() => uploadingFor = uid} ondelete={() => deleteDeck(uid)} />
                     {:else}
                       <span class="inline-flex items-center gap-1.5 text-sm text-ash-400">
                         <Lock class="w-3.5 h-3.5" />

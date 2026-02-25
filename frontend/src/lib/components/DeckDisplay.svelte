@@ -1,6 +1,8 @@
 <script lang="ts">
-  import type { Deck, VtesCard } from "$lib/types";
+  import type { Deck, VtesCard, User } from "$lib/types";
   import { getCards } from "$lib/cards";
+  import { getFilteredUsers } from "$lib/db";
+  import { getCountryFlag } from "$lib/geonames";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
   import { validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
@@ -12,6 +14,8 @@
     editable = false,
     tournamentUid = '',
     playerUid = '',
+    playerName = undefined,
+    playerVekn = undefined,
     deckIndex = 0,
     format = '',
     onsaved,
@@ -22,6 +26,8 @@
     editable?: boolean;
     tournamentUid?: string;
     playerUid?: string;
+    playerName?: string;
+    playerVekn?: string;
     deckIndex?: number;
     format?: string;
     onsaved?: () => void;
@@ -32,6 +38,15 @@
   let cards = $state<Map<number, VtesCard>>(new Map());
   let cardImageUrl = $state<string | null>(null);
   let editedCards = $state<Record<string, number>>({});
+  let editedName = $state('');
+  let attrMode = $state<'self' | 'anonymous' | 'other'>('self');
+  let attributionSearch = $state('');
+  let attributionVekn = $state('');
+  let attributionName = $state('');
+  let attrResults = $state<User[]>([]);
+  let attrTotal = $state(0);
+  let attrSelectedIndex = $state(-1);
+  const ATTR_SEARCH_LIMIT = 10;
   let editing = $state(false);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
@@ -55,6 +70,18 @@
 
   function startEditing() {
     editedCards = { ...deck.cards };
+    editedName = deck.name;
+    // Determine attribution mode from current deck
+    if (deck.attribution === null) {
+      attrMode = 'anonymous';
+    } else if (deck.attribution) {
+      attrMode = 'other';
+      attributionVekn = deck.attribution;
+      attributionName = deck.author || '';
+      attributionSearch = deck.author || '';
+    } else {
+      attrMode = 'self';
+    }
     editing = true;
     saveError = null;
   }
@@ -62,7 +89,43 @@
   function cancelEditing() {
     editing = false;
     editedCards = {};
+    editedName = '';
+    attrResults = [];
     saveError = null;
+  }
+
+  async function searchAttribution() {
+    attrSelectedIndex = -1;
+    if (attributionSearch.trim().length < 2) {
+      attrResults = [];
+      attrTotal = 0;
+      return;
+    }
+    const results = await getFilteredUsers(undefined, undefined, attributionSearch.trim());
+    attrTotal = results.length;
+    attrResults = results.slice(0, ATTR_SEARCH_LIMIT);
+  }
+
+  function selectAttrUser(user: User) {
+    attributionVekn = user.vekn_id || user.name;
+    attributionName = user.name;
+    attributionSearch = user.name + (user.vekn_id ? ` (${user.vekn_id})` : '');
+    attrResults = [];
+  }
+
+  function handleAttrKeydown(e: KeyboardEvent) {
+    if (!attrResults.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      attrSelectedIndex = Math.min(attrSelectedIndex + 1, attrResults.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      attrSelectedIndex = Math.max(attrSelectedIndex - 1, 0);
+    } else if (e.key === 'Enter' && attrSelectedIndex >= 0) {
+      e.preventDefault();
+      const user = attrResults[attrSelectedIndex];
+      if (user) selectAttrUser(user);
+    }
   }
 
   function adjustCount(idStr: string, delta: number) {
@@ -86,21 +149,45 @@
     saveError = null;
     try {
       const { tournamentAction } = await import('$lib/api');
-      const targetUid = playerUid || (await import('$lib/stores/auth.svelte')).getAuthState().user?.uid;
+      const auth = (await import('$lib/stores/auth.svelte')).getAuthState();
+      const targetUid = playerUid || auth.user?.uid;
+
+      // Compute attribution and author from attrMode
+      let attrValue: string | null | undefined = undefined;
+      let authorValue = deck.author;
+      if (attrMode === 'anonymous') {
+        attrValue = null;
+      } else if (attrMode === 'self') {
+        const selfVekn = playerVekn || auth.user?.vekn_id;
+        const selfName = playerName || auth.user?.name;
+        attrValue = selfVekn || selfName || null;
+        if (selfName) authorValue = selfName;
+      } else if (attrMode === 'other') {
+        const val = attributionVekn.trim() || attributionSearch.trim();
+        if (val) {
+          attrValue = val;
+          authorValue = attributionName || attributionSearch.trim();
+        }
+      }
+
+      const deckData: Record<string, unknown> = {
+        name: editedName,
+        author: authorValue,
+        comments: deck.comments,
+        cards: editedCards,
+      };
+      if (attrValue !== undefined) deckData.attribution = attrValue;
 
       await tournamentAction(tournamentUid, 'UpsertDeck', {
         player_uid: targetUid,
-        deck: {
-          name: deck.name,
-          author: deck.author,
-          comments: deck.comments,
-          cards: editedCards,
-        },
+        deck: deckData,
         multideck: false,
       });
 
       editing = false;
       editedCards = {};
+      editedName = '';
+      attrResults = [];
       onsaved?.();
     } catch (e: any) {
       saveError = e.message || 'Save failed';
@@ -173,41 +260,98 @@
   }
 </script>
 
-{#if deck.name}
-  <h4 class="text-sm font-semibold text-bone-200 mb-1">{deck.name}</h4>
-{/if}
-{#if deck.author}
-  <p class="text-xs text-ash-400 mb-2">{m.deck_by_author({ author: deck.author })}</p>
-{/if}
-
-{#if (editable || onreplace || ondelete) && !editing}
-  <div class="flex gap-2 mb-3">
-    {#if editable}
-      <button
-        onclick={startEditing}
-        class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-      >{m.deck_edit()}</button>
-    {/if}
-    {#if onreplace}
-      <button
-        onclick={onreplace}
-        class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-      >{m.decks_replace()}</button>
-    {/if}
-    {#if ondelete}
-      <button
-        onclick={ondelete}
-        class="px-3 py-1.5 text-sm font-medium text-crimson-400 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-      >{m.decks_delete()}</button>
-    {/if}
-  </div>
-{/if}
-
 {#if editing}
+  <!-- Editable name -->
+  <input
+    type="text"
+    bind:value={editedName}
+    placeholder={m.deck_upload_name_placeholder()}
+    class="w-full px-3 py-2 mb-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+  />
+
+  <!-- Attribution -->
+  <div class="flex items-center gap-3 text-sm flex-wrap mb-2">
+    <span class="text-ash-400">{m.deck_upload_attribution()}:</span>
+    <label class="flex items-center gap-1 text-ash-200">
+      <input type="radio" bind:group={attrMode} value="self" class="accent-crimson-500" />
+      {playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self()}
+    </label>
+    <label class="flex items-center gap-1 text-ash-200">
+      <input type="radio" bind:group={attrMode} value="anonymous" class="accent-crimson-500" />
+      {m.deck_upload_attr_anonymous()}
+    </label>
+    <label class="flex items-center gap-1 text-ash-200">
+      <input type="radio" bind:group={attrMode} value="other" class="accent-crimson-500" />
+      {m.deck_upload_attr_other()}
+    </label>
+  </div>
+  {#if attrMode === 'other'}
+    <div class="relative mb-2">
+      <input
+        type="text"
+        bind:value={attributionSearch}
+        oninput={() => { attributionVekn = attributionSearch; attributionName = ''; searchAttribution(); }}
+        onkeydown={handleAttrKeydown}
+        placeholder={m.deck_upload_attr_other_placeholder()}
+        class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+      />
+      {#if attrResults.length > 0}
+        <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
+          {#each attrResults as user, i}
+            <button
+              onclick={() => selectAttrUser(user)}
+              class="w-full px-3 py-2 text-left text-sm text-ash-200 transition-colors {i === attrSelectedIndex ? 'bg-ash-700' : 'hover:bg-ash-800'}"
+            >
+              {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
+              {#if user.vekn_id}
+                <span class="text-ash-500 ml-2">({user.vekn_id})</span>
+              {/if}
+            </button>
+          {/each}
+          {#if attrTotal > ATTR_SEARCH_LIMIT}
+            <div class="px-3 py-2 text-xs text-ash-500 text-center">
+              {m.add_player_more_results({ count: (attrTotal - ATTR_SEARCH_LIMIT).toString() })}
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
   <div class="mb-3">
     <CardSearch onselect={addCard} />
     <p class="text-xs text-ash-500 mt-1">{m.deck_edit_search_hint()}</p>
   </div>
+{:else}
+  {#if deck.name}
+    <h4 class="text-sm font-semibold text-bone-200 mb-1">{deck.name}</h4>
+  {/if}
+  {#if deck.author}
+    <p class="text-xs text-ash-400 mb-2">{m.deck_by_author({ author: deck.author })}</p>
+  {/if}
+
+  {#if editable || onreplace || ondelete}
+    <div class="flex gap-2 mb-3">
+      {#if editable}
+        <button
+          onclick={startEditing}
+          class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+        >{m.deck_edit()}</button>
+      {/if}
+      {#if onreplace}
+        <button
+          onclick={onreplace}
+          class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+        >{m.decks_replace()}</button>
+      {/if}
+      {#if ondelete}
+        <button
+          onclick={ondelete}
+          class="px-3 py-1.5 text-sm font-medium text-crimson-400 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+        >{m.decks_delete()}</button>
+      {/if}
+    </div>
+  {/if}
 {/if}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
