@@ -310,9 +310,15 @@
   });
 
   // Cutoff score: 5th player's score threshold for finals selection
+  // Only show after at least one round is fully completed
   const cutoffScore = $derived.by(() => {
     if (tournament?.state === "Finished") return null;
     if ((tournament?.standings_mode ?? "Private") !== "Cutoff") return null;
+    const rounds = tournament?.rounds?.length ?? 0;
+    // During Playing, the last round is in progress, so completed = rounds - 1
+    if (tournament?.state === "Playing" && rounds < 2) return null;
+    // During Waiting before any round, no data yet
+    if (tournament?.state === "Waiting" && rounds < 1) return null;
     const entry = standings[4];
     if (!entry) return null;
     return { gw: entry.gw, vp: entry.vp, tp: entry.tp };
