@@ -55,8 +55,30 @@
   } = $props();
 
   let showRegisteredPlayers = $state(false);
+  let showPreviousRounds = $state(false);
   let showQrScanner = $state(false);
   let judgeCallCooldown = $state(false);
+
+  const myStanding = $derived(standings.find(s => s.user_uid === userUid));
+  const previousRounds = $derived.by(() => {
+    if (!tournament.rounds || tournament.rounds.length < 1) return [];
+    // When Playing, exclude the last round (shown as "Your Table"); otherwise show all
+    const count = tournament.state === "Playing" ? tournament.rounds.length - 1 : tournament.rounds.length;
+    if (count < 1) return [];
+    const result: { round: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
+    for (let r = 0; r < count; r++) {
+      const round = tournament.rounds[r]!;
+      const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
+      if (tIdx >= 0) {
+        result.push({
+          round: r + 1,
+          tableLabel: resolveTableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
+          table: round[tIdx]!,
+        });
+      }
+    }
+    return result;
+  });
 
   async function handleCallJudge(tableIdx: number) {
     if (judgeCallCooldown) return;
@@ -150,6 +172,13 @@
         >{m.tournament_drop_out_btn()}</button>
       {/if}
     </div>
+    <!-- Player's current score -->
+    {#if myStanding && (tournament.state === "Playing" || tournament.state === "Waiting") && (tournament.rounds?.length ?? 0) > 0}
+      <div class="text-sm">
+        <span class="text-ash-500">{m.tournament_your_score()}</span>
+        <span class="ml-2 text-bone-100 font-medium">{formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}</span>
+      </div>
+    {/if}
     <!-- QR Check-in scanner -->
     {#if showQrScanner}
       <QrCheckinScanner tournamentUid={tournament.uid} onclose={() => showQrScanner = false} />
@@ -292,6 +321,38 @@
           </div>
         </div>
       {/if}
+    {/if}
+    <!-- Previous rounds history -->
+    {#if previousRounds.length > 0}
+      <div>
+        <button
+          onclick={() => showPreviousRounds = !showPreviousRounds}
+          class="text-sm text-ash-400 hover:text-ash-200 transition-colors flex items-center gap-1"
+        >
+          {#if showPreviousRounds}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+          {m.tournament_previous_rounds()}
+        </button>
+        {#if showPreviousRounds}
+          <div class="mt-2 space-y-3">
+            {#each previousRounds as prev}
+              <div class="bg-ash-900/50 rounded-lg p-3">
+                <h4 class="text-xs font-medium text-ash-400 mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
+                <div class="divide-y divide-ash-800">
+                  {#each prev.table.seating as seat, j}
+                    {@const tVps = prev.table.seating.map(s => s.result.vp)}
+                    {@const tGws = computeGwLocal(tVps)}
+                    {@const tTps = computeTpLocal(prev.table.seating.length, tVps)}
+                    <div class="py-1 flex items-center justify-between text-sm {seat.player_uid === userUid ? 'text-bone-100' : 'text-ash-400'}">
+                      <span>{seatDisplay(seat.player_uid)}</span>
+                      <span class="text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/if}
   {:else}
     <p class="text-ash-400 text-sm">{m.tournament_registration_not_open()}</p>
