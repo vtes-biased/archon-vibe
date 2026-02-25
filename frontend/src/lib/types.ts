@@ -94,35 +94,35 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<SanctionCategory, SanctionSubcate
 };
 
 export const BASELINE_PENALTIES: Record<SanctionSubcategory, SanctionLevel> = {
-  // Procedural Errors
+  // Procedural Errors (v2 §2)
   missed_mandatory_effect: "caution",
-  card_access_error: "warning",
-  game_rule_violation: "warning",
-  failure_to_maintain_game_state: "warning",
-  // Tournament Errors
+  card_access_error: "caution",
+  game_rule_violation: "caution",
+  failure_to_maintain_game_state: "standings_adjustment",
+  // Tournament Errors (v2 §3)
   illegal_decklist: "warning",
   illegal_main_deck_legal_decklist: "standings_adjustment",
-  illegal_main_deck_no_decklist: "disqualification",
-  outside_assistance: "warning",
+  illegal_main_deck_no_decklist: "standings_adjustment",
+  outside_assistance: "standings_adjustment",
   slow_play: "caution",
-  limited_procedure_violation: "warning",
+  limited_procedure_violation: "caution",
   public_info_miscommunication: "warning",
-  obscuring_game_state: "warning",
+  obscuring_game_state: "caution",
   marked_cards: "warning",
-  insufficient_shuffling: "caution",
-  // Unsportsmanlike Conduct
+  insufficient_shuffling: "warning",
+  // Unsportsmanlike Conduct (v2 §4)
   minor: "warning",
   major: "standings_adjustment",
   aggressive_behaviour: "disqualification",
   bribery_and_wagering: "disqualification",
   theft_of_tournament_material: "disqualification",
-  stalling: "standings_adjustment",
+  stalling: "disqualification",
   cheating: "disqualification",
   fraud: "disqualification",
   collusion: "disqualification",
-  health_and_safety_disruption: "disqualification",
-  rage_quitting: "standings_adjustment",
-  failure_to_play_to_win: "standings_adjustment",
+  health_and_safety_disruption: "warning",
+  rage_quitting: "disqualification",
+  failure_to_play_to_win: "warning",
 };
 
 export const ESCALATION_SEQUENCE: SanctionLevel[] = [

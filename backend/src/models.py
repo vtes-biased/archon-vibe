@@ -142,37 +142,37 @@ SUBCATEGORIES_BY_CATEGORY: dict[SanctionCategory, list[SanctionSubcategory]] = {
     ],
 }
 
-# Baseline penalties from Judges Guide v2 Appendix I
+# Baseline penalties from Judges Guide v2
 BASELINE_PENALTIES: dict[SanctionSubcategory, SanctionLevel] = {
-    # Procedural Errors
+    # Procedural Errors (v2 §2)
     SanctionSubcategory.MISSED_MANDATORY_EFFECT: SanctionLevel.CAUTION,
-    SanctionSubcategory.CARD_ACCESS_ERROR: SanctionLevel.WARNING,
-    SanctionSubcategory.GAME_RULE_VIOLATION: SanctionLevel.WARNING,
-    SanctionSubcategory.FAILURE_TO_MAINTAIN_GAME_STATE: SanctionLevel.WARNING,
-    # Tournament Errors
+    SanctionSubcategory.CARD_ACCESS_ERROR: SanctionLevel.CAUTION,
+    SanctionSubcategory.GAME_RULE_VIOLATION: SanctionLevel.CAUTION,
+    SanctionSubcategory.FAILURE_TO_MAINTAIN_GAME_STATE: SanctionLevel.STANDINGS_ADJUSTMENT,
+    # Tournament Errors (v2 §3)
     SanctionSubcategory.ILLEGAL_DECKLIST: SanctionLevel.WARNING,
     SanctionSubcategory.ILLEGAL_MAIN_DECK_LEGAL_DECKLIST: SanctionLevel.STANDINGS_ADJUSTMENT,
-    SanctionSubcategory.ILLEGAL_MAIN_DECK_NO_DECKLIST: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.OUTSIDE_ASSISTANCE: SanctionLevel.WARNING,
+    SanctionSubcategory.ILLEGAL_MAIN_DECK_NO_DECKLIST: SanctionLevel.STANDINGS_ADJUSTMENT,
+    SanctionSubcategory.OUTSIDE_ASSISTANCE: SanctionLevel.STANDINGS_ADJUSTMENT,
     SanctionSubcategory.SLOW_PLAY: SanctionLevel.CAUTION,
-    SanctionSubcategory.LIMITED_PROCEDURE_VIOLATION: SanctionLevel.WARNING,
+    SanctionSubcategory.LIMITED_PROCEDURE_VIOLATION: SanctionLevel.CAUTION,
     SanctionSubcategory.PUBLIC_INFO_MISCOMMUNICATION: SanctionLevel.WARNING,
-    SanctionSubcategory.OBSCURING_GAME_STATE: SanctionLevel.WARNING,
+    SanctionSubcategory.OBSCURING_GAME_STATE: SanctionLevel.CAUTION,
     SanctionSubcategory.MARKED_CARDS: SanctionLevel.WARNING,
-    SanctionSubcategory.INSUFFICIENT_SHUFFLING: SanctionLevel.CAUTION,
-    # Unsportsmanlike Conduct
+    SanctionSubcategory.INSUFFICIENT_SHUFFLING: SanctionLevel.WARNING,
+    # Unsportsmanlike Conduct (v2 §4)
     SanctionSubcategory.MINOR: SanctionLevel.WARNING,
     SanctionSubcategory.MAJOR: SanctionLevel.STANDINGS_ADJUSTMENT,
     SanctionSubcategory.AGGRESSIVE_BEHAVIOUR: SanctionLevel.DISQUALIFICATION,
     SanctionSubcategory.BRIBERY_AND_WAGERING: SanctionLevel.DISQUALIFICATION,
     SanctionSubcategory.THEFT_OF_TOURNAMENT_MATERIAL: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.STALLING: SanctionLevel.STANDINGS_ADJUSTMENT,
+    SanctionSubcategory.STALLING: SanctionLevel.DISQUALIFICATION,
     SanctionSubcategory.CHEATING: SanctionLevel.DISQUALIFICATION,
     SanctionSubcategory.FRAUD: SanctionLevel.DISQUALIFICATION,
     SanctionSubcategory.COLLUSION: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.HEALTH_AND_SAFETY_DISRUPTION: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.RAGE_QUITTING: SanctionLevel.STANDINGS_ADJUSTMENT,
-    SanctionSubcategory.FAILURE_TO_PLAY_TO_WIN: SanctionLevel.STANDINGS_ADJUSTMENT,
+    SanctionSubcategory.HEALTH_AND_SAFETY_DISRUPTION: SanctionLevel.WARNING,
+    SanctionSubcategory.RAGE_QUITTING: SanctionLevel.DISQUALIFICATION,
+    SanctionSubcategory.FAILURE_TO_PLAY_TO_WIN: SanctionLevel.WARNING,
 }
 
 

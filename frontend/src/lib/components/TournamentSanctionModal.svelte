@@ -64,14 +64,21 @@
     disqualification: 3, suspension: 4, probation: 4,
   };
 
-  // Escalation hint: count prior sanctions and suggest next level
+  // All active (non-lifted, non-deleted) prior sanctions in this tournament
   const activePrior = $derived(
     priorSanctions.filter(s => !s.lifted_at && !s.deleted_at)
   );
-  const activePriorCount = $derived(activePrior.length);
+
+  // Escalation hint: count prior sanctions for same subcategory (v2 §1.2.1)
+  const sameInfractionPrior = $derived(
+    subcategory
+      ? activePrior.filter(s => s.subcategory === subcategory)
+      : activePrior
+  );
+  const sameInfractionCount = $derived(sameInfractionPrior.length);
   const suggestedLevel = $derived<SanctionLevel>(
-    activePriorCount < ESCALATION_SEQUENCE.length
-      ? ESCALATION_SEQUENCE[activePriorCount]!
+    sameInfractionCount < ESCALATION_SEQUENCE.length
+      ? ESCALATION_SEQUENCE[sameInfractionCount]!
       : "disqualification"
   );
 
@@ -201,13 +208,18 @@
       onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}
       class="p-6 space-y-4"
     >
-      <!-- Escalation hint -->
-      {#if activePriorCount > 0}
+      <!-- Escalation hint (per-infraction-type, v2 §1.2.1) -->
+      {#if sameInfractionCount > 0}
         <div class="p-3 rounded banner-amber border text-sm">
           <div class="flex items-center gap-2">
             <TriangleAlert class="w-4 h-4 shrink-0" />
-            {m.sanction_escalation_hint({ count: String(activePriorCount), suggested: levelLabel(suggestedLevel) })}
+            {m.sanction_escalation_hint({ count: String(sameInfractionCount), suggested: levelLabel(suggestedLevel) })}
           </div>
+          {#if subcategory && activePrior.length > sameInfractionCount}
+            <p class="mt-1 text-xs opacity-75">
+              {m.sanction_other_infractions({ count: String(activePrior.length - sameInfractionCount) })}
+            </p>
+          {/if}
         </div>
       {/if}
       <!-- Downgrade warning -->
