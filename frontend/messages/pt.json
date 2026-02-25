@@ -525,6 +525,7 @@
   "overview_reset_checkin": "Resetar Check-in",
   "overview_check_all_in": "Check-in Geral",
   "overview_start_round": "Iniciar Rodada {n}",
+  "overview_start_round_hint": "São necessários pelo menos 4 jogadores com check-in ({count} atualmente).",
   "overview_start_finals": "Iniciar Finais",
   "overview_seating_warning": "{count} jogadores não podem ser alocados (configuração impossível).",
   "overview_finish_tournament": "Finalizar Torneio",

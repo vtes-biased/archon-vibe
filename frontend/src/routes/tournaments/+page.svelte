@@ -295,7 +295,7 @@
           <button
             onclick={handleGenerateCalendarToken}
             disabled={calendarLoading}
-            class="px-3 py-1.5 text-xs rounded bg-crimson-700 hover:bg-crimson-600 text-white disabled:opacity-50 transition-colors"
+            class="px-3 py-1.5 text-xs rounded bg-crimson-700 hover:bg-crimson-600 text-white disabled:bg-ash-800 disabled:text-ash-500 transition-colors"
           >
             {#if calendarLoading}
               <Loader2 class="inline h-3 w-3 animate-spin mr-1" />
@@ -418,13 +418,13 @@
             <button
               onclick={() => page = Math.max(0, page - 1)}
               disabled={page === 0}
-              class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 disabled:cursor-not-allowed text-ash-200"
+              class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 text-ash-200"
             >{m.tournaments_prev()}</button>
             <span>{m.tournaments_page_info({ current: String(page + 1), total: String(totalPages) })}</span>
             <button
               onclick={() => page = Math.min(totalPages - 1, page + 1)}
               disabled={page >= totalPages - 1}
-              class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 disabled:cursor-not-allowed text-ash-200"
+              class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 text-ash-200"
             >{m.common_next()}</button>
           </div>
         {/if}

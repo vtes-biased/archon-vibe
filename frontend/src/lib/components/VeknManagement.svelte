@@ -167,14 +167,14 @@
           <button
             onclick={handleSponsor}
             disabled={processingAction}
-            class="flex-1 px-4 py-2 btn-emerald disabled:bg-ash-700 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 btn-emerald rounded font-medium transition-colors"
           >
             {processingAction ? m.vekn_sponsoring() : m.vekn_sponsor()}
           </button>
           <button
             onclick={() => (showSponsorConfirm = false)}
             disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
           </button>
@@ -229,7 +229,7 @@
           <button
             type="submit"
             disabled={processingAction || !linkVeknIdInput.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
           >
             {processingAction ? m.vekn_linking() : m.vekn_link_submit()}
           </button>
@@ -240,7 +240,7 @@
               linkVeknIdInput = "";
             }}
             disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
           </button>
@@ -280,14 +280,14 @@
           <button
             onclick={handleForceAbandon}
             disabled={processingAction}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
           >
             {processingAction ? m.vekn_abandoning() : m.vekn_force_abandon()}
           </button>
           <button
             onclick={() => (showForceAbandonConfirm = false)}
             disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
           </button>
@@ -342,7 +342,7 @@
           <button
             type="submit"
             disabled={processingAction || !mergeTargetUid.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
           >
             {processingAction ? m.vekn_merging() : m.vekn_merge()}
           </button>
@@ -353,7 +353,7 @@
               mergeTargetUid = "";
             }}
             disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
           </button>

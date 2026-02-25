@@ -92,13 +92,13 @@
             <button
               onclick={() => moveUp(i)}
               disabled={i === 0 || saving}
-              class="p-0.5 text-ash-500 hover:text-bone-100 disabled:opacity-30 transition-colors"
+              class="p-0.5 text-ash-500 hover:text-bone-100 disabled:opacity-40 transition-colors"
               aria-label="Move up"
             ><ChevronUp class="w-3.5 h-3.5" /></button>
             <button
               onclick={() => moveDown(i)}
               disabled={i === rooms.length - 1 || saving}
-              class="p-0.5 text-ash-500 hover:text-bone-100 disabled:opacity-30 transition-colors"
+              class="p-0.5 text-ash-500 hover:text-bone-100 disabled:opacity-40 transition-colors"
               aria-label="Move down"
             ><ChevronDown class="w-3.5 h-3.5" /></button>
           </div>

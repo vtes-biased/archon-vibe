@@ -211,7 +211,7 @@
               <button type="button" onclick={() => (showRegister = false)}
                 class="flex-1 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded text-sm font-medium transition-colors">{m.common_cancel()}</button>
               <button type="submit" disabled={registering || !newName.trim() || !newRedirectUris.trim() || newScopes.length === 0}
-                class="flex-1 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1.5">
+                class="flex-1 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1.5">
                 {#if registering}<Loader2 class="w-4 h-4 animate-spin" />{/if}
                 {m.developer_register_submit()}
               </button>

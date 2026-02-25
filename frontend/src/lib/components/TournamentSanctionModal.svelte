@@ -314,7 +314,7 @@
         <button
           type="submit"
           disabled={creating || !description.trim() || (roundRequired && roundNumber === null)}
-          class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
+          class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
         >
           {creating ? m.sanction_mgr_issuing() : m.sanction_mgr_issue_btn()}
         </button>
@@ -322,7 +322,7 @@
           type="button"
           onclick={onClose}
           disabled={creating}
-          class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+          class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
         >
           {m.common_cancel()}
         </button>

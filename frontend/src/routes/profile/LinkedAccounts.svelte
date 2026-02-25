@@ -94,7 +94,7 @@
           placeholder={m.login_placeholder_email()}
           class="flex-1 px-3 py-2 bg-dusk-900 border border-ash-700 rounded text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 text-sm" />
         <button type="submit" disabled={sendingEmailLink || !emailInput.trim()}
-          class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium text-sm transition-colors disabled:cursor-not-allowed whitespace-nowrap">
+          class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium text-sm transition-colors whitespace-nowrap">
           {sendingEmailLink ? m.profile_email_sending() : m.profile_email_send_link()}
         </button>
       </form>
@@ -147,7 +147,7 @@
       </div>
       {#if !hasPasskey}
         <button onclick={handleRegisterPasskey} disabled={registeringPasskey}
-          class="px-4 py-2 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-700 text-bone-100 rounded font-medium transition-colors disabled:cursor-not-allowed">
+          class="px-4 py-2 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded font-medium transition-colors">
           {registeringPasskey ? m.profile_passkey_adding() : m.common_add()}
         </button>
       {:else}

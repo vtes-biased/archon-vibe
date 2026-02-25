@@ -215,14 +215,14 @@
             <button
               onclick={handleDeny}
               disabled={submitting}
-              class="flex-1 py-3 bg-ash-800 hover:bg-ash-700 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors"
+              class="flex-1 py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded-lg font-medium transition-colors"
             >
               {m.oauth_deny()}
             </button>
             <button
               onclick={handleApprove}
               disabled={submitting}
-              class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if submitting}
                 <Loader2 class="w-5 h-5 animate-spin" />

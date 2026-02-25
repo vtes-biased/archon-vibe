@@ -381,7 +381,7 @@
                 {/each}
               </select>
               <button onclick={addChildLeague} disabled={!addChildUid}
-                class="px-3 py-2 text-sm font-medium btn-emerald rounded-lg disabled:opacity-50">
+                class="px-3 py-2 text-sm font-medium btn-emerald rounded-lg">
                 <Plus class="w-4 h-4 inline -mt-0.5" /> Add
               </button>
             </div>

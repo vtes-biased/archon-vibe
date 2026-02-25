@@ -194,7 +194,7 @@
                   } catch (e) { error = e instanceof Error ? e.message : m.override_error(); } finally { overrideSaving = false; }
                 }}
                 disabled={overrideSaving || !overrideComment.trim()}
-                class="px-3 py-1 text-xs font-medium btn-amber disabled:bg-ash-700 rounded transition-colors"
+                class="px-3 py-1 text-xs font-medium btn-amber rounded transition-colors"
               >{overrideSaving ? m.common_saving() : m.override_save()}</button>
             </div>
           </div>

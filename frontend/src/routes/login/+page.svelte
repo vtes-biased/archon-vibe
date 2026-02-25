@@ -228,7 +228,7 @@
             <button
               type="submit"
               disabled={auth.isLoading || !email.trim()}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if auth.isLoading}
                 <Loader2 class="w-5 h-5 animate-spin" />
@@ -283,7 +283,7 @@
             <button
               type="submit"
               disabled={auth.isLoading || !email.trim() || !password}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if auth.isLoading}
                 <Loader2 class="w-5 h-5 animate-spin" />
@@ -313,7 +313,7 @@
             <button
               onclick={handlePasskeyLogin}
               disabled={auth.isLoading}
-              class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               <KeyRound class="w-5 h-5" />
               {m.login_passkey_login()}
@@ -324,7 +324,7 @@
           <button
             onclick={handleDiscordLogin}
             disabled={auth.isLoading}
-            class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+            class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
           >
             <DiscordIcon class="w-5 h-5" />
             {m.login_discord_login()}
@@ -347,7 +347,7 @@
             <button
               onclick={handleCreateAccount}
               disabled={auth.isLoading}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if auth.isLoading}
                 <Loader2 class="w-5 h-5 animate-spin" />
@@ -362,7 +362,7 @@
           <button
             onclick={handleDiscordLogin}
             disabled={auth.isLoading}
-            class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+            class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
           >
             <DiscordIcon class="w-5 h-5" />
             {m.login_discord_signup()}
@@ -394,7 +394,7 @@
             <button
               type="submit"
               disabled={auth.isLoading || !email.trim()}
-              class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:opacity-50 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if auth.isLoading}
                 <Loader2 class="w-5 h-5 animate-spin" />

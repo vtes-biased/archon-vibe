@@ -31,9 +31,22 @@ Available colors: `emerald`, `amber`, `red`, `yellow`, `orange`, `purple`, `blue
 
 **When to use what:**
 - `badge-*` — for any small status indicator or tag
-- `btn-*` — for solid action buttons (combine with `disabled:bg-ash-700`, `rounded-lg`, etc.)
+- `btn-*` — for solid action buttons (`:disabled` styling is automatic via CSS, just add `rounded-lg` etc.)
 - `banner-*` — for info/warning boxes (add `border rounded-lg p-3` etc.)
 - Crimson palette classes (`bg-crimson-*`, `text-crimson-*`) — already handled by scale inversion, use directly
+
+### Disabled States
+
+Three tiers of disabled styling, applied consistently:
+
+| Element | Disabled style | Notes |
+|---------|---------------|-------|
+| `btn-*` buttons | Automatic via CSS (`ash-800` bg, `ash-500` text) | No inline classes needed |
+| Non-`btn-*` colored buttons | `disabled:bg-ash-800 disabled:text-ash-500` | Inline, replaces original bg |
+| Form inputs (text, select, textarea) | `disabled:opacity-50` | Borders/placeholders give extra context |
+| Icon-only / small buttons | `disabled:opacity-40` | Preserves icon visibility |
+
+`button:disabled { cursor: not-allowed }` is global in `app.css` — never add `disabled:cursor-not-allowed` inline.
 
 ### Light Theme — Scale Inversion
 

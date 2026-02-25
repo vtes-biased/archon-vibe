@@ -215,7 +215,7 @@
           <button
             type="submit"
             disabled={isSubmitting}
-            class="px-6 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md disabled:opacity-50"
+            class="px-6 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
           >
             {isSubmitting ? "Creating..." : "Create League"}
           </button>

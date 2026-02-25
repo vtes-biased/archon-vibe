@@ -157,7 +157,7 @@
         <button
           onclick={handleDraw}
           disabled={actionLoading || !label.trim() || currentEligible === 0}
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm btn-amber disabled:bg-ash-700 rounded-lg transition-colors"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm btn-amber rounded-lg transition-colors"
         >
           <Dices class="w-4 h-4" />
           {m.raffle_draw()}

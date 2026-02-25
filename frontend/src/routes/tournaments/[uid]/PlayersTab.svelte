@@ -267,7 +267,7 @@
             <button
               onclick={addOfflinePlayerAction}
               disabled={!offlinePlayerName.trim() || actionLoading}
-              class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 rounded transition-colors"
+              class="px-4 py-2 text-sm font-medium btn-amber rounded transition-colors"
             >{m.offline_player_add()}</button>
           </div>
         {/if}

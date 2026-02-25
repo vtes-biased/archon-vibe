@@ -93,7 +93,7 @@
     <button
       onclick={() => doAction("Register", { user_uid: userUid })}
       disabled={actionLoading}
-      class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
     >{m.tournament_register_btn()}</button>
   {:else if tournament.state === "Registration" && currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">

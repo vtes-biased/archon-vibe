@@ -525,6 +525,7 @@
   "overview_reset_checkin": "Reiniciar check-in",
   "overview_check_all_in": "Check-in a todos",
   "overview_start_round": "Iniciar ronda {n}",
+  "overview_start_round_hint": "Se necesitan al menos 4 jugadores con check-in ({count} actualmente).",
   "overview_start_finals": "Iniciar finales",
   "overview_seating_warning": "{count} jugadores no pueden sentarse (configuración imposible).",
   "overview_finish_tournament": "Finalizar torneo",

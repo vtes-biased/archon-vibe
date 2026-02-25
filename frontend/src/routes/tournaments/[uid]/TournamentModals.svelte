@@ -89,7 +89,7 @@
           <button
             onclick={onGoOffline}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-amber disabled:bg-ash-700 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 btn-amber rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}</button>
           <button
             onclick={() => (showGoOfflineConfirm = false)}
@@ -128,7 +128,7 @@
           <button
             onclick={onGoOnline}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-emerald disabled:bg-ash-700 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 btn-emerald rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}</button>
           <button
             onclick={() => (showGoOnlineConfirm = false)}
@@ -167,7 +167,7 @@
           <button
             onclick={onForceTakeover}
             disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-amber disabled:bg-ash-700 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 btn-amber rounded font-medium transition-colors"
           >{offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}</button>
           <button
             onclick={() => (showForceTakeoverConfirm = false)}

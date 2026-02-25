@@ -430,7 +430,7 @@
           <button
             type="submit"
             disabled={saving}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
           >
             {saving ? m.user_creating() : m.user_create_btn()}
           </button>
@@ -438,7 +438,7 @@
             type="button"
             onclick={cancelEdit}
             disabled={saving}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed"
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
           </button>

@@ -273,7 +273,7 @@
         <button
           onclick={handleSave}
           disabled={saving}
-          class="flex-1 px-4 py-2 rounded-lg bg-crimson-600 text-white hover:bg-crimson-500 transition-colors disabled:opacity-50"
+          class="flex-1 px-4 py-2 rounded-lg bg-crimson-600 text-white hover:bg-crimson-500 transition-colors disabled:bg-ash-800 disabled:text-ash-500"
         >
           {saving ? m.common_saving() : m.common_save()}
         </button>

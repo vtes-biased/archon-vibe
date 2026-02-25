@@ -117,7 +117,7 @@
         placeholder={disabled
             ? m.city_select_country_first()
             : m.city_search_placeholder()}
-        class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 placeholder:text-mist-dark focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:bg-ash-900 disabled:text-mist-dark disabled:cursor-not-allowed"
+        class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 placeholder:text-mist-dark focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:bg-ash-900 disabled:text-mist-dark"
     />
 
     {#if searching}

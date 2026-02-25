@@ -28,7 +28,7 @@
     <button
       onclick={handleResync}
       disabled={isSyncing}
-      class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed flex items-center gap-2"
+      class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors flex items-center gap-2"
     >
       <RefreshCw class="w-4 h-4 {isSyncing ? 'animate-spin' : ''}" />
       {isSyncing ? m.profile_resyncing() : m.profile_resync_btn()}

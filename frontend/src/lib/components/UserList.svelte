@@ -307,7 +307,7 @@
             id="new-user-button"
             onclick={toggleCreateForm}
             disabled={!isOnline}
-            class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg disabled:cursor-not-allowed"
+            class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
           >
             {showCreateForm ? m.common_cancel() : m.user_list_new_user()}
           </button>
@@ -547,7 +547,7 @@
             <button
               onclick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50"
             >
               {m.common_previous()}
             </button>
@@ -557,7 +557,7 @@
             <button
               onclick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50"
             >
               {m.common_next()}
             </button>

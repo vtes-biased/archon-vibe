@@ -159,7 +159,7 @@
   {#if isFinished && standings.length > 0}
     <div class="flex gap-2">
       <button onclick={shareImage} disabled={sharingImage}
-        class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors disabled:opacity-50">
+        class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors disabled:opacity-40">
         <Share2 class="w-4 h-4" />
         {sharingImage ? m.common_loading() : m.share_results_image()}
       </button>
@@ -225,7 +225,7 @@
               onchange={(e) => { archonFile = (e.target as HTMLInputElement).files?.[0] ?? null; archonResult = null; archonConfirmOverwrite = false; }}
               class="text-sm text-ash-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-ash-700 file:text-ash-200 hover:file:bg-ash-600" />
             <button onclick={handleArchonImport} disabled={!archonFile || archonUploading}
-              class="flex items-center gap-2 px-3 py-1.5 text-sm bg-blood-600 hover:bg-blood-500 text-bone-100 rounded transition-colors disabled:opacity-50">
+              class="flex items-center gap-2 px-3 py-1.5 text-sm bg-blood-600 hover:bg-blood-500 text-bone-100 rounded transition-colors disabled:opacity-40">
               <Upload class="w-4 h-4" />
               {archonUploading ? m.archon_uploading() : m.archon_upload_file()}
             </button>

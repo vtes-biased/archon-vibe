@@ -561,7 +561,7 @@
           <button
             onclick={() => showGoOnlineConfirm = true}
             disabled={offlineActionLoading}
-            class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors shrink-0"
+            class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shrink-0"
           >
             <Wifi class="w-4 h-4 inline mr-1" />
             {m.offline_go_online()}
@@ -790,12 +790,12 @@
             <div class="flex flex-wrap gap-2">
               {#if tournament.state === "Planned"}
                 <button onclick={() => doAction("OpenRegistration")} disabled={actionLoading}
-                  class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
+                  class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
                 >{m.overview_open_registration()}</button>
 
               {:else if tournament.state === "Registration"}
                 <button onclick={() => doAction("CloseRegistration")} disabled={actionLoading}
-                  class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 rounded-lg transition-colors"
+                  class="px-4 py-2 text-sm font-medium btn-amber rounded-lg transition-colors"
                 >{m.overview_close_registration()}</button>
                 <button onclick={() => doAction("CancelRegistration")} disabled={actionLoading}
                   class="px-3 py-1.5 text-sm text-ash-300 border border-ash-700 hover:border-ash-600 hover:text-ash-200 rounded-lg transition-colors"
@@ -811,11 +811,14 @@
 
               {:else if tournament.state === "Waiting"}
                 <button onclick={() => doAction("StartRound")} disabled={actionLoading || checkedInCount < 4}
-                  class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
+                  class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
                 >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
+                {#if checkedInCount < 4}
+                  <span class="text-sm text-ash-500">{m.overview_start_round_hint({ count: String(checkedInCount) })}</span>
+                {/if}
                 {#if finalsReady}
                   <button onclick={() => doAction("StartFinals")} disabled={actionLoading}
-                    class="px-4 py-2 text-sm font-medium btn-emerald disabled:bg-ash-700 rounded-lg transition-colors"
+                    class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
                   >{m.overview_start_finals()}</button>
                 {/if}
                 <!-- Secondary actions -->
@@ -846,11 +849,11 @@
               {:else if tournament.state === "Playing"}
                 {#if isFinals}
                   <button onclick={() => doAction("FinishFinals")} disabled={actionLoading || !finalsTableFinished}
-                    class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+                    class="px-4 py-2 text-sm font-medium btn-amber rounded-lg transition-colors"
                   >{m.finals_finish()}</button>
                 {:else}
                   <button onclick={() => doAction("FinishRound")} disabled={actionLoading || !allTablesFinished}
-                    class="px-4 py-2 text-sm font-medium btn-amber disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+                    class="px-4 py-2 text-sm font-medium btn-amber rounded-lg transition-colors"
                   >{m.rounds_end_round()}</button>
                 {/if}
 

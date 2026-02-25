@@ -525,6 +525,7 @@
   "overview_reset_checkin": "Réinitialiser le pointage",
   "overview_check_all_in": "Tout pointer",
   "overview_start_round": "Commencer la ronde {n}",
+  "overview_start_round_hint": "Il faut au moins 4 joueurs pointés ({count} actuellement).",
   "overview_start_finals": "Commencer la finale",
   "overview_seating_warning": "{count} joueurs ne peuvent pas être placés (configuration impossible).",
   "overview_finish_tournament": "Terminer le tournoi",

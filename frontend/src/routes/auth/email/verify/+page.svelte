@@ -150,7 +150,7 @@
             <button
               type="submit"
               disabled={auth.isLoading || !password}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if auth.isLoading}
                 <Loader2 class="w-5 h-5 animate-spin" />

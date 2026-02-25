@@ -255,11 +255,11 @@
         </div>
         <div class="flex gap-2">
           <button type="submit" disabled={claimingVekn || !claimVeknIdInput.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed">
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors">
             {claimingVekn ? m.profile_claiming() : m.profile_claim_btn()}
           </button>
           <button type="button" onclick={() => { showClaimModal = false; claimVeknIdInput = ""; }} disabled={claimingVekn}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed">
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors">
             {m.common_cancel()}
           </button>
         </div>
@@ -297,11 +297,11 @@
         <p class="text-sm text-ash-400 mb-6">{m.profile_abandon_vekn_hint()}</p>
         <div class="flex gap-2">
           <button onclick={handleAbandonVekn} disabled={abandoningVekn}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 text-white rounded font-medium transition-colors disabled:cursor-not-allowed">
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors">
             {abandoningVekn ? m.profile_abandoning() : m.profile_abandon_btn()}
           </button>
           <button onclick={() => (showAbandonConfirm = false)} disabled={abandoningVekn}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors disabled:cursor-not-allowed">
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors">
             {m.common_cancel()}
           </button>
         </div>

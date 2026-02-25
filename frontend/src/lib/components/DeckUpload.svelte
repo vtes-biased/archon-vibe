@@ -322,7 +322,7 @@
     <button
       onclick={upload}
       disabled={loading || (mode === 'text' ? !deckText.trim() : !deckUrl.trim())}
-      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
     >
       {loading ? m.deck_upload_uploading() : m.deck_upload_submit()}
     </button>

@@ -277,7 +277,7 @@
     <button
       onclick={saveDeck}
       disabled={saving}
-      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-700 disabled:text-ash-500 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
     >{saving ? m.common_saving() : m.deck_save_changes()}</button>
     <button
       onclick={cancelEditing}
