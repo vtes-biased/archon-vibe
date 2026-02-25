@@ -406,6 +406,9 @@
               {#if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
                 <button onclick={() => doAction("CheckIn", { player_uid: puid })}
                   class="px-3 py-2 text-xs text-emerald-400 border border-emerald-800 rounded transition-colors">{m.players_check_in()}</button>
+              {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
+                <button onclick={() => doAction("CheckOut", { player_uid: puid })}
+                  class="px-3 py-2 text-xs text-amber-400 border border-amber-800 rounded transition-colors">{m.players_check_out()}</button>
               {/if}
               {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
                 <button onclick={() => dropPlayer(puid)}
@@ -575,6 +578,10 @@
                     <button onclick={() => doAction("CheckIn", { player_uid: puid })}
                       class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded transition-colors"
                     >{m.players_check_in()}</button>
+                  {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
+                    <button onclick={() => doAction("CheckOut", { player_uid: puid })}
+                      class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 border border-amber-800 rounded transition-colors"
+                    >{m.players_check_out()}</button>
                   {/if}
                   {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
                     <button onclick={() => dropPlayer(puid)}

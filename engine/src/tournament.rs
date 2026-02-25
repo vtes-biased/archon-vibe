@@ -137,6 +137,9 @@ pub enum TournamentEvent {
     CheckIn {
         player_uid: String,
     },
+    CheckOut {
+        player_uid: String,
+    },
     CheckInAll,
     ResetCheckIn,
 
@@ -1218,6 +1221,26 @@ fn apply_event(
                 tournament["players"][idx]["missing_decklist"] = true.into();
             }
 
+            Ok(())
+        }
+
+        TournamentEvent::CheckOut { player_uid } => {
+            require_organizer(actor)?;
+            require_state_or_finished(state, TournamentState::Waiting)?;
+
+            let idx =
+                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
+
+            if tournament["players"][idx]["state"].as_str() != Some("Checked-in") {
+                return Err("Player is not checked in".to_string());
+            }
+
+            tournament["players"][idx]["state"] = if state == TournamentState::Finished {
+                "Finished"
+            } else {
+                "Registered"
+            }
+            .into();
             Ok(())
         }
 
