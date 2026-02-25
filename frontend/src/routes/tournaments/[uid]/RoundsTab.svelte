@@ -75,7 +75,7 @@
   }
 
   const currentRoundIdx = $derived(
-    tournament.state === "Playing" ? tournament.rounds!.length - 1 : -1
+    tournament.state === "Playing" && !tournament.finals ? tournament.rounds!.length - 1 : -1
   );
   // Seating score
   let seatingScore = $state<{ rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null>(null);
