@@ -72,78 +72,49 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
 ## Development
 
 ### Prerequisites
-- **uv** (Python package manager): https://docs.astral.sh/uv/
-- **Node.js** 18+ (for frontend)
-- **PostgreSQL** 15+
-- **Rust** 1.70+
 
-Note: uv will automatically install Python 3.11 when you run `uv sync`
+Install these tools before setting up the project:
+
+| Tool | Install | Purpose |
+|------|---------|---------|
+| **Rust** | [rustup.rs](https://rustup.rs/) | Shared engine (business logic) |
+| **Node.js** 18+ | [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org/) | Frontend tooling |
+| **uv** | [docs.astral.sh/uv](https://docs.astral.sh/uv/) | Python package manager (auto-installs Python) |
+| **just** | [github.com/casey/just](https://github.com/casey/just#installation) | Task runner |
+| **Docker** | [Docker Desktop](https://www.docker.com/) or [OrbStack](https://orbstack.dev/) | Database (dev) and deployment |
 
 ### Setup
 
 ```bash
-# Clone repository
 git clone https://github.com/lionel-panhaleux/archon-cursor.git
 cd archon-cursor
 
-# Backend setup
-# Install dependencies (uv will create venv and install Python 3.11 automatically)
-uv sync --dev
-
-# Frontend setup
-cd frontend
-npm install
-cd ..
-
-# Database setup (when schema is ready)
-createdb archon
-psql archon < schema.sql
-
-# Build Rust core (when implemented)
-cd core
-cargo build --release
-cd ..
+# Install all dependencies (Python, Node, Rust, wasm-pack) and build the engine
+just update
 ```
 
 ### Running
 
 ```bash
-# Start backend
-uv run uvicorn src.main:app --app-dir backend --reload
+# Start everything (database + backend + frontend)
+just dev
 
-# Start frontend
-cd frontend
-npm run dev
+# Stop all services
+just dev-stop
 ```
 
-The backend API will be available at `http://localhost:8000`  
-The PWA will be available at `http://localhost:5173`
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **Database**: Docker on port 5433
 
-### Development with Just
-
-The project uses [just](https://github.com/casey/just) for task automation:
+### Useful Commands
 
 ```bash
-# List all available commands
-just
-
-# Install all dependencies
-just install
-
-# Build all components
-just build
-
-# Run backend (development)
-just serve-backend
-
-# Run frontend (development)
-just serve-frontend
-
-# Run tests
-just test
-
-# Lint and format
-just lint
+just              # List all commands
+just test         # Run all tests (engine + backend + frontend)
+just lint         # Lint and auto-fix
+just build        # Production build (Docker images)
+just dev-reset    # Reset dev database
 ```
 
 ### Docker Deployment
