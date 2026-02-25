@@ -16,7 +16,6 @@ Steps 3-6 should run in parallel when applicable. Skip agents only for trivial c
 - Keep answers short and token efficient
 - Prefer compact code and minimal changes
 - Check assumptions in project code or web docs
-- Use codanna MCP tools for codebase search and project documentation
 - Use context7 MCP tools for external library/framework documentation (see CONTEXT7.md for library IDs)
 - Challenge instructions when needed
 - Follow frontend/DESIGN.md for UI styling guidelines
