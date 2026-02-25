@@ -42,6 +42,9 @@
     multideck: tournament.multideck ?? false,
     decklist_required: tournament.decklist_required ?? false,
     league_uid: tournament.league_uid ?? "",
+    round_time: tournament.round_time ?? 0,
+    finals_time: tournament.finals_time ?? 0,
+    time_extension_policy: tournament.time_extension_policy ?? "additions",
   });
 
   // Sync from tournament when it changes externally (but not while user is editing)
@@ -71,6 +74,9 @@
         multideck: t.multideck ?? false,
         decklist_required: t.decklist_required ?? false,
         league_uid: t.league_uid ?? "",
+        round_time: t.round_time ?? 0,
+        finals_time: t.finals_time ?? 0,
+        time_extension_policy: t.time_extension_policy ?? "additions",
       };
     }
   });
@@ -173,59 +179,6 @@
         {disabledFields}
         idPrefix="cfg"
       />
-
-      <!-- Timer Configuration -->
-      <div class="border-t border-ash-800 pt-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-3">{m.timer_config_heading()}</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-ash-400 mb-1" for="cfg-round-time">{m.timer_round_time()}</label>
-            <select
-              id="cfg-round-time"
-              value={String(tournament.round_time ?? 0)}
-              onchange={(e) => save("round_time", parseInt((e.target as HTMLSelectElement).value))}
-              class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
-            >
-              <option value="0">{m.timer_no_timer()}</option>
-              <option value="7200">2h</option>
-              <option value="8100">2h15</option>
-              <option value="9000">2h30</option>
-              <option value="9900">2h45</option>
-              <option value="10800">3h</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-ash-400 mb-1" for="cfg-finals-time">{m.timer_finals_time()}</label>
-            <select
-              id="cfg-finals-time"
-              value={String(tournament.finals_time ?? 0)}
-              onchange={(e) => save("finals_time", parseInt((e.target as HTMLSelectElement).value))}
-              class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
-            >
-              <option value="0">{m.timer_same_as_round()}</option>
-              <option value="7200">2h</option>
-              <option value="8100">2h15</option>
-              <option value="9000">2h30</option>
-              <option value="9900">2h45</option>
-              <option value="10800">3h</option>
-            </select>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="block text-sm text-ash-400 mb-1" for="cfg-extension-policy">{m.timer_extension_policy()}</label>
-          <select
-            id="cfg-extension-policy"
-            value={tournament.time_extension_policy ?? "additions"}
-            onchange={(e) => save("time_extension_policy", (e.target as HTMLSelectElement).value)}
-            class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
-          >
-            <option value="additions">{m.timer_policy_additions()}</option>
-            <option value="clock_stop">{m.timer_policy_clock_stop()}</option>
-            <option value="both">{m.timer_policy_both()}</option>
-          </select>
-          <p class="text-xs text-ash-500 mt-1">{m.timer_extension_policy_desc()}</p>
-        </div>
-      </div>
     </div>
 
     {#if saving}

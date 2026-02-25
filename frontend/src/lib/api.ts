@@ -423,6 +423,9 @@ export interface CreateTournamentData {
   decklist_required?: boolean;
   table_rooms?: { name: string; count: number }[];
   league_uid?: string | null;
+  round_time?: number;
+  finals_time?: number;
+  time_extension_policy?: string;
 }
 
 export async function createTournament(data: CreateTournamentData): Promise<Tournament> {
@@ -468,6 +471,9 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
     decklists_mode: (data.decklists_mode as Tournament['decklists_mode']) || 'Winner',
     max_rounds: data.max_rounds || 0,
     league_uid: data.league_uid || null,
+    round_time: data.round_time || 0,
+    finals_time: data.finals_time || 0,
+    time_extension_policy: (data.time_extension_policy as Tournament['time_extension_policy']) || 'additions',
     players: [],
     rounds: [],
     finals: null,

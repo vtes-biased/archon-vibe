@@ -29,6 +29,9 @@
     multideck: boolean;
     decklist_required: boolean;
     league_uid: string;
+    round_time: number;
+    finals_time: number;
+    time_extension_policy: string;
   }
 
   let {
@@ -429,4 +432,60 @@
     />
     <span class="text-sm text-ash-200">{m.tfield_decklist_required()}</span>
   </label>
+</div>
+
+<!-- Timer Configuration -->
+<div class="border-t border-ash-800 pt-4">
+  <h3 class="text-sm font-medium text-bone-100 mb-3">{m.timer_config_heading()}</h3>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm text-ash-400 mb-1" for={id("round-time")}>{m.timer_round_time()}</label>
+      <select
+        id={id("round-time")}
+        value={String(values.round_time ?? 0)}
+        {disabled}
+        onchange={(e) => handleInput("round_time", parseInt((e.target as HTMLSelectElement).value))}
+        class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      >
+        <option value="0">{m.timer_no_timer()}</option>
+        <option value="7200">2h</option>
+        <option value="8100">2h15</option>
+        <option value="9000">2h30</option>
+        <option value="9900">2h45</option>
+        <option value="10800">3h</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm text-ash-400 mb-1" for={id("finals-time")}>{m.timer_finals_time()}</label>
+      <select
+        id={id("finals-time")}
+        value={String(values.finals_time ?? 0)}
+        {disabled}
+        onchange={(e) => handleInput("finals_time", parseInt((e.target as HTMLSelectElement).value))}
+        class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      >
+        <option value="0">{m.timer_same_as_round()}</option>
+        <option value="7200">2h</option>
+        <option value="8100">2h15</option>
+        <option value="9000">2h30</option>
+        <option value="9900">2h45</option>
+        <option value="10800">3h</option>
+      </select>
+    </div>
+  </div>
+  <div class="mt-3">
+    <label class="block text-sm text-ash-400 mb-1" for={id("extension-policy")}>{m.timer_extension_policy()}</label>
+    <select
+      id={id("extension-policy")}
+      value={values.time_extension_policy ?? "additions"}
+      {disabled}
+      onchange={(e) => handleInput("time_extension_policy", (e.target as HTMLSelectElement).value)}
+      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+    >
+      <option value="additions">{m.timer_policy_additions()}</option>
+      <option value="clock_stop">{m.timer_policy_clock_stop()}</option>
+      <option value="both">{m.timer_policy_both()}</option>
+    </select>
+    <p class="text-xs text-ash-500 mt-1">{m.timer_extension_policy_desc()}</p>
+  </div>
 </div>

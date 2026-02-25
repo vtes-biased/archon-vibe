@@ -417,6 +417,9 @@ class CreateTournamentRequest(BaseModel):
     decklists_mode: str = "Winner"
     max_rounds: int = 0
     league_uid: str | None = None
+    round_time: int = 0
+    finals_time: int = 0
+    time_extension_policy: str = "additions"
 
 
 def _parse_datetime(s: str | None) -> datetime | None:
@@ -473,6 +476,13 @@ async def create_tournament(
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid decklists_mode") from e
 
+    try:
+        extension_policy = TimeExtensionPolicy(request.time_extension_policy)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400, detail="Invalid time_extension_policy"
+        ) from e
+
     now = datetime.now(UTC)
     tournament = Tournament(
         uid=str(uuid7()),
@@ -498,6 +508,9 @@ async def create_tournament(
         max_rounds=request.max_rounds,
         league_uid=request.league_uid or None,
         organizers_uids=[current_user.uid],
+        round_time=request.round_time,
+        finals_time=request.finals_time,
+        time_extension_policy=extension_policy,
     )
 
     bd = await insert_tournament(tournament)
