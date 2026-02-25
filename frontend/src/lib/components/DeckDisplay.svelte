@@ -2,7 +2,9 @@
   import type { Deck, VtesCard } from "$lib/types";
   import { getCards } from "$lib/cards";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
+  import { validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
+  import { CircleX, TriangleAlert } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -11,6 +13,7 @@
     tournamentUid = '',
     playerUid = '',
     deckIndex = 0,
+    format = '',
     onsaved,
     onreplace,
     ondelete,
@@ -20,6 +23,7 @@
     tournamentUid?: string;
     playerUid?: string;
     deckIndex?: number;
+    format?: string;
     onsaved?: () => void;
     onreplace?: () => void;
     ondelete?: () => void;
@@ -31,9 +35,22 @@
   let editing = $state(false);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
+  let validationErrors = $state<ValidationError[]>([]);
 
   $effect(() => {
     getCards().then(c => cards = c);
+  });
+
+  // Validate deck reactively
+  $effect(() => {
+    const cardsToValidate = editing ? editedCards : deck.cards;
+    if (!format || !Object.keys(cardsToValidate).length) {
+      validationErrors = [];
+      return;
+    }
+    validateDeck({ cards: cardsToValidate, name: deck.name }, format).then(errors => {
+      validationErrors = errors;
+    });
   });
 
   function startEditing() {
@@ -268,6 +285,17 @@
     {/each}
   </div>
 </div>
+
+{#if validationErrors.length > 0}
+  <div class="mt-3 space-y-1">
+    {#each validationErrors as err}
+      <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-amber-400'}">
+        {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
+        {err.message}
+      </p>
+    {/each}
+  </div>
+{/if}
 
 {#if editing}
   {#if saveError}

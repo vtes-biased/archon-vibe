@@ -244,6 +244,7 @@
                 editable={canModify}
                 tournamentUid={tournament.uid}
                 deckIndex={slotIdx}
+                format={tournament.format}
                 onreplace={canModify ? () => { uploadingFor = myUid; uploadingSlot = slotIdx; } : undefined}
                 ondelete={canModify ? () => deleteDeck(myUid, slotIdx) : undefined}
               />
@@ -274,7 +275,7 @@
           </button>
           {#if expandedDecks.has('my')}
             <div class="px-3 pb-3 sm:px-4 sm:pb-4" transition:slide={{ duration: 150 }}>
-              <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} ondelete={canPlayerDelete ? () => deleteDeck(myUid) : undefined} />
+              <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} format={tournament.format} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} ondelete={canPlayerDelete ? () => deleteDeck(myUid) : undefined} />
             </div>
           {/if}
         {:else}
@@ -283,7 +284,7 @@
             {#if canPlayerUpload && (uploadingFor === myUid || myDecks.length === 0)}
               <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
             {:else if myDecks.length > 0 && myDecks[0]}
-              <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} ondelete={canPlayerDelete ? () => deleteDeck(myUid) : undefined} />
+              <DeckDisplay deck={myDecks[0]} editable={canPlayerUpload} tournamentUid={tournament.uid} format={tournament.format} onreplace={canPlayerUpload ? () => uploadingFor = myUid : undefined} ondelete={canPlayerDelete ? () => deleteDeck(myUid) : undefined} />
             {:else}
               <p class="text-sm text-ash-400">{m.decks_no_deck_yet()}</p>
             {/if}
@@ -344,6 +345,7 @@
                           tournamentUid={tournament.uid}
                           playerUid={uid}
                           deckIndex={slotIdx}
+                          format={tournament.format}
                           onreplace={() => { uploadingFor = uid; uploadingSlot = slotIdx; }}
                           ondelete={() => deleteDeck(uid, slotIdx)}
                         />
@@ -365,7 +367,7 @@
                 {#each decks as deck, i}
                   {#if deck}
                     {#if isDeckVisibleToOrganizer(i)}
-                      <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} deckIndex={i} onreplace={() => uploadingFor = uid} ondelete={() => deleteDeck(uid)} />
+                      <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} deckIndex={i} format={tournament.format} onreplace={() => uploadingFor = uid} ondelete={() => deleteDeck(uid)} />
                     {:else}
                       <span class="inline-flex items-center gap-1.5 text-sm text-ash-400">
                         <Lock class="w-3.5 h-3.5" />
@@ -448,7 +450,7 @@
                 </button>
                 {#if expanded}
                   <div class="px-3 pb-3 sm:px-4 sm:pb-4" transition:slide={{ duration: 150 }}>
-                    <DeckDisplay {deck} />
+                    <DeckDisplay {deck} format={tournament.format} />
                   </div>
                 {/if}
               </div>
