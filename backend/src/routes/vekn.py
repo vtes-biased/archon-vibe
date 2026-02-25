@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from ..db import (
     allocate_next_vekn_id,
+    get_auth_methods_for_user,
     get_user_by_uid,
     get_user_by_vekn_id,
     is_vekn_id_claimed,
@@ -417,6 +418,15 @@ async def force_abandon_vekn_id(
     if not target.vekn_id:
         raise HTTPException(
             status_code=400, detail="User doesn't have a VEKN ID to abandon"
+        )
+
+    # Don't split unclaimed users — nobody is behind this account,
+    # so force-abandon would just create an empty orphan user.
+    auth_methods = await get_auth_methods_for_user(target.uid)
+    if not auth_methods:
+        raise HTTPException(
+            status_code=400,
+            detail="This VEKN ID is not claimed by anyone — no need to abandon",
         )
 
     new_user = await split_user_from_vekn(target.uid)
