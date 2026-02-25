@@ -396,7 +396,7 @@
             <button
               onclick={cancelRound}
               disabled={actionLoading}
-              class="px-4 py-2 text-sm font-medium text-white bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-700 rounded-lg transition-colors"
+              class="px-4 py-2 text-sm font-medium text-white bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
             >{m.rounds_cancel_yes()}</button>
             <button
               onclick={() => showCancelConfirm = false}
@@ -584,7 +584,7 @@
                         <button
                           onclick={() => submitOverride(r, i)}
                           disabled={overrideSaving || !overrideComment.trim()}
-                          class="px-3 py-1 text-xs font-medium btn-amber disabled:bg-ash-700 rounded transition-colors"
+                          class="px-3 py-1 text-xs font-medium btn-amber rounded transition-colors"
                         >{overrideSaving ? m.common_saving() : m.override_save()}</button>
                       </div>
                     </div>
@@ -614,7 +614,7 @@
                   </div>
                 {/if}
                 <!-- Seat a player -->
-                {#if isEditable && unseatedPlayers.length > 0}
+                {#if isEditable && unseatedPlayers.length > 0 && table.seating.length < 5}
                   <div class="mt-2 pt-2 border-t border-ash-800">
                     {#if seatTargetTable === i}
                       <div class="flex flex-wrap gap-1">

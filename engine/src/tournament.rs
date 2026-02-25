@@ -1735,9 +1735,12 @@ fn apply_event(
                 return Err("Invalid table number".to_string());
             }
 
-            // Insert seat entry at position
+            // Verify table is not already full (max 5 players)
             let seating = &mut rounds[last][*table]["seating"];
             let seating_len = seating.len();
+            if seating_len >= 5 {
+                return Err("Table already has 5 players".to_string());
+            }
             let insert_pos = if *seat > seating_len {
                 seating_len
             } else {
