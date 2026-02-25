@@ -720,6 +720,7 @@
   "decks_my_decks": "Meus Decks",
   "decks_round_label": "Rodada {n}",
   "decks_locked": "Bloqueado",
+  "decks_hidden_until_round": "Deck enviado — oculto até o início da rodada",
   "decks_delete": "Excluir deck",
   "rooms_title": "Salas",
   "rooms_total": "{count} mesas",

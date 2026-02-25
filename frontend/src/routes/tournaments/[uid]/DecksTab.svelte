@@ -110,6 +110,12 @@
     return false;
   });
 
+  // Organizer deck visibility: hide contents until the round for this deck has started
+  function isDeckVisibleToOrganizer(slotIdx: number): boolean {
+    if (tournament.state === 'Finished') return true;
+    return isMultideck ? slotIdx < roundCount : roundCount > 0;
+  }
+
   async function deleteDeck(playerUid: string, deckIndex?: number) {
     deleteLoading = true;
     try {
@@ -331,15 +337,22 @@
                       {/if}
                     </div>
                     {#if deck}
-                      <DeckDisplay
-                        {deck}
-                        editable={true}
-                        tournamentUid={tournament.uid}
-                        playerUid={uid}
-                        deckIndex={slotIdx}
-                        onreplace={() => { uploadingFor = uid; uploadingSlot = slotIdx; }}
-                        ondelete={() => deleteDeck(uid, slotIdx)}
-                      />
+                      {#if isDeckVisibleToOrganizer(slotIdx)}
+                        <DeckDisplay
+                          {deck}
+                          editable={true}
+                          tournamentUid={tournament.uid}
+                          playerUid={uid}
+                          deckIndex={slotIdx}
+                          onreplace={() => { uploadingFor = uid; uploadingSlot = slotIdx; }}
+                          ondelete={() => deleteDeck(uid, slotIdx)}
+                        />
+                      {:else}
+                        <span class="inline-flex items-center gap-1.5 text-sm text-ash-400">
+                          <Lock class="w-3.5 h-3.5" />
+                          {m.decks_hidden_until_round()}
+                        </span>
+                      {/if}
                     {:else}
                       <button
                         onclick={() => { uploadingFor = uid; uploadingSlot = slotIdx; }}
@@ -351,7 +364,14 @@
               {:else}
                 {#each decks as deck, i}
                   {#if deck}
-                    <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} deckIndex={i} onreplace={() => uploadingFor = uid} ondelete={() => deleteDeck(uid)} />
+                    {#if isDeckVisibleToOrganizer(i)}
+                      <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} deckIndex={i} onreplace={() => uploadingFor = uid} ondelete={() => deleteDeck(uid)} />
+                    {:else}
+                      <span class="inline-flex items-center gap-1.5 text-sm text-ash-400">
+                        <Lock class="w-3.5 h-3.5" />
+                        {m.decks_hidden_until_round()}
+                      </span>
+                    {/if}
                   {/if}
                 {/each}
                 {#if !decks.length}

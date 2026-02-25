@@ -720,6 +720,7 @@
   "decks_my_decks": "Mes Decks",
   "decks_round_label": "Ronde {n}",
   "decks_locked": "Verrouillé",
+  "decks_hidden_until_round": "Deck soumis — masqué jusqu'au début de la manche",
   "decks_delete": "Supprimer le deck",
   "rooms_title": "Salles",
   "rooms_total": "{count} tables",

@@ -720,6 +720,7 @@
   "decks_my_decks": "I miei Deck",
   "decks_round_label": "Round {n}",
   "decks_locked": "Bloccato",
+  "decks_hidden_until_round": "Mazzo inviato — nascosto fino all'inizio del round",
   "decks_delete": "Elimina deck",
   "rooms_title": "Sale",
   "rooms_total": "{count} tavoli",

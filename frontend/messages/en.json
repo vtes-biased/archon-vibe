@@ -631,6 +631,7 @@
   "decks_my_decks": "My Decks",
   "decks_round_label": "Round {n}",
   "decks_locked": "Locked",
+  "decks_hidden_until_round": "Deck submitted — hidden until round starts",
   "decks_delete": "Delete deck",
   "finals_require_rounds": "Finals require at least 2 rounds and 5 players with results.",
   "finals_not_started": "Finals have not started yet. Start finals from the Overview tab.",
