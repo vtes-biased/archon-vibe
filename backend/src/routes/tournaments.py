@@ -516,6 +516,55 @@ async def create_tournament(
     )
 
 
+# --- Static routes (must be before /{uid} to avoid path parameter capture) ---
+
+
+@router.get("/archon-template")
+async def download_archon_template() -> FileResponse:
+    """Serve blank Archon v1.5l spreadsheet template. Public access."""
+    path = Path(__file__).parent.parent.parent / "data" / "thearchon1.5l.xlsx"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Template file not found")
+    return FileResponse(
+        path,
+        filename="thearchon1.5l.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.get("/fetch-deck")
+async def fetch_deck_proxy(
+    url: str,
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Proxy to fetch deck data from external URLs (VDB, VTESDecks, Amaranth).
+
+    Read-only — no mutation. Works around CORS restrictions on external APIs.
+    Returns parsed deck: {name, author, comments, cards}.
+    """
+    import asyncio
+
+    await _get_current_user(authorization)  # auth check
+
+    from ..providers import DeckFetchError, fetch_deck_from_url
+
+    try:
+        result = await asyncio.to_thread(fetch_deck_from_url, url)
+    except DeckFetchError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to fetch deck from URL")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch deck: {e}") from e
+
+    return Response(
+        content=msgspec.json.encode(result),
+        media_type="application/json",
+    )
+
+
+# --- Dynamic routes ---
+
+
 @router.get("/{uid}")
 async def get_tournament(
     uid: str,
@@ -620,22 +669,6 @@ async def delete_tournament_endpoint(
     return Response(
         content=encoder.encode({"message": "Tournament deleted"}),
         media_type="application/json",
-    )
-
-
-# --- Archon Import Endpoints ---
-
-
-@router.get("/archon-template")
-async def download_archon_template() -> FileResponse:
-    """Serve blank Archon v1.5l spreadsheet template. Public access."""
-    path = Path(__file__).parent.parent.parent / "data" / "thearchon1.5l.xlsx"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Template file not found")
-    return FileResponse(
-        path,
-        filename="thearchon1.5l.xlsx",
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
@@ -1043,36 +1076,6 @@ def _load_cards_json() -> str:
             )
         _cards_json = cards_path.read_text(encoding="utf-8")
     return _cards_json
-
-
-@router.get("/fetch-deck")
-async def fetch_deck_proxy(
-    url: str,
-    authorization: str | None = Header(default=None),
-) -> Response:
-    """Proxy to fetch deck data from external URLs (VDB, VTESDecks, Amaranth).
-
-    Read-only — no mutation. Works around CORS restrictions on external APIs.
-    Returns parsed deck: {name, author, comments, cards}.
-    """
-    import asyncio
-
-    await _get_current_user(authorization)  # auth check
-
-    from ..providers import DeckFetchError, fetch_deck_from_url
-
-    try:
-        result = await asyncio.to_thread(fetch_deck_from_url, url)
-    except DeckFetchError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("Failed to fetch deck from URL")
-        raise HTTPException(status_code=400, detail=f"Failed to fetch deck: {e}") from e
-
-    return Response(
-        content=msgspec.json.encode(result),
-        media_type="application/json",
-    )
 
 
 @router.get("/{uid}/decks/{player_uid}/twda")
