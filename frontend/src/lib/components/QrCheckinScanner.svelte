@@ -42,6 +42,7 @@
         await saveTournament(updated);
         success = true;
         stopScanner();
+        setTimeout(() => onclose(), 1500);
       } catch (e: any) {
         error = e.detail || e.message || m.checkin_qr_error();
       } finally {
