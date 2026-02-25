@@ -313,10 +313,19 @@ fn try_strip_crypt_tail<'a>(name: &str, card_map: &'a CardMap) -> Option<&'a Car
 // Deck parsing
 // ============================================================================
 
+/// Result of parsing a deck list text.
+#[derive(Debug)]
+pub struct ParseResult {
+    pub deck: Deck,
+    pub unrecognized_lines: Vec<String>,
+}
+
 /// Parse a deck list text into a Deck. Auto-detects format.
-pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<Deck, String> {
+/// Returns the parsed deck and any lines that looked like card entries but couldn't be matched.
+pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, String> {
     let mut deck = Deck::new();
     let mut header_lines: Vec<String> = Vec::new();
+    let mut unrecognized_lines: Vec<String> = Vec::new();
     let mut found_card = false;
 
     for line in text.lines() {
@@ -354,6 +363,12 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<Deck, String> {
             *deck.cards.entry(card_id).or_insert(0) += count;
         } else if !found_card && !line.trim().is_empty() && !is_comment_line(line) {
             header_lines.push(line.trim().to_string());
+        } else if found_card
+            && !line.trim().is_empty()
+            && !is_comment_line(line.trim())
+            && !is_section_header(line.trim())
+        {
+            unrecognized_lines.push(line.trim().to_string());
         }
     }
 
@@ -366,7 +381,10 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<Deck, String> {
         deck.name = header_lines.remove(0);
     }
 
-    Ok(deck)
+    Ok(ParseResult {
+        deck,
+        unrecognized_lines,
+    })
 }
 
 // ============================================================================
@@ -400,6 +418,22 @@ impl ValidationError {
 /// Validate a deck against Standard format rules.
 pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
+
+    // Check for unknown card IDs (not in card database)
+    let mut unknown_count = 0u32;
+    for (&id, &count) in &deck.cards {
+        if card_map.by_id(id).is_none() {
+            unknown_count += count;
+        }
+    }
+    if unknown_count > 0 {
+        errors.push(ValidationError {
+            severity: Severity::Error,
+            message: format!(
+                "{unknown_count} card(s) not found in card database (unknown or outdated IDs)"
+            ),
+        });
+    }
 
     let crypt_count = deck.crypt_count(card_map);
     let library_count = deck.library_count(card_map);
@@ -795,20 +829,31 @@ mod tests {
     fn test_parse_deck_basic() {
         let cm = CardMap::load(test_cards_json()).unwrap();
         let text = "Deck Name: Test Deck\nCreated by: Tester\n\n2x .44 Magnum\n3 419 Operation\n1 Delaying Tactics\n";
-        let deck = parse_deck(text, &cm).unwrap();
-        assert_eq!(deck.name, "Test Deck");
-        assert_eq!(deck.author, "Tester");
-        assert_eq!(deck.cards.get(&100001), Some(&2));
-        assert_eq!(deck.cards.get(&100002), Some(&3));
-        assert_eq!(deck.cards.get(&100519), Some(&1));
+        let result = parse_deck(text, &cm).unwrap();
+        assert_eq!(result.deck.name, "Test Deck");
+        assert_eq!(result.deck.author, "Tester");
+        assert_eq!(result.deck.cards.get(&100001), Some(&2));
+        assert_eq!(result.deck.cards.get(&100002), Some(&3));
+        assert_eq!(result.deck.cards.get(&100519), Some(&1));
+        assert!(result.unrecognized_lines.is_empty());
+    }
+
+    #[test]
+    fn test_parse_deck_unrecognized_lines() {
+        let cm = CardMap::load(test_cards_json()).unwrap();
+        let text = "2x .44 Magnum\n3x Nonexistent Card\n1 Delaying Tactics\n";
+        let result = parse_deck(text, &cm).unwrap();
+        assert_eq!(result.deck.cards.len(), 2);
+        assert_eq!(result.unrecognized_lines, vec!["3x Nonexistent Card"]);
     }
 
     #[test]
     fn test_section_headers_skipped() {
         let cm = CardMap::load(test_cards_json()).unwrap();
         let text = "Crypt (12 cards)\n2x Aabbt Kindred\nLibrary (61 cards)\n2x .44 Magnum\n";
-        let deck = parse_deck(text, &cm).unwrap();
-        assert_eq!(deck.cards.len(), 2);
+        let result = parse_deck(text, &cm).unwrap();
+        assert_eq!(result.deck.cards.len(), 2);
+        assert!(result.unrecognized_lines.is_empty());
     }
 
     #[test]

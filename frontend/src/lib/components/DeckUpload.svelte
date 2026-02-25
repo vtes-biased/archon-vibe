@@ -33,6 +33,7 @@
   const ATTR_SEARCH_LIMIT = 10;
   let loading = $state(false);
   let error = $state<string | null>(null);
+  let warnings = $state<string[]>([]);
   let success = $state(false);
 
   // Attribution autocomplete
@@ -121,19 +122,38 @@
   async function upload() {
     loading = true;
     error = null;
+    warnings = [];
     success = false;
 
     try {
       const { tournamentAction } = await import('$lib/api');
       const { fetchDeckFromUrl, parseDeckText } = await import('$lib/deck-fetch');
+      const { getCards } = await import('$lib/cards');
 
       // Parse deck (URL fetch or text parse via WASM)
-      let deck: { name: string; author: string; comments: string; cards: Record<string, number> };
+      let deck: { name: string; author: string; comments: string; cards: Record<string, number>; warnings?: string[] };
       if (mode === 'text') {
         deck = await parseDeckText(deckText);
       } else {
         deck = await fetchDeckFromUrl(deckUrl);
       }
+
+      // Collect parse warnings (unrecognized lines from text parsing)
+      const uploadWarnings: string[] = [...(deck.warnings ?? [])];
+
+      // Check for unknown card IDs against local card database
+      try {
+        const cardsDb = await getCards();
+        if (cardsDb.size > 0) {
+          const unknownIds: string[] = [];
+          for (const id of Object.keys(deck.cards)) {
+            if (!cardsDb.has(parseInt(id))) unknownIds.push(id);
+          }
+          if (unknownIds.length > 0) {
+            uploadWarnings.push(`${unknownIds.length} card(s) not found in card database (IDs: ${unknownIds.join(', ')})`);
+          }
+        }
+      } catch { /* card DB unavailable — skip check */ }
 
       // Override name if provided
       if (deckName) deck.name = deckName;
@@ -171,6 +191,7 @@
       });
 
       success = true;
+      warnings = uploadWarnings;
       deckText = '';
       deckUrl = '';
       deckName = '';
@@ -285,6 +306,13 @@
 
   {#if error}
     <p class="text-sm text-red-400">{error}</p>
+  {/if}
+  {#if warnings.length > 0}
+    <div class="space-y-1">
+      {#each warnings as w}
+        <p class="text-sm text-amber-400">{w}</p>
+      {/each}
+    </div>
   {/if}
   {#if success}
     <p class="text-sm text-emerald-400">{m.deck_upload_success()}</p>

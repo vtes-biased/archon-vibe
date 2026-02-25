@@ -81,7 +81,13 @@
   }
 
   function onUploaded() {
+    const uid = uploadingFor;
     uploadingFor = null;
+    // Clear validation cache so it re-validates with the new deck
+    if (uid) {
+      const { [uid]: _, ...rest } = validationCache;
+      validationCache = rest;
+    }
     getDecksByTournamentGrouped(tournament.uid).then(grouped => {
       decksByUser = grouped;
     });
@@ -422,7 +428,9 @@
             {@const playerDeck = getPlayerDeck(puid)}
             {@const errors = validationCache[puid] ?? []}
             <div class="mt-2 pt-2 border-t border-ash-800 space-y-3">
-              {#if playerDeck}
+              {#if isOrganizer && uploadingFor === puid}
+                <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
+              {:else if playerDeck}
                 <DeckDisplay deck={playerDeck} onreplace={isOrganizer ? () => uploadingFor = puid : undefined} />
                 {#if errors.length > 0}
                   <div class="space-y-1">
@@ -437,7 +445,7 @@
               {:else}
                 <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
               {/if}
-              {#if isOrganizer && (uploadingFor === puid || !playerDeck)}
+              {#if isOrganizer && !playerDeck && uploadingFor !== puid}
                 <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
               {/if}
             </div>
@@ -593,7 +601,9 @@
               <tr class="bg-ash-900/50">
                 <td colspan="99" class="p-4">
                   <div class="space-y-3">
-                    {#if playerDeck}
+                    {#if isOrganizer && uploadingFor === puid}
+                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
+                    {:else if playerDeck}
                       <DeckDisplay deck={playerDeck} onreplace={isOrganizer ? () => uploadingFor = puid : undefined} />
                       {#if errors.length > 0}
                         <div class="space-y-1">
@@ -608,7 +618,7 @@
                     {:else}
                       <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
                     {/if}
-                    {#if isOrganizer && (uploadingFor === puid || !playerDeck)}
+                    {#if isOrganizer && !playerDeck && uploadingFor !== puid}
                       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
                     {/if}
                   </div>

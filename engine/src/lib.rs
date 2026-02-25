@@ -267,7 +267,17 @@ mod shared {
 
     pub fn parse_deck_json(text: &str, cards_json: &str) -> Result<String, String> {
         let card_map = cards::CardMap::load(cards_json)?;
-        Ok(deck::parse_deck(text, &card_map)?.to_json().dump())
+        let result = deck::parse_deck(text, &card_map)?;
+        let mut json = result.deck.to_json();
+        if !result.unrecognized_lines.is_empty() {
+            let lines: Vec<JsonValue> = result
+                .unrecognized_lines
+                .iter()
+                .map(|l| l.as_str().into())
+                .collect();
+            json["unrecognized_lines"] = JsonValue::Array(lines);
+        }
+        Ok(json.dump())
     }
 
     pub fn validate_deck_json(

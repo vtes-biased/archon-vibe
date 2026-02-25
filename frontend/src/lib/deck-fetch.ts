@@ -7,11 +7,12 @@
 
 import { initEngine } from './engine';
 
-interface ParsedDeck {
+export interface ParsedDeck {
   name: string;
   author: string;
   comments: string;
   cards: Record<string, number>;
+  warnings?: string[];
 }
 
 /**
@@ -73,11 +74,18 @@ export async function parseDeckText(text: string): Promise<ParsedDeck> {
 
   const resultJson = engine.parseDeck(text, cardsJson);
   const result = JSON.parse(resultJson);
+  const warnings: string[] = [];
+  if (result.unrecognized_lines?.length) {
+    for (const line of result.unrecognized_lines) {
+      warnings.push(`Could not identify card: "${line}"`);
+    }
+  }
   return {
     name: result.name || '',
     author: result.author || '',
     comments: result.comments || '',
     cards: result.cards || {},
+    warnings: warnings.length ? warnings : undefined,
   };
 }
 
@@ -89,8 +97,9 @@ async function fetchVdb(parsed: URL): Promise<ParsedDeck> {
     for (const item of fragment.split(';')) {
       if (!item.includes('=')) continue;
       const parts = item.split('=', 2);
+      if (!parts[0] || !parts[1]) continue;
       const count = parseInt(parts[1], 10);
-      if (parts[0] && count > 0) cards[parts[0]] = count;
+      if (count > 0) cards[parts[0]] = count;
     }
     const params = parsed.searchParams;
     return {
