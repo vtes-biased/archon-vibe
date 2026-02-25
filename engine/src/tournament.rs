@@ -1420,11 +1420,13 @@ fn apply_event(
                 tournament["state"] = "Playing".into();
             }
 
-            // Mark checked-in players as playing (in Finished state, they were transitioned from Finished→Checked-in earlier)
+            // Mark checked-in players as playing, drop registered-but-not-checked-in players
             let players = &mut tournament["players"];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() == Some("Checked-in") {
-                    players[i]["state"] = "Playing".into();
+                match players[i]["state"].as_str() {
+                    Some("Checked-in") => players[i]["state"] = "Playing".into(),
+                    Some("Registered") => players[i]["state"] = "Finished".into(),
+                    _ => {}
                 }
             }
 
@@ -2877,6 +2879,37 @@ mod tests {
             .collect();
         assert_eq!(t0, vec!["p0", "p1", "p2", "p3"]);
         assert_eq!(t1, vec!["p4", "p5", "p6", "p7"]);
+    }
+
+    #[test]
+    fn test_start_round_drops_registered_players() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![
+            { user_uid: "p0", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p4", state: "Registered", payment_status: "Pending", toss: 0 },
+            { user_uid: "p5", state: "Registered", payment_status: "Pending", toss: 0 },
+        ];
+
+        let event = json::parse(
+            r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"]]}"#,
+        )
+        .unwrap();
+        let actor = make_organizer();
+
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok(), "StartRound failed: {:?}", result.err());
+        let updated = json::parse(&result.unwrap()).unwrap();
+
+        // Checked-in players should now be Playing
+        assert_eq!(updated["players"][0]["state"].as_str(), Some("Playing"));
+        assert_eq!(updated["players"][3]["state"].as_str(), Some("Playing"));
+        // Registered players should be dropped to Finished
+        assert_eq!(updated["players"][4]["state"].as_str(), Some("Finished"));
+        assert_eq!(updated["players"][5]["state"].as_str(), Some("Finished"));
     }
 
     #[test]
