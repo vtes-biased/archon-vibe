@@ -6,7 +6,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
-  import { getUser, getUserByVeknId, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped } from "$lib/db";
+  import { getUser, getUserByVeknId, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
   import { formatScore } from "$lib/utils";
@@ -69,6 +69,14 @@
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
+
+  // League name for display
+  let leagueName = $state<string | null>(null);
+  $effect(() => {
+    const luid = tournament?.league_uid;
+    if (!luid) { leagueName = null; return; }
+    getLeague(luid).then(l => { leagueName = l?.name ?? null; });
+  });
 
   // Decks loaded from IDB (separate store)
   let decksByUser = $state<Record<string, DeckObject[]>>({});
@@ -617,6 +625,12 @@
                  class="px-2 py-0.5 rounded text-xs font-medium bg-dusk-800 text-ash-300 hover:text-ash-100 inline-flex items-center gap-1"
                  title="View on vekn.net">
                 VEKN <ExternalLink class="w-3 h-3" />
+              </a>
+            {/if}
+            {#if tournament.league_uid && leagueName}
+              <a href="/leagues/{tournament.league_uid}"
+                 class="px-2 py-0.5 rounded text-xs font-medium badge-blue inline-flex items-center gap-1 hover:opacity-80 transition-opacity max-w-48 truncate">
+                {leagueName}
               </a>
             {/if}
           </div>

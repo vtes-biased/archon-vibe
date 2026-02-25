@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getLeague } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
   import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
@@ -55,6 +55,18 @@
 
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
+
+  // League names for display
+  let leagueNames = $state<Record<string, string>>({});
+  $effect(() => {
+    const uids = [...new Set(tournaments.map(t => t.league_uid).filter((u): u is string => !!u))];
+    if (!uids.length) { leagueNames = {}; return; }
+    Promise.all(uids.map(u => getLeague(u))).then(leagues => {
+      const map: Record<string, string> = {};
+      for (const l of leagues) { if (l) map[l.uid] = l.name; }
+      leagueNames = map;
+    });
+  });
 
   async function loadTournaments() {
     try {
@@ -366,13 +378,16 @@
                     {tournament.state}
                   </span>
                 </div>
-                <div class="flex gap-2 text-xs text-ash-500">
+                <div class="flex gap-2 text-xs text-ash-500 flex-wrap">
                   <span>{tournament.format}</span>
                   {#if tournament.rank}
                     <span>· {tournament.rank}</span>
                   {/if}
                   {#if tournament.online}
                     <span>· {m.tournaments_online()}</span>
+                  {/if}
+                  {#if tournament.league_uid && leagueNames[tournament.league_uid]}
+                    <span class="text-blue-400/70">· {leagueNames[tournament.league_uid]}</span>
                   {/if}
                 </div>
               </div>
@@ -381,8 +396,10 @@
               <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                 <div class="col-span-4">
                   <div class="font-semibold text-bone-100">{tournament.name}</div>
-                  {#if tournament.rank}
-                    <div class="text-xs text-ash-500">{tournament.rank}</div>
+                  {#if tournament.rank || (tournament.league_uid && leagueNames[tournament.league_uid])}
+                    <div class="text-xs text-ash-500 truncate">
+                      {#if tournament.rank}{tournament.rank}{/if}{#if tournament.rank && tournament.league_uid && leagueNames[tournament.league_uid]} · {/if}{#if tournament.league_uid && leagueNames[tournament.league_uid]}<span class="text-blue-400/70">{leagueNames[tournament.league_uid]}</span>{/if}
+                    </div>
                   {/if}
                 </div>
                 <div class="col-span-2 text-sm text-ash-400">
