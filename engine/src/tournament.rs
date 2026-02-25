@@ -2337,6 +2337,9 @@ fn apply_event(
                 }
             }
 
+            // Recompute standings so finalist flags are up-to-date
+            update_standings(tournament, sanctions);
+
             Ok(())
         }
 

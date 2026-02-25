@@ -1,9 +1,9 @@
 /// League standings computation shared between frontend (WASM) and backend (PyO3).
 ///
 /// Three standings modes:
-/// - **RTP**: Sum of per-tournament rating points (reuses `compute_rating_points`)
-/// - **Score**: Sum of preliminary GW/VP/TP (standings are prelim-only)
-/// - **GP**: Position-based points per tournament (25/15/10-6/3)
+/// - **RTP**: Sum of per-tournament rating points; GW/VP include finals
+/// - **Score**: Sum of preliminary GW/VP/TP only (finals excluded)
+/// - **GP**: Position-based points per tournament; GW/VP include finals
 use json::JsonValue;
 
 use crate::ratings::compute_rating_points;
@@ -115,6 +115,18 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
                 }
             }
         }
+
+        // For non-Score modes, add finals GW/VP/TP to displayed totals
+        if mode != "Score" {
+            for finalist in tournament["finals"].members() {
+                let uid = finalist["player_uid"].as_str().unwrap_or("").to_string();
+                if let Some(entry) = players.get_mut(&uid) {
+                    entry.gw += finalist["gw"].as_f64().unwrap_or(0.0);
+                    entry.vp += finalist["vp"].as_f64().unwrap_or(0.0);
+                    entry.tp += finalist["tp"].as_i32().unwrap_or(0);
+                }
+            }
+        }
     }
 
     // Sort players
@@ -212,7 +224,10 @@ mod tests {
                     {"user_uid": "p2", "gw": 2.0, "vp": 4.0, "tp": 140, "finalist": true},
                     {"user_uid": "p3", "gw": 1.0, "vp": 2.0, "tp": 100, "finalist": false}
                 ],
-                "finals": []
+                "finals": [
+                    {"player_uid": "p1", "gw": 1, "vp": 3.0, "tp": 60},
+                    {"player_uid": "p2", "gw": 0, "vp": 1.0, "tp": 24}
+                ]
             }]
         }"#;
         let result = compute_league_standings(config).unwrap();
@@ -223,6 +238,12 @@ mod tests {
         assert_eq!(parsed[0]["rank"].as_i32().unwrap(), 1);
         // p1 gets more RTP as winner
         assert!(parsed[0]["points"].as_i32().unwrap() > parsed[1]["points"].as_i32().unwrap());
+        // GW/VP should include finals
+        assert_eq!(parsed[0]["gw"].as_f64().unwrap(), 4.0); // 3 prelim + 1 final
+        assert_eq!(parsed[0]["vp"].as_f64().unwrap(), 9.0); // 6 prelim + 3 final
+        // p3 has no finals data, unchanged
+        assert_eq!(parsed[2]["gw"].as_f64().unwrap(), 1.0);
+        assert_eq!(parsed[2]["vp"].as_f64().unwrap(), 2.0);
     }
 
     #[test]
@@ -322,6 +343,74 @@ mod tests {
         assert_eq!(parsed[1]["rank"].as_i32().unwrap(), 1);
         // Both played 2 tournaments
         assert_eq!(parsed[0]["tournaments_count"].as_i32().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_real_data_gp_mode() {
+        // Exact data from DB: 5 players, 1 with 2GW, finals winner gets 1GW
+        let config = r#"{
+            "standings_mode": "GP",
+            "tournaments": [{
+                "uid": "t1",
+                "rank": "",
+                "player_count": 5,
+                "winner": "lionel",
+                "standings": [
+                    {"user_uid": "lionel", "gw": 2.0, "vp": 6.5, "tp": 120, "finalist": false},
+                    {"user_uid": "p2", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
+                    {"user_uid": "p3", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
+                    {"user_uid": "p4", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
+                    {"user_uid": "p5", "gw": 0.0, "vp": 0.0, "tp": 42, "finalist": false}
+                ],
+                "finals": [
+                    {"player_uid": "lionel", "gw": 1, "vp": 5.0, "tp": 60},
+                    {"player_uid": "p2", "gw": 0, "vp": 0.0, "tp": 30},
+                    {"player_uid": "p3", "gw": 0, "vp": 0.0, "tp": 30},
+                    {"player_uid": "p4", "gw": 0, "vp": 0.0, "tp": 30},
+                    {"player_uid": "p5", "gw": 0, "vp": 0.0, "tp": 30}
+                ]
+            }]
+        }"#;
+        let result = compute_league_standings(config).unwrap();
+        let parsed = json::parse(&result).unwrap();
+        let lionel = parsed.members().find(|e| e["user_uid"] == "lionel").unwrap();
+        // GP: prelim 2GW + finals 1GW = 3GW displayed
+        assert_eq!(lionel["gw"].as_f64().unwrap(), 3.0);
+        assert_eq!(lionel["vp"].as_f64().unwrap(), 11.5); // 6.5 + 5.0
+        assert_eq!(lionel["points"].as_i32().unwrap(), 25); // position 1
+    }
+
+    #[test]
+    fn test_real_data_score_mode() {
+        let config = r#"{
+            "standings_mode": "Score",
+            "tournaments": [{
+                "uid": "t1",
+                "rank": "",
+                "player_count": 5,
+                "winner": "lionel",
+                "standings": [
+                    {"user_uid": "lionel", "gw": 2.0, "vp": 6.5, "tp": 120, "finalist": false},
+                    {"user_uid": "p2", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
+                    {"user_uid": "p3", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
+                    {"user_uid": "p4", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
+                    {"user_uid": "p5", "gw": 0.0, "vp": 0.0, "tp": 42, "finalist": false}
+                ],
+                "finals": [
+                    {"player_uid": "lionel", "gw": 1, "vp": 5.0, "tp": 60},
+                    {"player_uid": "p2", "gw": 0, "vp": 0.0, "tp": 30},
+                    {"player_uid": "p3", "gw": 0, "vp": 0.0, "tp": 30},
+                    {"player_uid": "p4", "gw": 0, "vp": 0.0, "tp": 30},
+                    {"player_uid": "p5", "gw": 0, "vp": 0.0, "tp": 30}
+                ]
+            }]
+        }"#;
+        let result = compute_league_standings(config).unwrap();
+        let parsed = json::parse(&result).unwrap();
+        let lionel = parsed.members().find(|e| e["user_uid"] == "lionel").unwrap();
+        // Score: prelim only = 2GW
+        assert_eq!(lionel["gw"].as_f64().unwrap(), 2.0);
+        assert_eq!(lionel["vp"].as_f64().unwrap(), 6.5);
     }
 
     #[test]
