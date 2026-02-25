@@ -64,17 +64,24 @@ engine/data/cards.json
 backend.log
 frontend.log
 
+# Pytest
+.pytest_cache/
+
+# FastEmbed
+.fastembed_cache/
+
 # Test results and reports (Playwright)
 test-results/
 playwright-report/
-frontend/test-results/
-frontend/playwright-report/
 
 # GeoNames raw data (processed JSON files are committed)
 backend/data/geonames_raw/
 
 # Codanna
 .codanna/
+
+# Incoming notes
+INCOMING/
 
 # Claude Code (user-specific settings and private memory)
 .claude/settings.local.json
