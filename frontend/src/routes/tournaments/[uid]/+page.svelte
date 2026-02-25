@@ -728,8 +728,8 @@
         </div>
       {/if}
 
-      <!-- Judge Call Banner (organizer only) -->
-      {#if showOrganizerView && tournament.state === "Playing"}
+      <!-- Judge Call Banner (organizer only, shown in any view) -->
+      {#if tournament.state === "Playing"}
         <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
       {/if}
 
