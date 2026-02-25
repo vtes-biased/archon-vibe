@@ -777,7 +777,9 @@
               {:else if tournament.state === "Registration"}
                 {m.action_bar_registration({ count: String(registeredCount) })}
               {:else if tournament.state === "Waiting"}
-                {#if hasFinalsCandidate}
+                {#if hasFinalsCandidate && top5HasTiesFn(standings)}
+                  {m.action_bar_waiting_toss_needed({ n: String(tournament.rounds!.length) })}
+                {:else if hasFinalsCandidate}
                   {m.action_bar_waiting_finals_ready({ n: String(tournament.rounds!.length) })}
                 {:else if hasRounds}
                   {m.action_bar_waiting_after_round({ n: String(tournament.rounds!.length) })}
@@ -822,8 +824,8 @@
                 <button onclick={() => doAction("StartRound")} disabled={actionLoading || checkedInCount < 4}
                   class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
                 >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
-                {#if finalsReady}
-                  <button onclick={() => doAction("StartFinals")} disabled={actionLoading}
+                {#if hasFinalsCandidate}
+                  <button onclick={() => doAction("StartFinals")} disabled={actionLoading || !finalsReady}
                     class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
                   >{m.overview_start_finals()}</button>
                 {/if}

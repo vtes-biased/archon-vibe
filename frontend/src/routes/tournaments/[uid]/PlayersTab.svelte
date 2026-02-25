@@ -52,7 +52,8 @@
     return numRounds - 1; // default to last round
   });
 
-  let tossInputs = $state<Record<string, string>>({});
+  let editingToss = $state(false);
+  let tossEdits = $state<Record<string, string>>({});
   // svelte-ignore state_referenced_locally — intentionally captures initial value
   let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
   let standingsInitialized = false;
@@ -178,11 +179,37 @@
     await doAction("DropOut", { player_uid: playerUid });
   }
 
-  async function setToss(playerUid: string) {
-    const val = parseInt(tossInputs[playerUid] ?? "0", 10);
-    if (isNaN(val) || val < 0) return;
-    await doAction("SetToss", { player_uid: playerUid, toss: val });
-    tossInputs[playerUid] = "";
+  function enterTossEdit() {
+    editingToss = true;
+    const edits: Record<string, string> = {};
+    for (const entry of standings) {
+      const idx = standings.indexOf(entry);
+      const isTop5 = idx >= 0 && idx < 5;
+      const isTied = standings.some((s, j) => j !== idx && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5));
+      if (isTied) {
+        edits[entry.user_uid] = String(entry.toss ?? "");
+      }
+    }
+    tossEdits = edits;
+  }
+
+  async function saveTossEdits() {
+    for (const [uid, val] of Object.entries(tossEdits)) {
+      const entry = standingsMap.get(uid);
+      const numVal = parseInt(val, 10);
+      if (isNaN(numVal) || numVal < 0) continue;
+      if (entry && entry.toss !== numVal) {
+        const player = tournament.players?.find(p => p.user_uid === uid);
+        if (player) await doAction("SetToss", { player_uid: uid, toss: numVal });
+      }
+    }
+    editingToss = false;
+    tossEdits = {};
+  }
+
+  function cancelTossEdit() {
+    editingToss = false;
+    tossEdits = {};
   }
 
   async function randomToss() {
@@ -277,18 +304,34 @@
     {/if}
   </div>
 
-  <!-- Toss controls -->
-  {#if isOrganizer && hasFinalsCandidate && top5HasTiesFn(standings)}
+  <!-- Toss controls (only between rounds, not during play) -->
+  {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings)}
     <div class="flex items-center gap-2">
-      <button
-        onclick={randomToss}
-        disabled={actionLoading}
-        class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-      >
-        <Dice3 class="w-4 h-4 inline mr-1" />
-        {m.players_random_toss()}
-      </button>
-      <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
+      {#if editingToss}
+        <button
+          onclick={saveTossEdits}
+          disabled={actionLoading}
+          class="px-3 py-1.5 text-sm text-emerald-400 bg-ash-800 hover:bg-ash-700 border border-emerald-800 rounded-lg transition-colors"
+        >{m.common_save()}</button>
+        <button
+          onclick={cancelTossEdit}
+          class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+        >{m.common_cancel()}</button>
+      {:else}
+        <button
+          onclick={randomToss}
+          disabled={actionLoading}
+          class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+        >
+          <Dice3 class="w-4 h-4 inline mr-1" />
+          {m.players_random_toss()}
+        </button>
+        <button
+          onclick={enterTossEdit}
+          class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+        >{m.players_edit_toss()}</button>
+        <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
+      {/if}
     </div>
   {/if}
 
@@ -377,13 +420,13 @@
               <span>{formatScore(entry.gw, entry.vp, entry.tp)}</span>
               {#if hasFinals && entry.finals}<span>{entry.finals}</span>{/if}
               {#if isFinished && playerSort === 'standings'}<span class="text-ash-500">{getRatingPts(entry)} RP</span>{/if}
-              {#if isTied && hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
-                <span class="text-ash-500">Toss: {entry.toss || "—"}</span>
-                {#if isOrganizer}
-                  <input type="number" min="1" class="w-10 min-h-[44px] bg-ash-800 text-bone-100 text-xs rounded px-1 py-1.5 border border-ash-700"
-                    value={tossInputs[puid] ?? ""} oninput={(e) => tossInputs[puid] = (e.target as HTMLInputElement).value} />
-                  <button onclick={() => setToss(puid)} disabled={actionLoading}
-                    class="px-2 py-1.5 text-xs text-emerald-400 border border-emerald-800 rounded">{m.players_set_toss()}</button>
+              {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
+                {#if editingToss && isOrganizer}
+                  <span class="text-ash-500">Toss:</span>
+                  <input type="number" min="1" class="w-12 min-h-[44px] bg-ash-800 text-bone-100 text-xs rounded px-1 py-1.5 border border-ash-700"
+                    value={tossEdits[puid] ?? ""} oninput={(e) => tossEdits[puid] = (e.target as HTMLInputElement).value} />
+                {:else}
+                  <span class="text-ash-500">Toss: {entry.toss || "—"}</span>
                 {/if}
               {/if}
             </div>
@@ -477,7 +520,7 @@
                 <th class="text-right py-1.5 px-2">{m.tournament_col_rating()}</th>
               {/if}
             {/if}
-            {#if hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
+            {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
               <th class="text-right py-1.5 px-2">{m.tournament_col_toss()}</th>
             {/if}
             <th class="text-left py-1.5 px-2">{m.tournament_col_status()}</th>
@@ -521,21 +564,17 @@
                   <td class="text-right py-1.5 px-2 text-ash-400">{entry ? getRatingPts(entry) : "—"}</td>
                 {/if}
               {/if}
-              {#if hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
+              {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
                 <td class="text-right py-1.5 px-2">
-                  {#if isOrganizer && isTied}
-                    <div class="flex items-center gap-1 justify-end">
-                      <span class="text-ash-500">{entry?.toss || "—"}</span>
+                  {#if isTied}
+                    {#if editingToss && isOrganizer}
                       <input type="number" min="1"
-                        class="w-10 bg-ash-800 text-bone-100 text-xs rounded px-1 py-0.5 border border-ash-700"
-                        value={tossInputs[puid] ?? ""}
-                        oninput={(e) => tossInputs[puid] = (e.target as HTMLInputElement).value} />
-                      <button onclick={() => setToss(puid)} disabled={actionLoading}
-                        class="px-1.5 py-0.5 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded"
-                      >{m.players_set_toss()}</button>
-                    </div>
-                  {:else if isTied}
-                    {entry?.toss || "—"}
+                        class="w-14 bg-ash-800 text-bone-100 text-xs rounded px-1 py-0.5 border border-ash-700"
+                        value={tossEdits[puid] ?? ""}
+                        oninput={(e) => tossEdits[puid] = (e.target as HTMLInputElement).value} />
+                    {:else}
+                      {entry?.toss || "—"}
+                    {/if}
                   {/if}
                 </td>
               {/if}
