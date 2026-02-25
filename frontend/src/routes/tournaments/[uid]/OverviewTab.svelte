@@ -124,9 +124,11 @@
 
   function getRatingPts(entry: StandingEntry): number {
     if (!isFinished) return 0;
-    const finalistPos = entry.user_uid === tournament.winner ? 1
+    const isWinner = entry.user_uid === tournament.winner;
+    const finalistPos = isWinner ? 1
       : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
-    return computeRatingPoints(entry.vp, entry.gw, finalistPos, standings.length, tournament.rank);
+    const gw = isWinner ? entry.gw + 1 : entry.gw;
+    return computeRatingPoints(entry.vp, gw, finalistPos, standings.length, tournament.rank);
   }
 </script>
 

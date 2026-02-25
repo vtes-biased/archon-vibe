@@ -288,12 +288,15 @@
   const standings = $derived(computeStandings());
 
   // Rating points per player (only for finished tournaments)
+  // Finals GW counts toward total GW for rating computation (VEKN rules)
   function getRatingPts(entry: StandingEntry): number {
     if (!tournament || tournament.state !== "Finished") return 0;
-    const finalistPos = entry.user_uid === tournament.winner ? 1
+    const isWinner = entry.user_uid === tournament.winner;
+    const finalistPos = isWinner ? 1
       : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
     const playerCount = standings.length;
-    return computeRatingPoints(entry.vp, entry.gw, finalistPos, playerCount, tournament.rank);
+    const gw = isWinner ? entry.gw + 1 : entry.gw;
+    return computeRatingPoints(entry.vp, gw, finalistPos, playerCount, tournament.rank);
   }
 
   const isFinished = $derived(tournament?.state === "Finished");

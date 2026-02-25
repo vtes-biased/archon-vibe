@@ -2,7 +2,7 @@
 ///
 /// Three standings modes:
 /// - **RTP**: Sum of per-tournament rating points (reuses `compute_rating_points`)
-/// - **Score**: Sum of preliminary GW/VP/TP (finals scores subtracted for finalists)
+/// - **Score**: Sum of preliminary GW/VP/TP (standings are prelim-only)
 /// - **GP**: Position-based points per tournament (25/15/10-6/3)
 use json::JsonValue;
 
@@ -50,21 +50,6 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
         let rank = tournament["rank"].as_str().unwrap_or("");
         let player_count = tournament["player_count"].as_i32().unwrap_or(0);
 
-        // Build finals score map (player_uid -> (gw, vp, tp)) for Score mode subtraction
-        let mut finals_scores: std::collections::HashMap<String, (f64, f64, i32)> =
-            std::collections::HashMap::new();
-        if mode == "Score" {
-            for seat in tournament["finals"].members() {
-                let uid = seat["player_uid"].as_str().unwrap_or("").to_string();
-                if !uid.is_empty() {
-                    let gw = seat["gw"].as_f64().unwrap_or(0.0);
-                    let vp = seat["vp"].as_f64().unwrap_or(0.0);
-                    let tp = seat["tp"].as_i32().unwrap_or(0);
-                    finals_scores.insert(uid, (gw, vp, tp));
-                }
-            }
-        }
-
         // Process each player in the tournament standings
         let standings = &tournament["standings"];
         let standings_count = standings.members().count();
@@ -91,15 +76,10 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
 
             match mode {
                 "Score" => {
+                    // Standings are prelim-only (compute_standings sums rounds only)
                     entry.gw += gw;
                     entry.vp += vp;
                     entry.tp += tp;
-                    // Subtract finals scores so only prelim results count
-                    if let Some((fgw, fvp, ftp)) = finals_scores.get(&uid) {
-                        entry.gw -= fgw;
-                        entry.vp -= fvp;
-                        entry.tp -= ftp;
-                    }
                 }
                 "RTP" => {
                     let finalist_position = if finalist {
@@ -246,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn test_score_mode_subtracts_finals() {
+    fn test_score_mode_prelim_only() {
         let config = r#"{
             "standings_mode": "Score",
             "tournaments": [{
@@ -255,8 +235,8 @@ mod tests {
                 "player_count": 20,
                 "winner": "p1",
                 "standings": [
-                    {"user_uid": "p1", "gw": 4.0, "vp": 8.0, "tp": 240, "finalist": true},
-                    {"user_uid": "p2", "gw": 3.0, "vp": 5.0, "tp": 180, "finalist": true},
+                    {"user_uid": "p1", "gw": 3.0, "vp": 5.0, "tp": 180, "finalist": true},
+                    {"user_uid": "p2", "gw": 3.0, "vp": 4.0, "tp": 156, "finalist": true},
                     {"user_uid": "p3", "gw": 2.0, "vp": 4.0, "tp": 120, "finalist": false}
                 ],
                 "finals": [
@@ -267,9 +247,7 @@ mod tests {
         }"#;
         let result = compute_league_standings(config).unwrap();
         let parsed = json::parse(&result).unwrap();
-        // p1: prelim only = gw:3, vp:5, tp:180
-        // p2: prelim only = gw:3, vp:4, tp:156
-        // p3: gw:2, vp:4, tp:120
+        // Standings are prelim-only; league Score mode uses them directly
         let p1 = &parsed[0];
         assert_eq!(p1["user_uid"].as_str().unwrap(), "p1");
         assert_eq!(p1["gw"].as_f64().unwrap(), 3.0);

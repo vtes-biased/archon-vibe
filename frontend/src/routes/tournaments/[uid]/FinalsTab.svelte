@@ -4,7 +4,7 @@
   import { tournamentAction, setTableScore } from "$lib/api";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import { GripVertical, ShieldCheck } from "lucide-svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, type StandingEntry } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -140,7 +140,7 @@
       <div class="divide-y divide-ash-800">
         {#each tournament.finals.seating as seat, j}
           {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-          {@const tGws = computeGwLocal(tVps)}
+          {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
           {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
           {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
           {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}

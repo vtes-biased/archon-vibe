@@ -387,6 +387,45 @@ pub(crate) fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
         .collect()
 }
 
+/// Compute GW for finals: always awards 1 GW to the winner (highest adjusted VP,
+/// tiebroken by seed order). No 2VP threshold — finals always produce a winner.
+pub(crate) fn compute_gw_finals(
+    vps: &[f64],
+    adjustments: &[f64],
+    seating_uids: &[&str],
+    seed_order: &[String],
+) -> Vec<f64> {
+    if vps.is_empty() {
+        return vec![];
+    }
+    let adjusted: Vec<f64> = vps
+        .iter()
+        .zip(adjustments.iter())
+        .map(|(v, a)| v + a)
+        .collect();
+    let mut best_idx = 0;
+    let mut best_adj = adjusted[0];
+    let mut best_seed = seed_order
+        .iter()
+        .position(|s| s == seating_uids[0])
+        .unwrap_or(usize::MAX);
+    for i in 1..adjusted.len() {
+        let adj = adjusted[i];
+        let seed_pos = seed_order
+            .iter()
+            .position(|s| s == seating_uids[i])
+            .unwrap_or(usize::MAX);
+        if adj > best_adj || (adj == best_adj && seed_pos < best_seed) {
+            best_adj = adj;
+            best_idx = i;
+            best_seed = seed_pos;
+        }
+    }
+    let mut gws = vec![0.0; vps.len()];
+    gws[best_idx] = 1.0;
+    gws
+}
+
 /// Compute TP based on VP rank within table. Ties average their positions.
 pub(crate) fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
     let base: &[f64] = match table_size {
@@ -1963,7 +2002,18 @@ fn apply_event(
                 }
             }
 
-            let gws = compute_gw(&vps, &adjustments);
+            let gws = if is_finals {
+                let seating_uids: Vec<&str> = (0..table_size)
+                    .map(|i| t["seating"][i]["player_uid"].as_str().unwrap_or(""))
+                    .collect();
+                let seed_order: Vec<String> = t["seed_order"]
+                    .members()
+                    .filter_map(|s| s.as_str().map(|v| v.to_string()))
+                    .collect();
+                compute_gw_finals(&vps, &adjustments, &seating_uids, &seed_order)
+            } else {
+                compute_gw(&vps, &adjustments)
+            };
             let tps = compute_tp(table_size, &vps);
 
             // Apply scores
@@ -3162,6 +3212,101 @@ mod tests {
         let adj = vec![-1.0, 0.0, 0.0, 0.0, 0.0];
         let gw = compute_gw(&vps, &adj);
         assert_eq!(gw[0], 1.0); // keeps GW: adjusted 2.0, still highest
+    }
+
+    #[test]
+    fn test_gw_finals_clear_winner() {
+        // Clear winner with highest VP — gets the GW regardless of seed
+        let vps = vec![3.0, 1.0, 0.5, 0.5, 0.0];
+        let adj = vec![0.0; 5];
+        let seats = vec!["p1", "p2", "p3", "p4", "p5"];
+        let seed = vec!["p5", "p4", "p3", "p2", "p1"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let gw = compute_gw_finals(&vps, &adj, &seats, &seed);
+        assert_eq!(gw, vec![1.0, 0.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_gw_finals_all_zero_vp_uses_seed() {
+        // All at 0 VP — top seed wins the tiebreak
+        let vps = vec![0.0, 0.0, 0.0, 0.0, 0.0];
+        let adj = vec![0.0; 5];
+        let seats = vec!["p3", "p1", "p5", "p2", "p4"];
+        let seed = vec!["p1", "p2", "p3", "p4", "p5"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let gw = compute_gw_finals(&vps, &adj, &seats, &seed);
+        // p1 is top seed (index 0 in seed_order), seated at position 1
+        assert_eq!(gw, vec![0.0, 1.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_gw_finals_tied_vp_seed_tiebreak() {
+        // Two players tied at 2 VP — lower seed position wins
+        let vps = vec![2.0, 0.0, 2.0, 1.0, 0.0];
+        let adj = vec![0.0; 5];
+        let seats = vec!["p1", "p2", "p3", "p4", "p5"];
+        // p3 has better seed (position 1) than p1 (position 2)
+        let seed = vec!["p5", "p3", "p1", "p2", "p4"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let gw = compute_gw_finals(&vps, &adj, &seats, &seed);
+        // p3 wins: same VP but better seed
+        assert_eq!(gw, vec![0.0, 0.0, 1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_gw_finals_no_2vp_threshold() {
+        // Unlike prelim compute_gw, finals doesn't require 2 VP
+        // Winner at 1.5 VP still gets GW
+        let vps = vec![1.5, 1.0, 0.5, 0.5, 0.5];
+        let adj = vec![0.0; 5];
+        let seats = vec!["p1", "p2", "p3", "p4", "p5"];
+        let seed = vec!["p1", "p2", "p3", "p4", "p5"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let gw = compute_gw_finals(&vps, &adj, &seats, &seed);
+        assert_eq!(gw, vec![1.0, 0.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_gw_finals_adjustment_changes_winner() {
+        // p1 has most raw VP but SA penalty drops them below p2
+        let vps = vec![3.0, 2.5, 0.5, 0.0, 0.0];
+        let adj = vec![-1.0, 0.0, 0.0, 0.0, 0.0];
+        let seats = vec!["p1", "p2", "p3", "p4", "p5"];
+        let seed = vec!["p1", "p2", "p3", "p4", "p5"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let gw = compute_gw_finals(&vps, &adj, &seats, &seed);
+        // p2 wins: p1 adjusted to 2.0, p2 at 2.5
+        assert_eq!(gw, vec![0.0, 1.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_gw_finals_empty() {
+        let gw = compute_gw_finals(&[], &[], &[], &[]);
+        assert!(gw.is_empty());
+    }
+
+    #[test]
+    fn test_gw_finals_4_player_table() {
+        // Finals can also be 4 players
+        let vps = vec![2.0, 1.0, 1.0, 1.0];
+        let adj = vec![0.0; 4];
+        let seats = vec!["p1", "p2", "p3", "p4"];
+        let seed = vec!["p1", "p2", "p3", "p4"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let gw = compute_gw_finals(&vps, &adj, &seats, &seed);
+        assert_eq!(gw, vec![1.0, 0.0, 0.0, 0.0]);
     }
 
     #[test]

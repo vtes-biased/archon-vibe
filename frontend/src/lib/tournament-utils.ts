@@ -48,6 +48,28 @@ export function computeGwLocal(vps: number[]): number[] {
   return vps.map(v => (v >= 2 && v === max && maxCount === 1 ? 1 : 0));
 }
 
+/** Finals GW: always awards 1 GW to the winner (highest VP, tiebroken by seed order). */
+export function computeGwFinals(vps: number[], seedOrder: string[], seatingUids: string[]): number[] {
+  if (vps.length === 0) return [];
+  let bestIdx = 0;
+  let bestVp = vps[0]!;
+  let bestSeed = seedOrder.indexOf(seatingUids[0]!);
+  if (bestSeed < 0) bestSeed = Infinity;
+  for (let i = 1; i < vps.length; i++) {
+    const vp = vps[i]!;
+    let seed = seedOrder.indexOf(seatingUids[i]!);
+    if (seed < 0) seed = Infinity;
+    if (vp > bestVp || (vp === bestVp && seed < bestSeed)) {
+      bestVp = vp;
+      bestIdx = i;
+      bestSeed = seed;
+    }
+  }
+  const gws = new Array(vps.length).fill(0);
+  gws[bestIdx] = 1;
+  return gws;
+}
+
 export function computeTpLocal(tableSize: number, vps: number[]): number[] {
   const base: Record<number, number[]> = {
     5: [60, 48, 36, 24, 12],

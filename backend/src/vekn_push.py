@@ -71,10 +71,8 @@ def generate_archondata(
         city = user.city or ""
         vekn_id = user.vekn_id or ""
 
-        # GW: standings include finals win for winner, VEKN wants prelim only
+        # GW: standings are prelim-only (engine compute_standings sums rounds only)
         gw = standing.gw
-        if tournament.winner == standing.user_uid and tournament.finals:
-            gw = gw - 1  # Remove finals GW
 
         vpf = finals_vp.get(standing.user_uid, 0.0)
 

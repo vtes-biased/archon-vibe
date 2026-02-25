@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction } from "$lib/types";
   import type { StandingEntry } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translatePlayerState, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel } from "lucide-svelte";
@@ -103,9 +103,11 @@
 
   function getRatingPts(entry: StandingEntry): number {
     if (!isFinished) return 0;
-    const finalistPos = entry.user_uid === tournament.winner ? 1
+    const isWinner = entry.user_uid === tournament.winner;
+    const finalistPos = isWinner ? 1
       : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
-    return computeRatingPoints(entry.vp, entry.gw, finalistPos, standings.length, tournament.rank);
+    const gw = isWinner ? entry.gw + 1 : entry.gw;
+    return computeRatingPoints(entry.vp, gw, finalistPos, standings.length, tournament.rank);
   }
 </script>
 
@@ -237,7 +239,7 @@
         <div class="divide-y divide-ash-800">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-            {@const tGws = computeGwLocal(tVps)}
+            {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
             {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
             {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
             {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
@@ -468,7 +470,7 @@
         <div class="divide-y divide-ash-800">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-            {@const tGws = computeGwLocal(tVps)}
+            {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
             {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
             {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
             {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}

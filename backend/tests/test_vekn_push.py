@@ -195,15 +195,15 @@ def test_archondata_nrounds_includes_finals(mock_compute):
 
 
 @patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
-def test_archondata_winner_finals_gw_subtracted(mock_compute):
-    """Winner's GW should have finals GW subtracted (VEKN wants prelim-only GW)."""
+def test_archondata_winner_prelim_gw_only(mock_compute):
+    """Archondata GW should be prelim-only (standings don't include finals GW)."""
     users = {
         "u1": _user("u1", "Alice Smith", "1000001"),
         "u2": _user("u2", "Bob Jones", "1000002"),
     }
-    # Alice is the winner: standings include finals GW
+    # Standings are prelim-only (engine compute_standings sums rounds only)
     standings = [
-        Standing(user_uid="u1", gw=3.0, vp=10.0, tp=60),  # 2 prelim + 1 finals GW
+        Standing(user_uid="u1", gw=2.0, vp=10.0, tp=60),  # 2 prelim GW
         Standing(user_uid="u2", gw=1.0, vp=4.0, tp=48),
     ]
     finals = FinalsTable(
@@ -234,7 +234,7 @@ def test_archondata_winner_finals_gw_subtracted(mock_compute):
     after_nrounds = result.split("¤", 1)[1]
     parts = after_nrounds.split("§")
 
-    # Alice (winner): gw should be 3 - 1 = 2 (prelim only)
+    # Alice (winner): gw is prelim-only = 2
     assert parts[5] == "2"  # gw
 
     # Alice's vpf should be 3.0 (her finals VP)
