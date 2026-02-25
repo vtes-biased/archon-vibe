@@ -109,6 +109,23 @@ export function top5HasTies(standings: StandingEntry[]): boolean {
   return false;
 }
 
+/** Check if top 5 has score ties (GW/VP/TP only, ignoring toss) — for showing toss UI */
+export function top5HasScoreTies(standings: StandingEntry[]): boolean {
+  if (standings.length < 5) return false;
+  for (let i = 0; i < 5; i++) {
+    for (let j = i + 1; j < 5; j++) {
+      const a = standings[i]!, b = standings[j]!;
+      if (a.gw === b.gw && a.vp === b.vp && a.tp === b.tp) return true;
+    }
+  }
+  const fifth = standings[4]!;
+  for (let k = 5; k < standings.length; k++) {
+    const s = standings[k]!;
+    if (s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp) return true;
+  }
+  return false;
+}
+
 /** Strip leading markdown title if it matches the tournament name */
 export function stripLeadingTitle(description: string, name: string): string {
   const lines = description.split('\n');

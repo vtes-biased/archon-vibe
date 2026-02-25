@@ -9,7 +9,7 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X } from "lucide-svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
-  import { top5HasTies as top5HasTiesFn, translatePlayerState, type StandingEntry } from "$lib/tournament-utils";
+  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -305,7 +305,7 @@
   </div>
 
   <!-- Toss controls (only between rounds, not during play) -->
-  {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings)}
+  {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings)}
     <div class="flex items-center gap-2">
       {#if editingToss}
         <button
@@ -330,7 +330,9 @@
           onclick={enterTossEdit}
           class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
         >{m.players_edit_toss()}</button>
-        <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
+        {#if top5HasTiesFn(standings)}
+          <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
+        {/if}
       {/if}
     </div>
   {/if}
@@ -420,7 +422,7 @@
               <span>{formatScore(entry.gw, entry.vp, entry.tp)}</span>
               {#if hasFinals && entry.finals}<span>{entry.finals}</span>{/if}
               {#if isFinished && playerSort === 'standings'}<span class="text-ash-500">{getRatingPts(entry)} RP</span>{/if}
-              {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
+              {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
                 {#if editingToss && isOrganizer}
                   <span class="text-ash-500">Toss:</span>
                   <input type="number" min="1" class="w-12 min-h-[44px] bg-ash-800 text-bone-100 text-xs rounded px-1 py-1.5 border border-ash-700"
@@ -520,7 +522,7 @@
                 <th class="text-right py-1.5 px-2">{m.tournament_col_rating()}</th>
               {/if}
             {/if}
-            {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
+            {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
               <th class="text-right py-1.5 px-2">{m.tournament_col_toss()}</th>
             {/if}
             <th class="text-left py-1.5 px-2">{m.tournament_col_status()}</th>
@@ -564,7 +566,7 @@
                   <td class="text-right py-1.5 px-2 text-ash-400">{entry ? getRatingPts(entry) : "—"}</td>
                 {/if}
               {/if}
-              {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasTiesFn(standings) && playerSort === 'standings'}
+              {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
                 <td class="text-right py-1.5 px-2">
                   {#if isTied}
                     {#if editingToss && isOrganizer}
