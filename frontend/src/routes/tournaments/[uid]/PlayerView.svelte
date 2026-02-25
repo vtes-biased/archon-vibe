@@ -338,6 +338,7 @@
 <!-- Raffle results (visible to all players) -->
 {#if (tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished") && (tournament.raffles?.length ?? 0) > 0}
   <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6">
+    <h3 class="text-sm font-medium text-ash-300 mb-3">{m.raffle_title()}</h3>
     <RaffleSection
       {tournament}
       {playerInfo}

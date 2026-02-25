@@ -118,8 +118,7 @@
   const hasRaffles = $derived(raffles.length > 0);
 </script>
 
-<div class="bg-ash-900/30 rounded-lg p-4 space-y-3">
-  <h3 class="text-sm font-medium text-ash-300">{m.raffle_title()}</h3>
+<div class="space-y-3">
 
   {#if isOrganizer && doAction}
     <!-- Organizer controls -->

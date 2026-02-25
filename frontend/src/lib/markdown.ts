@@ -2,8 +2,11 @@ import { marked, type Tokens } from "marked";
 import DOMPurify from "dompurify";
 
 export function renderMarkdown(src: string): string {
-  const raw = marked.parse(src, { async: false }) as string;
-  return DOMPurify.sanitize(raw);
+  const renderer = new marked.Renderer();
+  renderer.link = ({ href, text }: Tokens.Link) =>
+    `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  const raw = marked.parse(src, { renderer, async: false }) as string;
+  return DOMPurify.sanitize(raw, { ADD_ATTR: ["target", "rel"] });
 }
 
 /** Slugify a heading text into a URL-friendly id */

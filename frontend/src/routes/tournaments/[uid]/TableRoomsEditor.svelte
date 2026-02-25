@@ -78,12 +78,11 @@
 </script>
 
 <div>
-  <div class="flex items-center justify-between mb-2">
-    <h4 class="text-sm font-medium text-ash-300">{m.rooms_title()}</h4>
-    {#if rooms.length > 0}
+  {#if rooms.length > 0}
+    <div class="flex items-center justify-end mb-2">
       <span class="text-xs text-ash-500">{m.rooms_total({ count: String(totalCount) })}</span>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   {#if rooms.length > 0}
     <div class="space-y-2 mb-3">

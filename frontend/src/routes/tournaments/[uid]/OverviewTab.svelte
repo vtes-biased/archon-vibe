@@ -41,7 +41,10 @@
   const hasFinals = $derived(standings.some(e => e.finals));
   const isFinished = $derived(tournament.state === "Finished");
 
-  // Archon import state
+  // Collapsible section states
+  let organizersExpanded = $state(false);
+  let roomsExpanded = $state(false);
+  let raffleExpanded = $state(false);
   let archonExpanded = $state(false);
   let archonFile = $state<File | null>(null);
   let archonUploading = $state(false);
@@ -171,18 +174,36 @@
   <!-- Organizers -->
   {#if isOrganizer}
     <div class="bg-ash-900/30 rounded-lg p-4">
-      <OrganizerManager
-        organizerUids={tournament.organizers_uids ?? []}
-        onadd={async (userUid) => { await addTournamentOrganizer(tournament.uid, userUid); }}
-        onremove={async (userUid) => { await removeTournamentOrganizer(tournament.uid, userUid); }}
-      />
+      <button onclick={() => organizersExpanded = !organizersExpanded}
+        class="flex items-center gap-2 text-sm font-medium text-ash-300 w-full text-left">
+        {#if organizersExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+        {m.organizers_title()}
+      </button>
+      {#if organizersExpanded}
+        <div class="mt-3">
+          <OrganizerManager
+            organizerUids={tournament.organizers_uids ?? []}
+            onadd={async (userUid) => { await addTournamentOrganizer(tournament.uid, userUid); }}
+            onremove={async (userUid) => { await removeTournamentOrganizer(tournament.uid, userUid); }}
+          />
+        </div>
+      {/if}
     </div>
     <div class="bg-ash-900/30 rounded-lg p-4">
-      <TableRoomsEditor
-        tournamentUid={tournament.uid}
-        tableRooms={tournament.table_rooms ?? []}
-        onupdate={(t) => { tournament = t; }}
-      />
+      <button onclick={() => roomsExpanded = !roomsExpanded}
+        class="flex items-center gap-2 text-sm font-medium text-ash-300 w-full text-left">
+        {#if roomsExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+        {m.rooms_title()}
+      </button>
+      {#if roomsExpanded}
+        <div class="mt-3">
+          <TableRoomsEditor
+            tournamentUid={tournament.uid}
+            tableRooms={tournament.table_rooms ?? []}
+            onupdate={(t) => { tournament = t; }}
+          />
+        </div>
+      {/if}
     </div>
     <!-- Archon Import -->
     <div class="bg-ash-900/30 rounded-lg p-4">
@@ -294,13 +315,24 @@
 
   <!-- Raffle section (Waiting, Playing, or Finished) -->
   {#if tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished"}
-    <RaffleSection
-      {tournament}
-      {playerInfo}
-      standings={tournament.standings ?? []}
-      {isOrganizer}
-      {doAction}
-      {actionLoading}
-    />
+    <div class="bg-ash-900/30 rounded-lg p-4">
+      <button onclick={() => raffleExpanded = !raffleExpanded}
+        class="flex items-center gap-2 text-sm font-medium text-ash-300 w-full text-left">
+        {#if raffleExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+        {m.raffle_title()}
+      </button>
+      {#if raffleExpanded}
+        <div class="mt-3">
+          <RaffleSection
+            {tournament}
+            {playerInfo}
+            standings={tournament.standings ?? []}
+            {isOrganizer}
+            {doAction}
+            {actionLoading}
+          />
+        </div>
+      {/if}
+    </div>
   {/if}
 </div>

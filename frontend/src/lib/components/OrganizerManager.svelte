@@ -101,8 +101,6 @@
 </script>
 
 <div class="space-y-3">
-  <h4 class="text-sm font-medium text-ash-300">{m.organizers_title()}</h4>
-
   <!-- Current organizers -->
   <div class="flex flex-wrap gap-2">
     {#each organizerUids as uid (uid)}
