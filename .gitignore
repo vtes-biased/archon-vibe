@@ -68,7 +68,7 @@ frontend.log
 .pytest_cache/
 
 # FastEmbed
-.fastembed_cache/
+.fastembed_cache
 
 # Test results and reports (Playwright)
 test-results/
