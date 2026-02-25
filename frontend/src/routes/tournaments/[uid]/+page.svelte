@@ -822,9 +822,6 @@
                 <button onclick={() => doAction("StartRound")} disabled={actionLoading || checkedInCount < 4}
                   class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
                 >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
-                {#if checkedInCount < 4}
-                  <span class="text-sm text-ash-500">{m.overview_start_round_hint({ count: String(checkedInCount) })}</span>
-                {/if}
                 {#if finalsReady}
                   <button onclick={() => doAction("StartFinals")} disabled={actionLoading}
                     class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
@@ -850,10 +847,6 @@
                     {showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code()}
                   </button>
                 {/if}
-                <!-- Seating warning -->
-                {#if [6, 7, 11].includes(checkedInCount)}
-                  <span class="text-sm text-amber-300">{m.overview_seating_warning({ count: String(checkedInCount) })}</span>
-                {/if}
 
               {:else if tournament.state === "Playing"}
                 {#if isFinals}
@@ -872,6 +865,16 @@
                 >{m.overview_reopen_tournament()}</button>
               {/if}
             </div>
+
+            <!-- Check-in hints (Waiting state) -->
+            {#if tournament.state === "Waiting"}
+              {#if checkedInCount < 4}
+                <p class="text-sm text-ash-500">{m.overview_start_round_hint({ count: String(checkedInCount) })}</p>
+              {/if}
+              {#if [6, 7, 11].includes(checkedInCount)}
+                <p class="text-sm text-amber-300">{m.overview_seating_warning({ count: String(checkedInCount) })}</p>
+              {/if}
+            {/if}
 
             <!-- Danger actions (Waiting state) -->
             {#if tournament.state === "Waiting"}
