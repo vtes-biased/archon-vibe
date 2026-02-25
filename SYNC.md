@@ -59,7 +59,6 @@ for obj_type in _STREAM_TYPES:
 ```
 
 No per-viewer filtering at read time — projections are pre-computed. After the catch-up phase, a **personal overlay** sends `full`-level data for the viewer's own objects and role-based full-access objects (NC/Prince same country, organizers).
-```
 
 ### Ephemeral SSE Events
 
@@ -97,6 +96,12 @@ Triggered when a viewer's data level changes (role or vekn_id change).
 ### Generic Broadcast
 
 Single `_broadcast()` function with per-viewer filtering replaces 4 separate broadcast functions.
+
+### Snapshot-Based Initial Sync
+
+On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects.
+
+After the snapshot loads, the SSE stream picks up from the snapshot's timestamp, delivering any changes that occurred since generation.
 
 ## Frontend: IndexedDB
 

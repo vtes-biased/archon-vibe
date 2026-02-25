@@ -54,13 +54,15 @@ Offline Mode:
 
 ### States
 
-| State | Description | Available Actions |
-|-------|-------------|-------------------|
-| `Planned` | Initial state, config editable | Open Registration, Delete |
-| `Registration` | Players can register | Register, Add Player, Close Registration |
-| `Waiting` | Between rounds, check-in active | Check In, Start Round, Finish |
-| `Playing` | Round in progress | Set Score, Finish Round |
-| `Finished` | Tournament complete | View Results |
+| State | Description | Key Actions |
+|-------|-------------|-------------|
+| `Planned` | Initial state, config editable | OpenRegistration, UpdateConfig, Delete |
+| `Registration` | Players can register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
+| `Waiting` | Between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
+| `Playing` | Round in progress | SetScore, Override, FinishRound, CancelRound, seating edits |
+| `Finished` | Tournament complete | ReopenTournament, deck uploads, view results |
+
+Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig available in Planned/Registration and for timer/display settings in later states.
 
 ## Business Events
 
@@ -71,21 +73,83 @@ Events are processed by the Rust engine. Each event includes:
 
 ### Event Types
 
+#### State Transitions
+
 | Event | Required Fields | Description |
 |-------|-----------------|-------------|
 | `OpenRegistration` | - | Planned → Registration |
 | `CloseRegistration` | - | Registration → Waiting |
+| `CancelRegistration` | - | Registration → Planned |
+| `ReopenRegistration` | - | Waiting → Registration |
+| `ReopenTournament` | - | Finished → Waiting |
 | `FinishTournament` | - | Waiting/Playing → Finished |
+
+#### Player Management
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
 | `Register` | `user_uid` | Player self-registration |
+| `Unregister` | `user_uid` | Player self-unregistration |
 | `AddPlayer` | `user_uid` | Organizer adds player |
-| `RemovePlayer` | `user_uid` | Organizer removes player |
+| `RemovePlayer` | `user_uid` | Organizer removes unplayed player (use DropOut if they have played) |
+| `DropOut` | `player_uid` | Drop a player who has played (preserves their scores) |
 | `CheckIn` | `player_uid` | Single player check-in |
 | `CheckInAll` | - | All registered → checked-in |
-| `StartRound` | - | Creates round with seating |
+| `ResetCheckIn` | - | All checked-in → registered |
+| `SetPaymentStatus` | `player_uid`, `payment_status` | Toggle payment status (Pending/Paid/Refunded/Cancelled) |
+| `MarkAllPaid` | - | Set all registered players to Paid |
+
+#### Rounds & Seating
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
+| `StartRound` | `seating?` | Creates round with seating (optional seating for deterministic forwarding) |
 | `FinishRound` | - | Ends current round |
+| `CancelRound` | - | Cancels current round, players return to Checked-in |
+| `SwapSeats` | `round`, `table`, `seat_a`, `seat_b` | Swap two players within a table |
+| `AlterSeating` | `round`, `seating` | Replace entire round or finals seating |
+| `SeatPlayer` | `round`, `table`, `player_uid` | Add player to a specific table |
+| `UnseatPlayer` | `player_uid` | Remove player from their current table |
+| `AddTable` | - | Add empty table to current round |
+| `RemoveTable` | `table` | Remove a table from current round |
+
+#### Scoring
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
 | `SetScore` | `round`, `table`, `scores[]` | Set table VP results (GW/TP auto-computed) |
-| `Override` | `round`, `table`, `comment` | Judge forces table to Finished |
+| `Override` | `round`, `table`, `comment` | Judge forces table to Finished (requires comment) |
 | `Unoverride` | `round`, `table` | Remove judge override |
+
+#### Finals
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
+| `SetToss` | `player_uid`, `toss` | Manually set toss value for finals qualification tie-breaking |
+| `RandomToss` | - | Randomly assign toss values to tied players |
+| `StartFinals` | - | Start finals round with top 5 qualifiers |
+| `FinishFinals` | - | End finals (requires valid scores) |
+
+#### Decks
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
+| `UpsertDeck` | `player_uid`, deck fields | Create or update a player's deck |
+| `DeleteDeck` | deck uid | Remove a deck |
+
+#### Raffle
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
+| `RaffleDraw` | `pool` | Draw from pool: AllPlayers, NonFinalists, GameWinners, NoGameWin, NoVictoryPoint |
+| `RaffleUndo` | - | Undo last raffle draw |
+| `RaffleClear` | - | Clear all raffle results |
+
+#### Configuration
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
+| `UpdateConfig` | `config` | Update tournament settings (timer, standings/decklists modes, table rooms, etc.) |
 
 ### Score Format
 
@@ -261,22 +325,22 @@ Request body:
 }
 ```
 
-### Legacy Action Endpoints
+### Other Tournament Endpoints
 
-These wrap the unified `/action` endpoint for backward compatibility:
-
-| Method | Path | Event Type |
-|--------|------|------------|
-| `POST` | `/{uid}/open-registration` | `OpenRegistration` |
-| `POST` | `/{uid}/register` | `Register` |
-| `POST` | `/{uid}/add-player` | `AddPlayer` |
-| `POST` | `/{uid}/close-registration` | `CloseRegistration` |
-| `POST` | `/{uid}/checkin` | `CheckIn` |
-| `POST` | `/{uid}/checkin-all` | `CheckInAll` |
-| `POST` | `/{uid}/rounds/start` | `StartRound` |
-| `POST` | `/{uid}/rounds/finish` | `FinishRound` |
-| `POST` | `/{uid}/finish` | `FinishTournament` |
-| `PUT` | `/{uid}/rounds/{r}/tables/{t}/score` | `SetScore` |
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/{uid}/organizers` | Add organizer |
+| `DELETE` | `/{uid}/organizers/{organizer_uid}` | Remove organizer |
+| `POST` | `/{uid}/qr-checkin` | Player self-check-in via QR code |
+| `POST` | `/{uid}/archon-import` | Import from legacy Archon Excel |
+| `GET` | `/{uid}/report` | Download tournament report (text/JSON) |
+| `GET` | `/{uid}/decks/{player_uid}/twda` | Export deck in TWDA format |
+| `POST` | `/{uid}/timer/*` | Timer controls (start/pause/reset/add-time/clock-stop/clock-resume) |
+| `POST` | `/{uid}/call-judge` | Player requests judge at table |
+| `POST` | `/{uid}/go-offline` | Lock tournament for offline mode |
+| `POST` | `/{uid}/go-online` | Submit offline changes and unlock |
+| `POST` | `/{uid}/force-takeover` | Force take over offline lock |
+| `POST` | `/{uid}/force-unlock` | Force-unlock without syncing |
 
 ## Seating Algorithm
 
@@ -326,30 +390,36 @@ Actions are validated by the Rust engine:
 | Action | Who Can Perform |
 |--------|-----------------|
 | Create Tournament | IC, NC, Prince |
-| Update Config | Organizers (Planned/Registration only) |
+| Update Config | Organizers (Planned/Registration; timer/display settings in later states) |
 | Delete | Organizers (Planned only) |
-| Open/Close Registration | Organizers |
-| Register | Any authenticated user (Registration state) |
-| Add/Remove Player | Organizers |
-| Check In | Organizers |
-| Start/Finish Round | Organizers |
-| Set Score | Organizers or table players |
-| Finish Tournament | Organizers |
+| Open/Close/Cancel/Reopen Registration | Organizers |
+| Register/Unregister | Any authenticated member (Registration state) |
+| Add/Remove/Drop Player | Organizers |
+| Check In / Check In All / Reset Check-in | Organizers |
+| Start/Finish/Cancel Round | Organizers |
+| Set Score | Organizers or any player at the table |
+| Override/Unoverride | Organizers |
+| Seating edits (Swap, Alter, Seat, Unseat, AddTable, RemoveTable) | Organizers |
+| Set Toss / Random Toss | Organizers |
+| Start/Finish Finals | Organizers |
+| Finish/Reopen Tournament | Organizers |
+| Payment Status | Organizers |
+| Raffle | Organizers |
+| Deck Upload | Players (own deck) and Organizers (any deck) |
 
 ## SSE Streaming
 
-### Tournament Events
-
-- `tournament`: Full tournament update (TournamentMinimal for non-organizers)
-- `tournament_delete`: Tournament deleted
+Tournament updates are delivered via the unified SSE stream (see SYNC.md). Access-level projections are pre-computed at write time.
 
 ### Privacy Filtering
 
-| Viewer | Data Received |
-|--------|--------------|
-| Organizer | Full Tournament |
-| Registered Player | Config + own player/table/deck |
-| Public | TournamentMinimal only |
+| Viewer Level | Data Received |
+|--------------|--------------|
+| `full` (organizer, IC, NC/Prince same country) | Everything including rounds, finals, checkin_code |
+| `member` (has vekn_id) | Config, players (no per-player results), standings per mode, decks per mode |
+| `public` (no auth) | Minimal tournament fields only |
+
+Personal overlay additionally sends `full`-level data for own tournaments (organizer or participant).
 
 ## Offline Support
 

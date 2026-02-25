@@ -227,19 +227,19 @@ Players check in via QR code displayed by organizers. The organizer's tournament
 
 ---
 
-## Phase 7: Printable Round Seating & Table Labels
+## Phase 7: Printable Round Seating & Table Rooms ✅
 
 ### Printable Seating ✅
 
 - Print-optimized HTML page of round seating with proper print CSS (`@media print`, page breaks)
 
-### Table Labels
+### Table Rooms ✅
 
-Two modes (keep it lean):
-- **Custom names:** organizer provides freeform table names
-- **Rooms:** configure named spaces with table counts (e.g., "Lobby: 5 tables, Center room: 15 tables, Garden: 6 tables")
+- Organizers assign named rooms to table ranges (e.g., "Lobby: tables 1-5, Center room: tables 6-20")
+- `table_rooms: list[Room]` on `TournamentConfig`; `TableRoomsEditor.svelte` for UI
+- Room names appear as table labels in seating displays and print views
 
-**Done when:** Table labeling works in both modes.
+Custom per-table names were considered but dropped — room-based assignment covers the real-world use case.
 
 ---
 
@@ -281,34 +281,27 @@ Two modes (keep it lean):
 
 ---
 
-## Phase 9: Entry Fee & Pretix Integration
+## Phase 9: Payment Tracking ✅
 
-### Payment Tracking ✅
-
-- Simple paid/unpaid flag per registered player (SetPaymentStatus action)
+- Simple paid/unpaid flag per registered player (`SetPaymentStatus`, `MarkAllPaid` actions)
+- Payment status enum: Pending, Paid, Refunded, Cancelled
 - Organizers can toggle payment status; visible in registration list
 
-### Pretix Integration
-
-- Players cannot self-check-in if not flagged as paid; organizers can check in anyone
-- Optional: link tournament to a Pretix event via [Pretix API](https://docs.pretix.eu) to auto-track payment status
-
-**Done when:** Payment tracking works (✅); Pretix integration optional but functional.
+Pretix integration was considered but dropped — the simple built-in tracking covers the real-world need. External payment systems can be managed out-of-band.
 
 ---
 
-## Phase 10: Venue Completion
+## Phase 10: Venue Completion ✅
 
 ### Venue Autocomplete ✅
 
 - Tournament creation/edit: auto-complete venue name (country-scoped), auto-fill address, map, URL from last known data for that venue name
 - No separate venue table — dynamic in-memory completion from existing tournament data
 
-### VEKN Venue Import
+### VEKN Venue Import ✅
 
-- VEKN sync imports venue information via VEKN API to seed autocomplete data for countries with historical tournaments
-
-**Done when:** Venue auto-complete works during tournament creation (✅) and VEKN venue data is imported.
+- VEKN tournament sync imports venue information from VEKN API, seeding autocomplete data for countries with historical tournaments
+- Part of the broader VEKN inbound sync pipeline (`vekn_tournament_sync.py`)
 
 ---
 
@@ -332,13 +325,46 @@ Two modes (keep it lean):
 
 ---
 
-## Phase 12: Discord Bot
+## Phase 12: Discord Bots
+
+Two complementary Discord integrations, each serving different use cases.
+
+### 12.1 Role Verification Webhook
+
+Webhook-based endpoint for Discord's **Linked Roles** feature. Players link their Discord account to Archon (Discord OAuth already implemented), and Discord fetches their VEKN roles (Prince, NC, Judge, etc.) to assign matching Discord server roles automatically.
+
+**Use case**: Official VEKN Discord servers and national community servers can auto-assign roles based on Archon membership data, without manual verification by moderators.
+
+**Scope**:
+- Linked Roles metadata endpoint serving VEKN role data
+- Discord OAuth account linking (already done — extend with metadata push)
+- Role mapping configuration (which VEKN roles → which Discord roles)
+- Automatic role updates when VEKN roles change
+
+**Done when:** Discord servers can use Linked Roles to auto-assign VEKN-based roles to members.
+
+### 12.2 Tournament Butler Bot
+
+Full tournament management bot for online VTES events on Discord. Reference implementation: `../archon-bot`.
 
 Using [hikari](https://github.com/hikari-py/hikari) with slash commands:
 
-- Player interactions: register, check-in, deck upload, results record
-- Auto-create table channels per round, invite correct players
+**Player interactions**: `/register`, `/check-in`, `/drop`, `/upload-deck`, `/report` (VP), `/status`
+
+**Judge interactions**: `/register-player`, `/drop-player`, `/disqualify`, `/note`, `/fix-report`, `/validate-score`
+
+**Tournament lifecycle**: `/open-tournament`, `/configure-tournament`, `/round start|finish|reset`, `/finals`, `/standings`, `/close-tournament`
+
+**Discord infrastructure**:
+- Auto-create table text+voice channels per round in the tournament category
+- Assign per-table roles (Organizer, Judge, Player, Spectator, Bot)
 - In-channel timer based on tournament timer preferences
-- Good guidance bot <-> webapp (webapp explains how to install bot, easy discord invite linked to online tournament, discaord event & stage management)
+- `/raffle` for prize draws
+- `/download-reports` for VEKN-compatible CSV export
+- Staggered seating support for 6/7/11 players
+
+**UX bridge**: Good guidance between bot and webapp — webapp explains how to install the bot, easy Discord invite linked to online tournaments, Discord event and stage management.
+
+**Architecture**: Thin client reusing the shared Rust engine. Two options (decision deferred): (A) call Archon's HTTP API (simpler, network overhead); (B) use Rust engine directly via PyO3 if co-located (tighter coupling, no network overhead).
 
 **Done when:** Bot manages tournament channels and player interactions on Discord.
