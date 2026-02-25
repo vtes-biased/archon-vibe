@@ -509,6 +509,12 @@ impl TournamentEvent {
                     .ok_or("player_uid required")?
                     .to_string(),
             }),
+            "CheckOut" => Ok(Self::CheckOut {
+                player_uid: value["player_uid"]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string(),
+            }),
             "CheckInAll" => Ok(Self::CheckInAll),
             "ResetCheckIn" => Ok(Self::ResetCheckIn),
             "SetPaymentStatus" => {
