@@ -157,17 +157,21 @@ class SyncManager {
    * Start syncing with the backend.
    * First connect: fetch snapshot, then connect SSE for catch-up + real-time.
    * Subsequent connects: SSE only with since= parameter.
+   * @param forceFull - skip snapshot and since param (used after resync/refresh)
    */
-  async connect(): Promise<void> {
+  async connect(forceFull = false): Promise<void> {
     await this.disconnect();
     this.isSynced = false;
 
-    let lastSync = await getLastSyncTimestamp();
+    let lastSync: string | null = null;
+    if (!forceFull) {
+      lastSync = await getLastSyncTimestamp();
 
-    // If no sync timestamp, fetch snapshot first
-    if (!lastSync) {
-      lastSync = await this.fetchSnapshot();
-      // If snapshot failed, fall back to full SSE sync (no since param)
+      // If no sync timestamp, fetch snapshot first
+      if (!lastSync) {
+        lastSync = await this.fetchSnapshot();
+        // If snapshot failed, fall back to full SSE sync (no since param)
+      }
     }
 
     const params = new URLSearchParams();
@@ -189,15 +193,12 @@ class SyncManager {
       try {
         const message = JSON.parse(event.data);
 
-        // Handle resync: server says data is too stale — re-fetch snapshot
+        // Handle resync: server says data is too stale — reconnect with full stream
         if (message.type === 'resync') {
+          this.buffers.clear();
           await this.clearAllStores();
-          const ts = await this.fetchSnapshot();
-          if (ts) {
-            // Reconnect SSE with new timestamp
-            await this.disconnect();
-            void this.connect();
-          }
+          await this.disconnect();
+          void this.connect(true);  // forceFull: skip snapshot, no since param
           this.emit({ type: 'resync' });
           return;
         }
@@ -362,10 +363,11 @@ class SyncManager {
 
   /**
    * Perform a full refresh: clear local data and resync everything.
+   * Uses forceFull to avoid stale snapshot → resync loop.
    */
   async refresh(): Promise<void> {
     await this.clearAllStores();
-    await this.connect();
+    await this.connect(true);
   }
 
   addEventListener(callback: SyncEventCallback): void {
