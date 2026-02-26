@@ -1237,8 +1237,32 @@ fn apply_event(
                 return Err("Only organizers or the player themselves can check in".to_string());
             }
 
-            let idx =
-                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
+            let idx = match find_player_index(&tournament["players"], player_uid) {
+                Some(idx) => idx,
+                None => {
+                    if state != TournamentState::Waiting {
+                        return Err("Player not found".to_string());
+                    }
+                    if has_dq_sanction(sanctions, player_uid) {
+                        return Err(
+                            "Player has a disqualification sanction and cannot check in".to_string()
+                        );
+                    }
+                    if has_active_suspension(sanctions, player_uid) {
+                        return Err("Player is suspended and cannot check in".to_string());
+                    }
+                    let player = json::object! {
+                        user_uid: player_uid.as_str(),
+                        state: "Registered",
+                        payment_status: "Pending",
+                        toss: 0,
+                        result: { gw: 0, vp: 0.0, tp: 0 },
+                        finalist: false,
+                    };
+                    tournament["players"].push(player).map_err(|e| e.to_string())?;
+                    tournament["players"].len() - 1
+                }
+            };
 
             // Block disqualified players from checking in
             if tournament["players"][idx]["state"].as_str() == Some("Disqualified") {
@@ -3752,5 +3776,70 @@ mod tests {
         assert_eq!(updated["description"].as_str(), Some("New desc"));
         // venue should remain unchanged
         assert_eq!(updated["venue"].as_str(), Some("Old Venue"));
+    }
+
+    #[test]
+    fn test_checkin_auto_registers_unregistered_player() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![];
+
+        let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+        let actor = make_player("player-1");
+
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["players"].len(), 1);
+        assert_eq!(
+            updated["players"][0]["user_uid"].as_str(),
+            Some("player-1")
+        );
+        assert_eq!(
+            updated["players"][0]["state"].as_str(),
+            Some("Checked-in")
+        );
+    }
+
+    #[test]
+    fn test_checkin_auto_register_blocked_by_dq() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![];
+
+        let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+        let actor = make_player("player-1");
+        let sanctions = r#"[{"user_uid":"player-1","level":"disqualification","lifted_at":null,"deleted_at":null}]"#;
+
+        let raw = process_tournament_event(
+            &tournament.dump(),
+            &event.dump(),
+            &actor.dump(),
+            sanctions,
+            &no_decks(),
+        );
+        assert!(raw.is_err());
+        assert!(raw.unwrap_err().contains("disqualification"));
+    }
+
+    #[test]
+    fn test_checkin_auto_register_blocked_by_suspension() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![];
+
+        let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+        let actor = make_player("player-1");
+        let sanctions = r#"[{"user_uid":"player-1","level":"suspension","lifted_at":null,"deleted_at":null}]"#;
+
+        let raw = process_tournament_event(
+            &tournament.dump(),
+            &event.dump(),
+            &actor.dump(),
+            sanctions,
+            &no_decks(),
+        );
+        assert!(raw.is_err());
+        assert!(raw.unwrap_err().contains("suspended"));
     }
 }

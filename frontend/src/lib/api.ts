@@ -3,7 +3,7 @@
  */
 
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, DeckObject, League } from '$lib/types';
-import { getAllUsers, getTournament, saveTournament, saveLeague, getSanctionsForTournament, getDecksByTournament, saveDeck, deleteDeck } from './db';
+import { getAllUsers, getTournament, saveTournament, saveLeague, getSanctionsForTournament, getSanctionsForUser, getDecksByTournament, saveDeck, deleteDeck } from './db';
 import { processTournamentEvent, buildActorContext, type DeckOp, type TournamentEvent } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
@@ -517,6 +517,32 @@ function enqueueServerAction(uid: string, fn: () => Promise<void>): void {
   });
 }
 
+/**
+ * Pre-check: block barred players (suspension, league-wide DQ) before WASM optimistic path.
+ * Mirrors backend _check_player_barred() logic.
+ */
+async function checkPlayerBarred(playerUid: string, tournament: Tournament): Promise<void> {
+  const sanctions = await getSanctionsForUser(playerUid);
+  const now = new Date();
+  for (const s of sanctions) {
+    if (s.deleted_at || s.lifted_at) continue;
+    if (s.level === 'suspension' && (!s.expires_at || new Date(s.expires_at) > now)) {
+      throw new Error('Player is suspended and cannot check in');
+    }
+  }
+  if (tournament.league_uid) {
+    for (const s of sanctions) {
+      if (s.deleted_at || s.lifted_at) continue;
+      if (s.level === 'disqualification' && s.tournament_uid) {
+        const dqTournament = await getTournament(s.tournament_uid);
+        if (dqTournament && dqTournament.league_uid === tournament.league_uid) {
+          throw new Error('Player is disqualified from a league tournament and cannot check in');
+        }
+      }
+    }
+  }
+}
+
 export async function tournamentAction(uid: string, action: string, data?: Record<string, unknown>): Promise<Tournament> {
   const event = { type: action as import('$lib/engine').TournamentEventType, ...data };
 
@@ -524,6 +550,10 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
   const current = await getTournament(uid);
   if (current) {
     try {
+      // Pre-check: block barred players before WASM optimistic path
+      if (action === 'CheckIn' && data?.player_uid) {
+        await checkPlayerBarred(data.player_uid as string, current);
+      }
       const actor = buildActorContext(getAuthState().user ?? null, current);
       const sanctions = await getSanctionsForTournament(uid);
       const decks = await getDecksByTournament(uid);

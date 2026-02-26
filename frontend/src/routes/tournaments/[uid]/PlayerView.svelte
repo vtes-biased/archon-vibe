@@ -131,6 +131,12 @@
         class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
       >{m.tournament_unregister_btn()}</button>
     </div>
+  {:else if tournament.state === "Waiting" && !currentPlayerEntry}
+    <button
+      onclick={() => doAction("CheckIn", { player_uid: userUid })}
+      disabled={actionLoading}
+      class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+    >{m.tournament_register_checkin_btn()}</button>
   {:else if currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
