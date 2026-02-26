@@ -317,13 +317,13 @@ html.light {
 
 /* Heading anchor links — hover-reveal on desktop, always visible on touch */
 .heading-anchor { position: relative; }
-.heading-anchor .anchor-link { opacity: 0; transition: opacity 0.15s; margin-left: 0.25rem; font-size: 0.8em; text-decoration: none; color: var(--color-ash-500); }
+.heading-anchor .anchor-link, .callout-title .anchor-link { opacity: 0; transition: opacity 0.15s; margin-left: 0.25rem; font-size: 0.8em; text-decoration: none; color: var(--color-ash-500); }
 @media (hover: hover) {
-    .heading-anchor:hover .anchor-link { opacity: 0.5; }
-    .heading-anchor .anchor-link:hover { opacity: 1; }
+    .heading-anchor:hover .anchor-link, .callout-title:hover .anchor-link { opacity: 0.5; }
+    .heading-anchor .anchor-link:hover, .callout-title .anchor-link:hover { opacity: 1; }
 }
 @media (hover: none) {
-    .heading-anchor .anchor-link { opacity: 0.4; }
+    .heading-anchor .anchor-link, .callout-title .anchor-link { opacity: 0.4; }
 }
 
 /* Document images: constrained, not full-width; max-height prevents tall images from dominating */

@@ -92,7 +92,7 @@ Each crypt card has a set of elements that define the vampire as described below
 **Name:** Each crypt card is unique, so only one copy of each can be in play at a time.
 
 > **ADVANCED RULES**\
-> A second Methuselah could contest control of the vampire (see [Contested Cards](#Contested-cards)), which means that the Methuselahs are struggling for control of them.
+> **Contested Vampires** A second Methuselah could contest control of the vampire (see [Contested Cards](#Contested-cards)), which means that the Methuselahs are struggling for control of them.
 
 **Blood Capacity:** The number in the red circle in the lower right corner of the card is the vampire's capacity.
 
@@ -137,14 +137,14 @@ Some library cards have multiple Discipline symbols on the attribute bar (see [R
 ![](/help/rules/image11.png)
 
 > **DECK CONSTRUCTION**\
-> **Group:** Each vampire belongs to a specific group, identified by a number above the upper left corner of the text box.
+> **Group** Each vampire belongs to a specific group, identified by a number above the upper left corner of the text box.
 > A Methuselah's crypt must be built using vampires from a single group or from two consecutive groups.
 > This does not restrict a Methuselah from stealing vampires from other groups through play, however.
 
 ![](/help/rules/image12.png)
 
 > **ADVANCED RULES**\
-> An advanced card is a type of vampire card for your crypt.
+> **Advanced** An advanced card is a type of vampire card for your crypt.
 > An advanced card looks just like a regular crypt card except that it has an Advanced icon under the clan icon.
 > The advanced card is a vampire card in all respects, so it can be influenced in the normal manner (see [Advanced](#advanced-merge)).
 >
@@ -174,7 +174,7 @@ Master cards have no icon at the top of the attribute bar while the other cards 
 **Minion Cards:** Minion cards are played by the minions (vampires and allies) the Methuselah controls.
 
 > **ADVANCED RULES**\
-> Event Cards: Event cards are put into play during the discard phase to represent events that affect the World of Darkness as a whole (see [Event Card](#event-card)).
+> **Event Cards** Event cards are put into play during the discard phase to represent events that affect the World of Darkness as a whole (see [Event Card](#event-card)).
 
 ### Playing a Card
 
@@ -183,7 +183,7 @@ Sometimes a card will state to put it into play, you should announce its effects
 Some cards such as action cards are not resolved immediately; in that case, they are temporarily out of play between the moment they are played and the moment they reach resolution.
 
 > **ADVANCED RULES**\
-> Some effects can cancel a card "as it is played." These effects, as well as [wake effects](#wake), are the only effects allowed during the "as played" time period of another card.
+> **Cancel a card** Some effects can cancel a card "as it is played." These effects, as well as [wake effects](#wake), are the only effects allowed during the "as played" time period of another card.
 > Even drawing to replace cards, comes after this time period.
 
 ### Drawing Cards
@@ -265,13 +265,15 @@ A Methuselah can gain only one master phase action from trifles in a given maste
 
 > **ADVANCED RULES**\
 > **Disciplines** A Discipline card is played on a controlled vampire to give them an additional level of a Discipline, either giving a vampire the basic level of a new Discipline or increasing the level of a Discipline from basic to superior.
-> Most of them also increase the capacity of the vampire by 1 (the "+1" in the red circle in the bottom right corner of the card indicates this in that case) along with the Discipline granted, but they do not automatically gain an extra blood to fill the new capacity.\
-> \
-> **Trophy:** A trophy may be put into play using a master phase action (or can be retrieved as described in traits: [Red List](#red-list)).
+> Most of them also increase the capacity of the vampire by 1 (the "+1" in the red circle in the bottom right corner of the card indicates this in that case) along with the Discipline granted, but they do not automatically gain an extra blood to fill the new capacity.
+
+> **ADVANCED RULES**\
+> **Trophy** A trophy may be put into play using a master phase action (or can be retrieved as described in traits: [Red List](#red-list)).
 > It has no effect until it is moved to a vampire.
-> Once placed on a vampire, a trophy is controlled by the controller of the vampire it is on, and it cannot be awarded again.\
-> \
-> **Out-of-turn:** You may play an out-of-turn master card whenever appropriate during another Methuselah's turn.
+> Once placed on a vampire, a trophy is controlled by the controller of the vampire it is on, and it cannot be awarded again.
+
+> **ADVANCED RULES**\
+> **Out-of-turn** You may play an out-of-turn master card whenever appropriate during another Methuselah's turn.
 > Doing so counts against the allotted number of master phase actions you receive in your next master phase, even if the out-of-turn master card is cancelled (see [Master Phase](#master-phase)).\
 > \
 > Regardless of the number of master phase actions you normally have, you cannot play a second out-of-turn master card before your next master phase.
@@ -284,7 +286,7 @@ Minion cards are cards that your vampires and allies (collectively referred to a
 ![](/help/rules/image19.png)
 
 > **ADVANCED RULES**\
-> A minion card in play is controlled by the controller of the minion it is on.
+> **Minion Card Control** A minion card in play is controlled by the controller of the minion it is on.
 > If a minion card is just in play and not on another controlled card, then it is controlled by the Methuselah who played it.
 
 In many cases, a minion card will have a Discipline symbol, a clan symbol and/or a blood cost; in these cases, the card can only be played by a vampire who meets the requirements.
@@ -361,7 +363,7 @@ A reaction card does not lock the minion playing it.
 
 > **ADVANCED RULES**\
 > \
-> **Event Cards**\
+> **Event Card**\
 > \
 > Event cards are played to represent events that affect the World of Darkness as a whole.
 > Once each discard phase, a Methuselah may use a discard phase action to put an event card in play.
@@ -452,7 +454,7 @@ If you search your library or crypt, you must shuffle it afterwards.
 
 > **ADVANCED RULES**\
 > \
-> **"Cancel a card"** A cancelled card has no effect, but it is still considered played.\
+> **Cancellation Effects** A cancelled card has no effect, but it is still considered played.\
 > \
 > If an action card is cancelled, the minion does not lock (they do not pay for the action card), and can play the same action card again.\
 > \
@@ -476,7 +478,7 @@ If you have the Edge, you may gain 1 pool from the blood bank.
 
 > **ADVANCED RULES**\
 > \
-> Some cards have a burn option <span class="vtes-d">~</span> icon.\
+> **Burn Option** Some cards have a burn option <span class="vtes-d">~</span> icon.\
 > \
 > This icon means that a Methuselah who does not control a minion who meets the requirements of this card or is not a legal target, may discard it during ANY Methuselah's unlock phase and replace it.\
 > \
@@ -501,7 +503,7 @@ If you have the Edge, you may gain 1 pool from the blood bank.
 
 > **DECK CONSTRUCTION**\
 > \
-> **CAUTION:** Be careful about putting duplicates of the same unique cards in your deck.
+> **CAUTION** Be careful about putting duplicates of the same unique cards in your deck.
 > You cannot control more than one of the same unique card at a time, and you cannot voluntarily contest cards with yourself (if some effect would force you to contest a card with yourself, then you simply burn the incoming copy of the unique card).
 > On the other hand, you may wish to have a second copy handy in case the first is burned.
 
@@ -539,7 +541,7 @@ However, you cannot save master phase actions for later; master phase actions no
 
 > **ADVANCED RULES**\
 > \
-> You can use a master phase action to mark a Red List minion (see [Red List](#red-list)).\
+> **Master Phase Actions** You can use a master phase action to mark a Red List minion (see [Red List](#red-list)).\
 > \
 > If you've played an out-of-turn master card against this master phase (even if it was cancelled), then you gain one fewer master phase actions than normal (see [Master Cards](#master-cards)).
 
@@ -562,7 +564,7 @@ For example, a ready vampire with no blood must hunt as a mandatory action.
 
 If a minion has two or more different mandatory actions or one mandatory action they cannot take, then they are "stuck" and cannot perform any action (this does not prevent your other minions from performing actions, however).
 
-**Types of Actions**
+### Types of Actions
 
 > **DIRECTED AND UNDIRECTED ACTIONS**\
 > \
@@ -670,7 +672,7 @@ If the action is unsuccessful, the equipment remains where it is.
 
 > **ADVANCED RULES**\
 > \
-> If equipping the equipment requires a Discipline and the equipment is put into play by some means other than equipping, use the basic version of the equipment.
+> **Equipment Discipline** If equipping the equipment requires a Discipline and the equipment is put into play by some means other than equipping, use the basic version of the equipment.
 
 ### Employ Retainer
 
@@ -688,9 +690,9 @@ When a retainer loses their last life counter, they are burned.
 
 ![](/help/rules/image35.png)
 
-> **ADVANCED RULES**
->
-> If employing the retainer requires a Discipline and the retainer is put into play by some means other than employing, use the basic version of the retainer.
+> **ADVANCED RULES**\
+> \
+> **Retainer Discipline** If employing the retainer requires a Discipline and the retainer is put into play by some means other than employing, use the basic version of the retainer.
 
 ### Recruit Ally
 
@@ -708,7 +710,7 @@ When an ally loses their last life counter, they are burned.
 
 > **ADVANCED RULES**\
 > \
-> Note that allies brought into play by other means are able to act on the same turn.
+> **Ally Discipline** Note that allies brought into play by other means are able to act on the same turn.
 > If recruiting the ally requires a Discipline and the ally is put into play by some means other than recruiting, use the basic version of the ally.
 
 ### Political Action
@@ -813,7 +815,7 @@ Also remember that the same minion cannot play the same action modifier or react
 
 ![](/help/rules/image42.png)
 
-**1. Announce the Action**
+### 1. Announce the Action
 
 All details of the action are defined when the action is announced, including the target(s), the cost, the effects, and so on.
 Any card required for the action is played (face up) at this time, but is temporarily set aside (out of play) until the action resolves.
@@ -829,7 +831,7 @@ Some cards are played "as the action is announced”, those cards must be played
 > *After resolving that action (successful or not), Sarah decides that another of her unlocked minions, The Dowager, will recruit an ally, the Underbridge Stray, from her hand.
 > She locks The Dowager and plays the Underbridge Stray, announcing: "The Dowager recruits the Underbridge Stray at +1 stealth, costing The Dowager 1 blood." (The blood is not paid until the action succeeds.)*
 
-**2. Resolve Any Block Attempts**
+### 2. Resolve Any Block Attempts
 
 **Who May Attempt to Block**
 
@@ -858,7 +860,7 @@ Remember, political actions are always undirected.
 > It can be blocked by the ready unlocked minions of Sarah's prey or Sarah's predator.
 > If her prey's first attempt fails, another can be made and so on until her prey declines to make any further attempts, at which point her predator may begin attempting to block.*
 
-**Stealth and Intercept**
+**Stealth and Intercept Resolution**
 
 **Stealth** represents the measures that the acting minion is taking to conduct their business discreetly, to avoid attracting the attention of those who would oppose them.
 **Intercept** represents the blocking minion's efforts to discover the plans of the acting minion and to stalk or chase them in order to detain them (by fighting with them) before they can accomplish their goal.
@@ -924,7 +926,7 @@ Once all Methuselahs have declined to block, the impulse goes back to the acting
 > There is no current block attempt"
 > 3. once every Methuselah has passed, the action is successful and resolves
 
-**3. Resolve the Action**
+### 3. Resolve the Action
 
 If the action is successful (all block attempts were unsuccessful), then the cost of the action is paid and the effects of the successful action take place.
 
@@ -1009,7 +1011,7 @@ The two minions being involved in combat are called **combatants**; each one of 
 **Note:** The only minion cards that can be played during combat are combat cards.
 
 > **ADVANCED RULES**\
-> Some combat cards are played by minions "not involved in the current combat".
+> **Combat Cards** Some combat cards are played by minions "not involved in the current combat".
 > Minions controlled by ANY Methuselah can play those cards.
 
 **Combat Sequence**
@@ -1086,7 +1088,7 @@ One strike from each minion is considered a "pair".
 
 > **ADVANCED RULES**\
 > \
-> Some cards may allow a minion to get additional strikes during a round of combat, these are resolved after the normal pair of strikes.
+> **Additional Strikes Overview** Some cards may allow a minion to get additional strikes during a round of combat, these are resolved after the normal pair of strikes.
 > If only one minion has additional strikes these are resolved on their own after the normal pair of strikes.
 
 During each pair of strikes, the minions first choose their respective strikes (the acting minion first, then their opponent), and then the strikes are resolved.
@@ -1098,7 +1100,7 @@ If a minion has used a maneuver from a strike (either a strike card or a weapon)
 
 > **ADVANCED RULES**\
 > \
-> For additional strikes, any strike can be chosen, even if a maneuver of a strike card or a weapon has been used.
+> **Additional Strike Choice** For additional strikes, any strike can be chosen, even if a maneuver of a strike card or a weapon has been used.
 
  - **Resolve Strike:** The effects of the strikes from both minions are resolved simultaneously.
  Most strikes are effective only at close range, unless the strike is identified as ranged, does "R" damage, or is a defensive strike such as dodge or combat ends.
@@ -1113,11 +1115,11 @@ This is true at any point during combat, not just during strike resolution.
 
 > **ADVANCED RULES**\
 > \
-> If a strike card is cancelled, the minion who played it must choose a strike, which might come from another strike card.
+> **Cancelled Strike** If a strike card is cancelled, the minion who played it must choose a strike, which might come from another strike card.
 
 > **ADVANCED RULES**\
 > \
-> **Additional Strikes:** Some cards and effects allow a minion to make additional strikes during the current round of combat.
+> **Additional Strikes** Some cards and effects allow a minion to make additional strikes during the current round of combat.
 > Additional strikes are announced and performed only after the first pair of strikes is completed.
 > The acting minion decides whether or not to gain additional strikes before the opposing minion, as usual.\
 > \
@@ -1191,9 +1193,9 @@ They do not go through torpor first.
 > He does not have enough blood to mend the second point and becomes wounded.
 > The aggravated damage burns him, since he already is wounded and cannot burn 1 blood to prevent his destruction.*
 
-> **ADVANCED RULES**
->
-> Allies and retainers treat aggravated damage the same as normal damage.
+> **ADVANCED RULES**\
+> \
+> **Aggravated Damage** Allies and retainers treat aggravated damage the same as normal damage.
 > For each point of damage successfully inflicted on an ally or retainer, they burn 1 life counter.
 > An ally or retainer who loses all of their life counters is burned.
 
@@ -1256,7 +1258,9 @@ If the stolen blood causes the striking vampire to have more blood than their ca
 > The Underbridge Stray has no life counters remaining, so the ally is burned.
 > Chrysanthemum has 1 damage to deal with and does not prevent any, so she burns 1 blood to mend the damage, leaving her with 4 blood.*
 
-> **ADVANCED RULES**
+> **ADVANCED RULES**\
+> \
+> **Special Strikes**
 >
 > **Destroy Equipment:** This effect burns an equipment card of the opposing minion.
 > If there is more than one piece of equipment on the opposing minion, the striking minion chooses which one is burned.
@@ -1311,12 +1315,12 @@ Any cards and counters on them are also burned.
 
 > **ADVANCED RULES**\
 > \
-> 4.
+> **Diablerie Rewards** 4.
 > If the victim was older (had a higher capacity) than the diablerist, the diablerist can be given a Discipline: their controller may go through their library, ash heap, and hand to get a master Discipline card to put on the diablerist and then shuffle their library or draw back up to their hand size as necessary.
 > If the Discipline card increases the diablerist's capacity, the diablerie does not give 1 blood to fill that new capacity.\
 > \
 > 5.
-> If the victim was Red List, the diablerist may receive trophies (see [Trophy](#trophy)).
+> If the victim was Red List, the diablerist may receive trophies (see [Trophy](#advanced-rules-trophy)).
 > The steps of diablerie are treated as a single unit.
 > No effects can be used to interrupt the diablerie; effects may be played either before or after, as appropriate.
 
@@ -1373,7 +1377,7 @@ Other types of crypt cards are handled similarly.
 <span id="advanced-merge"></span>
 
 > **ADVANCED RULES**\
-> **Advanced**\
+> **Advanced Merge**\
 > An advanced card is a type of vampire card for your crypt.
 > An advanced card has a special icon under the clan icon.
 > The advanced card is a vampire card in all respects, so it can be influenced in the normal manner.
@@ -1401,9 +1405,9 @@ In your discard phase you receive by default one discard phase action.
 You can use a discard phase action to discard a card from your hand and draw to replace it.
 Discard phase actions not used are lost; they cannot be saved for later.
 
-> **ADVANCED RULES**
->
-> You may use a discard phase action to put an **event card** into play but no more than one per phase.
+> **ADVANCED RULES**\
+> \
+> **Discard Phase Actions** You may use a discard phase action to put an **event card** into play but no more than one per phase.
 > Some effects may change the number of discard phase actions you receive or may give you alternate ways to use your discard phase actions.
 >
 > Each event card may only be played once each game.
@@ -1633,11 +1637,11 @@ There may be other Traits that allow vampires and minions to play cards.
 <span class="vtes-ref"><span class="vtes-c">D</span> Assamite</span>
 <span class="vtes-ref"><span class="vtes-c">E</span> Baali</span>
 <span class="vtes-ref"><span class="vtes-c">F</span> Blood Brother</span>
-<span class="vtes-ref"><span class="vtes-c">o</span> Brujah</span>
+<span class="vtes-ref"><span class="vtes-c">G</span> Brujah</span>
 <span class="vtes-ref"><span class="vtes-c">H</span> Brujah antitribu</span>
 <span class="vtes-ref"><span class="vtes-c">J</span> Daughter of Cacophony</span>
 <span class="vtes-ref"><span class="vtes-c">K</span> Followers of Set</span>
-<span class="vtes-ref"><span class="vtes-c">p</span> Gangrel</span>
+<span class="vtes-ref"><span class="vtes-c">L</span> Gangrel</span>
 <span class="vtes-ref"><span class="vtes-c">M</span> Gangrel antitribu</span>
 <span class="vtes-ref"><span class="vtes-c">N</span> Gargoyle</span>
 <span class="vtes-ref"><span class="vtes-c">O</span> Giovanni</span>
@@ -1645,23 +1649,23 @@ There may be other Traits that allow vampires and minions to play cards.
 <span class="vtes-ref"><span class="vtes-c">Q</span> Harbinger of Skulls</span>
 <span class="vtes-ref"><span class="vtes-c">R</span> Ishtarri</span>
 <span class="vtes-ref"><span class="vtes-c">S</span> Kiasyd</span>
-<span class="vtes-ref"><span class="vtes-c">w</span> Lasombra</span>
-<span class="vtes-ref"><span class="vtes-c">q</span> Malkavian</span>
+<span class="vtes-ref"><span class="vtes-c">T</span> Lasombra</span>
+<span class="vtes-ref"><span class="vtes-c">U</span> Malkavian</span>
 <span class="vtes-ref"><span class="vtes-c">V</span> Malkavian antitribu</span>
 <span class="vtes-ref"><span class="vtes-c">W</span> Nagaraja</span>
-<span class="vtes-ref"><span class="vtes-c">s</span> Nosferatu</span>
+<span class="vtes-ref"><span class="vtes-c">X</span> Nosferatu</span>
 <span class="vtes-ref"><span class="vtes-c">Y</span> Nosferatu antitribu</span>
 <span class="vtes-ref"><span class="vtes-c">Z</span> Osebo</span>
 <span class="vtes-ref"><span class="vtes-c">a</span> Pander</span>
 <span class="vtes-ref"><span class="vtes-c">b</span> Ravnos</span>
 <span class="vtes-ref"><span class="vtes-c">d</span> Salubri antitribu</span>
 <span class="vtes-ref"><span class="vtes-c">e</span> Samedi</span>
-<span class="vtes-ref"><span class="vtes-c">t</span> Toreador</span>
+<span class="vtes-ref"><span class="vtes-c">f</span> Toreador</span>
 <span class="vtes-ref"><span class="vtes-c">g</span> Toreador antitribu</span>
-<span class="vtes-ref"><span class="vtes-c">u</span> Tremere</span>
+<span class="vtes-ref"><span class="vtes-c">h</span> Tremere</span>
 <span class="vtes-ref"><span class="vtes-c">i</span> Tremere antitribu</span>
 <span class="vtes-ref"><span class="vtes-c">j</span> True Brujah</span>
-<span class="vtes-ref"><span class="vtes-c">v</span> Ventrue</span>
+<span class="vtes-ref"><span class="vtes-c">l</span> Ventrue</span>
 <span class="vtes-ref"><span class="vtes-c">m</span> Ventrue antitribu</span>
 </div>
 
@@ -2004,6 +2008,7 @@ These Traditions are laws that protect the vampires from mortals and from one an
 <span class="vtes-ref"><span class="vtes-d">d</span><span class="vtes-d">D</span> Dominate</span>
 <span class="vtes-ref"><span class="vtes-d">f</span><span class="vtes-d">F</span> Fortitude</span>
 <span class="vtes-ref"><span class="vtes-d">o</span><span class="vtes-d">O</span> Obfuscate</span>
+<span class="vtes-ref"><span class="vtes-d">ø</span><span class="vtes-d">Ø</span> Oblivion</span>
 <span class="vtes-ref"><span class="vtes-d">p</span><span class="vtes-d">P</span> Potence</span>
 <span class="vtes-ref"><span class="vtes-d">r</span><span class="vtes-d">R</span> Presence</span>
 <span class="vtes-ref"><span class="vtes-d">j</span><span class="vtes-d">J</span> Protean</span>
@@ -2016,6 +2021,7 @@ These Traditions are laws that protect the vampires from mortals and from one an
 <span class="vtes-ref"><span class="vtes-c">o</span> Brujah</span>
 <span class="vtes-ref"><span class="vtes-c">I</span> Caitiff</span>
 <span class="vtes-ref"><span class="vtes-c">p</span> Gangrel</span>
+<span class="vtes-ref"><span class="vtes-c">y</span> Hecata</span>
 <span class="vtes-ref"><span class="vtes-c">w</span> Lasombra</span>
 <span class="vtes-ref"><span class="vtes-c">q</span> Malkavian</span>
 <span class="vtes-ref"><span class="vtes-c">r</span> Ministry (Followers of Set)</span>

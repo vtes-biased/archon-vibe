@@ -62,7 +62,7 @@
       else img.addEventListener("load", classify, { once: true });
     }
 
-    // Click delegation for anchor links
+    // Click delegation for anchor links and internal navigation
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const anchor = target.closest(".anchor-link");
@@ -71,6 +71,23 @@
         const url = new URL(anchor.href, window.location.href);
         navigator.clipboard.writeText(url.toString()).then(() => {
           showToast({ type: "success", message: "Link copied" });
+        });
+        return;
+      }
+      // Internal hash links: update active TOC heading after scroll
+      const link = target.closest("a[href^='#']");
+      if (link instanceof HTMLAnchorElement) {
+        const hash = link.getAttribute("href")!;
+        requestAnimationFrame(() => {
+          // After browser scrolls, find topmost visible TOC heading
+          let best: string | undefined;
+          for (const el of headingEls) {
+            if (el.getBoundingClientRect().top <= window.innerHeight * 0.2) best = el.id;
+          }
+          if (best) {
+            onActiveHeadingChange(best);
+            replaceState(hash, {});
+          }
         });
       }
     };

@@ -159,7 +159,9 @@ export function renderDocument(src: string): string {
         // Strip <br> again after subtitle extraction
         body = body.replace(/^(<p>)\s*(?:<br\s*\/?>[\s\n]*)*/i, "$1");
       }
-      return `<div class="callout"><div class="callout-title">${title}</div>${body}</div>\n`;
+      const calloutId = slugify(title);
+      idSet.add(calloutId);
+      return `<div class="callout" id="${calloutId}"><div class="callout-title">${title} <a href="#${calloutId}" class="anchor-link" aria-label="Link to this section">#</a></div>${body}</div>\n`;
     }
     return `<blockquote>${html}</blockquote>\n`;
   };
