@@ -275,7 +275,11 @@
     {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0 && tournament.rounds![tournament.rounds!.length - 1]}
       {@const currentRound = tournament.rounds![tournament.rounds!.length - 1]!}
       {@const myTableIdx = currentRound.findIndex(t => t.seating.some(s => s.player_uid === userUid))}
-      {#if myTableIdx >= 0 && currentRound[myTableIdx]}
+      {#if myTableIdx < 0 && currentPlayerEntry?.state === "Checked-in"}
+        <div class="bg-sky-900/20 border border-sky-800/40 rounded-lg p-4">
+          <p class="text-sm text-sky-300">{m.player_sitting_out()}</p>
+        </div>
+      {:else if myTableIdx >= 0 && currentRound[myTableIdx]}
         {@const myTable = currentRound[myTableIdx]!}
         <div class="bg-ash-900/50 rounded-lg p-4">
           <div class="flex items-center justify-between mb-2">

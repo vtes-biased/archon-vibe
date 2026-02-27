@@ -134,6 +134,13 @@
       : []
   );
 
+  // Players sitting out this round (Checked-in while tournament is Playing = stagger sit-out)
+  const sittingOutPlayers = $derived(
+    tournament.state === "Playing"
+      ? (tournament.players ?? []).filter(p => p.state === "Checked-in")
+      : []
+  );
+
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo);
   }
@@ -408,12 +415,26 @@
 
     {/if}
 
-    <!-- Not seated players (outside header, visible in Playing and Finished) -->
+    <!-- Not seated players (alter mode, visible in Playing and Finished) -->
     {#if unseatedPlayers.length > 0}
       <div class="banner-amber border rounded-lg p-3">
         <p class="text-xs mb-2">{m.rounds_not_seated()}</p>
         <div class="flex flex-wrap gap-2">
           {#each unseatedPlayers as player}
+            {@const puid = player.user_uid ?? ""}
+            <span class="inline-flex items-center gap-1 px-2 py-1 text-sm bg-ash-800 rounded text-ash-200">
+              {seatDisplay(puid)}
+            </span>
+          {/each}
+        </div>
+      </div>
+    {/if}
+    <!-- Sitting out players (stagger rounds) -->
+    {#if sittingOutPlayers.length > 0}
+      <div class="bg-sky-900/20 border border-sky-800/40 rounded-lg p-3">
+        <p class="text-xs text-sky-300 mb-2">{m.rounds_sitting_out()}</p>
+        <div class="flex flex-wrap gap-2">
+          {#each sittingOutPlayers as player}
             {@const puid = player.user_uid ?? ""}
             <span class="inline-flex items-center gap-1 px-2 py-1 text-sm bg-ash-800 rounded text-ash-200">
               {seatDisplay(puid)}

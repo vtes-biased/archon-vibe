@@ -1404,12 +1404,6 @@ fn apply_event(
             if n < 4 {
                 return Err("Need at least 4 checked-in players".to_string());
             }
-            if n == 6 || n == 7 || n == 11 {
-                return Err(format!(
-                    "Cannot seat {} players (impossible seating configuration)",
-                    n
-                ));
-            }
 
             // Get previous rounds for seating optimization
             let previous_rounds: Vec<Vec<Vec<String>>> = tournament["rounds"]
@@ -1429,34 +1423,38 @@ fn apply_event(
                 })
                 .collect();
 
+            // Select which players to seat (handles awkward counts like 6, 7, 11)
+            let players_to_seat =
+                seating::select_players_for_round(&checked_in, &previous_rounds);
+
             // Use submitted seating if provided, otherwise compute
             let new_round: Vec<Vec<String>> = if let Some(submitted) = submitted_seating {
-                // Validate submitted seating
-                let checked_set: std::collections::HashSet<&str> =
-                    checked_in.iter().map(|s| s.as_str()).collect();
+                // Validate submitted seating against the selected subset
+                let seat_set: std::collections::HashSet<&str> =
+                    players_to_seat.iter().map(|s| s.as_str()).collect();
                 let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
                 for table in submitted.iter() {
                     if table.len() < 4 || table.len() > 5 {
                         return Err(format!("Invalid table size: {}", table.len()));
                     }
                     for uid in table {
-                        if !checked_set.contains(uid.as_str()) {
-                            return Err(format!("Player {} not checked in", uid));
+                        if !seat_set.contains(uid.as_str()) {
+                            return Err(format!("Player {} not in selected subset", uid));
                         }
                         if !seen.insert(uid.as_str()) {
                             return Err(format!("Duplicate player {}", uid));
                         }
                     }
                 }
-                if seen.len() != checked_in.len() {
+                if seen.len() != players_to_seat.len() {
                     return Err(
-                        "Submitted seating does not include all checked-in players".to_string()
+                        "Submitted seating does not include all selected players".to_string()
                     );
                 }
                 submitted.clone()
             } else {
                 let (computed, _score) =
-                    seating::compute_next_round(&checked_in, &previous_rounds)?;
+                    seating::compute_next_round(&players_to_seat, &previous_rounds)?;
                 computed
             };
 
@@ -1489,11 +1487,25 @@ fn apply_event(
                 tournament["state"] = "Playing".into();
             }
 
-            // Mark checked-in players as playing, drop registered-but-not-checked-in players
+            // Build set of seated player UIDs
+            let seated_uids: std::collections::HashSet<String> = new_round
+                .iter()
+                .flat_map(|table| table.iter().cloned())
+                .collect();
+
+            // Mark seated players as Playing, drop registered-but-not-checked-in players
+            // Checked-in players not seated (stagger sit-outs) stay Checked-in
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 match players[i]["state"].as_str() {
-                    Some("Checked-in") => players[i]["state"] = "Playing".into(),
+                    Some("Checked-in") => {
+                        if let Some(uid) = players[i]["user_uid"].as_str() {
+                            if seated_uids.contains(uid) {
+                                players[i]["state"] = "Playing".into();
+                            }
+                            // else: sitting out, stay Checked-in
+                        }
+                    }
                     Some("Registered") => players[i]["state"] = "Finished".into(),
                     _ => {}
                 }

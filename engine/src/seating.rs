@@ -1659,6 +1659,78 @@ fn get_sa_params(n: usize) -> (u32, u32) {
     }
 }
 
+/// Check if n players can be divided into valid tables of 4-5
+pub fn is_valid_table_count(n: usize) -> bool {
+    n >= 4 && n != 6 && n != 7 && n != 11
+}
+
+/// For awkward counts, find the largest valid T < N such that (N*2 - 2*T) is also valid.
+/// This ensures 3-round equalization: R1=T, R2=T, R3=(2N-2T) players.
+fn find_equalization_target(n: usize) -> usize {
+    // Hard-coded for the three awkward counts
+    match n {
+        6 => 4,   // R1=4, R2=4, R3=4
+        7 => 5,   // R1=5, R2=5, R3=4
+        11 => 9,  // R1=9, R2=9, R3=4
+        _ => n,   // shouldn't be called for valid counts
+    }
+}
+
+/// Select which players should play this round. For normal counts, returns all.
+/// For awkward counts (6, 7, 11), returns a subset so that after 3 rounds everyone
+/// plays exactly 2. Players are sorted by (rounds_played ASC, UID ASC) for determinism.
+pub fn select_players_for_round(
+    checked_in: &[String],
+    previous_rounds: &[Vec<Vec<String>>],
+) -> Vec<String> {
+    let n = checked_in.len();
+    if is_valid_table_count(n) {
+        return checked_in.to_vec();
+    }
+
+    // Count rounds played per player
+    let mut play_count: HashMap<String, usize> = HashMap::new();
+    for uid in checked_in {
+        play_count.insert(uid.clone(), 0);
+    }
+    for round in previous_rounds {
+        for table in round {
+            for uid in table {
+                if let Some(count) = play_count.get_mut(uid) {
+                    *count += 1;
+                }
+            }
+        }
+    }
+
+    let min_played = play_count.values().copied().min().unwrap_or(0);
+    let max_played = play_count.values().copied().max().unwrap_or(0);
+
+    // Equalizing round: if some players have fewer rounds, and they form a valid count
+    if min_played < max_played {
+        let mut behind: Vec<String> = checked_in
+            .iter()
+            .filter(|uid| play_count[uid.as_str()] < max_played)
+            .cloned()
+            .collect();
+        behind.sort();
+        if is_valid_table_count(behind.len()) {
+            return behind;
+        }
+    }
+
+    // Normal stagger: seat find_equalization_target(n) players, prioritizing those with fewest rounds
+    let target = find_equalization_target(n);
+    let mut sorted: Vec<String> = checked_in.to_vec();
+    sorted.sort_by(|a, b| {
+        play_count[a.as_str()]
+            .cmp(&play_count[b.as_str()])
+            .then_with(|| a.cmp(b))
+    });
+    sorted.truncate(target);
+    sorted
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2072,5 +2144,120 @@ mod tests {
                 assert!(p.is_string(), "each player should be a string");
             }
         }
+    }
+
+    #[test]
+    fn test_is_valid_table_count() {
+        assert!(!is_valid_table_count(3));
+        assert!(is_valid_table_count(4));
+        assert!(is_valid_table_count(5));
+        assert!(!is_valid_table_count(6));
+        assert!(!is_valid_table_count(7));
+        assert!(is_valid_table_count(8));
+        assert!(is_valid_table_count(9));
+        assert!(is_valid_table_count(10));
+        assert!(!is_valid_table_count(11));
+        assert!(is_valid_table_count(12));
+        assert!(is_valid_table_count(20));
+    }
+
+    #[test]
+    fn test_select_players_normal_count() {
+        let players = make_players(8);
+        let selected = select_players_for_round(&players, &[]);
+        assert_eq!(selected.len(), 8);
+    }
+
+    #[test]
+    fn test_select_players_6_three_rounds() {
+        let players = make_players(6);
+        // R1: should select 4
+        let r1 = select_players_for_round(&players, &[]);
+        assert_eq!(r1.len(), 4);
+        let rounds = vec![vec![r1.clone()]]; // one round with one table of 4
+
+        // R2: should select 4 (prioritize the 2 who sat out)
+        let r2 = select_players_for_round(&players, &rounds);
+        assert_eq!(r2.len(), 4);
+        let rounds2 = vec![vec![r1.clone()], vec![r2.clone()]];
+
+        // R3: equalizing - players with 1 round should be 4
+        let r3 = select_players_for_round(&players, &rounds2);
+        assert_eq!(r3.len(), 4);
+
+        // Verify everyone plays exactly 2
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for uid in r1.iter().chain(r2.iter()).chain(r3.iter()) {
+            *counts.entry(uid.clone()).or_default() += 1;
+        }
+        for p in &players {
+            assert_eq!(counts[p], 2, "Player {} should play exactly 2 rounds", p);
+        }
+    }
+
+    #[test]
+    fn test_select_players_7_three_rounds() {
+        let players = make_players(7);
+        let r1 = select_players_for_round(&players, &[]);
+        assert_eq!(r1.len(), 5);
+        let rounds = vec![vec![r1.clone()]];
+
+        let r2 = select_players_for_round(&players, &rounds);
+        assert_eq!(r2.len(), 5);
+        let rounds2 = vec![vec![r1.clone()], vec![r2.clone()]];
+
+        let r3 = select_players_for_round(&players, &rounds2);
+        assert_eq!(r3.len(), 4);
+
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for uid in r1.iter().chain(r2.iter()).chain(r3.iter()) {
+            *counts.entry(uid.clone()).or_default() += 1;
+        }
+        for p in &players {
+            assert_eq!(counts[p], 2, "Player {} should play exactly 2 rounds", p);
+        }
+    }
+
+    #[test]
+    fn test_select_players_11_three_rounds() {
+        let players = make_players(11);
+        let r1 = select_players_for_round(&players, &[]);
+        assert_eq!(r1.len(), 9);
+
+        // Simulate R1 as 1×5 + 1×4 tables
+        let round1 = vec![r1[..5].to_vec(), r1[5..].to_vec()];
+        let rounds = vec![round1.clone()];
+
+        let r2 = select_players_for_round(&players, &rounds);
+        assert_eq!(r2.len(), 9);
+        let round2 = vec![r2[..5].to_vec(), r2[5..].to_vec()];
+        let rounds2 = vec![round1, round2];
+
+        let r3 = select_players_for_round(&players, &rounds2);
+        assert_eq!(r3.len(), 4);
+
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for uid in r1.iter().chain(r2.iter()).chain(r3.iter()) {
+            *counts.entry(uid.clone()).or_default() += 1;
+        }
+        for p in &players {
+            assert_eq!(counts[p], 2, "Player {} should play exactly 2 rounds", p);
+        }
+    }
+
+    #[test]
+    fn test_select_players_dropout_out_of_stagger() {
+        // 6→5: should return all 5 (valid count)
+        let players = make_players(5);
+        let selected = select_players_for_round(&players, &[]);
+        assert_eq!(selected.len(), 5);
+    }
+
+    #[test]
+    fn test_select_players_dropout_into_stagger() {
+        // 8→7: should activate stagger, seat 5
+        let players = make_players(7);
+        let selected = select_players_for_round(&players, &[]);
+        assert_eq!(selected.len(), 5);
     }
 }

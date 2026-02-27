@@ -350,6 +350,24 @@
     return lastRound.length > 0 && lastRound.every(t => t.state === "Finished");
   });
   const finalsTableFinished = $derived(tournament?.finals?.state === "Finished");
+  // Detect unequal rounds played (stagger sit-outs)
+  const hasUnequalRounds = $derived.by(() => {
+    if (!tournament?.rounds?.length || !tournament?.players) return false;
+    const counts = new Map<string, number>();
+    const active = new Set(tournament.players.filter(p => p.state !== "Finished" && p.state !== "Disqualified").map(p => p.user_uid));
+    for (const round of tournament.rounds) {
+      for (const table of round) {
+        for (const seat of table.seating) {
+          if (active.has(seat.player_uid)) {
+            counts.set(seat.player_uid, (counts.get(seat.player_uid) ?? 0) + 1);
+          }
+        }
+      }
+    }
+    if (counts.size === 0) return false;
+    const vals = [...counts.values()];
+    return Math.min(...vals) < Math.max(...vals);
+  });
   const tablesFinishedCount = $derived.by(() => {
     if (!tournament?.rounds?.length) return { done: 0, total: 0 };
     const lastRound = tournament.rounds[tournament.rounds.length - 1]!;
@@ -890,7 +908,10 @@
                 <p class="text-sm text-ash-500">{m.overview_start_round_hint({ count: String(checkedInCount) })}</p>
               {/if}
               {#if [6, 7, 11].includes(checkedInCount)}
-                <p class="text-sm text-amber-300">{m.overview_seating_warning({ count: String(checkedInCount) })}</p>
+                <p class="text-sm text-sky-300">{m.overview_stagger_info({ count: String(checkedInCount) })}</p>
+              {/if}
+              {#if hasFinalsCandidate && hasUnequalRounds}
+                <p class="text-sm text-amber-300">{m.overview_stagger_finals_warning()}</p>
               {/if}
             {/if}
 
