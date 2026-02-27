@@ -95,7 +95,7 @@ export const helpDocs: Record<string, HelpDoc> = {
     title: "Organizer Guide",
     description: "How to create, configure, and run tournaments with Archon.",
     icon: "clipboard",
-    tocDepth: 3,
+    tocDepth: 2,
     raw: organizerGuideRaw,
     get content() { return getRendered("organizer-guide", this.raw); },
   },
