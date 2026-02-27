@@ -12,6 +12,7 @@
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
+  import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);
   const countries = getCountries();
@@ -157,28 +158,50 @@
 
   // Edit fields
   let editName = $state("");
+  let editFormat = $state("");
+  let editCountry = $state("");
+  let editStart = $state("");
+  let editFinish = $state("");
   let editDescription = $state("");
   let editStandingsMode = $state<LeagueStandingsMode>("RTP");
-  let editAllowNoFinals = $state(false);
+
+  function toDateInput(d: string | null): string {
+    if (!d) return "";
+    try { return new Date(d).toISOString().slice(0, 10); } catch { return ""; }
+  }
 
   function startEdit() {
     if (!league) return;
     editName = league.name;
+    editFormat = league.format || "";
+    editCountry = league.country || "";
+    editStart = toDateInput(league.start);
+    editFinish = toDateInput(league.finish);
     editDescription = league.description;
     editStandingsMode = league.standings_mode;
-    editAllowNoFinals = league.allow_no_finals;
     editing = true;
   }
 
   async function saveEdit() {
     if (!league) return;
+    if (!editName.trim()) {
+      error = m.tournament_new_error_name_required();
+      return;
+    }
+    if (!editStart) {
+      error = m.tournament_new_error_start_required();
+      return;
+    }
     error = null;
     try {
       await updateLeague(league.uid, {
         name: editName.trim(),
+        format: editFormat || null,
+        country: editCountry || null,
+        start: editStart || null,
+        finish: editFinish || null,
         description: editDescription,
         standings_mode: editStandingsMode,
-        allow_no_finals: editAllowNoFinals,
       });
       editing = false;
       await loadLeague();
@@ -270,6 +293,11 @@
               {#if league.format}
                 <span>· {league.format}</span>
               {/if}
+              {#if league.country}
+                <span>· {getCountryFlag(league.country)} {countries[league.country]?.name || league.country}</span>
+              {:else}
+                <span>· Worldwide</span>
+              {/if}
               {#if league.kind === "Meta-League"}
                 <span class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">Meta</span>
               {/if}
@@ -297,54 +325,87 @@
       <!-- Edit form -->
       {#if editing}
         <div class="bg-dusk-950 rounded-lg shadow p-6 border border-ash-800 mb-6 space-y-4">
+          <!-- Name -->
           <div>
-            <label for="edit-name" class="block text-sm font-medium text-ash-400 mb-1">Name</label>
-            <input id="edit-name" type="text" bind:value={editName}
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200" />
+            <label for="edit-name" class="block text-sm text-ash-400 mb-1">{m.tfield_name_label()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+            <input id="edit-name" type="text" bind:value={editName} required
+              class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {editName.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
           </div>
+
+          <!-- Standings Mode & Format -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="edit-mode" class="block text-sm text-ash-400 mb-1">Standings Mode</label>
+              <select id="edit-mode" bind:value={editStandingsMode}
+                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+                <option value="RTP">Rating Points (RTP)</option>
+                <option value="Score">GW/VP/TP (prelims only)</option>
+                <option value="GP">Grand Prix</option>
+              </select>
+            </div>
+            <div>
+              <label for="edit-format" class="block text-sm text-ash-400 mb-1">{m.tfield_format()}</label>
+              <select id="edit-format" bind:value={editFormat}
+                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+                <option value="">Any format</option>
+                <option value="Standard">Standard</option>
+                <option value="V5">V5</option>
+                <option value="Limited">Limited</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dates -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="edit-start" class="block text-sm text-ash-400 mb-1">{m.tfield_start()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+              <input id="edit-start" type="date" bind:value={editStart} required
+                class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {editStart ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
+            </div>
+            <div>
+              <label for="edit-finish" class="block text-sm text-ash-400 mb-1">{m.tfield_finish()}</label>
+              <input id="edit-finish" type="date" bind:value={editFinish}
+                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200 focus:border-ash-500 focus:outline-none" />
+              <p class="text-xs text-ash-500 mt-1">Leave empty for ongoing league</p>
+            </div>
+          </div>
+
+          <!-- Country -->
           <div>
-            <label for="edit-mode" class="block text-sm font-medium text-ash-400 mb-1">Standings Mode</label>
-            <select id="edit-mode" bind:value={editStandingsMode}
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200">
-              <option value="RTP">Rating Points</option>
-              <option value="Score">GW/VP/TP (prelims only)</option>
-              <option value="GP">Grand Prix</option>
+            <label for="edit-country" class="block text-sm text-ash-400 mb-1">{m.common_country()}</label>
+            <select id="edit-country" bind:value={editCountry}
+              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+              <option value="">Worldwide</option>
+              {#each Object.entries(countries) as [code, c]}
+                <option value={code}>{c.name} {getCountryFlag(code)}</option>
+              {/each}
             </select>
           </div>
+
+
+          <!-- Description -->
           <div>
-            <label for="edit-desc" class="block text-sm font-medium text-ash-400 mb-1">Description</label>
-            <textarea id="edit-desc" bind:value={editDescription} rows={3}
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 resize-y"></textarea>
+            <label for="edit-desc" class="block text-sm text-ash-400 mb-1">{m.common_description()}</label>
+            <textarea id="edit-desc" bind:value={editDescription} rows={10}
+              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200 focus:border-ash-500 focus:outline-none resize-y"></textarea>
           </div>
-          <label class="flex items-center gap-2 text-sm text-ash-400 cursor-pointer">
-            <input type="checkbox" bind:checked={editAllowNoFinals}
-              class="rounded border-ash-600 bg-dusk-950 text-crimson-500" />
-            Allow tournaments without finals
-          </label>
+
           <div class="flex gap-3 justify-end">
-            <button onclick={() => editing = false} class="px-4 py-2 text-sm text-ash-400 hover:text-bone-100">Cancel</button>
-            <button onclick={saveEdit} class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">Save</button>
+            <button onclick={() => editing = false} class="px-4 py-2 text-sm text-ash-400 hover:text-bone-100">{m.common_cancel()}</button>
+            <button onclick={saveEdit} disabled={!editName.trim() || !editStart}
+              class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">{m.common_save()}</button>
           </div>
         </div>
       {/if}
 
       <!-- Info cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
           <div class="text-sm text-ash-400">Dates</div>
           <div class="text-bone-100 mt-1">{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : "ongoing"}</div>
         </div>
         <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
-          <div class="text-sm text-ash-400">Country</div>
-          <div class="text-bone-100 mt-1">
-            {#if league.country}
-              {getCountryFlag(league.country)} {countries[league.country]?.name || league.country}
-            {:else}
-              Worldwide
-            {/if}
-          </div>
-        </div>
-        <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
+          <div class="text-sm text-ash-400 mb-1">Organizers</div>
           {#if isOrganizer}
             <OrganizerManager
               organizerUids={league.organizers_uids}
@@ -352,8 +413,7 @@
               onremove={async (userUid) => { await removeLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
             />
           {:else}
-            <div class="text-sm text-ash-400">Organizers</div>
-            <div class="text-bone-100 mt-1">
+            <div class="text-bone-100">
               {#each league.organizers_uids as ouid}
                 <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
               {/each}

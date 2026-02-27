@@ -15,13 +15,10 @@
   let kind = $state<LeagueKind>("League");
   let standingsMode = $state<LeagueStandingsMode>("RTP");
   let format = $state<string>("");
-  let online = $state(false);
   let country = $state("");
   let startDate = $state("");
   let finishDate = $state("");
-  let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
   let description = $state("");
-  let allowNoFinals = $state(false);
   let parentUid = $state("");
 
   let metaLeagues = $state<League[]>([]);
@@ -42,7 +39,11 @@
 
   async function handleSubmit() {
     if (!name.trim()) {
-      error = "Name is required";
+      error = m.tournament_new_error_name_required();
+      return;
+    }
+    if (!startDate) {
+      error = m.tournament_new_error_start_required();
       return;
     }
     isSubmitting = true;
@@ -53,14 +54,11 @@
         kind,
         standings_mode: standingsMode,
         format: format || null,
-        online,
         country: country || null,
         start: startDate || null,
         finish: finishDate || null,
-        timezone,
         description,
         parent_uid: parentUid || null,
-        allow_no_finals: allowNoFinals,
       });
       await saveLeague(league);
       goto(`/leagues/${league.uid}`);
@@ -100,16 +98,16 @@
         <div class="bg-dusk-950 rounded-lg shadow p-6 border border-ash-800 space-y-4">
           <!-- Name -->
           <div>
-            <label for="name" class="block text-sm font-medium text-ash-400 mb-1">Name *</label>
-            <input id="name" type="text" bind:value={name} required
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200" />
+            <label for="name" class="block text-sm text-ash-400 mb-1">{m.tfield_name_label()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+            <input id="name" type="text" bind:value={name} required autofocus
+              class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {name.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
           </div>
 
           <!-- Kind -->
           <div>
-            <label for="kind" class="block text-sm font-medium text-ash-400 mb-1">Kind</label>
+            <label for="kind" class="block text-sm text-ash-400 mb-1">Kind</label>
             <select id="kind" bind:value={kind}
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200">
+              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
               <option value="League">League</option>
               <option value="Meta-League">Meta-League</option>
             </select>
@@ -121,9 +119,9 @@
           <!-- Parent league (only for regular leagues) -->
           {#if kind === "League" && metaLeagues.length > 0}
             <div>
-              <label for="parent" class="block text-sm font-medium text-ash-400 mb-1">Parent League</label>
+              <label for="parent" class="block text-sm text-ash-400 mb-1">Parent League</label>
               <select id="parent" bind:value={parentUid}
-                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
                 <option value="">None</option>
                 {#each metaLeagues as ml (ml.uid)}
                   <option value={ml.uid}>{ml.name}</option>
@@ -135,9 +133,9 @@
 
           <!-- Standings mode -->
           <div>
-            <label for="standings" class="block text-sm font-medium text-ash-400 mb-1">Standings Mode</label>
+            <label for="standings" class="block text-sm text-ash-400 mb-1">Standings Mode</label>
             <select id="standings" bind:value={standingsMode}
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200">
+              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
               <option value="RTP">Rating Points (RTP)</option>
               <option value="Score">GW/VP/TP (prelims only)</option>
               <option value="GP">Grand Prix (position-based)</option>
@@ -147,9 +145,9 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Format restriction -->
             <div>
-              <label for="format" class="block text-sm font-medium text-ash-400 mb-1">Format</label>
+              <label for="format" class="block text-sm text-ash-400 mb-1">Format</label>
               <select id="format" bind:value={format}
-                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
                 <option value="">Any format</option>
                 <option value="Standard">Standard</option>
                 <option value="V5">V5</option>
@@ -159,9 +157,9 @@
 
             <!-- Country -->
             <div>
-              <label for="country" class="block text-sm font-medium text-ash-400 mb-1">Country</label>
+              <label for="country" class="block text-sm text-ash-400 mb-1">Country</label>
               <select id="country" bind:value={country}
-                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
                 <option value="">Worldwide</option>
                 {#each Object.entries(countries) as [code, c]}
                   <option value={code}>{c.name} {getCountryFlag(code)}</option>
@@ -173,43 +171,30 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Start date -->
             <div>
-              <label for="start" class="block text-sm font-medium text-ash-400 mb-1">Start Date</label>
-              <input id="start" type="date" bind:value={startDate}
-                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200" />
+              <label for="start" class="block text-sm text-ash-400 mb-1">{m.tfield_start()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+              <input id="start" type="date" bind:value={startDate} required
+                class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {startDate ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
             </div>
 
             <!-- End date -->
             <div>
-              <label for="finish" class="block text-sm font-medium text-ash-400 mb-1">End Date</label>
+              <label for="finish" class="block text-sm text-ash-400 mb-1">End Date</label>
               <input id="finish" type="date" bind:value={finishDate}
-                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200" />
+                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200" />
               <p class="text-xs text-ash-500 mt-1">Leave empty for ongoing league</p>
             </div>
           </div>
 
           <!-- Description -->
           <div>
-            <label for="desc" class="block text-sm font-medium text-ash-400 mb-1">Description</label>
+            <label for="desc" class="block text-sm text-ash-400 mb-1">Description</label>
             <span class="text-xs text-ash-500 mb-1 block">
               {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
             </span>
-            <textarea id="desc" bind:value={description} rows={3}
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 resize-y"></textarea>
+            <textarea id="desc" bind:value={description} rows={10}
+              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200 resize-y"></textarea>
           </div>
 
-          <!-- Options -->
-          <div class="flex flex-wrap gap-6">
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" bind:checked={online}
-                class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500" />
-              <span class="text-sm text-ash-200">Online</span>
-            </label>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" bind:checked={allowNoFinals}
-                class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500" />
-              <span class="text-sm text-ash-200">Allow tournaments without finals</span>
-            </label>
-          </div>
         </div>
 
         <div class="flex justify-end gap-3">
@@ -218,7 +203,7 @@
           </a>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !name.trim() || !startDate}
             class="px-6 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
           >
             {isSubmitting ? "Creating..." : "Create League"}

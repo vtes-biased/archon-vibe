@@ -98,14 +98,16 @@
 
 <!-- Name -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("name")}>{m.tfield_name_label()}</label>
+  <label class="block text-sm text-ash-400 mb-1" for={id("name")}>{m.tfield_name_label()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
   <input
     id={id("name")}
     type="text"
+    required
     value={values.name}
     {disabled}
+    autofocus
     oninput={(e) => handleInput("name", (e.target as HTMLInputElement).value)}
-    class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+    class="w-full px-3 py-2 text-sm bg-dusk-950 border rounded-lg text-ash-200 focus:outline-none {values.name.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}"
     placeholder={m.tfield_name_placeholder()}
   />
 </div>
@@ -225,14 +227,15 @@
 <!-- Dates & Timezone -->
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("start")}>{m.tfield_start()}</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("start")}>{m.tfield_start()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
     <input
       id={id("start")}
       type="datetime-local"
+      required
       value={values.start}
       {disabled}
       onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+      class="w-full px-3 py-2 text-sm bg-dusk-950 border rounded-lg text-ash-200 focus:outline-none {values.start ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}"
     />
   </div>
   <div>
@@ -268,7 +271,14 @@
     type="checkbox"
     checked={values.online}
     {disabled}
-    onchange={(e) => handleInput("online", (e.target as HTMLInputElement).checked)}
+    onchange={(e) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      handleInput("online", checked);
+      if (checked && !values.venue) {
+        handleInput("venue", "VEKN Discord");
+        handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
+      }
+    }}
     class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
   />
   <span class="text-sm text-ash-200">{m.tfield_online()}</span>
@@ -277,13 +287,14 @@
 <!-- Location fields (hidden when online) -->
 {#if !values.online}
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("country")}>{m.common_country()}</label>
+    <label class="block text-sm text-ash-400 mb-1" for={id("country")}>{m.common_country()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
     <select
       id={id("country")}
+      required
       value={values.country}
       {disabled}
       onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-dusk-950 border rounded-lg text-ash-200 {values.country ? 'border-ash-700' : 'border-crimson-700/50'}"
     >
       <option value="">{m.tfield_select_country()}</option>
       {#each Object.entries(countries) as [code, c]}
@@ -349,23 +360,6 @@
     />
   </div>
 {/if}
-
-<!-- Description -->
-<div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("description")}>{m.common_description()}</label>
-  <span class="text-xs text-ash-500 mb-1 block">
-    {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
-  </span>
-  <textarea
-    id={id("description")}
-    value={values.description}
-    {disabled}
-    oninput={(e) => handleInput("description", (e.target as HTMLTextAreaElement).value)}
-    rows="3"
-    class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none resize-none"
-    placeholder={m.tfield_description_placeholder()}
-  ></textarea>
-</div>
 
 <!-- Standings & Decklists -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -488,4 +482,21 @@
     </select>
     <p class="text-xs text-ash-500 mt-1">{m.timer_extension_policy_desc()}</p>
   </div>
+</div>
+
+<!-- Description -->
+<div>
+  <label class="block text-sm text-ash-400 mb-1" for={id("description")}>{m.common_description()}</label>
+  <span class="text-xs text-ash-500 mb-1 block">
+    {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
+  </span>
+  <textarea
+    id={id("description")}
+    value={values.description}
+    {disabled}
+    oninput={(e) => handleInput("description", (e.target as HTMLTextAreaElement).value)}
+    rows="10"
+    class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none resize-y"
+    placeholder={m.tfield_description_placeholder()}
+  ></textarea>
 </div>

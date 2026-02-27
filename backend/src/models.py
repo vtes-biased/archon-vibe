@@ -353,15 +353,12 @@ class League(BaseObject, kw_only=True):
     kind: LeagueKind = LeagueKind.LEAGUE
     standings_mode: LeagueStandingsMode = LeagueStandingsMode.RTP
     format: str | None = None  # TournamentFormat value or None = any
-    online: bool = False
     country: str | None = None  # None = worldwide
     start: datetime | None = None
     finish: datetime | None = None  # None = ongoing
-    timezone: str = "UTC"
     description: str = ""
     organizers_uids: list[str] = msgspec.field(default_factory=list)
     parent_uid: str | None = None  # FK → leagues (child of meta-league)
-    allow_no_finals: bool = False
 
 
 class TournamentState(StrEnum):

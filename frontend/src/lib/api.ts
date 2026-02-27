@@ -686,14 +686,11 @@ export interface CreateLeagueData {
   kind?: string;
   standings_mode?: string;
   format?: string | null;
-  online?: boolean;
   country?: string | null;
   start?: string | null;
   finish?: string | null;
-  timezone?: string;
   description?: string;
   parent_uid?: string | null;
-  allow_no_finals?: boolean;
 }
 
 export async function createLeague(data: CreateLeagueData): Promise<League> {

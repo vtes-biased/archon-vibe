@@ -32,8 +32,7 @@
   function formatDateRange(league: League): string {
     if (!league.start) return "—";
     try {
-      const tz = league.timezone || "UTC";
-      const opts: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric", timeZone: tz };
+      const opts: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
       const start = new Date(league.start).toLocaleDateString(undefined, opts);
       if (league.finish) {
         const end = new Date(league.finish).toLocaleDateString(undefined, opts);
@@ -61,7 +60,7 @@
       }
       // Filter by country
       if (selectedCountry !== "all") {
-        all = all.filter(l => l.country === selectedCountry);
+        all = all.filter(l => !l.country || l.country === selectedCountry);
       }
       // Filter by search
       if (searchQuery.trim()) {
@@ -151,14 +150,15 @@
         </div>
 
         <!-- Show past -->
-        <label class="flex items-center gap-2 text-sm text-ash-400 cursor-pointer py-2">
-          <input
-            type="checkbox"
-            bind:checked={showPast}
-            class="rounded border-ash-600 bg-dusk-950 text-crimson-500"
-          />
-          {m.league_show_past()}
-        </label>
+        <div class="flex items-center gap-3 pb-1">
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" bind:checked={showPast} class="sr-only peer" />
+            <div class="relative w-11 h-6 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
+              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={showPast}></div>
+            </div>
+            <span class="text-sm text-ash-300">{m.league_show_past()}</span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -167,11 +167,10 @@
       <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
         <!-- Header (desktop) -->
         <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-ash-900 text-sm font-medium text-ash-300 border-b border-ash-700">
-          <div class="col-span-4">{m.common_name()}</div>
+          <div class="col-span-5">{m.common_name()}</div>
           <div class="col-span-3">{m.league_col_dates()}</div>
           <div class="col-span-2">{m.common_country()}</div>
           <div class="col-span-2">{m.league_col_standings()}</div>
-          <div class="col-span-1">{m.league_col_kind()}</div>
         </div>
 
         <div class="divide-y divide-ash-800">
@@ -209,8 +208,13 @@
 
               <!-- Desktop -->
               <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
-                <div class="col-span-4">
-                  <div class="font-semibold text-bone-100">{league.name}</div>
+                <div class="col-span-5">
+                  <div class="font-semibold text-bone-100">
+                    {league.name}
+                    {#if league.kind === "Meta-League"}
+                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">Meta</span>
+                    {/if}
+                  </div>
                   {#if league.format}
                     <div class="text-xs text-ash-500">{league.format}</div>
                   {/if}
@@ -227,11 +231,6 @@
                 </div>
                 <div class="col-span-2 text-sm text-ash-400">
                   {standingsModeLabel(league.standings_mode)}
-                </div>
-                <div class="col-span-1">
-                  {#if league.kind === "Meta-League"}
-                    <span class="px-2 py-1 rounded text-xs font-medium bg-violet-900/50 text-violet-300">Meta</span>
-                  {/if}
                 </div>
               </div>
             </a>

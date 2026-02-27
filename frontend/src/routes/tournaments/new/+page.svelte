@@ -33,7 +33,7 @@
     multideck: false,
     decklist_required: false,
     league_uid: "",
-    round_time: 0,
+    round_time: 7200,
     finals_time: 0,
     time_extension_policy: "additions",
   });
@@ -44,6 +44,14 @@
   async function handleSubmit() {
     if (!values.name.trim()) {
       error = m.tournament_new_error_name_required();
+      return;
+    }
+    if (!values.start) {
+      error = m.tournament_new_error_start_required();
+      return;
+    }
+    if (!values.online && !values.country) {
+      error = m.tournament_new_error_country_required();
       return;
     }
     if (veknPush && (values.max_rounds < 2 || values.max_rounds > 4)) {
@@ -126,7 +134,7 @@
           </a>
           <button
             type="submit"
-            disabled={isSubmitting || !values.name.trim()}
+            disabled={isSubmitting || !values.name.trim() || !values.start || (!values.online && !values.country)}
             class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
           >
             {isSubmitting ? m.tournament_new_creating() : m.tournament_new_create_btn()}

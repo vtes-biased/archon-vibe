@@ -211,15 +211,12 @@ export interface League extends BaseObject {
   kind: LeagueKind;
   standings_mode: LeagueStandingsMode;
   format: string | null; // TournamentFormat value or null = any
-  online: boolean;
   country: string | null; // null = worldwide
   start: string | null;
   finish: string | null; // null = ongoing
-  timezone: string;
   description: string;
   organizers_uids: string[];
   parent_uid: string | null; // FK → leagues (child of meta-league)
-  allow_no_finals: boolean;
 }
 
 // Tournament types

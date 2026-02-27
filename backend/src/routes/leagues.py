@@ -43,27 +43,21 @@ class LeagueCreate(BaseModel):
     kind: LeagueKind = LeagueKind.LEAGUE
     standings_mode: LeagueStandingsMode = LeagueStandingsMode.RTP
     format: str | None = None
-    online: bool = False
     country: str | None = None
     start: datetime | None = None
     finish: datetime | None = None
-    timezone: str = "UTC"
     description: str = ""
     parent_uid: str | None = None
-    allow_no_finals: bool = False
 
 
 class LeagueUpdate(BaseModel):
     name: str | None = None
     standings_mode: LeagueStandingsMode | None = None
     format: str | None = None
-    online: bool | None = None
     country: str | None = None
     start: datetime | None = None
     finish: datetime | None = None
-    timezone: str | None = None
     description: str | None = None
-    allow_no_finals: bool | None = None
     parent_uid: str | None = None
 
 
@@ -115,15 +109,12 @@ async def create_league(
         kind=body.kind,
         standings_mode=body.standings_mode,
         format=body.format,
-        online=body.online,
         country=body.country,
         start=body.start,
         finish=body.finish,
-        timezone=body.timezone,
         description=body.description,
         organizers_uids=[user.uid],
         parent_uid=body.parent_uid,
-        allow_no_finals=body.allow_no_finals,
     )
     bd = await insert_league(league)
     if broadcast_league_event:
