@@ -297,8 +297,8 @@
               {/if}
             </div>
           </div>
-          <!-- Timer for player's table -->
-          {#if (tournament.round_time ?? 0) > 0}
+          <!-- Timer for player's table (hidden in offline tournaments) -->
+          {#if !tournament.offline_mode && (tournament.round_time ?? 0) > 0}
             <div class="mb-2">
               <TimerDisplay {tournament} tableIndex={myTableIdx} />
             </div>
