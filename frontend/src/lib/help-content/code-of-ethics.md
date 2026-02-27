@@ -42,12 +42,11 @@ The purpose of this code of ethics is to describe:
 
 This document is intended to be used by VEKN members, with a focus on event organisers.
 
-### Note on the use of the word "sanction"
-
-This word has two distinctly different English definitions, both of which are used in this document:
-
-- **(1)** a threatened penalty for disobeying a law or rule (e.g., "The player received a sanction in response to their violation of the ethics code");
-- **(2)** official approval or permission (e.g., "this event is officially sanctioned by VEKN").
+> **NOTE ON THE USE OF THE WORD "SANCTION"**
+> This word has two distinctly different English definitions, both of which are used in this document:
+>
+> - **(1)** a threatened penalty for disobeying a law or rule (e.g., "The player received a sanction in response to their violation of the ethics code");
+> - **(2)** official approval or permission (e.g., "this event is officially sanctioned by VEKN").
 
 There is no direct relationship between this code of ethics and any criminal laws or procedures. The standards, procedures and sanctions concern only rights and privileges of VEKN membership. This includes, but is not limited to:
 
@@ -59,6 +58,7 @@ Every aspect of this code of ethics applies to all participants in activities ov
 
 ## Standards of conduct
 
+> **IMPORTANT**
 > VEKN is dedicated to ensuring player safety and to maintaining the upstanding reputation of sanctioned events.
 >
 > Judges and the Ethics Committee should have no hesitation in addressing code of ethics violations, regardless of the effect on games in progress or the disruption to local play groups occurring after sanctions are levied.
