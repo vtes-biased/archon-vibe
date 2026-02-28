@@ -10,12 +10,14 @@
     playerUid = undefined,
     playerName = undefined,
     playerVekn = undefined,
+    round = undefined,
     onuploaded,
   }: {
     tournamentUid: string;
     playerUid?: string;
     playerName?: string;
     playerVekn?: string;
+    round?: number;
     onuploaded?: () => void;
   } = $props();
 
@@ -180,6 +182,7 @@
         comments: deck.comments,
         cards: deck.cards,
       };
+      if (round !== undefined) deckData.round = round;
       if (attrValue !== undefined) deckData.attribution = attrValue;
 
       // Route through engine action
@@ -187,7 +190,7 @@
       await tournamentAction(tournamentUid, 'UpsertDeck', {
         player_uid: targetUid,
         deck: deckData,
-        multideck: false,
+        multideck: round !== undefined,
       });
 
       success = true;

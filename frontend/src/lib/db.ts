@@ -558,6 +558,10 @@ export async function getDecksByTournamentGrouped(tournamentUid: string): Promis
   for (const d of decks) {
     (grouped[d.user_uid] ??= []).push(d);
   }
+  // Sort each player's decks by round so array index matches slot index
+  for (const arr of Object.values(grouped)) {
+    arr.sort((a, b) => (a.round ?? 0) - (b.round ?? 0));
+  }
   return grouped;
 }
 

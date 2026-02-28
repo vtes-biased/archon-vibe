@@ -7,7 +7,8 @@
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X } from "lucide-svelte";
+  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight } from "lucide-svelte";
+  import { slide } from "svelte/transition";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
@@ -64,7 +65,9 @@
 
   // Deck expansion state
   let expandedPlayer = $state<string | null>(null);
+  let expandedDeckRound = $state<number | null>(null);
   let uploadingFor = $state<string | null>(null);
+  let uploadingRound = $state<number | undefined>(undefined);
   let validationCache = $state<Record<string, ValidationError[]>>({});
   let decksByUser = $state<Record<string, DeckObject[]>>({});
 
@@ -78,12 +81,15 @@
 
   function togglePlayer(uid: string) {
     expandedPlayer = expandedPlayer === uid ? null : uid;
+    expandedDeckRound = null;
     uploadingFor = null;
+    uploadingRound = undefined;
   }
 
   function onUploaded() {
     const uid = uploadingFor;
     uploadingFor = null;
+    uploadingRound = undefined;
     // Clear validation cache so it re-validates with the new deck
     if (uid) {
       const { [uid]: _, ...rest } = validationCache;
@@ -94,17 +100,21 @@
     });
   }
 
-  // Get player's deck
+  const isMultideck = $derived(!!tournament.multideck);
+
+  // Get player's decks
+  function getPlayerDecks(uid: string): DeckObject[] {
+    return decksByUser[uid] ?? [];
+  }
   function getPlayerDeck(uid: string): DeckObject | null {
-    const decks = decksByUser[uid];
-    return decks?.[0] ?? null;
+    return getPlayerDecks(uid)[0] ?? null;
   }
 
-  // Compute deck status for a player
+  // Compute deck status for a player (aggregate across all decks)
   type DeckStatus = 'valid' | 'warning' | 'error' | 'none';
   function getDeckStatus(uid: string): DeckStatus {
-    const deck = getPlayerDeck(uid);
-    if (!deck) return 'none';
+    const decks = getPlayerDecks(uid);
+    if (decks.length === 0) return 'none';
     const errors = validationCache[uid];
     if (!errors) return 'valid'; // Not validated yet, assume valid
     const hasError = errors.some(e => e.severity === 'error');
@@ -114,16 +124,18 @@
     return 'valid';
   }
 
-  // Validate decks when they change
+  // Validate decks when they change (all decks per player, aggregate errors)
   $effect(() => {
     const decks = decksByUser;
     const format = tournament.format;
     if (!Object.keys(decks).length) return;
 
     for (const [uid, playerDecks] of Object.entries(decks)) {
-      if (playerDecks.length > 0 && playerDecks[0] && !validationCache[uid]) {
-        validateDeck(playerDecks[0], format).then(errors => {
-          validationCache = { ...validationCache, [uid]: errors };
+      if (playerDecks.length > 0 && !validationCache[uid]) {
+        Promise.all(
+          playerDecks.filter(Boolean).map(d => validateDeck(d, format))
+        ).then(results => {
+          validationCache = { ...validationCache, [uid]: results.flat() };
         });
       }
     }
@@ -443,11 +455,11 @@
               </button>
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
-                <button onclick={() => togglePlayer(puid)} class="p-1.5 hover:bg-ash-800 rounded transition-colors" title={m.players_view_deck()}>
-                  {#if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-emerald-400" />
-                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-amber-400" />
-                  {:else if deckStatus === 'error'}<CircleX class="w-4 h-4 text-crimson-400" />
-                  {:else}<FileX class="w-4 h-4 text-ash-500" />{/if}
+                <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors hover:bg-ash-800" title={m.players_view_deck()}>
+                  {#if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-emerald-400" /><span class="text-emerald-400">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-amber-400" /><span class="text-amber-400">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-crimson-400" /><span class="text-crimson-400">{m.players_view_deck()}</span>
+                  {:else}<FileX class="w-3.5 h-3.5 text-ash-500" /><span class="text-ash-400">{m.players_no_deck()}</span>{/if}
                 </button>
               {/if}
               {#if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
@@ -475,13 +487,36 @@
           {/if}
           <!-- Expanded deck -->
           {#if expandedPlayer === puid}
-            {@const playerDeck = getPlayerDeck(puid)}
+            {@const playerDecks = getPlayerDecks(puid)}
             {@const errors = validationCache[puid] ?? []}
-            <div class="mt-2 pt-2 border-t border-ash-800 space-y-3">
+            <div class="mt-2 pt-2 border-t border-ash-800 space-y-2">
               {#if isOrganizer && uploadingFor === puid}
-                <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
-              {:else if playerDeck}
-                <DeckDisplay deck={playerDeck} onreplace={isOrganizer ? () => uploadingFor = puid : undefined} />
+                <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} onuploaded={onUploaded} />
+              {:else if playerDecks.length > 0}
+                {#if isMultideck}
+                  {#each playerDecks as deck, i}
+                    <div class="rounded-lg bg-ash-900/50">
+                      <button
+                        class="w-full flex items-center gap-2 p-2.5 text-left text-sm min-h-[44px]"
+                        onclick={() => expandedDeckRound = expandedDeckRound === i ? null : i}
+                        aria-expanded={expandedDeckRound === i}
+                      >
+                        <span class="text-ash-400 shrink-0">
+                          {#if expandedDeckRound === i}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+                        </span>
+                        <span class="font-medium text-ash-300">{m.decks_round_label({ n: String(i + 1) })}</span>
+                        <span class="text-ash-500 truncate">{deck.name || m.decks_unnamed()}</span>
+                      </button>
+                      {#if expandedDeckRound === i}
+                        <div class="px-2.5 pb-2.5" transition:slide={{ duration: 150 }}>
+                          <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                {:else if playerDecks[0]}
+                  <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+                {/if}
                 {#if errors.length > 0}
                   <div class="space-y-1">
                     {#each errors as err}
@@ -495,8 +530,8 @@
               {:else}
                 <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
               {/if}
-              {#if isOrganizer && !playerDeck && uploadingFor !== puid}
-                <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
+              {#if isOrganizer && playerDecks.length === 0 && uploadingFor !== puid}
+                <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
               {/if}
             </div>
           {/if}
@@ -646,15 +681,38 @@
             </tr>
             <!-- Expanded deck row -->
             {#if expandedPlayer === puid}
-              {@const playerDeck = getPlayerDeck(puid)}
+              {@const playerDecks = getPlayerDecks(puid)}
               {@const errors = validationCache[puid] ?? []}
               <tr class="bg-ash-900/50">
                 <td colspan="99" class="p-4">
-                  <div class="space-y-3">
+                  <div class="space-y-2">
                     {#if isOrganizer && uploadingFor === puid}
-                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
-                    {:else if playerDeck}
-                      <DeckDisplay deck={playerDeck} onreplace={isOrganizer ? () => uploadingFor = puid : undefined} />
+                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} onuploaded={onUploaded} />
+                    {:else if playerDecks.length > 0}
+                      {#if isMultideck}
+                        {#each playerDecks as deck, i}
+                          <div class="rounded-lg bg-ash-900/50">
+                            <button
+                              class="w-full flex items-center gap-2 p-2.5 text-left text-sm min-h-[44px]"
+                              onclick={() => expandedDeckRound = expandedDeckRound === i ? null : i}
+                              aria-expanded={expandedDeckRound === i}
+                            >
+                              <span class="text-ash-400 shrink-0">
+                                {#if expandedDeckRound === i}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+                              </span>
+                              <span class="font-medium text-ash-300">{m.decks_round_label({ n: String(i + 1) })}</span>
+                              <span class="text-ash-500 truncate">{deck.name || m.decks_unnamed()}</span>
+                            </button>
+                            {#if expandedDeckRound === i}
+                              <div class="px-2.5 pb-2.5" transition:slide={{ duration: 150 }}>
+                                <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
+                              </div>
+                            {/if}
+                          </div>
+                        {/each}
+                      {:else if playerDecks[0]}
+                        <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+                      {/if}
                       {#if errors.length > 0}
                         <div class="space-y-1">
                           {#each errors as err}
@@ -668,8 +726,8 @@
                     {:else}
                       <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
                     {/if}
-                    {#if isOrganizer && !playerDeck && uploadingFor !== puid}
-                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
+                    {#if isOrganizer && playerDecks.length === 0 && uploadingFor !== puid}
+                      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
                     {/if}
                   </div>
                 </td>

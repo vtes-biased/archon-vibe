@@ -4,8 +4,9 @@
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import { tournamentAction } from "$lib/api";
   import { getCards } from "$lib/cards";
-  import { ChevronDown, ChevronRight, Lock } from "lucide-svelte";
+  import { ChevronDown, ChevronRight, CircleCheck, Lock } from "lucide-svelte";
   import { slide } from "svelte/transition";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -47,11 +48,9 @@
 
   let uploadingFor = $state<string | null>(null);
   let uploadingSlot = $state<number>(0);
-  let expandedPlayer = $state<string | null>(null);
+  let expandedRoundIdx = $state<number | null>(null);
   let expandedDecks = $state<Set<string>>(new Set());
   let cardsDb = $state<Map<number, VtesCard>>(new Map());
-  let deleteLoading = $state(false);
-
   $effect(() => { getCards().then(c => cardsDb = c); });
 
   function toggleDeck(key: string) {
@@ -82,7 +81,6 @@
   }
 
   function canModifySlot(index: number): boolean {
-    if (isOrganizer) return true;
     const s = tournament.state;
     if (s === 'Finished') return false;
     if (s === 'Playing') {
@@ -94,7 +92,6 @@
 
   // Can the player upload (single-deck mode or first deck)
   const canPlayerUpload = $derived.by(() => {
-    if (isOrganizer) return true;
     const s = tournament.state;
     if (s === 'Planned' || s === 'Registration' || s === 'Waiting') return true;
     if (s === 'Playing') return myDecks.length === 0;
@@ -104,7 +101,6 @@
 
   // Can the player delete (single-deck mode)
   const canPlayerDelete = $derived.by(() => {
-    if (isOrganizer) return true;
     const s = tournament.state;
     if (s === 'Planned' || s === 'Registration' || s === 'Waiting') return true;
     return false;
@@ -113,30 +109,15 @@
   // Single-deck: player can edit before first round or after tournament ends
   const singleDeckEditable = $derived(roundCount === 0 || tournament.state === 'Finished');
 
-  // Organizer deck visibility: hide contents until the round for this deck has started
-  function isDeckVisibleToOrganizer(slotIdx: number): boolean {
-    if (tournament.state === 'Finished') return true;
-    return isMultideck ? slotIdx < roundCount : roundCount > 0;
-  }
-
   async function deleteDeck(playerUid: string, deckIndex?: number) {
-    deleteLoading = true;
     try {
-      const token = (await import('$lib/stores/auth.svelte')).getAccessToken();
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const params = deckIndex !== undefined ? `?deck_index=${deckIndex}` : '';
-      const resp = await fetch(`${API_URL}/api/tournaments/${tournament.uid}/decks/${playerUid}${params}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      await tournamentAction(tournament.uid, 'DeleteDeck', {
+        player_uid: playerUid,
+        deck_index: deckIndex ?? null,
+        multideck: isMultideck,
       });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        console.error('Delete deck failed:', data.detail || resp.status);
-      }
     } catch (e) {
       console.error('Delete deck error:', e);
-    } finally {
-      deleteLoading = false;
     }
   }
 
@@ -222,42 +203,59 @@
   <!-- Player's own deck(s) -->
   {#if isPlayer && !isOrganizer}
     {#if isMultideck}
-      <!-- Multideck: per-round slots -->
-      <div class="bg-ash-900/50 rounded-lg p-3 sm:p-4 space-y-4">
+      <!-- Multideck: per-round slots (accordion) -->
+      <div class="bg-ash-900/50 rounded-lg p-3 sm:p-4 space-y-2">
         <h3 class="text-sm font-semibold text-bone-200">{m.decks_my_decks()}</h3>
         {#each Array(deckSlotCount) as _, slotIdx}
           {@const deck = myDecks[slotIdx] ?? null}
           {@const locked = isDeckLocked(slotIdx)}
           {@const canModify = canModifySlot(slotIdx)}
-          <div class="border-t border-ash-800 pt-3 first:border-0 first:pt-0">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs font-medium text-ash-400">{m.decks_round_label({ n: String(slotIdx + 1) })}</span>
+          {@const isExpanded = expandedRoundIdx === slotIdx}
+          <div class="rounded-lg bg-ash-900/30">
+            <button
+              class="w-full flex items-center gap-2 p-2.5 text-left text-sm min-h-[44px]"
+              onclick={() => expandedRoundIdx = isExpanded ? null : slotIdx}
+              aria-expanded={isExpanded}
+            >
+              <span class="text-ash-400 shrink-0">
+                {#if isExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+              </span>
+              <span class="font-medium text-ash-300">{m.decks_round_label({ n: String(slotIdx + 1) })}</span>
               {#if locked}
-                <span class="inline-flex items-center gap-1 text-xs text-ash-500">
-                  <Lock class="w-3 h-3" />
-                  {m.decks_locked()}
-                </span>
+                <Lock class="w-3 h-3 text-ash-500" />
               {/if}
-            </div>
-            {#if uploadingFor === myUid && uploadingSlot === slotIdx}
-              <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
-            {:else if deck}
-              <DeckDisplay
-                {deck}
-                editable={canModify}
-                tournamentUid={tournament.uid}
-                deckIndex={slotIdx}
-                format={tournament.format}
-                onreplace={canModify ? () => { uploadingFor = myUid; uploadingSlot = slotIdx; } : undefined}
-                ondelete={canModify ? () => deleteDeck(myUid, slotIdx) : undefined}
-              />
-            {:else if canModify}
-              <button
-                onclick={() => { uploadingFor = myUid; uploadingSlot = slotIdx; }}
-                class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-              >{m.decks_upload()}</button>
-            {:else}
-              <p class="text-sm text-ash-500">{m.decks_no_deck()}</p>
+              {#if deck}
+                <CircleCheck class="w-3.5 h-3.5 text-emerald-400" />
+              {:else}
+                <span class="text-ash-600 truncate">{m.decks_no_deck()}</span>
+              {/if}
+            </button>
+            {#if isExpanded}
+              <div class="px-2.5 pb-2.5" transition:slide={{ duration: 150 }}>
+                {#if uploadingFor === myUid && uploadingSlot === slotIdx}
+                  <DeckUpload tournamentUid={tournament.uid} round={slotIdx} onuploaded={onUploaded} />
+                {:else if deck}
+                  <DeckDisplay
+                    {deck}
+                    editable={canModify}
+                    tournamentUid={tournament.uid}
+                    deckIndex={slotIdx}
+                    format={tournament.format}
+                    onreplace={canModify ? () => { uploadingFor = myUid; uploadingSlot = slotIdx; } : undefined}
+                    ondelete={canModify ? () => deleteDeck(myUid, slotIdx) : undefined}
+                  />
+                  {#if !canModify}
+                    <p class="text-sm text-ash-500">{m.decks_locked()}</p>
+                  {/if}
+                {:else if canModify}
+                  <button
+                    onclick={() => { uploadingFor = myUid; uploadingSlot = slotIdx; }}
+                    class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                  >{m.decks_upload()}</button>
+                {:else}
+                  <p class="text-sm text-ash-500">{m.decks_no_deck()}</p>
+                {/if}
+              </div>
             {/if}
           </div>
         {/each}
@@ -298,104 +296,6 @@
         {/if}
       </div>
     {/if}
-  {/if}
-
-  <!-- Organizer: all player decks -->
-  {#if isOrganizer}
-    <div class="space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-bone-200">{m.decks_player_decks()}</h3>
-        <span class="text-xs text-ash-500">
-          {m.decks_submitted_count({ submitted: String(Object.keys(decksByUser).length), total: String(tournament.players?.length ?? 0) })}
-        </span>
-      </div>
-
-      {#each tournament.players ?? [] as player}
-        {@const uid = player.user_uid ?? ''}
-        {@const decks = decksByUser[uid] ?? []}
-        {@const info = playerInfo[uid]}
-        <div class="bg-ash-900/50 rounded-lg p-3">
-          <button
-            class="w-full flex items-center justify-between text-left"
-            onclick={() => expandedPlayer = expandedPlayer === uid ? null : uid}
-          >
-            <span class="text-sm text-ash-200">{info?.name ?? uid}</span>
-            <span class="text-xs {decks.length ? 'text-emerald-400' : tournament.decklist_required ? 'text-amber-400' : 'text-ash-500'}">
-              {decks.length ? m.decks_deck_count({ count: String(decks.length) }) : tournament.decklist_required ? m.decks_missing() : m.decks_no_deck()}
-            </span>
-          </button>
-
-          {#if expandedPlayer === uid}
-            <div class="mt-3 space-y-3">
-              {#if uploadingFor === uid}
-                <DeckUpload tournamentUid={tournament.uid} playerUid={uid} playerName={info?.name} playerVekn={info?.vekn ?? undefined} onuploaded={onUploaded} />
-              {:else if isMultideck}
-                <!-- Multideck organizer: per-round display -->
-                {#each Array(Math.max(deckSlotCount, decks.length)) as _, slotIdx}
-                  {@const deck = decks[slotIdx] ?? null}
-                  {@const locked = isDeckLocked(slotIdx)}
-                  <div class="border-t border-ash-800 pt-2 first:border-0 first:pt-0">
-                    <div class="flex items-center gap-2 mb-1">
-                      <span class="text-xs font-medium text-ash-400">{m.decks_round_label({ n: String(slotIdx + 1) })}</span>
-                      {#if locked}
-                        <span class="inline-flex items-center gap-1 text-xs text-ash-500">
-                          <Lock class="w-3 h-3" />
-                        </span>
-                      {/if}
-                    </div>
-                    {#if deck}
-                      {#if isDeckVisibleToOrganizer(slotIdx)}
-                        <DeckDisplay
-                          {deck}
-                          editable={true}
-                          tournamentUid={tournament.uid}
-                          playerUid={uid}
-                          playerName={playerInfo[uid]?.name}
-                          playerVekn={playerInfo[uid]?.vekn ?? undefined}
-                          deckIndex={slotIdx}
-                          format={tournament.format}
-                          onreplace={() => { uploadingFor = uid; uploadingSlot = slotIdx; }}
-                          ondelete={() => deleteDeck(uid, slotIdx)}
-                        />
-                      {:else}
-                        <span class="inline-flex items-center gap-1.5 text-sm text-ash-400">
-                          <Lock class="w-3.5 h-3.5" />
-                          {m.decks_hidden_until_round()}
-                        </span>
-                      {/if}
-                    {:else}
-                      <button
-                        onclick={() => { uploadingFor = uid; uploadingSlot = slotIdx; }}
-                        class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                      >{m.decks_upload()}</button>
-                    {/if}
-                  </div>
-                {/each}
-              {:else}
-                {#each decks as deck, i}
-                  {#if deck}
-                    {#if isDeckVisibleToOrganizer(i)}
-                      <DeckDisplay {deck} editable={true} tournamentUid={tournament.uid} playerUid={uid} playerName={playerInfo[uid]?.name} playerVekn={playerInfo[uid]?.vekn ?? undefined} deckIndex={i} format={tournament.format} onreplace={() => uploadingFor = uid} ondelete={() => deleteDeck(uid)} />
-                    {:else}
-                      <span class="inline-flex items-center gap-1.5 text-sm text-ash-400">
-                        <Lock class="w-3.5 h-3.5" />
-                        {m.decks_hidden_until_round()}
-                      </span>
-                    {/if}
-                  {/if}
-                {/each}
-                {#if !decks.length}
-                  <button
-                    onclick={() => uploadingFor = uid}
-                    class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                  >{m.decks_upload()}</button>
-                {/if}
-              {/if}
-            </div>
-          {/if}
-        </div>
-      {/each}
-    </div>
   {/if}
 
   <!-- Visible decks (post-tournament, collapsible) -->

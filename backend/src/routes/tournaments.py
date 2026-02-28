@@ -26,6 +26,7 @@ from ..db import (
     insert_user,
     save_object,
     save_object_from_model,
+    set_user_resync_after,
     soft_delete_tournament,
     tournament_transaction,
     update_tournament,
@@ -59,6 +60,7 @@ broadcast_tournament_event = None
 broadcast_user_event = None
 broadcast_sanction_event = None
 broadcast_deck_event = None  # async fn(deck_uid: str) -> None
+broadcast_resync = None
 
 _engine = PyEngine()
 
@@ -92,6 +94,7 @@ async def _process_deck_ops(
     deck_ops: list,
     tournament_uid: str,
     existing_decks: list[DeckObject] | None = None,
+    org_uids: list[str] | None = None,
 ) -> list[BroadcastData]:
     """Process deck_ops from engine result. Returns BroadcastData for each affected deck."""
     if not deck_ops:
@@ -99,6 +102,7 @@ async def _process_deck_ops(
     if existing_decks is None:
         existing_decks = await get_decks_for_tournament(tournament_uid)
 
+    _org_uids = org_uids or []
     affected: list[BroadcastData] = []
     for op in deck_ops:
         op_type = op.get("op")
@@ -133,15 +137,22 @@ async def _process_deck_ops(
             deck_obj.attribution = deck_data.get("attribution")
             deck_obj.public = deck_data.get("public", False)
             bd = await save_object_from_model(ObjectType.DECK, deck_obj)
+            bd.org_uids = _org_uids
             affected.append(bd)
 
         elif op_type == "delete":
             player_uid = op["player_uid"]
+            deck_index = op.get("deck_index")
+            is_multideck = op.get("multideck", False)
             for d in existing_decks:
                 if d.user_uid == player_uid:
+                    if is_multideck and deck_index is not None:
+                        if d.round != deck_index:
+                            continue
                     d.deleted_at = datetime.now(UTC)
                     d.modified = datetime.now(UTC)
                     bd = await save_object_from_model(ObjectType.DECK, d)
+                    bd.org_uids = _org_uids
                     affected.append(bd)
 
         elif op_type == "set_public":
@@ -152,6 +163,7 @@ async def _process_deck_ops(
                 target.public = public_val
                 target.modified = datetime.now(UTC)
                 bd = await save_object_from_model(ObjectType.DECK, target)
+                bd.org_uids = _org_uids
                 affected.append(bd)
 
     return affected
@@ -389,6 +401,10 @@ async def remove_organizer(
         bd = await update_tournament(tournament)
         if broadcast_tournament_event:
             broadcast_tournament_event(bd)
+        # Revoke access: force removed organizer to resync
+        await set_user_resync_after(organizer_uid)
+        if broadcast_resync:
+            await broadcast_resync(organizer_uid)
 
     return Response(
         content=encoder.encode(tournament),
@@ -985,7 +1001,9 @@ async def tournament_action(
     logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
 
     # Process deck side-effects (outside transaction)
-    deck_bds = await _process_deck_ops(deck_ops, uid)
+    deck_bds = await _process_deck_ops(
+        deck_ops, uid, org_uids=updated.organizers_uids
+    )
     if broadcast_deck_event:
         for bd in deck_bds:
             broadcast_deck_event(bd)
@@ -1769,6 +1787,7 @@ async def go_online(
         deck_data["tournament_uid"] = uid
         deck_obj = msgspec.convert(deck_data, DeckObject)
         bd = await save_object_from_model(ObjectType.DECK, deck_obj)
+        bd.org_uids = updated.organizers_uids
         if broadcast_deck_event:
             broadcast_deck_event(bd)
 
