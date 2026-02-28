@@ -21,6 +21,8 @@ RUN uv tool install maturin
 
 # Copy and build the Rust engine
 COPY engine/ ./engine/
+COPY scripts/ ./scripts/
+RUN python scripts/update_cards.py
 RUN cd engine && /root/.local/bin/maturin build --release
 
 # Copy Python dependency files

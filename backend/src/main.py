@@ -262,6 +262,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "Set the JWT_SECRET environment variable."
         )
 
+    # Check cards.json availability
+    cards_data, _ = cards._load_cards()
+    if cards_data is None:
+        logger.warning(
+            "engine/data/cards.json not found — card database unavailable. "
+            "Run: python scripts/update_cards.py"
+        )
+
     _shutdown_event = asyncio.Event()
     await init_db()
 
@@ -560,6 +568,7 @@ tournaments.broadcast_user_event = broadcast_user_event  # ty: ignore[invalid-as
 tournaments.broadcast_sanction_event = broadcast_sanction_event  # ty: ignore[invalid-assignment]
 tournaments.broadcast_deck_event = broadcast_precomputed  # ty: ignore[invalid-assignment]
 tournaments.broadcast_judge_call = broadcast_judge_call  # ty: ignore[invalid-assignment]
+tournaments.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
 leagues.broadcast_league_event = broadcast_league_event  # ty: ignore[invalid-assignment]
 users.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
 vekn.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
