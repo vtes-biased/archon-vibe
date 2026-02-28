@@ -114,6 +114,10 @@
         onfocus={() => inputValue && inputValue.length >= 2 && handleInput()}
         {disabled}
         {required}
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
         placeholder={disabled
             ? m.city_select_country_first()
             : m.city_search_placeholder()}

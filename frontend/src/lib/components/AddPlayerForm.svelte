@@ -62,6 +62,10 @@
     oninput={() => searchPlayers()}
     onkeydown={handleSearchKeydown}
     placeholder={m.add_player_search_placeholder()}
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    spellcheck="false"
     class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
   />
   {#if searchResults.length > 0}
