@@ -557,7 +557,20 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
         await checkPlayerBarred(data.user_uid as string, current);
       }
       const actor = buildActorContext(getAuthState().user ?? null, current);
+      // Combine tournament-scoped sanctions with user-level suspension/DQ
+      // sanctions for all tournament players (needed for CheckInAll etc.)
       const sanctions = await getSanctionsForTournament(uid);
+      const seenUids = new Set(sanctions.map(s => s.uid));
+      const playerUids = new Set((current.players ?? []).map(p => p.user_uid));
+      for (const puid of playerUids) {
+        for (const s of await getSanctionsForUser(puid)) {
+          if (seenUids.has(s.uid) || s.deleted_at || s.lifted_at) continue;
+          if (s.level === 'suspension' || s.level === 'disqualification') {
+            sanctions.push(s);
+            seenUids.add(s.uid);
+          }
+        }
+      }
       const decks = await getDecksByTournament(uid);
       const result = await processTournamentEvent(current, event, actor, sanctions, decks);
       await saveTournament(result.tournament);
