@@ -63,6 +63,34 @@
 - Translator agent: `.claude/agents/i18n-translator.md` handles translation updates
 - VTES game terms: card/clan/discipline names stay English; game mechanics terms translated per official rulebook
 
+## Deck Architecture Patterns
+
+### SSE Broadcast for Decks
+- `BroadcastData.org_uids` is NOT auto-populated for DeckObjects by `save_object()` (decks don't have `organizers_uids` field)
+- `_process_deck_ops()` manually stamps `bd.org_uids` after save — this is the correct pattern
+- `broadcast_precomputed()` uses `org_uids` on BroadcastData to decide full-level access for SSE viewers
+
+### SSE Personal Overlay for Organizers
+- On initial connect, overlay queries `objects` table for tournaments where viewer is in `organizers_uids` (JSONB `?` operator)
+- Then fetches ALL decks for those tournaments (`tournament_uid IN (...)`)
+
+### Deck Visibility Model
+- `public` column: always NULL for decks (never visible to non-members)
+- `member` column: non-NULL only when `deck.public == True` (engine sets this)
+- `full` column: always present
+- Personal overlay: own decks always sent at full level
+- Organizer overlay: all decks for organized tournaments sent at full level
+- NC/Prince same-country: NOT given deck access (only user/tournament overlays)
+
+### Deck Delete Flow
+- All deck mutations go through `POST /{uid}/action` (engine `deck_ops` side-effects)
+- `DeleteDeck` engine action → `tournamentAction()` on frontend
+- `_process_deck_ops()` delete: filters by `deck_index` when multideck, deletes all player decks otherwise
+
+### Data Dedup
+- `saveDeck()` in db.ts deduplicates on `(tournament_uid, user_uid, round)`
+- `_process_deck_ops()` upsert also matches on `(tournament, player, round)` — consistent
+
 ## Recurring Bug Pattern: Sanction reconstruction
 - `main.py:run_sanction_cleanup()` reconstructs Sanction manually — must include ALL fields
 - Same pattern in `sanctions.py` delete endpoint — also manual reconstruction
