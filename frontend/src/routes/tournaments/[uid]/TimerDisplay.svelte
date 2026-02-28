@@ -54,7 +54,7 @@
     if (pausedAt) {
       clockStopBonus = (now - new Date(pausedAt).getTime()) / 1000;
     }
-    return Math.max(0, baseRemaining + extra + clockStopBonus);
+    return Math.max(0, roundTime - baseElapsed + extra + clockStopBonus);
   });
 
   const displaySeconds = $derived(tableIndex != null ? tableRemaining : baseRemaining);
@@ -109,7 +109,7 @@
       <Clock class="w-4 h-4 {expired ? 'text-crimson-400' : warning ? 'text-amber-400' : 'text-emerald-400'}" />
       <span class="font-mono text-2xl font-bold tabular-nums {expired ? 'text-crimson-400 animate-pulse' : warning ? 'text-amber-400' : 'text-emerald-400'}">
         {#if expired}
-          -{formatTime(Math.abs(roundTime - baseElapsed) + (tableIndex != null ? (tournament.table_extra_time?.[tableKey] ?? 0) + (tableIsPaused ? (now - new Date(tournament.table_paused_at![tableKey]!).getTime()) / 1000 : 0) : 0))}
+          -{formatTime(baseElapsed - roundTime - (tableIndex != null ? (tournament.table_extra_time?.[tableKey] ?? 0) + (tableIsPaused ? (now - new Date(tournament.table_paused_at![tableKey]!).getTime()) / 1000 : 0) : 0))}
         {:else}
           {formatTime(displaySeconds)}
         {/if}
