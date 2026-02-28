@@ -551,8 +551,7 @@
                       </span>
                       <div class="flex items-center gap-2">
                         <span class="text-ash-400 text-xs">VP:</span>
-                        {#if isOrganizer}
-                          <select
+                        <select
                             class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-1.5 sm:py-0.5 border border-ash-700"
                             disabled={scoreSaving === i}
                             value={seat.result.vp}
@@ -562,9 +561,6 @@
                               <option value={v}>{v}</option>
                             {/each}
                           </select>
-                        {:else}
-                          <span class="text-bone-100 text-xs">{seat.result.vp}</span>
-                        {/if}
                         <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
                         {#if isEditable}
                           <button
