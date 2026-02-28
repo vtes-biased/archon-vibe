@@ -92,10 +92,21 @@
   }
 
   const isMultideck = $derived(!!tournament.multideck);
+  const roundCount = $derived(tournament.rounds?.length ?? 0);
 
-  // Get player's decks
+  type RoundSlot = { round: number; deck: DeckObject | null };
+  function getMultideckSlots(uid: string): RoundSlot[] {
+    const decks = getPlayerDecks(uid);
+    if (roundCount === 0) return decks.map((d, i) => ({ round: d.round ?? i, deck: d }));
+    const byRound = new Map(decks.map(d => [d.round, d]));
+    return Array.from({ length: roundCount }, (_, r) => ({ round: r, deck: byRound.get(r) ?? null }));
+  }
+
+  // Get player's decks (hide future-round decks from organizers during play)
   function getPlayerDecks(uid: string): DeckObject[] {
-    return decksByUser[uid] ?? [];
+    const decks = decksByUser[uid] ?? [];
+    if (!isMultideck || tournament.state !== 'Playing') return decks;
+    return decks.filter(d => d.round === null || d.round < roundCount);
   }
   function getPlayerDeck(uid: string): DeckObject | null {
     return getPlayerDecks(uid)[0] ?? null;
@@ -485,16 +496,22 @@
                 <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} onuploaded={onUploaded} />
               {:else if playerDecks.length > 0}
                 {#if isMultideck}
-                  {#each playerDecks as deck, i}
+                  {#each getMultideckSlots(puid) as slot}
                     <DeckAccordion
-                      expanded={expandedDeckRound === i}
-                      ontoggle={() => expandedDeckRound = expandedDeckRound === i ? null : i}
-                      roundLabel={m.decks_round_label({ n: String(i + 1) })}
+                      expanded={expandedDeckRound === slot.round}
+                      ontoggle={() => expandedDeckRound = expandedDeckRound === slot.round ? null : slot.round}
+                      roundLabel={m.decks_round_label({ n: String(slot.round + 1) })}
                     >
                       {#snippet headerExtra()}
-                        <span class="text-ash-500 truncate">{deck.name || m.decks_unnamed()}</span>
+                        <span class="text-ash-500 truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
                       {/snippet}
-                      <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
+                      {#if slot.deck}
+                        <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round; } : undefined} />
+                      {:else if isOrganizer}
+                        <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round} onuploaded={onUploaded} />
+                      {:else}
+                        <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
+                      {/if}
                     </DeckAccordion>
                   {/each}
                 {:else if playerDecks[0]}
@@ -513,7 +530,7 @@
               {:else}
                 <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
               {/if}
-              {#if isOrganizer && playerDecks.length === 0 && uploadingFor !== puid}
+              {#if isOrganizer && playerDecks.length === 0 && (!isMultideck || roundCount === 0) && uploadingFor !== puid}
                 <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
               {/if}
             </div>
@@ -673,16 +690,22 @@
                       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} onuploaded={onUploaded} />
                     {:else if playerDecks.length > 0}
                       {#if isMultideck}
-                        {#each playerDecks as deck, i}
+                        {#each getMultideckSlots(puid) as slot}
                           <DeckAccordion
-                            expanded={expandedDeckRound === i}
-                            ontoggle={() => expandedDeckRound = expandedDeckRound === i ? null : i}
-                            roundLabel={m.decks_round_label({ n: String(i + 1) })}
+                            expanded={expandedDeckRound === slot.round}
+                            ontoggle={() => expandedDeckRound = expandedDeckRound === slot.round ? null : slot.round}
+                            roundLabel={m.decks_round_label({ n: String(slot.round + 1) })}
                           >
                             {#snippet headerExtra()}
-                              <span class="text-ash-500 truncate">{deck.name || m.decks_unnamed()}</span>
+                              <span class="text-ash-500 truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
                             {/snippet}
-                            <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
+                            {#if slot.deck}
+                              <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round; } : undefined} />
+                            {:else if isOrganizer}
+                              <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round} onuploaded={onUploaded} />
+                            {:else}
+                              <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
+                            {/if}
                           </DeckAccordion>
                         {/each}
                       {:else if playerDecks[0]}
@@ -701,7 +724,7 @@
                     {:else}
                       <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
                     {/if}
-                    {#if isOrganizer && playerDecks.length === 0 && uploadingFor !== puid}
+                    {#if isOrganizer && playerDecks.length === 0 && (!isMultideck || roundCount === 0) && uploadingFor !== puid}
                       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
                     {/if}
                   </div>
