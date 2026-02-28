@@ -40,6 +40,7 @@
   const decksByUser = $derived(decksByUserProp ?? localDecks);
 
   const myDecks = $derived(decksByUser[myUid] ?? []);
+  const myDecksByRound = $derived(new Map(myDecks.map(d => [d.round ?? 0, d])));
   const isPlayer = $derived(tournament.players?.some(p => p.user_uid === myUid) ?? false);
   const isMultideck = $derived(!!tournament.multideck);
   const roundCount = $derived(tournament.rounds?.length ?? 0);
@@ -211,7 +212,7 @@
       <div class="bg-ash-900/50 rounded-lg p-3 sm:p-4 space-y-2">
         <h3 class="text-sm font-semibold text-bone-200">{m.decks_my_decks()}</h3>
         {#each Array(deckSlotCount) as _, slotIdx}
-          {@const deck = myDecks[slotIdx] ?? null}
+          {@const deck = myDecksByRound.get(slotIdx) ?? null}
           {@const locked = isDeckLocked(slotIdx)}
           {@const canModify = canModifySlot(slotIdx)}
           {@const isExpanded = expandedRoundIdx === slotIdx}
