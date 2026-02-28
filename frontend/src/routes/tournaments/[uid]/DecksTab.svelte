@@ -142,7 +142,6 @@
   // Only client filter needed: decklists_mode for "visible decks" section post-tournament.
   const visibleDecks = $derived.by(() => {
     if (Object.keys(decksByUser).length === 0) return {};
-    if (isOrganizer) return decksByUser;
     if (tournament.state !== 'Finished') return {};
     const mode = tournament.decklists_mode;
     if (!mode || mode === 'All') return decksByUser;
