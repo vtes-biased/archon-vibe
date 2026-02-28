@@ -7,7 +7,7 @@
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight } from "lucide-svelte";
+  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff } from "lucide-svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
@@ -93,6 +93,14 @@
 
   const isMultideck = $derived(!!tournament.multideck);
   const roundCount = $derived(tournament.rounds?.length ?? 0);
+  // Hide a deck's card contents from organizers until its round has started.
+  // Single-deck (round=null): hidden until round 1 starts.
+  // Multideck (round=N): hidden until round N+1 exists (i.e. round N has started).
+  function isDeckHiddenFromOrganizer(round: number | null): boolean {
+    if (!isOrganizer) return false;
+    if (round === null) return roundCount === 0;
+    return roundCount <= round;
+  }
 
   type RoundSlot = { round: number; deck: DeckObject | null };
   function getMultideckSlots(uid: string): RoundSlot[] {
@@ -505,7 +513,16 @@
                       {#snippet headerExtra()}
                         <span class="text-ash-500 truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
                       {/snippet}
-                      {#if slot.deck}
+                      {#if slot.deck && isDeckHiddenFromOrganizer(slot.round)}
+                        <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                          <EyeOff class="w-4 h-4 shrink-0" />
+                          {m.decks_hidden_until_round()}
+                        </p>
+                        <button
+                          onclick={() => { uploadingFor = puid; uploadingRound = slot.round; }}
+                          class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                        >{m.decks_replace()}</button>
+                      {:else if slot.deck}
                         <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round; } : undefined} />
                       {:else if isOrganizer}
                         <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round} onuploaded={onUploaded} />
@@ -515,9 +532,22 @@
                     </DeckAccordion>
                   {/each}
                 {:else if playerDecks[0]}
-                  <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+                  {#if isDeckHiddenFromOrganizer(null)}
+                    <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                      <EyeOff class="w-4 h-4 shrink-0" />
+                      {m.decks_hidden_until_round()}
+                    </p>
+                    {#if isOrganizer}
+                      <button
+                        onclick={() => { uploadingFor = puid; uploadingRound = undefined; }}
+                        class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                      >{m.decks_replace()}</button>
+                    {/if}
+                  {:else}
+                    <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+                  {/if}
                 {/if}
-                {#if errors.length > 0}
+                {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                   <div class="space-y-1">
                     {#each errors as err}
                       <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-amber-400'}">
@@ -699,7 +729,16 @@
                             {#snippet headerExtra()}
                               <span class="text-ash-500 truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
                             {/snippet}
-                            {#if slot.deck}
+                            {#if slot.deck && isDeckHiddenFromOrganizer(slot.round)}
+                              <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                                <EyeOff class="w-4 h-4 shrink-0" />
+                                {m.decks_hidden_until_round()}
+                              </p>
+                              <button
+                                onclick={() => { uploadingFor = puid; uploadingRound = slot.round; }}
+                                class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                              >{m.decks_replace()}</button>
+                            {:else if slot.deck}
                               <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round; } : undefined} />
                             {:else if isOrganizer}
                               <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round} onuploaded={onUploaded} />
@@ -709,9 +748,22 @@
                           </DeckAccordion>
                         {/each}
                       {:else if playerDecks[0]}
-                        <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+                        {#if isDeckHiddenFromOrganizer(null)}
+                          <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                            <EyeOff class="w-4 h-4 shrink-0" />
+                            {m.decks_hidden_until_round()}
+                          </p>
+                          {#if isOrganizer}
+                            <button
+                              onclick={() => { uploadingFor = puid; uploadingRound = undefined; }}
+                              class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                            >{m.decks_replace()}</button>
+                          {/if}
+                        {:else}
+                          <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+                        {/if}
                       {/if}
-                      {#if errors.length > 0}
+                      {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                         <div class="space-y-1">
                           {#each errors as err}
                             <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-amber-400'}">
