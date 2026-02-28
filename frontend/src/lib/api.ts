@@ -527,7 +527,7 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
   for (const s of sanctions) {
     if (s.deleted_at || s.lifted_at) continue;
     if (s.level === 'suspension' && (!s.expires_at || new Date(s.expires_at) > now)) {
-      throw new Error('Player is suspended and cannot check in');
+      throw new Error('Player is suspended and cannot participate');
     }
   }
   if (tournament.league_uid) {
@@ -536,7 +536,7 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
       if (s.level === 'disqualification' && s.tournament_uid) {
         const dqTournament = await getTournament(s.tournament_uid);
         if (dqTournament && dqTournament.league_uid === tournament.league_uid) {
-          throw new Error('Player is disqualified from a league tournament and cannot check in');
+          throw new Error('Player is disqualified from a league tournament and cannot participate');
         }
       }
     }
@@ -553,6 +553,8 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
       // Pre-check: block barred players before WASM optimistic path
       if (action === 'CheckIn' && data?.player_uid) {
         await checkPlayerBarred(data.player_uid as string, current);
+      } else if ((action === 'Register' || action === 'AddPlayer') && data?.user_uid) {
+        await checkPlayerBarred(data.user_uid as string, current);
       }
       const actor = buildActorContext(getAuthState().user ?? null, current);
       const sanctions = await getSanctionsForTournament(uid);

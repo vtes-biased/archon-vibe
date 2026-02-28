@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { User, Tournament } from "$lib/types";
-  import { getFilteredUsers } from "$lib/db";
+  import { getFilteredUsers, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
+  import { Ban } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -16,6 +17,7 @@
   let searchResults = $state<User[]>([]);
   let searchTotal = $state(0);
   let selectedIndex = $state(-1);
+  let suspendedUids = $state<Set<string>>(new Set());
   const SEARCH_LIMIT = 10;
 
   async function searchPlayers() {
@@ -23,6 +25,7 @@
     if (playerSearch.trim().length < 2) {
       searchResults = [];
       searchTotal = 0;
+      suspendedUids = new Set();
       return;
     }
     const results = await getFilteredUsers(undefined, undefined, playerSearch.trim());
@@ -30,6 +33,12 @@
     const filtered = results.filter(u => !registeredUids.has(u.uid));
     searchTotal = filtered.length;
     searchResults = filtered.slice(0, SEARCH_LIMIT);
+    // Check suspension status for displayed results
+    const suspended = new Set<string>();
+    await Promise.all(searchResults.map(async (u) => {
+      if (await isUserCurrentlySanctioned(u.uid)) suspended.add(u.uid);
+    }));
+    suspendedUids = suspended;
   }
 
   function handleSearchKeydown(e: KeyboardEvent) {
@@ -43,7 +52,7 @@
     } else if (e.key === "Enter" && selectedIndex >= 0) {
       e.preventDefault();
       const user = searchResults[selectedIndex];
-      if (user) selectUser(user);
+      if (user && !suspendedUids.has(user.uid)) selectUser(user);
     }
   }
 
@@ -51,6 +60,7 @@
     onadd(user);
     playerSearch = "";
     searchResults = [];
+    suspendedUids = new Set();
   }
 </script>
 
@@ -71,14 +81,22 @@
   {#if searchResults.length > 0}
     <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
       {#each searchResults as user, i}
+        {@const isSuspended = suspendedUids.has(user.uid)}
         <button
-          onclick={() => selectUser(user)}
-          class="w-full px-3 py-2 text-left text-sm text-ash-200 transition-colors {i === selectedIndex ? 'bg-ash-700' : 'hover:bg-ash-800'}"
+          onclick={() => !isSuspended && selectUser(user)}
+          disabled={isSuspended}
+          class="w-full px-3 py-2 text-left text-sm transition-colors {isSuspended ? 'text-ash-500 cursor-not-allowed' : 'text-ash-200'} {i === selectedIndex && !isSuspended ? 'bg-ash-700' : isSuspended ? '' : 'hover:bg-ash-800'}"
         >
-          {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
-          {#if user.vekn_id}
-            <span class="text-ash-500 ml-2">({user.vekn_id})</span>
-          {/if}
+          <span class="inline-flex items-center gap-1">
+            {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
+            {#if user.vekn_id}
+              <span class="text-ash-500 ml-2">({user.vekn_id})</span>
+            {/if}
+            {#if isSuspended}
+              <Ban class="w-3.5 h-3.5 text-crimson-400 ml-1" />
+              <span class="text-xs text-crimson-400">{m.error_suspended_cannot_register()}</span>
+            {/if}
+          </span>
         </button>
       {/each}
       {#if searchTotal > SEARCH_LIMIT}

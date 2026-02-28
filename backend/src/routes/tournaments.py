@@ -281,7 +281,7 @@ def _can_manage_tournaments(user) -> bool:
 async def _check_player_barred(
     player_uid: str, tournament_uid: str, tournament: Tournament
 ) -> None:
-    """Check if a player is barred from checking in (cross-tournament sanctions).
+    """Check if a player is barred from participating (cross-tournament sanctions).
 
     Raises HTTPException(400) if:
     - Player has an active suspension
@@ -298,7 +298,8 @@ async def _check_player_barred(
         if s.level == SanctionLevel.SUSPENSION:
             if s.expires_at is None or s.expires_at > now:
                 raise HTTPException(
-                    status_code=400, detail="Player is suspended and cannot check in"
+                    status_code=400,
+                    detail="Player is suspended and cannot participate",
                 )
 
     # Check league-wide DQ (only if tournament is in a league)
@@ -312,7 +313,7 @@ async def _check_player_barred(
                 if dq_tournament and dq_tournament.league_uid == tournament.league_uid:
                     raise HTTPException(
                         status_code=400,
-                        detail="Player is disqualified from a league tournament and cannot check in",
+                        detail="Player is disqualified from a league tournament and cannot participate",
                     )
 
 
@@ -930,8 +931,18 @@ async def tournament_action(
         # Build actor context for Rust engine
         actor_data = _build_actor_context(current_user, tournament)
 
-        # Fetch sanctions for this tournament
+        # Fetch sanctions for this tournament + user-level suspension/DQ
+        # sanctions for all tournament players (needed for CheckInAll etc.)
         tournament_sanctions = await get_sanctions_for_tournament(uid)
+        seen_uids = {s.uid for s in tournament_sanctions}
+        player_uids = {p.user_uid for p in tournament.players}
+        for puid in player_uids:
+            for s in await get_sanctions_for_user(puid):
+                if s.uid in seen_uids or s.deleted_at or s.lifted_at:
+                    continue
+                if s.level in (SanctionLevel.SUSPENSION, SanctionLevel.DISQUALIFICATION):
+                    tournament_sanctions.append(s)
+                    seen_uids.add(s.uid)
         sanctions_data = [
             {
                 "user_uid": s.user_uid,
@@ -950,9 +961,11 @@ async def tournament_action(
         sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
         decks_json = await _build_decks_json(uid)
 
-        # Backend pre-checks for cross-tournament sanctions (CheckIn)
-        if request.type == "CheckIn" and request.player_uid:
-            await _check_player_barred(request.player_uid, uid, tournament)
+        # Backend pre-checks for cross-tournament sanctions
+        if request.type in ("CheckIn", "Register", "AddPlayer"):
+            player_uid = request.player_uid or request.user_uid
+            if player_uid:
+                await _check_player_barred(player_uid, uid, tournament)
 
         # Call Rust engine
         engine = _engine

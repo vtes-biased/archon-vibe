@@ -12,6 +12,7 @@
   import RaffleSection from "./RaffleSection.svelte";
   import { callJudge } from "$lib/api";
   import { isOnline } from "$lib/api";
+  import { isUserCurrentlySanctioned } from "$lib/db";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -60,6 +61,14 @@
   let showPreviousRounds = $state(false);
   let showQrScanner = $state(false);
   let judgeCallCooldown = $state(false);
+  let userSuspended = $state(false);
+
+  // Check if current user is suspended
+  $effect(() => {
+    if (userUid) {
+      isUserCurrentlySanctioned(userUid).then(v => { userSuspended = v; });
+    }
+  });
 
   const myStanding = $derived(standings.find(s => s.user_uid === userUid));
   const previousRounds = $derived.by(() => {
@@ -117,11 +126,15 @@
 <!-- Player interaction section -->
 <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
   {#if tournament.state === "Registration" && !currentPlayerEntry}
-    <button
-      onclick={() => doAction("Register", { user_uid: userUid })}
-      disabled={actionLoading}
-      class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-    >{m.tournament_register_btn()}</button>
+    {#if userSuspended}
+      <div class="text-sm text-crimson-400">{m.error_suspended_cannot_register()}</div>
+    {:else}
+      <button
+        onclick={() => doAction("Register", { user_uid: userUid })}
+        disabled={actionLoading}
+        class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+      >{m.tournament_register_btn()}</button>
+    {/if}
   {:else if tournament.state === "Registration" && currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>

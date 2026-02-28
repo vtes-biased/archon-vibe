@@ -1129,6 +1129,16 @@ fn apply_event(
                 return Err("Already registered".to_string());
             }
 
+            // Block players with DQ or suspension sanctions
+            if has_dq_sanction(sanctions, user_uid) {
+                return Err(
+                    "Player has a disqualification sanction and cannot register".to_string(),
+                );
+            }
+            if has_active_suspension(sanctions, user_uid) {
+                return Err("Player is suspended and cannot register".to_string());
+            }
+
             // Add player
             let player = json::object! {
                 user_uid: user_uid.as_str(),
@@ -1171,6 +1181,16 @@ fn apply_event(
 
             if player_exists(&tournament["players"], user_uid) {
                 return Err("Player already registered".to_string());
+            }
+
+            // Block players with DQ or suspension sanctions
+            if has_dq_sanction(sanctions, user_uid) {
+                return Err(
+                    "Player has a disqualification sanction and cannot register".to_string(),
+                );
+            }
+            if has_active_suspension(sanctions, user_uid) {
+                return Err("Player is suspended and cannot register".to_string());
             }
 
             let player = json::object! {
