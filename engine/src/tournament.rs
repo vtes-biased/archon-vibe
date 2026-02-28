@@ -1193,14 +1193,25 @@ fn apply_event(
                 return Err("Player is suspended and cannot register".to_string());
             }
 
-            let player = json::object! {
+            // Auto check-in when adding during Waiting state
+            let auto_checkin = state == TournamentState::Waiting;
+            let player_state = if auto_checkin { "Checked-in" } else { "Registered" };
+            let mut player = json::object! {
                 user_uid: user_uid.as_str(),
-                state: "Registered",
+                state: player_state,
                 payment_status: "Pending",
                 toss: 0,
                 result: { gw: 0, vp: 0.0, tp: 0 },
                 finalist: false,
             };
+            if auto_checkin
+                && tournament["decklist_required"].as_bool().unwrap_or(false)
+                && !decks
+                    .members()
+                    .any(|d| d["user_uid"].as_str() == Some(user_uid.as_str()))
+            {
+                player["missing_decklist"] = true.into();
+            }
             tournament["players"]
                 .push(player)
                 .map_err(|e| e.to_string())?;
