@@ -64,8 +64,9 @@
   const myStanding = $derived(standings.find(s => s.user_uid === userUid));
   const previousRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.rounds.length < 1) return [];
-    // When Playing, exclude the last round (shown as "Your Table"); otherwise show all
-    const count = tournament.state === "Playing" ? tournament.rounds.length - 1 : tournament.rounds.length;
+    // When Playing a prelim round, exclude the last round (shown as "Your Table");
+    // during finals or other states, show all preliminary rounds
+    const count = (tournament.state === "Playing" && !isFinals) ? tournament.rounds.length - 1 : tournament.rounds.length;
     if (count < 1) return [];
     const result: { round: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
     for (let r = 0; r < count; r++) {
