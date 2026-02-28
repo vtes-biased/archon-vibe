@@ -8,30 +8,36 @@
   import { getCards } from "$lib/cards";
   import { ChevronDown, ChevronRight, CircleCheck, Lock } from "lucide-svelte";
   import { slide } from "svelte/transition";
+  import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
     tournament,
     playerInfo,
     isOrganizer = false,
+    decksByUser: decksByUserProp,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
     isOrganizer?: boolean;
+    decksByUser?: Record<string, DeckObject[]>;
   } = $props();
 
   const auth = $derived(getAuthState());
   const myUid = $derived(auth.user?.uid ?? '');
 
-  // Load decks from IDB (separate store, not tournament.decks)
-  let decksByUser = $state<Record<string, DeckObject[]>>({});
+  // Use parent-provided decksByUser if available, otherwise load locally
+  let localDecks = $state<Record<string, DeckObject[]>>({});
 
   $effect(() => {
-    const tUid = tournament.uid;
-    getDecksByTournamentGrouped(tUid).then(grouped => {
-      decksByUser = grouped;
-    });
+    if (!decksByUserProp) {
+      getDecksByTournamentGrouped(tournament.uid).then(grouped => {
+        localDecks = grouped;
+      });
+    }
   });
+
+  const decksByUser = $derived(decksByUserProp ?? localDecks);
 
   const myDecks = $derived(decksByUser[myUid] ?? []);
   const isPlayer = $derived(tournament.players?.some(p => p.user_uid === myUid) ?? false);
@@ -49,6 +55,7 @@
   let uploadingFor = $state<string | null>(null);
   let uploadingSlot = $state<number>(0);
   let expandedRoundIdx = $state<number | null>(null);
+  let confirmDeleteSlot = $state<number | null>(null);
   let expandedDecks = $state<Set<string>>(new Set());
   let cardsDb = $state<Map<number, VtesCard>>(new Map());
   $effect(() => { getCards().then(c => cardsDb = c); });
@@ -70,10 +77,12 @@
 
   function onUploaded() {
     uploadingFor = null;
-    // Reload decks from IDB after upload
-    getDecksByTournamentGrouped(tournament.uid).then(grouped => {
-      decksByUser = grouped;
-    });
+    // Reload local decks from IDB after upload (when not using parent prop)
+    if (!decksByUserProp) {
+      getDecksByTournamentGrouped(tournament.uid).then(grouped => {
+        localDecks = grouped;
+      });
+    }
   }
 
   function isDeckLocked(index: number): boolean {
@@ -129,25 +138,20 @@
   const isWinner = $derived(myUid === winnerUid);
 
   // Determine which decks are visible
+  // IDB already has role-appropriate data (organizers see all, members see public+own).
+  // Only client filter needed: decklists_mode for "visible decks" section post-tournament.
   const visibleDecks = $derived.by(() => {
     if (Object.keys(decksByUser).length === 0) return {};
-    if (isOrganizer) return decksByUser;
-    // Players see their own deck always
+    if (isOrganizer || tournament.state !== 'Finished') return decksByUser;
+    const mode = tournament.decklists_mode;
+    if (!mode || mode === 'All') return decksByUser;
     const result: Record<string, DeckObject[]> = {};
-    if (myUid && decksByUser[myUid]) {
-      result[myUid] = decksByUser[myUid];
-    }
-    if (tournament.state === 'Finished' && tournament.decklists_mode) {
-      for (const [uid, decks] of Object.entries(decksByUser)) {
-        if (uid === myUid) continue;
-        if (tournament.decklists_mode === 'All') {
-          result[uid] = decks;
-        } else if (tournament.decklists_mode === 'Winner' && uid === tournament.winner) {
-          result[uid] = decks;
-        } else if (tournament.decklists_mode === 'Finalists') {
-          const player = tournament.players?.find(p => p.user_uid === uid);
-          if (player?.finalist) result[uid] = decks;
-        }
+    if (myUid && decksByUser[myUid]) result[myUid] = decksByUser[myUid];
+    for (const [uid, decks] of Object.entries(decksByUser)) {
+      if (uid === myUid) continue;
+      if (mode === 'Winner' && uid === tournament.winner) result[uid] = decks;
+      else if (mode === 'Finalists') {
+        if (tournament.players?.find(p => p.user_uid === uid)?.finalist) result[uid] = decks;
       }
     }
     return result;
@@ -211,16 +215,13 @@
           {@const locked = isDeckLocked(slotIdx)}
           {@const canModify = canModifySlot(slotIdx)}
           {@const isExpanded = expandedRoundIdx === slotIdx}
-          <div class="rounded-lg bg-ash-900/30">
-            <button
-              class="w-full flex items-center gap-2 p-2.5 text-left text-sm min-h-[44px]"
-              onclick={() => expandedRoundIdx = isExpanded ? null : slotIdx}
-              aria-expanded={isExpanded}
-            >
-              <span class="text-ash-400 shrink-0">
-                {#if isExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-              </span>
-              <span class="font-medium text-ash-300">{m.decks_round_label({ n: String(slotIdx + 1) })}</span>
+          <DeckAccordion
+            expanded={isExpanded}
+            ontoggle={() => expandedRoundIdx = isExpanded ? null : slotIdx}
+            roundLabel={m.decks_round_label({ n: String(slotIdx + 1) })}
+            bgClass="bg-ash-900/30"
+          >
+            {#snippet headerExtra()}
               {#if locked}
                 <Lock class="w-3 h-3 text-ash-500" />
               {/if}
@@ -229,35 +230,47 @@
               {:else}
                 <span class="text-ash-600 truncate">{m.decks_no_deck()}</span>
               {/if}
-            </button>
-            {#if isExpanded}
-              <div class="px-2.5 pb-2.5" transition:slide={{ duration: 150 }}>
-                {#if uploadingFor === myUid && uploadingSlot === slotIdx}
-                  <DeckUpload tournamentUid={tournament.uid} round={slotIdx} onuploaded={onUploaded} />
-                {:else if deck}
-                  <DeckDisplay
-                    {deck}
-                    editable={canModify}
-                    tournamentUid={tournament.uid}
-                    deckIndex={slotIdx}
-                    format={tournament.format}
-                    onreplace={canModify ? () => { uploadingFor = myUid; uploadingSlot = slotIdx; } : undefined}
-                    ondelete={canModify ? () => deleteDeck(myUid, slotIdx) : undefined}
-                  />
-                  {#if !canModify}
-                    <p class="text-sm text-ash-500">{m.decks_locked()}</p>
-                  {/if}
-                {:else if canModify}
-                  <button
-                    onclick={() => { uploadingFor = myUid; uploadingSlot = slotIdx; }}
-                    class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                  >{m.decks_upload()}</button>
-                {:else}
-                  <p class="text-sm text-ash-500">{m.decks_no_deck()}</p>
-                {/if}
-              </div>
+            {/snippet}
+            {#if uploadingFor === myUid && uploadingSlot === slotIdx}
+              <DeckUpload tournamentUid={tournament.uid} round={slotIdx} onuploaded={onUploaded} />
+            {:else if deck}
+              <DeckDisplay
+                {deck}
+                editable={canModify}
+                tournamentUid={tournament.uid}
+                deckIndex={slotIdx}
+                format={tournament.format}
+                onreplace={canModify ? () => { uploadingFor = myUid; uploadingSlot = slotIdx; } : undefined}
+                ondelete={canModify ? () => { confirmDeleteSlot = slotIdx; } : undefined}
+              />
+              {#if confirmDeleteSlot === slotIdx}
+                <div class="mt-2 bg-crimson-900/20 border border-crimson-800/50 rounded-lg p-3 space-y-2">
+                  <p class="text-sm text-crimson-200 font-medium">{m.decks_delete_confirm_title()}</p>
+                  <p class="text-xs text-ash-400">{m.decks_delete_confirm_msg()}</p>
+                  <div class="flex gap-2">
+                    <button
+                      onclick={() => { deleteDeck(myUid, slotIdx); confirmDeleteSlot = null; }}
+                      class="px-3 py-1.5 text-sm font-medium text-crimson-100 bg-crimson-700 hover:bg-crimson-600 rounded-lg transition-colors"
+                    >{m.decks_delete_confirm_yes()}</button>
+                    <button
+                      onclick={() => confirmDeleteSlot = null}
+                      class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                    >{m.common_cancel()}</button>
+                  </div>
+                </div>
+              {/if}
+              {#if !canModify}
+                <p class="text-sm text-ash-500">{m.decks_locked()}</p>
+              {/if}
+            {:else if canModify}
+              <button
+                onclick={() => { uploadingFor = myUid; uploadingSlot = slotIdx; }}
+                class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+              >{m.decks_upload()}</button>
+            {:else}
+              <p class="text-sm text-ash-500">{m.decks_no_deck()}</p>
             {/if}
-          </div>
+          </DeckAccordion>
         {/each}
       </div>
     {:else}
@@ -280,7 +293,23 @@
               {#if uploadingFor === myUid && singleDeckEditable}
                 <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
               {:else}
-                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => deleteDeck(myUid) : undefined} />
+                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeleteSlot = -1; } : undefined} />
+                {#if confirmDeleteSlot === -1}
+                  <div class="mt-2 bg-crimson-900/20 border border-crimson-800/50 rounded-lg p-3 space-y-2">
+                    <p class="text-sm text-crimson-200 font-medium">{m.decks_delete_confirm_title()}</p>
+                    <p class="text-xs text-ash-400">{m.decks_delete_confirm_msg()}</p>
+                    <div class="flex gap-2">
+                      <button
+                        onclick={() => { deleteDeck(myUid); confirmDeleteSlot = null; }}
+                        class="px-3 py-1.5 text-sm font-medium text-crimson-100 bg-crimson-700 hover:bg-crimson-600 rounded-lg transition-colors"
+                      >{m.decks_delete_confirm_yes()}</button>
+                      <button
+                        onclick={() => confirmDeleteSlot = null}
+                        class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                      >{m.common_cancel()}</button>
+                    </div>
+                  </div>
+                {/if}
               {/if}
             </div>
           {/if}

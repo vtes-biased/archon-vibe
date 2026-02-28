@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Tournament, Player, Sanction } from "$lib/types";
+  import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry } from "$lib/tournament-utils";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
@@ -33,6 +33,7 @@
     setVp,
     setFinalsVp,
     tournamentSanctions,
+    decksByUser,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
@@ -52,6 +53,7 @@
     setVp: (tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
     setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
     tournamentSanctions: Sanction[];
+    decksByUser?: Record<string, DeckObject[]>;
   } = $props();
 
   let showRegisteredPlayers = $state(false);
@@ -403,6 +405,7 @@
         {tournament}
         {playerInfo}
         isOrganizer={false}
+        {decksByUser}
       />
     </div>
   {/if}

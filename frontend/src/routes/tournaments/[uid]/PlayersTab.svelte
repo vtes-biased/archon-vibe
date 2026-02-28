@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament, User, Player, DeckObject, Sanction } from "$lib/types";
-  import { getDecksByTournamentGrouped } from "$lib/db";
+  type DeckMap = Record<string, DeckObject[]>;
   import { formatScore } from "$lib/utils";
   import AddPlayerForm from "$lib/components/AddPlayerForm.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -9,6 +9,7 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight } from "lucide-svelte";
   import { slide } from "svelte/transition";
+  import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
@@ -22,6 +23,7 @@
     doAction,
     tournamentSanctions,
     isOfflineMode = false,
+    decksByUser,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
@@ -31,6 +33,7 @@
     doAction: (action: string, body?: any) => Promise<void>;
     tournamentSanctions?: Sanction[];
     isOfflineMode?: boolean;
+    decksByUser: DeckMap;
   } = $props();
 
   // Sanction modal state
@@ -69,15 +72,6 @@
   let uploadingFor = $state<string | null>(null);
   let uploadingRound = $state<number | undefined>(undefined);
   let validationCache = $state<Record<string, ValidationError[]>>({});
-  let decksByUser = $state<Record<string, DeckObject[]>>({});
-
-  // Load decks from IDB (separate store)
-  $effect(() => {
-    const tUid = tournament.uid;
-    getDecksByTournamentGrouped(tUid).then(grouped => {
-      decksByUser = grouped;
-    });
-  });
 
   function togglePlayer(uid: string) {
     expandedPlayer = expandedPlayer === uid ? null : uid;
@@ -95,9 +89,6 @@
       const { [uid]: _, ...rest } = validationCache;
       validationCache = rest;
     }
-    getDecksByTournamentGrouped(tournament.uid).then(grouped => {
-      decksByUser = grouped;
-    });
   }
 
   const isMultideck = $derived(!!tournament.multideck);
@@ -495,24 +486,16 @@
               {:else if playerDecks.length > 0}
                 {#if isMultideck}
                   {#each playerDecks as deck, i}
-                    <div class="rounded-lg bg-ash-900/50">
-                      <button
-                        class="w-full flex items-center gap-2 p-2.5 text-left text-sm min-h-[44px]"
-                        onclick={() => expandedDeckRound = expandedDeckRound === i ? null : i}
-                        aria-expanded={expandedDeckRound === i}
-                      >
-                        <span class="text-ash-400 shrink-0">
-                          {#if expandedDeckRound === i}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-                        </span>
-                        <span class="font-medium text-ash-300">{m.decks_round_label({ n: String(i + 1) })}</span>
+                    <DeckAccordion
+                      expanded={expandedDeckRound === i}
+                      ontoggle={() => expandedDeckRound = expandedDeckRound === i ? null : i}
+                      roundLabel={m.decks_round_label({ n: String(i + 1) })}
+                    >
+                      {#snippet headerExtra()}
                         <span class="text-ash-500 truncate">{deck.name || m.decks_unnamed()}</span>
-                      </button>
-                      {#if expandedDeckRound === i}
-                        <div class="px-2.5 pb-2.5" transition:slide={{ duration: 150 }}>
-                          <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
-                        </div>
-                      {/if}
-                    </div>
+                      {/snippet}
+                      <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
+                    </DeckAccordion>
                   {/each}
                 {:else if playerDecks[0]}
                   <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
@@ -691,24 +674,16 @@
                     {:else if playerDecks.length > 0}
                       {#if isMultideck}
                         {#each playerDecks as deck, i}
-                          <div class="rounded-lg bg-ash-900/50">
-                            <button
-                              class="w-full flex items-center gap-2 p-2.5 text-left text-sm min-h-[44px]"
-                              onclick={() => expandedDeckRound = expandedDeckRound === i ? null : i}
-                              aria-expanded={expandedDeckRound === i}
-                            >
-                              <span class="text-ash-400 shrink-0">
-                                {#if expandedDeckRound === i}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-                              </span>
-                              <span class="font-medium text-ash-300">{m.decks_round_label({ n: String(i + 1) })}</span>
+                          <DeckAccordion
+                            expanded={expandedDeckRound === i}
+                            ontoggle={() => expandedDeckRound = expandedDeckRound === i ? null : i}
+                            roundLabel={m.decks_round_label({ n: String(i + 1) })}
+                          >
+                            {#snippet headerExtra()}
                               <span class="text-ash-500 truncate">{deck.name || m.decks_unnamed()}</span>
-                            </button>
-                            {#if expandedDeckRound === i}
-                              <div class="px-2.5 pb-2.5" transition:slide={{ duration: 150 }}>
-                                <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
-                              </div>
-                            {/if}
-                          </div>
+                            {/snippet}
+                            <DeckDisplay {deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = deck.round ?? i; } : undefined} />
+                          </DeckAccordion>
                         {/each}
                       {:else if playerDecks[0]}
                         <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />

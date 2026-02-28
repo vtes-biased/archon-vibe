@@ -1,9 +1,8 @@
 <script lang="ts">
-  import type { Deck, VtesCard, User } from "$lib/types";
+  import type { Deck, VtesCard } from "$lib/types";
   import { getCards } from "$lib/cards";
-  import { getFilteredUsers } from "$lib/db";
-  import { getCountryFlag } from "$lib/geonames";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
+  import AttributionPicker from "./AttributionPicker.svelte";
   import { validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
   import { CircleX, TriangleAlert } from "lucide-svelte";
@@ -43,10 +42,6 @@
   let attributionSearch = $state('');
   let attributionVekn = $state('');
   let attributionName = $state('');
-  let attrResults = $state<User[]>([]);
-  let attrTotal = $state(0);
-  let attrSelectedIndex = $state(-1);
-  const ATTR_SEARCH_LIMIT = 10;
   let editing = $state(false);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
@@ -90,42 +85,7 @@
     editing = false;
     editedCards = {};
     editedName = '';
-    attrResults = [];
     saveError = null;
-  }
-
-  async function searchAttribution() {
-    attrSelectedIndex = -1;
-    if (attributionSearch.trim().length < 2) {
-      attrResults = [];
-      attrTotal = 0;
-      return;
-    }
-    const results = await getFilteredUsers(undefined, undefined, attributionSearch.trim());
-    attrTotal = results.length;
-    attrResults = results.slice(0, ATTR_SEARCH_LIMIT);
-  }
-
-  function selectAttrUser(user: User) {
-    attributionVekn = user.vekn_id || user.name;
-    attributionName = user.name;
-    attributionSearch = user.name + (user.vekn_id ? ` (${user.vekn_id})` : '');
-    attrResults = [];
-  }
-
-  function handleAttrKeydown(e: KeyboardEvent) {
-    if (!attrResults.length) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      attrSelectedIndex = Math.min(attrSelectedIndex + 1, attrResults.length - 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      attrSelectedIndex = Math.max(attrSelectedIndex - 1, 0);
-    } else if (e.key === 'Enter' && attrSelectedIndex >= 0) {
-      e.preventDefault();
-      const user = attrResults[attrSelectedIndex];
-      if (user) selectAttrUser(user);
-    }
   }
 
   function adjustCount(idStr: string, delta: number) {
@@ -187,7 +147,6 @@
       editing = false;
       editedCards = {};
       editedName = '';
-      attrResults = [];
       onsaved?.();
     } catch (e: any) {
       saveError = e.message || 'Save failed';
@@ -270,53 +229,14 @@
   />
 
   <!-- Attribution -->
-  <div class="flex items-center gap-3 text-sm flex-wrap mb-2">
-    <span class="text-ash-400">{m.deck_upload_attribution()}:</span>
-    <label class="flex items-center gap-1 text-ash-200">
-      <input type="radio" bind:group={attrMode} value="self" class="accent-crimson-500" />
-      {playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self()}
-    </label>
-    <label class="flex items-center gap-1 text-ash-200">
-      <input type="radio" bind:group={attrMode} value="anonymous" class="accent-crimson-500" />
-      {m.deck_upload_attr_anonymous()}
-    </label>
-    <label class="flex items-center gap-1 text-ash-200">
-      <input type="radio" bind:group={attrMode} value="other" class="accent-crimson-500" />
-      {m.deck_upload_attr_other()}
-    </label>
-  </div>
-  {#if attrMode === 'other'}
-    <div class="relative mb-2">
-      <input
-        type="text"
-        bind:value={attributionSearch}
-        oninput={() => { attributionVekn = attributionSearch; attributionName = ''; searchAttribution(); }}
-        onkeydown={handleAttrKeydown}
-        placeholder={m.deck_upload_attr_other_placeholder()}
-        class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
-      />
-      {#if attrResults.length > 0}
-        <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
-          {#each attrResults as user, i}
-            <button
-              onclick={() => selectAttrUser(user)}
-              class="w-full px-3 py-2 text-left text-sm text-ash-200 transition-colors {i === attrSelectedIndex ? 'bg-ash-700' : 'hover:bg-ash-800'}"
-            >
-              {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
-              {#if user.vekn_id}
-                <span class="text-ash-500 ml-2">({user.vekn_id})</span>
-              {/if}
-            </button>
-          {/each}
-          {#if attrTotal > ATTR_SEARCH_LIMIT}
-            <div class="px-3 py-2 text-xs text-ash-500 text-center">
-              {m.add_player_more_results({ count: (attrTotal - ATTR_SEARCH_LIMIT).toString() })}
-            </div>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  {/if}
+  <AttributionPicker
+    bind:mode={attrMode}
+    bind:search={attributionSearch}
+    bind:vekn={attributionVekn}
+    bind:name={attributionName}
+    {playerUid}
+    {playerName}
+  />
 
   <div class="mb-3">
     <CardSearch onselect={addCard} />
@@ -364,7 +284,7 @@
           {#if editing}
             <button
               onclick={() => adjustCount(entry.id.toString(), -1)}
-              class="w-5 h-5 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-xs shrink-0"
+              class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
             >-</button>
           {/if}
           <button
@@ -383,7 +303,7 @@
           {#if editing}
             <button
               onclick={() => adjustCount(entry.id.toString(), 1)}
-              class="w-5 h-5 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-xs shrink-0"
+              class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
             >+</button>
           {/if}
         </div>
@@ -406,7 +326,7 @@
               {#if editing}
                 <button
                   onclick={() => adjustCount(entry.id.toString(), -1)}
-                  class="w-5 h-5 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-xs shrink-0"
+                  class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
                 >-</button>
               {/if}
               <button
@@ -419,7 +339,7 @@
               {#if editing}
                 <button
                   onclick={() => adjustCount(entry.id.toString(), 1)}
-                  class="w-5 h-5 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-xs shrink-0"
+                  class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
                 >+</button>
               {/if}
             </div>

@@ -82,8 +82,9 @@
   let decksByUser = $state<Record<string, DeckObject[]>>({});
 
   $effect(() => {
-    if (!tournament?.uid) return;
-    getDecksByTournamentGrouped(tournament.uid).then(grouped => {
+    const _uid = uid;
+    if (!_uid) return;
+    getDecksByTournamentGrouped(_uid).then(grouped => {
       decksByUser = grouped;
     });
   });
@@ -548,6 +549,9 @@
 
     const handleSync = (event: { type: string; data?: any }) => {
       if (event.type === "tournament") untrack(() => load());
+      if (event.type === "deck" && (!event.data?.tournament_uid || event.data.tournament_uid === uid)) {
+        getDecksByTournamentGrouped(uid).then(grouped => { decksByUser = grouped; });
+      }
       if (event.type === "sanction") {
         getSanctionsForTournament(uid).then(s => { tournamentSanctions = s; });
       }
@@ -956,6 +960,7 @@
                 {doAction}
                 {tournamentSanctions}
                 isOfflineMode={tournamentIsOffline}
+                {decksByUser}
               />
             {:else if activeTab === 'rounds'}
               <RoundsTab
@@ -1008,6 +1013,7 @@
           {setVp}
           {setFinalsVp}
           {tournamentSanctions}
+          {decksByUser}
         />
       {/if}
       {/if}<!-- end isMinimalView else -->

@@ -3854,4 +3854,261 @@ mod tests {
         assert!(raw.is_err());
         assert!(raw.unwrap_err().contains("suspended"));
     }
+
+    // ================================================================
+    // DeleteDeck tests
+    // ================================================================
+
+    #[test]
+    fn test_delete_deck_success() {
+        let tournament = tournament_with_player("Waiting");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: json::Null,
+            multideck: false,
+        };
+        let actor = make_player("player-1");
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("delete"));
+    }
+
+    #[test]
+    fn test_delete_deck_auth_failure() {
+        let tournament = tournament_with_player("Waiting");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: json::Null,
+            multideck: false,
+        };
+        let actor = make_player("other-player");
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("organizers or the player"));
+    }
+
+    #[test]
+    fn test_delete_deck_playing_blocked() {
+        let tournament = tournament_with_player("Playing");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: json::Null,
+            multideck: false,
+        };
+        let actor = make_player("player-1");
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("in progress"));
+    }
+
+    #[test]
+    fn test_delete_deck_finished_blocked() {
+        let tournament = tournament_with_player("Finished");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: json::Null,
+            multideck: false,
+        };
+        let actor = make_player("player-1");
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("finished"));
+    }
+
+    #[test]
+    fn test_delete_deck_organizer_always() {
+        let tournament = tournament_with_player("Playing");
+        let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: json::Null,
+            multideck: false,
+        };
+        let actor = make_organizer();
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("delete"));
+    }
+
+    // ================================================================
+    // Multideck tests
+    // ================================================================
+
+    fn multideck_tournament(state: &str, rounds_played: usize) -> JsonValue {
+        let mut t = make_tournament();
+        t["state"] = state.into();
+        t["multideck"] = true.into();
+        t["players"] = json::array![
+            { user_uid: "player-1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        ];
+        // Add dummy rounds to simulate played rounds
+        let mut rounds = json::JsonValue::new_array();
+        for _ in 0..rounds_played {
+            let table = json::object! {
+                seating: [{ player_uid: "player-1", result: { vp: 0 } }],
+                state: "Finished",
+            };
+            let mut round = json::JsonValue::new_array();
+            let _ = round.push(table);
+            let _ = rounds.push(round);
+        }
+        t["rounds"] = rounds;
+        t
+    }
+
+    #[test]
+    fn test_multideck_upsert_round_0() {
+        let tournament = multideck_tournament("Waiting", 0);
+        let event = json::object! {
+            type: "UpsertDeck",
+            player_uid: "player-1",
+            deck: { name: "Round 1 Deck", author: "", comments: "", cards: {} },
+            multideck: true,
+        };
+        let actor = make_player("player-1");
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("upsert"));
+        assert_eq!(deck_ops[0]["multideck"].as_bool(), Some(true));
+    }
+
+    #[test]
+    fn test_multideck_upsert_round_1_playing() {
+        // 1 round played, player has 1 deck → new deck goes at index 1 (unlocked)
+        let tournament = multideck_tournament("Playing", 1);
+        let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
+        let event = json::object! {
+            type: "UpsertDeck",
+            player_uid: "player-1",
+            deck: { name: "Round 2 Deck", author: "", comments: "", cards: {} },
+            multideck: true,
+        };
+        let actor = make_player("player-1");
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("upsert"));
+    }
+
+    #[test]
+    fn test_multideck_upsert_locked_round_blocked() {
+        // 1 round played, player has 0 decks → new deck at index 0 (locked, round 0 already played)
+        let tournament = multideck_tournament("Playing", 1);
+        let event = json::object! {
+            type: "UpsertDeck",
+            player_uid: "player-1",
+            deck: { name: "Late Deck", author: "", comments: "", cards: {} },
+            multideck: true,
+        };
+        let actor = make_player("player-1");
+        let result = run_event_with_decks(&tournament, &event, &actor, "[]");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("already started"));
+    }
+
+    #[test]
+    fn test_multideck_delete_unlocked() {
+        // 1 round played, player has 2 decks → delete index 1 (unlocked)
+        let tournament = multideck_tournament("Playing", 1);
+        let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}, {"user_uid": "player-1", "round": 1, "uid": "d1"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: 1,
+            multideck: true,
+        };
+        let actor = make_player("player-1");
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("delete"));
+    }
+
+    #[test]
+    fn test_multideck_delete_locked_blocked() {
+        // 1 round played, delete index 0 (locked) → blocked
+        let tournament = multideck_tournament("Playing", 1);
+        let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: 0,
+            multideck: true,
+        };
+        let actor = make_player("player-1");
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("already started"));
+    }
+
+    #[test]
+    fn test_multideck_delete_requires_index() {
+        // Multideck delete without deck_index during Playing → error
+        let tournament = multideck_tournament("Playing", 1);
+        let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
+        let event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "player-1",
+            deck_index: json::Null,
+            multideck: true,
+        };
+        let actor = make_player("player-1");
+        let result = run_event_with_decks(&tournament, &event, &actor, decks);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("deck_index required"));
+    }
+
+    #[test]
+    fn test_multideck_lifecycle() {
+        // Upload deck at round 0, start round → round 0 deck locked
+        let mut tournament = multideck_tournament("Waiting", 0);
+        // Add enough players for StartRound
+        tournament["players"] = json::array![
+            { user_uid: "p0", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+            { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        ];
+
+        // Upload deck for p0 at round 0
+        let event = json::object! {
+            type: "UpsertDeck",
+            player_uid: "p0",
+            deck: { name: "Round 1 Deck", author: "", comments: "", cards: {} },
+            multideck: true,
+        };
+        let actor = make_player("p0");
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
+        assert_eq!(deck_ops.len(), 1);
+
+        // Start round
+        let start_event = json::parse(
+            r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"]]}"#,
+        ).unwrap();
+        let org = make_organizer();
+        let result = run_event(&tournament, &start_event, &org).unwrap();
+        let updated = json::parse(&result).unwrap();
+        assert_eq!(updated["state"].as_str(), Some("Playing"));
+        assert_eq!(updated["rounds"].len(), 1);
+
+        // Now try to delete p0's round 0 deck → should be locked
+        let delete_event = json::object! {
+            type: "DeleteDeck",
+            player_uid: "p0",
+            deck_index: 0,
+            multideck: true,
+        };
+        let actor_p0 = make_player("p0");
+        let decks = r#"[{"user_uid": "p0", "round": 0, "uid": "d0"}]"#;
+        let delete_result = run_event_with_decks(&updated, &delete_event, &actor_p0, decks);
+        assert!(delete_result.is_err());
+        assert!(delete_result.unwrap_err().contains("already started"));
+    }
 }

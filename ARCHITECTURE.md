@@ -192,6 +192,7 @@ The frontend is the seating source; the server validates and stores it determini
 - No REST endpoints for decks. All mutations via `POST /{uid}/action` → engine `deck_ops` side-effects.
 - `deck_ops` ops: `upsert` (create/update), `delete`, `set_public` (flip existing deck by uid).
 - Client-side deck URL fetching; backend provides CORS proxy fallback.
+- **SSE reactivity**: tournament `+page.svelte` listens for `type === "deck"` sync events → re-queries `getDecksByTournamentGrouped()` → updates `decksByUser` state → passed as prop to `PlayersTab` / `PlayerView` / `DecksTab`. Decks are not bundled into the tournament SSE event.
 
 **Validation**: Rust engine validates deck legality (crypt/library counts, banned cards, multideck rules) before tournament actions that require decks.
 
