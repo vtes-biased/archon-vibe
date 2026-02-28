@@ -263,6 +263,7 @@ def generate_mock_users(count: int = 400) -> list[User]:
 
     users = []
     base_time = datetime.now(UTC)
+    next_vekn_id = 1000000
 
     for _i in range(count):
         first_name = random.choice(first_names)
@@ -276,10 +277,12 @@ def generate_mock_users(count: int = 400) -> list[User]:
             else None
         )
 
-        # Generate VEKN ID (format: some have it, some don't)
-        vekn_id = (
-            f"{random.randint(1000000, 9999999)}" if random.random() > 0.2 else None
-        )
+        # Generate VEKN ID (sequential to avoid collisions with unique constraint)
+        if random.random() > 0.2:
+            vekn_id = str(next_vekn_id)
+            next_vekn_id += 1
+        else:
+            vekn_id = None
 
         # Some users have nicknames
         nickname = (
