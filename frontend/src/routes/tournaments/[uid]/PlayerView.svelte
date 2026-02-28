@@ -149,10 +149,13 @@
     </div>
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
     <button
-      onclick={() => doAction("CheckIn", { player_uid: userUid })}
+      onclick={() => showQrScanner = true}
       disabled={actionLoading}
-      class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-    >{m.tournament_register_checkin_btn()}</button>
+      class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors flex items-center gap-1.5"
+    >
+      <QrCode class="w-4 h-4" />
+      {m.tournament_register_checkin_btn()}
+    </button>
   {:else if currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
@@ -183,10 +186,13 @@
           </div>
         {:else}
           <button
-            onclick={() => doAction("CheckIn", { player_uid: userUid })}
+            onclick={() => showQrScanner = true}
             disabled={actionLoading}
-            class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors"
-          >{m.tournament_check_in_btn()}</button>
+            class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <QrCode class="w-4 h-4" />
+            {m.tournament_check_in_btn()}
+          </button>
         {/if}
       {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
         <button
@@ -202,10 +208,6 @@
         <span class="text-ash-500">{m.tournament_your_score()}</span>
         <span class="ml-2 text-bone-100 font-medium">{formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}</span>
       </div>
-    {/if}
-    <!-- QR Check-in scanner -->
-    {#if showQrScanner}
-      <QrCheckinScanner tournamentUid={tournament.uid} onclose={() => showQrScanner = false} />
     {/if}
     <!-- Cutoff score threshold for players -->
     {#if cutoffScore}
@@ -384,6 +386,11 @@
     {/if}
   {:else}
     <p class="text-ash-400 text-sm">{m.tournament_registration_not_open()}</p>
+  {/if}
+
+  <!-- QR Check-in scanner -->
+  {#if showQrScanner}
+    <QrCheckinScanner tournamentUid={tournament.uid} onclose={() => showQrScanner = false} />
   {/if}
 
   <!-- Registered players list (player view, Planned/Registration) -->
