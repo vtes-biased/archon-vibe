@@ -249,6 +249,7 @@ class User(BaseObject, kw_only=True):
     country: str | None = None
     vekn_id: str | None = None  # Optional VEKN ID (non-members don't have one)
     city: str | None = None
+    city_geoname_id: int | None = None
     state: str | None = None  # State/region
     nickname: str | None = None
     roles: list[Role] = msgspec.field(default_factory=list)

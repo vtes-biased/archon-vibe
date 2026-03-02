@@ -370,6 +370,7 @@ export interface ProfileUpdate {
   nickname?: string;
   country?: string;
   city?: string;
+  city_geoname_id?: number | null;
   contact_email?: string;
   contact_phone?: string;
 }

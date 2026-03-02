@@ -23,7 +23,7 @@ _USER_PUBLIC_FIELDS = {
 _USER_PUBLIC_CONTACT = {"contact_email", "contact_discord", "contact_phone"}
 _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
-    | {"vekn_id", "city", "state", "nickname", "avatar_path"}
+    | {"vekn_id", "city", "city_geoname_id", "state", "nickname", "avatar_path"}
     # Rating fields (embedded in user after merge)
     | {
         "constructed_online",

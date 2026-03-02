@@ -562,9 +562,14 @@ class VEKNSyncService:
         country_code = vekn_player.get("countrycode") or ""
         if city and country_name in FIX_CITIES:
             city = FIX_CITIES[country_name].get(city, city)
+        city_geoname_id = None
         if city and country_code:
             matched = match_city(city, country_code)
-            city = matched["name"] if matched else None
+            if matched:
+                city = matched["name"]
+                city_geoname_id = matched["geoname_id"]
+            else:
+                city = None
 
         # Infer Prince/NC roles from princeid/coordinatorid presence
         roles: list[Role] = []
@@ -591,6 +596,7 @@ class VEKNSyncService:
             "country": vekn_player.get("countrycode") or None,
             "vekn_id": vekn_id,
             "city": city,
+            "city_geoname_id": city_geoname_id,
             "state": vekn_player.get("statename") or None,
             "roles": roles,
             "vekn_prefix": vekn_prefix,
@@ -670,6 +676,7 @@ class VEKNSyncService:
         new_name = update_fields.get("name", existing_user.name)
         new_country = update_fields.get("country", existing_user.country)
         new_city = update_fields.get("city", existing_user.city)
+        new_city_geoname_id = update_fields.get("city_geoname_id", existing_user.city_geoname_id)
         new_state = update_fields.get("state", existing_user.state)
         new_roles = update_fields.get("roles", existing_user.roles)
         new_vekn_prefix = update_fields.get("vekn_prefix", existing_user.vekn_prefix)
@@ -678,6 +685,7 @@ class VEKNSyncService:
             new_name != existing_user.name
             or new_country != existing_user.country
             or new_city != existing_user.city
+            or new_city_geoname_id != existing_user.city_geoname_id
             or new_state != existing_user.state
             or sorted(new_roles) != sorted(existing_user.roles)
             or new_vekn_prefix != existing_user.vekn_prefix
@@ -696,6 +704,7 @@ class VEKNSyncService:
             "country": new_country,
             "vekn_id": existing_user.vekn_id,  # Never update VEKN ID
             "city": new_city,
+            "city_geoname_id": new_city_geoname_id,
             "state": new_state,
             "nickname": existing_user.nickname,
             "roles": new_roles,

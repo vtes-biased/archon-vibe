@@ -151,6 +151,7 @@ export interface User extends BaseObject {
   country: string | null; // ISO 3166-1 alpha-2 country code
   vekn_id?: string | null; // Optional VEKN ID
   city?: string | null;
+  city_geoname_id?: number | null;
   state?: string | null; // State/region
   nickname?: string | null;
   roles: Role[];

@@ -132,6 +132,7 @@ class ProfileUpdateRequest(BaseModel):
     nickname: str | None = None
     country: str | None = None
     city: str | None = None
+    city_geoname_id: int | None = None
     contact_email: str | None = None
     contact_phone: str | None = None
 
@@ -761,6 +762,10 @@ async def update_current_user(
         user.country = request.country.upper() if request.country else None
     if request.city is not None:
         user.city = request.city if request.city else None
+        if not request.city:
+            user.city_geoname_id = None
+    if request.city_geoname_id is not None:
+        user.city_geoname_id = request.city_geoname_id if request.city_geoname_id else None
     if request.contact_email is not None:
         user.contact_email = request.contact_email if request.contact_email else None
     if request.contact_phone is not None:

@@ -6,7 +6,7 @@
   interface Props {
     user: any;
     error: string | null;
-    onSave: (data: { name?: string; nickname?: string; country?: string; city?: string; contact_email?: string; contact_phone?: string }) => Promise<void>;
+    onSave: (data: { name?: string; nickname?: string; country?: string; city?: string; city_geoname_id?: number | null; contact_email?: string; contact_phone?: string }) => Promise<void>;
     onCancel: () => void;
   }
   let { user, error, onSave, onCancel }: Props = $props();
@@ -21,6 +21,7 @@
   let editNickname = $state(initial.nickname || "");
   let editCountry = $state(initial.country || "");
   let editCity = $state(initial.city || "");
+  let editCityGeonameId = $state<number | null>(initial.city_geoname_id ?? null);
   let editContactEmail = $state(initial.contact_email || "");
   let editContactPhone = $state(initial.contact_phone || "");
 
@@ -31,6 +32,7 @@
       nickname: editNickname || undefined,
       country: editCountry || undefined,
       city: editCity || undefined,
+      city_geoname_id: editCity ? editCityGeonameId : null,
       contact_email: editContactEmail || undefined,
       contact_phone: editContactPhone || undefined,
     });
@@ -58,7 +60,7 @@
 
     <div>
       <label for="edit-country" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
-      <select id="edit-country" bind:value={editCountry} onchange={() => { editCity = ""; }}
+      <select id="edit-country" bind:value={editCountry} onchange={() => { editCity = ""; editCityGeonameId = null; }}
         class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent">
         <option value="">{m.user_country_placeholder()}</option>
         {#each sortedCountries as country}
@@ -69,7 +71,7 @@
 
     <div>
       <label for="edit-city" class="block text-sm font-medium text-ash-400 mb-1">{m.common_city()}</label>
-      <CityAutocomplete bind:value={editCity} countryCode={editCountry} disabled={!editCountry} />
+      <CityAutocomplete bind:value={editCity} bind:geonameId={editCityGeonameId} countryCode={editCountry} disabled={!editCountry} />
       {#if !editCountry}
         <p class="mt-1 text-xs text-mist-500">{m.city_select_country_first()}</p>
       {/if}

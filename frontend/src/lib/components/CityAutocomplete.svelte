@@ -6,6 +6,7 @@
 
     let {
         value = $bindable(""),
+        geonameId = $bindable<number | null>(null),
         countryCode,
         disabled = false,
         required = false,
@@ -13,6 +14,7 @@
         onselect,
     }: {
         value?: string;
+        geonameId?: number | null;
         countryCode: string;
         disabled?: boolean;
         required?: boolean;
@@ -65,6 +67,7 @@
 
     function selectCity(city: City) {
         value = city.name;
+        geonameId = city.geoname_id;
         inputValue = city.name;
         showSuggestions = false;
         suggestions = [];
@@ -99,7 +102,10 @@
             showSuggestions = false;
             selectedIndex = -1;
             // Update bound value with current input
-            value = inputValue;
+            if (inputValue !== value) {
+                value = inputValue;
+                geonameId = null; // User typed freely, no selection
+            }
         }, 200);
     }
 </script>

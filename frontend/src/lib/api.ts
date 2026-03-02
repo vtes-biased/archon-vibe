@@ -90,7 +90,8 @@ export async function createUser(
   city?: string | null,
   nickname?: string | null,
   email?: string | null,
-  roles?: string[]
+  roles?: string[],
+  city_geoname_id?: number | null,
 ): Promise<User> {
   if (!isOnline()) {
     throw new Error('Cannot create users while offline. Please connect to the internet.');
@@ -100,6 +101,7 @@ export async function createUser(
   params.append('name', name);
   params.append('country', country);
   if (city) params.append('city', city);
+  if (city_geoname_id != null) params.append('city_geoname_id', String(city_geoname_id));
   if (nickname) params.append('nickname', nickname);
   if (email) params.append('email', email);
   if (roles !== undefined) {
@@ -116,7 +118,8 @@ export async function updateUser(
   vekn_id?: string | null,
   city?: string | null,
   nickname?: string | null,
-  roles?: string[]
+  roles?: string[],
+  city_geoname_id?: number | null,
 ): Promise<User> {
   if (!isOnline()) {
     throw new Error('Cannot update users while offline. Please connect to the internet.');
@@ -127,6 +130,7 @@ export async function updateUser(
   if (country) params.append('country', country);
   if (vekn_id !== undefined) params.append('vekn_id', vekn_id || '');
   if (city !== undefined) params.append('city', city || '');
+  if (city_geoname_id !== undefined) params.append('city_geoname_id', city_geoname_id != null ? String(city_geoname_id) : '');
   if (nickname !== undefined) params.append('nickname', nickname || '');
   if (roles !== undefined) {
     if (roles.length === 0) {

@@ -75,6 +75,7 @@ async def create_user(
     name: str,
     country: str,
     city: str | None = None,
+    city_geoname_id: int | None = None,
     state: str | None = None,
     nickname: str | None = None,
     email: str | None = None,
@@ -123,6 +124,7 @@ async def create_user(
         country=country,
         vekn_id=vekn_id,
         city=city,
+        city_geoname_id=city_geoname_id,
         state=state,
         nickname=nickname,
         contact_email=email.lower() if email else None,
@@ -200,6 +202,7 @@ async def update_user(
     country: str | None = None,
     vekn_id: str | None = None,
     city: str | None = None,
+    city_geoname_id: int | None = None,
     state: str | None = None,
     nickname: str | None = None,
     roles: Annotated[list[str] | None, Query()] = None,
@@ -265,6 +268,7 @@ async def update_user(
         or country is not None
         or vekn_id is not None
         or city is not None
+        or city_geoname_id is not None
         or state is not None
         or nickname is not None
         or validated_roles is not None
@@ -276,6 +280,8 @@ async def update_user(
             local_mods.add("country")
         if city is not None:
             local_mods.add("city")
+        if city_geoname_id is not None:
+            local_mods.add("city_geoname_id")
         if state is not None:
             local_mods.add("state")
         if nickname is not None:
@@ -288,6 +294,7 @@ async def update_user(
             country=country if country is not None else user.country,
             vekn_id=vekn_id if vekn_id is not None else user.vekn_id,
             city=city if city is not None else user.city,
+            city_geoname_id=city_geoname_id if city_geoname_id is not None else user.city_geoname_id,
             state=state if state is not None else user.state,
             nickname=nickname if nickname is not None else user.nickname,
             roles=validated_roles if validated_roles is not None else user.roles,

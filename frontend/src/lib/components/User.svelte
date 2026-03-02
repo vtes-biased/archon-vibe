@@ -86,6 +86,7 @@
   let editName = $state("");
   let editCountry = $state("");
   let editCity = $state("");
+  let editCityGeonameId = $state<number | null>(null);
   let editNickname = $state("");
   let editEmail = $state("");  // For create mode: optional email to send invite
   let editRoles = $state<Role[]>([]);
@@ -105,6 +106,7 @@
       editName = user.name || "";
       editCountry = user.country || "";
       editCity = user.city || "";
+      editCityGeonameId = user.city_geoname_id ?? null;
       editNickname = user.nickname || "";
       editRoles = [...user.roles];
       editInitialized = true;
@@ -133,6 +135,7 @@
         editCity.trim() || null,
         editNickname.trim() || null,
         editRoles,
+        editCity.trim() ? editCityGeonameId : null,
       );
       onupdated?.(updated);
     } catch (e) {
@@ -181,6 +184,7 @@
     editName = user.name;
     editCountry = user.country || "";
     editCity = user.city || "";
+    editCityGeonameId = user.city_geoname_id ?? null;
     editNickname = user.nickname || "";
     editRoles = [...user.roles];
     editInitialized = true;
@@ -227,6 +231,7 @@
           editNickname.trim() || null,
           editEmail.trim() || null,
           editRoles,
+          editCity.trim() ? editCityGeonameId : null,
         );
         oncreated?.(created);
       } else if (user) {
@@ -238,6 +243,7 @@
           editCity.trim() || null,
           editNickname.trim() || null,
           editRoles,
+          editCity.trim() ? editCityGeonameId : null,
         );
         _isEditingLocal = false;
         onupdated?.(updated);
@@ -340,6 +346,7 @@
             // Clear city when country changes
             if (editCity) {
               editCity = "";
+              editCityGeonameId = null;
             }
             // Immediate save for country changes
             if (mode !== "create") immediateAutoSave();
@@ -364,6 +371,7 @@
         </label>
         <CityAutocomplete
           bind:value={editCity}
+          bind:geonameId={editCityGeonameId}
           countryCode={editCountry}
           disabled={!editCountry}
           onselect={() => mode !== "create" && immediateAutoSave()}
