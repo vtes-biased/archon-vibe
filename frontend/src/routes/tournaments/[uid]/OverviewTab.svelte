@@ -21,6 +21,7 @@
     playerInfo,
     standings,
     isOrganizer,
+    winnerHasDeck = false,
     doAction,
     actionLoading,
   }: {
@@ -28,6 +29,7 @@
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
     standings: StandingEntry[];
     isOrganizer: boolean;
+    winnerHasDeck?: boolean;
     doAction?: (action: string, body?: any) => Promise<void>;
     actionLoading?: boolean;
   } = $props();
@@ -154,6 +156,13 @@
     <div class="banner-emerald border rounded-lg p-4">
       <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
       <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
+    </div>
+  {/if}
+
+  <!-- Winner deck nudge (organizer, finished, no deck) -->
+  {#if isOrganizer && isFinished && tournament.winner && !winnerHasDeck}
+    <div class="banner-amber border rounded-lg p-3 text-sm">
+      {m.decks_winner_nudge_organizer({ name: playerInfo[tournament.winner]?.name ?? 'the winner' })}
     </div>
   {/if}
 

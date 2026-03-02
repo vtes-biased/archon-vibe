@@ -946,6 +946,7 @@ import TournamentModals from "./TournamentModals.svelte";
                 {playerInfo}
                 {standings}
                 isOrganizer={true}
+                winnerHasDeck={!!(tournament.winner && decksByUser[tournament.winner]?.length)}
                 {doAction}
                 {actionLoading}
               />
