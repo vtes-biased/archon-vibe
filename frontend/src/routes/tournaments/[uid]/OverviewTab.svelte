@@ -159,7 +159,7 @@
 
   <!-- Share buttons (finished tournaments with standings) -->
   {#if isFinished && standings.length > 0}
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
       <button onclick={shareImage} disabled={sharingImage}
         class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors disabled:opacity-40">
         <Share2 class="w-4 h-4" />
@@ -170,6 +170,14 @@
         <ClipboardCopy class="w-4 h-4" />
         {m.share_results_text()}
       </button>
+      {#if isOrganizer}
+        <a href="{API_BASE}/api/tournaments/{tournament.uid}/report"
+          class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors"
+          download>
+          <Download class="w-4 h-4" />
+          {m.decks_download_report_json()}
+        </a>
+      {/if}
     </div>
   {/if}
 

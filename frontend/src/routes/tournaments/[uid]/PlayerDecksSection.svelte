@@ -14,12 +14,10 @@
   let {
     tournament,
     playerInfo,
-    isOrganizer = false,
     decksByUser: decksByUserProp,
   }: {
     tournament: Tournament;
     playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
-    isOrganizer?: boolean;
     decksByUser?: Record<string, DeckObject[]>;
   } = $props();
 
@@ -157,32 +155,17 @@
     }
     return result;
   });
+
+  // Visible decks: entries for other players + total count (used in template)
+  const deckEntries = $derived(Object.entries(visibleDecks).filter(([uid]) => uid !== myUid));
+  const totalVisibleDecks = $derived(deckEntries.reduce((n, [, d]) => n + d.filter(Boolean).length, 0));
 </script>
 
 <div class="space-y-6">
-  <!-- Download Report (organizer, finished tournament) -->
-  {#if isOrganizer && tournament.state === 'Finished'}
-    {@const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'}
-    <div class="flex gap-2">
-      <a
-        href="{API_URL}/api/tournaments/{tournament.uid}/report?format=text"
-        class="px-3 py-1.5 text-sm bg-ash-800 text-ash-200 hover:bg-ash-700 rounded-lg transition-colors"
-        download
-      >{m.decks_download_report_text()}</a>
-      <a
-        href="{API_URL}/api/tournaments/{tournament.uid}/report?format=json"
-        class="px-3 py-1.5 text-sm bg-ash-800 text-ash-200 hover:bg-ash-700 rounded-lg transition-colors"
-        download
-      >{m.decks_download_report_json()}</a>
-    </div>
-  {/if}
-
   <!-- Decklist required reminder -->
   {#if tournament.decklist_required && (tournament.state === 'Registration' || tournament.state === 'Waiting')}
     <div class="banner-amber border rounded-lg p-3 text-sm">
-      {#if isOrganizer}
-        {m.decks_required_organizer_hint()}
-      {:else if isPlayer && myDecks.length === 0}
+      {#if isPlayer && myDecks.length === 0}
         {m.decks_required_player_hint()}
       {:else if isPlayer}
         {m.decks_required_submitted()}
@@ -198,15 +181,11 @@
       <div class="bg-crimson-900/30 border border-crimson-700/50 rounded-lg p-3 text-sm text-crimson-200">
         {m.decks_winner_nudge_self()}
       </div>
-    {:else if isOrganizer}
-      <div class="banner-amber border rounded-lg p-3 text-sm">
-        {m.decks_winner_nudge_organizer({ name: playerInfo[winnerUid]?.name ?? 'the winner' })}
-      </div>
     {/if}
   {/if}
 
   <!-- Player's own deck(s) -->
-  {#if isPlayer && !isOrganizer}
+  {#if isPlayer}
     {#if isMultideck}
       <!-- Multideck: per-round slots (accordion) -->
       <div class="bg-ash-900/50 rounded-lg p-3 sm:p-4 space-y-2">
@@ -329,34 +308,31 @@
   {/if}
 
   <!-- Visible decks (post-tournament, collapsible) -->
-  {#if !isOrganizer}
-    {@const deckEntries = Object.entries(visibleDecks).filter(([uid]) => uid !== myUid)}
-    {@const totalDecks = deckEntries.reduce((n, [, d]) => n + d.filter(Boolean).length, 0)}
-    {#if deckEntries.length > 0}
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-bone-200">{m.decks_visible_heading()}</h3>
-          {#if totalDecks >= 5}
-            <button
-              class="text-xs text-ash-400 hover:text-ash-200 transition-colors"
-              onclick={() => {
-                if (expandedDecks.size >= totalDecks) {
-                  expandedDecks = new Set();
-                } else {
-                  const all = new Set<string>();
-                  for (const [uid, decks] of deckEntries) {
-                    for (let i = 0; i < decks.length; i++) {
-                      if (decks[i]) all.add(`${uid}-${i}`);
-                    }
+  {#if deckEntries.length > 0}
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-bone-200">{m.decks_visible_heading()}</h3>
+        {#if totalVisibleDecks >= 5}
+          <button
+            class="text-xs text-ash-400 hover:text-ash-200 transition-colors"
+            onclick={() => {
+              if (expandedDecks.size >= totalVisibleDecks) {
+                expandedDecks = new Set();
+              } else {
+                const all = new Set<string>();
+                for (const [uid, decks] of deckEntries) {
+                  for (let i = 0; i < decks.length; i++) {
+                    if (decks[i]) all.add(`${uid}-${i}`);
                   }
-                  expandedDecks = all;
                 }
-              }}
-            >
-              {expandedDecks.size >= totalDecks ? m.decks_collapse_all() : m.decks_expand_all()}
-            </button>
-          {/if}
-        </div>
+                expandedDecks = all;
+              }
+            }}
+          >
+            {expandedDecks.size >= totalVisibleDecks ? m.decks_collapse_all() : m.decks_expand_all()}
+          </button>
+        {/if}
+      </div>
         {#each deckEntries as [uid, decks]}
           {#each decks as deck, i}
             {#if deck}
@@ -397,5 +373,4 @@
         {/each}
       </div>
     {/if}
-  {/if}
 </div>

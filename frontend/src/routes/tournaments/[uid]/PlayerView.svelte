@@ -8,7 +8,7 @@
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
-  import DecksTab from "./DecksTab.svelte";
+  import PlayerDecksSection from "./PlayerDecksSection.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import { callJudge } from "$lib/api";
   import { isOnline } from "$lib/api";
@@ -422,10 +422,9 @@
   <!-- Player deck section -->
   {#if currentPlayerEntry || (tournament.state === 'Finished' && tournament.decklists_mode)}
     <div class="mt-4">
-      <DecksTab
+      <PlayerDecksSection
         {tournament}
         {playerInfo}
-        isOrganizer={false}
         {decksByUser}
       />
     </div>

@@ -25,8 +25,7 @@
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
   import ConfigTab from "./ConfigTab.svelte";
-  import DecksTab from "./DecksTab.svelte"; // Used in player view only
-  import TournamentModals from "./TournamentModals.svelte";
+import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
   import JudgeCallBanner from "./JudgeCallBanner.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";

@@ -1183,14 +1183,9 @@ async def export_deck_twda(
 @router.get("/{uid}/report")
 async def tournament_report(
     uid: str,
-    format: str = "text",
     authorization: str | None = Header(default=None),
 ) -> Response:
-    """Download a tournament report with standings, results, and winner's deck.
-
-    Query params:
-    - format: "text" (default) or "json"
-    """
+    """Download a tournament report (JSON) with standings and results."""
     user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -1202,119 +1197,41 @@ async def tournament_report(
     if tournament.state != TournamentState.FINISHED:
         raise HTTPException(status_code=400, detail="Tournament is not finished")
 
-    # Check if organizer
     if not _is_organizer(user, tournament):
         raise HTTPException(
             status_code=403, detail="Only organizers can download reports"
         )
 
-    if format == "json":
-        # JSON report
-        import json as json_mod
+    import json as json_mod
 
-        report = {
-            "tournament": {
-                "name": tournament.name,
-                "date": str(tournament.start or tournament.modified.isoformat()),
-                "country": tournament.country,
-                "format": tournament.format.value
-                if hasattr(tournament.format, "value")
-                else str(tournament.format),
-                "player_count": len(tournament.players),
-                "winner": tournament.winner,
-            },
-            "standings": [
-                {
-                    "user_uid": s.user_uid,
-                    "gw": s.gw,
-                    "vp": s.vp,
-                    "tp": s.tp,
-                    "finalist": s.finalist,
-                }
-                for s in tournament.standings
-            ],
-        }
-        return Response(
-            content=json_mod.dumps(report, indent=2),
-            media_type="application/json",
-            headers={
-                "Content-Disposition": f'attachment; filename="{uid}-report.json"'
-            },
-        )
-
-    # Text report
-    lines = []
-    lines.append(f"Tournament Report: {tournament.name}")
-    lines.append(f"Date: {tournament.start or tournament.modified.isoformat()}")
-    lines.append(f"Location: {tournament.country or 'Unknown'}")
-    lines.append(f"Players: {len(tournament.players)}")
-    lines.append("")
-
-    # Standings
-    lines.append("=== Standings ===")
-    for i, s in enumerate(tournament.standings, 1):
-        player_user = await get_user_by_uid(s.user_uid)
-        name = player_user.name if player_user else s.user_uid
-        finalist_mark = " (F)" if s.finalist else ""
-        winner_mark = " *WINNER*" if s.user_uid == tournament.winner else ""
-        lines.append(
-            f"{i:>3}. {name:30} GW={s.gw:.1f} VP={s.vp:.1f} TP={s.tp}{finalist_mark}{winner_mark}"
-        )
-
-    # Winner's deck (from DeckObject store)
-    winner_deck = None
-    if tournament.winner:
-        all_decks = await get_decks_for_tournament(uid)
-        winner_deck = next(
-            (d for d in all_decks if d.user_uid == tournament.winner), None
-        )
-
-    if winner_deck:
-        lines.append("")
-        lines.append("=== Winner's Decklist ===")
-        try:
-            engine = _engine
-            import json as json_mod
-
-            deck_json = json_mod.dumps(
-                {
-                    "name": winner_deck.name,
-                    "author": winner_deck.author,
-                    "comments": winner_deck.comments,
-                    "cards": winner_deck.cards,
-                }
-            )
-
-            player_user = await get_user_by_uid(tournament.winner)
-            player_name = player_user.name if player_user else "Unknown"
-            tournament_date = tournament.start or tournament.modified.isoformat()
-            rounds_count = len(tournament.rounds)
-            has_finals = tournament.finals is not None
-            tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
-
-            twda_text = engine.export_twda(
-                deck_json,
-                _load_cards_json(),
-                tournament.name,
-                str(tournament_date),
-                tournament.country or "",
-                tournament_format,
-                "",
-                len(tournament.players),
-                player_name,
-            )
-            lines.append(twda_text)
-        except Exception:
-            lines.append("(Failed to generate decklist)")
-    else:
-        lines.append("")
-        lines.append("Winner's decklist: not available")
-
-    text = "\n".join(lines)
+    report = {
+        "tournament": {
+            "name": tournament.name,
+            "date": str(tournament.start or tournament.modified.isoformat()),
+            "country": tournament.country,
+            "format": tournament.format.value
+            if hasattr(tournament.format, "value")
+            else str(tournament.format),
+            "player_count": len(tournament.players),
+            "winner": tournament.winner,
+        },
+        "standings": [
+            {
+                "user_uid": s.user_uid,
+                "gw": s.gw,
+                "vp": s.vp,
+                "tp": s.tp,
+                "finalist": s.finalist,
+            }
+            for s in tournament.standings
+        ],
+    }
     return Response(
-        content=text,
-        media_type="text/plain",
-        headers={"Content-Disposition": f'attachment; filename="{uid}-report.txt"'},
+        content=json_mod.dumps(report, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{uid}-report.json"'
+        },
     )
 
 
