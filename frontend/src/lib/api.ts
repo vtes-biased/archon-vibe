@@ -567,6 +567,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
       const seenUids = new Set(sanctions.map(s => s.uid));
       const playerUids = new Set((current.players ?? []).map(p => p.user_uid));
       for (const puid of playerUids) {
+        if (!puid) continue;
         for (const s of await getSanctionsForUser(puid)) {
           if (seenUids.has(s.uid) || s.deleted_at || s.lifted_at) continue;
           if (s.level === 'suspension' || s.level === 'disqualification') {

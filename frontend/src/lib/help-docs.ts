@@ -5,7 +5,6 @@ import vtesRulesRaw from "$lib/help-content/vtes-rules.md?raw";
 import tournamentRulesRaw from "$lib/help-content/tournament-rules.md?raw";
 import judgesGuideRaw from "$lib/help-content/judges-guide.md?raw";
 import codeOfEthicsRaw from "$lib/help-content/code-of-ethics.md?raw";
-import playerGuideRaw from "$lib/help-content/player-guide.md?raw";
 import organizerGuideRaw from "$lib/help-content/organizer-guide.md?raw";
 
 export interface TocEntry {
@@ -19,8 +18,9 @@ export interface HelpDoc {
   description: string;
   icon: string;
   tocDepth: number;
-  content: string; // rendered HTML (lazy)
-  raw: string;
+  content: string; // rendered HTML (lazy, empty for component docs)
+  raw: string; // raw markdown (empty for component docs)
+  isComponent?: boolean; // true if rendered by a Svelte component
 }
 
 /** Extract table of contents entries from rendered HTML */
@@ -88,8 +88,9 @@ export const helpDocs: Record<string, HelpDoc> = {
     description: "How to find tournaments, register, check in, and upload decks.",
     icon: "user",
     tocDepth: 2,
-    raw: playerGuideRaw,
-    get content() { return getRendered("player-guide", this.raw); },
+    isComponent: true,
+    raw: "",
+    get content() { return ""; },
   },
   "organizer-guide": {
     title: "Organizer Guide",

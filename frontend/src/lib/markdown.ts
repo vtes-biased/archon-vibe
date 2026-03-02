@@ -212,3 +212,37 @@ export function renderDocument(src: string): string {
     ADD_ATTR: ["id", "class", "aria-label"],
   });
 }
+
+/**
+ * Render a markdown section for interactive guides.
+ * Lighter than renderDocument: heading anchors + callouts, no preprocessing.
+ */
+export function renderGuideSection(src: string): string {
+  const renderer = new marked.Renderer();
+  renderer.heading = ({ tokens, depth }: Tokens.Heading) => {
+    const text = tokens.map(t => ('text' in t ? (t as any).text : t.raw)).join("");
+    const id = slugify(text);
+    const inner = marked.parser(
+      [{ type: "heading", depth, raw: "", text: "", tokens }] as any,
+      { async: false }
+    ) as string;
+    const match = inner.match(/<h\d[^>]*>([\s\S]*?)<\/h\d>/);
+    const content = match ? match[1] : text;
+    return `<h${depth} id="${id}" class="heading-anchor">${content} <a href="#${id}" class="anchor-link" aria-label="Link to this section">#</a></h${depth}>\n`;
+  };
+  renderer.blockquote = ({ tokens }: Tokens.Blockquote) => {
+    const html = marked.parser(tokens as any, { async: false }) as string;
+    const calloutMatch = html.match(/^<p>\s*<strong>([A-Z][A-Z\s&:,\-]+)<\/strong>/);
+    if (calloutMatch) {
+      const title = calloutMatch[1]!.trim();
+      const body = html.replace(calloutMatch[0], "<p>");
+      return `<div class="callout"><div class="callout-title">${title}</div>${body}</div>\n`;
+    }
+    return `<blockquote>${html}</blockquote>\n`;
+  };
+  renderer.link = ({ href, text }: Tokens.Link) =>
+    href.startsWith("/") || href.startsWith("#")
+      ? `<a href="${href}">${text}</a>`
+      : `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  return marked.parse(src.trim(), { renderer, async: false }) as string;
+}
