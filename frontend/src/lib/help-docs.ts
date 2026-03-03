@@ -5,7 +5,6 @@ import vtesRulesRaw from "$lib/help-content/vtes-rules.md?raw";
 import tournamentRulesRaw from "$lib/help-content/tournament-rules.md?raw";
 import judgesGuideRaw from "$lib/help-content/judges-guide.md?raw";
 import codeOfEthicsRaw from "$lib/help-content/code-of-ethics.md?raw";
-import organizerGuideRaw from "$lib/help-content/organizer-guide.md?raw";
 
 export interface TocEntry {
   id: string;
@@ -97,8 +96,9 @@ export const helpDocs: Record<string, HelpDoc> = {
     description: "How to create, configure, and run tournaments with Archon.",
     icon: "clipboard",
     tocDepth: 2,
-    raw: organizerGuideRaw,
-    get content() { return getRendered("organizer-guide", this.raw); },
+    isComponent: true,
+    raw: "",
+    get content() { return ""; },
   },
 };
 

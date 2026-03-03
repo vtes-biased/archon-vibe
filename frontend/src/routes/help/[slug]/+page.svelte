@@ -8,6 +8,7 @@
   import DocumentViewer from "$lib/components/DocumentViewer.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import PlayerGuide from "$lib/components/help/PlayerGuide.svelte";
+  import OrganizerGuide from "$lib/components/help/OrganizerGuide.svelte";
   import { ArrowLeft } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -104,6 +105,8 @@
             <article bind:this={guideEl} class="doc-prose prose max-w-none">
               {#if slug === 'player-guide'}
                 <PlayerGuide />
+              {:else if slug === 'organizer-guide'}
+                <OrganizerGuide />
               {/if}
             </article>
           {:else}
