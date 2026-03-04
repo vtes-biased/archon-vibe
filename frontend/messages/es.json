@@ -789,5 +789,14 @@
   "archon_import_error": "Error en la importación",
   "archon_import_confirm_overwrite": "Este torneo ya tiene datos de rondas. La importación reemplazará todas las rondas, clasificaciones y resultados existentes. ¿Continuar?",
   "archon_players_matched": "{count} jugadores encontrados",
-  "archon_rounds_imported": "{count} rondas importadas"
+  "archon_rounds_imported": "{count} rondas importadas",
+  "tournament_vekn_id_required_to_register": "Necesitas un ID de VEKN para inscribirte. Pide a un coordinador que te patrocine.",
+  "add_player_no_vekn_id": "Sin ID de VEKN",
+  "add_player_not_on_archon": "¿Jugador no está en Archon?",
+  "vekn_sponsor_to_register_title": "Patrocinar e Inscribir",
+  "vekn_sponsor_to_register_message": "{name} no tiene ID de VEKN. ¿Patrocinarlo para inscribirlo?",
+  "vekn_sponsor_and_register": "Patrocinar e Inscribir",
+  "create_and_register_title": "Inscribir Nuevo Jugador",
+  "create_and_register_message": "Crear una cuenta en Archon e inscribir en este torneo. Se enviará un correo de invitación.",
+  "create_and_register_btn": "Crear e Inscribir"
 }

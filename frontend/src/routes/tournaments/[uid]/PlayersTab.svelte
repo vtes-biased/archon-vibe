@@ -11,6 +11,8 @@
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
+  import { sponsorVeknMember, createUser, isOnline } from "$lib/api";
+  import { showToast } from "$lib/stores/toast.svelte";
   import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -189,8 +191,70 @@
     return sortedPlayers.filter(p => p.payment_status === paymentFilter);
   });
 
+  // Sponsor modal state
+  let sponsorTarget = $state<User | null>(null);
+  let sponsorLoading = $state(false);
+
+  // Create-and-register modal state
+  let showCreateModal = $state(false);
+  let createName = $state('');
+  let createEmail = $state('');
+  let createCountry = $state(tournament.country ?? '');
+  let createLoading = $state(false);
+
   async function addPlayerByUser(user: User) {
-    await doAction("AddPlayer", { user_uid: user.uid });
+    if (!user.vekn_id) {
+      // Show sponsor modal instead of directly registering
+      sponsorTarget = user;
+      return;
+    }
+    await doAction("AddPlayer", { user_uid: user.uid, vekn_id: user.vekn_id });
+  }
+
+  async function handleSponsorAndRegister() {
+    if (!sponsorTarget) return;
+    sponsorLoading = true;
+    try {
+      const result = await sponsorVeknMember(sponsorTarget.uid);
+      showToast({ type: "success", message: result.message });
+      await doAction("AddPlayer", { user_uid: sponsorTarget.uid, vekn_id: result.user.vekn_id });
+      sponsorTarget = null;
+    } catch {
+      // Error toast shown by apiRequest (e.g. 403 if no sponsor rights)
+    } finally {
+      sponsorLoading = false;
+    }
+  }
+
+  async function handleCreateAndRegister() {
+    if (!createName.trim() || !createEmail.trim()) return;
+    createLoading = true;
+    try {
+      if (isOnline()) {
+        const newUser = await createUser(createName.trim(), createCountry || tournament.country || '', null, null, createEmail.trim());
+        await doAction("AddPlayer", { user_uid: newUser.uid, vekn_id: newUser.vekn_id });
+      } else {
+        // Offline mode: create temp player
+        const tempUid = crypto.randomUUID();
+        const tempVeknId = `TEMP-${tempUid.slice(0, 8)}`;
+        const { addOfflinePlayer } = await import('$lib/stores/offline.svelte');
+        await addOfflinePlayer(tournament.uid, {
+          temp_uid: tempUid,
+          name: createName.trim(),
+          vekn_id: tempVeknId,
+          email: createEmail.trim(),
+        });
+        await doAction('AddPlayer', { user_uid: tempUid, vekn_id: tempVeknId });
+      }
+      showCreateModal = false;
+      createName = '';
+      createEmail = '';
+      createCountry = tournament.country ?? '';
+    } catch {
+      // Error toast shown by apiRequest
+    } finally {
+      createLoading = false;
+    }
   }
 
   async function removePlayer(userUid: string) {
@@ -262,14 +326,15 @@
   async function addOfflinePlayerAction() {
     if (!offlinePlayerName.trim()) return;
     const tempUid = crypto.randomUUID();
+    const veknId = offlinePlayerVeknId.trim() || `TEMP-${tempUid.slice(0, 8)}`;
     const { addOfflinePlayer } = await import('$lib/stores/offline.svelte');
     await addOfflinePlayer(tournament.uid, {
       temp_uid: tempUid,
       name: offlinePlayerName.trim(),
-      vekn_id: offlinePlayerVeknId.trim() || undefined,
+      vekn_id: veknId,
       email: offlinePlayerEmail.trim() || undefined,
     });
-    await doAction('AddPlayer', { user_uid: tempUid });
+    await doAction('AddPlayer', { user_uid: tempUid, vekn_id: veknId });
     offlinePlayerName = '';
     offlinePlayerVeknId = '';
     offlinePlayerEmail = '';
@@ -283,7 +348,7 @@
     <div class="flex items-center gap-3">
       <p class="text-ash-400 shrink-0">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
       {#if isOrganizer}
-        <AddPlayerForm {tournament} onadd={addPlayerByUser} />
+        <AddPlayerForm {tournament} onadd={addPlayerByUser} oncreate={() => showCreateModal = true} />
       {/if}
     </div>
     {#if isOrganizer && isOfflineMode}
@@ -799,4 +864,60 @@
     {currentRound}
     onClose={() => sanctionTarget = null}
   />
+{/if}
+
+<!-- Sponsor & Register Modal -->
+{#if sponsorTarget}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="bg-dusk-950 border border-ash-700 rounded-lg p-6 max-w-sm w-full mx-4 space-y-4">
+      <h3 class="text-lg font-medium text-bone-100">{m.vekn_sponsor_to_register_title()}</h3>
+      <p class="text-sm text-ash-300">{m.vekn_sponsor_to_register_message({ name: sponsorTarget.name })}</p>
+      <div class="flex gap-2 justify-end">
+        <button
+          onclick={() => sponsorTarget = null}
+          class="px-4 py-2 text-sm text-ash-300 hover:text-ash-100 border border-ash-700 rounded-lg transition-colors"
+        >{m.common_cancel()}</button>
+        <button
+          onclick={handleSponsorAndRegister}
+          disabled={sponsorLoading}
+          class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+        >{sponsorLoading ? m.common_loading() : m.vekn_sponsor_and_register()}</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Create & Register Modal -->
+{#if showCreateModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="bg-dusk-950 border border-ash-700 rounded-lg p-6 max-w-sm w-full mx-4 space-y-4">
+      <h3 class="text-lg font-medium text-bone-100">{m.create_and_register_title()}</h3>
+      <p class="text-sm text-ash-300">{m.create_and_register_message()}</p>
+      <div class="space-y-2">
+        <input
+          type="text"
+          bind:value={createName}
+          placeholder={m.offline_player_name()}
+          class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+        />
+        <input
+          type="email"
+          bind:value={createEmail}
+          placeholder={m.common_email()}
+          class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+        />
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button
+          onclick={() => showCreateModal = false}
+          class="px-4 py-2 text-sm text-ash-300 hover:text-ash-100 border border-ash-700 rounded-lg transition-colors"
+        >{m.common_cancel()}</button>
+        <button
+          onclick={handleCreateAndRegister}
+          disabled={!createName.trim() || !createEmail.trim() || createLoading}
+          class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+        >{createLoading ? m.common_loading() : m.create_and_register_btn()}</button>
+      </div>
+    </div>
+  </div>
 {/if}

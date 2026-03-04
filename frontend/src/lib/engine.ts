@@ -117,6 +117,7 @@ export interface TournamentEvent {
   toss?: number;
   status?: string;
   seating?: string[][];
+  vekn_id?: string;
   deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
   multideck?: boolean;
   config?: Record<string, unknown>;

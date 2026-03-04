@@ -121,12 +121,14 @@ pub enum TournamentEvent {
     // Player management
     Register {
         user_uid: String,
+        vekn_id: Option<String>,
     },
     Unregister {
         user_uid: String,
     },
     AddPlayer {
         user_uid: String,
+        vekn_id: Option<String>,
     },
     RemovePlayer {
         user_uid: String,
@@ -478,6 +480,7 @@ impl TournamentEvent {
                     .as_str()
                     .ok_or("user_uid required")?
                     .to_string(),
+                vekn_id: value["vekn_id"].as_str().map(|s| s.to_string()),
             }),
             "Unregister" => Ok(Self::Unregister {
                 user_uid: value["user_uid"]
@@ -490,6 +493,7 @@ impl TournamentEvent {
                     .as_str()
                     .ok_or("user_uid required")?
                     .to_string(),
+                vekn_id: value["vekn_id"].as_str().map(|s| s.to_string()),
             }),
             "RemovePlayer" => Ok(Self::RemovePlayer {
                 user_uid: value["user_uid"]
@@ -1121,8 +1125,13 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::Register { user_uid } => {
+        TournamentEvent::Register { user_uid, vekn_id } => {
             require_state(state, TournamentState::Registration)?;
+
+            // Require VEKN ID
+            if vekn_id.as_ref().map_or(true, |v| v.is_empty()) {
+                return Err("Player must have a VEKN ID to register".to_string());
+            }
 
             // Check not already registered
             if player_exists(&tournament["players"], user_uid) {
@@ -1168,7 +1177,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::AddPlayer { user_uid } => {
+        TournamentEvent::AddPlayer { user_uid, vekn_id } => {
             require_organizer(actor)?;
             if state != TournamentState::Planned
                 && state != TournamentState::Registration
@@ -1177,6 +1186,11 @@ fn apply_event(
                 && state != TournamentState::Finished
             {
                 return Err("Cannot add players in this state".to_string());
+            }
+
+            // Require VEKN ID
+            if vekn_id.as_ref().map_or(true, |v| v.is_empty()) {
+                return Err("Player must have a VEKN ID to register".to_string());
             }
 
             if player_exists(&tournament["players"], user_uid) {
@@ -2922,11 +2936,70 @@ mod tests {
         let event = json::object! {
             type: "Register",
             user_uid: "player-1",
+            vekn_id: "1000001",
         };
         let actor = make_player("player-1");
 
         let result = run_event(&tournament, &event, &actor);
 
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["players"].len(), 1);
+        assert_eq!(updated["players"][0]["user_uid"].as_str(), Some("player-1"));
+    }
+
+    #[test]
+    fn test_register_without_vekn_id_rejected() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Registration".into();
+
+        let event = json::object! {
+            type: "Register",
+            user_uid: "player-1",
+        };
+        let actor = make_player("player-1");
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("VEKN ID"));
+
+        // Also reject empty string
+        let event2 = json::object! {
+            type: "Register",
+            user_uid: "player-1",
+            vekn_id: "",
+        };
+        let result2 = run_event(&tournament, &event2, &actor);
+        assert!(result2.is_err());
+        assert!(result2.unwrap_err().contains("VEKN ID"));
+    }
+
+    #[test]
+    fn test_add_player_without_vekn_id_rejected() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Registration".into();
+
+        let event = json::object! {
+            type: "AddPlayer",
+            user_uid: "player-1",
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("VEKN ID"));
+    }
+
+    #[test]
+    fn test_add_player_with_vekn_id() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Registration".into();
+
+        let event = json::object! {
+            type: "AddPlayer",
+            user_uid: "player-1",
+            vekn_id: "1000042",
+        };
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
         assert!(result.is_ok());
         let updated = json::parse(&result.unwrap()).unwrap();
         assert_eq!(updated["players"].len(), 1);

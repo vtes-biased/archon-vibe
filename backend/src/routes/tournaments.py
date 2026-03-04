@@ -14,6 +14,7 @@ from uuid6 import uuid7
 
 from ..db import (
     BroadcastData,
+    allocate_next_vekn_id,
     get_auth_method_by_identifier,
     get_decks_for_tournament,
     get_sanctions_for_tournament,
@@ -48,7 +49,7 @@ from ..models import (
     TournamentState,
     User,
 )
-from .auth import verify_token
+from .auth import send_invite_email, verify_token
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 logger = logging.getLogger(__name__)
@@ -952,6 +953,12 @@ async def tournament_action(
         sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
         decks_json = await _build_decks_json(uid)
 
+        # Inject authoritative vekn_id for Register/AddPlayer (server overrides client)
+        if request.type in ("Register", "AddPlayer") and request.user_uid:
+            target_user = await get_user_by_uid(request.user_uid)
+            if target_user and target_user.vekn_id:
+                event_data["vekn_id"] = target_user.vekn_id
+
         # Backend pre-checks for cross-tournament sanctions
         if request.type in ("CheckIn", "Register", "AddPlayer"):
             player_uid = request.player_uid or request.user_uid
@@ -1549,11 +1556,13 @@ class GoOnlineRequest(BaseModel):
 
 
 async def _resolve_or_create_offline_player(
-    player_data: OfflinePlayerData, tournament_country: str | None
+    player_data: OfflinePlayerData,
+    tournament_country: str | None,
+    organizer_uid: str | None = None,
 ) -> tuple[str, User]:
     """Resolve an offline player to a real user. Returns (temp_uid, real_user)."""
-    # 1. Match by vekn_id
-    if player_data.vekn_id:
+    # 1. Match by vekn_id (skip temp IDs)
+    if player_data.vekn_id and not player_data.vekn_id.startswith("TEMP-"):
         user = await get_user_by_vekn_id(player_data.vekn_id)
         if user:
             return player_data.temp_uid, user
@@ -1564,20 +1573,40 @@ async def _resolve_or_create_offline_player(
         if auth_method:
             user = await get_user_by_uid(auth_method.user_uid)
             if user:
+                # If matched user lacks VEKN ID, allocate one
+                if not user.vekn_id:
+                    user.vekn_id = await allocate_next_vekn_id()
+                    user.coopted_by = organizer_uid
+                    user.coopted_at = datetime.now(UTC)
+                    user.modified = datetime.now(UTC)
+                    bd = await save_object_from_model(ObjectType.USER, user)
+                    if broadcast_user_event:
+                        broadcast_user_event(bd)
                 return player_data.temp_uid, user
 
-    # 3. Create new user
+    # 3. Create new user with VEKN ID
     now = datetime.now(UTC)
+    vekn_id = await allocate_next_vekn_id()
     new_user = User(
         uid=str(uuid7()),
         modified=now,
         name=player_data.name,
         country=tournament_country,
+        vekn_id=vekn_id,
+        coopted_by=organizer_uid,
+        coopted_at=now,
     )
     bd = await insert_user(new_user)
-    logger.info(f"Created user {new_user.uid} for offline player '{player_data.name}'")
+    logger.info(f"Created user {new_user.uid} (VEKN {vekn_id}) for offline player '{player_data.name}'")
 
     broadcast_precomputed(bd)
+
+    # Send invite email if provided
+    if player_data.email:
+        try:
+            await send_invite_email(player_data.email.lower(), new_user.uid, new_user.name)
+        except Exception:
+            logger.warning(f"Failed to send invite email to {player_data.email}")
 
     return player_data.temp_uid, new_user
 
@@ -1634,7 +1663,7 @@ async def go_online(
     uid_map: dict[str, str] = {}
     for player_data in request.offline_players:
         temp_uid, real_user = await _resolve_or_create_offline_player(
-            player_data, request.tournament.get("country")
+            player_data, request.tournament.get("country"), current_user.uid
         )
         uid_map[temp_uid] = real_user.uid
 

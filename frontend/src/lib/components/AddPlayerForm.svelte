@@ -2,15 +2,17 @@
   import type { User, Tournament } from "$lib/types";
   import { getFilteredUsers, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
-  import { Ban } from "lucide-svelte";
+  import { Ban, TriangleAlert } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
     tournament,
     onadd,
+    oncreate,
   }: {
     tournament: Tournament;
     onadd: (user: User) => void;
+    oncreate?: () => void;
   } = $props();
 
   let playerSearch = $state("");
@@ -78,7 +80,7 @@
     spellcheck="false"
     class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
   />
-  {#if searchResults.length > 0}
+  {#if searchResults.length > 0 || playerSearch.trim().length >= 2}
     <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
       {#each searchResults as user, i}
         {@const isSuspended = suspendedUids.has(user.uid)}
@@ -91,6 +93,11 @@
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
             {#if user.vekn_id}
               <span class="text-ash-500 ml-2">({user.vekn_id})</span>
+            {:else}
+              <span class="inline-flex items-center gap-0.5 ml-2 text-xs text-amber-400">
+                <TriangleAlert class="w-3 h-3" />
+                {m.add_player_no_vekn_id()}
+              </span>
             {/if}
             {#if isSuspended}
               <Ban class="w-3.5 h-3.5 text-crimson-400 ml-1" />
@@ -103,6 +110,14 @@
         <div class="px-3 py-2 text-xs text-ash-500 text-center">
           {m.add_player_more_results({ count: (searchTotal - SEARCH_LIMIT).toString() })}
         </div>
+      {/if}
+      {#if oncreate}
+        <button
+          onclick={() => oncreate?.()}
+          class="w-full px-3 py-2 text-left text-sm text-amber-400 hover:text-amber-300 hover:bg-ash-800 transition-colors {searchResults.length === 0 ? 'font-medium' : ''}"
+        >
+          {m.add_player_not_on_archon()}
+        </button>
       {/if}
     </div>
   {/if}

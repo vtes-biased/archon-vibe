@@ -128,9 +128,11 @@
   {#if tournament.state === "Registration" && !currentPlayerEntry}
     {#if userSuspended}
       <div class="text-sm text-crimson-400">{m.error_suspended_cannot_register()}</div>
+    {:else if !userVeknId}
+      <div class="text-sm text-amber-400">{m.tournament_vekn_id_required_to_register()}</div>
     {:else}
       <button
-        onclick={() => doAction("Register", { user_uid: userUid })}
+        onclick={() => doAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
         disabled={actionLoading}
         class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
       >{m.tournament_register_btn()}</button>
