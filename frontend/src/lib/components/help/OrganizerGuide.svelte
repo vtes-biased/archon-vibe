@@ -208,7 +208,7 @@ Check-in confirms who is actually present and ready to play. This matters becaus
 
 ### Late Arrivals
 
-Players showing up after check-in is common. Use **Add Player** to add them — during the Waiting state they are automatically checked in. During a round, they enter as Registered and sit out until the next round. If a round just started and there's room on a 4-player table, use **Seat Player** to add them directly.
+Unregistered players showing up is common. Use **Add Player** to add them — during check-in they are automatically checked in. During a round, they enter as Registered and sit out until the next round. If a round just started and there's room on a 4-player table, use **Seat Player** to add them directly.
 
 ### Check-in Rules
 
