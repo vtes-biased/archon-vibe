@@ -11,7 +11,7 @@
   const faqs = [
     { q: "Can I run an event without ever opening registration?", a: "Yes. You can keep the tournament in Planned state, add players manually, and start rounds. This works for small impromptu events." },
     { q: "What happens if a player self-reports the wrong VP?", a: "VP scores are validated against oust-order simulation — impossible distributions are rejected. If a valid but incorrect score is entered, you can correct it as organizer." },
-    { q: "Can I change the number of rounds mid-tournament?", a: "Yes, you can increase max rounds at any time (up to the VEKN limit when pushed). You cannot decrease it below the number of completed rounds." },
+    { q: "Can I change the number of rounds mid-tournament?", a: "Yes, if the event is not pushed to VEKN. You cannot decrease below the number of completed rounds. If the event is pushed to VEKN, you must play exactly the announced number of preliminary rounds (max rounds) — otherwise finished results won't sync to VEKN." },
     { q: "Can I run finals with fewer than 5 players?", a: "No. Finals require exactly 5 eligible (non-DQ'd) players. If a DQ'd player is in the top 5, the 6th-place player takes their spot." },
     { q: "I finished the tournament but the scores are wrong — what now?", a: "Use **Reopen Tournament** to go back to Waiting state, fix the scores, and finish again. Ratings recompute automatically." },
     { q: "Do I need to run finals?", a: "No. Some events skip finals — typically league events or tournaments that didn't complete all planned rounds. Players still receive base rating points — only the finalist bonus (winner/runner-up) requires finals." },
@@ -826,13 +826,26 @@ Import tournament data from legacy Archon spreadsheets (.xlsx format). This is u
 
 Archon matches players by VEKN ID first, then by email. Unmatched players are created as new accounts. If the tournament already has rounds, you'll be asked to confirm before overwriting.
 
-## League Integration
+## Leagues
 
-Leagues group a series of tournaments with aggregated standings — common for regional circuits, seasonal series, or national championships. Only NC (National Coordinator) or IC members can create leagues.
+Leagues group a series of tournaments with aggregated standings: regional circuits, seasonal series, or grand prix.
+
+### Creating a League
+
+Only NC (National Coordinator) or IC members can create leagues. Go to **Leagues** and tap **+ New League**. Fill in:
+
+- **Name**: displayed on the league page
+- **Kind**: League or Meta-League (a meta-league groups child leagues)
+- **Standings Mode**: how standings are calculated (see below)
+- **Format**: optional — if set, only tournaments with a matching format can be linked
+- **Country**: optional — for regional leagues
+- **Start / End Date**: start date is required. Leave end date empty for an ongoing league.
+- **Parent League**: optionally attach to a meta-league
+- **Description**: optional (supports Markdown)
 
 ### Linking a Tournament to a League
 
-In the **Config** tab, use the **League** dropdown to link a tournament to an active league. If the league has a format set, the tournament format must match.
+In the tournament **Config** tab, use the **League** dropdown to link a tournament to an active league.
 
 ### Standings Modes
 
