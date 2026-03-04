@@ -15,8 +15,10 @@ from uuid6 import uuid7
 from ..db import (
     BroadcastData,
     allocate_next_vekn_id,
+    get_all_leagues,
     get_auth_method_by_identifier,
     get_decks_for_tournament,
+    get_league_by_uid,
     get_sanctions_for_tournament,
     get_sanctions_for_user,
     get_tournament_by_uid,
@@ -260,13 +262,29 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
         logger.exception("Failed to submit TWDA PR")
 
 
-def _build_actor_context(user, tournament: Tournament) -> dict:
+def _build_actor_context(
+    user, tournament: Tournament, can_organize_league_uids: list[str] | None = None
+) -> dict:
     """Build actor context dict for the Rust engine."""
     return {
         "uid": user.uid,
         "roles": [r.value if hasattr(r, "value") else str(r) for r in user.roles],
         "is_organizer": _is_organizer(user, tournament),
+        "can_organize_league_uids": can_organize_league_uids or [],
     }
+
+
+async def _get_user_organizable_league_uids(user) -> list[str]:
+    """Get league UIDs the user can organize (own leagues + NC same-country)."""
+    if Role.IC in user.roles:
+        return []  # IC bypasses league check in engine
+    leagues = await get_all_leagues()
+    return [
+        l.uid
+        for l in leagues
+        if user.uid in l.organizers_uids
+        or (Role.NC in user.roles and l.country == user.country)
+    ]
 
 
 def _can_manage_tournaments(user) -> bool:
@@ -492,6 +510,22 @@ async def create_tournament(
         raise HTTPException(
             status_code=400, detail="Invalid time_extension_policy"
         ) from e
+
+    # Validate league_uid: only league organizers (or IC) can link
+    if request.league_uid:
+        league = await get_league_by_uid(request.league_uid)
+        if not league:
+            raise HTTPException(status_code=400, detail="League not found")
+        if Role.IC not in current_user.roles:
+            is_nc_same_country = (
+                Role.NC in current_user.roles and league.country == current_user.country
+            )
+            is_organizer = current_user.uid in league.organizers_uids
+            if not (is_nc_same_country or is_organizer):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only league organizers can link tournaments to this league",
+                )
 
     now = datetime.now(UTC)
     tournament = Tournament(
@@ -921,7 +955,12 @@ async def tournament_action(
             )
 
         # Build actor context for Rust engine
-        actor_data = _build_actor_context(current_user, tournament)
+        can_organize = None
+        if request.type == "UpdateConfig" and request.config:
+            can_organize = await _get_user_organizable_league_uids(current_user)
+        actor_data = _build_actor_context(
+            current_user, tournament, can_organize
+        )
 
         # Fetch sanctions for this tournament + user-level suspension/DQ
         # sanctions for all tournament players (needed for CheckInAll etc.)

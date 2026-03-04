@@ -6,6 +6,7 @@
  */
 
 import type { DeckObject, Sanction, Tournament, User } from './types';
+import { getAllLeagues } from './db';
 
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
@@ -133,6 +134,7 @@ export interface ActorContext {
   uid: string;
   roles: string[];
   is_organizer: boolean;
+  can_organize_league_uids: string[];
 }
 
 /**
@@ -389,14 +391,26 @@ export function computePlayerIssuesSync(
 /**
  * Build actor context from current user and tournament.
  */
-export function buildActorContext(user: User | null, tournament: Tournament): ActorContext {
+export async function buildActorContext(
+  user: User | null, tournament: Tournament, actionType?: string
+): Promise<ActorContext> {
   if (!user) {
-    return { uid: '', roles: [], is_organizer: false };
+    return { uid: '', roles: [], is_organizer: false, can_organize_league_uids: [] };
+  }
+  const isIC = user.roles?.includes('IC');
+  let canOrganize: string[] = [];
+  if (actionType === 'UpdateConfig' && !isIC) {
+    const leagues = await getAllLeagues();
+    canOrganize = leagues
+      .filter(l => (user.uid && l.organizers_uids?.includes(user.uid))
+        || (user.roles?.includes('NC') && l.country === user.country))
+      .map(l => l.uid);
   }
   return {
     uid: user.uid,
     roles: user.roles || [],
-    is_organizer: (tournament.organizers_uids?.includes(user.uid) || user.roles?.includes('IC')) ?? false,
+    is_organizer: (tournament.organizers_uids?.includes(user.uid) || isIC) ?? false,
+    can_organize_league_uids: canOrganize,
   };
 }
 

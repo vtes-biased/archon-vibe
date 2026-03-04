@@ -718,6 +718,7 @@ pub struct ActorContext {
     pub uid: String,
     pub roles: Vec<String>,
     pub is_organizer: bool,
+    pub can_organize_league_uids: Vec<String>,
 }
 
 impl ActorContext {
@@ -731,10 +732,15 @@ impl ActorContext {
             .filter_map(|r| r.as_str().map(|s| s.to_string()))
             .collect();
         let is_organizer = value["is_organizer"].as_bool().unwrap_or(false);
+        let can_organize_league_uids: Vec<String> = value["can_organize_league_uids"]
+            .members()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
         Ok(Self {
             uid,
             roles,
             is_organizer,
+            can_organize_league_uids,
         })
     }
 
@@ -2698,6 +2704,20 @@ fn apply_event(
                     "time_extension_policy",
                 )?;
             }
+            // Validate league_uid: only league organizers (or IC) can link
+            if config.has_key("league_uid") && !config["league_uid"].is_null() {
+                let league_uid = config["league_uid"].as_str().unwrap_or("");
+                if !league_uid.is_empty()
+                    && !actor.roles.contains(&"IC".to_string())
+                    && !actor
+                        .can_organize_league_uids
+                        .contains(&league_uid.to_string())
+                {
+                    return Err(
+                        "Only league organizers can link tournaments to this league".to_string(),
+                    );
+                }
+            }
 
             // Check if decklists_mode is changing on a Finished tournament
             let decklists_mode_changing =
@@ -3892,6 +3912,71 @@ mod tests {
         assert_eq!(updated["description"].as_str(), Some("New desc"));
         // venue should remain unchanged
         assert_eq!(updated["venue"].as_str(), Some("Old Venue"));
+    }
+
+    #[test]
+    fn test_update_config_league_uid_unauthorized() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { league_uid: "league-123" },
+        };
+        // Organizer without league access
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Only league organizers"));
+    }
+
+    #[test]
+    fn test_update_config_league_uid_authorized() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { league_uid: "league-123" },
+        };
+        let actor = json::object! {
+            uid: "organizer-1",
+            roles: ["Prince"],
+            is_organizer: true,
+            can_organize_league_uids: ["league-123"],
+        };
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert_eq!(updated["league_uid"].as_str(), Some("league-123"));
+    }
+
+    #[test]
+    fn test_update_config_league_uid_ic_bypass() {
+        let tournament = make_tournament();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { league_uid: "league-123" },
+        };
+        let actor = json::object! {
+            uid: "ic-1",
+            roles: ["IC"],
+            is_organizer: true,
+        };
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_update_config_league_uid_unlink_allowed() {
+        let mut tournament = make_tournament();
+        tournament["league_uid"] = "league-123".into();
+        let event = json::object! {
+            type: "UpdateConfig",
+            config: { league_uid: json::Null },
+        };
+        // Even without league access, unlinking is allowed
+        let actor = make_organizer();
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_ok());
+        let updated = json::parse(&result.unwrap()).unwrap();
+        assert!(updated["league_uid"].is_null());
     }
 
     #[test]

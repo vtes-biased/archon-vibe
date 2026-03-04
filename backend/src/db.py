@@ -1271,6 +1271,17 @@ async def update_league(league: League) -> BroadcastData:
     return await save_object_from_model(ObjectType.LEAGUE, league)
 
 
+async def get_all_leagues() -> list[League]:
+    """Get all leagues."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'league' AND deleted_at IS NULL""",
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], League) for row in rows]
+
+
 async def get_league_by_uid(uid: str) -> League | None:
     """Get a league by UID."""
     return await get_object_full(uid, League)

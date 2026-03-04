@@ -560,7 +560,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
       } else if ((action === 'Register' || action === 'AddPlayer') && data?.user_uid) {
         await checkPlayerBarred(data.user_uid as string, current);
       }
-      const actor = buildActorContext(getAuthState().user ?? null, current);
+      const actor = await buildActorContext(getAuthState().user ?? null, current, action);
       // Combine tournament-scoped sanctions with user-level suspension/DQ
       // sanctions for all tournament players (needed for CheckInAll etc.)
       const sanctions = await getSanctionsForTournament(uid);
