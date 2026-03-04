@@ -15,6 +15,13 @@
     { q: "Can I run finals with fewer than 5 players?", a: "No. Finals require exactly 5 eligible (non-DQ'd) players. If a DQ'd player is in the top 5, the 6th-place player takes their spot." },
     { q: "I finished the tournament but the scores are wrong — what now?", a: "Use **Reopen Tournament** to go back to Waiting state, fix the scores, and finish again. Ratings recompute automatically." },
     { q: "Do I need to run finals?", a: "No. Some events skip finals — typically league events or tournaments that didn't complete all planned rounds. Players still receive base rating points — only the finalist bonus (winner/runner-up) requires finals." },
+    { q: "How does staggered seating work for 6, 7, or 11 players?", a: "Not everyone plays every round. Extra rounds are added automatically and players rotate sitting out, with those who have the fewest games played prioritized for the next round. This ensures everyone gets a fair number of games." },
+    { q: "When are events pushed to VEKN?", a: "When you finish a tournament that has a VEKN event ID, results are pushed automatically. If the push fails, it retries periodically in the background. The winner's deck is also submitted to the TWDA." },
+    { q: "Can I delete a tournament?", a: "Yes, but only in **Planned** state (before registration opens). Any organizer or IC member can delete. Use **Reopen Tournament** to fix issues on finished events." },
+    { q: "What is the difference between Remove Player and Drop Out?", a: "**Remove Player** is for players who haven't played any rounds. If they've already played, use **Drop Out** instead — it preserves their scores but excludes them from future seating." },
+    { q: "A player is disqualified — what happens?", a: "DQ removes them from future rounds and blocks check-in. Existing scores stay. If currently seated, unseat them first and handle the table via **Override**. If the DQ'd player was in the top 5, the 6th-place player qualifies for finals. DQ can be lifted." },
+    { q: "How do I handle a multi-day tournament?", a: "Between days, use **Reset Check-In** and run fresh check-in the next morning. Use **Go Offline** if the venue has unreliable internet." },
+    { q: "What does decklists mode control?", a: "Controls which decks become visible to all members after the tournament finishes. **Winner** = only winner's deck. **Finalists** = top 5. **All** = every submitted deck. Changeable at any time." },
   ];
 </script>
 
@@ -28,8 +35,8 @@ This guide walks you through running a tournament with Archon — from setup to 
 Go to **Tournaments** and tap **+ New Tournament**. Fill in:
 
 - **Name**: displayed to players on the tournament page
-- **Format**: Constructed, Limited, V5, or Draft
-- **Rank**: VEKN ranking tier (Basic, NC, CC, etc.)
+- **Format**: Standard, V5, or Limited
+- **Rank**: Standard (default), National Championship, or Continental Championship — rank affects rating point multipliers
 - **Date & Time**: start time with timezone. Finish time is optional — useful for players planning their day, but not required.
 - **Location**: country, city, venue, address — or mark as **Online**
 - **Max Rounds**: number of preliminary rounds (2–4 when VEKN push is enabled)
@@ -38,13 +45,17 @@ Go to **Tournaments** and tap **+ New Tournament**. Fill in:
 > **NOTE**
 > Once the first round begins, **name**, **format**, **rank**, and **online** are locked. Max rounds becomes immutable once results have been pushed to VEKN.
 
+### Deleting a Tournament
+
+A tournament can only be deleted while in **Planned** state — before registration opens. Any organizer or IC member can delete. Deletion is permanent and requires confirmation — there is no undo.
+
 ### VEKN Calendar
 
 Most organizers push to VEKN early so the event appears on the calendar and players can plan ahead. Tap **Push to VEKN** from the Overview tab to create the calendar entry.
 
-Alternatively, if you created the event on the VEKN website first, it will sync to Archon automatically. Avoid creating the event in both places — duplicates are confusing and hard to resolve.
+Alternatively, if you created the event on the VEKN website first, it will sync to Archon automatically. **Avoid creating the event in both places** — duplicates are confusing and hard to resolve.
 
-All players must have VEKN IDs before final results can be pushed. When you finish the tournament, results are uploaded automatically. Failed pushes are retried hourly in the background.
+When you finish the tournament, results are uploaded automatically. Failed pushes are retried hourly in the background.
 
 ### Configuration
 
@@ -103,7 +114,7 @@ In the **Config** tab you can adjust settings at any time unless noted otherwise
 
 ### Co-organizers
 
-Tap **Add Co-organiser** from the tournament page to grant another user full organizer permissions. Co-organisers have equal access — there is no hierarchy. Remove them at any time.
+Tap **Add Co-organiser** from the tournament page to grant another user full organizer permissions. Co-organisers have equal access — there is no hierarchy. Remove them at any time. IC (Inner Circle) members automatically have organizer access to all tournaments.
 
 For larger events, having co-organizers is essential: they can help with check-in, scoring, and handling issues at different tables. For multi-judge events (tournament rules recommend 6 judges when judges are playing), co-organizers also serve as judges with full app access.
 
@@ -121,9 +132,12 @@ From **Overview**, tap **Open Registration**. Players can now self-register from
 </ExampleBox>
 
 {@html renderGuideSection(`
+> **TIP**
+> All players should link their VEKN ID before the tournament finishes, so results can be pushed to VEKN.
+
 **Planning ahead**: For events where you need to size the venue, estimate catering, or cap attendance, open registration days or weeks in advance. The player list builds up and gives you a headcount.
 
-**Walk-in events**: If your event is small and everyone registers on-site, you can skip early registration entirely. Open registration, let people sign up on their phones, then move straight to check-in. You can even use **Add Player** to register people manually if they have trouble with the app.
+**Walk-in events**: If your event is small and everyone registers on-site, you can skip early registration entirely. **Move straight to check-in** — checking in an unregistered player registers and checks them in at the same time, which is the ideal workflow for small walk-in events.
 
 As organizer, you can manually add or remove players at any time, whether or not registration is open.
 
@@ -201,7 +215,7 @@ Players showing up after check-in is common. Use **Add Player** to add them — 
 - Players with an active **disqualification** or **suspension** cannot be checked in, even by you.
 - If "Decklist required" is enabled and a player has no deck, they get a **missing decklist** warning badge. This is a warning only — it does not block check-in (see [Deck Management](#deck-management)).
 
-If you moved to check-in too early and need to go back, use **Reopen Registration** to revert to Registration state. All checked-in players are reset to Registered.
+If you moved to check-in too early and need to go back, use **Reopen Registration** to revert to Registration. All checked-in players are reset to Registered.
 `)}
 
 <ExampleBox>
@@ -219,7 +233,7 @@ If you moved to check-in too early and need to go back, use **Reopen Registratio
 
 When enabled, players without a deck see a warning badge. This is intentionally non-blocking — the goal is to surface missing decklists so you and the player can address it, not to prevent anyone from playing.
 
-In practice: some players will deliver a paper decklist, others may forget, and that's between the player and the judge. The app flags the issue; what you do about it is your call. You can review who has and hasn't uploaded a deck from the **Decks** tab and issue warnings per the judge's guide if needed.
+In practice: some players will deliver a paper decklist, others may forget, and that's between the player and the judge. The app flags the issue; what you do about it is your call. You can review who has and hasn't uploaded a deck from the **Decks** tab and issue warnings per the [judge's guide](/help/judges-guide) if needed.
 
 ### How Players Submit Decks
 
@@ -239,19 +253,49 @@ Decks follow a lifecycle:
 
 ### Organizer Deck Tools
 
-From the **Decks** tab, you can:
+From the **player list**, you can:
 
 - View all player decks (once the first round has started)
 - Upload, replace, or delete decks on behalf of any player
 - Manage multideck round slots
 
-You bypass all timing restrictions — you can modify decks at any stage, including after the tournament finishes.
+Organizers can modify decks at any stage, including after the tournament finishes — but cannot see deck contents until the first round begins.
+
+## Understanding Standings and Scoring
+
+Standings are computed automatically from VP scores. Here's how the numbers work:
+
+### Victory Points (VP)
+
+VP are reported in 0.5 increments and validated against an oust-order simulation — impossible VP distributions are rejected. The total VP at a table must equal the number of players at the table.
+
+### GW, TP, and Standings Order
+
+A player earns a **Game Win (GW)** when their VP is **at least 2.0** and **strictly the highest** at the table. VP ties at 2.0 or above do not award a GW to either player.
+
+**Tournament Points (TP)** are position-based. Ties average their positions' values:
+
+- **5-player table**: 60 / 48 / 36 / 24 / 12
+- **4-player table**: 60 / 48 / 24 / 12 — the missing 36 position is the "table bye"
+
+Players are ranked by **GW > VP > TP** (in that priority).
+
+### Standings Adjustment (SA) Effect
+
+A −1 VP penalty is applied to the adjusted round. If the player's raw VP in that round is less than 1.0, the shortfall (1.0 − raw VP) overflows as a deduction from their total standings VP. SA can change GW and TP results for that round.
+
+### Finals Scoring Differences
+
+In finals, the GW rules differ from preliminary rounds:
+
+- **No 2.0 VP threshold** — the player with the highest VP always gets the GW
+- **VP ties broken by seed order** — the higher-seeded player (better preliminary ranking) wins
 
 ## Running Rounds
 
 ### Starting a Round
 
-Tap **Start Round** from the Overview tab. Archon seats players automatically using the VEKN seating algorithm — a simulated annealing optimization over 9 fairness rules (see [Seating Rules Reference](#seating-rules-reference) below).
+Tap **Start Round** from the Overview tab. Archon seats players automatically using the VEKN seating algorithm, which optimizes 9 fairness rules (see [Seating Rules Reference](#seating-rules-reference) below).
 `)}
 
 <ExampleBox>
@@ -266,13 +310,13 @@ Tap **Start Round** from the Overview tab. Archon seats players automatically us
 - At least **4 checked-in** players
 - Not exceeding **max rounds**
 
-> **IMPORTANT**
-> Exactly **6, 7, or 11** checked-in players cannot be seated into valid tables of 4–5. Adjust attendance (add or drop a player) before starting.
+> **NOTE - STAGGERED SEATING**
+> For player counts that don't divide evenly into tables of 4–5 (e.g. 6, 7, or 11), Archon uses **staggered seating**: extra rounds are added automatically and players rotate sitting out. Players with the fewest games played are prioritized for the next round, so everyone gets a fair number of games.
 
 When a round starts:
 
-- Any Registered (not checked-in) players are **automatically dropped** (set to Finished). This is why check-in matters.
-- The seating quality is displayed: **Perfect**, **OK** (minor rule compromises), or **Invalid** (with a rule-by-rule R1–R9 breakdown).
+- Any Registered (not checked-in) players are **automatically dropped** (set to Finished).
+- The seating quality is displayed: **Perfect**, **OK**, or **Invalid** (with an R1–R9 breakdown).
 
 ### Viewing Tables
 
@@ -332,6 +376,7 @@ The standard workflow is **player self-reporting**: players enter their own VP a
 - **Players** can enter VP in 0.5 increments from 0 to the table size, but cannot enter (table size − 0.5). Self-reporting is blocked if the table has an override.
 - **Organizers** can force any VP value — the table state becomes "Invalid" if scores don't add up.
 - VP scores are validated via oust-order simulation. Invalid distributions are rejected for non-organizers.
+- On 4-player tables, TP values are 60/48/24/12. The missing 36 position is the "table bye."
 
 ### Override
 
@@ -372,7 +417,11 @@ This is invaluable for online events where you can't physically walk between tab
 `)}
 
 <ExampleBox>
-  <div class="space-y-2 max-w-sm">
+  <div class="space-y-3 max-w-sm">
+    <button class="px-2 py-1 text-xs text-amber-400 border border-amber-800 rounded-lg flex items-center gap-1">
+      <Gavel class="w-3 h-3" />
+      Call Judge
+    </button>
     <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <Gavel class="w-5 h-5 text-amber-400 shrink-0" />
@@ -403,7 +452,7 @@ This is invaluable for online events where you can't physically walk between tab
 {@html renderGuideSection(`
 ### Finishing a Round
 
-Tap **End Round** when all tables are scored. Every table must be Finished or have an Override. Standings are recalculated.
+Tap **End Round** when all tables are scored. Every table must be Finished or have an Override. Standings update only when a round ends — during a round, standings reflect previous rounds only.
 `)}
 
 <ExampleBox>
@@ -419,7 +468,7 @@ After ending a round, the tournament returns to **Waiting** state. Decide whethe
 
 ### Drop Outs
 
-If a player needs to leave, use **Drop Out** to mark them as Finished. Either the player or you can trigger this. If they're mid-game, use **Unseat** to remove them from the table first, then resolve scoring with an Override if needed.
+If a player needs to leave, use **Drop Out** to mark them as Finished. Either the player or you can trigger this. For handling mid-round drops (unseating, table adjustments, overrides), see the [judge's guide](/help/judges-guide#51-event-organization-unexpected-drop).
 
 ### Cancelling a Round
 
@@ -522,7 +571,7 @@ Open a player's profile from the player list and tap **Add Sanction**. Select th
 
 Archon shows **escalation hints** suggesting the appropriate level based on prior infractions. If you select a level below the suggestion, a **downgrade warning** appears — you can still proceed.
 
-These escalation guidelines come from the judge's guide. The app does not enforce them — it is up to the head judge to decide. That said, judges should not deviate from the guidelines without head judge approval, and the head judge should be conservative about deviations. Archon does not track head judge versus other judges; that's for you to manage between co-organizers.
+These escalation guidelines come from the [judge's guide](/help/judges-guide). The app does not enforce them — it is up to the head judge to decide. That said, judges should not deviate from the guidelines without head judge approval, and the head judge should be conservative about deviations. Archon does not track head judge versus other judges; that's for you to manage between co-organizers.
 
 ### Standings Adjustment Details
 
@@ -598,7 +647,7 @@ Requirements:
 
 Tap **Start Finals**. The top 5 are selected by GW > VP > TP > toss. DQ'd players are skipped (so the 6th-place player may qualify if a top-5 player was DQ'd).
 
-After selecting the finalists, conduct the **VEKN card-drawing procedure** ("the seating dance") as described in the tournament rules, then input the resulting seating order into Archon.
+After selecting the finalists, conduct the **VEKN card-drawing procedure**: the top seed draws a random card to determine starting position, then picks their seat. Remaining players pick seats in reverse standing order. Input the resulting seating order into Archon.
 
 ### Altering Finals Seating
 
@@ -680,7 +729,7 @@ After the tournament finishes, several export options are available:
 {@html renderGuideSection(`
 - **Share Image** — generates a social-media-friendly PNG card (1080×1350) with tournament details, winner, and top-5 standings. Great for posting to Discord or community forums.
 - **Copy Text** — copies markdown-formatted results to clipboard (includes standings and winner's decklist)
-- **Download Report (JSON)** — organizer-only. Downloads a structured JSON export of the tournament data (standings, rounds, scores).
+- **Download Report (JSON)** — organizer-only. Downloads a structured JSON export of the tournament data.
 
 ## Raffle
 
@@ -721,7 +770,7 @@ Run prize draws from the **Raffle** section — common at medium and large event
 {@html renderGuideSection(`
 ## Offline Mode
 
-Many VTES events take place in venues with unreliable internet — game stores in basements, underground bars, or just buildings with thick walls and no mobile signal. Archon supports full offline operation for these situations.
+Many VTES events take place in venues with unreliable internet — game store basements or buildings with no mobile signal. Archon supports full offline operation for these situations.
 
 ### Preparing
 
@@ -742,7 +791,7 @@ You can prepare at home: load the tournament, go offline, then close the app. Wh
 
 ### Running Offline
 
-Run the tournament normally. All changes are stored locally. When your device has intermittent connectivity, Archon periodically saves a backup to the server (every 30 seconds), but the tournament stays in offline mode until you explicitly go back online.
+Run the tournament normally. All changes are stored locally. When your device has intermittent connectivity, Archon periodically saves a backup to the server (every 30 seconds), but the tournament stays in offline mode until you explicitly go back online. The periodic backup is a safety net, not live sync — other users see the backup state (read-only), not real-time updates.
 
 ### Going Back Online
 
@@ -776,6 +825,38 @@ Import tournament data from legacy Archon spreadsheets (.xlsx format). This is u
 3. Upload the completed spreadsheet
 
 Archon matches players by VEKN ID first, then by email. Unmatched players are created as new accounts. If the tournament already has rounds, you'll be asked to confirm before overwriting.
+
+## League Integration
+
+Leagues group a series of tournaments with aggregated standings — common for regional circuits, seasonal series, or national championships. Only NC (National Coordinator) or IC members can create leagues.
+
+### Linking a Tournament to a League
+
+In the **Config** tab, use the **League** dropdown to link a tournament to an active league. If the league has a format set, the tournament format must match.
+
+### Standings Modes
+
+Leagues support three standings calculation modes:
+
+- **RTP (Rating Points)** — sums rating points across all tournaments in the league, including finals.
+- **Score** — sums GW, VP, and TP from preliminary rounds only. Finals are excluded.
+- **GP (Grand Prix)** — position-based points awarded per tournament: Winner = 25, 2nd–5th = 15, 6th = 10, decreasing to 11th+ = 3. Includes finals.
+
+### Meta-leagues
+
+Leagues can form a parent/child hierarchy (max 2 levels deep). A meta-league aggregates standings from all its child leagues.
+
+### League Organizers
+
+League organizers work the same way as tournament co-organizers — equal access, no hierarchy. You cannot remove the last organizer.
+
+### League-wide Disqualification
+
+A DQ in one league tournament blocks check-in to **all other tournaments** in the same league. League organizers can lift DQs.
+
+### Dates and Status
+
+Leagues have start and finish dates. No finish date means the league is ongoing.
 
 ## Seating Rules Reference
 
