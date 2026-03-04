@@ -104,7 +104,7 @@ In the **Config** tab you can adjust settings at any time unless noted otherwise
     <h4 class="text-sm font-semibold text-bone-100 mb-2">Other Settings</h4>
     <dl class="space-y-1.5 text-sm">
       <div><dt class="text-ash-300 inline font-medium">Max Rounds</dt> <dd class="text-ash-400 inline">— cannot go below completed rounds; locked once pushed to VEKN</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">League</dt> <dd class="text-ash-400 inline">— link to an active league (grouping only, no effect on scoring)</dd></div>
+      <div><dt class="text-ash-300 inline font-medium">League</dt> <dd class="text-ash-400 inline">— link to an active league (only league organizers, IC, or NC for same-country leagues)</dd></div>
       <div><dt class="text-ash-300 inline font-medium">Table Rooms</dt> <dd class="text-ash-400 inline">— room names for table ranges in multi-room venues</dd></div>
     </dl>
   </div>
@@ -845,7 +845,7 @@ Only NC (National Coordinator) or IC members can create leagues. Go to **Leagues
 
 ### Linking a Tournament to a League
 
-In the tournament **Config** tab, use the **League** dropdown to link a tournament to an active league.
+In the tournament **Config** tab, use the **League** dropdown to link a tournament to an active league. Only league organizers can link a tournament to a league — IC members can link to any league, and NC members can link to leagues in their country.
 
 ### Standings Modes
 
