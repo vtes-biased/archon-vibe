@@ -9,7 +9,7 @@
   import { Loader2, Trophy, Calendar, Copy, Check } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
   let tournaments = $state<Tournament[]>([]);
   let totalCount = $state(0);

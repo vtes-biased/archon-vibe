@@ -66,3 +66,66 @@ IT: "round" is kept as loanword (not "turno"). IT finals = "Finali" (plural) for
 - `help_toc_title`: fr=Sommaire, es=Contenido, pt=Sumário, it=Indice
 - `help_back_to_list`: fr=Retour à l'aide, es=Volver a la ayuda, pt=Voltar à ajuda, it=Torna alla guida
 - `nav_help`: fr=Aide, es=Ayuda, pt=Ajuda, it=Guida
+
+## Extended Key Naming Conventions
+- `pg_*` — Player Guide sections
+- `og_*` — Organizer Guide sections
+- `og_cfg_*` — Organizer Guide config tab descriptions
+- `og_faq_q_*` / `og_faq_a_*` — FAQ questions/answers
+- `help_player_guide_*` / `help_organizer_guide_*` — guide index entries
+
+## VTES Term Glossary (Spanish)
+- tournament = torneo, round = ronda, standings = clasificación
+- check-in = registro de asistencia (noun), hacer check-in (verb)
+- deck/decklist = mazo / lista de mazo (but keep "deck" for UI labels)
+- player = jugador, organizer = organizador, judge = juez
+- finals = finales, seed = cabeza de serie, toss = sorteo
+- override = anulación, sanction = sanción
+- caution = advertencia verbal, warning = advertencia
+- disqualification = descalificación, standings adjustment = ajuste de clasificación
+- raffle = sorteo, league = liga, offline mode = modo sin conexión
+- game win (GW) = victoria de partida, predator = depredador, prey = presa
+- drop out = retirar/retirarse, remove player = eliminar jugador
+- Use "usted" (formal) for addressing users
+
+## VTES Term Glossary (Brazilian Portuguese / pt)
+- tournament = torneio, round = rodada, standings = classificação
+- check-in = check-in (keep), deck/decklist = deck / lista de deck
+- player = jogador, organizer = organizador, judge = juiz
+- finals = final, seed = cabeça de chave, toss = sorteio
+- override = substituição, sanction = sanção
+- caution = advertência verbal, warning = advertência
+- disqualification = desqualificação, standings adjustment = ajuste de classificação
+- raffle = sorteio, league = liga, offline mode = modo offline
+- GW = vitória de partida, predator = predador, prey = presa
+- drop out = desistir, remove player = remover jogador
+- Use "você" (not "tu")
+
+## VTES Term Glossary (Italian)
+- tournament = torneo, round = round (keep English)
+- standings = classifica, check-in = check-in (keep)
+- deck/decklist = deck / lista del mazzo
+- player = giocatore, organizer = organizzatore, judge = giudice
+- finals = finale/finali, seed = testa di serie, toss = sorteggio
+- override = override (keep), sanction = sanzione
+- caution = avvertimento verbale, warning = avvertimento
+- disqualification = squalifica, standings adjustment = aggiustamento di classifica
+- raffle = estrazione, league = campionato, offline mode = modalità offline
+- predator = predatore, prey = preda
+- GW/VP/TP kept as abbreviations
+- "league" = "campionato" (confirmed: nav_leagues = "Campionati" in existing it.json)
+- Use polite forms ("Lei") where addressing users
+
+## Terms to Keep in English (all languages)
+VEKN, VP, GW, TP, TWDA, VDB, Archon, Discord, Markdown, IndexedDB, QR,
+Constructed, Limited, Standard, Grand Prix, Inner Circle (IC), NC, Prince,
+passkey, multideck
+
+## File Size Note
+en.json exceeds 25000 token read limit. Use:
+  python3 -c "import json; ..." to extract keys, or read with offset+limit (200 lines at a time).
+
+## Bulk Translation Workflow
+1. Extract missing keys: `python3 -c "import json; en=json.load(open('en.json')); xx=json.load(open('xx.json')); print([k for k in en if k not in xx])"`
+2. Prepare translations dict in Python, `xx.update(translations)`, write back with `json.dump(..., ensure_ascii=False, indent=2)` + trailing newline `'\n'`
+3. Validate: `python3 -c "import json; json.load(open('xx.json')); print('ok')"`

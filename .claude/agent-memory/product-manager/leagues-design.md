@@ -1,10 +1,10 @@
 # Phase 2: Leagues — Design Notes
 
-## Legacy Archon Reference
-- Backend: `/Users/lionelpanhaleux/dev/perso/archon/src/archon/app/api/league.py`
-- Models: `/Users/lionelpanhaleux/dev/perso/archon/src/archon/models.py` lines 75-84, 228-232, 301-420
-- Standings computation: `/Users/lionelpanhaleux/dev/perso/archon/src/archon/db.py` lines 1403-1509
-- Frontend: `/Users/lionelpanhaleux/dev/perso/archon/src/front/league.ts`
+## Legacy Archon Reference (separate repo: archon)
+- Backend: `src/archon/app/api/league.py`
+- Models: `src/archon/models.py` lines 75-84, 228-232, 301-420
+- Standings computation: `src/archon/db.py` lines 1403-1509
+- Frontend: `src/front/league.ts`
 
 ## League Model Fields
 ```
@@ -32,7 +32,7 @@ allow_no_finals (hint for Score leagues)
 ### GP (Grand Prix)
 - Position-based: Winner=25, Finalists=15, 6th-10th=10..6, 11th+=3
 - Sum across tournaments, rank by total desc
-- From legacy: `/Users/lionelpanhaleux/dev/perso/archon/src/archon/engine.py` lines 1242-1258
+- From legacy archon: `src/archon/engine.py` lines 1242-1258
 
 ## Architecture Decision: Standings Not in SSE
 - League SSE payload = config only (lean)

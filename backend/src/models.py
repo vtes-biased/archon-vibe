@@ -176,6 +176,31 @@ BASELINE_PENALTIES: dict[SanctionSubcategory, SanctionLevel] = {
 }
 
 
+class CommunityLinkType(StrEnum):
+    """Types of community links officials can share."""
+
+    DISCORD = "discord"
+    TELEGRAM = "telegram"
+    WHATSAPP = "whatsapp"
+    FORUM = "forum"
+    FACEBOOK = "facebook"
+    WEBSITE = "website"
+    TWITCH = "twitch"
+    YOUTUBE = "youtube"
+    REDDIT = "reddit"
+    INSTAGRAM = "instagram"
+    BLOG = "blog"
+    OTHER = "other"
+
+
+class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
+    """A community resource link shared by an official."""
+
+    type: CommunityLinkType
+    url: str
+    label: str = ""
+
+
 class TimeExtensionPolicy(StrEnum):
     """Time extension method per VEKN Judges Guide v2 section 1.2.4."""
 
@@ -260,7 +285,11 @@ class User(BaseObject, kw_only=True):
     # Contact info (visible based on role-based access rules)
     contact_email: str | None = None
     contact_discord: str | None = None  # Discord handle
-    contact_phone: str | None = None  # WhatsApp/phone
+    contact_phone: str | None = None
+    phone_is_whatsapp: bool = False
+
+    # Community links (officials only: NC/Prince/IC)
+    community_links: list[CommunityLink] = msgspec.field(default_factory=list)
 
     # Cooptation tracking (who granted VEKN membership)
     coopted_by: str | None = None  # user_uid of Prince/NC/IC who granted VEKN ID

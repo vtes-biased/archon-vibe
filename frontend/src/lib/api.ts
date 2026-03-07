@@ -10,7 +10,7 @@ import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
 import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
 import { addOfflineDeckUid } from '$lib/db';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /**
  * API error class with message extraction.

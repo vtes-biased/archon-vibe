@@ -6,7 +6,7 @@ import type { VtesCard } from '$lib/types';
 import { getDB } from './db';
 import { normalizeSearch } from './utils';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /** In-memory card map: id → card */
 let cardsMap: Map<number, VtesCard> | null = null;

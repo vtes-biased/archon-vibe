@@ -8,6 +8,7 @@
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
+  import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -551,6 +552,33 @@
           {/if}
 
           <SanctionsManager {user} canIssueSanctions={false} inline={true} />
+
+          {#if user.contact_email || user.contact_discord || user.contact_phone}
+            <div class="mt-3 pt-3 border-t border-ash-700 space-y-1">
+              <span class="font-medium text-ash-400">{m.profile_contact()}:</span>
+              {#if user.contact_email}
+                <div class="flex items-center gap-2">
+                  <a href="mailto:{user.contact_email}" class="text-crimson-500 hover:text-crimson-400 text-sm">{user.contact_email}</a>
+                </div>
+              {/if}
+              {#if user.contact_discord}
+                <div class="text-sm">{m.profile_contact_discord()}: {user.contact_discord}</div>
+              {/if}
+              {#if user.contact_phone}
+                {#if user.phone_is_whatsapp}
+                  <a href="https://wa.me/{user.contact_phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-sm text-crimson-500 hover:text-crimson-400">WhatsApp: {user.contact_phone}</a>
+                {:else}
+                  <div class="text-sm">{user.contact_phone}</div>
+                {/if}
+              {/if}
+            </div>
+          {/if}
+
+          {#if user.community_links?.length}
+            <div class="mt-3 pt-3 border-t border-ash-700">
+              <CommunityLinkPills links={user.community_links} />
+            </div>
+          {/if}
         </div>
       </div>
 

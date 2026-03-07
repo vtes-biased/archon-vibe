@@ -14,7 +14,7 @@
 
   import * as m from '$lib/paraglide/messages.js';
 
-  const API_BASE = import.meta.env.VITE_API_URL || "";
+  const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
   let {
     tournament = $bindable(),

@@ -20,6 +20,14 @@ export type Role =
 
 export type AuthMethodType = "email" | "discord" | "passkey";
 
+export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | "facebook" | "website" | "twitch" | "youtube" | "reddit" | "instagram" | "blog" | "other";
+
+export interface CommunityLink {
+  type: CommunityLinkType;
+  url: string;
+  label: string;
+}
+
 export type SanctionLevel = "caution" | "warning" | "standings_adjustment" | "disqualification" | "suspension" | "probation";
 
 export type SanctionCategory =
@@ -162,7 +170,11 @@ export interface User extends BaseObject {
   // Contact info (visible based on role-based access rules)
   contact_email?: string | null;
   contact_discord?: string | null; // Discord handle
-  contact_phone?: string | null; // WhatsApp/phone
+  contact_phone?: string | null;
+  phone_is_whatsapp?: boolean;
+
+  // Community links (officials only)
+  community_links?: CommunityLink[];
 
   // Cooptation tracking (who granted VEKN membership)
   coopted_by?: string | null; // user_uid of Prince/NC/IC who granted VEKN ID

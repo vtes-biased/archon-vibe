@@ -5,7 +5,7 @@
  * Persists tokens in localStorage and handles automatic refresh.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 import type { User } from "$lib/types";
 import { syncManager } from "$lib/sync";
 
@@ -376,7 +376,10 @@ export interface ProfileUpdate {
   city?: string;
   city_geoname_id?: number | null;
   contact_email?: string;
+  contact_discord?: string;
   contact_phone?: string;
+  phone_is_whatsapp?: boolean;
+  community_links?: { type: string; url: string; label: string }[];
 }
 
 /**

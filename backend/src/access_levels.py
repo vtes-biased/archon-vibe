@@ -20,7 +20,8 @@ _USER_PUBLIC_FIELDS = {
     "roles",
     "vekn_prefix",
 }
-_USER_PUBLIC_CONTACT = {"contact_email", "contact_discord", "contact_phone"}
+_USER_CONTACT_FIELDS = {"contact_email", "contact_discord", "contact_phone", "phone_is_whatsapp"}
+_USER_COMMUNITY_LINKS = {"community_links"}
 _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
     | {"vekn_id", "city", "city_geoname_id", "state", "nickname", "avatar_path"}
@@ -33,7 +34,7 @@ _USER_MEMBER_FIELDS = (
         "wins",
     }
 )
-_USER_FULL_EXTRA = _USER_PUBLIC_CONTACT | {
+_USER_FULL_EXTRA = _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS | {
     "coopted_by",
     "coopted_at",
     "vekn_synced",
@@ -52,18 +53,31 @@ def _pick(d: dict, keys: set[str]) -> dict:
 def compute_user_public(d: dict) -> dict | None:
     """Public projection for User.
 
-    Only NC/Prince users get a public representation.
-    Includes contact info for NC/Prince so non-members can reach organizers.
+    NC/Prince: public fields + contact info + community_links
+    IC: public fields + community_links only (no contact info)
+    Others: hidden
     """
     roles = d.get("roles", [])
-    if Role.NC not in roles and Role.PRINCE not in roles:
-        return None
-    result = _pick(d, _USER_PUBLIC_FIELDS | _USER_PUBLIC_CONTACT)
-    return result
+    if Role.NC in roles or Role.PRINCE in roles:
+        return _pick(d, _USER_PUBLIC_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
+    if Role.IC in roles:
+        return _pick(d, _USER_PUBLIC_FIELDS | _USER_COMMUNITY_LINKS)
+    return None
 
 
 def compute_user_member(d: dict) -> dict:
-    """Member projection for User. All users visible, no contact info."""
+    """Member projection for User.
+
+    All users visible with identity + rating fields.
+    NC/Prince: also get contact info + community_links (fixes bug where
+    members saw less than anonymous users).
+    IC: also get community_links (no contact — IC contact is restricted).
+    """
+    roles = d.get("roles", [])
+    if Role.NC in roles or Role.PRINCE in roles:
+        return _pick(d, _USER_MEMBER_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
+    if Role.IC in roles:
+        return _pick(d, _USER_MEMBER_FIELDS | _USER_COMMUNITY_LINKS)
     return _pick(d, _USER_MEMBER_FIELDS)
 
 

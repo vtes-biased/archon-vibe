@@ -3,9 +3,8 @@
   import { onMount } from "svelte";
   import {
     getAuthState, setAuthState, getAccessToken, logout,
-    updateProfile, initAuth, storeTokensFromCallback, hasAnyRole,
+    initAuth, storeTokensFromCallback, hasAnyRole,
     requestMagicLink,
-    type ProfileUpdate,
   } from "$lib/stores/auth.svelte";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
@@ -16,18 +15,16 @@
   import * as m from '$lib/paraglide/messages.js';
 
   import ProfileView from "./ProfileView.svelte";
-  import ProfileEdit from "./ProfileEdit.svelte";
   import LinkedAccounts from "./LinkedAccounts.svelte";
   import AppSettings from "./AppSettings.svelte";
   import DeveloperSection from "./DeveloperSection.svelte";
   import DataSection from "./DataSection.svelte";
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
   const auth = $derived(getAuthState());
   const isDev = $derived(hasAnyRole('DEV', 'IC'));
 
-  let isEditing = $state(false);
   let discordMessage = $state("");
   let discordError = $state("");
   let passkeyMessage = $state("");
@@ -94,11 +91,6 @@
   async function handleLogout() {
     await logout();
     goto("/login");
-  }
-
-  async function handleSaveProfile(data: ProfileUpdate) {
-    const success = await updateProfile(data);
-    if (success) isEditing = false;
   }
 
   async function handleRegisterPasskey() {
@@ -190,39 +182,34 @@
     {:else}
       {@const user = auth.user}
 
-      {#if isEditing}
-        <ProfileEdit {user} error={auth.error} onSave={handleSaveProfile} onCancel={() => (isEditing = false)} />
-      {:else}
-        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800">
-          <ProfileView
-            {user}
-            {avatarCacheBust}
-            onEdit={() => (isEditing = true)}
-            onAvatarClick={() => (showAvatarCropper = true)}
-            onAbandonVekn={() => (showAbandonConfirm = true)}
-            onClaimVekn={() => (showClaimModal = true)}
-          />
-          <LinkedAccounts
-            {hasEmail}
-            {emailIdentifier}
-            {hasDiscord}
-            {discordUsername}
-            {hasPasskey}
-            {discordMessage}
-            {discordError}
-            {passkeyMessage}
-            error={auth.error}
-            onLinkEmail={handleLinkEmail}
-            onLinkDiscord={handleLinkDiscord}
-            onRegisterPasskey={handleRegisterPasskey}
-          />
-          <AppSettings />
-          {#if isDev}
-            <DeveloperSection />
-          {/if}
-          <DataSection onResync={handleResync} onLogout={handleLogout} />
-        </div>
-      {/if}
+      <div class="bg-dusk-950 rounded-lg shadow border border-ash-800">
+        <ProfileView
+          {user}
+          {avatarCacheBust}
+          onAvatarClick={() => (showAvatarCropper = true)}
+          onAbandonVekn={() => (showAbandonConfirm = true)}
+          onClaimVekn={() => (showClaimModal = true)}
+        />
+        <LinkedAccounts
+          {hasEmail}
+          {emailIdentifier}
+          {hasDiscord}
+          {discordUsername}
+          {hasPasskey}
+          {discordMessage}
+          {discordError}
+          {passkeyMessage}
+          error={auth.error}
+          onLinkEmail={handleLinkEmail}
+          onLinkDiscord={handleLinkDiscord}
+          onRegisterPasskey={handleRegisterPasskey}
+        />
+        <AppSettings />
+        {#if isDev}
+          <DeveloperSection />
+        {/if}
+        <DataSection onResync={handleResync} onLogout={handleLogout} />
+      </div>
     {/if}
   </div>
 </div>

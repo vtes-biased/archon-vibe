@@ -9,8 +9,26 @@
   import VeknManagement from "$lib/components/VeknManagement.svelte";
   import SanctionsManager from "$lib/components/SanctionsManager.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
-  import { Loader2 } from "lucide-svelte";
+  import { Loader2, Share2, Check } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
+
+  let copied = $state(false);
+
+  async function shareProfile() {
+    if (!user) return;
+    const url = `${window.location.origin}/users/${user.uid}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: user.name, url });
+        return;
+      } catch { /* user cancelled */ }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = true;
+      setTimeout(() => { copied = false; }, 2000);
+    } catch { /* noop */ }
+  }
 
   let user = $state<User | undefined>();
   let isOnline = $state(navigator.onLine);
@@ -101,6 +119,20 @@
       <span class="ml-2">{m.common_loading()}</span>
     </div>
   {:else}
+    <div class="flex items-center justify-between mb-2">
+      <div></div>
+      <button
+        onclick={shareProfile}
+        class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
+        title={m.profile_share()}
+      >
+        {#if copied}
+          <Check class="w-5 h-5 text-emerald-400" />
+        {:else}
+          <Share2 class="w-5 h-5" />
+        {/if}
+      </button>
+    </div>
     <UserComponent
       {user}
       mode="view"

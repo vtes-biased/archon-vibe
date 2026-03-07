@@ -36,7 +36,7 @@ import {
 import { getAccessToken } from '$lib/stores/auth.svelte';
 import { isOffline, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'deck' | 'league' | 'judge_call' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
 

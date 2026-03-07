@@ -16,7 +16,7 @@
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
   const auth = $derived(getAuthState());
   const passkeySupported = $derived(isPasskeySupported());

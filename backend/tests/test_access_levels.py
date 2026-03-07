@@ -26,6 +26,7 @@ def _make_user(**overrides) -> dict:
         "contact_email": "alice@example.com",
         "contact_discord": "alice#1234",
         "contact_phone": "+33612345678",
+        "community_links": [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}],
         "coopted_by": "u-prince",
         "coopted_at": "2025-01-01T00:00:00",
         "vekn_synced": True,
@@ -91,10 +92,24 @@ class TestUserPublic:
         assert "wins" not in result
         assert "calendar_token" not in result
 
-    def test_ic_user_without_nc_prince_hidden(self):
-        """IC user without NC/Prince role is hidden at public level."""
+    def test_nc_includes_community_links(self):
+        """NC public projection includes community_links."""
+        user = _make_user(roles=["NC"])
+        result = compute_public(ObjectType.USER, user)
+        assert result is not None
+        assert result["community_links"] == [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}]
+
+    def test_ic_user_visible_with_community_links_only(self):
+        """IC user gets public representation with community_links but no contact info."""
         user = _make_user(roles=["IC"])
-        assert compute_public(ObjectType.USER, user) is None
+        result = compute_public(ObjectType.USER, user)
+        assert result is not None
+        assert result["roles"] == ["IC"]
+        assert result["community_links"] == [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}]
+        # IC should NOT have contact info at public level
+        assert "contact_email" not in result
+        assert "contact_discord" not in result
+        assert "contact_phone" not in result
 
     def test_deleted_user_preserves_deleted_at(self):
         """Deleted NC user still has deleted_at in public projection."""
@@ -137,11 +152,40 @@ class TestUserMember:
         assert result["constructed_online"] == {"total": 100, "tournaments": []}
         assert result["wins"] == ["t-001"]
 
-    def test_excludes_contact_info(self):
-        """Member projection does not include contact info."""
-        user = _make_user()
+    def test_excludes_contact_for_regular_users(self):
+        """Member projection does not include contact info for regular users."""
+        user = _make_user(roles=[])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
+        assert "contact_email" not in result
+        assert "contact_discord" not in result
+        assert "contact_phone" not in result
+        assert "community_links" not in result
+
+    def test_nc_includes_contact_and_community_links(self):
+        """Member projection includes contact info + community_links for NC."""
+        user = _make_user(roles=["NC"])
+        result = compute_member(ObjectType.USER, user)
+        assert result is not None
+        assert result["contact_email"] == "alice@example.com"
+        assert result["contact_discord"] == "alice#1234"
+        assert result["contact_phone"] == "+33612345678"
+        assert result["community_links"] == [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}]
+
+    def test_prince_includes_contact_and_community_links(self):
+        """Member projection includes contact info + community_links for Prince."""
+        user = _make_user(roles=["Prince"])
+        result = compute_member(ObjectType.USER, user)
+        assert result is not None
+        assert result["contact_email"] == "alice@example.com"
+        assert result["community_links"] == [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}]
+
+    def test_ic_includes_community_links_no_contact(self):
+        """Member projection includes community_links but no contact for IC."""
+        user = _make_user(roles=["IC"])
+        result = compute_member(ObjectType.USER, user)
+        assert result is not None
+        assert result["community_links"] == [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}]
         assert "contact_email" not in result
         assert "contact_discord" not in result
         assert "contact_phone" not in result

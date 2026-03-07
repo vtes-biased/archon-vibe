@@ -198,9 +198,10 @@
 }
 
 /* ── Banners (alert/info boxes) ── */
-.banner-emerald { background: rgb(6 78 59 / 0.2);  border-color: #065f46; }
-.banner-amber   { background: rgb(120 53 15 / 0.2); border-color: #92400e; }
-.banner-red     { background: rgb(127 29 29 / 0.2); border-color: #991b1b; }
+.banner-emerald { background: rgb(6 78 59 / 0.2);  border-color: #065f46; color: #6ee7b7; }
+.banner-amber   { background: rgb(120 53 15 / 0.2); border-color: #92400e; color: #fcd34d; }
+.banner-red     { background: rgb(127 29 29 / 0.2); border-color: #991b1b; color: #fca5a5; }
+.banner-blue    { background: rgb(30 58 138 / 0.2); border-color: #1e3a8a; color: #93c5fd; }
 
 /* ── Toasts ── */
 .toast-emerald { background: rgb(6 78 59 / 0.9);   border-color: #047857; color: #d1fae5; }
@@ -239,9 +240,10 @@ html.light {
         color: var(--color-ash-500);
     }
 
-    .banner-emerald { background: #ecfdf5; border-color: #a7f3d0; }
-    .banner-amber   { background: #fffbeb; border-color: #fde68a; }
-    .banner-red     { background: #fef2f2; border-color: #fecaca; }
+    .banner-emerald { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .banner-amber   { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    .banner-red     { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    .banner-blue    { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
 
     .toast-emerald { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
     .toast-amber   { background: #fffbeb; border-color: #fde68a; color: #92400e; }

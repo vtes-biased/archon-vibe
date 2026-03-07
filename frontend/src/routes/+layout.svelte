@@ -25,7 +25,7 @@
     { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: 'trophy' },
     { href: '/leagues', labelFn: () => m.nav_leagues(), icon: 'chart' },
     { href: '/rankings', labelFn: () => m.nav_rankings(), icon: 'ranking' },
-    { href: '/users', labelFn: () => m.nav_users(), icon: 'users' },
+    { href: '/users', labelFn: () => m.nav_community(), icon: 'users' },
     { href: '/help', labelFn: () => m.nav_help(), icon: 'help' },
     { href: '/profile', labelFn: () => m.nav_profile(), icon: 'user' },
   ];

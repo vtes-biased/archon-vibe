@@ -7,7 +7,7 @@
 
 import { getAccessToken, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 // Helper functions for base64url encoding/decoding
 function base64urlToBuffer(base64url: string): ArrayBuffer {

@@ -22,7 +22,7 @@ Standard Tailwind colors (emerald, amber, red, etc.) are **not** covered by the 
 |-------|-------|-----------|------------|
 | `badge-{color}` | Status pills, role tags | Dark tinted bg + light text | Light tinted bg + dark text |
 | `btn-{color}` | Action buttons | Saturated bg + white text | Darker bg + white text |
-| `banner-{color}` | Alert/info boxes | Dark bg 20% + border | Light tint bg + soft border |
+| `banner-{color}` | Alert/info boxes | Dark bg 20% + border + light text | Light tint bg + soft border + dark text |
 | `toast-{color}` | Toast notifications | Dark bg + light text | Light bg + dark text |
 | `status-offline` | Offline status bar | Amber bg + light text | Dark amber bg + white text |
 | `status-update` | Update available bar | Indigo bg + light text | Dark indigo bg + white text |

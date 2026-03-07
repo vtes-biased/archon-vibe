@@ -2,14 +2,14 @@
 
 ## Documentation File Locations
 
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/CLAUDE.md` — Top-level project guidelines
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/ARCHITECTURE.md` — Detailed architecture
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/SYNC.md` — SSE sync patterns
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/CONTEXT7.md` — Library IDs for context7 MCP
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/frontend/DESIGN.md` — UI styling guidelines
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/TOURNAMENTS.md` — Tournament system details
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/VEKN_SYNC.md` — VEKN external sync
-- `/Users/lionelpanhaleux/dev/perso/archon-cursor/TESTING.md` — Testing guidelines
+- `CLAUDE.md` — Top-level project guidelines
+- `ARCHITECTURE.md` — Detailed architecture
+- `SYNC.md` — SSE sync patterns
+- `CONTEXT7.md` — Library IDs for context7 MCP
+- `frontend/DESIGN.md` — UI styling guidelines
+- `TOURNAMENTS.md` — Tournament system details
+- `VEKN_SYNC.md` — VEKN external sync
+- `TESTING.md` — Testing guidelines
 
 ## Documentation Cross-References
 

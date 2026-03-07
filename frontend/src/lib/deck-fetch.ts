@@ -49,7 +49,7 @@ export async function fetchDeckFromUrl(url: string): Promise<ParsedDeck> {
 }
 
 async function fetchViaProxy(url: string): Promise<ParsedDeck> {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
   const { getAccessToken } = await import('./stores/auth.svelte');
   const token = getAccessToken();
   const resp = await fetch(

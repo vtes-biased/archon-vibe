@@ -46,10 +46,13 @@ from ..db import (
 )
 from ..email_service import send_magic_link_email
 from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
-from ..models import AuthMethod, AuthMethodType, User
+from ..models import AuthMethod, AuthMethodType, CommunityLink, CommunityLinkType, Role, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 encoder = msgspec.json.Encoder()
+
+# Injected by main.py to broadcast user updates via SSE
+broadcast_user_event = None
 
 # Password hasher
 ph = PasswordHasher()
@@ -125,6 +128,14 @@ class PasskeyLoginVerifyRequest(BaseModel):
     credential: dict  # Raw credential from navigator.credentials.get()
 
 
+class CommunityLinkInput(BaseModel):
+    """Community link input for profile update."""
+
+    type: str
+    url: str
+    label: str = ""
+
+
 class ProfileUpdateRequest(BaseModel):
     """Profile update request payload."""
 
@@ -134,7 +145,10 @@ class ProfileUpdateRequest(BaseModel):
     city: str | None = None
     city_geoname_id: int | None = None
     contact_email: str | None = None
+    contact_discord: str | None = None
     contact_phone: str | None = None
+    phone_is_whatsapp: bool | None = None
+    community_links: list[CommunityLinkInput] | None = None
 
 
 class MagicLinkRequest(BaseModel):
@@ -768,13 +782,47 @@ async def update_current_user(
         user.city_geoname_id = request.city_geoname_id if request.city_geoname_id else None
     if request.contact_email is not None:
         user.contact_email = request.contact_email if request.contact_email else None
+    if request.contact_discord is not None:
+        user.contact_discord = request.contact_discord if request.contact_discord else None
     if request.contact_phone is not None:
         user.contact_phone = request.contact_phone if request.contact_phone else None
+    if request.phone_is_whatsapp is not None:
+        user.phone_is_whatsapp = request.phone_is_whatsapp
+    if request.community_links is not None:
+        # Only officials can set community links
+        is_official = any(
+            r in (Role.IC, Role.NC, Role.PRINCE) for r in user.roles
+        )
+        if not is_official:
+            raise HTTPException(
+                status_code=403,
+                detail="Only officials (IC/NC/Prince) can manage community links",
+            )
+        if len(request.community_links) > 10:
+            raise HTTPException(
+                status_code=422, detail="Maximum 10 community links allowed"
+            )
+        links = []
+        for link in request.community_links:
+            try:
+                link_type = CommunityLinkType(link.type)
+            except ValueError:
+                raise HTTPException(
+                    status_code=422, detail=f"Invalid link type: {link.type}"
+                )
+            if not link.url.startswith(("http://", "https://")):
+                raise HTTPException(
+                    status_code=422, detail=f"Invalid URL: {link.url}"
+                )
+            links.append(CommunityLink(type=link_type, url=link.url, label=link.label))
+        user.community_links = links
 
     # Update modified timestamp
     user.modified = datetime.now(UTC)
 
-    await update_user(user)
+    bd = await update_user(user)
+    if broadcast_user_event:
+        broadcast_user_event(bd)
 
     # Return updated user with auth methods
     auth_methods = await get_auth_methods_for_user(user_uid)

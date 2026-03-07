@@ -1,4 +1,5 @@
 import { renderDocument } from "$lib/markdown";
+import * as m from "$lib/paraglide/messages.js";
 
 // Import markdown files as raw strings (bundled into JS, works offline)
 import vtesRulesRaw from "$lib/help-content/vtes-rules.md?raw";
@@ -83,8 +84,8 @@ export const helpDocs: Record<string, HelpDoc> = {
     get content() { return getRendered("code-of-ethics", this.raw); },
   },
   "player-guide": {
-    title: "Player Guide",
-    description: "How to find tournaments, register, check in, and upload decks.",
+    get title() { return m.help_player_guide_title(); },
+    get description() { return m.help_player_guide_description(); },
     icon: "user",
     tocDepth: 2,
     isComponent: true,
@@ -92,8 +93,8 @@ export const helpDocs: Record<string, HelpDoc> = {
     get content() { return ""; },
   },
   "organizer-guide": {
-    title: "Organizer Guide",
-    description: "How to create, configure, and run tournaments with Archon.",
+    get title() { return m.help_organizer_guide_title(); },
+    get description() { return m.help_organizer_guide_description(); },
     icon: "clipboard",
     tocDepth: 2,
     isComponent: true,

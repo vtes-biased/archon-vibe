@@ -1,29 +1,26 @@
+# Stage 1: Build WASM engine (same as production Dockerfile)
+FROM rust:slim AS wasm-builder
+RUN rustup target add wasm32-unknown-unknown && \
+    cargo install wasm-pack
+WORKDIR /engine
+COPY engine/ .
+RUN wasm-pack build --no-opt --target web --release --features wasm
+
+# Stage 2: Test runner with Playwright
 FROM node:22-slim
 WORKDIR /app
 
-# Install Playwright system dependencies, curl, build tools, and Rust deps
+# Install Playwright system dependencies and curl
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
     libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
-    libxrandr2 libgbm1 libasound2 curl ca-certificates \
-    build-essential pkg-config && \
+    libxrandr2 libgbm1 libasound2 curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Rust (for building the engine)
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
+# Copy WASM engine output to where the $engine alias resolves
+COPY --from=wasm-builder /engine/pkg /engine/pkg
 
-# Install wasm-pack
-RUN cargo install wasm-pack
-
-# Add wasm32 target
-RUN rustup target add wasm32-unknown-unknown
-
-# Copy and build the Rust engine to WASM
-COPY engine/ ./engine/
-RUN cd engine && wasm-pack build --no-opt --target web --release --features wasm
-
-# Copy package files
+# Install dependencies
 COPY frontend/package*.json ./
 RUN npm ci
 
@@ -33,13 +30,9 @@ RUN npx playwright install --with-deps chromium
 # Copy frontend source
 COPY frontend/ ./
 
-# Fix geonames symlink - copy actual data files from backend to $lib/data/geonames
-RUN rm -rf /app/src/lib/data/geonames
-COPY backend/src/data/geonames/ /app/src/lib/data/geonames/
-
-# Place WASM engine where the relative import expects it
-# engine.ts imports ../../../engine/pkg/archon_engine (3 levels up from src/lib/ = /)
-RUN mkdir -p /engine/pkg && cp -r /app/engine/pkg/* /engine/pkg/
+# Fix geonames: copy actual files instead of broken symlink
+RUN rm -rf src/lib/data/geonames
+COPY backend/src/data/geonames/ src/lib/data/geonames/
 
 # Wait for backend, start dev server, and run tests
 CMD ["sh", "-c", "\
