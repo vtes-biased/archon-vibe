@@ -19,6 +19,10 @@
   let saving = $state(false);
   let error = $state<string | null>(null);
 
+  // Stash location fields when toggling online mode, so we can restore on toggle-back
+  let stashedPhysical = $state<{ country: string; venue: string; venue_url: string; address: string; map_url: string } | null>(null);
+  let stashedOnline = $state<{ venue: string; venue_url: string } | null>(null);
+
   // Derive field values from tournament for the shared component
   let fieldValues = $state<TournamentFieldValues>({
     name: tournament.name,
@@ -144,19 +148,40 @@
 
   async function handleToggleOnline(checked: boolean) {
     if (checked) {
+      // Stash physical-location fields, restore any stashed online fields
+      stashedPhysical = {
+        country: tournament.country ?? "",
+        venue: tournament.venue ?? "",
+        venue_url: tournament.venue_url ?? "",
+        address: tournament.address ?? "",
+        map_url: tournament.map_url ?? "",
+      };
+      const restored = stashedOnline ?? { venue: DISCORD_VENUE, venue_url: DISCORD_URL };
+      stashedOnline = null;
       await saveMultiple({
         online: true,
         country: null,
         address: "",
         map_url: "",
-        venue: DISCORD_VENUE,
-        venue_url: DISCORD_URL,
+        venue: restored.venue,
+        venue_url: restored.venue_url,
       });
     } else {
-      const updates: Record<string, any> = { online: false };
-      if (tournament.venue === DISCORD_VENUE) updates.venue = "";
-      if (tournament.venue_url === DISCORD_URL) updates.venue_url = "";
-      await saveMultiple(updates);
+      // Stash online venue fields, restore any stashed physical fields
+      stashedOnline = {
+        venue: tournament.venue ?? "",
+        venue_url: tournament.venue_url ?? "",
+      };
+      const restored = stashedPhysical ?? { country: "", venue: "", venue_url: "", address: "", map_url: "" };
+      stashedPhysical = null;
+      await saveMultiple({
+        online: false,
+        country: restored.country || null,
+        venue: restored.venue,
+        venue_url: restored.venue_url,
+        address: restored.address,
+        map_url: restored.map_url,
+      });
     }
   }
 </script>
