@@ -18,10 +18,14 @@ export async function waitForSync(page: Page, timeout = DEFAULT_SYNC_TIMEOUT) {
 }
 
 /**
- * Wait for users to load in the users list.
+ * Navigate to the Members tab and wait for user rows to load.
+ * The Community page defaults to the "Community" tab; the user list
+ * is on the "Members" tab.
  */
 export async function waitForUsers(page: Page) {
   await waitForSync(page);
+  // Switch to Members tab (user list)
+  await page.getByRole('button', { name: 'Members' }).click();
   await expect(
     page.locator('.user-row').first(),
   ).toBeVisible({ timeout: 3_000 });
