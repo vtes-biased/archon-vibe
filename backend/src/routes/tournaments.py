@@ -915,7 +915,14 @@ async def tournament_action(
         import json as json_mod
 
         result = json_mod.loads(result_json)
-        updated = decoder.decode(msgspec.json.encode(result["tournament"]))
+        # Normalize datetime fields: frontend sends "YYYY-MM-DDTHH:MM" (no seconds)
+        # but msgspec requires at least "YYYY-MM-DDTHH:MM:SS" for RFC3339 decoding
+        t_data = result["tournament"]
+        for dt_field in ("start", "finish"):
+            v = t_data.get(dt_field)
+            if isinstance(v, str) and len(v) == 16:  # "YYYY-MM-DDTHH:MM"
+                t_data[dt_field] = v + ":00"
+        updated = decoder.decode(msgspec.json.encode(t_data))
         updated.modified = datetime.now(UTC)
         deck_ops = result.get("deck_ops", [])
 
