@@ -295,6 +295,7 @@ class User(BaseObject, kw_only=True):
     # Contact info (visible based on role-based access rules)
     contact_email: str | None = None
     contact_discord: str | None = None  # Discord handle
+    discord_id: str | None = None  # Discord numeric user ID (from linked account)
     contact_phone: str | None = None
     phone_is_whatsapp: bool = False
 

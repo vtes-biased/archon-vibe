@@ -226,10 +226,13 @@ async def discord_callback(
             )
             await insert_auth_method(auth_method)
 
-        # Update user's contact_discord and nickname from Discord
+        # Update user's discord_id, contact_discord and nickname from Discord
         user = await get_user_by_uid(user_uid_from_state)
         if user:
             changed = False
+            if user.discord_id != discord_id:
+                user.discord_id = discord_id
+                changed = True
             if not user.contact_discord:
                 user.contact_discord = discord_username
                 changed = True
@@ -265,6 +268,13 @@ async def discord_callback(
                 last_used_at=now,
             )
             await update_auth_method(updated_auth)
+
+            # Backfill discord_id for existing users
+            user = await get_user_by_uid(user_uid)
+            if user and user.discord_id != discord_id:
+                user.discord_id = discord_id
+                user.modified = now
+                await update_user(user)
         else:
             # Check if verified email matches an existing EMAIL auth user
             email_auth_user_uid = None
@@ -294,10 +304,13 @@ async def discord_callback(
                 )
                 await insert_auth_method(auth_method)
 
-                # Update user's contact_discord and nickname if not set
+                # Update user's discord_id, contact_discord and nickname if not set
                 user = await get_user_by_uid(user_uid)
                 if user:
                     changed = False
+                    if user.discord_id != discord_id:
+                        user.discord_id = discord_id
+                        changed = True
                     if not user.contact_discord:
                         user.contact_discord = discord_username
                         changed = True
@@ -314,6 +327,7 @@ async def discord_callback(
                     modified=now,
                     name=discord_username or "",
                     nickname=discord_global_name,
+                    discord_id=discord_id,
                     contact_discord=discord_username,
                     contact_email=discord_email,
                 )

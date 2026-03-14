@@ -34,7 +34,6 @@
   let editCity = $state(initial.city || "");
   let editCityGeonameId = $state<number | null>(initial.city_geoname_id ?? null);
   let editContactEmail = $state(initial.contact_email || "");
-  let editContactDiscord = $state(initial.contact_discord || "");
   let editContactPhone = $state(initial.contact_phone || "");
   let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
 
@@ -97,7 +96,6 @@
     city: initial.city || "",
     city_geoname_id: initial.city_geoname_id ?? null,
     contact_email: initial.contact_email || "",
-    contact_discord: initial.contact_discord || "",
     contact_phone: initial.contact_phone || "",
     phone_is_whatsapp: initial.phone_is_whatsapp ?? false,
     community_links: JSON.stringify(initial.community_links || []),
@@ -308,12 +306,6 @@
       <label for="edit-contact-email" class="block text-sm font-medium text-ash-400 mb-1">{m.profile_contact_email()}</label>
       <input id="edit-contact-email" type="email" bind:value={editContactEmail}
         onblur={() => saveField("contact_email", editContactEmail || undefined)}
-        class={inputClass} />
-    </div>
-    <div>
-      <label for="edit-contact-discord" class="block text-sm font-medium text-ash-400 mb-1">{m.profile_contact_discord()}</label>
-      <input id="edit-contact-discord" type="text" bind:value={editContactDiscord} placeholder="username"
-        onblur={() => saveField("contact_discord", editContactDiscord || undefined)}
         class={inputClass} />
     </div>
     <div>

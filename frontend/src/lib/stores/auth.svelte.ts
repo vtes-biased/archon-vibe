@@ -392,7 +392,6 @@ export interface ProfileUpdate {
   city?: string;
   city_geoname_id?: number | null;
   contact_email?: string;
-  contact_discord?: string;
   contact_phone?: string;
   phone_is_whatsapp?: boolean;
   community_links?: { type: string; url: string; label: string }[];

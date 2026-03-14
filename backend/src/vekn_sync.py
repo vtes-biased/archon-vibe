@@ -823,6 +823,7 @@ class VEKNSyncService:
                     avatar_path=user.avatar_path,
                     contact_email=user.contact_email,
                     contact_discord=user.contact_discord,
+                    discord_id=user.discord_id,
                     contact_phone=user.contact_phone,
                     coopted_by=sponsor.uid,
                     coopted_at=None,  # Historical - no timestamp

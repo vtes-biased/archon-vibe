@@ -10,6 +10,7 @@
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunitySocialSection from "./CommunitySocialSection.svelte";
   import CommunityContentSection from "./CommunityContentSection.svelte";
+  import DiscordIcon from "./DiscordIcon.svelte";
   import { ChevronDown, ChevronRight, Globe, Hash, Pencil, Search, Users, Video } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -147,7 +148,7 @@
     const grouped = new Map<string, User[]>();
     for (const u of allUsersWithLinks) {
       if (!u.roles?.some(r => r === "NC" || r === "Prince")) continue;
-      if (!u.contact_email && !u.contact_discord && !u.contact_phone) continue;
+      if (!u.contact_email && !u.discord_id && !u.contact_phone) continue;
       const c = u.country || "??";
       if (!grouped.has(c)) grouped.set(c, []);
       grouped.get(c)!.push(u);
@@ -366,13 +367,21 @@
                         {#if official.city}
                           <div class="text-sm text-ash-400 mt-0.5">{official.city}</div>
                         {/if}
-                        {#if official.contact_email || official.contact_discord || official.contact_phone}
+                        {#if official.contact_email || official.discord_id || official.contact_phone}
                           <div class="flex flex-wrap gap-3 mt-2 text-xs text-ash-400">
                             {#if official.contact_email}
                               <a href="mailto:{official.contact_email}" class="text-crimson-500 hover:text-crimson-400">{official.contact_email}</a>
                             {/if}
-                            {#if official.contact_discord}
-                              <span>Discord: {official.contact_discord}</span>
+                            {#if official.discord_id}
+                              <a
+                                href="https://discord.com/users/{official.discord_id}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center gap-1 text-crimson-500 hover:text-crimson-400"
+                              >
+                                <DiscordIcon class="w-3.5 h-3.5" />
+                                <span>{official.contact_discord || "Discord"}</span>
+                              </a>
                             {/if}
                             {#if official.contact_phone}
                               {#if official.phone_is_whatsapp}

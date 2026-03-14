@@ -35,7 +35,6 @@ class ProfileUpdateRequest(BaseModel):
     city: str | None = None
     city_geoname_id: int | None = None
     contact_email: str | None = None
-    contact_discord: str | None = None
     contact_phone: str | None = None
     phone_is_whatsapp: bool | None = None
     community_links: list[CommunityLinkInput] | None = None
@@ -119,8 +118,6 @@ async def update_current_user(
         user.city_geoname_id = request.city_geoname_id if request.city_geoname_id else None
     if request.contact_email is not None:
         user.contact_email = request.contact_email if request.contact_email else None
-    if request.contact_discord is not None:
-        user.contact_discord = request.contact_discord if request.contact_discord else None
     if request.contact_phone is not None:
         user.contact_phone = request.contact_phone if request.contact_phone else None
     if request.phone_is_whatsapp is not None:

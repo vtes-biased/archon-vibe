@@ -553,7 +553,7 @@
 
           <SanctionsManager {user} canIssueSanctions={false} inline={true} />
 
-          {#if user.contact_email || user.contact_discord || user.contact_phone}
+          {#if user.contact_email || user.discord_id || user.contact_phone}
             <div class="mt-3 pt-3 border-t border-ash-700 space-y-1">
               <span class="font-medium text-ash-400">{m.profile_contact()}:</span>
               {#if user.contact_email}
@@ -561,8 +561,10 @@
                   <a href="mailto:{user.contact_email}" class="text-crimson-500 hover:text-crimson-400 text-sm">{user.contact_email}</a>
                 </div>
               {/if}
-              {#if user.contact_discord}
-                <div class="text-sm">{m.profile_contact_discord()}: {user.contact_discord}</div>
+              {#if user.discord_id}
+                <div class="text-sm">
+                  <a href="https://discord.com/users/{user.discord_id}" target="_blank" rel="noopener noreferrer" class="text-crimson-500 hover:text-crimson-400">{m.profile_contact_discord()}: {user.contact_discord || "Discord"}</a>
+                </div>
               {/if}
               {#if user.contact_phone}
                 {#if user.phone_is_whatsapp}

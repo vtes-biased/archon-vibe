@@ -178,6 +178,7 @@ export interface User extends BaseObject {
   // Contact info (visible based on role-based access rules)
   contact_email?: string | null;
   contact_discord?: string | null; // Discord handle
+  discord_id?: string | null; // Discord numeric user ID (from linked account)
   contact_phone?: string | null;
   phone_is_whatsapp?: boolean;
 

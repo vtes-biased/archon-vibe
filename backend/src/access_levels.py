@@ -20,7 +20,7 @@ _USER_PUBLIC_FIELDS = {
     "roles",
     "vekn_prefix",
 }
-_USER_CONTACT_FIELDS = {"contact_email", "contact_discord", "contact_phone", "phone_is_whatsapp"}
+_USER_CONTACT_FIELDS = {"contact_email", "contact_discord", "discord_id", "contact_phone", "phone_is_whatsapp"}
 _USER_COMMUNITY_LINKS = {"community_links"}
 # Minimal fields for anonymous link browsing (no name/personal info)
 _USER_LINKS_ONLY_FIELDS = {"uid", "modified", "deleted_at", "country", "roles", "community_links"}
