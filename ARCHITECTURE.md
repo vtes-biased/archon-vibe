@@ -79,7 +79,7 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 - **Purpose**: Synchronize database state between client and server
 - **Types**: Create, Update, Delete
 - **Payload**: Contains full object data, including `uid` and `modified` fields
-- **Flow**: Database change → CRUD event → SSE/reconciliation → IndexedDB sync
+- **Flow**: Database change → CRUD event → SSE → IndexedDB sync
 
 ### 3. Ephemeral SSE Events
 - **Purpose**: Real-time notifications not requiring persistent storage
@@ -117,43 +117,37 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 
 ## Offline Mode
 
-### Going Offline
-When the PWA is deliberately taken offline (or loses connection):
+### Device-Lock Model
 
-1. PWA detects offline state
-2. Switches to "offline mode" - takes charge of its data
-3. Business events are processed locally by Rust engine (compiled to WASM)
-4. Objects in IndexedDB are updated directly
-5. All CRUD operations are tracked in a local change log
+Offline mode uses primary device ownership — no CRUD log or conflict resolution needed:
 
-### Reconciliation on Reconnect
+1. Organizer takes tournament offline via `go-offline` → tournament locked to their device
+2. Other devices see "offline" message — no mutations available
+3. Business events processed locally by WASM Rust engine → IndexedDB updated directly
+4. Offline-created players get temp UIDs (remapped to real UIDs on sync)
+
+### Going Back Online
 
 ```
-┌─────────────┐                      ┌──────────────┐
-│   Svelte    │  1. Send change log  │   FastAPI    │
-│     PWA     ├─────────────────────►│   Backend    │
-│             │                      │              │
-│             │  2. Receive fixes    │              │
-│             │◄─────────────────────┤              │
-│             │                      │              │
-│             │  3. Resume SSE       │              │
-│             │◄─────────────────────┤              │
-└─────────────┘                      └──────────────┘
+┌─────────────┐                           ┌──────────────┐
+│   Svelte    │  1. Send full tournament  │   FastAPI    │
+│     PWA     │     state + offline data  │   Backend    │
+│  (primary)  ├──────────────────────────►│              │
+│             │                           │              │
+│             │  2. Server overwrites,    │              │
+│             │     remaps temp UIDs      │              │
+│             │◄──────────────────────────┤              │
+│             │                           │              │
+│             │  3. Resume SSE            │              │
+│             │◄──────────────────────────┤              │
+└─────────────┘                           └──────────────┘
 ```
 
-#### Reconciliation Steps
-1. **Upload**: PWA sends accumulated CRUD events to server
-2. **Conflict Detection**: Server compares against its current state
-3. **Resolution**: Server applies changes or detects conflicts
-4. **Adjustment**: Server returns correction CRUD events if needed
-5. **Sync**: PWA applies adjustments to IndexedDB
-6. **Resume**: SSE connection is re-established
-
-### Conflict Resolution Strategy
-- Server is the source of truth for conflicts
-- Timestamp-based "last write wins" for simple cases
-- Custom resolution logic in Rust engine for complex business rules
-- Client always accepts server's reconciliation response
+### Ownership & Transfer
+- **Primary device** is authoritative — server accepts its full state on go-online
+- **Force-takeover**: another organizer can claim the lock (warned about losing primary's unsaved data)
+- **Opportunistic sync**: primary device can background-sync without unlocking (`sync-offline`)
+- **IC force-unlock**: emergency unlock without syncing offline data
 
 ## Mutation Pipeline
 

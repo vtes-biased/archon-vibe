@@ -94,12 +94,12 @@ Access projections computed by `access_levels.py` at write time. No per-viewer f
 4. Frontend receives CRUD → updates IndexedDB → UI reacts
 
 ### Offline
-1. PWA detects offline → switches to local mode
-2. Business events processed by WASM Rust engine
-3. IndexedDB updated directly, CRUD log tracked
-4. On reconnect: send CRUD log → server reconciles → apply fixes → resume SSE
+1. Organizer takes tournament offline → locked to their device (primary device ownership)
+2. Business events processed by WASM Rust engine → IndexedDB updated directly
+3. Other devices see "offline" message — no mutations available
+4. On go-online: primary device sends full tournament state → server overwrites → SSE resumes
 
-**Reconciliation**: Server is source of truth. Returns adjustment CRUD events if conflicts detected.
+**Ownership model**: No conflicts possible — tournament is locked to one device. Force-takeover available for other organizers (with data loss warning). IC can force-unlock in emergencies.
 
 ## Access Model (Data Levels)
 

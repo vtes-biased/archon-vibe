@@ -245,7 +245,7 @@ Custom per-table names were considered but dropped — room-based assignment cov
 
 ## Phase 8: Offline Mode (Full) ✅
 
-> Basic offline CRUD already works (IndexedDB + WASM engine + changes log). This phase adds ownership and conflict resolution.
+> Offline mode uses a device-lock model: organizer takes tournament offline (locked to their device), WASM processes actions locally, go-online sends full state to server.
 
 ### Primary Device Ownership
 

@@ -65,7 +65,7 @@ Archon is designed to work seamlessly online or offline, crucial for tournament 
 - All objects stored as JSONB in PostgreSQL
 - UUID v7 identifiers (time-ordered)
 - Event-driven architecture with business logic in Rust
-- Automatic conflict resolution during offline reconciliation
+- Offline mode with primary device ownership (tournament locked to one device)
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
 

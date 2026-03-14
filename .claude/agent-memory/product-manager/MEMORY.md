@@ -42,9 +42,9 @@
 - Phase 3 (Sanctions Enhancement): COMPLETE (v2 categories, SA adjustments, DQ barring, lifting)
 - Phase 4 (Ratings/Hall of Fame): COMPLETE (4-cat ratings, rankings page, HoF on rankings page, RP in PlayersTab)
 - Phase 5 (QR Code Check-in): COMPLETE (QrCheckinDisplay + QrCheckinScanner components)
-- Phase 6 (Online Features): NOT STARTED (Call for Judge, Shared Timer)
+- Phase 6 (Online Features): COMPLETE (Call for Judge, Shared Timer with per-table extensions)
 - Phase 7 (Printable Seating & Table Labels): PARTIAL (Printable seating done, table labels not)
-- Phase 8 (Full Offline Mode): NOT STARTED
+- Phase 8 (Full Offline Mode): COMPLETE (device-lock model, go-offline/online, force-takeover, offline player creation)
 - Phase 9 (Entry Fee & Pretix): PARTIAL (payment tracking done, Pretix not)
 - Phase 10 (Venue Completion): PARTIAL (autocomplete done via TournamentFields.svelte + db.ts, VEKN venue import not)
 - Phase 11 (Help & Documentation): COMPLETE (help-content/ has all reference docs + player/organizer guides, /help route)
@@ -60,9 +60,9 @@
 - Venue autocomplete: IMPLEMENTED (country-scoped, from tournament history)
 - Help pages: IMPLEMENTED (rulebook, tournament rules, judges guide v1+v2, ethics, player/organizer guides)
 - Deck UX improvements: IMPLEMENTED (collapsible decklists, attribution fixes, replace UX)
-- Round timer: NOT IMPLEMENTED
-- VEKN results reporting (push): NOT IMPLEMENTED (pull/import exists via vekn_tournament_sync.py)
-- Full offline mode (ownership model): NOT IMPLEMENTED
+- Round timer: IMPLEMENTED (global + per-table, extensions, clock-stop policy)
+- VEKN results reporting (push): IMPLEMENTED (vekn_push.py, hourly batch + manual)
+- Full offline mode: IMPLEMENTED (device-lock model, no CRUD log needed)
 
 ## Recently Shipped (Jan-Feb 2026)
 - QR code check-in (QrCheckinDisplay + QrCheckinScanner)

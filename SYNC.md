@@ -122,22 +122,14 @@ Minimal indexes only:
 | decks | `by-tournament`, `by-user` |
 | leagues | `by-country`, `by-start` |
 
-### Changes Log (Offline-Ready)
+### Offline Mode
 
-Generalized for all object types:
-
-```typescript
-changes: {
-  store: string;        // "users" | "sanctions" | "tournaments" | "decks" | "ratings" | "leagues"
-  type: 'create' | 'update' | 'delete';
-  uid: string;
-  timestamp: string;
-  event?: unknown;      // tournament action payload
-  data?: unknown;       // object snapshot
-}
-```
-
-Entries cleared when SSE confirms the update (matching uid).
+Offline tournaments use a device-lock model (no changes log needed):
+- Tournament locked to one device via `go-offline` endpoint
+- WASM engine processes all actions locally, updating IndexedDB directly
+- On `go-online`, full tournament state (including offline-created players, decks, sanctions) is sent to server
+- Server overwrites its state with the primary device's authoritative data
+- Temp UIDs (offline-created players) are remapped to real UIDs on sync
 
 ## Frontend: Sync Manager
 

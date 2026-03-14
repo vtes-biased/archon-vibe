@@ -407,7 +407,7 @@ Three data levels control what each connected client sees:
 - Primary device ownership (organizer takes tournament offline)
 - Other devices see "offline" message — no mutations available
 - Force-takeover by other organizers (with data loss warning)
-- Go-online with CRUD log reconciliation (primary device is authoritative)
+- Go-online sends full state to server (primary device is authoritative, no CRUD log needed)
 - IC emergency force-unlock (without syncing offline data)
 - Opportunistic sync when network detected
 - Offline member creation with temp UIDs remapped on sync
@@ -415,7 +415,7 @@ Three data levels control what each connected client sees:
 
 **Infrastructure**:
 - Offline-first PWA with service workers (update detection and application)
-- IndexedDB for all read operations (5 object stores + cards + changes log)
+- IndexedDB for all read operations (5 object stores + cards)
 - SSE real-time sync with role-based filtering (3 access levels: public/member/full)
 - Pre-computed access-level JSONB columns (no per-viewer filtering at read time)
 - Personal overlay for own objects and role-based full-access
