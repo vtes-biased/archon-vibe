@@ -451,22 +451,17 @@ async def update_sanction_endpoint(
         lifted_by_uid = current_user.uid
 
     # Create updated sanction
-    updated = Sanction(
-        uid=sanction.uid,
+    updated = msgspec.structs.replace(
+        sanction,
         modified=now,
-        user_uid=sanction.user_uid,
-        issued_by_uid=sanction.issued_by_uid,
-        tournament_uid=sanction.tournament_uid,
         level=level,
         category=category,
         subcategory=subcategory,
         round_number=round_number,
         description=description,
-        issued_at=sanction.issued_at,
         expires_at=expires_at,
         lifted_at=lifted_at,
         lifted_by_uid=lifted_by_uid,
-        deleted_at=sanction.deleted_at,
     )
 
     bd = await update_sanction(updated)
@@ -523,23 +518,7 @@ async def delete_sanction_endpoint(
 
     # Soft delete
     now = datetime.now(UTC)
-    updated = Sanction(
-        uid=sanction.uid,
-        modified=now,
-        user_uid=sanction.user_uid,
-        issued_by_uid=sanction.issued_by_uid,
-        tournament_uid=sanction.tournament_uid,
-        level=sanction.level,
-        category=sanction.category,
-        subcategory=sanction.subcategory,
-        round_number=sanction.round_number,
-        description=sanction.description,
-        issued_at=sanction.issued_at,
-        expires_at=sanction.expires_at,
-        lifted_at=sanction.lifted_at,
-        lifted_by_uid=sanction.lifted_by_uid,
-        deleted_at=now,
-    )
+    updated = msgspec.structs.replace(sanction, modified=now, deleted_at=now)
 
     bd = await update_sanction(updated)
     logger.info(f"Sanction {uid} soft-deleted by {current_user.uid}")

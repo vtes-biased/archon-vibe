@@ -854,21 +854,7 @@ async def reassign_sanctions(from_user_uid: str, to_user_uid: str) -> int:
     sanctions = await get_sanctions_for_user(from_user_uid)
     count = 0
     for sanction in sanctions:
-        updated = Sanction(
-            uid=sanction.uid,
-            modified=sanction.modified,
-            user_uid=to_user_uid,
-            issued_by_uid=sanction.issued_by_uid,
-            tournament_uid=sanction.tournament_uid,
-            level=sanction.level,
-            category=sanction.category,
-            description=sanction.description,
-            issued_at=sanction.issued_at,
-            expires_at=sanction.expires_at,
-            lifted_at=sanction.lifted_at,
-            lifted_by_uid=sanction.lifted_by_uid,
-            deleted_at=sanction.deleted_at,
-        )
+        updated = msgspec.structs.replace(sanction, user_uid=to_user_uid)
         await update_sanction(updated)
         count += 1
     return count
@@ -924,11 +910,13 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         city_geoname_id=keep_user.city_geoname_id or delete_user_obj.city_geoname_id,
         state=keep_user.state or delete_user_obj.state,
         nickname=delete_user_obj.nickname or keep_user.nickname,
-        roles=list(set(keep_user.roles) | set(delete_user_obj.roles)),  # Union of roles
+        roles=list(set(keep_user.roles) | set(delete_user_obj.roles)),
         avatar_path=delete_user_obj.avatar_path or keep_user.avatar_path,
         contact_email=delete_user_obj.contact_email or keep_user.contact_email,
         contact_discord=delete_user_obj.contact_discord or keep_user.contact_discord,
         contact_phone=delete_user_obj.contact_phone or keep_user.contact_phone,
+        phone_is_whatsapp=delete_user_obj.phone_is_whatsapp or keep_user.phone_is_whatsapp,
+        community_links=keep_user.community_links or delete_user_obj.community_links,
         coopted_by=keep_user.coopted_by or delete_user_obj.coopted_by,
         coopted_at=keep_user.coopted_at or delete_user_obj.coopted_at,
         vekn_synced=keep_user.vekn_synced or delete_user_obj.vekn_synced,
@@ -936,6 +924,12 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         local_modifications=keep_user.local_modifications
         | delete_user_obj.local_modifications,
         vekn_prefix=keep_user.vekn_prefix or delete_user_obj.vekn_prefix,
+        calendar_token=delete_user_obj.calendar_token or keep_user.calendar_token,
+        constructed_online=keep_user.constructed_online,
+        constructed_offline=keep_user.constructed_offline,
+        limited_online=keep_user.limited_online,
+        limited_offline=keep_user.limited_offline,
+        wins=keep_user.wins,
     )
 
     await update_user(merged)
@@ -964,46 +958,39 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
 
     new_uid = str(uuid7())
     now = datetime.now(UTC)
-    displaced = User(
+    displaced = msgspec.structs.replace(
+        user,
         uid=new_uid,
         modified=now,
-        name=user.name,
-        country=user.country,
         vekn_id=None,
-        city=user.city,
-        city_geoname_id=user.city_geoname_id,
-        state=user.state,
-        nickname=user.nickname,
         roles=[],
-        avatar_path=user.avatar_path,
-        contact_email=user.contact_email,
-        contact_discord=user.contact_discord,
-        contact_phone=user.contact_phone,
+        coopted_by=None,
+        coopted_at=None,
+        vekn_synced=False,
+        vekn_synced_at=None,
+        local_modifications=set(),
+        vekn_prefix=None,
+        constructed_online=None,
+        constructed_offline=None,
+        limited_online=None,
+        limited_offline=None,
+        wins=[],
     )
     await insert_user(displaced)
     await reassign_auth_methods(user_uid, new_uid)
 
-    stripped = User(
-        uid=user.uid,
+    stripped = msgspec.structs.replace(
+        user,
         modified=now,
-        name=user.name,
-        country=user.country,
-        vekn_id=user.vekn_id,
-        city=user.city,
-        city_geoname_id=user.city_geoname_id,
-        state=user.state,
         nickname=None,
-        roles=user.roles,
         avatar_path=None,
         contact_email=None,
         contact_discord=None,
         contact_phone=None,
-        coopted_by=user.coopted_by,
-        coopted_at=user.coopted_at,
-        vekn_synced=user.vekn_synced,
-        vekn_synced_at=user.vekn_synced_at,
+        phone_is_whatsapp=False,
+        community_links=[],
+        calendar_token=None,
         local_modifications=set(),
-        vekn_prefix=user.vekn_prefix,
     )
     await update_user(stripped)
 
@@ -1027,43 +1014,38 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
 
     new_uid = str(uuid7())
     now = datetime.now(UTC)
-    new_user = User(
+    new_user = msgspec.structs.replace(
+        user,
         uid=new_uid,
         modified=now,
-        name=user.name,
-        country=user.country,
         vekn_id=None,
-        city=user.city,
-        city_geoname_id=user.city_geoname_id,
-        state=user.state,
-        nickname=user.nickname,
         roles=[],
-        avatar_path=user.avatar_path,
-        contact_email=user.contact_email,
-        contact_discord=user.contact_discord,
-        contact_phone=user.contact_phone,
+        coopted_by=None,
+        coopted_at=None,
+        vekn_synced=False,
+        vekn_synced_at=None,
+        local_modifications=set(),
+        vekn_prefix=None,
+        constructed_online=None,
+        constructed_offline=None,
+        limited_online=None,
+        limited_offline=None,
+        wins=[],
     )
     await insert_user(new_user)
 
-    stripped = User(
-        uid=user.uid,
-        modified=user.modified,
-        name=user.name,
-        country=user.country,
-        vekn_id=user.vekn_id,
-        city=user.city,
-        city_geoname_id=user.city_geoname_id,
-        state=user.state,
+    stripped = msgspec.structs.replace(
+        user,
         nickname=None,
-        roles=user.roles,
         avatar_path=None,
         contact_email=None,
         contact_discord=None,
         contact_phone=None,
+        phone_is_whatsapp=False,
+        community_links=[],
         coopted_by=None,
         coopted_at=None,
-        vekn_synced=user.vekn_synced,
-        vekn_synced_at=user.vekn_synced_at,
+        calendar_token=None,
         local_modifications=set(),
         vekn_prefix=None,
     )

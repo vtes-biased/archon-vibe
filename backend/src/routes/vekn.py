@@ -234,26 +234,14 @@ async def sponsor_new_member(
     now = datetime.now(UTC)
 
     # Update target user
-    updated = User(
-        uid=target.uid,
+    updated = msgspec.structs.replace(
+        target,
         modified=now,
-        name=target.name,
-        country=target.country,
         vekn_id=new_vekn_id,
-        city=target.city,
-        state=target.state,
-        nickname=target.nickname,
-        roles=target.roles,
-        avatar_path=target.avatar_path,
-        contact_email=target.contact_email,
-        contact_discord=target.contact_discord,
-        contact_phone=target.contact_phone,
         coopted_by=manager.uid,
         coopted_at=now,
-        vekn_synced=False,  # Locally created, not from VEKN
+        vekn_synced=False,
         vekn_synced_at=None,
-        local_modifications=target.local_modifications,
-        vekn_prefix=target.vekn_prefix,
     )
 
     await update_user(updated)

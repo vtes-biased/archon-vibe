@@ -284,8 +284,8 @@ async def update_user(
         if nickname is not None:
             local_mods.add("nickname")
 
-        user = User(
-            uid=user.uid,
+        user = msgspec.structs.replace(
+            user,
             modified=datetime.now(UTC),
             name=name if name is not None else user.name,
             country=country if country is not None else user.country,
@@ -295,16 +295,6 @@ async def update_user(
             state=state if state is not None else user.state,
             nickname=nickname if nickname is not None else user.nickname,
             roles=validated_roles if validated_roles is not None else user.roles,
-            # Preserve new profile/contact fields
-            avatar_path=user.avatar_path,
-            contact_email=user.contact_email,
-            contact_discord=user.contact_discord,
-            contact_phone=user.contact_phone,
-            coopted_by=user.coopted_by,
-            coopted_at=user.coopted_at,
-            # VEKN sync tracking
-            vekn_synced=user.vekn_synced,
-            vekn_synced_at=user.vekn_synced_at,
             local_modifications=local_mods,
         )
 
@@ -369,26 +359,10 @@ async def upload_avatar(
     # Update user's avatar_path
     user = await get_user_by_uid(uid)
     if user:
-        updated_user = User(
-            uid=user.uid,
+        updated_user = msgspec.structs.replace(
+            user,
             modified=datetime.now(UTC),
-            name=user.name,
-            country=user.country,
-            vekn_id=user.vekn_id,
-            city=user.city,
-            state=user.state,
-            nickname=user.nickname,
-            roles=user.roles,
             avatar_path=f"/api/users/{uid}/avatar",
-            contact_email=user.contact_email,
-            contact_discord=user.contact_discord,
-            contact_phone=user.contact_phone,
-            coopted_by=user.coopted_by,
-            coopted_at=user.coopted_at,
-            vekn_synced=user.vekn_synced,
-            vekn_synced_at=user.vekn_synced_at,
-            local_modifications=user.local_modifications,
-            vekn_prefix=user.vekn_prefix,
         )
         bd = await db_update_user(updated_user)
 
@@ -446,26 +420,10 @@ async def delete_avatar(
     # Update user's avatar_path to None
     user = await get_user_by_uid(uid)
     if user:
-        updated_user = User(
-            uid=user.uid,
+        updated_user = msgspec.structs.replace(
+            user,
             modified=datetime.now(UTC),
-            name=user.name,
-            country=user.country,
-            vekn_id=user.vekn_id,
-            city=user.city,
-            state=user.state,
-            nickname=user.nickname,
-            roles=user.roles,
             avatar_path=None,
-            contact_email=user.contact_email,
-            contact_discord=user.contact_discord,
-            contact_phone=user.contact_phone,
-            coopted_by=user.coopted_by,
-            coopted_at=user.coopted_at,
-            vekn_synced=user.vekn_synced,
-            vekn_synced_at=user.vekn_synced_at,
-            local_modifications=user.local_modifications,
-            vekn_prefix=user.vekn_prefix,
         )
         bd = await db_update_user(updated_user)
 

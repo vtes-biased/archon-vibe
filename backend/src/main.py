@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import jwt
+import msgspec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
@@ -34,7 +35,6 @@ from .models import (
     DataLevel,
     ObjectType,
     Role,
-    Sanction,
     User,
 )
 from .routes import (
@@ -128,24 +128,7 @@ async def run_sanction_cleanup() -> None:
         now = datetime.now(UTC)
 
         for sanction in expired:
-            # Set deleted_at and update modified
-            updated = Sanction(
-                uid=sanction.uid,
-                modified=now,
-                user_uid=sanction.user_uid,
-                issued_by_uid=sanction.issued_by_uid,
-                tournament_uid=sanction.tournament_uid,
-                level=sanction.level,
-                category=sanction.category,
-                subcategory=sanction.subcategory,
-                round_number=sanction.round_number,
-                description=sanction.description,
-                issued_at=sanction.issued_at,
-                expires_at=sanction.expires_at,
-                lifted_at=sanction.lifted_at,
-                lifted_by_uid=sanction.lifted_by_uid,
-                deleted_at=now,
-            )
+            updated = msgspec.structs.replace(sanction, modified=now, deleted_at=now)
             bd = await update_sanction(updated)
             # Broadcast the soft-delete so clients can sync
             broadcast_precomputed(bd)
