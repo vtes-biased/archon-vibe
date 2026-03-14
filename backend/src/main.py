@@ -96,6 +96,16 @@ async def run_vekn_sync() -> None:
     except Exception as e:
         logger.error(f"Error during VEKN tournament sync: {e}", exc_info=True)
 
+    # Import TWDA winner decklists for matched tournaments
+    try:
+        from .twda_import import import_twda_decks
+
+        logger.info("Starting TWDA deck import")
+        stats = await import_twda_decks()
+        logger.info(f"TWDA deck import: {stats}")
+    except Exception as e:
+        logger.error(f"Error during TWDA deck import: {e}", exc_info=True)
+
     # Recompute ratings after tournaments are up to date
     await run_rating_recompute()
 

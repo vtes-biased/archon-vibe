@@ -99,6 +99,22 @@ async def trigger_vekn_tournament_sync() -> dict:
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}") from e
 
 
+@router.post("/sync-twda-decks")
+async def trigger_twda_deck_import() -> dict:
+    """Manually trigger TWDA winner decklist import."""
+    try:
+        from ..twda_import import import_twda_decks
+
+        logger.info("Manual TWDA deck import triggered via admin endpoint")
+        stats = await import_twda_decks()
+        return {"status": "success", "stats": stats}
+    except Exception as e:
+        logger.error(f"Error during manual TWDA deck import: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"TWDA import failed: {str(e)}"
+        ) from e
+
+
 @router.post("/users/merge")
 async def merge_user_accounts(
     request: MergeRequest,
