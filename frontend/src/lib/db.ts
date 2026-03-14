@@ -196,12 +196,6 @@ function matchesNameSearch(user: User, search: string): boolean {
   );
 }
 
-export async function getUserByVeknId(veknId: string): Promise<User | undefined> {
-  const db = await getDB();
-  const allUsers = await db.getAll('users');
-  return allUsers.find(u => u.vekn_id === veknId);
-}
-
 export async function getFilteredUsers(
   country?: string,
   roles?: Role[],

@@ -6,7 +6,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
-  import { getUser, getUserByVeknId, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
+  import { getUser, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
   import { formatScore } from "$lib/utils";

@@ -442,16 +442,6 @@ export interface CategoryRating {
   tournaments: TournamentRatingEntry[];
 }
 
-export interface Rating extends BaseObject {
-  user_uid: string;
-  country: string | null;
-  constructed_online: CategoryRating | null;
-  constructed_offline: CategoryRating | null;
-  limited_online: CategoryRating | null;
-  limited_offline: CategoryRating | null;
-  wins: string[]; // All-time tournament UIDs won
-}
-
 // Card types (VTES card database)
 export interface VtesCard {
   id: number;

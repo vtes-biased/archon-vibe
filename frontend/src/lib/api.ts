@@ -486,9 +486,13 @@ export async function deleteTournamentApi(uid: string): Promise<{ message: strin
   if (!isOnline()) {
     throw new Error('Cannot delete tournament while offline.');
   }
-  return apiRequest<{ message: string }>(`/api/tournaments/${uid}`, {
+  const result = await apiRequest<{ message: string }>(`/api/tournaments/${uid}`, {
     method: 'DELETE',
   });
+  // Optimistic IDB delete so UI updates immediately instead of waiting for SSE
+  const { deleteTournament } = await import('./db');
+  await deleteTournament(uid);
+  return result;
 }
 
 /**
@@ -731,6 +735,9 @@ export async function deleteLeagueApi(uid: string): Promise<void> {
   await apiRequest<void>(`/api/leagues/${uid}`, {
     method: 'DELETE',
   });
+  // Optimistic IDB delete so UI updates immediately instead of waiting for SSE
+  const { deleteLeague } = await import('./db');
+  await deleteLeague(uid);
 }
 
 export async function addLeagueOrganizer(uid: string, userUid: string): Promise<League> {

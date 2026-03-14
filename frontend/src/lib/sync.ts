@@ -157,21 +157,18 @@ class SyncManager {
    * Start syncing with the backend.
    * First connect: fetch snapshot, then connect SSE for catch-up + real-time.
    * Subsequent connects: SSE only with since= parameter.
-   * @param forceFull - skip snapshot and since param (used after resync/refresh)
+   * After clearAllStores(), lastSync is null so connect() naturally fetches snapshot first.
    */
-  async connect(forceFull = false): Promise<void> {
+  async connect(): Promise<void> {
     await this.disconnect();
     this.isSynced = false;
 
-    let lastSync: string | null = null;
-    if (!forceFull) {
-      lastSync = await getLastSyncTimestamp();
+    let lastSync: string | null = await getLastSyncTimestamp();
 
-      // If no sync timestamp, fetch snapshot first
-      if (!lastSync) {
-        lastSync = await this.fetchSnapshot();
-        // If snapshot failed, fall back to full SSE sync (no since param)
-      }
+    // If no sync timestamp, fetch snapshot first
+    if (!lastSync) {
+      lastSync = await this.fetchSnapshot();
+      // If snapshot failed, fall back to full SSE sync (no since param)
     }
 
     const params = new URLSearchParams();
@@ -198,7 +195,7 @@ class SyncManager {
           this.buffers.clear();
           await this.clearAllStores();
           await this.disconnect();
-          void this.connect(true);  // forceFull: skip snapshot, no since param
+          void this.connect();
           this.emit({ type: 'resync' });
           return;
         }
@@ -363,11 +360,11 @@ class SyncManager {
 
   /**
    * Perform a full refresh: clear local data and resync everything.
-   * Uses forceFull to avoid stale snapshot → resync loop.
+   * After clearAllStores(), lastSync is null so connect() fetches snapshot first.
    */
   async refresh(): Promise<void> {
     await this.clearAllStores();
-    await this.connect(true);
+    await this.connect();
   }
 
   addEventListener(callback: SyncEventCallback): void {
