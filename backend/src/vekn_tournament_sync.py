@@ -4,6 +4,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from uuid6 import uuid7
 
@@ -53,14 +54,123 @@ EVENT_TYPE_MAP: dict[int, tuple[TournamentFormat, TournamentRank]] = {
     16: (TournamentFormat.V5, TournamentRank.BASIC),  # V5 Constructed
 }
 
+# Country code → IANA timezone (single-timezone countries, common VTES countries)
+COUNTRY_TIMEZONE: dict[str, str] = {
+    "AR": "America/Argentina/Buenos_Aires",
+    "AT": "Europe/Vienna",
+    "BE": "Europe/Brussels",
+    "BY": "Europe/Minsk",
+    "CH": "Europe/Zurich",
+    "CL": "America/Santiago",
+    "CZ": "Europe/Prague",
+    "DE": "Europe/Berlin",
+    "DK": "Europe/Copenhagen",
+    "ES": "Europe/Madrid",
+    "FI": "Europe/Helsinki",
+    "FO": "Atlantic/Faroe",
+    "FR": "Europe/Paris",
+    "GB": "Europe/London",
+    "GR": "Europe/Athens",
+    "HR": "Europe/Zagreb",
+    "HU": "Europe/Budapest",
+    "IE": "Europe/Dublin",
+    "IS": "Atlantic/Reykjavik",
+    "IT": "Europe/Rome",
+    "JP": "Asia/Tokyo",
+    "LT": "Europe/Vilnius",
+    "NL": "Europe/Amsterdam",
+    "NO": "Europe/Oslo",
+    "NZ": "Pacific/Auckland",
+    "PH": "Asia/Manila",
+    "PL": "Europe/Warsaw",
+    "PT": "Europe/Lisbon",
+    "RS": "Europe/Belgrade",
+    "SE": "Europe/Stockholm",
+    "SG": "Asia/Singapore",
+    "SK": "Europe/Bratislava",
+    "ZA": "Africa/Johannesburg",
+    # Multi-timezone defaults (overridden by city lookup below)
+    "AU": "Australia/Melbourne",
+    "BR": "America/Sao_Paulo",
+    "CA": "America/Toronto",
+    "MX": "America/Mexico_City",
+    "RU": "Europe/Moscow",
+    "US": "America/New_York",
+}
 
-def _parse_date(s: str | None) -> datetime | None:
-    """Parse a YYYY-MM-DD date string from VEKN API."""
-    if not s:
+# City substring → timezone for multi-timezone countries.
+# Checked case-insensitively against venue city and address fields.
+_CITY_TZ_OVERRIDES: list[tuple[str, str, str]] = [
+    # US
+    ("US", "Berkeley", "America/Los_Angeles"),
+    ("US", "Los Angeles", "America/Los_Angeles"),
+    ("US", "San Francisco", "America/Los_Angeles"),
+    ("US", "Seattle", "America/Los_Angeles"),
+    ("US", "Portland", "America/Los_Angeles"),
+    ("US", "Denver", "America/Denver"),
+    ("US", "Longmont", "America/Denver"),
+    ("US", "Wheatridge", "America/Denver"),
+    ("US", "Chicago", "America/Chicago"),
+    ("US", "Minneapolis", "America/Chicago"),
+    ("US", "Houston", "America/Chicago"),
+    ("US", "Dallas", "America/Chicago"),
+    ("US", "Phoenix", "America/Phoenix"),
+    # BR
+    ("BR", "Manaus", "America/Manaus"),
+    # CA
+    ("CA", "Vancouver", "America/Vancouver"),
+    ("CA", "Victoria", "America/Vancouver"),
+    ("CA", "Winnipeg", "America/Winnipeg"),
+    ("CA", "St. Albert", "America/Edmonton"),
+    ("CA", "Edmonton", "America/Edmonton"),
+    ("CA", "Calgary", "America/Edmonton"),
+    ("CA", "Halifax", "America/Halifax"),
+    ("CA", "Amherst", "America/Halifax"),
+    # AU
+    ("AU", "Brisbane", "Australia/Brisbane"),
+    ("AU", "Rockhampton", "Australia/Brisbane"),
+    ("AU", "Townsville", "Australia/Brisbane"),
+    ("AU", "Annerley", "Australia/Brisbane"),
+    ("AU", "Perth", "Australia/Perth"),
+    ("AU", "Canning", "Australia/Perth"),
+    ("AU", "Sydney", "Australia/Sydney"),
+    ("AU", "Newcastle", "Australia/Sydney"),
+    ("AU", "Burwood", "Australia/Sydney"),
+]
+
+
+def _guess_timezone(country: str | None, venue_city: str = "", address: str = "") -> str:
+    """Best-effort IANA timezone from country code and venue location."""
+    if not country:
+        return "UTC"
+    country = country.upper()
+    # Check city overrides for multi-timezone countries
+    location = f"{venue_city} {address}".lower()
+    for cc, city, tz in _CITY_TZ_OVERRIDES:
+        if cc == country and city.lower() in location:
+            return tz
+    return COUNTRY_TIMEZONE.get(country, "UTC")
+
+
+def _parse_date(
+    date_str: str | None, time_str: str | None = None, tz_name: str = "UTC"
+) -> datetime | None:
+    """Parse date and optional time strings from VEKN API as local time, convert to UTC.
+
+    date_str: "YYYY-MM-DD", time_str: "HH:MM:SS" or "HH:MM"
+    tz_name: IANA timezone name (times are interpreted as local to this zone)
+    """
+    if not date_str:
         return None
     try:
-        return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=UTC)
-    except (ValueError, TypeError):
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        if time_str:
+            fmt = "%H:%M:%S" if len(time_str) > 5 else "%H:%M"
+            t = datetime.strptime(time_str, fmt)
+            dt = dt.replace(hour=t.hour, minute=t.minute, second=t.second)
+        tz = ZoneInfo(tz_name)
+        return dt.replace(tzinfo=tz).astimezone(UTC)
+    except (ValueError, TypeError, KeyError):
         return None
 
 
@@ -72,9 +182,10 @@ def _map_vekn_to_tournament(
     """Map VEKN event data to a Tournament object.
 
     VEKN event fields:
-      event_id, event_name, event_startdate, event_enddate,
-      event_isonline, eventtype_id, venue_name, venue_city,
-      venue_country, venue_id, players[{pos, veknid, gw, vp, tp, tie, vpf, ...}]
+      event_id, event_name, event_startdate, event_starttime,
+      event_enddate, event_endtime, event_isonline, eventtype_id,
+      venue_name, venue_city, venue_country, venue_id,
+      players[{pos, veknid, gw, vp, tp, tie, vpf, ...}]
     venue_data (from separate /venue/<id> call):
       name, address, city, country, website, zip, phone, email, lat, lng
     """
@@ -91,8 +202,6 @@ def _map_vekn_to_tournament(
     )
 
     name = data.get("event_name") or f"VEKN Event {event_id}"
-    start = _parse_date(data.get("event_startdate"))
-    finish = _parse_date(data.get("event_enddate"))
     country = data.get("venue_country") or None
 
     # Online detection
@@ -101,6 +210,12 @@ def _map_vekn_to_tournament(
     # Venue info: name from event, address/website from venue details
     venue = data.get("venue_name") or ""
     address = venue_data.get("address") or ""
+
+    # Guess timezone from venue location (VEKN times are local)
+    venue_city = venue_data.get("city") or data.get("venue_city") or ""
+    tz_name = "UTC" if online else _guess_timezone(country, venue_city, address)
+    start = _parse_date(data.get("event_startdate"), data.get("event_starttime"), tz_name)
+    finish = _parse_date(data.get("event_enddate"), data.get("event_endtime"), tz_name)
     if address and venue_data.get("city"):
         address += f", {venue_data['city']}"
     elif not address:
@@ -196,6 +311,7 @@ def _map_vekn_to_tournament(
             online=online,
             start=start,
             finish=finish or start,
+            timezone=tz_name,
             country=country,
             state=state,
             venue=venue,
@@ -219,6 +335,7 @@ def _map_vekn_to_tournament(
             online=online,
             start=start,
             finish=finish,
+            timezone=tz_name,
             country=country,
             state=TournamentState.PLANNED,
             venue=venue,
@@ -297,6 +414,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     or existing.rank != tournament.rank
                     or existing.start != tournament.start
                     or existing.finish != tournament.finish
+                    or existing.timezone != tournament.timezone
                     or existing.country != tournament.country
                     or existing.online != tournament.online
                     or existing.winner != tournament.winner
@@ -322,6 +440,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         online=tournament.online,
                         start=tournament.start,
                         finish=tournament.finish,
+                        timezone=tournament.timezone,
                         country=tournament.country,
                         state=tournament.state,
                         venue=tournament.venue,
