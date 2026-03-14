@@ -446,43 +446,30 @@ export async function createTournament(data: CreateTournamentData): Promise<Tour
 export async function createTournamentOffline(data: CreateTournamentData): Promise<Tournament> {
   const { markOffline } = await import('$lib/stores/offline.svelte');
   const { getDeviceId } = await import('./db');
+  const { createTournamentWithEngine } = await import('./engine');
   const user = getAuthState().user;
   const uid = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  const tournament: Tournament = {
+  const config = {
     uid,
-    modified: now,
-    name: data.name,
-    format: (data.format as Tournament['format']) || 'Standard',
-    rank: (data.rank as Tournament['rank']) || '',
-    online: data.online || false,
-    start: data.start || null,
-    finish: data.finish || null,
+    now,
+    ...data,
     timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     country: data.country || user?.country || null,
-    state: 'Planned',
-    organizers_uids: user ? [user.uid] : [],
-    venue: data.venue || '',
-    venue_url: data.venue_url || '',
-    address: data.address || '',
-    map_url: data.map_url || '',
-    proxies: data.proxies || false,
-    multideck: data.multideck || false,
-    decklist_required: data.decklist_required || false,
-    description: data.description || '',
-    standings_mode: (data.standings_mode as Tournament['standings_mode']) || 'Private',
-    decklists_mode: (data.decklists_mode as Tournament['decklists_mode']) || 'Winner',
-    max_rounds: data.max_rounds || 0,
-    league_uid: data.league_uid || null,
-    round_time: data.round_time || 0,
-    finals_time: data.finals_time || 0,
-    time_extension_policy: (data.time_extension_policy as Tournament['time_extension_policy']) || 'additions',
-    players: [],
-    rounds: [],
-    finals: null,
-    winner: '',
-    standings: [],
+  };
+
+  const actor = {
+    uid: user?.uid || '',
+    roles: user?.roles || [],
+    is_organizer: true,
+    can_organize_league_uids: [],
+  };
+
+  const result = await createTournamentWithEngine(config, actor);
+  const tournament: Tournament = {
+    ...(result as unknown as Tournament),
+    // Offline-only fields (not part of engine output)
     offline_mode: true,
     offline_device_id: getDeviceId(),
     offline_user_uid: user?.uid || '',

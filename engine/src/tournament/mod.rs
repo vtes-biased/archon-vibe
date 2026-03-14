@@ -40,6 +40,106 @@ use standings::{compute_standings, top5_has_ties, update_standings};
 // TOURNAMENT ENGINE
 // ============================================================================
 
+/// Validate config fields shared between UpdateConfig and CreateTournament.
+fn validate_config_fields(config: &JsonValue) -> Result<(), String> {
+    if let Some(f) = config["format"].as_str() {
+        validate_enum(f, &["Standard", "V5", "Limited"], "format")?;
+    }
+    if let Some(r) = config["rank"].as_str() {
+        validate_enum(
+            r,
+            &["", "National Championship", "Continental Championship"],
+            "rank",
+        )?;
+    }
+    if let Some(s) = config["standings_mode"].as_str() {
+        validate_enum(
+            s,
+            &["Private", "Cutoff", "Top 10", "Public"],
+            "standings_mode",
+        )?;
+    }
+    if let Some(d) = config["decklists_mode"].as_str() {
+        validate_enum(d, &["Winner", "Finalists", "All"], "decklists_mode")?;
+    }
+    if config.has_key("name") {
+        if let Some(n) = config["name"].as_str() {
+            if n.trim().is_empty() {
+                return Err("name cannot be empty".to_string());
+            }
+        }
+    }
+    if let Some(p) = config["time_extension_policy"].as_str() {
+        validate_enum(
+            p,
+            &["additions", "clock_stop", "both"],
+            "time_extension_policy",
+        )?;
+    }
+    Ok(())
+}
+
+/// Create a new tournament from config and actor context.
+/// Returns the tournament JSON string.
+pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, String> {
+    let config = json::parse(config_json).map_err(|e| e.to_string())?;
+    let actor = ActorContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+
+    if !actor.can_manage_tournaments() {
+        return Err("Only IC, NC, or Prince can create tournaments".to_string());
+    }
+
+    validate_config_fields(&config)?;
+
+    // Name is required for creation
+    let name = config["name"]
+        .as_str()
+        .ok_or("name is required")?;
+    if name.trim().is_empty() {
+        return Err("name cannot be empty".to_string());
+    }
+
+    let uid = config["uid"].as_str().unwrap_or("").to_string();
+    let now = config["now"].as_str().unwrap_or("").to_string();
+
+    let tournament = json::object! {
+        "uid" => if uid.is_empty() { json::JsonValue::Null } else { uid.into() },
+        "modified" => if now.is_empty() { json::JsonValue::Null } else { now.clone().into() },
+        "name" => name,
+        "format" => config["format"].as_str().unwrap_or("Standard"),
+        "rank" => config["rank"].as_str().unwrap_or(""),
+        "online" => config["online"].as_bool().unwrap_or(false),
+        "start" => config["start"].clone(),
+        "finish" => config["finish"].clone(),
+        "timezone" => config["timezone"].as_str().unwrap_or(""),
+        "country" => config["country"].clone(),
+        "state" => "Planned",
+        "organizers_uids" => json::array![actor.uid.clone()],
+        "venue" => config["venue"].as_str().unwrap_or(""),
+        "venue_url" => config["venue_url"].as_str().unwrap_or(""),
+        "address" => config["address"].as_str().unwrap_or(""),
+        "map_url" => config["map_url"].as_str().unwrap_or(""),
+        "proxies" => config["proxies"].as_bool().unwrap_or(false),
+        "multideck" => config["multideck"].as_bool().unwrap_or(false),
+        "decklist_required" => config["decklist_required"].as_bool().unwrap_or(false),
+        "description" => config["description"].as_str().unwrap_or(""),
+        "standings_mode" => config["standings_mode"].as_str().unwrap_or("Private"),
+        "decklists_mode" => config["decklists_mode"].as_str().unwrap_or("Winner"),
+        "max_rounds" => config["max_rounds"].as_u32().unwrap_or(0),
+        "league_uid" => config["league_uid"].clone(),
+        "round_time" => config["round_time"].as_u32().unwrap_or(0),
+        "finals_time" => config["finals_time"].as_u32().unwrap_or(0),
+        "time_extension_policy" => config["time_extension_policy"].as_str().unwrap_or("additions"),
+        "players" => json::array![],
+        "rounds" => json::array![],
+        "finals" => json::JsonValue::Null,
+        "winner" => "",
+        "standings" => json::array![],
+    };
+
+    Ok(tournament.dump())
+}
+
 /// Process a tournament event and return updated tournament + deck side-effects.
 ///
 /// # Arguments
@@ -1693,34 +1793,9 @@ fn apply_event(
         TournamentEvent::UpdateConfig { config } => {
             require_organizer(actor)?;
 
-            // Validate before applying
-            if let Some(f) = config["format"].as_str() {
-                validate_enum(f, &["Standard", "V5", "Limited"], "format")?;
-            }
-            if let Some(r) = config["rank"].as_str() {
-                validate_enum(
-                    r,
-                    &["", "National Championship", "Continental Championship"],
-                    "rank",
-                )?;
-            }
-            if let Some(s) = config["standings_mode"].as_str() {
-                validate_enum(
-                    s,
-                    &["Private", "Cutoff", "Top 10", "Public"],
-                    "standings_mode",
-                )?;
-            }
-            if let Some(d) = config["decklists_mode"].as_str() {
-                validate_enum(d, &["Winner", "Finalists", "All"], "decklists_mode")?;
-            }
-            if config.has_key("name") {
-                if let Some(n) = config["name"].as_str() {
-                    if n.trim().is_empty() {
-                        return Err("name cannot be empty".to_string());
-                    }
-                }
-            }
+            // Validate shared config fields
+            validate_config_fields(config)?;
+
             if let Some(mr) = config["max_rounds"].as_usize() {
                 if mr != 0 {
                     let completed = count_completed_rounds(tournament);
@@ -1731,13 +1806,6 @@ fn apply_event(
                         ));
                     }
                 }
-            }
-            if let Some(p) = config["time_extension_policy"].as_str() {
-                validate_enum(
-                    p,
-                    &["additions", "clock_stop", "both"],
-                    "time_extension_policy",
-                )?;
             }
             // Validate league_uid: only league organizers (or IC) can link
             if config.has_key("league_uid") && !config["league_uid"].is_null() {
@@ -1810,6 +1878,10 @@ fn apply_event(
             }
 
             Ok(())
+        }
+
+        TournamentEvent::CreateTournament { .. } => {
+            Err("CreateTournament is not a tournament event — use create_tournament() instead".to_string())
         }
     }
 }

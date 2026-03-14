@@ -193,6 +193,10 @@ mod shared {
         ))
     }
 
+    pub fn create_tournament_json(config_json: &str, actor_json: &str) -> Result<String, String> {
+        super::tournament::create_tournament(config_json, actor_json)
+    }
+
     pub fn compute_league_standings_json(config_json: &str) -> Result<String, String> {
         league::compute_league_standings(config_json)
     }
@@ -330,6 +334,15 @@ mod wasm {
             enrich_deck_json(deck_json, cards_json)
         }
 
+        #[wasm_bindgen(js_name = createTournament)]
+        pub fn create_tournament(
+            &self,
+            config_json: &str,
+            actor_json: &str,
+        ) -> Result<String, String> {
+            create_tournament_json(config_json, actor_json)
+        }
+
         #[wasm_bindgen(js_name = computeLeagueStandings)]
         pub fn compute_league_standings(&self, config_json: &str) -> Result<String, String> {
             compute_league_standings_json(config_json)
@@ -447,6 +460,10 @@ mod python {
 
         fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> PyResult<String> {
             py_str(enrich_deck_json(deck_json, cards_json))
+        }
+
+        fn create_tournament(&self, config_json: &str, actor_json: &str) -> PyResult<String> {
+            py_str(create_tournament_json(config_json, actor_json))
         }
 
         fn compute_league_standings(&self, config_json: &str) -> PyResult<String> {

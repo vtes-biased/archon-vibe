@@ -221,6 +221,11 @@ pub enum TournamentEvent {
     UpdateConfig {
         config: JsonValue,
     },
+
+    // Tournament creation
+    CreateTournament {
+        config: JsonValue,
+    },
 }
 
 #[derive(Debug, Clone)]

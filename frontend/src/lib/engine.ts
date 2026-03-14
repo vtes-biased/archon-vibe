@@ -389,6 +389,18 @@ export function computePlayerIssuesSync(
 }
 
 /**
+ * Create a tournament using the WASM engine (for offline creation).
+ */
+export async function createTournamentWithEngine(
+  config: Record<string, unknown>,
+  actor: { uid: string; roles: string[]; is_organizer: boolean; can_organize_league_uids: string[] }
+): Promise<Record<string, unknown>> {
+  const engine = await initEngine();
+  const result = engine.createTournament(JSON.stringify(config), JSON.stringify(actor));
+  return JSON.parse(result);
+}
+
+/**
  * Build actor context from current user and tournament.
  */
 export async function buildActorContext(
