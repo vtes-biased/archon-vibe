@@ -58,7 +58,9 @@
 
     // Listen for sync events
     const handleSyncEvent = (event: { type: string; error?: string }) => {
-      if (event.type === 'connected') {
+      if (event.type === 'syncing') {
+        isSyncing = true;
+      } else if (event.type === 'connected') {
         syncError = null;
       } else if (event.type === 'sync_complete') {
         isSyncing = false;

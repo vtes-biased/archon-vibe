@@ -38,7 +38,7 @@ import { isOffline, getOfflineTournamentUids } from '$lib/stores/offline.svelte'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'deck' | 'league' | 'judge_call' | 'sync_complete' | 'resync' | 'error' | 'disconnected';
+type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'deck' | 'league' | 'judge_call' | 'sync_complete' | 'syncing' | 'resync' | 'error' | 'disconnected';
 
 export interface JudgeCallData {
   tournament_uid: string;
@@ -162,6 +162,7 @@ class SyncManager {
   async connect(): Promise<void> {
     await this.disconnect();
     this.isSynced = false;
+    this.emit({ type: 'syncing' });
 
     let lastSync: string | null = await getLastSyncTimestamp();
 

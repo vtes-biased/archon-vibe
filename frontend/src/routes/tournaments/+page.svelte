@@ -21,6 +21,14 @@
     const timer = setTimeout(() => { showLoading = true; }, 200);
     return () => clearTimeout(timer);
   });
+  let isSyncing = $state(!syncManager.isSynced);
+  let showSyncing = $state(false);
+  // Delay showing syncing spinner to avoid flash
+  $effect(() => {
+    if (!isSyncing) { showSyncing = false; return; }
+    const timer = setTimeout(() => { showSyncing = true; }, 200);
+    return () => clearTimeout(timer);
+  });
   let error = $state<string | null>(null);
 
   // View mode
@@ -147,7 +155,14 @@
   // SSE sync listener
   $effect(() => {
     const handleSyncEvent = (event: { type: string }) => {
-      if (event.type === "tournament" || event.type === "sync_complete") {
+      if (event.type === "syncing") {
+        isSyncing = true;
+      } else if (event.type === "sync_complete") {
+        isSyncing = false;
+        loadTournaments();
+      } else if (event.type === "error" || event.type === "disconnected") {
+        isSyncing = false;
+      } else if (event.type === "tournament") {
         loadTournaments();
       }
     };
@@ -456,6 +471,14 @@
           <p class="text-ash-400">{m.tournaments_loading_from_storage()}</p>
         </div>
       {/if}
+    {:else if showSyncing}
+      <div class="text-center py-12">
+        <div class="text-ash-500 mb-4">
+          <Loader2 class="mx-auto h-12 w-12 animate-spin" />
+        </div>
+        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.status_syncing()}</h3>
+        <p class="text-ash-400">{m.tournaments_loading_from_storage()}</p>
+      </div>
     {:else}
       <div class="text-center py-12">
         <div class="text-ash-600 mb-4">
