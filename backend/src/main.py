@@ -11,7 +11,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
 from fastapi import FastAPI, Response
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from .broadcast import (
@@ -385,15 +384,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Archon", version="0.1.0", lifespan=lifespan)
 
-# Configure CORS - allow all origins for development
-app.add_middleware(
-    CORSMiddleware,  # ty: ignore[invalid-argument-type]
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Include routers
 app.include_router(auth.router)
 app.include_router(users.router)
@@ -435,32 +425,6 @@ def _viewer_level(viewer: User | None) -> DataLevel:
 
 
 
-@app.options("/stream")
-async def stream_options() -> Response:
-    """Handle CORS preflight for SSE endpoint."""
-    return Response(
-        content="",
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        },
-    )
-
-
-@app.options("/snapshot")
-async def snapshot_options() -> Response:
-    """Handle CORS preflight for snapshot endpoint."""
-    return Response(
-        content="",
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        },
-    )
-
-
 async def _resolve_user_from_token(token: str | None) -> User | None:
     """Resolve a User from a JWT token query param. Returns None on any failure."""
     if not token:
@@ -497,10 +461,7 @@ async def get_snapshot(token: str | None = None) -> Response:
             content='{"error":"snapshot not available yet"}',
             status_code=503,
             media_type="application/json",
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Retry-After": "60",
-            },
+            headers={"Retry-After": "60"},
         )
 
     # Read and serve the gzip file directly
@@ -511,7 +472,6 @@ async def get_snapshot(token: str | None = None) -> Response:
         headers={
             "Content-Encoding": "gzip",
             "Cache-Control": "no-cache",
-            "Access-Control-Allow-Origin": "*",
         },
     )
 
@@ -749,8 +709,5 @@ async def stream_updates(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
         },
     )
