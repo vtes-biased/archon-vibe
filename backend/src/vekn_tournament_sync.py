@@ -327,6 +327,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         venue=tournament.venue,
                         venue_url=tournament.venue_url,
                         address=tournament.address,
+                        map_url=tournament.map_url,
                         external_ids=tournament.external_ids,
                         organizers_uids=merged_organizers,
                         players=tournament.players,
