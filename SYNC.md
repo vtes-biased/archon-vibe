@@ -95,7 +95,7 @@ Triggered when a viewer's data level changes (role or vekn_id change).
 
 ### Generic Broadcast
 
-Single `_broadcast()` function with per-viewer filtering replaces 4 separate broadcast functions.
+Single `broadcast_precomputed()` function (in `broadcast.py`) with per-viewer filtering handles all object types.
 
 ### Snapshot-Based Initial Sync
 
@@ -211,7 +211,7 @@ Apply to IndexedDB optimistically → send to server → SSE corrects if needed.
 3. **CRUD wrappers** in `db.py`: thin wrappers calling `save_object_from_model("<type>", obj)` and `get_object_full(uid, Type)`
 4. **Add to `_STREAM_TYPES`** in `main.py` (SSE catch-up loop)
 5. **Add to `OBJECT_TYPES`** in `snapshots.py`
-6. **Broadcast** via `_broadcast()` after mutations
+6. **Broadcast** via `broadcast_precomputed()` (from `broadcast.py`) after mutations
 7. **Frontend type** in `types.ts`
 8. **IndexedDB store** in `db.ts` (bump version → full clear)
 9. **Add to `SPECS`** in `sync.ts`
