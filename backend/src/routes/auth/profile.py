@@ -103,19 +103,27 @@ async def update_current_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Track locally modified fields so VEKN sync won't overwrite them
+    local_mods = set(user.local_modifications)
+
     # Update only provided fields
     if request.name is not None:
         user.name = request.name
+        local_mods.add("name")
     if request.nickname is not None:
         user.nickname = request.nickname if request.nickname else None
     if request.country is not None:
         user.country = request.country.upper() if request.country else None
+        local_mods.add("country")
     if request.city is not None:
         user.city = request.city if request.city else None
+        local_mods.add("city")
         if not request.city:
             user.city_geoname_id = None
+            local_mods.add("city_geoname_id")
     if request.city_geoname_id is not None:
         user.city_geoname_id = request.city_geoname_id if request.city_geoname_id else None
+        local_mods.add("city_geoname_id")
     if request.contact_email is not None:
         user.contact_email = request.contact_email if request.contact_email else None
     if request.contact_phone is not None:
@@ -162,8 +170,9 @@ async def update_current_user(
             ))
         user.community_links = links
 
-    # Update modified timestamp
+    # Update modified timestamp and local modifications
     user.modified = datetime.now(UTC)
+    user.local_modifications = local_mods
 
     bd = await update_user(user)
     broadcast_precomputed(bd)
