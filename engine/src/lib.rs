@@ -15,146 +15,12 @@ pub use permissions::{
 };
 
 // ============================================================================
-// Base object structure matching the architecture
-#[derive(Debug, Clone)]
-pub struct BaseObject {
-    pub uid: String,
-    pub modified: String, // ISO 8601 timestamp
-    pub data: JsonValue,
-}
-
-impl BaseObject {
-    pub fn from_json(value: &JsonValue) -> Result<Self, String> {
-        Ok(BaseObject {
-            uid: value["uid"].as_str().ok_or("uid is required")?.to_string(),
-            modified: value["modified"]
-                .as_str()
-                .ok_or("modified is required")?
-                .to_string(),
-            data: value.clone(),
-        })
-    }
-
-    pub fn to_json(&self) -> JsonValue {
-        self.data.clone()
-    }
-}
-
-// Business event structure
-#[derive(Debug, Clone)]
-pub struct BusinessEvent {
-    pub event_type: String,
-    pub payload: JsonValue,
-}
-
-impl BusinessEvent {
-    pub fn from_json(value: &JsonValue) -> Result<Self, String> {
-        Ok(BusinessEvent {
-            event_type: value["event_type"]
-                .as_str()
-                .ok_or("event_type is required")?
-                .to_string(),
-            payload: value["payload"].clone(),
-        })
-    }
-}
-
-// CRUD event structure
-#[derive(Debug, Clone)]
-pub enum CrudEvent {
-    Create { object: BaseObject },
-    Update { object: BaseObject },
-    Delete { uid: String },
-}
-
-impl CrudEvent {
-    pub fn to_json(&self) -> JsonValue {
-        match self {
-            CrudEvent::Create { object } => {
-                json::object! {
-                    type: "Create",
-                    object: object.to_json()
-                }
-            }
-            CrudEvent::Update { object } => {
-                json::object! {
-                    type: "Update",
-                    object: object.to_json()
-                }
-            }
-            CrudEvent::Delete { uid } => {
-                json::object! {
-                    type: "Delete",
-                    uid: uid.clone()
-                }
-            }
-        }
-    }
-}
-
-// Core business logic engine
-pub struct Engine {
-    // State can be added here if needed
-}
-
-impl Engine {
-    pub fn new() -> Self {
-        Engine {}
-    }
-
-    /// Process a business event and return resulting CRUD events
-    pub fn process_event(
-        &self,
-        event: BusinessEvent,
-        _objects: &[BaseObject],
-    ) -> Result<Vec<CrudEvent>, String> {
-        // This is where business logic will be implemented
-        // For now, just a placeholder that demonstrates the pattern
-        Err(format!("Unknown event type: {}", event.event_type))
-    }
-
-    /// Validate an object according to business rules
-    pub fn validate_object(&self, object: &BaseObject) -> Result<(), String> {
-        if object.uid.is_empty() {
-            return Err("uid cannot be empty".to_string());
-        }
-        if object.modified.is_empty() {
-            return Err("modified cannot be empty".to_string());
-        }
-        Ok(())
-    }
-}
-
-impl Default for Engine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ============================================================================
 // Shared JSON→core→JSON functions (used by both WASM and PyO3 shims).
 // Appear unused when neither feature is enabled (test builds).
 // ============================================================================
 #[allow(dead_code)]
 mod shared {
     use super::*;
-
-    pub fn process_event_json(event_json: &str, objects_json: &str) -> Result<String, String> {
-        let event_value = json::parse(event_json).map_err(|e| e.to_string())?;
-        let event = BusinessEvent::from_json(&event_value)?;
-        let objects_value = json::parse(objects_json).map_err(|e| e.to_string())?;
-        let objects: Vec<BaseObject> = objects_value
-            .members()
-            .map(BaseObject::from_json)
-            .collect::<Result<_, _>>()?;
-        let crud_events = Engine::new().process_event(event, &objects)?;
-        Ok(JsonValue::Array(crud_events.iter().map(|e| e.to_json()).collect()).dump())
-    }
-
-    pub fn validate_object_json(object_json: &str) -> Result<(), String> {
-        let value = json::parse(object_json).map_err(|e| e.to_string())?;
-        Engine::new().validate_object(&BaseObject::from_json(&value)?)
-    }
 
     pub fn can_change_role_json(
         actor_json: &str,
@@ -369,20 +235,6 @@ mod wasm {
             WasmEngine
         }
 
-        #[wasm_bindgen(js_name = processEvent)]
-        pub fn process_event(
-            &self,
-            event_json: &str,
-            objects_json: &str,
-        ) -> Result<String, String> {
-            process_event_json(event_json, objects_json)
-        }
-
-        #[wasm_bindgen(js_name = validateObject)]
-        pub fn validate_object(&self, object_json: &str) -> Result<(), String> {
-            validate_object_json(object_json)
-        }
-
         #[wasm_bindgen(js_name = canChangeRole)]
         pub fn can_change_role(
             &self,
@@ -502,10 +354,6 @@ mod python {
         r.map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
-    fn py_unit(r: Result<(), String>) -> PyResult<()> {
-        r.map_err(pyo3::exceptions::PyValueError::new_err)
-    }
-
     #[pyclass]
     pub struct PyEngine;
 
@@ -514,14 +362,6 @@ mod python {
         #[new]
         fn new() -> Self {
             PyEngine
-        }
-
-        fn process_event(&self, event_json: &str, objects_json: &str) -> PyResult<String> {
-            py_str(process_event_json(event_json, objects_json))
-        }
-
-        fn validate_object(&self, object_json: &str) -> PyResult<()> {
-            py_unit(validate_object_json(object_json))
         }
 
         fn can_change_role(
@@ -666,26 +506,3 @@ mod python {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validate_object() {
-        let engine = Engine::new();
-        let data = json::object! {
-            uid: "test-uid",
-            modified: "2025-11-08T12:00:00Z"
-        };
-        let object = BaseObject::from_json(&data).unwrap();
-
-        assert!(engine.validate_object(&object).is_ok());
-
-        let invalid_data = json::object! {
-            uid: "",
-            modified: "2025-11-08T12:00:00Z"
-        };
-        let invalid_object = BaseObject::from_json(&invalid_data).unwrap();
-        assert!(engine.validate_object(&invalid_object).is_err());
-    }
-}
