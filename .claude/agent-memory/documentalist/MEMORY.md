@@ -114,6 +114,12 @@ When Rust engine capabilities change:
 - E2E strategy: real auth (JWT tokens via /auth/login), real DB (truncate + seed), IDB polling to read WASM results for API scoring
 - Test spec coverage: users.spec.ts (SSE sync), tournament.spec.ts (full lifecycle with 2 rounds)
 
+**Session 2026-03-14: TWDA inbound import**
+- ARCHITECTURE.md: split "TWDA Integration" into "TWDA Outbound (Export)" (existing GitHub PR flow) and new "TWDA Inbound (Import)" section
+- New section documents: `twda_import.py`, matching logic (numeric id vs event_link fallback), ETag caching, DeckObject fields (`attribution="twda"`, `public=True`), skip-if-winner-has-deck guard
+- Scheduled tasks table updated: VEKN sync row now includes `twda_import.py`
+- No changes to CLAUDE.md (DeckObject `attribution` field already documented), SYNC.md (no new object type/sync pattern), or other docs
+
 **Session 2026-02-16: Icon library migration (@iconify/svelte → lucide-svelte)**
 - Replaced @iconify/svelte (runtime icon fetching from api.iconify.design) with lucide-svelte (tree-shaken, build-time bundled)
 - Updated staff-frontend-engineer MEMORY.md stack dependencies (line 9)

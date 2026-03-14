@@ -621,7 +621,7 @@ Pulls data FROM vekn.net into Archon. Runs periodically (default every 6h).
 
 **Triggered by**: Scheduled background task + manual `POST /admin/sync-vekn` and `POST /admin/sync-vekn-tournaments`
 
-## TWDA Integration
+## TWDA Outbound (Export)
 
 Auto-submits winner's decklists to the [Tournament Winning Deck Archive](https://github.com/GiottoVerducci/TWD).
 
@@ -633,6 +633,23 @@ Auto-submits winner's decklists to the [Tournament Winning Deck Archive](https:/
 - Late uploads (winner adds deck post-tournament) trigger PR at that point
 
 **Key files**: `backend/src/twda.py`, `engine/src/deck.rs` (`export_twda`)
+
+## TWDA Inbound (Import)
+
+Pulls winner decklists from [static.krcg.org/data/twda.json](https://static.krcg.org/data/twda.json) and creates `DeckObject`s for matched tournaments.
+
+**Trigger**: Runs as part of `run_vekn_sync()` (after tournament sync, before rating recompute). Manual trigger: `POST /admin/sync-twda-decks`.
+
+**Matching logic**:
+- Recent TWDA entries: numeric `id` matches `tournament.external_ids["vekn"]`
+- Older entries: VEKN ID extracted from `event_link` URL
+- Only creates a deck if the winner has no existing deck for that tournament
+
+**DeckObject created**: `attribution="twda"`, `public=True`, cards flattened from nested crypt/library structure into `{card_id_str: count}`.
+
+**ETag caching**: In-memory only (no persistent cache). `~12MB` JSON released via `del raw_entries` after parsing.
+
+**Key file**: `backend/src/twda_import.py`
 
 ## Archon Import
 
@@ -668,7 +685,7 @@ Consolidates all associated data: sanctions, tournament participation, deck owne
 
 | Job | Schedule | Module | Description |
 |-----|----------|--------|-------------|
-| VEKN sync | Every 6h (configurable) | `vekn_sync.py`, `vekn_tournament_sync.py` | Pull members + historical tournaments from VEKN |
+| VEKN sync | Every 6h (configurable) | `vekn_sync.py`, `vekn_tournament_sync.py`, `twda_import.py` | Pull members + historical tournaments from VEKN; import TWDA winner decks |
 | VEKN push | Every 1h (configurable) | `vekn_push.py` | Batch push missed tournament events/results/members |
 | Sanction cleanup | Daily | `db.py` | Soft-delete expired (>18mo), hard-delete soft-deleted (>30d) |
 | Rating recompute | Daily | `ratings.py` | Full recompute of all player ratings and wins |
