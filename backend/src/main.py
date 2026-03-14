@@ -368,6 +368,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Archon", version="0.1.0", lifespan=lifespan)
 
+# CORS: only needed in development (nginx handles it in production)
+if os.getenv("ENVIRONMENT", "development") == "development":
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 # Include routers
 app.include_router(auth.router)
 app.include_router(users.router)
