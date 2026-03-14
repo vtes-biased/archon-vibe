@@ -194,12 +194,8 @@ test.describe('Users list filtering', () => {
 
 // ─── Authenticated Features ────────────────────────────────────
 
-// Edit user tests are skipped: the WASM engine fails to initialize in the E2E
-// environment ("WasmEngine is not a constructor"), so canEditUser() always
-// returns false and the edit button never renders. This is a pre-existing
-// WASM build issue unrelated to the Community page redesign.
 test.describe('Edit user (authenticated)', () => {
-  test.fixme('shows edit button when authenticated', async ({ page }) => {
+  test('shows edit button when authenticated', async ({ page }) => {
     await page.goto('/login');
     await loginAsOrganizer(page);
     await page.goto('/users');
@@ -212,7 +208,7 @@ test.describe('Edit user (authenticated)', () => {
     await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
   });
 
-  test.fixme('opens edit mode and shows form fields', async ({ page }) => {
+  test('opens edit mode and shows form fields', async ({ page }) => {
     await page.goto('/login');
     await loginAsOrganizer(page);
     await page.goto('/users');
@@ -230,7 +226,7 @@ test.describe('Edit user (authenticated)', () => {
     await expect(page.getByTitle('Close')).toBeVisible();
   });
 
-  test.fixme('can close edit mode', async ({ page }) => {
+  test('can close edit mode', async ({ page }) => {
     await page.goto('/login');
     await loginAsOrganizer(page);
     await page.goto('/users');
