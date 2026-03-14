@@ -28,7 +28,7 @@ router = APIRouter(prefix="/vekn", tags=["vekn"])
 encoder = msgspec.json.Encoder()
 logger = logging.getLogger(__name__)
 
-from ..broadcast import broadcast_resync
+from ..broadcast import broadcast_precomputed, broadcast_resync
 
 
 async def _get_current_user_from_token(authorization: str | None) -> User:
@@ -244,7 +244,8 @@ async def sponsor_new_member(
         vekn_synced_at=None,
     )
 
-    await update_user(updated)
+    bd = await update_user(updated)
+    broadcast_precomputed(bd)
     await set_user_resync_after(updated.uid)
     logger.info(
         f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}"

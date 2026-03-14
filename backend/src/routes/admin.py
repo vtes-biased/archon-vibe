@@ -60,12 +60,14 @@ class MergeRequest(BaseModel):
 
 
 @router.post("/sync-vekn")
-async def trigger_vekn_sync() -> dict:
-    """
-    Manually trigger VEKN member synchronization.
+async def trigger_vekn_sync(
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Manually trigger VEKN member synchronization. Requires IC role."""
+    manager = await _get_current_user_from_token(authorization)
+    if Role.IC not in manager.roles:
+        raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
-    Returns sync statistics.
-    """
     if not _sync_service:
         raise HTTPException(
             status_code=503, detail="VEKN sync service is not available"
@@ -81,8 +83,14 @@ async def trigger_vekn_sync() -> dict:
 
 
 @router.post("/sync-vekn-tournaments")
-async def trigger_vekn_tournament_sync() -> dict:
-    """Manually trigger VEKN tournament synchronization."""
+async def trigger_vekn_tournament_sync(
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Manually trigger VEKN tournament synchronization. Requires IC role."""
+    manager = await _get_current_user_from_token(authorization)
+    if Role.IC not in manager.roles:
+        raise HTTPException(status_code=403, detail="Only IC can trigger sync")
+
     if not _sync_service:
         raise HTTPException(
             status_code=503, detail="VEKN sync service is not available"
@@ -100,8 +108,14 @@ async def trigger_vekn_tournament_sync() -> dict:
 
 
 @router.post("/sync-twda-decks")
-async def trigger_twda_deck_import() -> dict:
-    """Manually trigger TWDA winner decklist import."""
+async def trigger_twda_deck_import(
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Manually trigger TWDA winner decklist import. Requires IC role."""
+    manager = await _get_current_user_from_token(authorization)
+    if Role.IC not in manager.roles:
+        raise HTTPException(status_code=403, detail="Only IC can trigger sync")
+
     try:
         from ..twda_import import import_twda_decks
 

@@ -985,18 +985,18 @@ async def tournament_action(
             for s in tournament_sanctions
         ]
 
+        # Inject authoritative vekn_id for Register/AddPlayer (server overrides client)
+        if request.type in ("Register", "AddPlayer") and request.user_uid:
+            target_user = await get_user_by_uid(request.user_uid)
+            if target_user and target_user.vekn_id:
+                event_data["vekn_id"] = target_user.vekn_id
+
         # Serialize tournament to JSON for engine
         tournament_json = encoder.encode(tournament).decode("utf-8")
         event_json = msgspec.json.encode(event_data).decode("utf-8")
         actor_json = msgspec.json.encode(actor_data).decode("utf-8")
         sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
         decks_json = await _build_decks_json(uid)
-
-        # Inject authoritative vekn_id for Register/AddPlayer (server overrides client)
-        if request.type in ("Register", "AddPlayer") and request.user_uid:
-            target_user = await get_user_by_uid(request.user_uid)
-            if target_user and target_user.vekn_id:
-                event_data["vekn_id"] = target_user.vekn_id
 
         # Backend pre-checks for cross-tournament sanctions
         if request.type in ("CheckIn", "Register", "AddPlayer"):

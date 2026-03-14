@@ -187,6 +187,7 @@ async def import_twda_decks() -> dict[str, int]:
             public=True,
         )
         bd = await save_object_from_model(ObjectType.DECK, deck)
+        bd.org_uids = tournament.organizers_uids
         broadcast_precomputed(bd)
         created += 1
 

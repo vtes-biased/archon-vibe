@@ -105,16 +105,19 @@ async def _can_lift_sanction(user, sanction: Sanction) -> bool:
     if Role.IC in user.roles or Role.RULEMONGER in user.roles:
         return True
 
-    # NC can lift if same country as the tournament
-    if Role.NC in user.roles and sanction.tournament_uid:
+    # Fetch tournament once for both NC and league organizer checks
+    tournament = None
+    if sanction.tournament_uid:
         tournament = await get_tournament_by_uid(sanction.tournament_uid)
-        if tournament and tournament.country and user.country == tournament.country:
+
+    # NC can lift if same country as the tournament
+    if Role.NC in user.roles and tournament:
+        if tournament.country and user.country == tournament.country:
             return True
 
     # League organizer can lift DQ from their league tournaments
-    if sanction.level == SanctionLevel.DISQUALIFICATION and sanction.tournament_uid:
-        tournament = await get_tournament_by_uid(sanction.tournament_uid)
-        if tournament and tournament.league_uid:
+    if sanction.level == SanctionLevel.DISQUALIFICATION and tournament:
+        if tournament.league_uid:
             league = await get_league_by_uid(tournament.league_uid)
             if league and user.uid in (league.organizers_uids or []):
                 return True
