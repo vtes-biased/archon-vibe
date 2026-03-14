@@ -193,12 +193,22 @@ class CommunityLinkType(StrEnum):
     OTHER = "other"
 
 
+class LinkModeration(msgspec.Struct, kw_only=True, frozen=True):
+    """Moderation state for a community link, set by NC/Prince/IC."""
+
+    status: str  # "hidden" | "promoted"
+    by: str  # moderator user_uid
+    at: datetime
+
+
 class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
-    """A community resource link shared by an official."""
+    """A community resource link shared by a member."""
 
     type: CommunityLinkType
     url: str
     label: str = ""
+    language: str = ""  # ISO 639-1 code (e.g., "en", "es"). Empty = unset.
+    moderation: LinkModeration | None = None
 
 
 class TimeExtensionPolicy(StrEnum):

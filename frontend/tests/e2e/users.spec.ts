@@ -54,6 +54,28 @@ test.describe('App loads correctly', () => {
   });
 });
 
+// ─── Community Tab ────────────────────────────────────────────
+
+test.describe('Community tab', () => {
+  test('shows all three sections with seeded links', async ({ page }) => {
+    await page.goto('/users');
+    await waitForSync(page);
+    await expect(page.getByText('Global Resources')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByText('Communities', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Content', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Officials Directory')).toBeVisible();
+  });
+
+  test('country search filters Communities section', async ({ page }) => {
+    await page.goto('/users');
+    await waitForSync(page);
+    await page.getByPlaceholder('Search countries...').fill('Germany');
+    await page.waitForTimeout(300);
+    await expect(page.getByText('Germany')).toBeVisible();
+    await expect(page.getByText('France')).not.toBeVisible();
+  });
+});
+
 // ─── Login Page ────────────────────────────────────────────────
 
 test.describe('Login page', () => {

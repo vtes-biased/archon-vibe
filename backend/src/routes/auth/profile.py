@@ -23,6 +23,7 @@ class CommunityLinkInput(BaseModel):
     type: str
     url: str
     label: str = ""
+    language: str = ""
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -125,20 +126,26 @@ async def update_current_user(
     if request.phone_is_whatsapp is not None:
         user.phone_is_whatsapp = request.phone_is_whatsapp
     if request.community_links is not None:
-        # Only officials can set community links
+        if not user.vekn_id:
+            raise HTTPException(
+                status_code=403,
+                detail="VEKN membership required to add community links",
+            )
         is_official = any(
             r in (Role.IC, Role.NC, Role.PRINCE) for r in user.roles
         )
-        if not is_official:
+        max_links = 10 if is_official else 5
+        if len(request.community_links) > max_links:
             raise HTTPException(
-                status_code=403,
-                detail="Only officials (IC/NC/Prince) can manage community links",
-            )
-        if len(request.community_links) > 10:
-            raise HTTPException(
-                status_code=422, detail="Maximum 10 community links allowed"
+                status_code=422,
+                detail=f"Maximum {max_links} community links allowed",
             )
         links = []
+        # Build map of existing moderation states (keyed by url)
+        existing_mod: dict[str, object] = {}
+        for existing in user.community_links:
+            if existing.moderation:
+                existing_mod[existing.url] = existing.moderation
         for link in request.community_links:
             try:
                 link_type = CommunityLinkType(link.type)
@@ -150,7 +157,12 @@ async def update_current_user(
                 raise HTTPException(
                     status_code=422, detail=f"Invalid URL: {link.url}"
                 )
-            links.append(CommunityLink(type=link_type, url=link.url, label=link.label))
+            # Preserve moderation state from existing link with same URL
+            mod = existing_mod.get(link.url)
+            links.append(CommunityLink(
+                type=link_type, url=link.url, label=link.label,
+                language=link.language, moderation=mod,
+            ))
         user.community_links = links
 
     # Update modified timestamp

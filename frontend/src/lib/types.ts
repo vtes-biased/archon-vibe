@@ -22,10 +22,18 @@ export type AuthMethodType = "email" | "discord" | "passkey";
 
 export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | "facebook" | "website" | "twitch" | "youtube" | "reddit" | "instagram" | "blog" | "other";
 
+export interface LinkModeration {
+  status: "hidden" | "promoted";
+  by: string; // moderator user_uid
+  at: string; // ISO datetime
+}
+
 export interface CommunityLink {
   type: CommunityLinkType;
   url: string;
   label: string;
+  language: string;
+  moderation?: LinkModeration | null;
 }
 
 export type SanctionLevel = "caution" | "warning" | "standings_adjustment" | "disqualification" | "suspension" | "probation";

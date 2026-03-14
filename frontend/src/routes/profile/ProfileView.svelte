@@ -38,10 +38,41 @@
   let editContactPhone = $state(initial.contact_phone || "");
   let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
 
-  interface EditLink { type: CommunityLinkType; url: string; label: string }
+  interface EditLink { type: CommunityLinkType; url: string; label: string; language: string }
   let editLinks = $state<EditLink[]>(
-    (initial.community_links || []).map((l: any) => ({ ...l }))
+    (initial.community_links || []).map((l: any) => ({ type: l.type, url: l.url, label: l.label, language: l.language || "" }))
   );
+
+  // Country → default language
+  const COUNTRY_LANGUAGE: Record<string, string> = {
+    US: "en", GB: "en", AU: "en", CA: "en", NZ: "en", IE: "en", ZA: "en",
+    FR: "fr", BE: "fr", CH: "fr",
+    ES: "es", MX: "es", AR: "es", CO: "es", CL: "es", PE: "es", VE: "es",
+    PT: "pt", BR: "pt",
+    IT: "it",
+    DE: "de", AT: "de",
+    PL: "pl", FI: "fi", SE: "sv", NL: "nl", NO: "no", DK: "da",
+    JP: "ja", CN: "zh", TW: "zh", KR: "ko", RU: "ru",
+    CZ: "cs", HU: "hu", RO: "ro", BG: "bg", HR: "hr", GR: "el", TR: "tr",
+  };
+  const defaultLanguage = $derived(COUNTRY_LANGUAGE[editCountry] || "en");
+
+  const CONTENT_TYPES = new Set(["youtube", "twitch", "blog", "website", "instagram", "other"]);
+  const LANGUAGES = [
+    { value: "en", label: "English" }, { value: "es", label: "Español" },
+    { value: "fr", label: "Français" }, { value: "pt", label: "Português" },
+    { value: "it", label: "Italiano" }, { value: "de", label: "Deutsch" },
+    { value: "pl", label: "Polski" }, { value: "fi", label: "Suomi" },
+    { value: "sv", label: "Svenska" }, { value: "nl", label: "Nederlands" },
+    { value: "ja", label: "日本語" }, { value: "zh", label: "中文" },
+    { value: "ko", label: "한국어" }, { value: "ru", label: "Русский" },
+    { value: "cs", label: "Čeština" }, { value: "hu", label: "Magyar" },
+    { value: "ro", label: "Română" }, { value: "hr", label: "Hrvatski" },
+    { value: "el", label: "Ελληνικά" }, { value: "tr", label: "Türkçe" },
+    { value: "th", label: "ไทย" },
+  ];
+
+  const maxLinks = $derived(isOfficial ? 10 : 5);
 
   const LINK_TYPES: { value: CommunityLinkType; label: string }[] = [
     { value: "discord", label: "Discord" },
@@ -121,8 +152,8 @@
   }
 
   function addLink() {
-    if (editLinks.length >= 10) return;
-    editLinks = [...editLinks, { type: "discord", url: "", label: "" }];
+    if (editLinks.length >= maxLinks) return;
+    editLinks = [...editLinks, { type: "discord", url: "", label: "", language: defaultLanguage }];
   }
 
   function removeLink(index: number) {
@@ -300,10 +331,16 @@
   </div>
 </div>
 
-<!-- Community Links (officials only) -->
-{#if isOfficial}
+<!-- Community Links -->
+{#if user.vekn_id}
   <div class="p-6 border-t border-ash-800">
     <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide mb-4">{m.profile_community_links()}</h3>
+
+    {#if !isOfficial}
+      <div class="p-3 rounded border text-sm banner-blue mb-4">
+        {m.profile_community_links_member()}
+      </div>
+    {/if}
 
     <div class="space-y-3">
       {#each editLinks as link, i}
@@ -315,6 +352,14 @@
                 <option value={lt.value}>{lt.label}</option>
               {/each}
             </select>
+            {#if CONTENT_TYPES.has(link.type)}
+              <select bind:value={link.language} onchange={saveLinks}
+                class="px-2 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 text-sm w-32">
+                {#each LANGUAGES as lang}
+                  <option value={lang.value}>{lang.label}</option>
+                {/each}
+              </select>
+            {/if}
             <button type="button" onclick={() => removeLink(i)}
               class="p-2 text-ash-500 hover:text-crimson-400 transition-colors shrink-0">
               <Trash2 class="w-4 h-4" />
@@ -330,7 +375,7 @@
       {/each}
     </div>
 
-    {#if editLinks.length < 10}
+    {#if editLinks.length < maxLinks}
       <button type="button" onclick={addLink}
         class="mt-3 flex items-center gap-1 text-sm text-crimson-500 hover:text-crimson-400 transition-colors">
         <Plus class="w-4 h-4" />

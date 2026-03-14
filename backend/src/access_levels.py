@@ -22,6 +22,8 @@ _USER_PUBLIC_FIELDS = {
 }
 _USER_CONTACT_FIELDS = {"contact_email", "contact_discord", "contact_phone", "phone_is_whatsapp"}
 _USER_COMMUNITY_LINKS = {"community_links"}
+# Minimal fields for anonymous link browsing (no name/personal info)
+_USER_LINKS_ONLY_FIELDS = {"uid", "modified", "deleted_at", "country", "roles", "community_links"}
 _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
     | {"vekn_id", "city", "city_geoname_id", "state", "nickname", "avatar_path"}
@@ -55,6 +57,7 @@ def compute_user_public(d: dict) -> dict | None:
 
     NC/Prince: public fields + contact info + community_links
     IC: public fields + community_links only (no contact info)
+    Any user with community_links: minimal fields (country, roles, links) — no name
     Others: hidden
     """
     roles = d.get("roles", [])
@@ -62,6 +65,8 @@ def compute_user_public(d: dict) -> dict | None:
         return _pick(d, _USER_PUBLIC_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
     if Role.IC in roles:
         return _pick(d, _USER_PUBLIC_FIELDS | _USER_COMMUNITY_LINKS)
+    if d.get("community_links"):
+        return _pick(d, _USER_LINKS_ONLY_FIELDS)
     return None
 
 
@@ -69,14 +74,16 @@ def compute_user_member(d: dict) -> dict:
     """Member projection for User.
 
     All users visible with identity + rating fields.
-    NC/Prince: also get contact info + community_links (fixes bug where
-    members saw less than anonymous users).
+    NC/Prince: also get contact info + community_links.
     IC: also get community_links (no contact — IC contact is restricted).
+    Any user with community_links: include them in member projection.
     """
     roles = d.get("roles", [])
     if Role.NC in roles or Role.PRINCE in roles:
         return _pick(d, _USER_MEMBER_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
     if Role.IC in roles:
+        return _pick(d, _USER_MEMBER_FIELDS | _USER_COMMUNITY_LINKS)
+    if d.get("community_links"):
         return _pick(d, _USER_MEMBER_FIELDS | _USER_COMMUNITY_LINKS)
     return _pick(d, _USER_MEMBER_FIELDS)
 

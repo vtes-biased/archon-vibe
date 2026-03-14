@@ -932,6 +932,17 @@
   "community_no_officials": "No officials found",
   "community_no_officials_hint": "Officials will appear here once data is synced.",
   "community_add_contact_prompt": "Add your contact info and community links.",
+  "community_add_links_prompt": "Share your community links and content.",
+  "community_section_communities": "Communities",
+  "community_section_content": "Content",
+  "community_section_officials": "Officials Directory",
+  "community_filter_all": "All",
+  "community_search_countries": "Search countries...",
+  "community_no_content": "No content found for this language.",
+  "community_moderate_hide": "Hide link",
+  "community_moderate_promote": "Promote link",
+  "community_moderate_clear": "Clear moderation",
+  "profile_community_links_member": "Your community links are visible to all VEKN members.",
   "tournaments_discovery_banner": "Find your local VTES community and connect with coordinators.",
   "tournaments_discovery_link": "Explore Community"
 }

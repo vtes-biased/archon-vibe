@@ -120,6 +120,12 @@ When Rust engine capabilities change:
 - Scheduled tasks table updated: VEKN sync row now includes `twda_import.py`
 - No changes to CLAUDE.md (DeckObject `attribution` field already documented), SYNC.md (no new object type/sync pattern), or other docs
 
+**Session 2026-03-14: Community links redesign**
+- ARCHITECTURE.md: added "Community Links" section documenting CommunityLink/LinkModeration structs, access-level rules, moderation endpoint, and frontend components
+- SYNC.md: updated user row in access-level projections table to reflect community_links inclusion logic
+- CLAUDE.md: updated access model bullet points for public and member levels to reflect community_links visibility changes
+- Key changes: any member with vekn_id can now add links (up to 5; officials 10); `compute_user_member()` includes community_links for any user with non-empty links (not just officials); new `PATCH /api/users/{uid}/community-link-moderation` endpoint; CommunityTab split into 3 sub-components
+
 **Session 2026-02-16: Icon library migration (@iconify/svelte → lucide-svelte)**
 - Replaced @iconify/svelte (runtime icon fetching from api.iconify.design) with lucide-svelte (tree-shaken, build-time bundled)
 - Updated staff-frontend-engineer MEMORY.md stack dependencies (line 9)

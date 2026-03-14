@@ -105,8 +105,8 @@ Access projections computed by `access_levels.py` at write time. No per-viewer f
 
 Three pre-computed JSONB columns per object (see SYNC.md for field details):
 
-- **public**: no token or no vekn_id. Only Prince/NC users, minimal tournaments, no sanctions, no decks
-- **member**: has vekn_id. All users (no contact info), sanctions, most tournament fields, decks where `public=true` (own decks via personal overlay)
+- **public**: no token or no vekn_id. Only Prince/NC users (with contact + community_links), IC (community_links only), minimal tournaments, no sanctions, no decks
+- **member**: has vekn_id. All users (no contact info); community_links included for NC/Prince/IC and any member with non-empty links; sanctions; most tournament fields; decks where `public=true` (own decks via personal overlay)
 - **full**: base level for all viewers; personal overlay sends full data for own objects + role-based access (IC, NC/Prince same country, organizer)
 
 Projections computed by `access_levels.py` at write time. SSE reads the matching column directly.
