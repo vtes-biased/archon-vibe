@@ -695,28 +695,21 @@ class VEKNSyncService:
         if not has_changes:
             return existing_user, False
 
-        # Create and save updated user (trigger will set modified)
+        # Apply changes to existing user, preserving all non-sync fields
         now = datetime.now(UTC)
-        user_dict = {
-            "uid": existing_user.uid,
-            "modified": now,  # Will be overwritten by trigger
-            "name": new_name,
-            "country": new_country,
-            "vekn_id": existing_user.vekn_id,  # Never update VEKN ID
-            "city": new_city,
-            "city_geoname_id": new_city_geoname_id,
-            "state": new_state,
-            "nickname": existing_user.nickname,
-            "roles": new_roles,
-            "vekn_synced": True,
-            "vekn_synced_at": now,
-            "local_modifications": existing_user.local_modifications,
-            "vekn_prefix": new_vekn_prefix,
-        }
+        existing_user.name = new_name
+        existing_user.country = new_country
+        existing_user.city = new_city
+        existing_user.city_geoname_id = new_city_geoname_id
+        existing_user.state = new_state
+        existing_user.roles = new_roles
+        existing_user.vekn_prefix = new_vekn_prefix
+        existing_user.vekn_synced = True
+        existing_user.vekn_synced_at = now
+        existing_user.modified = now
 
-        updated_user = User(**user_dict)  # ty: ignore[invalid-argument-type]
-        await update_user(updated_user)
-        return updated_user, True
+        await update_user(existing_user)
+        return existing_user, True
 
     async def sync_player(self, vekn_player: dict[str, Any]) -> tuple[User, str]:
         """

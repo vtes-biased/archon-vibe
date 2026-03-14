@@ -92,7 +92,11 @@ function scheduleRefresh(expiresIn: number) {
   refreshTimer = setTimeout(async () => {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (refreshToken) {
-      await refreshTokens();
+      const success = await refreshTokens();
+      if (!success && localStorage.getItem(REFRESH_TOKEN_KEY)) {
+        // Network error — server may be restarting. Retry in 5 seconds.
+        scheduleRefresh(5);
+      }
     }
   }, refreshIn);
 }
@@ -174,6 +178,7 @@ async function refreshTokens(): Promise<boolean> {
     });
 
     if (!response.ok) {
+      // Server explicitly rejected the token — clear auth state
       clearTokens();
       setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
       return false;
@@ -183,8 +188,8 @@ async function refreshTokens(): Promise<boolean> {
     storeTokens(tokens);
     return true;
   } catch {
-    clearTokens();
-    setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
+    // Network error (server unreachable) — keep tokens for retry later.
+    // Don't clear auth state; the server may just be restarting.
     return false;
   }
 }
@@ -246,6 +251,12 @@ export async function initAuth(): Promise<void> {
     // Token expired, try to refresh
     const refreshed = await refreshTokens();
     if (!refreshed) {
+      // If we still have a refresh token, the server may be temporarily down.
+      // Keep tokens and show as not authenticated for now — next app load will retry.
+      const hasRefresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (!hasRefresh) {
+        clearTokens();
+      }
       setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
       return;
     }
@@ -266,7 +277,12 @@ export async function initAuth(): Promise<void> {
       }
     }
   } else {
-    clearTokens();
+    // fetchCurrentUser returns null on both auth failure and network error.
+    // Only clear tokens if the refresh token is also gone (definitively rejected).
+    const hasRefresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!hasRefresh) {
+      clearTokens();
+    }
     setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
   }
 }
