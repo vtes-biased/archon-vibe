@@ -95,6 +95,7 @@ test.describe('Tournament lifecycle', () => {
 
     // ── Step 2: Create tournament (optimistic: redirect is instant) ──
     await page.locator('#name').fill('E2E Test Tournament');
+    await page.locator('#start').fill('2099-01-01T10:00');
     await page.locator('#country').selectOption('US');
     await page.getByRole('button', { name: 'Create Tournament' }).click();
     await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]+/, { timeout: 2_000 });
@@ -105,7 +106,7 @@ test.describe('Tournament lifecycle', () => {
 
     // ── Step 3: Open Registration (optimistic) ──
     await page.getByRole('button', { name: 'Open Registration' }).click();
-    await expect(page.getByRole('button', { name: /Close Registration/ })).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByRole('button', { name: /Start Check-in/ })).toBeVisible({ timeout: 2_000 });
 
     // ── Step 4: Add Players via VEKN ID search ──
     await page.getByRole('button', { name: 'Players' }).click();
@@ -125,7 +126,7 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByText('8 registered')).toBeVisible({ timeout: 2_000 });
 
     // ── Step 5: Close Registration & Check In All (optimistic) ──
-    await page.getByRole('button', { name: 'Close Registration' }).click();
+    await page.getByRole('button', { name: 'Start Check-in' }).click();
     await expect(page.getByRole('button', { name: 'Check All In' })).toBeVisible({ timeout: 2_000 });
     await page.getByRole('button', { name: 'Check All In' }).click();
     await expect(
