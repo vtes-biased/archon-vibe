@@ -28,8 +28,7 @@ router = APIRouter(prefix="/vekn", tags=["vekn"])
 encoder = msgspec.json.Encoder()
 logger = logging.getLogger(__name__)
 
-# Broadcast function will be set by main.py
-broadcast_resync = None
+from ..broadcast import broadcast_resync
 
 
 async def _get_current_user_from_token(authorization: str | None) -> User:
@@ -131,8 +130,7 @@ async def claim_vekn_id(
     # Trigger resync — user gained a vekn_id, data level changes
     await set_user_resync_after(merged.uid)
     logger.info(f"User claimed VEKN ID {request.vekn_id}: {merged.uid}")
-    if broadcast_resync:
-        await broadcast_resync(merged.uid)
+    await broadcast_resync(merged.uid)
 
     # Issue new tokens for the VEKN user's uid (different from the old user)
     access_token, expires_in = create_access_token(merged.uid)
@@ -176,8 +174,7 @@ async def abandon_vekn_id(
         f"User abandoned VEKN ID {current_user.vekn_id}: old={current_user.uid} new={new_user.uid}"
     )
     await set_user_resync_after(new_user.uid)
-    if broadcast_resync:
-        await broadcast_resync(new_user.uid)
+    await broadcast_resync(new_user.uid)
 
     # Issue new tokens for the new user
     access_token, expires_in = create_access_token(new_user.uid)
@@ -264,8 +261,7 @@ async def sponsor_new_member(
     logger.info(
         f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}"
     )
-    if broadcast_resync:
-        await broadcast_resync(updated.uid)
+    await broadcast_resync(updated.uid)
 
     # Push new member to VEKN registry
     if os.getenv("VEKN_PUSH", "").lower() == "true":
@@ -365,12 +361,10 @@ async def link_vekn_to_user(
 
     # Trigger resync for affected users
     await set_user_resync_after(merged.uid)
-    if broadcast_resync:
-        await broadcast_resync(merged.uid)
+    await broadcast_resync(merged.uid)
     if displaced_user:
         await set_user_resync_after(displaced_user.uid)
-        if broadcast_resync:
-            await broadcast_resync(displaced_user.uid)
+        await broadcast_resync(displaced_user.uid)
 
     response_data = {
         "user": msgspec.to_builtins(merged),
@@ -437,8 +431,7 @@ async def force_abandon_vekn_id(
         f"Force-abandoned VEKN ID {target.vekn_id} for user {target.uid} by {manager.uid}"
     )
     await set_user_resync_after(new_user.uid)
-    if broadcast_resync:
-        await broadcast_resync(new_user.uid)
+    await broadcast_resync(new_user.uid)
 
     return Response(
         content=encoder.encode(

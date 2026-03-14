@@ -22,8 +22,7 @@ router = APIRouter(prefix="/api/leagues", tags=["leagues"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
-# Broadcast function will be set by main.py
-broadcast_league_event = None
+from ..broadcast import broadcast_precomputed
 
 
 async def _get_current_user(authorization: str | None):
@@ -117,8 +116,7 @@ async def create_league(
         parent_uid=body.parent_uid,
     )
     bd = await insert_league(league)
-    if broadcast_league_event:
-        broadcast_league_event(bd)
+    broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",
@@ -177,8 +175,7 @@ async def update_league_endpoint(
 
     league.modified = datetime.now(UTC)
     bd = await update_league(league)
-    if broadcast_league_event:
-        broadcast_league_event(bd)
+    broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",
@@ -212,8 +209,7 @@ async def delete_league_endpoint(
     league.deleted_at = datetime.now(UTC)
     league.modified = datetime.now(UTC)
     bd = await update_league(league)
-    if broadcast_league_event:
-        broadcast_league_event(bd)
+    broadcast_precomputed(bd)
     return Response(status_code=204)
 
 
@@ -241,8 +237,7 @@ async def add_organizer(
         league.organizers_uids.append(body.user_uid)
         league.modified = datetime.now(UTC)
         bd = await update_league(league)
-        if broadcast_league_event:
-            broadcast_league_event(bd)
+        broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",
@@ -271,8 +266,7 @@ async def remove_organizer(
         league.organizers_uids.remove(organizer_uid)
         league.modified = datetime.now(UTC)
         bd = await update_league(league)
-        if broadcast_league_event:
-            broadcast_league_event(bd)
+        broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
         media_type="application/json",

@@ -5,10 +5,8 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 
 import jwt
-import msgspec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
@@ -16,8 +14,14 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from .broadcast import (
+    SSEConnection,
+    _sse_connections,
+    _wake_sse_connections,
+    broadcast_precomputed,
+    encoder,
+)
 from .db import (
-    BroadcastData,
     cleanup_expired_tokens,
     close_db,
     delete_sanction_hard,
@@ -65,25 +69,6 @@ _sync_service: VEKNSyncService | None = None
 # Shutdown event for graceful SSE termination
 _shutdown_event: asyncio.Event | None = None
 
-# SSE connection management
-
-
-@dataclass(eq=False)
-class SSEConnection:
-    queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=100))
-    user: User | None = None
-
-
-_sse_connections: set[SSEConnection] = set()
-
-
-def _wake_sse_connections() -> None:
-    """Wake up all SSE connections so they can check for shutdown."""
-    for conn in list(_sse_connections):
-        try:
-            conn.queue.put_nowait("")  # Empty message to wake up the queue.get()
-        except Exception:
-            pass
 
 
 async def run_vekn_sync() -> None:
@@ -154,7 +139,7 @@ async def run_sanction_cleanup() -> None:
             )
             bd = await update_sanction(updated)
             # Broadcast the soft-delete so clients can sync
-            broadcast_sanction_event(bd)
+            broadcast_precomputed(bd)
 
         if expired:
             logger.info(f"Soft-deleted {len(expired)} expired sanctions")
@@ -184,7 +169,7 @@ async def run_rating_recompute() -> None:
         logger.info("Starting daily rating recompute")
         results = await recompute_all_ratings()
         for _user, bd in results:
-            broadcast_user_event(bd)
+            broadcast_precomputed(bd)
         logger.info(f"Daily rating recompute complete: {len(results)} users updated")
     except Exception as e:
         logger.error(f"Error during rating recompute: {e}", exc_info=True)
@@ -418,8 +403,6 @@ async def root() -> dict[str, str]:
     return {"status": "ok"}
 
 
-encoder = msgspec.json.Encoder()
-
 # Bump this on releases that require a full client resync
 MINIMUM_SYNC_EPOCH = "2026-01-31T00:00:00"
 
@@ -438,140 +421,6 @@ def _viewer_level(viewer: User | None) -> DataLevel:
     if viewer.vekn_id:
         return DataLevel.MEMBER
     return DataLevel.PUBLIC
-
-
-# ---------------------------------------------------------------------------
-# New sync: broadcast reads pre-computed columns from objects table
-# ---------------------------------------------------------------------------
-
-
-def broadcast_precomputed(bd: BroadcastData) -> None:
-    """Broadcast pre-computed projections to SSE connections. No DB access."""
-
-    def _make_msg(json_str: str) -> str:
-        return f'data: {{"type":"{bd.obj_type}","data":{json_str}}}\n\n'
-
-    pub_msg = _make_msg(bd.pub_json) if bd.pub_json else None
-    mem_msg = _make_msg(bd.mem_json) if bd.mem_json else None
-    full_msg = _make_msg(bd.full_json) if bd.full_json else None
-
-    org_uids = bd.org_uids or []
-    disconnected: set[SSEConnection] = set()
-    for sse_conn in _sse_connections:
-        try:
-            viewer = sse_conn.user
-            msg = None
-
-            if not viewer:
-                msg = pub_msg
-            elif Role.IC in viewer.roles:
-                msg = full_msg
-            elif (
-                (Role.NC in viewer.roles or Role.PRINCE in viewer.roles)
-                and viewer.country
-                and bd.country
-                and viewer.country == bd.country
-            ):
-                msg = full_msg
-            elif isinstance(org_uids, list) and viewer.uid in org_uids:
-                msg = full_msg
-            elif viewer.vekn_id:
-                # Member level — but check personal overlay
-                if bd.obj_type == ObjectType.USER and bd.uid == viewer.uid:
-                    msg = full_msg  # Own profile
-                elif bd.obj_type == ObjectType.DECK and bd.obj_user_uid == viewer.uid:
-                    msg = full_msg  # Own deck
-                else:
-                    msg = mem_msg
-            else:
-                msg = pub_msg
-
-            if msg:
-                sse_conn.queue.put_nowait(msg)
-        except asyncio.QueueFull:
-            logger.warning("SSE queue full for connection, dropping")
-            disconnected.add(sse_conn)
-    _sse_connections.difference_update(disconnected)
-
-
-def broadcast_user_event(bd: BroadcastData) -> None:
-    """Broadcast user update via SSE."""
-    broadcast_precomputed(bd)
-
-
-def broadcast_sanction_event(bd: BroadcastData) -> None:
-    """Broadcast sanction update via SSE."""
-    broadcast_precomputed(bd)
-
-
-def broadcast_tournament_event(bd: BroadcastData) -> None:
-    """Broadcast tournament update via SSE."""
-    broadcast_precomputed(bd)
-
-
-def broadcast_league_event(bd: BroadcastData) -> None:
-    """Broadcast league update via SSE."""
-    broadcast_precomputed(bd)
-
-
-async def broadcast_judge_call(
-    *,
-    tournament_uid: str,
-    table: int,
-    table_label: str,
-    player_name: str,
-    organizer_uids: list[str] | None = None,
-) -> None:
-    """Broadcast judge call to organizers and IC users only."""
-    event_data = {
-        "type": "judge_call",
-        "data": {
-            "tournament_uid": tournament_uid,
-            "table": table,
-            "table_label": table_label,
-            "player_name": player_name,
-        },
-    }
-    message = f"data: {encoder.encode(event_data).decode('utf-8')}\n\n"
-    org_set = set(organizer_uids or [])
-    disconnected: set[SSEConnection] = set()
-    for conn in _sse_connections:
-        if not conn.user:
-            continue
-        if Role.IC in conn.user.roles or conn.user.uid in org_set:
-            try:
-                conn.queue.put_nowait(message)
-            except asyncio.QueueFull:
-                logger.warning("SSE queue full for judge_call, dropping")
-                disconnected.add(conn)
-    _sse_connections.difference_update(disconnected)
-
-
-async def broadcast_resync(user_uid: str) -> None:
-    """Push a resync event to a specific user's SSE connection(s)."""
-    event_data = {"type": "resync"}
-    message = f"data: {encoder.encode(event_data).decode('utf-8')}\n\n"
-    for conn in _sse_connections:
-        if conn.user and conn.user.uid == user_uid:
-            try:
-                conn.queue.put_nowait(message)
-            except asyncio.QueueFull:
-                logger.warning(f"SSE queue full for resync user {user_uid}")
-
-
-# Make broadcast functions available to routes
-users.broadcast_user_event = broadcast_user_event  # ty: ignore[invalid-assignment]
-sanctions.broadcast_sanction_event = broadcast_sanction_event  # ty: ignore[invalid-assignment]
-sanctions.broadcast_tournament_event = broadcast_tournament_event  # ty: ignore[invalid-assignment]
-tournaments.broadcast_tournament_event = broadcast_tournament_event  # ty: ignore[invalid-assignment]
-tournaments.broadcast_user_event = broadcast_user_event  # ty: ignore[invalid-assignment]
-tournaments.broadcast_sanction_event = broadcast_sanction_event  # ty: ignore[invalid-assignment]
-tournaments.broadcast_deck_event = broadcast_precomputed  # ty: ignore[invalid-assignment]
-tournaments.broadcast_judge_call = broadcast_judge_call  # ty: ignore[invalid-assignment]
-tournaments.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
-leagues.broadcast_league_event = broadcast_league_event  # ty: ignore[invalid-assignment]
-users.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
-vekn.broadcast_resync = broadcast_resync  # ty: ignore[invalid-assignment]
 
 
 @app.options("/stream")

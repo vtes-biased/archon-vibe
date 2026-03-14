@@ -30,9 +30,7 @@ logger = logging.getLogger(__name__)
 # Encoder with decimal_format to handle all types properly
 encoder = msgspec.json.Encoder()
 
-# Broadcast functions will be set by main.py
-broadcast_user_event = None
-broadcast_resync = None
+from ..broadcast import broadcast_precomputed, broadcast_resync
 
 # Rust engine for permission checks
 _engine = PyEngine()
@@ -153,8 +151,7 @@ async def create_user(
             # Don't fail the request, user is already created
 
     # Broadcast to SSE clients
-    if broadcast_user_event:
-        broadcast_user_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(
         content=encoder.encode(user),
@@ -317,12 +314,10 @@ async def update_user(
     # Trigger resync if roles or vekn_id changed
     if set(user.roles) != old_roles or user.vekn_id != old_vekn_id:
         await set_user_resync_after(user.uid)
-        if broadcast_resync:
-            await broadcast_resync(user.uid)
+        await broadcast_resync(user.uid)
 
     # Broadcast to SSE clients
-    if broadcast_user_event:
-        broadcast_user_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(
         content=encoder.encode(user),
@@ -398,8 +393,7 @@ async def upload_avatar(
         bd = await db_update_user(updated_user)
 
         # Broadcast user update via SSE
-        if broadcast_user_event:
-            broadcast_user_event(bd)
+        broadcast_precomputed(bd)
 
     return Response(
         content=b'{"success": true}',
@@ -476,8 +470,7 @@ async def delete_avatar(
         bd = await db_update_user(updated_user)
 
         # Broadcast user update via SSE
-        if broadcast_user_event:
-            broadcast_user_event(bd)
+        broadcast_precomputed(bd)
 
     return Response(
         content=b'{"success": true}',

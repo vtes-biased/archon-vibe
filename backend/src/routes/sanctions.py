@@ -34,9 +34,7 @@ router = APIRouter(prefix="/sanctions", tags=["sanctions"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
-# Broadcast functions will be set by main.py
-broadcast_sanction_event = None
-broadcast_tournament_event = None
+from ..broadcast import broadcast_precomputed
 
 # Rust engine for permission checks
 _engine = PyEngine()
@@ -174,8 +172,7 @@ async def _set_player_dq_state(
 
     tournament.modified = datetime.now(UTC)
     bd = await update_tournament(tournament)
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
 
 
 class CreateSanctionRequest(BaseModel):
@@ -323,8 +320,7 @@ async def create_sanction(
         )
 
     # Broadcast to SSE clients
-    if broadcast_sanction_event:
-        broadcast_sanction_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(
         content=encoder.encode(sanction),
@@ -488,8 +484,7 @@ async def update_sanction_endpoint(
         )
 
     # Broadcast to SSE clients
-    if broadcast_sanction_event:
-        broadcast_sanction_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(
         content=encoder.encode(updated),
@@ -550,8 +545,7 @@ async def delete_sanction_endpoint(
     logger.info(f"Sanction {uid} soft-deleted by {current_user.uid}")
 
     # Broadcast to SSE clients
-    if broadcast_sanction_event:
-        broadcast_sanction_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(
         content=encoder.encode({"message": "Sanction deleted"}),

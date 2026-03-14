@@ -29,6 +29,8 @@ from .models import (
 )
 from .vekn_api import VEKNAPIClient
 
+from .broadcast import broadcast_precomputed
+
 logger = logging.getLogger(__name__)
 
 # VEKN event type → (format, rank)
@@ -331,12 +333,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         winner=tournament.winner,
                         standings=tournament.standings,
                     )
-                    await update_tournament(tournament)
+                    bd = await update_tournament(tournament)
+                    broadcast_precomputed(bd)
                     stats["updated"] += 1
                 else:
                     stats["unchanged"] += 1
             else:
-                await insert_tournament(tournament)
+                bd = await insert_tournament(tournament)
+                broadcast_precomputed(bd)
                 stats["created"] += 1
 
         except Exception as e:

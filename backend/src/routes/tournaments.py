@@ -55,12 +55,7 @@ logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 decoder = msgspec.json.Decoder(Tournament)
 
-# Broadcast functions will be set by main.py
-broadcast_tournament_event = None
-broadcast_user_event = None
-broadcast_sanction_event = None
-broadcast_deck_event = None  # async fn(deck_uid: str) -> None
-broadcast_resync = None
+from ..broadcast import broadcast_judge_call, broadcast_precomputed, broadcast_resync
 
 _engine = PyEngine()
 
@@ -363,8 +358,7 @@ async def add_organizer(
         tournament.organizers_uids.append(body.user_uid)
         tournament.modified = datetime.now(UTC)
         bd = await update_tournament(tournament)
-        if broadcast_tournament_event:
-            broadcast_tournament_event(bd)
+        broadcast_precomputed(bd)
 
     return Response(
         content=encoder.encode(tournament),
@@ -400,12 +394,10 @@ async def remove_organizer(
         tournament.organizers_uids.remove(organizer_uid)
         tournament.modified = datetime.now(UTC)
         bd = await update_tournament(tournament)
-        if broadcast_tournament_event:
-            broadcast_tournament_event(bd)
+        broadcast_precomputed(bd)
         # Revoke access: force removed organizer to resync
         await set_user_resync_after(organizer_uid)
-        if broadcast_resync:
-            await broadcast_resync(organizer_uid)
+        await broadcast_resync(organizer_uid)
 
     return Response(
         content=encoder.encode(tournament),
@@ -533,8 +525,7 @@ async def create_tournament(
     bd = await insert_tournament(tournament)
     logger.info(f"Tournament {tournament.uid} created by {current_user.uid}")
 
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
 
     # VEKN push: create calendar event
     await _maybe_push_vekn_event(tournament)
@@ -693,8 +684,8 @@ async def delete_tournament_endpoint(
     result = await soft_delete_tournament(uid)
     logger.info(f"Tournament {uid} soft-deleted by {current_user.uid}")
 
-    if result and broadcast_tournament_event:
-        broadcast_tournament_event(result[1])
+    if result:
+        broadcast_precomputed(result[1])
 
     return Response(
         content=encoder.encode({"message": "Tournament deleted"}),
@@ -776,8 +767,8 @@ async def archon_import(
         data=data,
         actor_uid=current_user.uid,
         engine=engine,
-        broadcast_tournament_event=broadcast_tournament_event,
-        broadcast_user_event=broadcast_user_event,
+        broadcast_tournament_event=broadcast_precomputed,
+        broadcast_user_event=broadcast_precomputed,
     )
 
     status = 200 if result.success else 400
@@ -1017,12 +1008,10 @@ async def tournament_action(
     deck_bds = await _process_deck_ops(
         deck_ops, uid, org_uids=updated.organizers_uids
     )
-    if broadcast_deck_event:
-        for bd in deck_bds:
-            broadcast_deck_event(bd)
+    for bd in deck_bds:
+        broadcast_precomputed(bd)
 
-    if broadcast_tournament_event:
-        broadcast_tournament_event(tournament_bd)
+    broadcast_precomputed(tournament_bd)
 
     # Recompute ratings when tournament enters/leaves Finished state,
     # or when data changes on a finished tournament (e.g. SetScore, UpdateConfig)
@@ -1038,18 +1027,16 @@ async def tournament_action(
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
             results = await recompute_ratings_for_players(player_uids, category)
-            if broadcast_user_event:
-                for _user, bd in results:
-                    broadcast_user_event(bd)
+            for _user, bd in results:
+                broadcast_precomputed(bd)
             # If category changed (format/online toggle), also recompute old category
             old_category = rating_category_for_tournament(tournament)
             if old_category != category:
                 old_results = await recompute_ratings_for_players(
                     player_uids, old_category
                 )
-                if broadcast_user_event:
-                    for _user, bd in old_results:
-                        broadcast_user_event(bd)
+                for _user, bd in old_results:
+                    broadcast_precomputed(bd)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
@@ -1289,8 +1276,7 @@ async def timer_start(
             paused=False,
         )
         bd = await _save_timer_tx(tournament, tx_conn)
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1314,8 +1300,7 @@ async def timer_pause(
             paused=True,
         )
         bd = await _save_timer_tx(tournament, tx_conn)
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1333,8 +1318,7 @@ async def timer_reset(
         tournament.table_extra_time = {}
         tournament.table_paused_at = {}
         bd = await _save_timer_tx(tournament, tx_conn)
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1370,8 +1354,7 @@ async def timer_add_time(
             )
         tournament.table_extra_time[request.table] = current + request.seconds
         bd = await _save_timer_tx(tournament, tx_conn)
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1403,8 +1386,7 @@ async def timer_clock_stop(
             )
         tournament.table_paused_at[request.table] = datetime.now(UTC).isoformat()
         bd = await _save_timer_tx(tournament, tx_conn)
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
@@ -1435,17 +1417,13 @@ async def timer_clock_resume(
         tournament.table_extra_time[request.table] = current_extra + pause_duration
         del tournament.table_paused_at[request.table]
         bd = await _save_timer_tx(tournament, tx_conn)
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
 # ============================================================================
 # Judge call endpoint (online-only)
 # ============================================================================
-
-# Broadcast function set by main.py
-broadcast_judge_call = None
 
 
 class JudgeCallRequest(BaseModel):
@@ -1481,8 +1459,7 @@ async def call_judge(
     # Build table label
     table_label = resolveTableLabelPy(tournament.table_rooms, request.table)
     # Broadcast to organizers
-    if broadcast_judge_call:
-        await broadcast_judge_call(
+    await broadcast_judge_call(
             tournament_uid=tournament.uid,
             table=request.table,
             table_label=table_label,
@@ -1550,8 +1527,7 @@ async def go_offline(
         f"Tournament {uid} went offline (device={request.device_id}, user={current_user.uid})"
     )
 
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
@@ -1601,8 +1577,7 @@ async def _resolve_or_create_offline_player(
     bd = await insert_user(new_user)
     logger.info(f"Created user {new_user.uid} for offline player '{player_data.name}'")
 
-    if broadcast_user_event:
-        broadcast_user_event(bd)
+    broadcast_precomputed(bd)
 
     return player_data.temp_uid, new_user
 
@@ -1700,8 +1675,7 @@ async def go_online(
 
         sanction = msgspec.convert(sanction_data, Sanction)
         bd = await insert_sanction(sanction)
-        if broadcast_sanction_event:
-            broadcast_sanction_event(bd)
+        broadcast_precomputed(bd)
 
     # 6. Save offline decks with remapped UIDs
     for deck_data in request.offline_decks:
@@ -1718,12 +1692,10 @@ async def go_online(
         deck_obj = msgspec.convert(deck_data, DeckObject)
         bd = await save_object_from_model(ObjectType.DECK, deck_obj)
         bd.org_uids = updated.organizers_uids
-        if broadcast_deck_event:
-            broadcast_deck_event(bd)
+        broadcast_precomputed(bd)
 
     # 7. Broadcast updated tournament
-    if broadcast_tournament_event:
-        broadcast_tournament_event(tournament_bd)
+    broadcast_precomputed(tournament_bd)
 
     return Response(content=encoder.encode(updated), media_type="application/json")
 
@@ -1765,8 +1737,7 @@ async def force_takeover(
         f"Tournament {uid} force-takeover: {old_device} → {request.device_id} by {current_user.uid}"
     )
 
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
@@ -1852,7 +1823,6 @@ async def force_unlock(
     bd = await update_tournament(tournament)
     logger.info(f"Tournament {uid} force-unlocked by IC {current_user.uid}")
 
-    if broadcast_tournament_event:
-        broadcast_tournament_event(bd)
+    broadcast_precomputed(bd)
 
     return Response(content=encoder.encode(tournament), media_type="application/json")

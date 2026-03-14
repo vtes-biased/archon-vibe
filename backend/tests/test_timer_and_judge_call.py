@@ -9,7 +9,7 @@ Covers:
 
 from datetime import UTC, datetime
 
-from src.main import SSEConnection, broadcast_judge_call
+from src.broadcast import SSEConnection, broadcast_judge_call
 from src.models import (
     Role,
     Room,
