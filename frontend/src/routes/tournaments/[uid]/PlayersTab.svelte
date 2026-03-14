@@ -199,7 +199,7 @@
   let showCreateModal = $state(false);
   let createName = $state('');
   let createEmail = $state('');
-  let createCountry = $state(tournament.country ?? '');
+  let createCountry = $state('');
   let createLoading = $state(false);
 
   async function addPlayerByUser(user: User) {
@@ -348,7 +348,7 @@
     <div class="flex items-center gap-3">
       <p class="text-ash-400 shrink-0">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
       {#if isOrganizer}
-        <AddPlayerForm {tournament} onadd={addPlayerByUser} oncreate={() => showCreateModal = true} />
+        <AddPlayerForm {tournament} onadd={addPlayerByUser} oncreate={() => { createCountry = tournament.country ?? ''; showCreateModal = true; }} />
       {/if}
     </div>
     {#if isOrganizer && isOfflineMode}

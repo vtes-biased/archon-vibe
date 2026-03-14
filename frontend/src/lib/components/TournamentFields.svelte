@@ -105,7 +105,6 @@
     required
     value={values.name}
     {disabled}
-    autofocus
     oninput={(e) => handleInput("name", (e.target as HTMLInputElement).value)}
     class="w-full px-3 py-2 text-sm bg-dusk-950 border rounded-lg text-ash-200 focus:outline-none {values.name.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}"
     placeholder={m.tfield_name_placeholder()}

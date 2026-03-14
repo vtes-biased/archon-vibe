@@ -99,7 +99,7 @@
           <!-- Name -->
           <div>
             <label for="name" class="block text-sm text-ash-400 mb-1">{m.tfield_name_label()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
-            <input id="name" type="text" bind:value={name} required autofocus
+            <input id="name" type="text" bind:value={name} required
               class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {name.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
           </div>
 
