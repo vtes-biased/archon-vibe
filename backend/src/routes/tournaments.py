@@ -46,7 +46,6 @@ from ..models import (
     TimerState,
     Tournament,
     TournamentFormat,
-    TournamentMinimal,
     TournamentRank,
     TournamentState,
     User,
@@ -320,23 +319,6 @@ async def _check_player_barred(
                     )
 
 
-def _tournament_to_minimal(t: Tournament) -> TournamentMinimal:
-    """Strip tournament to minimal public data for SSE streaming."""
-    return TournamentMinimal(
-        uid=t.uid,
-        modified=t.modified,
-        name=t.name,
-        format=t.format,
-        rank=t.rank,
-        online=t.online,
-        start=t.start,
-        finish=t.finish,
-        timezone=t.timezone,
-        country=t.country,
-        league_uid=t.league_uid,
-        state=t.state,
-    )
-
 
 class OrganizerAction(BaseModel):
     user_uid: str
@@ -607,73 +589,6 @@ async def fetch_deck_proxy(
 
 # --- Dynamic routes ---
 
-
-@router.get("/{uid}")
-async def get_tournament(
-    uid: str,
-    current_user: OptionalUser = None,
-) -> Response:
-    """Get a tournament by UID.
-
-    Organizers get full data. Registered players get filtered data.
-    Unauthenticated users get minimal data.
-    """
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # Organizers get full tournament
-    if current_user and _is_organizer(current_user, tournament):
-        return Response(
-            content=encoder.encode(tournament),
-            media_type="application/json",
-        )
-
-    # ICs get full access to all tournaments
-    if current_user and Role.IC in current_user.roles:
-        return Response(
-            content=encoder.encode(tournament),
-            media_type="application/json",
-        )
-
-    # NCs get full access to tournaments in their country
-    if (
-        current_user
-        and Role.NC in current_user.roles
-        and current_user.country
-        and tournament.country == current_user.country
-    ):
-        return Response(
-            content=encoder.encode(tournament),
-            media_type="application/json",
-        )
-
-    # Registered players see full tournament data (decks are separate objects)
-    if current_user:
-        player_uids = {p.user_uid for p in tournament.players if p.user_uid}
-        if current_user.uid in player_uids:
-            return Response(
-                content=encoder.encode(tournament),
-                media_type="application/json",
-            )
-
-    # Members (users with vekn_id) see full data for finished tournaments
-    if (
-        current_user
-        and current_user.vekn_id
-        and tournament.state == TournamentState.FINISHED
-    ):
-        return Response(
-            content=encoder.encode(tournament),
-            media_type="application/json",
-        )
-
-    # Public / non-member users: minimal data
-    minimal = _tournament_to_minimal(tournament)
-    return Response(
-        content=encoder.encode(minimal),
-        media_type="application/json",
-    )
 
 
 @router.delete("/{uid}")

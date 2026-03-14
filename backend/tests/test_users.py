@@ -38,8 +38,13 @@ async def test_create_user(test_client: AsyncClient, populated_db):
 
 @pytest.mark.asyncio
 async def test_list_users(test_client: AsyncClient, populated_db):
-    """Test listing users with pagination."""
-    response = await test_client.get("/api/users/")
+    """Test listing users via v1 API (requires auth)."""
+    admin = next(
+        u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles
+    )
+    response = await test_client.get(
+        "/api/v1/users/", headers=make_auth_header(admin.uid)
+    )
 
     assert response.status_code == 200
     users = response.json()
@@ -56,10 +61,15 @@ async def test_list_users(test_client: AsyncClient, populated_db):
 
 @pytest.mark.asyncio
 async def test_get_user(test_client: AsyncClient, populated_db):
-    """Test getting a specific user by UID."""
+    """Test getting a specific user by UID via v1 API (requires auth)."""
+    admin = next(
+        u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles
+    )
     test_uid = populated_db[0].uid
 
-    response = await test_client.get(f"/api/users/{test_uid}")
+    response = await test_client.get(
+        f"/api/v1/users/{test_uid}", headers=make_auth_header(admin.uid)
+    )
 
     assert response.status_code == 200
     user = response.json()
@@ -78,8 +88,10 @@ async def test_update_user(test_client: AsyncClient, populated_db):
     target = populated_db[0]
     headers = make_auth_header(admin.uid)
 
-    # First get the user
-    response = await test_client.get(f"/api/users/{target.uid}")
+    # First get the user via v1 API
+    response = await test_client.get(
+        f"/api/v1/users/{target.uid}", headers=headers
+    )
     assert response.status_code == 200
     original_user = response.json()
 

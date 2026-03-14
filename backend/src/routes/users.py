@@ -12,8 +12,6 @@ from uuid6 import uuid7
 
 from ..db import (
     allocate_next_vekn_id,
-    decode_json,
-    get_connection,
     get_user_by_uid,
     set_user_resync_after,
 )
@@ -23,7 +21,7 @@ from ..db import insert_user as db_insert_user
 from ..db import update_user as db_update_user
 from ..db import upsert_avatar as db_upsert_avatar
 from ..middleware.auth import OptionalUser
-from ..models import ObjectType, Role, User
+from ..models import Role, User
 from ..utils import user_to_context
 from .auth import send_invite_email
 
@@ -139,37 +137,6 @@ async def create_user(
         status_code=201,
     )
 
-
-@router.get("/")
-async def list_users() -> Response:
-    """List all users."""
-    async with get_connection() as conn:
-        cursor = await conn.execute(
-            """SELECT "full" FROM objects
-            WHERE type = %s AND "full"->>'name' IS NOT NULL
-            ORDER BY modified_at DESC""",
-            (ObjectType.USER,),
-        )
-        rows = await cursor.fetchall()
-
-    users = [decode_json(row[0], User) for row in rows]
-    return Response(
-        content=encoder.encode(users),
-        media_type="application/json",
-    )
-
-
-@router.get("/{uid}")
-async def get_user(uid: str) -> Response:
-    """Get a specific user by UID."""
-    user = await get_user_by_uid(uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return Response(
-        content=encoder.encode(user),
-        media_type="application/json",
-    )
 
 
 @router.put("/{uid}")

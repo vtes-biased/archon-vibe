@@ -39,6 +39,7 @@ from .models import (
 )
 from .routes import (
     admin,
+    api_v1,
     auth,
     calendar,
     cards,
@@ -378,6 +379,7 @@ app.include_router(oauth.router)
 app.include_router(cards.router)
 app.include_router(leagues.router)
 app.include_router(calendar.router)
+app.include_router(api_v1.router)
 
 
 @app.get("/")

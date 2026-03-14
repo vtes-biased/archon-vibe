@@ -110,17 +110,6 @@ async def create_league(
     )
 
 
-@router.get("/{uid}")
-async def get_league(uid: str) -> Response:
-    """Get a league by UID."""
-    league = await get_league_by_uid(uid)
-    if not league:
-        raise HTTPException(404, "League not found")
-    return Response(
-        content=encoder.encode(msgspec.to_builtins(league)),
-        media_type="application/json",
-    )
-
 
 @router.put("/{uid}")
 async def update_league_endpoint(

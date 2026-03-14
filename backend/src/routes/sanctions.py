@@ -12,7 +12,6 @@ from uuid6 import uuid7
 from ..db import (
     get_league_by_uid,
     get_sanction_by_uid,
-    get_sanctions_for_user,
     get_tournament_by_uid,
     get_user_by_uid,
     insert_sanction,
@@ -512,21 +511,3 @@ async def delete_sanction_endpoint(
     )
 
 
-@router.get("/user/{user_uid}")
-async def get_user_sanctions(
-    user_uid: str,
-    include_deleted: bool = False,
-) -> Response:
-    """Get all sanctions for a user.
-
-    By default excludes soft-deleted sanctions unless include_deleted=True.
-    """
-    sanctions = await get_sanctions_for_user(user_uid)
-
-    if not include_deleted:
-        sanctions = [s for s in sanctions if s.deleted_at is None]
-
-    return Response(
-        content=encoder.encode(sanctions),
-        media_type="application/json",
-    )
