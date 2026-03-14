@@ -176,12 +176,6 @@ def _compute_entry_sync(
     )
 
 
-async def _compute_entry(t: Tournament, user_uid: str) -> TournamentRatingEntry:
-    """Compute a TournamentRatingEntry for one player in one tournament."""
-    sanctions = await get_sanctions_for_tournament(t.uid)
-    return _compute_entry_sync(t, user_uid, sanctions)
-
-
 async def recompute_ratings_for_players(
     player_uids: set[str], category: RatingCategory
 ) -> list[tuple[User, BroadcastData]]:
@@ -225,6 +219,7 @@ async def recompute_ratings_for_players(
     wins_map = await get_tournament_wins_for_users(player_uids)
 
     updated_users: list[tuple[User, BroadcastData]] = []
+    sanctions_cache: dict[str, list] = {}
 
     for user_uid in player_uids:
         user = await get_user_by_uid(user_uid)
@@ -235,7 +230,9 @@ async def recompute_ratings_for_players(
         for t in all_tournaments:
             played = _players_with_rounds(t)
             if user_uid in played:
-                entries.append(await _compute_entry(t, user_uid))
+                if t.uid not in sanctions_cache:
+                    sanctions_cache[t.uid] = await get_sanctions_for_tournament(t.uid)
+                entries.append(_compute_entry_sync(t, user_uid, sanctions_cache[t.uid]))
 
         entries.sort(key=lambda e: e.points, reverse=True)
         top_entries = entries[:TOP_N]
