@@ -8,6 +8,7 @@ from typing import Annotated
 import msgspec
 from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Query, Response, UploadFile
+from pydantic import BaseModel
 from uuid6 import uuid7
 
 from ..db import (
@@ -380,7 +381,7 @@ async def delete_avatar(
     )
 
 
-class LinkModerationRequest(msgspec.Struct):
+class LinkModerationRequest(BaseModel):
     url: str  # link URL to moderate
     action: str  # "hide" | "promote" | "clear"
 
