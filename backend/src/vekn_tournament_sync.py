@@ -3,6 +3,7 @@
 import logging
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 from uuid6 import uuid7
 
@@ -104,6 +105,23 @@ def _map_vekn_to_tournament(
         address = data.get("venue_city") or ""
     venue_url = venue_data.get("website") or ""
 
+    # Build map URL: prefer coordinates from VEKN venue data, fall back to text search
+    map_url = ""
+    if not online:
+        lat = venue_data.get("lat")
+        lng = venue_data.get("lng")
+        try:
+            lat_f, lng_f = float(lat), float(lng)  # type: ignore[arg-type]
+            if lat_f != 0 or lng_f != 0:
+                map_url = f"https://www.google.com/maps/search/?api=1&query={lat_f},{lng_f}"
+        except (TypeError, ValueError):
+            pass
+        if not map_url and address:
+            parts = [p for p in [venue, address, country] if p]
+            map_url = (
+                f"https://www.google.com/maps/search/?api=1&query={quote(' '.join(parts))}"
+            )
+
     # Organizer
     organizer_vekn = str(data.get("organizer_veknid") or "")
     organizer_user = users_by_vekn_id.get(organizer_vekn)
@@ -181,6 +199,7 @@ def _map_vekn_to_tournament(
             venue=venue,
             venue_url=venue_url,
             address=address,
+            map_url=map_url,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
             players=players,
@@ -203,6 +222,7 @@ def _map_vekn_to_tournament(
             venue=venue,
             venue_url=venue_url,
             address=address,
+            map_url=map_url,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
         )
@@ -281,6 +301,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     or existing.venue != tournament.venue
                     or existing.address != tournament.address
                     or existing.venue_url != tournament.venue_url
+                    or existing.map_url != tournament.map_url
                     or len(existing.players) != len(tournament.players)
                 )
                 if changed:
