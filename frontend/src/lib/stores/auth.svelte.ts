@@ -152,6 +152,8 @@ export async function storeTokensFromCallback(
       isLoading: false,
       error: null,
     });
+    // Reconnect SSE with new token to get proper data level
+    syncManager.refresh();
   }
 }
 
@@ -299,6 +301,7 @@ export async function register(
     const result = await fetchCurrentUser();
     if (result) {
       setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
+      syncManager.refresh();
       return true;
     }
 
@@ -339,6 +342,7 @@ export async function login(email: string, password: string): Promise<boolean> {
     const result = await fetchCurrentUser();
     if (result) {
       setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
+      syncManager.refresh();
       return true;
     }
 
@@ -576,6 +580,7 @@ export async function setPassword(token: string, password: string): Promise<bool
         isLoading: false,
         error: null,
       });
+      syncManager.refresh();
       return true;
     }
 

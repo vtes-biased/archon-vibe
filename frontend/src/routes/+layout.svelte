@@ -50,14 +50,11 @@
     // Initialize engine (WASM) for permission checks
     initEngine().catch(err => console.error('Failed to initialize engine:', err));
 
-    // Initialize auth state
-    initAuth();
+    // Initialize auth state, then connect SSE with valid token
+    initAuth().then(() => syncManager.connect());
 
     // Restore offline tournament state from IndexedDB
     initOfflineState().catch(err => console.error('Failed to init offline state:', err));
-
-    // Connect to SSE stream
-    syncManager.connect();
 
     // Listen for sync events
     const handleSyncEvent = (event: { type: string; error?: string }) => {
