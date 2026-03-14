@@ -39,7 +39,7 @@
     if (!t.paused && t.started_at) {
       elapsed += (now - new Date(t.started_at).getTime()) / 1000;
     }
-    return elapsed;
+    return Math.max(0, elapsed);
   });
 
   const baseRemaining = $derived(Math.max(0, roundTime - baseElapsed));
