@@ -7,7 +7,7 @@ from pathlib import Path
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, Header, HTTPException, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from uuid6 import uuid7
@@ -51,7 +51,8 @@ from ..models import (
     TournamentState,
     User,
 )
-from .auth import send_invite_email, verify_token
+from ..middleware.auth import OptionalUser
+from .auth import send_invite_email
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 logger = logging.getLogger(__name__)
@@ -61,18 +62,6 @@ decoder = msgspec.json.Decoder(Tournament)
 from ..broadcast import broadcast_judge_call, broadcast_precomputed, broadcast_resync
 
 _engine = PyEngine()
-
-
-async def _get_current_user(authorization: str | None):
-    """Extract and verify current user from Authorization header."""
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    token = authorization[7:]
-    try:
-        user_uid = verify_token(token, expected_type="access")
-        return await get_user_by_uid(user_uid)
-    except Exception:
-        return None
 
 
 def _is_organizer(user, tournament: Tournament) -> bool:
@@ -357,10 +346,9 @@ class OrganizerAction(BaseModel):
 async def add_organizer(
     uid: str,
     body: OrganizerAction,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Add an organizer to a tournament."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -389,10 +377,9 @@ async def add_organizer(
 async def remove_organizer(
     uid: str,
     organizer_uid: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Remove an organizer from a tournament."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -459,10 +446,9 @@ def _parse_datetime(s: str | None) -> datetime | None:
 @router.post("/", status_code=201)
 async def create_tournament(
     request: CreateTournamentRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Create a new tournament."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -591,7 +577,7 @@ async def download_archon_template() -> FileResponse:
 @router.get("/fetch-deck")
 async def fetch_deck_proxy(
     url: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Proxy to fetch deck data from external URLs (VDB, VTESDecks, Amaranth).
 
@@ -600,7 +586,8 @@ async def fetch_deck_proxy(
     """
     import asyncio
 
-    await _get_current_user(authorization)  # auth check
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     from ..providers import DeckFetchError, fetch_deck_from_url
 
@@ -624,7 +611,7 @@ async def fetch_deck_proxy(
 @router.get("/{uid}")
 async def get_tournament(
     uid: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Get a tournament by UID.
 
@@ -634,8 +621,6 @@ async def get_tournament(
     tournament = await get_tournament_by_uid(uid)
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
-
-    current_user = await _get_current_user(authorization)
 
     # Organizers get full tournament
     if current_user and _is_organizer(current_user, tournament):
@@ -694,10 +679,9 @@ async def get_tournament(
 @router.delete("/{uid}")
 async def delete_tournament_endpoint(
     uid: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Delete a tournament (organizers only, PLANNED state only)."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -732,10 +716,9 @@ async def delete_tournament_endpoint(
 async def archon_import(
     uid: str,
     file: UploadFile,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Import a filled-in Archon v1.5l spreadsheet into an existing tournament."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -860,7 +843,7 @@ class TournamentActionRequest(BaseModel):
 async def tournament_action(
     uid: str,
     request: TournamentActionRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Process a tournament event via the Rust engine.
 
@@ -870,7 +853,6 @@ async def tournament_action(
     Uses SELECT ... FOR UPDATE to serialize concurrent writes per tournament,
     preventing lost updates when multiple actions arrive simultaneously.
     """
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1110,10 +1092,9 @@ class QrCheckinRequest(BaseModel):
 async def qr_checkin(
     uid: str,
     request: QrCheckinRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Self check-in via QR code scanned at the venue."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     tournament = await get_tournament_by_uid(uid)
@@ -1124,7 +1105,7 @@ async def qr_checkin(
     return await tournament_action(
         uid,
         TournamentActionRequest(type="CheckIn", player_uid=current_user.uid),
-        authorization,
+        current_user,
     )
 
 
@@ -1159,10 +1140,11 @@ def _load_cards_json() -> str:
 async def export_deck_twda(
     uid: str,
     player_uid: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Export a player's deck in TWDA text format."""
-    await _get_current_user(authorization)  # auth check
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     tournament = await get_tournament_by_uid(uid)
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
@@ -1216,10 +1198,9 @@ async def export_deck_twda(
 @router.get("/{uid}/report")
 async def tournament_report(
     uid: str,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Download a tournament report (JSON) with standings and results."""
-    user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1273,12 +1254,7 @@ async def tournament_report(
 # ============================================================================
 
 
-async def _check_organizer(authorization: str | None):
-    """Auth check for timer endpoints. Returns user."""
-    user = await _get_current_user(authorization)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    return user
+# _check_organizer removed — auth now via OptionalUser dependency
 
 
 def _validate_timer_tournament(user, tournament: Tournament | None):
@@ -1307,10 +1283,11 @@ async def _save_timer_tx(tournament: Tournament, tx_conn) -> BroadcastData:
 @router.post("/{uid}/timer/start")
 async def timer_start(
     uid: str,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Start or resume the global timer."""
-    user = await _check_organizer(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
@@ -1329,10 +1306,11 @@ async def timer_start(
 @router.post("/{uid}/timer/pause")
 async def timer_pause(
     uid: str,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Pause the global timer."""
-    user = await _check_organizer(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
@@ -1353,10 +1331,11 @@ async def timer_pause(
 @router.post("/{uid}/timer/reset")
 async def timer_reset(
     uid: str,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Reset the global timer to fresh paused state."""
-    user = await _check_organizer(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
@@ -1377,10 +1356,11 @@ class AddTimeRequest(BaseModel):
 async def timer_add_time(
     uid: str,
     request: AddTimeRequest,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Add extra time to a specific table."""
-    user = await _check_organizer(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
@@ -1412,10 +1392,11 @@ class ClockStopRequest(BaseModel):
 async def timer_clock_stop(
     uid: str,
     request: ClockStopRequest,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Pause a table's clock (clock-stop)."""
-    user = await _check_organizer(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
@@ -1440,10 +1421,11 @@ async def timer_clock_stop(
 async def timer_clock_resume(
     uid: str,
     request: ClockStopRequest,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Resume a table's clock (converts pause duration to extra_time)."""
-    user = await _check_organizer(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
@@ -1480,10 +1462,9 @@ class JudgeCallRequest(BaseModel):
 async def call_judge(
     uid: str,
     request: JudgeCallRequest,
-    authorization: str | None = Header(default=None),
+    user: OptionalUser = None,
 ) -> Response:
     """Player calls for judge assistance at their table."""
-    user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     tournament = await get_tournament_by_uid(uid)
@@ -1541,10 +1522,9 @@ class GoOfflineRequest(BaseModel):
 async def go_offline(
     uid: str,
     request: GoOfflineRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Lock a tournament for offline use on a specific device."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1664,10 +1644,9 @@ def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) ->
 async def go_online(
     uid: str,
     request: GoOnlineRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Bring a tournament back online with full reconciliation."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1776,10 +1755,9 @@ class ForceTakeoverRequest(BaseModel):
 async def force_takeover(
     uid: str,
     request: ForceTakeoverRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Transfer offline lock to a new device (any organizer of this tournament)."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1819,10 +1797,9 @@ class SyncOfflineRequest(BaseModel):
 async def sync_offline(
     uid: str,
     request: SyncOfflineRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Background data backup for offline tournament. Saves snapshot without unlocking."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1863,10 +1840,9 @@ async def sync_offline(
 @router.post("/{uid}/force-unlock")
 async def force_unlock(
     uid: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """IC-only emergency unlock. Clears offline mode entirely."""
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 

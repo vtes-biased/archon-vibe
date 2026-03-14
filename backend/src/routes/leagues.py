@@ -4,37 +4,24 @@ import logging
 from datetime import UTC, datetime
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
 from ..db import (
     get_child_leagues,
     get_league_by_uid,
-    get_user_by_uid,
     insert_league,
     update_league,
 )
+from ..middleware.auth import OptionalUser
 from ..models import League, LeagueKind, LeagueStandingsMode, Role
-from .auth import verify_token
 
 router = APIRouter(prefix="/api/leagues", tags=["leagues"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
 from ..broadcast import broadcast_precomputed
-
-
-async def _get_current_user(authorization: str | None):
-    """Extract and verify current user from Authorization header."""
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    token = authorization[7:]
-    try:
-        user_uid = verify_token(token, expected_type="access")
-        return await get_user_by_uid(user_uid)
-    except Exception:
-        return None
 
 
 class LeagueCreate(BaseModel):
@@ -77,10 +64,9 @@ def _can_edit_league(user, league: League) -> bool:
 @router.post("/")
 async def create_league(
     body: LeagueCreate,
-    authorization: str | None = Header(None),
+    user: OptionalUser = None,
 ) -> Response:
     """Create a new league. NC/IC only."""
-    user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(401, "Authentication required")
     if not _can_manage_leagues(user):
@@ -140,10 +126,9 @@ async def get_league(uid: str) -> Response:
 async def update_league_endpoint(
     uid: str,
     body: LeagueUpdate,
-    authorization: str | None = Header(None),
+    user: OptionalUser = None,
 ) -> Response:
     """Update a league."""
-    user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(401, "Authentication required")
     league = await get_league_by_uid(uid)
@@ -185,10 +170,9 @@ async def update_league_endpoint(
 @router.delete("/{uid}")
 async def delete_league_endpoint(
     uid: str,
-    authorization: str | None = Header(None),
+    user: OptionalUser = None,
 ) -> Response:
     """Soft-delete a league."""
-    user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(401, "Authentication required")
     league = await get_league_by_uid(uid)
@@ -221,10 +205,9 @@ class OrganizerAction(BaseModel):
 async def add_organizer(
     uid: str,
     body: OrganizerAction,
-    authorization: str | None = Header(None),
+    user: OptionalUser = None,
 ) -> Response:
     """Add an organizer to a league."""
-    user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(401, "Authentication required")
     league = await get_league_by_uid(uid)
@@ -248,10 +231,9 @@ async def add_organizer(
 async def remove_organizer(
     uid: str,
     organizer_uid: str,
-    authorization: str | None = Header(None),
+    user: OptionalUser = None,
 ) -> Response:
     """Remove an organizer from a league."""
-    user = await _get_current_user(authorization)
     if not user:
         raise HTTPException(401, "Authentication required")
     league = await get_league_by_uid(uid)

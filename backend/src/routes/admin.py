@@ -3,13 +3,13 @@
 import logging
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from ..db import get_user_by_uid, merge_users
+from ..middleware.auth import CurrentUser
 from ..models import Role, User
-from .auth import verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -24,23 +24,6 @@ def set_sync_service(sync_service) -> None:
     """Set the sync service instance."""
     global _sync_service
     _sync_service = sync_service
-
-
-async def _get_current_user_from_token(authorization: str | None) -> User:
-    """Extract and verify current user from Authorization header."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid authorization header"
-        )
-
-    token = authorization[7:]
-    user_uid = verify_token(token, expected_type="access")
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return user
 
 
 def _can_manage_country(manager: User, target_country: str | None) -> bool:
@@ -61,10 +44,9 @@ class MergeRequest(BaseModel):
 
 @router.post("/sync-vekn")
 async def trigger_vekn_sync(
-    authorization: str | None = Header(default=None),
+    manager: CurrentUser,
 ) -> dict:
     """Manually trigger VEKN member synchronization. Requires IC role."""
-    manager = await _get_current_user_from_token(authorization)
     if Role.IC not in manager.roles:
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
@@ -84,10 +66,9 @@ async def trigger_vekn_sync(
 
 @router.post("/sync-vekn-tournaments")
 async def trigger_vekn_tournament_sync(
-    authorization: str | None = Header(default=None),
+    manager: CurrentUser,
 ) -> dict:
     """Manually trigger VEKN tournament synchronization. Requires IC role."""
-    manager = await _get_current_user_from_token(authorization)
     if Role.IC not in manager.roles:
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
@@ -109,10 +90,9 @@ async def trigger_vekn_tournament_sync(
 
 @router.post("/sync-twda-decks")
 async def trigger_twda_deck_import(
-    authorization: str | None = Header(default=None),
+    manager: CurrentUser,
 ) -> dict:
     """Manually trigger TWDA winner decklist import. Requires IC role."""
-    manager = await _get_current_user_from_token(authorization)
     if Role.IC not in manager.roles:
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
@@ -132,14 +112,13 @@ async def trigger_twda_deck_import(
 @router.post("/users/merge")
 async def merge_user_accounts(
     request: MergeRequest,
-    authorization: str | None = Header(default=None),
+    manager: CurrentUser,
 ) -> Response:
     """Merge two user accounts.
 
     Requires IC, or NC/Prince for same country (both users must be same country).
     Transfers auth methods, sanctions from delete_uid to keep_uid.
     """
-    manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
     if not (

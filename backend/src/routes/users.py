@@ -7,7 +7,7 @@ from typing import Annotated
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, Header, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Query, Response, UploadFile
 from uuid6 import uuid7
 
 from ..db import (
@@ -22,8 +22,10 @@ from ..db import get_avatar as db_get_avatar
 from ..db import insert_user as db_insert_user
 from ..db import update_user as db_update_user
 from ..db import upsert_avatar as db_upsert_avatar
+from ..middleware.auth import OptionalUser
 from ..models import ObjectType, Role, User
-from .auth import send_invite_email, verify_token
+from ..utils import user_to_context
+from .auth import send_invite_email
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
@@ -36,32 +38,11 @@ from ..broadcast import broadcast_precomputed, broadcast_resync
 _engine = PyEngine()
 
 
-def _user_to_context(user: User) -> dict:
-    """Convert User to context dict for engine."""
-    return {
-        "roles": [r.value for r in user.roles],
-        "country": user.country,
-        "vekn_id": user.vekn_id,
-    }
-
-
-async def _get_current_user(authorization: str | None) -> User | None:
-    """Extract and verify current user from Authorization header."""
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    token = authorization[7:]
-    try:
-        user_uid = verify_token(token, expected_type="access")
-        return await get_user_by_uid(user_uid)
-    except Exception:
-        return None
-
-
 def _can_change_role(manager: User, role: Role, target_user: User) -> bool:
     """Check if manager can change a specific role on target user (uses Rust engine)."""
     result_json = _engine.can_change_role(
-        json.dumps(_user_to_context(manager)),
-        json.dumps(_user_to_context(target_user)),
+        json.dumps(user_to_context(manager)),
+        json.dumps(user_to_context(target_user)),
         role.value,
     )
     result = json.loads(result_json)
@@ -72,13 +53,13 @@ def _can_change_role(manager: User, role: Role, target_user: User) -> bool:
 async def create_user(
     name: str,
     country: str,
+    current_user: OptionalUser = None,
     city: str | None = None,
     city_geoname_id: int | None = None,
     state: str | None = None,
     nickname: str | None = None,
     email: str | None = None,
     roles: Annotated[list[str] | None, Query()] = None,
-    authorization: str | None = Header(default=None),
 ) -> Response:
     """Create a new user.
 
@@ -86,7 +67,6 @@ async def create_user(
     If email is provided, sends an invite email so they can log in.
     """
     # Authenticate current user
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -195,6 +175,7 @@ async def get_user(uid: str) -> Response:
 @router.put("/{uid}")
 async def update_user(
     uid: str,
+    current_user: OptionalUser = None,
     name: str | None = None,
     country: str | None = None,
     vekn_id: str | None = None,
@@ -203,11 +184,9 @@ async def update_user(
     state: str | None = None,
     nickname: str | None = None,
     roles: Annotated[list[str] | None, Query()] = None,
-    authorization: str | None = Header(default=None),
 ) -> Response:
     """Update an existing user."""
     # Authenticate current user
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -323,14 +302,13 @@ MAX_AVATAR_SIZE = 1024 * 1024  # 1MB
 async def upload_avatar(
     uid: str,
     file: UploadFile,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Upload or update user avatar.
 
     Expects a webp image, max 1MB. Client should resize/crop before upload.
     """
     # Authenticate
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -400,11 +378,10 @@ async def get_avatar(uid: str) -> Response:
 @router.delete("/{uid}/avatar")
 async def delete_avatar(
     uid: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Delete user avatar."""
     # Authenticate
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 

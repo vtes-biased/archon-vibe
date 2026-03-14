@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
@@ -19,6 +19,7 @@ from ..db import (
     update_sanction,
     update_tournament,
 )
+from ..middleware.auth import OptionalUser
 from ..models import (
     SUBCATEGORIES_BY_CATEGORY,
     PlayerState,
@@ -28,7 +29,7 @@ from ..models import (
     SanctionLevel,
     SanctionSubcategory,
 )
-from .auth import verify_token
+
 
 router = APIRouter(prefix="/sanctions", tags=["sanctions"])
 logger = logging.getLogger(__name__)
@@ -41,27 +42,6 @@ _engine = PyEngine()
 
 # Maximum expiry for probation/suspension (18 months)
 MAX_EXPIRY_MONTHS = 18
-
-
-def _user_to_context(user) -> dict:
-    """Convert User to context dict for engine."""
-    return {
-        "roles": [r.value for r in user.roles],
-        "country": user.country,
-        "vekn_id": user.vekn_id,
-    }
-
-
-async def _get_current_user(authorization: str | None):
-    """Extract and verify current user from Authorization header."""
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    token = authorization[7:]
-    try:
-        user_uid = verify_token(token, expected_type="access")
-        return await get_user_by_uid(user_uid)
-    except Exception:
-        return None
 
 
 async def _can_issue_sanction(
@@ -206,14 +186,13 @@ class UpdateSanctionRequest(BaseModel):
 @router.post("/", status_code=201)
 async def create_sanction(
     request: CreateSanctionRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Create a new sanction.
 
     Only IC and Ethics can issue SUSPENSION and PROBATION outside tournaments.
     """
     # Authenticate
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -336,7 +315,7 @@ async def create_sanction(
 async def update_sanction_endpoint(
     uid: str,
     request: UpdateSanctionRequest,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Update a sanction (lift or modify).
 
@@ -345,7 +324,6 @@ async def update_sanction_endpoint(
     - Tournament sanctions: IC/Ethics can modify, Rulemonger/NC/IC can lift
     """
     # Authenticate
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -493,7 +471,7 @@ async def update_sanction_endpoint(
 @router.delete("/{uid}")
 async def delete_sanction_endpoint(
     uid: str,
-    authorization: str | None = Header(default=None),
+    current_user: OptionalUser = None,
 ) -> Response:
     """Soft delete a sanction.
 
@@ -501,7 +479,6 @@ async def delete_sanction_endpoint(
     Only IC and Ethics can delete sanctions.
     """
     # Authenticate
-    current_user = await _get_current_user(authorization)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 

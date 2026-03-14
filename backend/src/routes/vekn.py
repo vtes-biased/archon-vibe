@@ -5,7 +5,7 @@ import os
 from datetime import UTC, datetime
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -21,31 +21,15 @@ from ..db import (
     strip_vekn_from_user,
     update_user,
 )
+from ..middleware.auth import CurrentUser
 from ..models import Role, User
-from .auth import create_access_token, create_refresh_token, verify_token
+from .auth import create_access_token, create_refresh_token
 
 router = APIRouter(prefix="/vekn", tags=["vekn"])
 encoder = msgspec.json.Encoder()
 logger = logging.getLogger(__name__)
 
 from ..broadcast import broadcast_precomputed, broadcast_resync
-
-
-async def _get_current_user_from_token(authorization: str | None) -> User:
-    """Extract and verify current user from Authorization header."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid authorization header"
-        )
-
-    token = authorization[7:]
-    user_uid = verify_token(token, expected_type="access")
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return user
 
 
 def _can_manage_country(manager: User, target_country: str | None) -> bool:
@@ -97,7 +81,7 @@ class ForceAbandonRequest(BaseModel):
 @router.post("/claim")
 async def claim_vekn_id(
     request: ClaimRequest,
-    authorization: str | None = Header(default=None),
+    current_user: CurrentUser,
 ) -> Response:
     """User claims an unclaimed VEKN ID.
 
@@ -105,7 +89,6 @@ async def claim_vekn_id(
     The current user must not already have a VEKN ID.
     On success, merges the VEKN user into the current user's account.
     """
-    current_user = await _get_current_user_from_token(authorization)
 
     # Check current user doesn't already have a VEKN ID
     if current_user.vekn_id:
@@ -152,14 +135,13 @@ async def claim_vekn_id(
 
 @router.post("/abandon")
 async def abandon_vekn_id(
-    authorization: str | None = Header(default=None),
+    current_user: CurrentUser,
 ) -> Response:
     """User voluntarily abandons their VEKN ID.
 
     Splits the user: creates a new user with auth methods and personal data,
     orphans the old VEKN record. Returns new tokens for the new user.
     """
-    current_user = await _get_current_user_from_token(authorization)
 
     if not current_user.vekn_id:
         raise HTTPException(
@@ -197,7 +179,7 @@ async def abandon_vekn_id(
 @router.post("/sponsor")
 async def sponsor_new_member(
     request: SponsorRequest,
-    authorization: str | None = Header(default=None),
+    manager: CurrentUser,
 ) -> Response:
     """Sponsor a new VEKN member.
 
@@ -205,7 +187,6 @@ async def sponsor_new_member(
     Requires IC, or NC/Prince for same country.
     Target user must not already have a VEKN ID.
     """
-    manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
     if not (
@@ -281,7 +262,7 @@ async def sponsor_new_member(
 @router.post("/link")
 async def link_vekn_to_user(
     request: LinkRequest,
-    authorization: str | None = Header(default=None),
+    manager: CurrentUser,
 ) -> Response:
     """Link a VEKN ID to a user account.
 
@@ -289,7 +270,6 @@ async def link_vekn_to_user(
     If claimed by another user, displaces them first (strips their account).
     Requires IC, or NC/Prince for same country (both users must be same country).
     """
-    manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
     if not (
@@ -371,14 +351,13 @@ async def link_vekn_to_user(
 @router.post("/force-abandon")
 async def force_abandon_vekn_id(
     request: ForceAbandonRequest,
-    authorization: str | None = Header(default=None),
+    manager: CurrentUser,
 ) -> Response:
     """Force-abandon a user's VEKN ID.
 
     Requires IC, or NC/Prince for same country.
     Same effect as user abandoning themselves.
     """
-    manager = await _get_current_user_from_token(authorization)
 
     # Check manager has appropriate role
     if not (
