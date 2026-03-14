@@ -46,13 +46,11 @@ from ..db import (
 )
 from ..email_service import send_magic_link_email
 from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
+from ..broadcast import broadcast_precomputed
 from ..models import AuthMethod, AuthMethodType, CommunityLink, CommunityLinkType, Role, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 encoder = msgspec.json.Encoder()
-
-# Injected by main.py to broadcast user updates via SSE
-broadcast_user_event = None
 
 # Password hasher
 ph = PasswordHasher()
@@ -821,8 +819,7 @@ async def update_current_user(
     user.modified = datetime.now(UTC)
 
     bd = await update_user(user)
-    if broadcast_user_event:
-        broadcast_user_event(bd)
+    broadcast_precomputed(bd)
 
     # Return updated user with auth methods
     auth_methods = await get_auth_methods_for_user(user_uid)

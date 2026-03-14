@@ -423,9 +423,6 @@ def _viewer_level(viewer: User | None) -> DataLevel:
     return DataLevel.PUBLIC
 
 
-# Wire up auth broadcast (still uses monkey-patching)
-auth.broadcast_user_event = broadcast_precomputed  # ty: ignore[invalid-assignment]
-
 
 
 @app.options("/stream")
