@@ -18,7 +18,7 @@ async function globalSetup() {
   // 1. Health-check backend
   for (let i = 0; i < 10; i++) {
     try {
-      const res = await fetch(`${API_URL}/health`);
+      const res = await fetch(`${API_URL}/`);
       if (res.ok) break;
     } catch {
       if (i === 9) throw new Error(`Backend not reachable at ${API_URL}`);
