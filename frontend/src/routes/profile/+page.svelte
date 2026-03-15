@@ -2,14 +2,15 @@
   import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import {
-    getAuthState, setAuthState, getAccessToken, logout,
+    getAuthState, getAccessToken, logout,
     initAuth, storeTokensFromCallback, hasAnyRole,
     requestMagicLink,
   } from "$lib/stores/auth.svelte";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
+  import { syncManager } from "$lib/sync";
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { syncManager } from "$lib/sync";
+
   import { User } from "lucide-svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -120,9 +121,8 @@
       showToast({ type: "success", message: result.message });
       showClaimModal = false;
       claimVeknIdInput = "";
+      // storeTokensFromCallback handles: store tokens, fetch /auth/me, set auth state, sync refresh
       await storeTokensFromCallback(result.access_token, result.refresh_token);
-      setAuthState({ user: result.user, isAuthenticated: true, isLoading: false, error: null });
-      await syncManager.refresh();
     } catch {
       // Error toast is shown by apiRequest
     } finally {
@@ -137,8 +137,6 @@
       showToast({ type: "success", message: result.message });
       showAbandonConfirm = false;
       await storeTokensFromCallback(result.access_token, result.refresh_token);
-      setAuthState({ user: result.user, isAuthenticated: true, isLoading: false, error: null });
-      await syncManager.refresh();
     } catch {
       // Error toast is shown by apiRequest
     } finally {
@@ -183,6 +181,7 @@
       {@const user = auth.user}
 
       <div class="bg-dusk-950 rounded-lg shadow border border-ash-800">
+        {#key user.uid}
         <ProfileView
           {user}
           {avatarCacheBust}
@@ -190,6 +189,7 @@
           onAbandonVekn={() => (showAbandonConfirm = true)}
           onClaimVekn={() => (showClaimModal = true)}
         />
+        {/key}
         <LinkedAccounts
           {hasEmail}
           {emailIdentifier}
