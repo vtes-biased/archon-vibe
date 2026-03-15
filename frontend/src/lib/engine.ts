@@ -421,7 +421,10 @@ export async function buildActorContext(
   return {
     uid: user.uid,
     roles: user.roles || [],
-    is_organizer: (tournament.organizers_uids?.includes(user.uid) || isIC) ?? false,
+    is_organizer: !!(tournament.organizers_uids?.includes(user.uid) || isIC
+      || (user.roles?.includes('NC')
+        && user.country && tournament.country
+        && user.country === tournament.country)),
     can_organize_league_uids: canOrganize,
   };
 }

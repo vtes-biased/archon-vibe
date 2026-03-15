@@ -4,7 +4,7 @@ Covers:
 - Timer data visibility in SSE filter (member must see timer fields)
 - Timer lifecycle hooks in tournament_action (StartRound resets, FinishRound pauses)
 - resolveTableLabelPy (room label resolution)
-- broadcast_judge_call targeting (only organizers/IC receive)
+- broadcast_judge_call targeting (only explicit organizers receive)
 """
 
 from datetime import UTC, datetime
@@ -128,8 +128,8 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_judge_call_only_sent_to_organizers_and_ic():
-    """Judge call SSE events must only reach organizers of that tournament + IC."""
+async def test_judge_call_only_sent_to_explicit_organizers():
+    """Judge call SSE events must only reach explicit organizers of that tournament."""
     from src.main import _sse_connections
 
     # Create mock SSE connections
@@ -153,8 +153,8 @@ async def test_judge_call_only_sent_to_organizers_and_ic():
 
         # Organizer should have received it
         assert not organizer.queue.empty()
-        # IC should have received it
-        assert not ic_user.queue.empty()
+        # IC should NOT (not on premises)
+        assert ic_user.queue.empty()
         # Random member should NOT
         assert random_member.queue.empty()
         # No user connection should NOT
@@ -165,8 +165,7 @@ async def test_judge_call_only_sent_to_organizers_and_ic():
 
 @pytest.mark.asyncio
 async def test_judge_call_not_sent_to_other_tournament_organizer():
-    """An organizer of tournament X should not get judge calls for tournament Y,
-    unless they are IC."""
+    """An organizer of tournament X should not get judge calls for tournament Y."""
     from src.main import _sse_connections
 
     other_org = SSEConnection(user=_make_user(uid="org-other", roles=[]))

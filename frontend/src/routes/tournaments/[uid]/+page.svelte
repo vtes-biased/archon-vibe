@@ -44,7 +44,10 @@ import TournamentModals from "./TournamentModals.svelte";
   const uid = $derived($page.params.uid as string);
   const isOrganizer = $derived(
     (tournament?.organizers_uids?.includes(auth.user?.uid ?? "") ||
-      auth.user?.roles?.includes("IC")) ?? false
+      auth.user?.roles?.includes("IC") ||
+      (auth.user?.roles?.includes("NC") &&
+        auth.user?.country && tournament?.country &&
+        auth.user.country === tournament.country)) ?? false
   );
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null

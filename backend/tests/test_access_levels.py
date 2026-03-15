@@ -53,9 +53,20 @@ def _make_user(**overrides) -> dict:
 
 class TestUserPublic:
     def test_regular_user_hidden(self):
-        """Regular users (no NC/Prince role) are hidden at public level."""
-        user = _make_user(roles=[])
+        """Regular users (no NC/Prince role, no community links) are hidden at public level."""
+        user = _make_user(roles=[], community_links=[])
         assert compute_public(ObjectType.USER, user) is None
+
+    def test_regular_user_with_links_visible(self):
+        """Regular users with community_links get a minimal public projection (links only)."""
+        user = _make_user(roles=[])
+        result = compute_public(ObjectType.USER, user)
+        assert result is not None
+        assert result["community_links"] == [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}]
+        assert result["country"] == "FR"
+        # No name or contact info for regular users
+        assert "name" not in result
+        assert "contact_email" not in result
 
     def test_nc_user_visible(self):
         """NC users get a public representation with contact info."""
@@ -154,13 +165,21 @@ class TestUserMember:
 
     def test_excludes_contact_for_regular_users(self):
         """Member projection does not include contact info for regular users."""
-        user = _make_user(roles=[])
+        user = _make_user(roles=[], community_links=[])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
         assert "contact_email" not in result
         assert "contact_discord" not in result
         assert "contact_phone" not in result
         assert "community_links" not in result
+
+    def test_includes_community_links_for_regular_users_who_have_them(self):
+        """Member projection includes community_links for regular users with links."""
+        user = _make_user(roles=[])
+        result = compute_member(ObjectType.USER, user)
+        assert result is not None
+        assert result["community_links"] == [{"type": "discord", "url": "https://discord.gg/test", "label": "Test"}]
+        assert "contact_email" not in result
 
     def test_nc_includes_contact_and_community_links(self):
         """Member projection includes contact info + community_links for NC."""

@@ -23,10 +23,10 @@ async def _insert_user(roles: list[Role], **kwargs) -> User:
 
 
 @pytest.mark.asyncio
-async def test_non_official_cannot_set_community_links(
+async def test_non_member_cannot_set_community_links(
     test_client: AsyncClient, test_db
 ):
-    """Regular user gets 403 when trying to set community_links."""
+    """User without VEKN ID gets 403 when trying to set community_links."""
     user = await _insert_user(roles=[])
     response = await test_client.patch(
         "/auth/me",
@@ -38,13 +38,13 @@ async def test_non_official_cannot_set_community_links(
         headers=make_auth_header(user.uid),
     )
     assert response.status_code == 403
-    assert "officials" in response.json()["detail"].lower()
+    assert "vekn" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
 async def test_nc_can_set_community_links(test_client: AsyncClient, test_db):
     """NC user can successfully set community_links via PATCH /me."""
-    user = await _insert_user(roles=[Role.NC])
+    user = await _insert_user(roles=[Role.NC], vekn_id="1000001")
     response = await test_client.patch(
         "/auth/me",
         json={
@@ -69,7 +69,7 @@ async def test_community_links_invalid_type_rejected(
     test_client: AsyncClient, test_db
 ):
     """Invalid link type returns 422."""
-    user = await _insert_user(roles=[Role.NC])
+    user = await _insert_user(roles=[Role.NC], vekn_id="1000002")
     response = await test_client.patch(
         "/auth/me",
         json={
@@ -86,7 +86,7 @@ async def test_community_links_invalid_type_rejected(
 @pytest.mark.asyncio
 async def test_community_links_bad_url_rejected(test_client: AsyncClient, test_db):
     """URL without http(s) scheme returns 422."""
-    user = await _insert_user(roles=[Role.NC])
+    user = await _insert_user(roles=[Role.NC], vekn_id="1000003")
     response = await test_client.patch(
         "/auth/me",
         json={

@@ -64,8 +64,20 @@ _engine = PyEngine()
 
 
 def _is_organizer(user, tournament: Tournament) -> bool:
-    """Check if user is an organizer of this tournament (IC is implicit organizer)."""
-    return user.uid in tournament.organizers_uids or Role.IC in user.roles
+    """Check if user is an organizer of this tournament.
+
+    Implicit organizers: IC (all tournaments), NC (same country).
+    """
+    if user.uid in tournament.organizers_uids or Role.IC in user.roles:
+        return True
+    if (
+        Role.NC in user.roles
+        and user.country
+        and tournament.country
+        and user.country == tournament.country
+    ):
+        return True
+    return False
 
 
 async def _build_decks_json(tournament_uid: str) -> str:
@@ -641,16 +653,10 @@ async def archon_import(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    # Auth: organizer, IC, or NC/Prince of same country
-    if not (
-        _is_organizer(current_user, tournament)
-        or Role.NC in current_user.roles
-        and current_user.country
-        and tournament.country == current_user.country
-    ):
+    if not _is_organizer(current_user, tournament):
         raise HTTPException(
             status_code=403,
-            detail="Only organizers, IC, or NC/Prince of the same country can import",
+            detail="Only organizers can import",
         )
 
     # File validation

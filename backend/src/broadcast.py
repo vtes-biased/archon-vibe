@@ -93,7 +93,7 @@ async def broadcast_judge_call(
     player_name: str,
     organizer_uids: list[str] | None = None,
 ) -> None:
-    """Broadcast judge call to organizers and IC users only."""
+    """Broadcast judge call to explicit organizers only (they are on premises)."""
     event_data = {
         "type": "judge_call",
         "data": {
@@ -109,7 +109,7 @@ async def broadcast_judge_call(
     for conn in _sse_connections:
         if not conn.user:
             continue
-        if Role.IC in conn.user.roles or conn.user.uid in org_set:
+        if conn.user.uid in org_set:
             try:
                 conn.queue.put_nowait(message)
             except asyncio.QueueFull:

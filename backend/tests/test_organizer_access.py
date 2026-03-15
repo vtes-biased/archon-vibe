@@ -1,8 +1,9 @@
-"""Tests for IC implicit organizer access and VEKN sync organizer mapping.
+"""Tests for implicit organizer access and VEKN sync organizer mapping.
 
 Covers:
 - _is_organizer: IC role grants implicit organizer access
-- _build_actor_context: IC role sets is_organizer=True
+- _is_organizer: NC same-country grants implicit organizer access
+- _build_actor_context: IC/NC role sets is_organizer=True
 - _map_vekn_to_tournament: organizer_veknid mapped to organizers_uids
 - sync_all_tournaments: organizer merge on update preserves existing + adds VEKN
 """
@@ -21,16 +22,17 @@ from src.vekn_tournament_sync import _map_vekn_to_tournament
 NOW = datetime.now(UTC)
 
 
-def _user(uid="u1", roles=None):
-    return User(uid=uid, modified=NOW, name="Test", roles=roles or [])
+def _user(uid="u1", roles=None, country=None):
+    return User(uid=uid, modified=NOW, name="Test", roles=roles or [], country=country)
 
 
-def _tournament(organizers_uids=None):
+def _tournament(organizers_uids=None, country=None):
     return Tournament(
         uid="t1",
         modified=NOW,
         name="Test",
         organizers_uids=organizers_uids or [],
+        country=country,
     )
 
 
@@ -60,14 +62,30 @@ class TestIsOrganizer:
         t = _tournament(organizers_uids=[])
         assert _is_organizer(user, t) is True
 
-    def test_nc_is_not_implicit_organizer(self):
-        """NC should NOT get implicit organizer access (only IC does)."""
-        user = _user("nc-user", roles=[Role.NC])
-        t = _tournament(organizers_uids=["someone-else"])
+    def test_nc_same_country_is_implicit_organizer(self):
+        """NC with matching country should get implicit organizer access."""
+        user = _user("nc-user", roles=[Role.NC], country="France")
+        t = _tournament(organizers_uids=["someone-else"], country="France")
+        assert _is_organizer(user, t) is True
+
+    def test_prince_same_country_not_implicit_organizer(self):
+        """Prince does NOT get implicit organizer access (only NC does)."""
+        user = _user("prince-user", roles=[Role.PRINCE], country="France")
+        t = _tournament(organizers_uids=[], country="France")
         assert _is_organizer(user, t) is False
 
-    def test_prince_is_not_implicit_organizer(self):
-        user = _user("prince-user", roles=[Role.PRINCE])
+    def test_nc_different_country_not_organizer(self):
+        user = _user("nc-user", roles=[Role.NC], country="France")
+        t = _tournament(organizers_uids=[], country="Spain")
+        assert _is_organizer(user, t) is False
+
+    def test_nc_no_country_not_organizer(self):
+        user = _user("nc-user", roles=[Role.NC])
+        t = _tournament(organizers_uids=[], country="France")
+        assert _is_organizer(user, t) is False
+
+    def test_nc_tournament_no_country_not_organizer(self):
+        user = _user("nc-user", roles=[Role.NC], country="France")
         t = _tournament(organizers_uids=[])
         assert _is_organizer(user, t) is False
 
