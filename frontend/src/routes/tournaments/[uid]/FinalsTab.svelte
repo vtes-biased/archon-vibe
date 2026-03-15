@@ -3,7 +3,7 @@
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/api";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
-  import { GripVertical, ShieldCheck } from "lucide-svelte";
+  import { GripVertical, ShieldCheck, Lock } from "lucide-svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -151,16 +151,23 @@
             </div>
             <div class="flex items-center gap-2">
               <span class="text-ash-400 text-xs">VP:</span>
-              <select
-                class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-1.5 sm:py-0.5 border border-ash-700"
-                disabled={scoreSaving === -1}
-                value={seat.result.vp}
-                onchange={(e) => setFinalsVp(seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), tournament.finals!.seating)}
-              >
-                {#each vpOptions(tournament.finals.seating.length, isOrganizer) as v}
-                  <option value={v}>{v}</option>
-                {/each}
-              </select>
+              {#if !isOrganizer && tournament.finals.seating.some(s => s.judge_uid)}
+                <span class="inline-flex items-center gap-1 text-xs text-ash-400">
+                  {seat.result.vp}
+                  <Lock class="w-3.5 h-3.5" />
+                </span>
+              {:else}
+                <select
+                  class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-1.5 sm:py-0.5 border border-ash-700"
+                  disabled={scoreSaving === -1}
+                  value={seat.result.vp}
+                  onchange={(e) => setFinalsVp(seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), tournament.finals!.seating)}
+                >
+                  {#each vpOptions(tournament.finals.seating.length, isOrganizer) as v}
+                    <option value={v}>{v}</option>
+                  {/each}
+                </select>
+              {/if}
               <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
             </div>
           </div>

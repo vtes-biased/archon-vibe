@@ -1443,4 +1443,46 @@ mod tests {
         assert!(delete_result.is_err());
         assert!(delete_result.unwrap_err().contains("already started"));
     }
+
+    // --- Judge-locked score tests ---
+
+    #[test]
+    fn test_player_blocked_from_scoring_after_organizer_sets_score() {
+        let mut t = tournament_with_round();
+        // Set judge_uid on table 1 seat to simulate organizer having scored
+        t["rounds"][0][1]["seating"][0]["judge_uid"] = "organizer-1".into();
+        t["rounds"][0][1]["state"] = "In Progress".into();
+
+        let event = json::object! {
+            type: "SetScore",
+            round: 0,
+            table: 1,
+            scores: [
+                { player_uid: "p5", vp: 1.0 },
+            ],
+        };
+        let player = make_player("p5");
+        let result = run_event(&t, &event, &player);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("set by organiser"));
+    }
+
+    #[test]
+    fn test_organizer_can_rescore_judge_locked_table() {
+        let mut t = tournament_with_round();
+        t["rounds"][0][1]["seating"][0]["judge_uid"] = "organizer-1".into();
+        t["rounds"][0][1]["state"] = "In Progress".into();
+
+        let event = json::object! {
+            type: "SetScore",
+            round: 0,
+            table: 1,
+            scores: [
+                { player_uid: "p5", vp: 2.0 },
+            ],
+        };
+        let organizer = make_organizer();
+        let result = run_event(&t, &event, &organizer);
+        assert!(result.is_ok());
+    }
 }

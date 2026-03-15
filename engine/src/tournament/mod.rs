@@ -1231,6 +1231,16 @@ fn apply_event(
                 return Err("Table score is locked by judge".to_string());
             }
 
+            // If any seat was scored by an organizer, non-organizers cannot change scores
+            if !actor.is_organizer {
+                let has_judge_score = t["seating"]
+                    .members()
+                    .any(|s| !s["judge_uid"].as_str().unwrap_or("").is_empty());
+                if has_judge_score {
+                    return Err("Score has been set by organiser".to_string());
+                }
+            }
+
             let table_size = t["seating"].len();
 
             // Basic VP validation per seat
