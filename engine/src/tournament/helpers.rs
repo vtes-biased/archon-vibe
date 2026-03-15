@@ -65,18 +65,38 @@ pub(super) fn validate_enum(value: &str, valid: &[&str], field: &str) -> Result<
 }
 
 pub(super) fn count_completed_rounds(tournament: &JsonValue) -> usize {
-    let total = tournament["rounds"].len();
-    if total == 0 {
-        return 0;
-    }
-    // Check if the last round is still in progress (has "In Progress" tables)
-    let last_round = &tournament["rounds"][total - 1];
-    let has_in_progress = last_round
+    tournament["rounds"]
         .members()
-        .any(|table| table["state"].as_str() == Some("In Progress"));
-    if has_in_progress {
-        total - 1
-    } else {
-        total
-    }
+        .filter(|round| {
+            round
+                .members()
+                .all(|t| t["state"].as_str() == Some("Finished"))
+        })
+        .count()
+}
+
+pub(super) fn all_rounds_finished(tournament: &JsonValue) -> bool {
+    let rounds = &tournament["rounds"];
+    !rounds.is_empty()
+        && rounds.members().all(|round| {
+            round
+                .members()
+                .all(|table| table["state"].as_str() == Some("Finished"))
+        })
+}
+
+/// Collect user UIDs of players still playing in rounds other than `exclude_round`.
+pub(super) fn players_in_other_active_rounds(
+    tournament: &JsonValue,
+    exclude_round: usize,
+) -> std::collections::HashSet<String> {
+    tournament["rounds"]
+        .members()
+        .enumerate()
+        .filter(|(i, _)| *i != exclude_round)
+        .flat_map(|(_, round)| round.members())
+        .filter(|table| table["state"].as_str() != Some("Finished"))
+        .flat_map(|table| table["seating"].members())
+        .filter_map(|seat| seat["player_uid"].as_str().map(|s| s.to_string()))
+        .collect()
 }

@@ -143,8 +143,8 @@ pub enum TournamentEvent {
     StartRound {
         seating: Option<Vec<Vec<String>>>,
     },
-    FinishRound,
-    CancelRound,
+    FinishRound { round: Option<usize> },
+    CancelRound { round: Option<usize> },
     SwapSeats {
         round: usize,
         table1: usize,

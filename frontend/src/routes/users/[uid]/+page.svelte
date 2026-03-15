@@ -3,7 +3,7 @@
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn } from "$lib/engine";
+  import { canEditUser, canManageVekn, initEngine } from "$lib/engine";
   import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
   import VeknManagement from "$lib/components/VeknManagement.svelte";
@@ -32,12 +32,16 @@
 
   let user = $state<User | undefined>();
   let isOnline = $state(navigator.onLine);
+  let engineReady = $state(false);
+
+  // Ensure WASM engine is loaded (may happen after first render)
+  $effect(() => { initEngine().then(() => { engineReady = true; }); });
 
   const uid = $derived($page.params.uid);
   const auth = $derived(getAuthState());
 
   const canEdit = $derived(() => {
-    if (!auth.user || !user) return false;
+    if (!auth.user || !user || !engineReady) return false;
     try {
       return canEditUser(auth.user, auth.user.uid, user.uid, user).allowed;
     } catch {

@@ -28,8 +28,9 @@ use types::VpError;
 
 // Import everything needed for apply_event from submodules
 use helpers::{
-    count_completed_rounds, find_player_index, is_deck_locked, player_exists, require_organizer,
-    require_state, require_state_or_finished, validate_enum,
+    all_rounds_finished, count_completed_rounds, find_player_index, is_deck_locked,
+    player_exists, players_in_other_active_rounds, require_organizer, require_state,
+    require_state_or_finished, validate_enum,
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{get_sa_sanctions, has_active_suspension, has_dq_sanction};
@@ -565,7 +566,21 @@ fn apply_event(
             seating: submitted_seating,
         } => {
             require_organizer(actor)?;
-            require_state_or_finished(state, TournamentState::Waiting)?;
+            let is_online = tournament["online"].as_bool().unwrap_or(false);
+            if is_online {
+                // Online: allow starting a round while Playing (parallel rounds)
+                if state != TournamentState::Waiting
+                    && state != TournamentState::Playing
+                    && state != TournamentState::Finished
+                {
+                    return Err(format!(
+                        "Tournament must be in Waiting state (currently {})",
+                        state.as_str()
+                    ));
+                }
+            } else {
+                require_state_or_finished(state, TournamentState::Waiting)?;
+            }
 
             // Cannot start prelim round after finals
             if !tournament["finals"].is_null() {
@@ -579,10 +594,13 @@ fn apply_event(
                 return Err("Maximum rounds reached".to_string());
             }
 
-            // Get checked-in players
+            // Get available players: Checked-in, plus Playing for online parallel rounds
             let checked_in: Vec<String> = tournament["players"]
                 .members()
-                .filter(|p| p["state"].as_str() == Some("Checked-in"))
+                .filter(|p| {
+                    let s = p["state"].as_str();
+                    s == Some("Checked-in") || (is_online && s == Some("Playing"))
+                })
                 .filter_map(|p| p["user_uid"].as_str().map(|s| s.to_string()))
                 .collect();
 
@@ -700,7 +718,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::FinishRound => {
+        TournamentEvent::FinishRound { round } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
@@ -709,10 +727,15 @@ fn apply_event(
                 return Err("No rounds to finish".to_string());
             }
 
-            let last_round = &rounds[rounds.len() - 1];
+            let target_round_idx = round.unwrap_or(rounds.len() - 1);
+            if target_round_idx >= rounds.len() {
+                return Err(format!("Invalid round number: {}", target_round_idx));
+            }
+
+            let target_round = &rounds[target_round_idx];
 
             // Check all tables are finished
-            let unfinished: Vec<usize> = last_round
+            let unfinished: Vec<usize> = target_round
                 .members()
                 .enumerate()
                 .filter(|(_, t)| t["state"].as_str() != Some("Finished"))
@@ -723,27 +746,35 @@ fn apply_event(
                 return Err(format!("Tables {:?} not finished yet", unfinished));
             }
 
-            // Move players back
+            // Move players back — only if not in another active round
             let target_state = if state == TournamentState::Finished {
                 "Finished"
             } else {
                 "Checked-in"
             };
+            let still_playing = players_in_other_active_rounds(tournament, target_round_idx);
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Playing") {
-                    players[i]["state"] = target_state.into();
+                    if let Some(uid) = players[i]["user_uid"].as_str() {
+                        if !still_playing.contains(uid) {
+                            players[i]["state"] = target_state.into();
+                        }
+                    }
                 }
             }
 
             if state != TournamentState::Finished {
-                tournament["state"] = "Waiting".into();
+                if all_rounds_finished(tournament) {
+                    tournament["state"] = "Waiting".into();
+                }
+                // else: stay Playing (other rounds still in progress)
             }
             update_standings(tournament, sanctions);
             Ok(())
         }
 
-        TournamentEvent::CancelRound => {
+        TournamentEvent::CancelRound { round } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
@@ -752,25 +783,42 @@ fn apply_event(
                 return Err("No rounds to cancel".to_string());
             }
 
-            // Remove last round
             let len = rounds.len();
+            // Can only cancel the last round (removing mid-array would shift indices)
+            if let Some(idx) = round {
+                if *idx != len - 1 {
+                    return Err("Can only cancel the last round".to_string());
+                }
+            }
+
+            // Remove last round
             rounds.array_remove(len - 1);
 
-            // Move playing players back
+            // Move playing players back — only if not in another active round.
+            // Note: exclude_round=len-1 no longer exists in the array, which is
+            // correct — we want to check ALL remaining rounds (indices 0..len-2).
             let target_state = if state == TournamentState::Finished {
                 "Finished"
             } else {
                 "Checked-in"
             };
+            let still_playing = players_in_other_active_rounds(tournament, len - 1);
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Playing") {
-                    players[i]["state"] = target_state.into();
+                    if let Some(uid) = players[i]["user_uid"].as_str() {
+                        if !still_playing.contains(uid) {
+                            players[i]["state"] = target_state.into();
+                        }
+                    }
                 }
             }
 
             if state != TournamentState::Finished {
-                tournament["state"] = "Waiting".into();
+                if all_rounds_finished(tournament) || tournament["rounds"].is_empty() {
+                    tournament["state"] = "Waiting".into();
+                }
+                // else: stay Playing (other rounds still in progress)
             }
             update_standings(tournament, sanctions);
             Ok(())

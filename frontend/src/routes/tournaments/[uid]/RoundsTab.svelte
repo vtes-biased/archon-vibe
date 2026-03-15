@@ -56,17 +56,27 @@
   let seatTargetTable = $state<number | null>(null);
   let expandedRounds = $state<Set<number>>(new Set());
 
-  // Auto-expand current round
+  // Auto-expand in-progress rounds
   $effect(() => {
     if (tournament.rounds!.length > 0) {
-      const lastIdx = tournament.rounds!.length - 1;
       if (tournament.state === "Playing") {
-        expandedRounds = new Set([lastIdx]);
+        const inProgress = new Set<number>();
+        for (let i = 0; i < tournament.rounds!.length; i++) {
+          if (tournament.rounds![i]!.some(t => t.state !== "Finished")) {
+            inProgress.add(i);
+          }
+        }
+        expandedRounds = inProgress.size > 0 ? inProgress : new Set([tournament.rounds!.length - 1]);
       } else if (expandedRounds.size === 0) {
-        expandedRounds = new Set([lastIdx]);
+        expandedRounds = new Set([tournament.rounds!.length - 1]);
       }
     }
   });
+
+  const inProgressRoundCount = $derived(
+    tournament.rounds?.filter(r => r.some(t => t.state !== "Finished")).length ?? 0
+  );
+  const hasParallelRounds = $derived(inProgressRoundCount > 1);
 
   function toggleRound(idx: number) {
     const next = new Set(expandedRounds);
@@ -77,6 +87,22 @@
   const currentRoundIdx = $derived(
     tournament.state === "Playing" && !tournament.finals ? tournament.rounds!.length - 1 : -1
   );
+
+  function isRoundInProgress(idx: number): boolean {
+    const round = tournament.rounds![idx];
+    return round ? round.some(t => t.state !== "Finished") : false;
+  }
+
+  function roundProgress(idx: number): { done: number; total: number } {
+    const round = tournament.rounds![idx];
+    if (!round) return { done: 0, total: 0 };
+    return { done: round.filter(t => t.state === "Finished").length, total: round.length };
+  }
+
+  function isRoundAllFinished(idx: number): boolean {
+    const round = tournament.rounds![idx];
+    return round ? round.length > 0 && round.every(t => t.state === "Finished") : false;
+  }
   // Seating score
   let seatingScore = $state<{ rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null>(null);
 
@@ -245,7 +271,7 @@
 
   function cancelRound() {
     showCancelConfirm = false;
-    doAction("CancelRound");
+    doAction("CancelRound", { round: tournament.rounds!.length - 1 });
   }
 
   function esc(s: string): string {
@@ -294,7 +320,7 @@
   }
 
   function isCurrentRound(idx: number): boolean {
-    return idx === currentRoundIdx;
+    return tournament.state === "Playing" && !tournament.finals && isRoundInProgress(idx);
   }
 </script>
 
@@ -305,8 +331,8 @@
     </div>
   {/if}
 
-  <!-- Global Timer -->
-  {#if (tournament.round_time ?? 0) > 0 && tournament.state === "Playing"}
+  <!-- Global Timer (hidden with parallel rounds) -->
+  {#if !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing"}
     <div class="bg-ash-900/50 rounded-lg p-4 flex justify-center">
       <TimerDisplay {tournament} {isOrganizer} />
     </div>
@@ -316,7 +342,7 @@
     <p class="text-ash-400">{m.rounds_no_rounds()}</p>
   {:else}
     <!-- Current round controls -->
-    {#if isOrganizer && currentRoundIdx >= 0}
+    {#if isOrganizer && currentRoundIdx >= 0 && !hasParallelRounds}
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3">
           <p class="text-ash-400">{m.rounds_round_in_progress({ n: String(currentRoundIdx + 1) })}</p>
@@ -429,8 +455,8 @@
         </div>
       </div>
     {/if}
-    <!-- Sitting out players (stagger rounds) -->
-    {#if sittingOutPlayers.length > 0}
+    <!-- Sitting out players (stagger rounds, hidden with parallel rounds) -->
+    {#if !hasParallelRounds && sittingOutPlayers.length > 0}
       <div class="bg-sky-900/20 border border-sky-800/40 rounded-lg p-3">
         <p class="text-xs text-sky-300 mb-2">{m.rounds_sitting_out()}</p>
         <div class="flex flex-wrap gap-2">
@@ -459,8 +485,10 @@
               <span class="text-sm font-medium {isCurrent ? 'text-bone-100' : 'text-ash-300'}">
                 {m.rounds_round_n({ n: String(r + 1) })}
               </span>
-              {#if tournament.state === "Playing" && isCurrent}
+              {#if tournament.state === "Playing" && isRoundInProgress(r)}
+                {@const prog = roundProgress(r)}
                 <span class="text-xs px-2 py-0.5 rounded badge-amber">{m.rounds_in_progress()}</span>
+                <span class="text-xs text-ash-500">{prog.done}/{prog.total}</span>
               {/if}
             </div>
             <span class="text-xs text-ash-500">{m.rounds_table_count({ count: String(round.length) })}</span>
@@ -531,8 +559,8 @@
                     {/if}
                   </div>
                 </div>
-                <!-- Per-table timer (organizer controls) -->
-                {#if (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
+                <!-- Per-table timer (organizer controls, hidden with parallel rounds) -->
+                {#if !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
                   <div class="mb-2">
                     <TimerDisplay {tournament} {isOrganizer} tableIndex={i} />
                   </div>
@@ -674,6 +702,13 @@
                 >
                   <GripVertical class="w-4 h-4 inline mr-1" />{m.rounds_alter_seating()}
                 </button>
+              {/if}
+              {#if hasParallelRounds && isOrganizer && isRoundAllFinished(r)}
+                <button
+                  onclick={() => doAction("FinishRound", { round: r })}
+                  disabled={actionLoading}
+                  class="px-3 py-1.5 text-sm font-medium btn-amber rounded-lg transition-colors"
+                >{m.rounds_finish_round_n({ n: String(r + 1) })}</button>
               {/if}
             </div>
             {/if}

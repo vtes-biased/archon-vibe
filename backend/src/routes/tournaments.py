@@ -933,20 +933,28 @@ async def tournament_action(
         deck_ops = result.get("deck_ops", [])
 
         # Timer lifecycle hooks (online-only, not handled by Rust engine)
+        # Skip timer reset if other rounds are still in progress (parallel rounds)
         if request.type in ("StartRound", "StartFinals"):
-            updated.timer = TimerState()  # Fresh paused timer
-            updated.table_extra_time = {}
-            updated.table_paused_at = {}
+            in_progress = sum(
+                1 for r in (updated.rounds or [])
+                if any(t.state != "Finished" for t in r)
+            )
+            if in_progress <= 1:
+                updated.timer = TimerState()  # Fresh paused timer
+                updated.table_extra_time = {}
+                updated.table_paused_at = {}
         elif request.type in ("FinishRound", "CancelRound", "FinishTournament"):
-            if not updated.timer.paused and updated.timer.started_at:
-                # Accumulate elapsed time before pausing
-                elapsed = (datetime.now(UTC) - updated.timer.started_at).total_seconds()
-                updated.timer = TimerState(
-                    elapsed_before_pause=updated.timer.elapsed_before_pause + elapsed,
-                    paused=True,
-                )
-            updated.table_extra_time = {}
-            updated.table_paused_at = {}
+            # Only reset timer if tournament left Playing state (all rounds done)
+            if updated.state != "Playing":
+                if not updated.timer.paused and updated.timer.started_at:
+                    # Accumulate elapsed time before pausing
+                    elapsed = (datetime.now(UTC) - updated.timer.started_at).total_seconds()
+                    updated.timer = TimerState(
+                        elapsed_before_pause=updated.timer.elapsed_before_pause + elapsed,
+                        paused=True,
+                    )
+                updated.table_extra_time = {}
+                updated.table_paused_at = {}
 
         # Save within the same transaction (row is still locked)
         tournament_bd = await save_object(

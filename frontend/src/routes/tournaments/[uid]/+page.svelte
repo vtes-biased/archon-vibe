@@ -347,10 +347,16 @@ import TournamentModals from "./TournamentModals.svelte";
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const finalsReady = $derived(hasFinalsCandidate && !top5HasTiesFn(standings));
+  // Find the single in-progress round (for action bar when not parallel)
+  const activeRoundIdx = $derived.by(() => {
+    if (!tournament?.rounds?.length) return -1;
+    const idx = tournament.rounds.findIndex(r => r.some(t => t.state !== "Finished"));
+    return idx >= 0 ? idx : tournament.rounds.length - 1;
+  });
   const allTablesFinished = $derived.by(() => {
-    if (!tournament?.rounds?.length) return false;
-    const lastRound = tournament.rounds[tournament.rounds.length - 1]!;
-    return lastRound.length > 0 && lastRound.every(t => t.state === "Finished");
+    if (!tournament?.rounds?.length || activeRoundIdx < 0) return false;
+    const round = tournament.rounds[activeRoundIdx]!;
+    return round.length > 0 && round.every(t => t.state === "Finished");
   });
   const finalsTableFinished = $derived(tournament?.finals?.state === "Finished");
   // Detect unequal rounds played (stagger sit-outs)
@@ -372,10 +378,15 @@ import TournamentModals from "./TournamentModals.svelte";
     return Math.min(...vals) < Math.max(...vals);
   });
   const tablesFinishedCount = $derived.by(() => {
-    if (!tournament?.rounds?.length) return { done: 0, total: 0 };
-    const lastRound = tournament.rounds[tournament.rounds.length - 1]!;
-    return { done: lastRound.filter(t => t.state === "Finished").length, total: lastRound.length };
+    if (!tournament?.rounds?.length || activeRoundIdx < 0) return { done: 0, total: 0 };
+    const round = tournament.rounds[activeRoundIdx]!;
+    return { done: round.filter(t => t.state === "Finished").length, total: round.length };
   });
+  const inProgressRoundCount = $derived(
+    tournament?.rounds?.filter(r => r.some(t => t.state !== "Finished")).length ?? 0
+  );
+  const hasParallelRounds = $derived(inProgressRoundCount > 1);
+  const playingCount = $derived(tournament?.players?.filter(p => p.state === "Playing").length ?? 0);
 
   // Player DQ state and sanctions helpers for standings display
   function isPlayerDQ(userUid: string): boolean {
@@ -391,9 +402,8 @@ import TournamentModals from "./TournamentModals.svelte";
 
   let scoreSaving = $state<number | null>(null);
 
-  async function setVp(tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
+  async function setVp(roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
     if (!tournament) return;
-    const roundIndex = tournament.rounds!.length - 1;
     const scores = seating.map(s => ({
       player_uid: s.player_uid,
       vp: s.player_uid === playerUid ? vp : s.result.vp,
@@ -829,8 +839,10 @@ import TournamentModals from "./TournamentModals.svelte";
               {:else if tournament.state === "Playing"}
                 {#if isFinals}
                   {m.action_bar_playing_finals()}
+                {:else if hasParallelRounds}
+                  {m.action_bar_playing_parallel({ count: String(inProgressRoundCount) })}
                 {:else}
-                  {m.action_bar_playing_round({ n: String(tournament.rounds!.length), done: String(tablesFinishedCount.done), total: String(tablesFinishedCount.total) })}
+                  {m.action_bar_playing_round({ n: String(activeRoundIdx + 1), done: String(tablesFinishedCount.done), total: String(tablesFinishedCount.total) })}
                 {/if}
               {:else if tournament.state === "Finished"}
                 {m.action_bar_finished()}
@@ -896,9 +908,18 @@ import TournamentModals from "./TournamentModals.svelte";
                     class="px-4 py-2 text-sm font-medium btn-amber rounded-lg transition-colors"
                   >{m.finals_finish()}</button>
                 {:else}
-                  <button onclick={() => doAction("FinishRound")} disabled={actionLoading || !allTablesFinished}
-                    class="px-4 py-2 text-sm font-medium btn-amber rounded-lg transition-colors"
-                  >{m.rounds_end_round()}</button>
+                  {#if !hasParallelRounds}
+                    <button onclick={() => doAction("FinishRound", { round: activeRoundIdx })} disabled={actionLoading || !allTablesFinished}
+                      class="px-4 py-2 text-sm font-medium btn-amber rounded-lg transition-colors"
+                    >{m.rounds_end_round()}</button>
+                  {/if}
+                  {#if tournament.online}
+                    {@const maxRounds = tournament.max_rounds ?? 0}
+                    {@const canStartNext = (checkedInCount + playingCount) >= 4 && (maxRounds === 0 || (tournament.rounds?.length ?? 0) < maxRounds)}
+                    <button onclick={() => doAction("StartRound")} disabled={actionLoading || !canStartNext}
+                      class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+                    >{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</button>
+                  {/if}
                 {/if}
 
               {:else if tournament.state === "Finished"}

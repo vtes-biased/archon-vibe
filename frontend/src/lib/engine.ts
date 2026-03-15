@@ -15,6 +15,7 @@ let wasmEngine: WasmEngine | null = null;
 let initPromise: Promise<void> | null = null;
 let initError: Error | null = null;
 
+
 /**
  * Initialize the WASM engine (lazy, called once).
  * Exported for use in layout initialization.

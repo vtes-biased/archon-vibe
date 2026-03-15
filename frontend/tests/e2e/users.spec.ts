@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { loginAsOrganizer } from './helpers/auth';
+import { test, expect, type Page } from '@playwright/test';
+import { loginAsOrganizer, getE2EState, setupAuthBeforeNavigation } from './helpers/auth';
 import { waitForUsers, waitForSync } from './helpers/wait';
 
 /**
@@ -69,10 +69,13 @@ test.describe('Community tab', () => {
   test('country search filters Communities section', async ({ page }) => {
     await page.goto('/users');
     await waitForSync(page);
-    await page.getByPlaceholder('Search countries...').fill('Germany');
+    const searchInput = page.getByPlaceholder('Search countries...');
+    await searchInput.fill('Germany');
     await page.waitForTimeout(300);
-    await expect(page.getByText('Germany')).toBeVisible();
-    await expect(page.getByText('France')).not.toBeVisible();
+    // Verify Germany appears in the communities list and France is filtered out
+    const communitiesList = searchInput.locator('..').locator('..');
+    await expect(communitiesList.getByText('Germany').first()).toBeVisible();
+    await expect(communitiesList.getByRole('button', { name: /France/ })).not.toBeVisible();
   });
 });
 
@@ -217,27 +220,26 @@ test.describe('Users list filtering', () => {
 // ─── Authenticated Features ────────────────────────────────────
 
 test.describe('Edit user (authenticated)', () => {
+  // Helper: navigate to another user's profile as IC organizer.
+  // Requires WASM engine + auth to be fully loaded, so we warm up via
+  // /tournaments first (same pattern as tournament lifecycle test).
+  async function goToUserProfile(page: Page) {
+    const state = getE2EState();
+    await setupAuthBeforeNavigation(page);
+    await page.goto('/tournaments');
+    await waitForSync(page);
+    // Navigate to a player profile (not self — IC can edit any user)
+    await page.goto(`/users/${state.player_uids[0]}`);
+    await expect(page.getByText('Country:')).toBeVisible({ timeout: 5_000 });
+  }
+
   test('shows edit button when authenticated', async ({ page }) => {
-    await page.goto('/login');
-    await loginAsOrganizer(page);
-    await page.goto('/users');
-    await waitForUsers(page);
-
-    await page.locator('.user-row').first().click();
-    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 2_000 });
-    await expect(page.getByText('Country:')).toBeVisible({ timeout: 2_000 });
-
+    await goToUserProfile(page);
     await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
   });
 
   test('opens edit mode and shows form fields', async ({ page }) => {
-    await page.goto('/login');
-    await loginAsOrganizer(page);
-    await page.goto('/users');
-    await waitForUsers(page);
-
-    await page.locator('.user-row').first().click();
-    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 2_000 });
+    await goToUserProfile(page);
     await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
 
@@ -249,13 +251,7 @@ test.describe('Edit user (authenticated)', () => {
   });
 
   test('can close edit mode', async ({ page }) => {
-    await page.goto('/login');
-    await loginAsOrganizer(page);
-    await page.goto('/users');
-    await waitForUsers(page);
-
-    await page.locator('.user-row').first().click();
-    await expect(page).toHaveURL(/\/users\/[a-f0-9-]+/, { timeout: 2_000 });
+    await goToUserProfile(page);
     await expect(page.getByTitle('Edit user')).toBeVisible({ timeout: 5_000 });
     await page.getByTitle('Edit user').click();
     await expect(page.locator('#edit-name')).toBeVisible({ timeout: 2_000 });

@@ -51,7 +51,7 @@
     scoreSaving: number | null;
     doAction: (action: string, body?: any) => Promise<void>;
     dropPlayer: (uid: string) => Promise<void>;
-    setVp: (tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
+    setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
     setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
     tournamentSanctions: Sanction[];
     decksByUser?: Record<string, DeckObject[]>;
@@ -73,13 +73,11 @@
   const myStanding = $derived(standings.find(s => s.user_uid === userUid));
   const previousRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.rounds.length < 1) return [];
-    // When Playing a prelim round, exclude the last round (shown as "Your Table");
-    // during finals or other states, show all preliminary rounds
-    const count = (tournament.state === "Playing" && !isFinals) ? tournament.rounds.length - 1 : tournament.rounds.length;
-    if (count < 1) return [];
     const result: { round: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
-    for (let r = 0; r < count; r++) {
+    for (let r = 0; r < tournament.rounds.length; r++) {
       const round = tournament.rounds[r]!;
+      // Skip in-progress rounds (shown as "Your Table(s)")
+      if (tournament.state === "Playing" && !isFinals && round.some(t => t.state !== "Finished")) continue;
       const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
       if (tIdx >= 0) {
         result.push({
@@ -91,6 +89,23 @@
     }
     return result;
   });
+
+  // Active rounds where the player is seated (for parallel round support)
+  const myActiveRounds = $derived.by(() => {
+    if (!tournament.rounds || tournament.state !== "Playing" || isFinals) return [];
+    return tournament.rounds
+      .map((round, r) => ({ round, r }))
+      .filter(({ round }) => round.some(t => t.state !== "Finished"))
+      .map(({ round, r }) => {
+        const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
+        return tIdx >= 0 ? { roundIdx: r, tableIdx: tIdx, table: round[tIdx]! } : null;
+      })
+      .filter((x): x is { roundIdx: number; tableIdx: number; table: typeof tournament.rounds[0][0] } => x !== null);
+  });
+
+  const hasParallelRounds = $derived(myActiveRounds.length > 1 || (
+    tournament.rounds?.filter(r => r.some(t => t.state !== "Finished")).length ?? 0
+  ) > 1);
 
   async function handleCallJudge(tableIdx: number) {
     if (judgeCallCooldown) return;
@@ -292,66 +307,70 @@
           {/each}
         </div>
       </div>
-    {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0 && tournament.rounds![tournament.rounds!.length - 1]}
-      {@const currentRound = tournament.rounds![tournament.rounds!.length - 1]!}
-      {@const myTableIdx = currentRound.findIndex(t => t.seating.some(s => s.player_uid === userUid))}
-      {#if myTableIdx < 0 && currentPlayerEntry?.state === "Checked-in"}
+    {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0}
+      {#if myActiveRounds.length === 0 && currentPlayerEntry?.state === "Checked-in"}
         <div class="bg-sky-900/20 border border-sky-800/40 rounded-lg p-4">
           <p class="text-sm text-sky-300">{m.player_sitting_out()}</p>
         </div>
-      {:else if myTableIdx >= 0 && currentRound[myTableIdx]}
-        {@const myTable = currentRound[myTableIdx]!}
-        <div class="bg-ash-900/50 rounded-lg p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-medium text-bone-100">{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}</h3>
-            <div class="flex items-center gap-2">
-              <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
-                {translateTableState(myTable.state)}
-              </span>
-              {#if !tournament.offline_mode && isOnline()}
-                <button
-                  onclick={() => handleCallJudge(myTableIdx)}
-                  disabled={judgeCallCooldown}
-                  class="px-2 py-1 text-xs {judgeCallCooldown ? 'text-ash-500 border-ash-700' : 'text-amber-400 hover:text-amber-300 border-amber-800 hover:border-amber-700'} border rounded-lg transition-colors flex items-center gap-1"
-                  title={judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
-                >
-                  <Gavel class="w-3 h-3" />
-                  {judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
-                </button>
-              {/if}
-            </div>
-          </div>
-          <!-- Timer for player's table (hidden in offline tournaments) -->
-          {#if !tournament.offline_mode && (tournament.round_time ?? 0) > 0}
-            <div class="mb-2">
-              <TimerDisplay {tournament} tableIndex={myTableIdx} />
-            </div>
-          {/if}
-          <div class="divide-y divide-ash-800">
-            {#each myTable.seating as seat, j}
-              {@const tVps = myTable.seating.map(s => s.result.vp)}
-              {@const tGws = computeGwLocal(tVps)}
-              {@const tTps = computeTpLocal(myTable.seating.length, tVps)}
-              <div class="py-1.5 flex items-center justify-between text-sm">
-                <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                <div class="flex items-center gap-2">
-                  <span class="text-ash-400 text-xs">VP:</span>
-                  <select
-                    class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
-                    disabled={scoreSaving === myTableIdx}
-                    value={seat.result.vp}
-                    onchange={(e) => setVp(myTableIdx, seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), myTable.seating)}
+      {:else}
+        {#each myActiveRounds as active}
+          {@const myTable = active.table}
+          {@const myTableIdx = active.tableIdx}
+          {@const roundIdx = active.roundIdx}
+          <div class="bg-ash-900/50 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-medium text-bone-100">
+                {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
+              </h3>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
+                  {translateTableState(myTable.state)}
+                </span>
+                {#if !tournament.offline_mode && isOnline()}
+                  <button
+                    onclick={() => handleCallJudge(myTableIdx)}
+                    disabled={judgeCallCooldown}
+                    class="px-2 py-1 text-xs {judgeCallCooldown ? 'text-ash-500 border-ash-700' : 'text-amber-400 hover:text-amber-300 border-amber-800 hover:border-amber-700'} border rounded-lg transition-colors flex items-center gap-1"
+                    title={judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
                   >
-                    {#each vpOptions(myTable.seating.length, false) as v}
-                      <option value={v}>{v}</option>
-                    {/each}
-                  </select>
-                  <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
-                </div>
+                    <Gavel class="w-3 h-3" />
+                    {judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
+                  </button>
+                {/if}
               </div>
-            {/each}
+            </div>
+            <!-- Timer for player's table (hidden in offline tournaments and parallel rounds) -->
+            {#if !hasParallelRounds && !tournament.offline_mode && (tournament.round_time ?? 0) > 0}
+              <div class="mb-2">
+                <TimerDisplay {tournament} tableIndex={myTableIdx} />
+              </div>
+            {/if}
+            <div class="divide-y divide-ash-800">
+              {#each myTable.seating as seat, j}
+                {@const tVps = myTable.seating.map(s => s.result.vp)}
+                {@const tGws = computeGwLocal(tVps)}
+                {@const tTps = computeTpLocal(myTable.seating.length, tVps)}
+                <div class="py-1.5 flex items-center justify-between text-sm">
+                  <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-ash-400 text-xs">VP:</span>
+                    <select
+                      class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
+                      disabled={scoreSaving === myTableIdx}
+                      value={seat.result.vp}
+                      onchange={(e) => setVp(roundIdx, myTableIdx, seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), myTable.seating)}
+                    >
+                      {#each vpOptions(myTable.seating.length, false) as v}
+                        <option value={v}>{v}</option>
+                      {/each}
+                    </select>
+                    <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
+                  </div>
+                </div>
+              {/each}
+            </div>
           </div>
-        </div>
+        {/each}
       {/if}
     {/if}
     <!-- Previous rounds history -->
