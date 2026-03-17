@@ -673,6 +673,7 @@ class VEKNSyncService:
                 update_fields[field] = value
 
         # Check if any data actually changed
+        old_roles = list(existing_user.roles)
         new_name = update_fields.get("name", existing_user.name)
         new_country = update_fields.get("country", existing_user.country)
         new_city = update_fields.get("city", existing_user.city)
@@ -709,6 +710,15 @@ class VEKNSyncService:
         existing_user.modified = now
 
         await update_user(existing_user)
+
+        # If roles changed, update Discord Linked Roles metadata
+        if sorted(new_roles) != sorted(old_roles):
+            import asyncio
+
+            from .roles_hook import sync_user_discord_roles
+
+            asyncio.create_task(sync_user_discord_roles(existing_user.uid))
+
         return existing_user, True
 
     async def sync_player(self, vekn_player: dict[str, Any]) -> tuple[User, str]:

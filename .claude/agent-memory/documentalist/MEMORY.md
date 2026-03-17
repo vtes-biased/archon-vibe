@@ -126,6 +126,11 @@ When Rust engine capabilities change:
 - CLAUDE.md: updated access model bullet points for public and member levels to reflect community_links visibility changes
 - Key changes: any member with vekn_id can now add links (up to 5; officials 10); `compute_user_member()` includes community_links for any user with non-empty links (not just officials); new `PATCH /api/users/{uid}/community-link-moderation` endpoint; CommunityTab split into 3 sub-components
 
+**Session 2026-03-17: Discord Linked Roles integration**
+- ARCHITECTURE.md: added "Discord Linked Roles" subsection under Authentication
+- Documents: 3 metadata fields (organization/judge/playtest) with integer levels, token storage pattern (`discord_rc:{user_uid}` in transient_tokens), push triggers (role/VEKN changes, login, VEKN sync), `register_metadata()` on startup, new `DISCORD_BOT_TOKEN` env var
+- No changes to CLAUDE.md (no env var section; no architecture summary impact), SYNC.md, or other docs
+
 **Session 2026-02-16: Icon library migration (@iconify/svelte → lucide-svelte)**
 - Replaced @iconify/svelte (runtime icon fetching from api.iconify.design) with lucide-svelte (tree-shaken, build-time bundled)
 - Updated staff-frontend-engineer MEMORY.md stack dependencies (line 9)

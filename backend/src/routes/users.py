@@ -261,6 +261,12 @@ async def update_user(
     if set(user.roles) != old_roles:
         await set_user_resync_after(user.uid)
         await broadcast_resync(user.uid)
+        # Update Discord Linked Roles metadata
+        import asyncio
+
+        from ..roles_hook import sync_user_discord_roles
+
+        asyncio.create_task(sync_user_discord_roles(user.uid))
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)

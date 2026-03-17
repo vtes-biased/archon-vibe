@@ -232,6 +232,7 @@ Three data levels control what each connected client sees:
 - Magic link authentication (signup, password reset, invite flow — link valid until password is actually set)
 - WebAuthn / Passkeys (registration and login, both for existing and new users)
 - Discord OAuth login and account linking
+- Discord Linked Roles integration — auto-assign VEKN roles (organization, judge, playtest) to Discord server members
 - JWT-based sessions with refresh tokens
 - Auto-focus first input field when modals open
 
@@ -433,7 +434,6 @@ See `development-plan.md` for implementation phasing.
 
 #### Discord Integration (Phase 12)
 
-- **Role verification webhook**: Discord Linked Roles integration — auto-assign VEKN roles to Discord server members
 - **Tournament butler bot**: Full tournament management via Discord slash commands (see `development-plan.md` Phase 12.2)
 
 #### Tournament Features

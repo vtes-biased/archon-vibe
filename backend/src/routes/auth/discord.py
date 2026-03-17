@@ -98,7 +98,7 @@ async def discord_authorize(
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": "identify email",
+        "scope": "identify email role_connections.write",
         "state": state,
     }
     discord_auth_url = f"https://discord.com/api/oauth2/authorize?{urlencode(params)}"
@@ -243,6 +243,9 @@ async def discord_callback(
                 user.modified = datetime.now(UTC)
                 await update_user(user)
 
+        # Store Discord tokens and push Linked Roles metadata
+        await _store_and_push_discord_roles(user_uid_from_state, discord_tokens)
+
         return RedirectResponse(
             url=f"{frontend_url}{redirect_path}?discord_linked=success",
             status_code=302,
@@ -348,6 +351,9 @@ async def discord_callback(
                 )
                 await insert_auth_method(auth_method)
 
+        # Store Discord tokens and push Linked Roles metadata
+        await _store_and_push_discord_roles(user_uid, discord_tokens)
+
         # Generate tokens
         access_token, _ = create_access_token(user_uid)
         refresh_token = create_refresh_token(user_uid)
@@ -358,3 +364,26 @@ async def discord_callback(
             url=f"{frontend_url}/login?{params}",
             status_code=302,
         )
+
+
+async def _store_and_push_discord_roles(user_uid: str, discord_tokens: dict) -> None:
+    """Store Discord OAuth tokens and push Linked Roles metadata."""
+    try:
+        from ...roles_hook import push_role_metadata
+
+        # Store tokens for future role updates (365-day expiry)
+        await store_transient_token(
+            f"discord_rc:{user_uid}",
+            {
+                "access_token": discord_tokens["access_token"],
+                "refresh_token": discord_tokens.get("refresh_token", ""),
+            },
+            datetime.now(UTC) + timedelta(days=365),
+        )
+
+        # Push current role metadata
+        user = await get_user_by_uid(user_uid)
+        if user:
+            await push_role_metadata(user, discord_tokens["access_token"])
+    except Exception:
+        logger.warning(f"Failed to push Discord Linked Roles for {user_uid}", exc_info=True)

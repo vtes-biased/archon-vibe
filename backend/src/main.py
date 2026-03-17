@@ -251,6 +251,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _shutdown_event = asyncio.Event()
     await init_db()
 
+    # Register Discord Linked Roles metadata (idempotent)
+    if os.getenv("DISCORD_CLIENTID"):
+        try:
+            from .roles_hook import register_metadata
+
+            await register_metadata()
+        except Exception:
+            logger.exception("Failed to register Discord Linked Roles metadata")
+
     # Initialize scheduler for background jobs
     _scheduler = AsyncIOScheduler()
 

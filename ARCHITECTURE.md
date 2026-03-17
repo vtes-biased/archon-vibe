@@ -620,6 +620,37 @@ Multiple authentication methods, all producing JWT access/refresh token pairs.
 
 **Discord OAuth**: `GET /auth/discord/authorize` initiates flow (with `mode` param: `login` or `link`). Callback at `GET /auth/discord/callback`. On login, matches by Discord ID or creates new user. On link, attaches Discord ID to authenticated user.
 
+### Discord Linked Roles
+
+Pushes VEKN role metadata to Discord so server admins can gate roles based on Archon standing.
+
+**OAuth scope**: `identify email role_connections.write` (added to existing Discord flow).
+
+**Metadata fields** (registered via `PUT` to Discord API on startup):
+| Field | Integer levels |
+|-------|---------------|
+| `organization` | 0=non-member, 1=VEKN member, 2=Prince, 3=NC, 4=IC |
+| `judge` | 0=none, 1=Judgekin, 2=Judge, 3=Rulemonger |
+| `playtest` | 0=none, 1=PT, 2=PTC |
+
+**Token storage**: `discord_rc:{user_uid}` key in `transient_tokens` table, data `{access_token, refresh_token}`, 365-day expiry. No schema changes.
+
+**Push triggers** (fire-and-forget `asyncio.create_task`):
+- Discord login or link (OAuth callback)
+- Role changes (`routes/users.py`)
+- VEKN ID changes: claim, abandon, sponsor, link, force-abandon (`routes/vekn.py`)
+- Periodic VEKN sync (`vekn_sync.py`)
+
+**High-level flow** (`sync_user_discord_roles(user_uid)` in `roles_hook/__init__.py`): fetch stored token → refresh if expired → push metadata. No-op if user has no stored token.
+
+**Platform display**: `("Archon", vekn_id_or_name)` → shown in Discord as "Connected as 1234567 on Archon".
+
+**Startup**: `register_metadata()` called if `DISCORD_CLIENTID` is set — idempotent PUT to Discord API requiring `DISCORD_BOT_TOKEN`.
+
+**Key file**: `backend/src/roles_hook/__init__.py`
+
+**Env vars**: `DISCORD_BOT_TOKEN` (new, for metadata registration) + existing `DISCORD_CLIENTID`, `DISCORD_SECRET`, `DISCORD_REDIRECT_URI`.
+
 ### JWT Structure
 
 - Access token: short-lived, used for API auth

@@ -327,21 +327,11 @@ Pretix integration was considered but dropped — the simple built-in tracking c
 
 ## Phase 12: Discord Bots
 
-Two complementary Discord integrations, each serving different use cases.
+Discord integrations for role verification and tournament management.
 
-### 12.1 Role Verification Webhook
+### 12.1 Role Verification Webhook ✅
 
-Webhook-based endpoint for Discord's **Linked Roles** feature. Players link their Discord account to Archon (Discord OAuth already implemented), and Discord fetches their VEKN roles (Prince, NC, Judge, etc.) to assign matching Discord server roles automatically.
-
-**Use case**: Official VEKN Discord servers and national community servers can auto-assign roles based on Archon membership data, without manual verification by moderators.
-
-**Scope**:
-- Linked Roles metadata endpoint serving VEKN role data
-- Discord OAuth account linking (already done — extend with metadata push)
-- Role mapping configuration (which VEKN roles → which Discord roles)
-- Automatic role updates when VEKN roles change
-
-**Done when:** Discord servers can use Linked Roles to auto-assign VEKN-based roles to members.
+Discord **Linked Roles** integration — implemented. Unified OAuth flow (`identify email role_connections.write`) pushes 3 metadata fields (organization, judge, playtest) as integer levels. Metadata auto-updates on role/VEKN ID changes. See `backend/src/roles_hook/` and ARCHITECTURE.md.
 
 ### 12.2 Tournament Butler Bot
 
