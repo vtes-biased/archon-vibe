@@ -132,7 +132,6 @@
         user.uid,
         editName.trim(),
         editCountry.trim().toUpperCase(),
-        undefined,  // VEKN ID managed via Sponsor/Link/Abandon only
         editCity.trim() || null,
         editNickname.trim() || null,
         editRoles,
@@ -240,7 +239,6 @@
           user.uid,
           editName.trim(),
           editCountry.trim().toUpperCase(),
-          undefined,  // VEKN ID managed via Sponsor/Link/Abandon only
           editCity.trim() || null,
           editNickname.trim() || null,
           editRoles,

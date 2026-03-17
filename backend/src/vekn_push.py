@@ -8,6 +8,7 @@ from .db import (
     get_connection,
     get_user_by_uid,
     update_tournament,
+    update_user,
 )
 from .models import (
     ObjectType,
@@ -260,6 +261,10 @@ async def push_member(
         logger.error(f"Failed to push member {user.vekn_id}: {e}")
         return False
 
+    user.vekn_synced = True
+    user.vekn_synced_at = datetime.now(UTC)
+    user.modified = datetime.now(UTC)
+    await update_user(user)
     logger.info(f"Member {user.vekn_id} pushed to VEKN")
     return True
 
@@ -273,7 +278,29 @@ async def batch_push(client: VEKNAPIClient) -> dict:
     if not os.getenv("VEKN_PUSH", "").lower() == "true":
         return stats
 
-    # 1. Push calendar events for tournaments without external_ids.vekn
+    # 1. Push unsynced members (must come before results so VEKN knows the IDs)
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """
+            SELECT "full" FROM objects
+            WHERE type = %s
+              AND "full"->>'vekn_id' IS NOT NULL
+              AND ("full"->>'vekn_synced')::boolean = false
+            """,
+            (ObjectType.USER,),
+        )
+        rows = await result.fetchall()
+
+    for row in rows:
+        u = decode_json(row[0], User)
+        try:
+            if await push_member(client, u):
+                stats["members_pushed"] += 1
+        except Exception:
+            logger.exception(f"Error pushing member {u.vekn_id}")
+            stats["errors"] += 1
+
+    # 2. Push calendar events for tournaments without external_ids.vekn
     async with get_connection() as conn:
         result = await conn.execute(
             """
@@ -299,7 +326,7 @@ async def batch_push(client: VEKNAPIClient) -> dict:
             logger.exception(f"Error pushing event for {t.uid}")
             stats["errors"] += 1
 
-    # 2. Push results for finished tournaments without vekn_pushed_at
+    # 3. Push results for finished tournaments without vekn_pushed_at
     async with get_connection() as conn:
         result = await conn.execute(
             """
@@ -321,29 +348,6 @@ async def batch_push(client: VEKNAPIClient) -> dict:
                 stats["results_pushed"] += 1
         except Exception:
             logger.exception(f"Error pushing results for {t.uid}")
-            stats["errors"] += 1
-
-    # 3. Push locally-sponsored members (coopted_by set, not synced from VEKN)
-    async with get_connection() as conn:
-        result = await conn.execute(
-            """
-            SELECT "full" FROM objects
-            WHERE type = %s
-              AND "full"->>'vekn_id' IS NOT NULL
-              AND "full"->>'coopted_by' IS NOT NULL
-              AND ("full"->>'vekn_synced')::boolean = false
-            """,
-            (ObjectType.USER,),
-        )
-        rows = await result.fetchall()
-
-    for row in rows:
-        u = decode_json(row[0], User)
-        try:
-            if await push_member(client, u):
-                stats["members_pushed"] += 1
-        except Exception:
-            logger.exception(f"Error pushing member {u.vekn_id}")
             stats["errors"] += 1
 
     logger.info(f"Batch push complete: {stats}")

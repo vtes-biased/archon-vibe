@@ -115,7 +115,6 @@ export async function updateUser(
   uid: string,
   name?: string,
   country?: string,
-  vekn_id?: string | null,
   city?: string | null,
   nickname?: string | null,
   roles?: string[],
@@ -128,7 +127,6 @@ export async function updateUser(
   const params = new URLSearchParams();
   if (name) params.append('name', name);
   if (country) params.append('country', country);
-  if (vekn_id !== undefined) params.append('vekn_id', vekn_id || '');
   if (city !== undefined) params.append('city', city || '');
   if (city_geoname_id !== undefined) params.append('city_geoname_id', city_geoname_id != null ? String(city_geoname_id) : '');
   if (nickname !== undefined) params.append('nickname', nickname || '');

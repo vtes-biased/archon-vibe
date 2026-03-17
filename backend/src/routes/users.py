@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -129,6 +130,20 @@ async def create_user(
             logger.error(f"Failed to send invite email to {email}: {e}")
             # Don't fail the request, user is already created
 
+    # Push new member to VEKN (fire-and-forget, batch_push catches failures)
+    if os.getenv("VEKN_PUSH", "").lower() == "true":
+        try:
+            from ..vekn_api import VEKNAPIClient
+            from ..vekn_push import push_member
+
+            client = VEKNAPIClient()
+            try:
+                await push_member(client, user)
+            finally:
+                await client.close()
+        except Exception:
+            logger.exception("Failed to push new member to VEKN")
+
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
 
@@ -146,7 +161,6 @@ async def update_user(
     current_user: OptionalUser = None,
     name: str | None = None,
     country: str | None = None,
-    vekn_id: str | None = None,
     city: str | None = None,
     city_geoname_id: int | None = None,
     state: str | None = None,
@@ -163,7 +177,6 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     old_roles = set(user.roles)
-    old_vekn_id = user.vekn_id
 
     # Track which fields are being modified locally
     local_mods = set(user.local_modifications)
@@ -198,7 +211,7 @@ async def update_user(
                 )
 
         # Ensure target has VEKN ID if any roles are being set
-        if validated_roles and not user.vekn_id and not vekn_id:
+        if validated_roles and not user.vekn_id:
             raise HTTPException(
                 status_code=400,
                 detail="User must have a VEKN ID to be assigned roles",
@@ -210,7 +223,6 @@ async def update_user(
     if (
         name is not None
         or country is not None
-        or vekn_id is not None
         or city is not None
         or city_geoname_id is not None
         or state is not None
@@ -228,15 +240,12 @@ async def update_user(
             local_mods.add("city_geoname_id")
         if state is not None:
             local_mods.add("state")
-        if nickname is not None:
-            local_mods.add("nickname")
 
         user = msgspec.structs.replace(
             user,
             modified=datetime.now(UTC),
             name=name if name is not None else user.name,
             country=country if country is not None else user.country,
-            vekn_id=vekn_id if vekn_id is not None else user.vekn_id,
             city=city if city is not None else user.city,
             city_geoname_id=city_geoname_id if city_geoname_id is not None else user.city_geoname_id,
             state=state if state is not None else user.state,
@@ -248,8 +257,8 @@ async def update_user(
     # Save to database
     bd = await db_update_user(user)
 
-    # Trigger resync if roles or vekn_id changed
-    if set(user.roles) != old_roles or user.vekn_id != old_vekn_id:
+    # Trigger resync if roles changed
+    if set(user.roles) != old_roles:
         await set_user_resync_after(user.uid)
         await broadcast_resync(user.uid)
 
