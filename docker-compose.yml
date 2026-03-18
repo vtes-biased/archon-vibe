@@ -57,7 +57,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: [ "sh", "-c", "uv sync --frozen --dev && uv run python backend/scripts/populate_test_db.py" ]
+    command: [ "sh", "-c", "uv sync --frozen --dev && uv run python backend/scripts/seed_e2e.py --output /shared/e2e-seed.json" ]
+    volumes:
+      - e2e-shared:/shared
     profiles:
       - test
 
@@ -67,13 +69,14 @@ services:
       dockerfile: frontend/Dockerfile.test
     environment:
       VITE_API_URL: http://backend:8000
+      E2E_SEED_FILE: /shared/e2e-seed.json
     depends_on:
       populate-db:
         condition: service_completed_successfully
       backend:
         condition: service_healthy
     volumes:
-      # Reports go to root level (../ from frontend working dir in container)
+      - e2e-shared:/shared:ro
       - ./playwright-report:/playwright-report
       - ./test-results:/test-results
     profiles:
@@ -81,5 +84,6 @@ services:
 
 volumes:
   postgres_data:
+  e2e-shared:
 
 

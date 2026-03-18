@@ -34,12 +34,13 @@ COPY frontend/ ./
 RUN rm -rf src/lib/data/geonames
 COPY backend/src/data/geonames/ src/lib/data/geonames/
 
-# Wait for backend, start dev server, and run tests
+# Wait for backend, start dev server (skip npm setup — geonames copied at
+# build time), and run tests
 CMD ["sh", "-c", "\
     echo 'Waiting for backend...' && \
     timeout 60 sh -c 'until curl -sf http://backend:8000/ > /dev/null; do sleep 1; done' && \
     echo 'Backend ready. Starting Vite dev server...' && \
-    npm run dev -- --host 0.0.0.0 & \
+    npx vite dev --host 0.0.0.0 & \
     sleep 5 && \
     echo 'Running Playwright tests...' && \
     BASE_URL=http://localhost:5173 npm run test:e2e \
