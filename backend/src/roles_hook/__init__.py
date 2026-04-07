@@ -18,20 +18,20 @@ logger = logging.getLogger(__name__)
 METADATA = [
     {
         "key": "organization",
-        "name": "Organization",
-        "description": "0: non-member, 1: VEKN member, 2: Prince, 3: NC, 4: IC",
+        "name": "VEKN Role",
+        "description": "VEKN organization level (1: Member, 2: Prince, 3: National Coordinator, 4: Inner Circle)",
         "type": 2,  # INTEGER_GREATER_THAN_OR_EQUAL
     },
     {
         "key": "judge",
-        "name": "Judge",
-        "description": "0: none, 1: Judgekin, 2: Judge, 3: Rulemonger",
+        "name": "Judge Level",
+        "description": "VEKN judge certification (1: Judgekin, 2: Judge, 3: Rulemonger)",
         "type": 2,
     },
     {
         "key": "playtest",
-        "name": "Playtest",
-        "description": "0: none, 1: Playtester, 2: Playtest Coordinator",
+        "name": "Playtest Role",
+        "description": "VEKN playtest participation (1: Playtester, 2: Playtest Coordinator)",
         "type": 2,
     },
 ]
