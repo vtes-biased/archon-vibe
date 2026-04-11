@@ -20,6 +20,9 @@ class TokenStore:
                 refresh_token TEXT NOT NULL
             )
         """)
+        await self._db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tokens_archon_uid ON tokens(archon_uid)"
+        )
         # Guild-tournament mapping: which tournament is linked to which guild
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS guild_tournaments (
@@ -258,6 +261,10 @@ class TokenStore:
 
     async def get_pending_oauth(self, state: str) -> dict | None:
         assert self._db
+        # Expire entries older than 15 minutes
+        await self._db.execute(
+            "DELETE FROM pending_oauth WHERE created_at < datetime('now', '-15 minutes')"
+        )
         async with self._db.execute(
             "SELECT discord_id, guild_id, channel_id, action, extra, code_verifier FROM pending_oauth WHERE state = ?",
             (state,),

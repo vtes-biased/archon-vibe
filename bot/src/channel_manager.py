@@ -75,12 +75,17 @@ async def sync_table_permissions(
     player_uids: set[str],
     organizer_uids: set[str],
     discord_id_map: dict[str, int],
+    current_member_ids: set[int] | None = None,
 ) -> None:
     """Idempotently sync voice channel permissions for a table.
 
     Sets CONNECT+SPEAK for each player and organizer found in discord_id_map.
     Removes stale member overrides for users no longer at this table.
     Leaves @everyone DENY CONNECT untouched.
+
+    Args:
+        current_member_ids: If provided, skip the fetch_channel call (e.g., when
+            called right after channel creation with known-empty overrides).
     """
     allowed_uids = player_uids | organizer_uids
     desired_discord_ids: set[int] = set()
@@ -89,15 +94,15 @@ async def sync_table_permissions(
         if did:
             desired_discord_ids.add(did)
 
-    # Fetch current overrides
-    channel = await bot.rest.fetch_channel(channel_id)
-    current_overrides = getattr(channel, "permission_overwrites", {})
-
-    # Find current member overrides (skip role overrides like @everyone)
-    current_member_ids: set[int] = set()
-    for ov in current_overrides.values():
-        if ov.type == hikari.PermissionOverwriteType.MEMBER:
-            current_member_ids.add(int(ov.id))
+    if current_member_ids is None:
+        # Fetch current overrides
+        channel = await bot.rest.fetch_channel(channel_id)
+        current_overrides = getattr(channel, "permission_overwrites", {})
+        # Find current member overrides (skip role overrides like @everyone)
+        current_member_ids = set()
+        for ov in current_overrides.values():
+            if ov.type == hikari.PermissionOverwriteType.MEMBER:
+                current_member_ids.add(int(ov.id))
 
     # Remove stale overrides
     stale = current_member_ids - desired_discord_ids
@@ -131,6 +136,7 @@ async def create_table_channels(
     discord_id_map: dict[str, int],
     organizer_uids: set[str] | None = None,
     is_finals: bool = False,
+    start_index: int = 0,
 ) -> list[int]:
     """Create voice channels for tournament tables, then sync permissions.
 
@@ -139,6 +145,7 @@ async def create_table_channels(
         discord_id_map: Mapping from archon_uid to Discord user ID (int)
         organizer_uids: Set of organizer archon UIDs (get access to all tables)
         is_finals: If True, create a single "Finals" channel
+        start_index: Table numbering offset (for adding new tables mid-round)
 
     Returns list of created channel IDs.
     """
@@ -162,14 +169,17 @@ async def create_table_channels(
         channel_ids.append(ch.id)
         # All finalists across all tables
         all_players = {uid for table in tables for uid in table}
+        # Freshly created: only @everyone role override, no member overrides
         await sync_table_permissions(
-            bot, guild_id, ch.id, all_players, org_uids, discord_id_map
+            bot, guild_id, ch.id, all_players, org_uids, discord_id_map,
+            current_member_ids=set(),
         )
     else:
         for i, table in enumerate(tables):
+            table_num = start_index + i + 1
             ch = await bot.rest.create_guild_voice_channel(
                 guild_id,
-                name=f"Table {i + 1}",
+                name=f"Table {table_num}",
                 category=category_id,
                 permission_overwrites=[
                     hikari.PermissionOverwrite(
@@ -180,8 +190,10 @@ async def create_table_channels(
                 ],
             )
             channel_ids.append(ch.id)
+            # Freshly created: only @everyone role override, no member overrides
             await sync_table_permissions(
-                bot, guild_id, ch.id, set(table), org_uids, discord_id_map
+                bot, guild_id, ch.id, set(table), org_uids, discord_id_map,
+                current_member_ids=set(),
             )
 
     return channel_ids

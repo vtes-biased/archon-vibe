@@ -40,6 +40,43 @@ def _task_key(guild_id: str, tournament_uid: str) -> str:
     return f"{guild_id}:{tournament_uid}"
 
 
+def find_player_table(
+    guild_id: str, tournament_uid: str, player_uid: str
+) -> tuple[int, int] | None:
+    """Find a player's (round_index, table_index) from cached tournament data.
+
+    Returns None if not found or no active round.
+    """
+    key = _task_key(guild_id, tournament_uid)
+    tournament = _last_tournament.get(key)
+    if not tournament:
+        return None
+
+    state = tournament.get("state", "")
+    if state != "Playing":
+        return None
+
+    rounds = tournament.get("rounds", [])
+    if not rounds:
+        return None
+
+    # Check latest round first
+    round_idx = len(rounds) - 1
+    for ti, table in enumerate(rounds[round_idx]):
+        seating = table.get("seating", [])
+        if any(s.get("player_uid") == player_uid for s in seating):
+            return (round_idx, ti)
+
+    # Check finals (round index = len(rounds))
+    finals = tournament.get("finals")
+    if finals and not finals.get("result"):
+        seating = finals.get("seating", [])
+        if any(s.get("player_uid") == player_uid for s in seating):
+            return (len(rounds), 0)
+
+    return None
+
+
 async def start_sse(
     bot,
     api,  # shared ArchonAPI instance
@@ -60,7 +97,7 @@ async def start_sse(
 
 
 async def stop_sse(guild_id: str, tournament_uid: str) -> None:
-    """Stop SSE listener for a tournament."""
+    """Stop SSE listener for a tournament and clean up all cached state."""
     key = _task_key(guild_id, tournament_uid)
     task = _sse_tasks.pop(key, None)
     if task and not task.done():
@@ -68,27 +105,34 @@ async def stop_sse(guild_id: str, tournament_uid: str) -> None:
     _last_state.pop(key, None)
     _last_round_count.pop(key, None)
     _last_seating.pop(key, None)
+    _table_channels.pop(key, None)
+    _last_tournament.pop(key, None)
 
 
 async def _sse_loop(
     bot,
-    api,  # shared ArchonAPI instance (has _refresh_tokens, _session)
+    api,  # shared ArchonAPI instance
     store: TokenStore,
     guild_id: str,
     tournament_uid: str,
     organizer_discord_id: str,
 ) -> None:
-    """Long-running SSE connection that reacts to tournament state changes."""
+    """Long-running SSE connection that reacts to tournament state changes.
+
+    Uses a single aiohttp session for the lifetime of the loop, reused across
+    all reconnections. The session is scoped to this task.
+    """
+    key = _task_key(guild_id, tournament_uid)
     retry_delay = 1
 
-    while True:
-        tokens = await store.get_tokens(organizer_discord_id)
-        if not tokens:
-            logger.warning("No tokens for organizer %s, stopping SSE", organizer_discord_id)
-            return
+    async with aiohttp.ClientSession() as session:
+        while True:
+            tokens = await store.get_tokens(organizer_discord_id)
+            if not tokens:
+                logger.warning("No tokens for organizer %s, stopping SSE", organizer_discord_id)
+                return
 
-        try:
-            async with aiohttp.ClientSession() as session:
+            try:
                 headers = {"Authorization": f"Bearer {tokens['access_token']}"}
                 async with session.get(
                     f"{config.ARCHON_URL}/stream",
@@ -96,8 +140,7 @@ async def _sse_loop(
                     timeout=aiohttp.ClientTimeout(total=None, sock_read=300),
                 ) as resp:
                     if resp.status == 401:
-                        # Refresh using the shared API instance
-                        refreshed = await api._refresh_tokens(organizer_discord_id)
+                        refreshed = await api.refresh_tokens(organizer_discord_id)
                         if not refreshed:
                             logger.error("Token refresh failed for SSE, stopping")
                             return
@@ -138,6 +181,10 @@ async def _sse_loop(
                                     await _handle_update(
                                         bot, store, guild_id, tournament_uid, data
                                     )
+                                elif event_type == "snapshot":
+                                    _handle_snapshot(
+                                        key, tournament_uid, data
+                                    )
                                 elif event_type == "judge_call":
                                     await _handle_judge_call(
                                         bot, store, guild_id, tournament_uid, data
@@ -146,12 +193,31 @@ async def _sse_loop(
                             event_type = ""
                             data_lines = []
 
-        except asyncio.CancelledError:
-            return
-        except Exception as e:
-            logger.error("SSE error: %s", e)
-            await asyncio.sleep(retry_delay)
-            retry_delay = min(retry_delay * 2, 60)
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                logger.error("SSE error: %s", e)
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)
+
+
+def _handle_snapshot(
+    key: str, tournament_uid: str, data: dict | list
+) -> None:
+    """Initialize state tracking from snapshot without posting announcements."""
+    items = data if isinstance(data, list) else [data]
+    for item in items:
+        obj = item.get("data", item)
+        if item.get("type") != "tournament" or obj.get("uid") != tournament_uid:
+            continue
+        _last_state[key] = obj.get("state", "")
+        _last_round_count[key] = len(obj.get("rounds", []))
+        _last_seating[key] = _extract_round_seating(obj) or []
+        _last_tournament[key] = obj
+        logger.info(
+            "Snapshot: state=%s rounds=%d for %s",
+            _last_state[key], _last_round_count[key], key,
+        )
 
 
 def _format_standings(
@@ -270,6 +336,8 @@ async def _handle_update(
         return
 
     if obj_type != "tournament":
+        if obj_type:
+            logger.debug("Ignoring SSE update of unknown type: %s", obj_type)
         return
 
     obj = data.get("data", data)
@@ -293,13 +361,11 @@ async def _handle_update(
     webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
 
     prev_state = _last_state.get(key)
-    _last_state[key] = state
+    prev_round_count = _last_round_count.get(key, 0)
 
     rounds = obj.get("rounds", [])
     players = obj.get("players", [])
     round_count = len(rounds)
-    prev_round_count = _last_round_count.get(key, 0)
-    _last_round_count[key] = round_count
 
     organizer_uids = set(obj.get("organizers_uids", []))
 
@@ -376,8 +442,7 @@ async def _handle_update(
             lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
 
         lines.append(
-            f"\nJoin your table's voice channel. "
-            f"Report results on the webapp when the round ends: {webapp_url}"
+            f"\nJoin your table's voice channel and use `/report` when the round ends."
         )
         await _post(bot, announcement_id, "\n".join(lines))
 
@@ -479,7 +544,7 @@ async def _handle_update(
 
             # Handle table count changes
             if new_count > prev_count:
-                # New tables added — create channels
+                # New tables added — create channels with correct numbering
                 new_tables = [
                     list(current_seating[i]) for i in range(prev_count, new_count)
                 ]
@@ -488,23 +553,18 @@ async def _handle_update(
                         bot, int(guild_id), category_id, new_tables,
                         discord_id_map=discord_id_map,
                         organizer_uids=organizer_uids,
+                        start_index=prev_count,
                     )
-                    # Rename with correct table numbers
-                    for idx, ch_id in enumerate(new_ch_ids):
-                        table_num = prev_count + idx + 1
-                        try:
-                            await bot.rest.edit_channel(ch_id, name=f"Table {table_num}")
-                        except Exception:
-                            pass
                     table_chs.extend(new_ch_ids)
                 except Exception as e:
                     logger.warning("Failed to create new table channels: %s", e)
 
             if new_count < prev_count:
-                # Tables removed — delete orphaned channels
+                # Tables removed — delete orphaned channels, update dict immediately
                 orphaned = table_chs[new_count:]
                 await delete_channels(bot, orphaned)
                 table_chs = table_chs[:new_count]
+                _table_channels[key] = table_chs
 
             # Sync permissions on existing tables that changed
             for i in range(min(new_count, len(table_chs))):
@@ -564,7 +624,10 @@ async def _handle_update(
             f"Use `/teardown` when you're ready to remove the tournament channels.\n{webapp_url}"
         )
 
-    # Cache tournament data LAST so comparisons above see previous state
+    # Update state tracking LAST so comparisons above see previous state.
+    # If handler crashes mid-way, next SSE event retries the transition.
+    _last_state[key] = state
+    _last_round_count[key] = round_count
     _last_tournament[key] = obj
 
 
