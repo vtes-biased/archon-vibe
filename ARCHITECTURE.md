@@ -21,6 +21,12 @@ This project is an offline-first Progressive Web App (PWA) with a client-server 
 - **Language**: Python 3.11+
 - **Tooling**: uv (package installer), ruff (linter/formatter), ty (type checker)
 
+### Discord Bot
+- **Framework**: hikari + lightbulb + miru
+- **Storage**: SQLite (token/guild state)
+- **Process**: Separate from backend; pure OAuth client
+- **Language**: Python
+
 ### Shared Core
 - **Language**: Rust
 - **Purpose**: Business logic and event handling
@@ -643,6 +649,8 @@ Pushes VEKN role metadata to Discord so server admins can gate roles based on Ar
 
 **High-level flow** (`sync_user_discord_roles(user_uid)` in `roles_hook/__init__.py`): fetch stored token → refresh if expired → push metadata. No-op if user has no stored token.
 
+**Constraint**: Discord's Linked Roles API requires the **target user's own OAuth token** — the backend cannot push metadata on behalf of a user who has never logged in via Discord OAuth. Metadata is only pushed when a stored token exists (`discord_rc:{user_uid}` key).
+
 **Platform display**: `("Archon", vekn_id_or_name)` → shown in Discord as "Connected as 1234567 on Archon".
 
 **Startup**: `register_metadata()` called if `DISCORD_CLIENTID` is set — idempotent PUT to Discord API requiring `DISCORD_BOT_TOKEN`.
@@ -672,6 +680,79 @@ Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.
 **Frontend**: `/oauth/consent` page, `DeveloperSection.svelte` in profile for client management.
 
 **Key files**: `routes/oauth.py`, `db_oauth.py`, `models.py` (OAuth models), `middleware/auth.py` (token validation)
+
+## Discord Tournament Bot
+
+Standalone process (`bot/`) — manages online VTES tournaments inside Discord servers. Pure OAuth client to the Archon backend; no direct DB access, no business logic. All mutations go through `POST /{uid}/action` via `user:impersonate` tokens on behalf of real users.
+
+**Stack**: hikari + lightbulb + miru, SQLite for persistent token/state storage.
+
+**Process isolation**: single process only (module-level state in `sse_listener.py`); communicates only via the Archon OAuth, REST APIs, and SSE stream.
+
+### Commands
+
+| Command | Description | Who |
+|---------|-------------|-----|
+| `/setup <url>` | Link an Archon tournament URL to the Discord guild; creates category + announcement/lobby/judges channels | NC/Prince/IC only |
+| `/teardown` | Remove all bot-created channels and unlink tournament | Organizer |
+| `/announce <message>` | Post to the announcement channel | Setup organizer, NC/Prince/IC |
+| `/register` | Self-register for the tournament (VEKN ID claim or sponsorship request flow) | Any guild member |
+| `/checkin` | Check in for current round | Any guild member |
+| `/report <vp>` | Submit VP score via `SetScore` action | Seated player |
+| `/judge` | Fire a `judge_call` event to organizers | Seated player |
+| `/sanction` | Multi-step sanction flow (category → subcategory → details) | Organizer/judge |
+
+### Architecture
+
+| Module | Role |
+|--------|------|
+| `token_store.py` | SQLite: `tokens` (OAuth), `guild_tournaments` (links), `pending_oauth` (15-min TTL) |
+| `archon_api.py` | HTTP client wrapping Archon REST; uses stored OAuth tokens |
+| `sse_listener.py` | SSE subscription per active (guild, tournament) pair; drives Discord channel/announcement updates |
+| `channel_manager.py` | Creates/syncs voice channels with per-player CONNECT+SPEAK permissions |
+| `oauth_callback.py` | Local HTTP server handling PKCE OAuth redirect for user login |
+| `commands/setup.py` | `/setup`, `/teardown`, `/announce` |
+| `commands/player.py` | `/register`, `/checkin`, `/report`, `/judge` |
+| `commands/judge.py` | `/sanction` |
+
+### SSE Listener
+
+Subscribes to the Archon SSE stream using the organizer's `user:impersonate` token. Reacts to tournament lifecycle events:
+
+- **Open/CheckIn state**: posts registration/check-in announcements to #announcement
+- **RoundStart**: posts seating; creates per-table voice channels; syncs per-player CONNECT+SPEAK permissions; warns unlinked players
+- **RoundFinish/Finals**: posts standings; deletes table voice channels; opens check-in for next round
+- **Finish**: posts final standings; prompts `/teardown`
+- **Mid-round seating changes** (SwapSeats, AlterSeating, etc.): detected via `_last_seating` diff → re-syncs voice channel permissions
+- **`judge_call` ephemeral event**: posts to #judges channel
+- **`snapshot` event on reconnect**: initializes state tracking without re-posting announcements (restart resilience)
+
+Uses a shared `aiohttp` session across SSE reconnects. State tracked in module-level dicts (`_sse_tasks`, `_last_state`, `_last_round_count`, `_last_tournament`, `_last_seating`, `_table_channels`). All state cleaned up on `stop_sse` and teardown.
+
+### Channel Permissions
+
+- **#announcement**: @everyone DENY SEND_MESSAGES; bot has SEND_MESSAGES
+- **Table voice channels**: @everyone DENY CONNECT; per-player + organizers ALLOW CONNECT+SPEAK
+- Organizers can join any table voice channel for judging
+- Permissions synced idempotently via `sync_table_permissions()`
+
+### OAuth Flow
+
+1. Organizer runs `/setup <url>` → bot initiates PKCE flow via `/oauth/token`
+2. User authorizes `user:impersonate` scope → redirect to local callback server
+3. Bot stores token in SQLite → uses it for all API calls and SSE subscriptions
+
+### Player `display_name`
+
+Register, AddPlayer, and CheckIn events accept an optional `display_name` field (Discord guild nickname). Stored on the `Player` model (`display_name: str | None`). Shown in `playerInfo` and `seatDisplay` in the frontend when present.
+
+### Frontend `login_hint`
+
+`/auth?login_hint=discord` auto-redirects to Discord OAuth, used by bot-generated links to streamline player login.
+
+**Key directory**: `bot/src/`
+
+**Constraints**: Only NC/Prince/IC can run `/setup`. Bot never holds privileged backend credentials.
 
 ## Avatar System
 
