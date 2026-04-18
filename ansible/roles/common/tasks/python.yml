@@ -5,7 +5,7 @@
 # into {{ uv_python_install_dir }} — the same location is referenced from the
 # app roles (UV_PYTHON_INSTALL_DIR env var) so `uv venv --python X.Y` finds it.
 
-- name: Install uv (single static binary)
+- name: Download uv installer
   ansible.builtin.get_url:
     url: https://astral.sh/uv/install.sh
     dest: /tmp/uv-install.sh

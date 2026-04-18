@@ -8,12 +8,12 @@
 admin_user: lpanhaleux
 archon_user: archon
 archon_group: archon
-site_url_base: "https://archon.vekn.net"
 contact_email: "lionel.panhaleux@gmail.com"
 
 # --- domains --------------------------------------------------------------
 domain_main: archon.vekn.net
 domain_bot: bot.archon.vekn.net
+site_url_base: "https://{{ domain_main }}"
 
 # --- ports ----------------------------------------------------------------
 backend_port: 8007

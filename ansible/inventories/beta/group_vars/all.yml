@@ -8,12 +8,12 @@
 admin_user: lpanhaleux           # sudo-capable human account used by ansible
 archon_user: archon              # unprivileged runtime user owning /opt/archon
 archon_group: archon
-site_url_base: "https://archon.krcg.org"
 contact_email: "lionel.panhaleux@gmail.com"
 
 # --- domains --------------------------------------------------------------
 domain_main: archon.krcg.org
 domain_bot: bot.archon.krcg.org
+site_url_base: "https://{{ domain_main }}"
 
 # --- ports (localhost only, nginx proxies to them) ------------------------
 backend_port: 8007

@@ -60,54 +60,30 @@
   become_user: postgres
   notify: Reload postgresql
 
-- name: Grant ALL on database to archon user
+- name: Grant privileges to archon user
   community.postgresql.postgresql_privs:
     login_db: "{{ db_name }}"
     privs: ALL
-    type: database
-    objs: "{{ db_name }}"
+    type: "{{ item.type }}"
+    objs: "{{ item.objs }}"
     role: "{{ db_user }}"
+  loop:
+    - { type: database, objs: "{{ db_name }}" }
+    - { type: schema, objs: public }
   become: true
   become_user: postgres
 
-- name: Grant ALL on schema public to archon user
-  community.postgresql.postgresql_privs:
-    login_db: "{{ db_name }}"
-    privs: ALL
-    type: schema
-    objs: public
-    role: "{{ db_user }}"
-  become: true
-  become_user: postgres
-
-- name: Tune log_destination to syslog
+- name: Apply PostgreSQL tunings
   community.postgresql.postgresql_alter_system:
-    param: log_destination
-    value: syslog
-  become: true
-  become_user: postgres
-  notify: Reload postgresql
-
-- name: Tune statement_timeout
-  community.postgresql.postgresql_alter_system:
-    param: statement_timeout
-    value: "{{ postgresql_statement_timeout_ms }}"
-  become: true
-  become_user: postgres
-  notify: Reload postgresql
-
-- name: Tune lock_timeout
-  community.postgresql.postgresql_alter_system:
-    param: lock_timeout
-    value: "{{ postgresql_lock_timeout_ms }}"
-  become: true
-  become_user: postgres
-  notify: Reload postgresql
-
-- name: Tune idle_in_transaction_session_timeout
-  community.postgresql.postgresql_alter_system:
-    param: idle_in_transaction_session_timeout
-    value: "{{ postgresql_idle_in_transaction_timeout_ms }}"
+    param: "{{ item.key }}"
+    value: "{{ item.value }}"
+  loop: "{{ postgresql_tunings | dict2items }}"
+  vars:
+    postgresql_tunings:
+      log_destination: syslog
+      statement_timeout: "{{ postgresql_statement_timeout_ms }}"
+      lock_timeout: "{{ postgresql_lock_timeout_ms }}"
+      idle_in_transaction_session_timeout: "{{ postgresql_idle_in_transaction_timeout_ms }}"
   become: true
   become_user: postgres
   notify: Reload postgresql

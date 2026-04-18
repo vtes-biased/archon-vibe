@@ -34,9 +34,8 @@ $(BUILD_DIR):
 
 build-engine-wheel: | $(BUILD_DIR) ## Build the PyO3 engine wheel for linux x86_64 (manylinux_2_28, cp313)
 	cd $(REPO_ROOT) && python scripts/update_cards.py
-	# Targets Python 3.13 specifically (no abi3). Both prod and beta run the
-	# same uv-managed Python 3.13 (see roles/common/tasks/python.yml), so a
-	# single cp313-cp313 wheel is sufficient.
+	# manylinux_2_28 ships pythons at /opt/python/cp3XX-cp3XX/bin/python3.XX (not on PATH),
+	# so we pass the full path. Both servers run the same uv-managed 3.13.
 	docker run --rm --platform=linux/amd64 \
 	  -v $(REPO_ROOT):/io \
 	  -w /io/engine \
@@ -45,7 +44,7 @@ build-engine-wheel: | $(BUILD_DIR) ## Build the PyO3 engine wheel for linux x86_
 	           /root/.local/bin/uv tool install maturin && \
 	           /root/.local/bin/maturin build --release \
 	             --compatibility manylinux_2_28 \
-	             --interpreter python3.13 \
+	             --interpreter /opt/python/cp313-cp313/bin/python3.13 \
 	             --out /io/ansible/build"
 
 build-backend: | $(BUILD_DIR) ## Build the backend wheel + export pinned requirements
