@@ -134,11 +134,16 @@ import TournamentModals from "./TournamentModals.svelte";
   });
 
   // Player display info keyed by uid
-  let playerInfo = $state<Record<string, { name: string; nickname: string | null; vekn: string | null }>>({});
+  let playerInfo = $state<Record<string, { name: string; nickname: string | null; vekn: string | null; display_name: string | null }>>({});
 
   async function loadPlayerNames() {
     if (!tournament) return;
-    const info: Record<string, { name: string; nickname: string | null; vekn: string | null }> = {};
+    const info: Record<string, { name: string; nickname: string | null; vekn: string | null; display_name: string | null }> = {};
+    // Build display_name lookup from tournament players
+    const displayNames: Record<string, string | null> = {};
+    for (const p of tournament.players ?? []) {
+      if (p.user_uid) displayNames[p.user_uid] = p.display_name ?? null;
+    }
     const uids = new Set<string>();
     for (const p of tournament.players ?? []) {
       if (p.user_uid) uids.add(p.user_uid);
@@ -156,6 +161,7 @@ import TournamentModals from "./TournamentModals.svelte";
         name: user?.name || uid,
         nickname: user?.nickname ?? null,
         vekn: user?.vekn_id ?? null,
+        display_name: displayNames[uid] ?? null,
       };
     }
     playerInfo = info;

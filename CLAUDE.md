@@ -31,6 +31,7 @@ Core architecture reference for offline-first PWA. See ARCHITECTURE.md for detai
 ## Stack
 - **Frontend**: Svelte + Vite + TypeScript, PWA (service workers), IndexedDB local storage
 - **Backend**: Python FastAPI, PostgreSQL (JSONB), msgspec serialization
+- **Bot**: Separate process — Discord bot (hikari + lightbulb + miru), pure OAuth client to backend, SQLite token/state storage
 - **Shared**: Rust core (business logic) → WASM (frontend) + PyO3 (backend)
 
 ## Data Model
@@ -54,6 +55,8 @@ Access projections computed by `access_levels.py` at write time. No per-viewer f
 **Card/Deck Support**: VTES card database loaded into IndexedDB (`cards` store). Deck validation in Rust engine, integrated into tournament player workflow.
 
 **Object Types**: User, Sanction, Tournament, DeckObject, League (all synced via SSE). VtesCard (static data, loaded into IndexedDB).
+
+**Player model** (embedded in Tournament): includes `display_name: str | None` — Discord guild nickname set per-tournament. Shown in `playerInfo` and `seatDisplay` when present. Set via Register/AddPlayer/CheckIn events (Rust engine).
 
 **DeckObject fields**: `tournament_uid`, `user_uid`, `round`, `name`, `author`, `comments`, `cards` (dict card_id→count), `attribution`, `public` (bool — engine-managed, drives member-level visibility).
 - No deck REST endpoints. All mutations go through `POST /{uid}/action` (engine `deck_ops` side-effects).

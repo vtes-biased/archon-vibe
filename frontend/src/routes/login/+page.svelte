@@ -85,6 +85,17 @@
   // Handle OAuth callback tokens from URL
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
+
+    // Auto-redirect to Discord OAuth when login_hint=discord (used by Discord bot)
+    if (params.get("login_hint") === "discord") {
+      const redirect = params.get("redirect");
+      const discordUrl = redirect
+        ? `${API_BASE}/auth/discord/authorize?redirect=${encodeURIComponent(redirect)}`
+        : `${API_BASE}/auth/discord/authorize`;
+      window.location.href = discordUrl;
+      return;
+    }
+
     const token = params.get("token");
     const refresh = params.get("refresh");
     const error = params.get("error");

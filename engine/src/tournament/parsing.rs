@@ -21,6 +21,7 @@ impl TournamentEvent {
                     .ok_or("user_uid required")?
                     .to_string(),
                 vekn_id: value["vekn_id"].as_str().map(|s| s.to_string()),
+                display_name: value["display_name"].as_str().map(|s| s.to_string()),
             }),
             "Unregister" => Ok(Self::Unregister {
                 user_uid: value["user_uid"]
@@ -34,6 +35,7 @@ impl TournamentEvent {
                     .ok_or("user_uid required")?
                     .to_string(),
                 vekn_id: value["vekn_id"].as_str().map(|s| s.to_string()),
+                display_name: value["display_name"].as_str().map(|s| s.to_string()),
             }),
             "RemovePlayer" => Ok(Self::RemovePlayer {
                 user_uid: value["user_uid"]
@@ -52,6 +54,8 @@ impl TournamentEvent {
                     .as_str()
                     .ok_or("player_uid required")?
                     .to_string(),
+                vekn_id: value["vekn_id"].as_str().map(|s| s.to_string()),
+                display_name: value["display_name"].as_str().map(|s| s.to_string()),
             }),
             "CheckOut" => Ok(Self::CheckOut {
                 player_uid: value["player_uid"]

@@ -28,7 +28,11 @@
     if (!auth.isAuthenticated) {
       // Redirect to login, then back here
       const currentUrl = window.location.href;
-      goto(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+      const params = new URLSearchParams(window.location.search);
+      const loginHint = params.get("login_hint");
+      const loginParams = new URLSearchParams({ redirect: currentUrl });
+      if (loginHint) loginParams.set("login_hint", loginHint);
+      goto(`/login?${loginParams.toString()}`);
       return;
     }
 

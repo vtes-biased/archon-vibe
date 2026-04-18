@@ -131,6 +131,15 @@ When Rust engine capabilities change:
 - Documents: 3 metadata fields (organization/judge/playtest) with integer levels, token storage pattern (`discord_rc:{user_uid}` in transient_tokens), push triggers (role/VEKN changes, login, VEKN sync), `register_metadata()` on startup, new `DISCORD_BOT_TOKEN` env var
 - No changes to CLAUDE.md (no env var section; no architecture summary impact), SYNC.md, or other docs
 
+**Session 2026-04-11: Discord Tournament Bot + Linked Roles constraint**
+- ARCHITECTURE.md "Discord Tournament Bot" section: expanded from stub to full reference
+  - Added all 8 slash commands with descriptions and access restrictions
+  - Added Architecture table with all modules (`commands/judge.py` was missing)
+  - Added SSE Listener section: lifecycle events, voice channel creation, mid-round seating detection, snapshot resilience, module-level state constraint
+  - Added Channel Permissions section: @everyone DENY CONNECT, per-player ALLOW CONNECT+SPEAK
+  - Updated OAuth Flow: PKCE via `/oauth/token` with Discord ID
+- ARCHITECTURE.md "Discord Linked Roles": added constraint — metadata push requires target user's own OAuth token (can't push for users who never logged in via Discord OAuth)
+
 **Session 2026-02-16: Icon library migration (@iconify/svelte → lucide-svelte)**
 - Replaced @iconify/svelte (runtime icon fetching from api.iconify.design) with lucide-svelte (tree-shaken, build-time bundled)
 - Updated staff-frontend-engineer MEMORY.md stack dependencies (line 9)

@@ -109,6 +109,7 @@ pub enum TournamentEvent {
     Register {
         user_uid: String,
         vekn_id: Option<String>,
+        display_name: Option<String>,
     },
     Unregister {
         user_uid: String,
@@ -116,6 +117,7 @@ pub enum TournamentEvent {
     AddPlayer {
         user_uid: String,
         vekn_id: Option<String>,
+        display_name: Option<String>,
     },
     RemovePlayer {
         user_uid: String,
@@ -125,6 +127,8 @@ pub enum TournamentEvent {
     },
     CheckIn {
         player_uid: String,
+        vekn_id: Option<String>,
+        display_name: Option<String>,
     },
     CheckOut {
         player_uid: String,

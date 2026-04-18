@@ -24,11 +24,11 @@ export function getStateBadgeClass(state: TournamentState): string {
 
 export function seatDisplay(
   uid: string,
-  playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>,
+  playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null; display_name?: string | null }>,
 ): string {
   const info = playerInfo[uid];
   if (!info) return uid;
-  const display = info.nickname || info.name;
+  const display = info.display_name || info.nickname || info.name;
   return info.vekn ? `${display} (${info.vekn})` : display;
 }
 

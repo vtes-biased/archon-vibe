@@ -272,6 +272,7 @@ export interface Player {
   toss: number;
   result: Score;
   finalist: boolean;
+  display_name?: string | null; // Discord guild nickname (per-tournament)
 }
 
 export interface Standing {

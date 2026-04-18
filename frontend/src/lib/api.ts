@@ -3,7 +3,7 @@
  */
 
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, DeckObject, League } from '$lib/types';
-import { getAllUsers, getTournament, saveTournament, saveLeague, getSanctionsForTournament, getSanctionsForUser, getDecksByTournament, saveDeck, deleteDeck } from './db';
+import { getAllUsers, getUser, getTournament, saveTournament, saveLeague, getSanctionsForTournament, getSanctionsForUser, getDecksByTournament, saveDeck, deleteDeck } from './db';
 import { processTournamentEvent, buildActorContext, type DeckOp, type TournamentEvent } from './engine';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
@@ -537,7 +537,15 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
 }
 
 export async function tournamentAction(uid: string, action: string, data?: Record<string, unknown>): Promise<Tournament> {
-  const event = { type: action as import('$lib/engine').TournamentEventType, ...data };
+  const event: Record<string, unknown> & { type: import('$lib/engine').TournamentEventType } = { type: action as import('$lib/engine').TournamentEventType, ...data };
+
+  // Inject vekn_id for CheckIn auto-registration (WASM engine requires it)
+  if (action === 'CheckIn' && data?.player_uid && !data.vekn_id) {
+    const targetUser = await getUser(data.player_uid as string);
+    if (targetUser?.vekn_id) {
+      event.vekn_id = targetUser.vekn_id;
+    }
+  }
 
   // Try optimistic update via WASM engine
   const current = await getTournament(uid);

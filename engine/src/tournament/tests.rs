@@ -1128,7 +1128,7 @@ mod tests {
         tournament["state"] = "Waiting".into();
         tournament["players"] = json::array![];
 
-        let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+        let event = json::object! { type: "CheckIn", player_uid: "player-1", vekn_id: "1234567" };
         let actor = make_player("player-1");
 
         let result = run_event(&tournament, &event, &actor);
@@ -1151,7 +1151,7 @@ mod tests {
         tournament["state"] = "Waiting".into();
         tournament["players"] = json::array![];
 
-        let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+        let event = json::object! { type: "CheckIn", player_uid: "player-1", vekn_id: "1234567" };
         let actor = make_player("player-1");
         let sanctions = r#"[{"user_uid":"player-1","level":"disqualification","lifted_at":null,"deleted_at":null}]"#;
 
@@ -1172,7 +1172,7 @@ mod tests {
         tournament["state"] = "Waiting".into();
         tournament["players"] = json::array![];
 
-        let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+        let event = json::object! { type: "CheckIn", player_uid: "player-1", vekn_id: "1234567" };
         let actor = make_player("player-1");
         let sanctions = r#"[{"user_uid":"player-1","level":"suspension","lifted_at":null,"deleted_at":null}]"#;
 
@@ -1185,6 +1185,21 @@ mod tests {
         );
         assert!(raw.is_err());
         assert!(raw.unwrap_err().contains("suspended"));
+    }
+
+    #[test]
+    fn test_checkin_auto_register_requires_vekn_id() {
+        let mut tournament = make_tournament();
+        tournament["state"] = "Waiting".into();
+        tournament["players"] = json::array![];
+
+        // No vekn_id → should fail
+        let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+        let actor = make_player("player-1");
+
+        let result = run_event(&tournament, &event, &actor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("VEKN ID to check in"));
     }
 
     // ================================================================

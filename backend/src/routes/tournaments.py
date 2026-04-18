@@ -888,9 +888,13 @@ async def tournament_action(
             for s in tournament_sanctions
         ]
 
-        # Inject authoritative vekn_id for Register/AddPlayer (server overrides client)
+        # Inject authoritative vekn_id for Register/AddPlayer/CheckIn (server overrides client)
         if request.type in ("Register", "AddPlayer") and request.user_uid:
             target_user = await get_user_by_uid(request.user_uid)
+            if target_user and target_user.vekn_id:
+                event_data["vekn_id"] = target_user.vekn_id
+        elif request.type == "CheckIn" and request.player_uid:
+            target_user = await get_user_by_uid(request.player_uid)
             if target_user and target_user.vekn_id:
                 event_data["vekn_id"] = target_user.vekn_id
 

@@ -267,7 +267,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::Register { user_uid, vekn_id } => {
+        TournamentEvent::Register { user_uid, vekn_id, display_name } => {
             require_state(state, TournamentState::Registration)?;
 
             // Require VEKN ID
@@ -291,7 +291,7 @@ fn apply_event(
             }
 
             // Add player
-            let player = json::object! {
+            let mut player = json::object! {
                 user_uid: user_uid.as_str(),
                 state: "Registered",
                 payment_status: "Pending",
@@ -299,6 +299,11 @@ fn apply_event(
                 result: { gw: 0, vp: 0.0, tp: 0 },
                 finalist: false,
             };
+            if let Some(dn) = display_name {
+                if !dn.is_empty() {
+                    player["display_name"] = dn.as_str().into();
+                }
+            }
             tournament["players"]
                 .push(player)
                 .map_err(|e| e.to_string())?;
@@ -319,7 +324,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::AddPlayer { user_uid, vekn_id } => {
+        TournamentEvent::AddPlayer { user_uid, vekn_id, display_name } => {
             require_organizer(actor)?;
             if state != TournamentState::Planned
                 && state != TournamentState::Registration
@@ -360,6 +365,11 @@ fn apply_event(
                 result: { gw: 0, vp: 0.0, tp: 0 },
                 finalist: false,
             };
+            if let Some(dn) = display_name {
+                if !dn.is_empty() {
+                    player["display_name"] = dn.as_str().into();
+                }
+            }
             if auto_checkin
                 && tournament["decklist_required"].as_bool().unwrap_or(false)
                 && !decks
@@ -416,7 +426,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::CheckIn { player_uid } => {
+        TournamentEvent::CheckIn { player_uid, vekn_id, display_name } => {
             require_state_or_finished(state, TournamentState::Waiting)?;
 
             // Permission: organizer or self (player checking themselves in)
@@ -430,6 +440,10 @@ fn apply_event(
                     if state != TournamentState::Waiting {
                         return Err("Player not found".to_string());
                     }
+                    // Require VEKN ID for auto-registration (same as Register)
+                    if vekn_id.as_ref().map_or(true, |v| v.is_empty()) {
+                        return Err("Player must have a VEKN ID to check in".to_string());
+                    }
                     if has_dq_sanction(sanctions, player_uid) {
                         return Err(
                             "Player has a disqualification sanction and cannot check in".to_string()
@@ -438,7 +452,7 @@ fn apply_event(
                     if has_active_suspension(sanctions, player_uid) {
                         return Err("Player is suspended and cannot check in".to_string());
                     }
-                    let player = json::object! {
+                    let mut player = json::object! {
                         user_uid: player_uid.as_str(),
                         state: "Registered",
                         payment_status: "Pending",
@@ -446,6 +460,11 @@ fn apply_event(
                         result: { gw: 0, vp: 0.0, tp: 0 },
                         finalist: false,
                     };
+                    if let Some(dn) = display_name {
+                        if !dn.is_empty() {
+                            player["display_name"] = dn.as_str().into();
+                        }
+                    }
                     tournament["players"].push(player).map_err(|e| e.to_string())?;
                     tournament["players"].len() - 1
                 }

@@ -497,6 +497,7 @@ class Player(msgspec.Struct, kw_only=True):
         Score()
     )  # aggregated score (used when no round detail, e.g. VEKN sync)
     finalist: bool = False  # true if player reached the finals table
+    display_name: str | None = None  # Discord guild nickname (per-tournament)
 
 
 class Seat(msgspec.Struct, kw_only=True):
