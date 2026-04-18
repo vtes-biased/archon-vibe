@@ -1,0 +1,113 @@
+---
+- name: Import PGDG repository tasks
+  ansible.builtin.import_tasks: pgdg_repo.yml
+
+- name: Install PostgreSQL {{ postgresql_version }}
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ postgresql_version }}"
+      - "postgresql-client-{{ postgresql_version }}"
+      - "postgresql-contrib-{{ postgresql_version }}"
+    state: present
+    update_cache: true
+
+- name: Ensure postgresql service is enabled + running
+  ansible.builtin.service:
+    name: "postgresql@{{ postgresql_version }}-main"
+    state: started
+    enabled: true
+
+- name: Ensure ansible tmp dir exists under postgres home
+  ansible.builtin.file:
+    path: /var/lib/postgresql/.ansible/tmp
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0755"
+
+- name: Create archon PostgreSQL user
+  community.postgresql.postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    state: present
+    expires: infinity
+  environment:
+    PGOPTIONS: "-c password_encryption=scram-sha-256"
+  become: true
+  become_user: postgres
+
+- name: Create archon database
+  community.postgresql.postgresql_db:
+    name: "{{ db_name }}"
+    owner: "{{ db_user }}"
+    encoding: UTF8
+    lc_ctype: C.UTF-8
+    lc_collate: C.UTF-8
+    conn_limit: "50"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Configure pg_hba to allow local socket auth (scram-sha-256) for archon
+  community.postgresql.postgresql_pg_hba:
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+    contype: local
+    users: "{{ db_user }}"
+    databases: "{{ db_name }}"
+    method: scram-sha-256
+    create: true
+  become: true
+  become_user: postgres
+  notify: Reload postgresql
+
+- name: Grant ALL on database to archon user
+  community.postgresql.postgresql_privs:
+    login_db: "{{ db_name }}"
+    privs: ALL
+    type: database
+    objs: "{{ db_name }}"
+    role: "{{ db_user }}"
+  become: true
+  become_user: postgres
+
+- name: Grant ALL on schema public to archon user
+  community.postgresql.postgresql_privs:
+    login_db: "{{ db_name }}"
+    privs: ALL
+    type: schema
+    objs: public
+    role: "{{ db_user }}"
+  become: true
+  become_user: postgres
+
+- name: Tune log_destination to syslog
+  community.postgresql.postgresql_alter_system:
+    param: log_destination
+    value: syslog
+  become: true
+  become_user: postgres
+  notify: Reload postgresql
+
+- name: Tune statement_timeout
+  community.postgresql.postgresql_alter_system:
+    param: statement_timeout
+    value: "{{ postgresql_statement_timeout_ms }}"
+  become: true
+  become_user: postgres
+  notify: Reload postgresql
+
+- name: Tune lock_timeout
+  community.postgresql.postgresql_alter_system:
+    param: lock_timeout
+    value: "{{ postgresql_lock_timeout_ms }}"
+  become: true
+  become_user: postgres
+  notify: Reload postgresql
+
+- name: Tune idle_in_transaction_session_timeout
+  community.postgresql.postgresql_alter_system:
+    param: idle_in_transaction_session_timeout
+    value: "{{ postgresql_idle_in_transaction_timeout_ms }}"
+  become: true
+  become_user: postgres
+  notify: Reload postgresql

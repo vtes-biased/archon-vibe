@@ -1,0 +1,18 @@
+---
+# ----------------------------------------------------------------------------
+# Beta secrets — encrypt this file with `ansible-vault encrypt` after editing.
+# Referenced as {{ vault_* }} in all.yml.
+# ----------------------------------------------------------------------------
+vault_db_password: ""
+vault_jwt_secret: "CHANGE_ME"
+vault_mail_password: "CHANGE_ME"
+vault_discord_client_id: "CHANGE_ME"
+vault_discord_client_secret: "CHANGE_ME"
+vault_discord_bot_token: "CHANGE_ME"
+vault_bot_oauth_client_id: "CHANGE_ME"
+vault_bot_oauth_client_secret: "CHANGE_ME"
+vault_vekn_username: "CHANGE_ME"
+vault_vekn_password: "CHANGE_ME"
+vault_twda_github_app_id: ""
+vault_twda_github_installation_id: ""
+vault_twda_github_private_key: ""

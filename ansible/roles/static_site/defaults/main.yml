@@ -1,0 +1,20 @@
+---
+# r.server_name      required  - FQDN (e.g. archon.krcg.org)
+# r.site_root        required  - filesystem base (dist lands at r.site_root/dist)
+# r.dist_src         required  - local path of the built frontend dir
+# r.owner            required  - unix owner of the dist files
+# r.group            required  - unix group
+# r.backend_port     required  - localhost port uvicorn listens on
+# r.backend_paths    optional  - list of URL prefixes proxied to the backend
+# r.sse_path         optional  - location that needs SSE-friendly nginx knobs
+# r.client_max_body  optional  - client_max_body_size (default 10M)
+r: {}
+static_site_backend_paths_default:
+  - /api
+  - /auth
+  - /oauth
+  - /vekn
+  - /sanctions
+  - /admin
+static_site_sse_path_default: /stream
+static_site_client_max_body_default: "10M"

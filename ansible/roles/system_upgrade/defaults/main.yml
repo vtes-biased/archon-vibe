@@ -1,0 +1,9 @@
+---
+# Override with `-e upgrade_full=true` for dist-upgrade (major kernel bumps)
+upgrade_full: false
+# Override with `-e upgrade_reboot=true` to actually reboot if required.
+upgrade_reboot: false
+# Services to stop before rebooting; started again after.
+upgrade_stop_services:
+  - "{{ backend_service }}"
+  - "{{ bot_service }}"

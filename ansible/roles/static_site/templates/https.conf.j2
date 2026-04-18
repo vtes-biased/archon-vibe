@@ -1,0 +1,104 @@
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  http2 on;
+  server_name {{ r.server_name }};
+
+  ssl_certificate         /etc/letsencrypt/live/{{ r.server_name }}/fullchain.pem;
+  ssl_certificate_key     /etc/letsencrypt/live/{{ r.server_name }}/privkey.pem;
+  ssl_trusted_certificate /etc/letsencrypt/live/{{ r.server_name }}/fullchain.pem;
+
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers off;
+  ssl_session_cache shared:SSL:50m;
+  ssl_session_timeout 5m;
+  ssl_stapling on;
+  ssl_stapling_verify on;
+
+  access_log syslog:server=unix:/dev/log,nohostname;
+  error_log syslog:server=unix:/dev/log,nohostname;
+
+  root {{ _dist_dir }};
+  index index.html;
+  charset utf-8;
+  client_max_body_size {{ _client_max_body }};
+
+  # Security headers
+  add_header X-Frame-Options "SAMEORIGIN" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+  # gzip
+  gzip on;
+  gzip_vary on;
+  gzip_min_length 1024;
+  gzip_proxied any;
+  gzip_types
+    text/css text/javascript text/xml text/plain
+    application/javascript application/json application/xml application/rss+xml application/wasm
+    font/truetype font/opentype
+    image/svg+xml;
+  gzip_static on;
+
+  # ---- backend reverse proxy (same origin) ------------------------------
+{% for path in _backend_paths %}
+  location {{ path }} {
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host $http_host;
+    proxy_http_version 1.1;
+    proxy_pass http://127.0.0.1:{{ r.backend_port }};
+  }
+{% endfor %}
+
+  # ---- SSE stream: buffering off, long read timeout, no gzip ------------
+  location {{ _sse_path }} {
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host $http_host;
+    proxy_set_header Connection '';
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 1d;
+    gzip off;
+    chunked_transfer_encoding on;
+    proxy_pass http://127.0.0.1:{{ r.backend_port }};
+  }
+
+  # ---- PWA caching rules ------------------------------------------------
+  # Service worker files: never cache
+  location ~ ^/(sw|registerSW|workbox-).*\.js$ {
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+  }
+
+  # Vite immutable hashed assets
+  location ^~ /_app/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+  }
+  location ^~ /assets/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+  }
+
+  # PWA manifest: short TTL
+  location = /manifest.webmanifest {
+    types { application/manifest+json webmanifest; }
+    add_header Cache-Control "public, must-revalidate, max-age=3600";
+  }
+
+  # Images, icons: moderate cache
+  location ~* \.(?:jpg|jpeg|png|svg|gif|webp|ico|avif)$ {
+    add_header Cache-Control "public, must-revalidate, max-age=3600";
+  }
+
+  # HTML / JSON / CSS: always revalidate
+  location ~* \.(?:html|css|json)$ {
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+  }
+
+  # SPA fallback
+  location / {
+    try_files $uri $uri/ /index.html;
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+  }
+}

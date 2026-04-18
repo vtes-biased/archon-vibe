@@ -1,0 +1,43 @@
+---
+- name: Assert required inputs
+  ansible.builtin.assert:
+    that:
+      - r.server_name is defined
+      - r.site_root is defined
+      - r.dist_src is defined
+      - r.owner is defined
+      - r.group is defined
+      - r.backend_port is defined
+    fail_msg: "static_site role missing required r.* inputs"
+
+- name: Set effective defaults
+  ansible.builtin.set_fact:
+    _backend_paths: "{{ r.backend_paths | default(static_site_backend_paths_default) }}"
+    _sse_path: "{{ r.sse_path | default(static_site_sse_path_default) }}"
+    _client_max_body: "{{ r.client_max_body | default(static_site_client_max_body_default) }}"
+    _dist_dir: "{{ r.site_root }}/dist"
+
+- name: Ensure dist directory exists
+  ansible.builtin.file:
+    path: "{{ _dist_dir }}"
+    state: directory
+    owner: "{{ r.owner }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Rsync built frontend dist to the host
+  ansible.posix.synchronize:
+    src: "{{ r.dist_src }}/"
+    dest: "{{ _dist_dir }}/"
+    delete: true
+    recursive: true
+    rsync_opts:
+      - "--chmod=D755,F644"
+      - "--chown={{ r.owner }}:{{ r.group }}"
+
+- name: Render HTTPS vhost
+  ansible.builtin.template:
+    src: https.conf.j2
+    dest: "/etc/nginx/sites-enabled/{{ r.server_name }}.https.conf"
+    mode: "0644"
+  notify: Reload nginx (static_site)

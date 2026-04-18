@@ -1,0 +1,7 @@
+---
+- name: Bootstrap base system (packages, users, firewall, unattended-upgrades)
+  hosts: archon
+  become: true
+  gather_facts: true
+  roles:
+    - role: common

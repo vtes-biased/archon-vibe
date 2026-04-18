@@ -1,0 +1,75 @@
+---
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Apply security + standard upgrades (apt upgrade --with-new-pkgs)
+  ansible.builtin.apt:
+    upgrade: "yes"
+    autoremove: true
+    autoclean: true
+  when: not upgrade_full | bool
+
+- name: Apply full dist-upgrade (major version / kernel bumps)
+  ansible.builtin.apt:
+    upgrade: dist
+    autoremove: true
+    autoclean: true
+  when: upgrade_full | bool
+
+- name: Check whether a reboot is required
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: reboot_required_file
+
+- name: Warn that a reboot is required but not requested
+  ansible.builtin.debug:
+    msg: >
+      REBOOT REQUIRED on {{ inventory_hostname }}.
+      Re-run: make upgrade-{{ archon_env }} REBOOT=1
+  when:
+    - reboot_required_file.stat.exists
+    - not upgrade_reboot | bool
+
+- name: Perform safe reboot + service dance
+  when:
+    - reboot_required_file.stat.exists
+    - upgrade_reboot | bool
+  block:
+    - name: Stop archon services before reboot
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: stopped
+      loop: "{{ upgrade_stop_services }}"
+      failed_when: false  # ok if unit not installed yet (e.g. first bootstrap)
+
+    - name: Reboot host and wait for SSH to come back
+      ansible.builtin.reboot:
+        msg: "Reboot initiated by ansible system_upgrade role"
+        connect_timeout: 10
+        reboot_timeout: 600
+        pre_reboot_delay: 5
+        post_reboot_delay: 10
+        test_command: uptime
+
+    - name: Start archon services after reboot
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+      loop: "{{ upgrade_stop_services }}"
+      failed_when: false
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Report post-reboot status for critical services
+      ansible.builtin.debug:
+        msg: >-
+          {{ item }} ->
+          {{ (ansible_facts.services[item + '.service'] | default({})).state
+             | default('missing') }}
+      loop:
+        - nginx
+        - "postgresql@{{ postgresql_version }}-main"
+        - "{{ backend_service }}"
+        - "{{ bot_service }}"

@@ -1,0 +1,7 @@
+---
+# Each invocation of this role is parametrised via a single `r` dict:
+#   r.server_name     required  - FQDN to request a cert for
+#   r.contact_email   required  - email registered with Let's Encrypt
+#   r.acme_webroot    optional  - override ACME webroot (default below)
+r: {}
+nginx_acme_webroot_default: /var/www/acme

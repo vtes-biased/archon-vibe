@@ -1,0 +1,12 @@
+---
+- name: Restart bot service
+  ansible.builtin.systemd:
+    name: "{{ r.service_name }}"
+    state: restarted
+    daemon_reload: true
+    enabled: true
+
+- name: Reload nginx (discord_bot)
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded

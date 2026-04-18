@@ -1,0 +1,99 @@
+---
+# ----------------------------------------------------------------------------
+# Production environment variables (non-secret).
+# Secrets live in vault.yml and are referenced via {{ vault_* }} below.
+# ----------------------------------------------------------------------------
+
+# --- identity -------------------------------------------------------------
+admin_user: lpanhaleux
+archon_user: archon
+archon_group: archon
+site_url_base: "https://archon.vekn.net"
+contact_email: "lionel.panhaleux@gmail.com"
+
+# --- domains --------------------------------------------------------------
+domain_main: archon.vekn.net
+domain_bot: bot.archon.vekn.net
+
+# --- ports ----------------------------------------------------------------
+backend_port: 8007
+bot_port: 9007
+
+# --- filesystem paths -----------------------------------------------------
+opt_root: /opt/archon
+backend_site_root: "{{ opt_root }}/backend"
+bot_site_root: "{{ opt_root }}/bot"
+frontend_site_root: /var/www/archon
+bot_state_dir: /var/lib/archon-bot
+env_dir: /etc/archon
+
+# --- service names --------------------------------------------------------
+backend_service: archon-backend
+bot_service: archon-bot
+
+# --- versions -------------------------------------------------------------
+# PostgreSQL pinned via PGDG repo. Python is managed by uv (downloaded from
+# python-build-standalone) — identical on prod and beta.
+postgresql_version: 17
+python_version: "3.13"
+uv_python_install_dir: /opt/uv/python
+
+# --- database -------------------------------------------------------------
+db_name: archon
+db_user: archon
+db_password: "{{ vault_db_password }}"
+
+# --- backend env vars -----------------------------------------------------
+backend_env:
+  PYTHONOPTIMIZE: 1
+  ENVIRONMENT: production
+  SITE_URL_BASE: "{{ site_url_base }}"
+  FRONTEND_URL: "{{ site_url_base }}"
+  API_BASE_URL: "{{ site_url_base }}"
+  DATABASE_URL: "postgresql://{{ db_user }}:{{ db_password }}@/{{ db_name }}?host=/var/run/postgresql"
+  # --- mail ---------------------------------------------------------------
+  MAIL_SERVER: smtp.gmail.com
+  MAIL_PORT: 587
+  MAIL_USE_TLS: "true"
+  MAIL_USERNAME: codex.of.the.damned@gmail.com
+  MAIL_FROM: codex.of.the.damned@gmail.com
+  MAIL_FROM_NAME: "Archon"
+  MAIL_PASSWORD: "{{ vault_mail_password }}"
+  # --- auth ---------------------------------------------------------------
+  JWT_SECRET: "{{ vault_jwt_secret }}"
+  # --- discord (note: backend uses CLIENTID/SECRET, not CLIENT_ID/CLIENT_SECRET)
+  DISCORD_CLIENTID: "{{ vault_discord_client_id }}"
+  DISCORD_SECRET: "{{ vault_discord_client_secret }}"
+  DISCORD_REDIRECT_URI: "{{ site_url_base }}/auth/discord/callback"
+  DISCORD_BOT_TOKEN: "{{ vault_discord_bot_token }}"
+  DISCORD_INSTALL_URL: "https://discord.com/oauth2/authorize?client_id=1495034668469194864"
+  # --- passkeys / WebAuthn ------------------------------------------------
+  WEBAUTHN_RP_ID: "{{ domain_main }}"
+  WEBAUTHN_RP_NAME: "Archon"
+  WEBAUTHN_ORIGIN: "{{ site_url_base }}"
+  # --- VEKN sync + push ---------------------------------------------------
+  VEKN_SYNC_ENABLED: "true"
+  VEKN_SYNC_INTERVAL_HOURS: 24
+  VEKN_API_BASE_URL: "https://www.vekn.net/api"
+  VEKN_API_USERNAME: "{{ vault_vekn_username }}"
+  VEKN_API_PASSWORD: "{{ vault_vekn_password }}"
+  VEKN_PUSH: "true"            # prod pushes ratified results back to VEKN
+  VEKN_PUSH_INTERVAL_HOURS: 1
+  # --- misc ---------------------------------------------------------------
+  SNAPSHOT_DIR: /var/lib/archon/snapshots
+  TWDA_GITHUB_APP_ID: "{{ vault_twda_github_app_id | default('') }}"
+  TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
+  TWDA_GITHUB_PRIVATE_KEY: "{{ vault_twda_github_private_key | default('') }}"
+
+# --- bot env vars ---------------------------------------------------------
+bot_env:
+  PYTHONOPTIMIZE: 1
+  ARCHON_URL: "http://127.0.0.1:{{ backend_port }}"
+  ARCHON_FRONTEND_URL: "{{ site_url_base }}"
+  DISCORD_BOT_TOKEN: "{{ vault_discord_bot_token }}"
+  OAUTH_CLIENT_ID: "{{ vault_bot_oauth_client_id }}"
+  OAUTH_CLIENT_SECRET: "{{ vault_bot_oauth_client_secret }}"
+  OAUTH_REDIRECT_URI: "https://{{ domain_bot }}/oauth/callback"
+  CALLBACK_HOST: "127.0.0.1"
+  CALLBACK_PORT: "{{ bot_port }}"
+  TOKEN_DB_PATH: "{{ bot_state_dir }}/tokens.db"

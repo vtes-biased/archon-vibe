@@ -1,0 +1,30 @@
+[Unit]
+Description={{ r.service_name }} (archon Discord bot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ r.user }}
+Group={{ r.group }}
+WorkingDirectory={{ r.site_root }}
+EnvironmentFile={{ _env_dir }}/{{ r.service_name }}.env
+ExecStart={{ _venv_dir }}/bin/python -m src
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths={{ r.site_root }} {{ r.state_dir }}
+
+[Install]
+WantedBy=multi-user.target

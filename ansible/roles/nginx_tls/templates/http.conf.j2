@@ -1,0 +1,18 @@
+server {
+  listen 80;
+  listen [::]:80;
+  server_name {{ r.server_name }};
+
+  access_log syslog:server=unix:/dev/log,nohostname;
+  error_log syslog:server=unix:/dev/log,nohostname;
+
+  location ^~ /.well-known/acme-challenge/ {
+    root {{ _acme_webroot }};
+    allow all;
+    default_type "text/plain";
+  }
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}

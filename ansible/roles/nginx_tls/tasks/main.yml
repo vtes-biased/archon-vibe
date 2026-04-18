@@ -1,0 +1,54 @@
+---
+- name: Assert required inputs
+  ansible.builtin.assert:
+    that:
+      - r.server_name is defined
+      - r.contact_email is defined
+    fail_msg: "nginx_tls role requires r.server_name and r.contact_email"
+
+- name: Set effective ACME webroot
+  ansible.builtin.set_fact:
+    _acme_webroot: "{{ r.acme_webroot | default(nginx_acme_webroot_default) }}"
+
+- name: Ensure ACME webroot exists
+  ansible.builtin.file:
+    path: "{{ _acme_webroot }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy HTTP (port 80) vhost for ACME challenge + HTTPS redirect
+  ansible.builtin.template:
+    src: http.conf.j2
+    dest: "/etc/nginx/sites-enabled/{{ r.server_name }}.http.conf"
+    mode: "0644"
+  notify: Reload nginx (nginx_tls)
+
+- name: Flush handlers so nginx reload happens before certbot runs
+  ansible.builtin.meta: flush_handlers
+
+- name: Request Let's Encrypt certificate (idempotent)
+  ansible.builtin.command: >
+    certbot certonly --webroot
+    --webroot-path {{ _acme_webroot }}
+    --email {{ r.contact_email }}
+    --agree-tos --no-eff-email --staple-ocsp
+    --non-interactive
+    -d {{ r.server_name }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ r.server_name }}/fullchain.pem"
+
+- name: Ensure certbot renewal-hooks/deploy directory exists
+  ansible.builtin.file:
+    path: /etc/letsencrypt/renewal-hooks/deploy
+    state: directory
+    mode: "0755"
+
+- name: Install nginx reload hook for cert renewals
+  ansible.builtin.copy:
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      systemctl reload nginx

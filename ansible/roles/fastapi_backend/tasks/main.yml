@@ -1,0 +1,150 @@
+---
+- name: Assert required inputs
+  ansible.builtin.assert:
+    that:
+      - r.service_name is defined
+      - r.site_root is defined
+      - r.port is defined
+      - r.asgi_entrypoint is defined
+      - r.python_version is defined
+      - r.uv_python_install_dir is defined
+      - r.user is defined
+      - r.group is defined
+      - r.backend_wheel_src is defined
+      - r.engine_wheel_src is defined
+      - r.requirements_src is defined
+      - r.env is defined
+    fail_msg: "fastapi_backend role missing required r.* inputs"
+
+- name: Set effective env_dir
+  ansible.builtin.set_fact:
+    _env_dir: "{{ r.env_dir | default(fastapi_env_dir_default) }}"
+    _wheels_dir: "{{ r.site_root }}/wheels"
+    _venv_dir: "{{ r.site_root }}/.venv"
+
+- name: Ensure site_root exists
+  ansible.builtin.file:
+    path: "{{ r.site_root }}"
+    state: directory
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Ensure wheels dir exists
+  ansible.builtin.file:
+    path: "{{ _wheels_dir }}"
+    state: directory
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Upload backend wheel
+  ansible.builtin.copy:
+    src: "{{ r.backend_wheel_src }}"
+    dest: "{{ _wheels_dir }}/"
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0644"
+  notify: Restart backend service
+
+- name: Upload engine wheel
+  ansible.builtin.copy:
+    src: "{{ r.engine_wheel_src }}"
+    dest: "{{ _wheels_dir }}/"
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0644"
+  notify: Restart backend service
+
+- name: Upload pinned requirements
+  ansible.builtin.copy:
+    src: "{{ r.requirements_src }}"
+    dest: "{{ r.site_root }}/requirements.txt"
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0644"
+  notify: Restart backend service
+
+- name: Create venv with uv-managed Python {{ r.python_version }}
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - venv
+      - --python
+      - "{{ r.python_version }}"
+      - "{{ _venv_dir }}"
+  args:
+    creates: "{{ _venv_dir }}/bin/python"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
+  become: true
+  become_user: "{{ r.user }}"
+
+- name: Install pinned dependencies into venv
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - pip
+      - install
+      - --python
+      - "{{ _venv_dir }}/bin/python"
+      - --requirement
+      - "{{ r.site_root }}/requirements.txt"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
+  register: uv_install_deps
+  changed_when: "'Installed' in uv_install_deps.stdout or 'Prepared' in uv_install_deps.stdout"
+  become: true
+  become_user: "{{ r.user }}"
+  notify: Restart backend service
+
+- name: Install engine + backend wheels into venv (force reinstall)
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - pip
+      - install
+      - --python
+      - "{{ _venv_dir }}/bin/python"
+      - --reinstall
+      - "{{ _wheels_dir }}/{{ r.engine_wheel_src | basename }}"
+      - "{{ _wheels_dir }}/{{ r.backend_wheel_src | basename }}"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
+  register: uv_install_wheels
+  changed_when: true
+  become: true
+  become_user: "{{ r.user }}"
+  notify: Restart backend service
+
+- name: Ensure env dir exists
+  ansible.builtin.file:
+    path: "{{ _env_dir }}"
+    state: directory
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0750"
+
+- name: Render environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ _env_dir }}/{{ r.service_name }}.env"
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0640"
+  notify: Restart backend service
+
+- name: Render systemd unit
+  ansible.builtin.template:
+    src: service.j2
+    dest: "/etc/systemd/system/{{ r.service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart backend service
+
+- name: Enable service
+  ansible.builtin.systemd:
+    name: "{{ r.service_name }}"
+    enabled: true
+    daemon_reload: true

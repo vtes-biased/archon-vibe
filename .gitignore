@@ -84,3 +84,9 @@ INCOMING/
 # Claude Code (user-specific settings and private memory)
 .claude/settings.local.json
 .claude/projects/
+
+# Ansible
+ansible/build/
+ansible/.vault_pass
+ansible/.ansible_facts/
+ansible/*.retry

@@ -1,0 +1,132 @@
+---
+- name: Assert required inputs
+  ansible.builtin.assert:
+    that:
+      - r.service_name is defined
+      - r.site_root is defined
+      - r.bot_src_dir is defined
+      - r.requirements_src is defined
+      - r.python_version is defined
+      - r.uv_python_install_dir is defined
+      - r.user is defined
+      - r.group is defined
+      - r.port is defined
+      - r.server_name is defined
+      - r.state_dir is defined
+      - r.env is defined
+    fail_msg: "discord_bot role missing required r.* inputs"
+
+- name: Set effective defaults
+  ansible.builtin.set_fact:
+    _env_dir: "{{ r.env_dir | default(discord_bot_env_dir_default) }}"
+    _venv_dir: "{{ r.site_root }}/.venv"
+
+- name: Ensure site_root exists
+  ansible.builtin.file:
+    path: "{{ r.site_root }}"
+    state: directory
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Ensure bot state directory exists (SQLite tokens)
+  ansible.builtin.file:
+    path: "{{ r.state_dir }}"
+    state: directory
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0750"
+
+- name: Rsync bot source tree
+  ansible.posix.synchronize:
+    src: "{{ r.bot_src_dir }}/"
+    dest: "{{ r.site_root }}/src/"
+    delete: true
+    recursive: true
+    rsync_opts:
+      - "--chmod=D755,F644"
+      - "--chown={{ r.user }}:{{ r.group }}"
+      - "--exclude=__pycache__"
+      - "--exclude=*.pyc"
+  notify: Restart bot service
+
+- name: Upload pinned requirements
+  ansible.builtin.copy:
+    src: "{{ r.requirements_src }}"
+    dest: "{{ r.site_root }}/requirements.txt"
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0644"
+  notify: Restart bot service
+
+- name: Create venv with uv-managed Python {{ r.python_version }}
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - venv
+      - --python
+      - "{{ r.python_version }}"
+      - "{{ _venv_dir }}"
+  args:
+    creates: "{{ _venv_dir }}/bin/python"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
+  become: true
+  become_user: "{{ r.user }}"
+
+- name: Install dependencies into venv
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - pip
+      - install
+      - --python
+      - "{{ _venv_dir }}/bin/python"
+      - --requirement
+      - "{{ r.site_root }}/requirements.txt"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
+  register: uv_install_deps
+  changed_when: "'Installed' in uv_install_deps.stdout or 'Prepared' in uv_install_deps.stdout"
+  become: true
+  become_user: "{{ r.user }}"
+  notify: Restart bot service
+
+- name: Ensure env dir exists
+  ansible.builtin.file:
+    path: "{{ _env_dir }}"
+    state: directory
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0750"
+
+- name: Render bot environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ _env_dir }}/{{ r.service_name }}.env"
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0640"
+  notify: Restart bot service
+
+- name: Render systemd unit
+  ansible.builtin.template:
+    src: service.j2
+    dest: "/etc/systemd/system/{{ r.service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart bot service
+
+- name: Enable bot service
+  ansible.builtin.systemd:
+    name: "{{ r.service_name }}"
+    enabled: true
+    daemon_reload: true
+
+- name: Deploy bot HTTPS vhost
+  ansible.builtin.template:
+    src: https.conf.j2
+    dest: "/etc/nginx/sites-enabled/{{ r.server_name }}.https.conf"
+    mode: "0644"
+  notify: Reload nginx (discord_bot)

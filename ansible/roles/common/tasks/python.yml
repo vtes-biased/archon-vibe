@@ -1,0 +1,40 @@
+---
+# Runtime Python is managed by uv, not by apt. The only apt-installed Python
+# is the distro's python3 (used by ansible itself and by postgres module deps).
+# The archon services use uv-managed Python {{ python_version }}, installed
+# into {{ uv_python_install_dir }} — the same location is referenced from the
+# app roles (UV_PYTHON_INSTALL_DIR env var) so `uv venv --python X.Y` finds it.
+
+- name: Install uv (single static binary)
+  ansible.builtin.get_url:
+    url: https://astral.sh/uv/install.sh
+    dest: /tmp/uv-install.sh
+    mode: "0755"
+
+- name: Run uv installer into /usr/local/bin
+  ansible.builtin.command: /tmp/uv-install.sh
+  environment:
+    UV_INSTALL_DIR: /usr/local/bin
+    UV_UNMANAGED_INSTALL: /usr/local/bin
+  args:
+    creates: /usr/local/bin/uv
+
+- name: Ensure uv managed-python dir exists
+  ansible.builtin.file:
+    path: "{{ uv_python_install_dir }}"
+    state: directory
+    owner: root
+    group: "{{ archon_group }}"
+    mode: "0755"
+
+- name: Install the uv-managed Python defined by python_version
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - python
+      - install
+      - "{{ python_version }}"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ uv_python_install_dir }}"
+  register: uv_python_install
+  changed_when: "'Installed' in uv_python_install.stderr"

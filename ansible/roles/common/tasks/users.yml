@@ -1,0 +1,48 @@
+---
+- name: Ensure archon group exists
+  ansible.builtin.group:
+    name: "{{ archon_group }}"
+    state: present
+    system: true
+
+- name: Ensure archon system user exists
+  ansible.builtin.user:
+    name: "{{ archon_user }}"
+    group: "{{ archon_group }}"
+    state: present
+    shell: /usr/sbin/nologin
+    system: true
+    home: "{{ opt_root }}"
+    create_home: false
+
+- name: Ensure /opt/archon exists
+  ansible.builtin.file:
+    path: "{{ opt_root }}"
+    state: directory
+    owner: "{{ archon_user }}"
+    group: "{{ archon_group }}"
+    mode: "0755"
+
+- name: Ensure /etc/archon exists (env files)
+  ansible.builtin.file:
+    path: "{{ env_dir }}"
+    state: directory
+    owner: root
+    group: "{{ archon_group }}"
+    mode: "0750"
+
+- name: Ensure /var/lib/archon exists (snapshots etc.)
+  ansible.builtin.file:
+    path: /var/lib/archon
+    state: directory
+    owner: "{{ archon_user }}"
+    group: "{{ archon_group }}"
+    mode: "0750"
+
+- name: Ensure /var/lib/archon/snapshots exists
+  ansible.builtin.file:
+    path: /var/lib/archon/snapshots
+    state: directory
+    owner: "{{ archon_user }}"
+    group: "{{ archon_group }}"
+    mode: "0750"

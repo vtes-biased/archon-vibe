@@ -1,0 +1,15 @@
+---
+- name: Import packages tasks
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Import python tasks
+  ansible.builtin.import_tasks: python.yml
+
+- name: Import users tasks
+  ansible.builtin.import_tasks: users.yml
+
+- name: Import firewall tasks
+  ansible.builtin.import_tasks: firewall.yml
+
+- name: Import unattended-upgrades tasks
+  ansible.builtin.import_tasks: unattended_upgrades.yml

@@ -1,0 +1,5 @@
+---
+postgresql_version: 17
+postgresql_statement_timeout_ms: 30000
+postgresql_lock_timeout_ms: 5000
+postgresql_idle_in_transaction_timeout_ms: 300000

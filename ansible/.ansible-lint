@@ -1,0 +1,18 @@
+---
+# ansible-lint config for the archon-vibe deploy
+# See https://ansible.readthedocs.io/projects/lint/configuring/
+
+profile: production
+
+exclude_paths:
+  - build/
+  - .ansible_facts/
+  - .cache/
+  - inventories/beta/group_vars/vault.yml
+  - inventories/prod/group_vars/vault.yml
+
+# We deliberately pass a single `r` dict into parameterised roles (matches the
+# reference deploys) rather than prefixing every variable. This makes it trivial
+# to invoke a role twice with different inputs in one playbook.
+skip_list:
+  - var-naming[no-role-prefix]

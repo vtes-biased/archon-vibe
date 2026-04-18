@@ -1,0 +1,16 @@
+---
+# r.service_name           required (e.g. archon-bot)
+# r.site_root              required (e.g. /opt/archon/bot)
+# r.bot_src_dir            required (local path to the bot/src directory)
+# r.requirements_src       required (local path to pinned requirements.txt)
+# r.python_version         required (uv-managed Python, e.g. "3.13")
+# r.uv_python_install_dir  required (where uv stores managed Pythons)
+# r.user                   required
+# r.group                  required
+# r.port               required (localhost port for OAuth callback http server)
+# r.server_name        required (public FQDN e.g. bot.archon.krcg.org)
+# r.state_dir          required (e.g. /var/lib/archon-bot — holds tokens.db)
+# r.env                required (dict)
+# r.env_dir            optional (default: /etc/archon)
+r: {}
+discord_bot_env_dir_default: /etc/archon

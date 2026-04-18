@@ -1,0 +1,31 @@
+[Unit]
+Description={{ r.service_name }} (archon FastAPI backend)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ r.user }}
+Group={{ r.group }}
+WorkingDirectory={{ r.site_root }}
+EnvironmentFile={{ _env_dir }}/{{ r.service_name }}.env
+ExecStart={{ _venv_dir }}/bin/uvicorn --host 127.0.0.1 --port {{ r.port }} --log-level info {{ r.asgi_entrypoint }}
+Restart=always
+RestartSec=3
+TimeoutStartSec=30
+RuntimeMaxSec=1d
+
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths={{ r.site_root }} /var/lib/archon
+
+[Install]
+WantedBy=multi-user.target

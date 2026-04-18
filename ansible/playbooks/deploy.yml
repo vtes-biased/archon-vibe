@@ -1,0 +1,84 @@
+---
+- name: Deploy archon app (backend + frontend + bot)
+  hosts: archon
+  become: true
+  gather_facts: true
+
+  vars:
+    build_dir: "{{ playbook_dir }}/../build"
+    backend_wheel: >-
+      {{ lookup('ansible.builtin.fileglob', build_dir + '/archon-*.whl',
+                wantlist=True) | sort | last }}
+    engine_wheel: >-
+      {{ lookup('ansible.builtin.fileglob', build_dir + '/archon_engine-*.whl',
+                wantlist=True) | sort | last }}
+    backend_requirements: "{{ build_dir }}/backend-requirements.txt"
+    bot_requirements: "{{ build_dir }}/bot-requirements.txt"
+    bot_src_dir: "{{ build_dir }}/bot-src"
+    frontend_dist_dir: "{{ build_dir }}/frontend-dist"
+
+  pre_tasks:
+    - name: Assert build artifacts are present
+      ansible.builtin.assert:
+        that:
+          - backend_wheel is string and backend_wheel | length > 0
+          - engine_wheel is string and engine_wheel | length > 0
+        fail_msg: "Run `make build-all` before deploying — build/ is missing wheels."
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+  roles:
+    # 1. TLS certs for main + bot domain (certbot webroot, idempotent)
+    - role: nginx_tls
+      r:
+        server_name: "{{ domain_main }}"
+        contact_email: "{{ contact_email }}"
+    - role: nginx_tls
+      r:
+        server_name: "{{ domain_bot }}"
+        contact_email: "{{ contact_email }}"
+
+    # 2. Backend uvicorn service (localhost only; the static_site vhost proxies to it)
+    - role: fastapi_backend
+      r:
+        service_name: "{{ backend_service }}"
+        site_root: "{{ backend_site_root }}"
+        port: "{{ backend_port }}"
+        asgi_entrypoint: "backend.src.main:app"
+        python_version: "{{ python_version }}"
+        uv_python_install_dir: "{{ uv_python_install_dir }}"
+        user: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        backend_wheel_src: "{{ backend_wheel }}"
+        engine_wheel_src: "{{ engine_wheel }}"
+        requirements_src: "{{ backend_requirements }}"
+        env: "{{ backend_env }}"
+        env_dir: "{{ env_dir }}"
+
+    # 3. Frontend static site + nginx vhost for the main domain (proxies backend)
+    - role: static_site
+      r:
+        server_name: "{{ domain_main }}"
+        site_root: "{{ frontend_site_root }}"
+        dist_src: "{{ frontend_dist_dir }}"
+        owner: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        backend_port: "{{ backend_port }}"
+
+    # 4. Discord bot service + nginx vhost on bot.<domain>
+    - role: discord_bot
+      r:
+        service_name: "{{ bot_service }}"
+        site_root: "{{ bot_site_root }}"
+        bot_src_dir: "{{ bot_src_dir }}"
+        requirements_src: "{{ bot_requirements }}"
+        python_version: "{{ python_version }}"
+        uv_python_install_dir: "{{ uv_python_install_dir }}"
+        user: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        port: "{{ bot_port }}"
+        server_name: "{{ domain_bot }}"
+        state_dir: "{{ bot_state_dir }}"
+        env: "{{ bot_env }}"
+        env_dir: "{{ env_dir }}"

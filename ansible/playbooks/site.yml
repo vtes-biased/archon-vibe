@@ -1,0 +1,11 @@
+---
+# Full provision: first-time bring-up of a host from zero to running archon.
+# Safe to re-run.
+- name: "Archon :: bootstrap"
+  ansible.builtin.import_playbook: bootstrap.yml
+
+- name: "Archon :: database"
+  ansible.builtin.import_playbook: database.yml
+
+- name: "Archon :: deploy"
+  ansible.builtin.import_playbook: deploy.yml
