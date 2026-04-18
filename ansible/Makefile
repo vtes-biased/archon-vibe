@@ -10,7 +10,8 @@ REPO_ROOT := $(abspath $(CURDIR)/..)
 BUILD_DIR := $(CURDIR)/build
 MANYLINUX := quay.io/pypa/manylinux_2_28_x86_64
 
-ANSIBLE := ansible-playbook
+ANSIBLE := uv run --project $(REPO_ROOT) ansible-playbook
+UV_RUN := uv run --project $(REPO_ROOT)
 
 # ---- helpers ---------------------------------------------------------------
 .PHONY: help galaxy clean build-all build-engine-wheel build-backend build-bot build-frontend
@@ -22,7 +23,7 @@ help:
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 galaxy: ## Install Ansible collection dependencies
-	ansible-galaxy collection install -r requirements.yml
+	$(UV_RUN) ansible-galaxy collection install -r requirements.yml
 
 clean: ## Remove local build artifacts
 	rm -rf $(BUILD_DIR)
@@ -101,8 +102,8 @@ migrate-postgres-prod: ## One-shot PG16 -> PG17 migration on prod (requires conf
 
 # ---- dev / CI --------------------------------------------------------------
 lint: galaxy ## yamllint + ansible-lint on the ansible tree
-	yamllint -s .
-	ansible-lint
+	$(UV_RUN) yamllint -s .
+	$(UV_RUN) ansible-lint
 
 dry-beta: galaxy ## Dry-run (check mode) of site.yml against beta
 	$(ANSIBLE) -i inventories/beta playbooks/site.yml --check --diff

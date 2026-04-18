@@ -27,8 +27,8 @@ On your workstation:
 - Python 3.13 + `uv` (`brew install uv`)
 - Docker Desktop (for the manylinux PyO3 wheel build)
 - Node 20+ (`brew install node`)
-- Ansible 2.17+ (`brew install ansible`)
-- `yamllint` + `ansible-lint` for `make lint`
+- `uv sync --group dev` from the repo root — installs pinned `ansible-core`,
+  `ansible-lint`, `yamllint` and everything else the Makefile needs.
 
 On each server (first time only, before `make bootstrap-<env>`):
 - A non-root admin user with passwordless sudo (see `inventories/<env>/hosts.ini`
