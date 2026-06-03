@@ -51,6 +51,9 @@ update:
     uv lock --upgrade && uv sync
     (cd frontend && npm update)
     (cd engine && cargo update)
+    # archon_engine (our PyO3 module) isn't a tracked dep, so `uv sync` above
+    # prunes it — rebuild it into the venv so the env is complete after update.
+    uv run maturin develop --manifest-path engine/Cargo.toml
 
 # Run all tests
 test:
@@ -63,6 +66,9 @@ test:
 test-backend *ARGS='-v':
     #!/usr/bin/env bash
     set -e
+    # Build the PyO3 engine into the venv — it's our own crate, not a tracked
+    # dep, so nothing else installs it for a bare test run (incremental, cached).
+    uv run maturin develop --manifest-path engine/Cargo.toml
     needs_stop=false
     if ! docker compose exec -T db pg_isready -U archon > /dev/null 2>&1; then
         echo "Starting database..."
