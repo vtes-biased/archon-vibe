@@ -28,9 +28,9 @@ use types::VpError;
 
 // Import everything needed for apply_event from submodules
 use helpers::{
-    all_rounds_finished, count_completed_rounds, find_player_index, is_deck_locked,
-    player_exists, players_in_other_active_rounds, require_organizer, require_state,
-    require_state_or_finished, validate_enum,
+    all_rounds_finished, count_completed_rounds, find_player_index, is_deck_locked, player_exists,
+    players_in_other_active_rounds, require_organizer, require_state, require_state_or_finished,
+    validate_enum,
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{get_sa_sanctions, has_active_suspension, has_dq_sanction};
@@ -93,9 +93,7 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
     validate_config_fields(&config)?;
 
     // Name is required for creation
-    let name = config["name"]
-        .as_str()
-        .ok_or("name is required")?;
+    let name = config["name"].as_str().ok_or("name is required")?;
     if name.trim().is_empty() {
         return Err("name cannot be empty".to_string());
     }
@@ -267,11 +265,15 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::Register { user_uid, vekn_id, display_name } => {
+        TournamentEvent::Register {
+            user_uid,
+            vekn_id,
+            display_name,
+        } => {
             require_state(state, TournamentState::Registration)?;
 
             // Require VEKN ID
-            if vekn_id.as_ref().map_or(true, |v| v.is_empty()) {
+            if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                 return Err("Player must have a VEKN ID to register".to_string());
             }
 
@@ -283,7 +285,7 @@ fn apply_event(
             // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, user_uid) {
                 return Err(
-                    "Player has a disqualification sanction and cannot register".to_string(),
+                    "Player has a disqualification sanction and cannot register".to_string()
                 );
             }
             if has_active_suspension(sanctions, user_uid) {
@@ -324,7 +326,11 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::AddPlayer { user_uid, vekn_id, display_name } => {
+        TournamentEvent::AddPlayer {
+            user_uid,
+            vekn_id,
+            display_name,
+        } => {
             require_organizer(actor)?;
             if state != TournamentState::Planned
                 && state != TournamentState::Registration
@@ -336,7 +342,7 @@ fn apply_event(
             }
 
             // Require VEKN ID
-            if vekn_id.as_ref().map_or(true, |v| v.is_empty()) {
+            if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                 return Err("Player must have a VEKN ID to register".to_string());
             }
 
@@ -347,7 +353,7 @@ fn apply_event(
             // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, user_uid) {
                 return Err(
-                    "Player has a disqualification sanction and cannot register".to_string(),
+                    "Player has a disqualification sanction and cannot register".to_string()
                 );
             }
             if has_active_suspension(sanctions, user_uid) {
@@ -356,7 +362,11 @@ fn apply_event(
 
             // Auto check-in when adding during Waiting state
             let auto_checkin = state == TournamentState::Waiting;
-            let player_state = if auto_checkin { "Checked-in" } else { "Registered" };
+            let player_state = if auto_checkin {
+                "Checked-in"
+            } else {
+                "Registered"
+            };
             let mut player = json::object! {
                 user_uid: user_uid.as_str(),
                 state: player_state,
@@ -426,7 +436,11 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::CheckIn { player_uid, vekn_id, display_name } => {
+        TournamentEvent::CheckIn {
+            player_uid,
+            vekn_id,
+            display_name,
+        } => {
             require_state_or_finished(state, TournamentState::Waiting)?;
 
             // Permission: organizer or self (player checking themselves in)
@@ -441,13 +455,12 @@ fn apply_event(
                         return Err("Player not found".to_string());
                     }
                     // Require VEKN ID for auto-registration (same as Register)
-                    if vekn_id.as_ref().map_or(true, |v| v.is_empty()) {
+                    if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                         return Err("Player must have a VEKN ID to check in".to_string());
                     }
                     if has_dq_sanction(sanctions, player_uid) {
-                        return Err(
-                            "Player has a disqualification sanction and cannot check in".to_string()
-                        );
+                        return Err("Player has a disqualification sanction and cannot check in"
+                            .to_string());
                     }
                     if has_active_suspension(sanctions, player_uid) {
                         return Err("Player is suspended and cannot check in".to_string());
@@ -465,7 +478,9 @@ fn apply_event(
                             player["display_name"] = dn.as_str().into();
                         }
                     }
-                    tournament["players"].push(player).map_err(|e| e.to_string())?;
+                    tournament["players"]
+                        .push(player)
+                        .map_err(|e| e.to_string())?;
                     tournament["players"].len() - 1
                 }
             };
@@ -647,8 +662,7 @@ fn apply_event(
                 .collect();
 
             // Select which players to seat (handles awkward counts like 6, 7, 11)
-            let players_to_seat =
-                seating::select_players_for_round(&checked_in, &previous_rounds);
+            let players_to_seat = seating::select_players_for_round(&checked_in, &previous_rounds);
 
             // Use submitted seating if provided, otherwise compute
             let new_round: Vec<Vec<String>> = if let Some(submitted) = submitted_seating {
@@ -783,12 +797,10 @@ fn apply_event(
                 }
             }
 
-            if state != TournamentState::Finished {
-                if all_rounds_finished(tournament) {
-                    tournament["state"] = "Waiting".into();
-                }
-                // else: stay Playing (other rounds still in progress)
+            if state != TournamentState::Finished && all_rounds_finished(tournament) {
+                tournament["state"] = "Waiting".into();
             }
+            // else: stay Playing (other rounds still in progress)
             update_standings(tournament, sanctions);
             Ok(())
         }
@@ -833,12 +845,12 @@ fn apply_event(
                 }
             }
 
-            if state != TournamentState::Finished {
-                if all_rounds_finished(tournament) || tournament["rounds"].is_empty() {
-                    tournament["state"] = "Waiting".into();
-                }
-                // else: stay Playing (other rounds still in progress)
+            if state != TournamentState::Finished
+                && (all_rounds_finished(tournament) || tournament["rounds"].is_empty())
+            {
+                tournament["state"] = "Waiting".into();
             }
+            // else: stay Playing (other rounds still in progress)
             update_standings(tournament, sanctions);
             Ok(())
         }
@@ -1727,12 +1739,8 @@ fn apply_event(
                             );
                         }
                     }
-                    TournamentState::Finished => {
-                        if existing_count > 0 {
-                            return Err(
-                                "Cannot modify deck after tournament is finished".to_string()
-                            );
-                        }
+                    TournamentState::Finished if existing_count > 0 => {
+                        return Err("Cannot modify deck after tournament is finished".to_string());
                     }
                     _ => {} // Planned, Registration, Waiting: always allowed
                 }
@@ -1894,7 +1902,7 @@ fn apply_event(
                         .contains(&league_uid.to_string())
                 {
                     return Err(
-                        "Only league organizers can link tournaments to this league".to_string(),
+                        "Only league organizers can link tournaments to this league".to_string()
                     );
                 }
             }
@@ -1957,8 +1965,9 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::CreateTournament { .. } => {
-            Err("CreateTournament is not a tournament event — use create_tournament() instead".to_string())
-        }
+        TournamentEvent::CreateTournament { .. } => Err(
+            "CreateTournament is not a tournament event — use create_tournament() instead"
+                .to_string(),
+        ),
     }
 }
