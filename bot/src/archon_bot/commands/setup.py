@@ -28,7 +28,11 @@ def extract_tournament_uid(url: str) -> str | None:
     return None
 
 
-class SetupCommand(lightbulb.SlashCommand, name="setup", description="Link a tournament to this Discord server"):
+class SetupCommand(
+    lightbulb.SlashCommand,
+    name="setup",
+    description="Link a tournament to this Discord server",
+):
     url = lightbulb.string("url", "Archon tournament URL")
 
     @lightbulb.invoke
@@ -37,7 +41,10 @@ class SetupCommand(lightbulb.SlashCommand, name="setup", description="Link a tou
         api: ArchonAPI = ctx.client.d["api"]
 
         if not ctx.guild_id:
-            await ctx.respond("This command must be used in a server.", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                "This command must be used in a server.",
+                flags=hikari.MessageFlag.EPHEMERAL,
+            )
             return
 
         tournament_uid = extract_tournament_uid(self.url)
@@ -98,7 +105,9 @@ class SetupCommand(lightbulb.SlashCommand, name="setup", description="Link a tou
             )
             return
 
-        await ctx.respond("Setting up tournament channels...", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(
+            "Setting up tournament channels...", flags=hikari.MessageFlag.EPHEMERAL
+        )
 
         # Create channels
         try:
@@ -108,7 +117,9 @@ class SetupCommand(lightbulb.SlashCommand, name="setup", description="Link a tou
                 tournament_uid[:8],
             )
         except Exception as e:
-            await ctx.respond(f"Failed to create channels: {e}", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                f"Failed to create channels: {e}", flags=hikari.MessageFlag.EPHEMERAL
+            )
             return
 
         # Store link
@@ -136,21 +147,24 @@ class SetupCommand(lightbulb.SlashCommand, name="setup", description="Link a tou
         judges_id = int(channels["judges_channel_id"])
 
         try:
-            await ctx.client.app.rest.create_message(ann_id,
-                f"**Tournament linked!**\n"
-                f"This channel will post seatings, results, and announcements.\n"
-                f"Registration is not open yet — watch this space."
+            await ctx.client.app.rest.create_message(
+                ann_id,
+                "**Tournament linked!**\n"
+                "This channel will post seatings, results, and announcements.\n"
+                "Registration is not open yet — watch this space.",
             )
-            await ctx.client.app.rest.create_message(lobby_id,
+            await ctx.client.app.rest.create_message(
+                lobby_id,
                 f"Welcome! This is the tournament lobby.\n"
                 f"When registration opens, use `/register` here to sign up.\n"
-                f"Tournament details: {webapp_url}"
+                f"Tournament details: {webapp_url}",
             )
-            await ctx.client.app.rest.create_message(judges_id,
+            await ctx.client.app.rest.create_message(
+                judges_id,
                 f"**Tournament linked by <@{discord_id}>**\n"
                 f"Open registration from the webapp when ready.\n"
                 f"This channel will receive judge calls, sanctions, and organizer guidance.\n"
-                f"{webapp_url}"
+                f"{webapp_url}",
             )
         except Exception as e:
             logger.warning("Failed to post welcome messages: %s", e)
@@ -164,7 +178,11 @@ class SetupCommand(lightbulb.SlashCommand, name="setup", description="Link a tou
         )
 
 
-class TeardownCommand(lightbulb.SlashCommand, name="teardown", description="Remove all bot-created channels for a tournament"):
+class TeardownCommand(
+    lightbulb.SlashCommand,
+    name="teardown",
+    description="Remove all bot-created channels for a tournament",
+):
     @lightbulb.invoke
     async def invoke(self, ctx: lightbulb.Context) -> None:
         store: TokenStore = ctx.client.d["store"]
@@ -179,7 +197,9 @@ class TeardownCommand(lightbulb.SlashCommand, name="teardown", description="Remo
 
         link = await store.get_tournament_link(guild_id, tournament_uid)
         if not link:
-            await ctx.respond("Tournament link not found.", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                "Tournament link not found.", flags=hikari.MessageFlag.EPHEMERAL
+            )
             return
 
         # Verify the user has organizer rights
@@ -196,7 +216,9 @@ class TeardownCommand(lightbulb.SlashCommand, name="teardown", description="Remo
             )
             return
 
-        await ctx.respond("Removing tournament channels...", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(
+            "Removing tournament channels...", flags=hikari.MessageFlag.EPHEMERAL
+        )
 
         await stop_sse(guild_id, tournament_uid)
 
@@ -210,10 +232,16 @@ class TeardownCommand(lightbulb.SlashCommand, name="teardown", description="Remo
             logger.warning("Teardown error: %s", e)
 
         await store.unlink_tournament(guild_id, tournament_uid)
-        await ctx.respond("Tournament channels removed.", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(
+            "Tournament channels removed.", flags=hikari.MessageFlag.EPHEMERAL
+        )
 
 
-class AnnounceCommand(lightbulb.SlashCommand, name="announce", description="Post a message to the announcement channel"):
+class AnnounceCommand(
+    lightbulb.SlashCommand,
+    name="announce",
+    description="Post a message to the announcement channel",
+):
     message = lightbulb.string("message", "Message to announce")
 
     @lightbulb.invoke
@@ -230,7 +258,9 @@ class AnnounceCommand(lightbulb.SlashCommand, name="announce", description="Post
 
         link = await store.get_tournament_link(guild_id, tournament_uid)
         if not link:
-            await ctx.respond("Tournament link not found.", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                "Tournament link not found.", flags=hikari.MessageFlag.EPHEMERAL
+            )
             return
 
         # Verify organizer permissions
@@ -249,6 +279,10 @@ class AnnounceCommand(lightbulb.SlashCommand, name="announce", description="Post
                 int(link["announcement_channel_id"]),
                 f"**Announcement:** {self.message}",
             )
-            await ctx.respond("Announcement posted!", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                "Announcement posted!", flags=hikari.MessageFlag.EPHEMERAL
+            )
         except Exception as e:
-            await ctx.respond(f"Failed to post announcement: {e}", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                f"Failed to post announcement: {e}", flags=hikari.MessageFlag.EPHEMERAL
+            )

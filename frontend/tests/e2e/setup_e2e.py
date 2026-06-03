@@ -23,7 +23,14 @@ from src.db import (  # noqa: E402
     insert_auth_method,
     insert_user,
 )
-from src.models import AuthMethod, AuthMethodType, CommunityLink, CommunityLinkType, Role, User  # noqa: E402
+from src.models import (  # noqa: E402
+    AuthMethod,
+    AuthMethodType,
+    CommunityLink,
+    CommunityLinkType,
+    Role,
+    User,
+)
 from src.snapshots import generate_snapshots  # noqa: E402
 from uuid6 import uuid7  # noqa: E402
 
@@ -68,17 +75,40 @@ PLAYER_ROLES: list[list[Role]] = [
 # Community links for some players
 PLAYER_LINKS: list[list[CommunityLink]] = [
     [  # Alice - regular member with links
-        CommunityLink(type=CommunityLinkType.BLOG, url="https://alice-vtes.blog", label="Alice's Blog", language="en"),
+        CommunityLink(
+            type=CommunityLinkType.BLOG,
+            url="https://alice-vtes.blog",
+            label="Alice's Blog",
+            language="en",
+        ),
     ],
     [],  # Bob
     [  # Charlie - Prince (FR)
-        CommunityLink(type=CommunityLinkType.DISCORD, url="https://discord.gg/vtes-france", label="VTES France"),
-        CommunityLink(type=CommunityLinkType.YOUTUBE, url="https://youtube.com/@vtes-fr", label="VTES FR", language="fr"),
+        CommunityLink(
+            type=CommunityLinkType.DISCORD,
+            url="https://discord.gg/vtes-france",
+            label="VTES France",
+        ),
+        CommunityLink(
+            type=CommunityLinkType.YOUTUBE,
+            url="https://youtube.com/@vtes-fr",
+            label="VTES FR",
+            language="fr",
+        ),
     ],
     [  # Diana - NC (DE)
-        CommunityLink(type=CommunityLinkType.TELEGRAM, url="https://t.me/vtes_germany", label="VTES Germany"),
+        CommunityLink(
+            type=CommunityLinkType.TELEGRAM,
+            url="https://t.me/vtes_germany",
+            label="VTES Germany",
+        ),
     ],
-    [], [], [], [], [], [],  # Eve through Jack
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],  # Eve through Jack
 ]
 
 
@@ -103,8 +133,17 @@ async def seed() -> dict:
         roles=[Role.IC, Role.ETHICS],
         contact_email=ORGANIZER_EMAIL,
         community_links=[
-            CommunityLink(type=CommunityLinkType.DISCORD, url="https://discord.gg/vtes-global", label="VTES Global"),
-            CommunityLink(type=CommunityLinkType.YOUTUBE, url="https://youtube.com/@vtes-channel", label="VTES Channel", language="en"),
+            CommunityLink(
+                type=CommunityLinkType.DISCORD,
+                url="https://discord.gg/vtes-global",
+                label="VTES Global",
+            ),
+            CommunityLink(
+                type=CommunityLinkType.YOUTUBE,
+                url="https://youtube.com/@vtes-channel",
+                label="VTES Channel",
+                language="en",
+            ),
         ],
     )
     await insert_user(organizer)

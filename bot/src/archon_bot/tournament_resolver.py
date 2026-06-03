@@ -10,9 +10,7 @@ from .token_store import TokenStore
 logger = logging.getLogger(__name__)
 
 
-async def resolve_tournament(
-    ctx: lightbulb.Context, store: TokenStore
-) -> str | None:
+async def resolve_tournament(ctx: lightbulb.Context, store: TokenStore) -> str | None:
     """Resolve the tournament UID for a command based on channel category.
 
     The command must be run inside a tournament channel (one whose parent category

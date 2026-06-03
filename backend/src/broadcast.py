@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import msgspec
 
 from .db import BroadcastData
-from .models import DataLevel, ObjectType, Role, User
+from .models import ObjectType, Role, User
 
 logger = logging.getLogger(__name__)
 

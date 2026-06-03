@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from ..broadcast import broadcast_judge_call, broadcast_precomputed, broadcast_resync
 from ..db import (
     BroadcastData,
     allocate_next_vekn_id,
@@ -34,6 +35,7 @@ from ..db import (
     tournament_transaction,
     update_tournament,
 )
+from ..middleware.auth import OptionalUser
 from ..models import (
     DeckListsMode,
     DeckObject,
@@ -50,15 +52,12 @@ from ..models import (
     TournamentState,
     User,
 )
-from ..middleware.auth import OptionalUser
 from .auth import send_invite_email
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 decoder = msgspec.json.Decoder(Tournament)
-
-from ..broadcast import broadcast_judge_call, broadcast_precomputed, broadcast_resync
 
 _engine = PyEngine()
 
@@ -280,10 +279,10 @@ async def _get_user_organizable_league_uids(user) -> list[str]:
         return []  # IC bypasses league check in engine
     leagues = await get_all_leagues()
     return [
-        l.uid
-        for l in leagues
-        if user.uid in l.organizers_uids
-        or (Role.NC in user.roles and l.country == user.country)
+        lg.uid
+        for lg in leagues
+        if user.uid in lg.organizers_uids
+        or (Role.NC in user.roles and lg.country == user.country)
     ]
 
 
@@ -329,7 +328,6 @@ async def _check_player_barred(
                         status_code=400,
                         detail="Player is disqualified from a league tournament and cannot participate",
                     )
-
 
 
 class OrganizerAction(BaseModel):
@@ -602,7 +600,6 @@ async def fetch_deck_proxy(
 # --- Dynamic routes ---
 
 
-
 @router.delete("/{uid}")
 async def delete_tournament_endpoint(
     uid: str,
@@ -861,9 +858,7 @@ async def tournament_action(
         can_organize = None
         if request.type == "UpdateConfig" and request.config:
             can_organize = await _get_user_organizable_league_uids(current_user)
-        actor_data = _build_actor_context(
-            current_user, tournament, can_organize
-        )
+        actor_data = _build_actor_context(current_user, tournament, can_organize)
 
         # Fetch sanctions for this tournament + user-level suspension/DQ
         # sanctions for all tournament players (needed for CheckInAll etc.)
@@ -874,7 +869,10 @@ async def tournament_action(
             for s in await get_sanctions_for_user(puid):
                 if s.uid in seen_uids or s.deleted_at or s.lifted_at:
                     continue
-                if s.level in (SanctionLevel.SUSPENSION, SanctionLevel.DISQUALIFICATION):
+                if s.level in (
+                    SanctionLevel.SUSPENSION,
+                    SanctionLevel.DISQUALIFICATION,
+                ):
                     tournament_sanctions.append(s)
                     seen_uids.add(s.uid)
         sanctions_data = [
@@ -940,7 +938,8 @@ async def tournament_action(
         # Skip timer reset if other rounds are still in progress (parallel rounds)
         if request.type in ("StartRound", "StartFinals"):
             in_progress = sum(
-                1 for r in (updated.rounds or [])
+                1
+                for r in (updated.rounds or [])
                 if any(t.state != "Finished" for t in r)
             )
             if in_progress <= 1:
@@ -952,9 +951,12 @@ async def tournament_action(
             if updated.state != "Playing":
                 if not updated.timer.paused and updated.timer.started_at:
                     # Accumulate elapsed time before pausing
-                    elapsed = (datetime.now(UTC) - updated.timer.started_at).total_seconds()
+                    elapsed = (
+                        datetime.now(UTC) - updated.timer.started_at
+                    ).total_seconds()
                     updated.timer = TimerState(
-                        elapsed_before_pause=updated.timer.elapsed_before_pause + elapsed,
+                        elapsed_before_pause=updated.timer.elapsed_before_pause
+                        + elapsed,
                         paused=True,
                     )
                 updated.table_extra_time = {}
@@ -973,9 +975,7 @@ async def tournament_action(
     logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
 
     # Process deck side-effects (outside transaction)
-    deck_bds = await _process_deck_ops(
-        deck_ops, uid, org_uids=updated.organizers_uids
-    )
+    deck_bds = await _process_deck_ops(deck_ops, uid, org_uids=updated.organizers_uids)
     for bd in deck_bds:
         broadcast_precomputed(bd)
 
@@ -1183,9 +1183,7 @@ async def tournament_report(
     return Response(
         content=json_mod.dumps(report, indent=2),
         media_type="application/json",
-        headers={
-            "Content-Disposition": f'attachment; filename="{uid}-report.json"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{uid}-report.json"'},
     )
 
 
@@ -1427,12 +1425,12 @@ async def call_judge(
     table_label = resolveTableLabelPy(tournament.table_rooms, request.table)
     # Broadcast to organizers
     await broadcast_judge_call(
-            tournament_uid=tournament.uid,
-            table=request.table,
-            table_label=table_label,
-            player_name=user.name,
-            organizer_uids=tournament.organizers_uids,
-        )
+        tournament_uid=tournament.uid,
+        table=request.table,
+        table_label=table_label,
+        player_name=user.name,
+        organizer_uids=tournament.organizers_uids,
+    )
     return Response(status_code=204)
 
 
@@ -1555,14 +1553,18 @@ async def _resolve_or_create_offline_player(
         coopted_at=now,
     )
     bd = await insert_user(new_user)
-    logger.info(f"Created user {new_user.uid} (VEKN {vekn_id}) for offline player '{player_data.name}'")
+    logger.info(
+        f"Created user {new_user.uid} (VEKN {vekn_id}) for offline player '{player_data.name}'"
+    )
 
     broadcast_precomputed(bd)
 
     # Send invite email if provided
     if player_data.email:
         try:
-            await send_invite_email(player_data.email.lower(), new_user.uid, new_user.name)
+            await send_invite_email(
+                player_data.email.lower(), new_user.uid, new_user.name
+            )
         except Exception:
             logger.warning(f"Failed to send invite email to {player_data.email}")
 

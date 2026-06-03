@@ -73,7 +73,7 @@ async def get_tournament(uid: str, user: CurrentUser) -> Response:
     # Need to peek at country for NC/Prince upgrade
     async with get_connection() as conn:
         cursor = await conn.execute(
-            'SELECT "full"->>\'country\' FROM objects WHERE uid = %s AND type = %s',
+            "SELECT \"full\"->>'country' FROM objects WHERE uid = %s AND type = %s",
             (uid, ObjectType.TOURNAMENT),
         )
         meta = await cursor.fetchone()

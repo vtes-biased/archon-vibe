@@ -108,11 +108,15 @@ async def sync_table_permissions(
     stale = current_member_ids - desired_discord_ids
     for did in stale:
         try:
-            await bot.rest.delete_permission_overwrite(channel_id, hikari.Snowflake(did))
+            await bot.rest.delete_permission_overwrite(
+                channel_id, hikari.Snowflake(did)
+            )
         except hikari.NotFoundError:
             pass
         except Exception as e:
-            logger.warning("Failed to remove override for %s on %s: %s", did, channel_id, e)
+            logger.warning(
+                "Failed to remove override for %s on %s: %s", did, channel_id, e
+            )
 
     # Add missing overrides
     missing = desired_discord_ids - current_member_ids
@@ -125,7 +129,9 @@ async def sync_table_permissions(
                 allow=PLAYER_ALLOW,
             )
         except Exception as e:
-            logger.warning("Failed to add override for %s on %s: %s", did, channel_id, e)
+            logger.warning(
+                "Failed to add override for %s on %s: %s", did, channel_id, e
+            )
 
 
 async def create_table_channels(
@@ -171,7 +177,12 @@ async def create_table_channels(
         all_players = {uid for table in tables for uid in table}
         # Freshly created: only @everyone role override, no member overrides
         await sync_table_permissions(
-            bot, guild_id, ch.id, all_players, org_uids, discord_id_map,
+            bot,
+            guild_id,
+            ch.id,
+            all_players,
+            org_uids,
+            discord_id_map,
             current_member_ids=set(),
         )
     else:
@@ -192,7 +203,12 @@ async def create_table_channels(
             channel_ids.append(ch.id)
             # Freshly created: only @everyone role override, no member overrides
             await sync_table_permissions(
-                bot, guild_id, ch.id, set(table), org_uids, discord_id_map,
+                bot,
+                guild_id,
+                ch.id,
+                set(table),
+                org_uids,
+                discord_id_map,
                 current_member_ids=set(),
             )
 

@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from uuid6 import uuid7
 
+from .broadcast import broadcast_precomputed
 from .db import (
     decode_json,
     get_connection,
@@ -29,8 +30,6 @@ from .models import (
     User,
 )
 from .vekn_api import VEKNAPIClient
-
-from .broadcast import broadcast_precomputed
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +138,9 @@ _CITY_TZ_OVERRIDES: list[tuple[str, str, str]] = [
 ]
 
 
-def _guess_timezone(country: str | None, venue_city: str = "", address: str = "") -> str:
+def _guess_timezone(
+    country: str | None, venue_city: str = "", address: str = ""
+) -> str:
     """Best-effort IANA timezone from country code and venue location."""
     if not country:
         return "UTC"
@@ -214,7 +215,9 @@ def _map_vekn_to_tournament(
     # Guess timezone from venue location (VEKN times are local)
     venue_city = venue_data.get("city") or data.get("venue_city") or ""
     tz_name = "UTC" if online else _guess_timezone(country, venue_city, address)
-    start = _parse_date(data.get("event_startdate"), data.get("event_starttime"), tz_name)
+    start = _parse_date(
+        data.get("event_startdate"), data.get("event_starttime"), tz_name
+    )
     finish = _parse_date(data.get("event_enddate"), data.get("event_endtime"), tz_name)
     if address and venue_data.get("city"):
         address += f", {venue_data['city']}"
@@ -230,14 +233,14 @@ def _map_vekn_to_tournament(
         try:
             lat_f, lng_f = float(lat), float(lng)  # type: ignore[arg-type]
             if lat_f != 0 or lng_f != 0:
-                map_url = f"https://www.google.com/maps/search/?api=1&query={lat_f},{lng_f}"
+                map_url = (
+                    f"https://www.google.com/maps/search/?api=1&query={lat_f},{lng_f}"
+                )
         except (TypeError, ValueError):
             pass
         if not map_url and address:
             parts = [p for p in [venue, address, country] if p]
-            map_url = (
-                f"https://www.google.com/maps/search/?api=1&query={quote(' '.join(parts))}"
-            )
+            map_url = f"https://www.google.com/maps/search/?api=1&query={quote(' '.join(parts))}"
 
     # Organizer
     organizer_vekn = str(data.get("organizer_veknid") or "")

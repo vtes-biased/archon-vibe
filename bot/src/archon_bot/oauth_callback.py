@@ -82,7 +82,6 @@ async def handle_callback(request: web.Request) -> web.Response:
 
     # Process the pending action
     action = pending["action"]
-    guild_id = pending["guild_id"]
 
     if action == "setup":
         # The setup command will be completed by the SSE listener

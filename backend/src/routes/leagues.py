@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from ..broadcast import broadcast_precomputed
 from ..db import (
     get_child_leagues,
     get_league_by_uid,
@@ -20,8 +21,6 @@ from ..models import League, LeagueKind, LeagueStandingsMode, Role
 router = APIRouter(prefix="/api/leagues", tags=["leagues"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
-
-from ..broadcast import broadcast_precomputed
 
 
 class LeagueCreate(BaseModel):
@@ -108,7 +107,6 @@ async def create_league(
         media_type="application/json",
         status_code=201,
     )
-
 
 
 @router.put("/{uid}")

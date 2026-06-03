@@ -70,7 +70,6 @@ _sync_service: VEKNSyncService | None = None
 _shutdown_event: asyncio.Event | None = None
 
 
-
 async def run_vekn_sync() -> None:
     """Run VEKN member sync, then tournament sync (scheduled task)."""
     global _sync_service
@@ -427,8 +426,6 @@ def _viewer_level(viewer: User | None) -> DataLevel:
     if viewer.vekn_id:
         return DataLevel.MEMBER
     return DataLevel.PUBLIC
-
-
 
 
 async def _resolve_user_from_token(token: str | None) -> User | None:

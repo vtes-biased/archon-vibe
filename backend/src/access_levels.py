@@ -20,10 +20,23 @@ _USER_PUBLIC_FIELDS = {
     "roles",
     "vekn_prefix",
 }
-_USER_CONTACT_FIELDS = {"contact_email", "contact_discord", "discord_id", "contact_phone", "phone_is_whatsapp"}
+_USER_CONTACT_FIELDS = {
+    "contact_email",
+    "contact_discord",
+    "discord_id",
+    "contact_phone",
+    "phone_is_whatsapp",
+}
 _USER_COMMUNITY_LINKS = {"community_links"}
 # Minimal fields for anonymous link browsing (no name/personal info)
-_USER_LINKS_ONLY_FIELDS = {"uid", "modified", "deleted_at", "country", "roles", "community_links"}
+_USER_LINKS_ONLY_FIELDS = {
+    "uid",
+    "modified",
+    "deleted_at",
+    "country",
+    "roles",
+    "community_links",
+}
 _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
     | {"vekn_id", "city", "city_geoname_id", "state", "nickname", "avatar_path"}
@@ -36,15 +49,19 @@ _USER_MEMBER_FIELDS = (
         "wins",
     }
 )
-_USER_FULL_EXTRA = _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS | {
-    "coopted_by",
-    "coopted_at",
-    "vekn_synced",
-    "vekn_synced_at",
-    "local_modifications",
-    "vekn_prefix",
-    "resync_after",
-}
+_USER_FULL_EXTRA = (
+    _USER_CONTACT_FIELDS
+    | _USER_COMMUNITY_LINKS
+    | {
+        "coopted_by",
+        "coopted_at",
+        "vekn_synced",
+        "vekn_synced_at",
+        "local_modifications",
+        "vekn_prefix",
+        "resync_after",
+    }
+)
 
 
 def _pick(d: dict, keys: set[str]) -> dict:
@@ -62,7 +79,9 @@ def compute_user_public(d: dict) -> dict | None:
     """
     roles = d.get("roles", [])
     if Role.NC in roles or Role.PRINCE in roles:
-        return _pick(d, _USER_PUBLIC_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
+        return _pick(
+            d, _USER_PUBLIC_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS
+        )
     if Role.IC in roles:
         return _pick(d, _USER_PUBLIC_FIELDS | _USER_COMMUNITY_LINKS)
     if d.get("community_links"):
@@ -80,7 +99,9 @@ def compute_user_member(d: dict) -> dict:
     """
     roles = d.get("roles", [])
     if Role.NC in roles or Role.PRINCE in roles:
-        return _pick(d, _USER_MEMBER_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
+        return _pick(
+            d, _USER_MEMBER_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS
+        )
     if Role.IC in roles:
         return _pick(d, _USER_MEMBER_FIELDS | _USER_COMMUNITY_LINKS)
     if d.get("community_links"):

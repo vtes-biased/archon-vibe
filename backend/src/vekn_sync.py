@@ -677,7 +677,9 @@ class VEKNSyncService:
         new_name = update_fields.get("name", existing_user.name)
         new_country = update_fields.get("country", existing_user.country)
         new_city = update_fields.get("city", existing_user.city)
-        new_city_geoname_id = update_fields.get("city_geoname_id", existing_user.city_geoname_id)
+        new_city_geoname_id = update_fields.get(
+            "city_geoname_id", existing_user.city_geoname_id
+        )
         new_state = update_fields.get("state", existing_user.state)
         new_roles = update_fields.get("roles", existing_user.roles)
         new_vekn_prefix = update_fields.get("vekn_prefix", existing_user.vekn_prefix)

@@ -188,14 +188,18 @@ class TokenStore:
             (guild_id,),
         ) as cur:
             async for row in cur:
-                rows.append({
-                    "tournament_uid": row[0],
-                    "organizer_discord_id": row[1],
-                    "category_id": row[2],
-                })
+                rows.append(
+                    {
+                        "tournament_uid": row[0],
+                        "organizer_discord_id": row[1],
+                        "category_id": row[2],
+                    }
+                )
         return rows
 
-    async def get_tournament_by_category(self, guild_id: str, category_id: str) -> dict | None:
+    async def get_tournament_by_category(
+        self, guild_id: str, category_id: str
+    ) -> dict | None:
         """Find the tournament linked to a specific Discord category."""
         assert self._db
         async with self._db.execute(
@@ -224,11 +228,13 @@ class TokenStore:
             "SELECT guild_id, tournament_uid, organizer_discord_id FROM guild_tournaments",
         ) as cur:
             async for row in cur:
-                rows.append({
-                    "guild_id": row[0],
-                    "tournament_uid": row[1],
-                    "organizer_discord_id": row[2],
-                })
+                rows.append(
+                    {
+                        "guild_id": row[0],
+                        "tournament_uid": row[1],
+                        "organizer_discord_id": row[2],
+                    }
+                )
         return rows
 
     async def unlink_tournament(self, guild_id: str, tournament_uid: str) -> None:

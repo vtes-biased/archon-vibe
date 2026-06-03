@@ -129,7 +129,9 @@ async def _sse_loop(
         while True:
             tokens = await store.get_tokens(organizer_discord_id)
             if not tokens:
-                logger.warning("No tokens for organizer %s, stopping SSE", organizer_discord_id)
+                logger.warning(
+                    "No tokens for organizer %s, stopping SSE", organizer_discord_id
+                )
                 return
 
             try:
@@ -180,14 +182,18 @@ async def _sse_loop(
                             try:
                                 data = json.loads(data_str)
                             except json.JSONDecodeError:
-                                logger.warning("Unparseable SSE data: %s", data_str[:200])
+                                logger.warning(
+                                    "Unparseable SSE data: %s", data_str[:200]
+                                )
                                 continue
 
                             if data.get("type") == "resync":
                                 # Server wants a clean re-sync. Reconnect for a
                                 # fresh catch-up (the bot sends no `since`, so a
                                 # reconnect always replays full current state).
-                                logger.info("Resync requested, reconnecting SSE for %s", key)
+                                logger.info(
+                                    "Resync requested, reconnecting SSE for %s", key
+                                )
                                 break
 
                             synced = await _dispatch_event(
@@ -255,9 +261,7 @@ async def _dispatch_event(
     return synced
 
 
-def _handle_snapshot(
-    key: str, tournament_uid: str, data: dict | list
-) -> None:
+def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
     """Initialize state tracking from snapshot without posting announcements."""
     items = data if isinstance(data, list) else [data]
     for item in items:
@@ -270,13 +274,13 @@ def _handle_snapshot(
         _last_tournament[key] = obj
         logger.info(
             "Snapshot: state=%s rounds=%d for %s",
-            _last_state[key], _last_round_count[key], key,
+            _last_state[key],
+            _last_round_count[key],
+            key,
         )
 
 
-def _format_standings(
-    standings: list, standings_mode: str, players: list
-) -> str:
+def _format_standings(standings: list, standings_mode: str, players: list) -> str:
     """Format standings respecting the tournament's standings_mode setting.
 
     - Private: no standings shown
@@ -359,8 +363,11 @@ async def _build_discord_id_map(
 
 
 async def _warn_unlinked_players(
-    bot, judges_id: int, player_uids: set[str],
-    discord_id_map: dict[str, int], players: list,
+    bot,
+    judges_id: int,
+    player_uids: set[str],
+    discord_id_map: dict[str, int],
+    players: list,
 ) -> None:
     """Post a warning to #judges about seated players without a Discord link."""
     unlinked = player_uids - set(discord_id_map.keys())
@@ -368,10 +375,11 @@ async def _warn_unlinked_players(
         return
     names = [_player_display(uid, players) for uid in unlinked]
     await _post(
-        bot, judges_id,
+        bot,
+        judges_id,
         f"**Warning:** {len(unlinked)} seated player{'s have' if len(unlinked) != 1 else ' has'} "
         f"not linked their Discord account and cannot join voice: {', '.join(names)}. "
-        f"Ask them to run `/checkin` in the lobby."
+        f"Ask them to run `/checkin` in the lobby.",
     )
 
 
@@ -425,16 +433,21 @@ async def _handle_update(
 
     # ── Registration opened (Planned → Registration) ──
     if state == "Registration" and prev_state != "Registration":
-        await _post(bot, announcement_id,
+        await _post(
+            bot,
+            announcement_id,
             f"**Registration is open for {name}!**\n"
-            f"Use `/register` in <#{lobby_id}> to sign up."
+            f"Use `/register` in <#{lobby_id}> to sign up.",
         )
-        await _post(bot, lobby_id,
-            f"Registration is open! Use `/register` to sign up for **{name}**."
+        await _post(
+            bot,
+            lobby_id,
+            f"Registration is open! Use `/register` to sign up for **{name}**.",
         )
-        await _post(bot, judges_id,
-            f"**{name}** — Registration opened.\n"
-            f"Manage tournament: {webapp_url}"
+        await _post(
+            bot,
+            judges_id,
+            f"**{name}** — Registration opened.\nManage tournament: {webapp_url}",
         )
 
     # ── Check-in opened (Registration → Waiting) ──
@@ -443,21 +456,25 @@ async def _handle_update(
         registered = len(players)
         decklist_note = ""
         if obj.get("decklist_required"):
-            decklist_note = (
-                f"\nThis tournament requires a decklist — upload yours on the webapp: {webapp_url}"
-            )
+            decklist_note = f"\nThis tournament requires a decklist — upload yours on the webapp: {webapp_url}"
 
-        await _post(bot, announcement_id,
+        await _post(
+            bot,
+            announcement_id,
             f"**Check-in is open for {name}!**\n"
             f"{registered} player{'s' if registered != 1 else ''} registered. "
-            f"Use `/checkin` in <#{lobby_id}> to check in.{decklist_note}"
+            f"Use `/checkin` in <#{lobby_id}> to check in.{decklist_note}",
         )
-        await _post(bot, lobby_id,
-            f"Check-in is now open! Use `/checkin` to check in for **{name}**.{decklist_note}"
+        await _post(
+            bot,
+            lobby_id,
+            f"Check-in is now open! Use `/checkin` to check in for **{name}**.{decklist_note}",
         )
-        await _post(bot, judges_id,
+        await _post(
+            bot,
+            judges_id,
             f"**{name}** — Check-in opened ({registered} registered).\n"
-            f"Close check-in and start Round 1 from the webapp when ready.\n{webapp_url}"
+            f"Close check-in and start Round 1 from the webapp when ready.\n{webapp_url}",
         )
 
     # ── Round finished → back to Waiting ──
@@ -467,7 +484,9 @@ async def _handle_update(
 
         lines = [f"**Round {round_count} complete!**"]
         lines.append(_format_standings(standings, standings_mode, players))
-        lines.append(f"\nCheck-in for the next round is open — use `/checkin` in <#{lobby_id}>.")
+        lines.append(
+            f"\nCheck-in for the next round is open — use `/checkin` in <#{lobby_id}>."
+        )
         await _post(bot, announcement_id, "\n".join(lines))
 
         # Clean up table channels
@@ -476,10 +495,12 @@ async def _handle_update(
         _last_seating.pop(key, None)
 
         checked_in = sum(1 for p in players if p.get("state") == "Checked-in")
-        await _post(bot, judges_id,
+        await _post(
+            bot,
+            judges_id,
             f"**{name}** — Round {round_count} finished. "
             f"{checked_in} player{'s' if checked_in != 1 else ''} checked in for next round.\n"
-            f"Start next round or finals from the webapp.\n{webapp_url}"
+            f"Start next round or finals from the webapp.\n{webapp_url}",
         )
 
     # ── New round started ──
@@ -496,7 +517,7 @@ async def _handle_update(
             lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
 
         lines.append(
-            f"\nJoin your table's voice channel and use `/report` when the round ends."
+            "\nJoin your table's voice channel and use `/report` when the round ends."
         )
         await _post(bot, announcement_id, "\n".join(lines))
 
@@ -509,7 +530,10 @@ async def _handle_update(
         # Create table voice channels with permissions
         try:
             channel_ids = await create_table_channels(
-                bot, int(guild_id), category_id, tables_data,
+                bot,
+                int(guild_id),
+                category_id,
+                tables_data,
                 discord_id_map=discord_id_map,
                 organizer_uids=organizer_uids,
             )
@@ -525,10 +549,12 @@ async def _handle_update(
             bot, judges_id, all_player_uids, discord_id_map, players
         )
 
-        await _post(bot, judges_id,
+        await _post(
+            bot,
+            judges_id,
             f"**{name}** — Round {round_count} started ({len(tables_data)} tables, "
             f"{sum(len(t) for t in tables_data)} players).\n"
-            f"Use `/sanction @player` to issue sanctions.\n{webapp_url}"
+            f"Use `/sanction @player` to issue sanctions.\n{webapp_url}",
         )
 
     # ── Finals started ──
@@ -545,7 +571,7 @@ async def _handle_update(
             seed = seed_order.index(uid) + 1 if uid in seed_order else "?"
             lines.append(f"  {i + 1}. {display} (seed #{seed})")
 
-        lines.append(f"\nJoin the Finals voice channel. Good luck!")
+        lines.append("\nJoin the Finals voice channel. Good luck!")
         await _post(bot, announcement_id, "\n".join(lines))
 
         finalists = [[s.get("player_uid", "") for s in seating]]
@@ -558,7 +584,10 @@ async def _handle_update(
 
         try:
             ch_ids = await create_table_channels(
-                bot, int(guild_id), category_id, finalists,
+                bot,
+                int(guild_id),
+                category_id,
+                finalists,
                 discord_id_map=discord_id_map,
                 organizer_uids=organizer_uids,
                 is_finals=True,
@@ -572,8 +601,10 @@ async def _handle_update(
             bot, judges_id, finalist_uids, discord_id_map, players
         )
 
-        await _post(bot, judges_id,
-            f"**{name}** — Finals started ({len(seating)} finalists).\n{webapp_url}"
+        await _post(
+            bot,
+            judges_id,
+            f"**{name}** — Finals started ({len(seating)} finalists).\n{webapp_url}",
         )
 
     # ── Mid-round seating changes (SwapSeats, AlterSeating, etc.) ──
@@ -586,7 +617,11 @@ async def _handle_update(
         current_seating = _extract_round_seating(obj)
         prev_seating = _last_seating.get(key)
 
-        if current_seating is not None and prev_seating is not None and current_seating != prev_seating:
+        if (
+            current_seating is not None
+            and prev_seating is not None
+            and current_seating != prev_seating
+        ):
             all_player_uids = _collect_all_player_uids(current_seating)
             discord_id_map = await _build_discord_id_map(
                 store, all_player_uids | organizer_uids
@@ -604,7 +639,10 @@ async def _handle_update(
                 ]
                 try:
                     new_ch_ids = await create_table_channels(
-                        bot, int(guild_id), category_id, new_tables,
+                        bot,
+                        int(guild_id),
+                        category_id,
+                        new_tables,
                         discord_id_map=discord_id_map,
                         organizer_uids=organizer_uids,
                         start_index=prev_count,
@@ -626,11 +664,17 @@ async def _handle_update(
                     if current_seating[i] != prev_seating[i]:
                         try:
                             await sync_table_permissions(
-                                bot, int(guild_id), table_chs[i],
-                                current_seating[i], organizer_uids, discord_id_map,
+                                bot,
+                                int(guild_id),
+                                table_chs[i],
+                                current_seating[i],
+                                organizer_uids,
+                                discord_id_map,
                             )
                         except Exception as e:
-                            logger.warning("Failed to sync table %d permissions: %s", i + 1, e)
+                            logger.warning(
+                                "Failed to sync table %d permissions: %s", i + 1, e
+                            )
 
             _table_channels[key] = table_chs
             _last_seating[key] = current_seating
@@ -672,10 +716,12 @@ async def _handle_update(
             await delete_channels(bot, _table_channels.pop(key))
         _last_seating.pop(key, None)
 
-        await _post(bot, judges_id,
+        await _post(
+            bot,
+            judges_id,
             f"**{name}** — Tournament finished.\n"
             f"Results and VEKN push available on the webapp.\n"
-            f"Use `/teardown` when you're ready to remove the tournament channels.\n{webapp_url}"
+            f"Use `/teardown` when you're ready to remove the tournament channels.\n{webapp_url}",
         )
 
     # Update state tracking LAST so comparisons above see previous state.
@@ -693,10 +739,10 @@ _SANCTION_LEVEL_LABELS = {
 }
 
 _SANCTION_LEVEL_EMOJI = {
-    "caution": "\u26a0\ufe0f",       # ⚠️
-    "warning": "\U0001f7e0",          # 🟠
+    "caution": "\u26a0\ufe0f",  # ⚠️
+    "warning": "\U0001f7e0",  # 🟠
     "standings_adjustment": "\U0001f7e3",  # 🟣
-    "disqualification": "\U0001f534",      # 🔴
+    "disqualification": "\U0001f534",  # 🔴
 }
 
 
@@ -786,7 +832,9 @@ async def _handle_sanction_update(
                                 await bot.rest.create_message(table_chs[ti], player_msg)
                                 posted_to_table = True
                             except Exception as e:
-                                logger.warning("Failed to post sanction to table %d: %s", ti, e)
+                                logger.warning(
+                                    "Failed to post sanction to table %d: %s", ti, e
+                                )
                         break
 
     if not posted_to_table:

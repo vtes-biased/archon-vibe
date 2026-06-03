@@ -386,4 +386,6 @@ async def _store_and_push_discord_roles(user_uid: str, discord_tokens: dict) -> 
         if user:
             await push_role_metadata(user, discord_tokens["access_token"])
     except Exception:
-        logger.warning(f"Failed to push Discord Linked Roles for {user_uid}", exc_info=True)
+        logger.warning(
+            f"Failed to push Discord Linked Roles for {user_uid}", exc_info=True
+        )

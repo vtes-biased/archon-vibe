@@ -132,7 +132,9 @@ class ArchonAPI:
 
         assert self._session
         headers = {"Authorization": f"Bearer {token}"}
-        async with self._session.request(method, path, json=json_body, headers=headers) as resp:
+        async with self._session.request(
+            method, path, json=json_body, headers=headers
+        ) as resp:
             if resp.status == 401:
                 # Try refresh
                 refreshed = await self._refresh_tokens(discord_id)
@@ -146,7 +148,9 @@ class ArchonAPI:
                 ) as resp2:
                     if resp2.status >= 400:
                         text = await resp2.text()
-                        logger.error("API error %s %s: %s %s", method, path, resp2.status, text)
+                        logger.error(
+                            "API error %s %s: %s %s", method, path, resp2.status, text
+                        )
                         return ApiResult.fail(self._extract_error(resp2.status, text))
                     return ApiResult.success(await resp2.json())
             if resp.status >= 400:
@@ -167,7 +171,10 @@ class ArchonAPI:
         """Send a tournament action via POST /{uid}/action."""
         payload = {"type": action, **kwargs}
         return await self._request(
-            "POST", f"/api/tournaments/{tournament_uid}/action", discord_id, json_body=payload
+            "POST",
+            f"/api/tournaments/{tournament_uid}/action",
+            discord_id,
+            json_body=payload,
         )
 
     async def claim_vekn_id(self, discord_id: str, vekn_id: str) -> ApiResult:
@@ -214,9 +221,7 @@ class ArchonAPI:
             "POST", "/api/sanctions/", discord_id, json_body=payload
         )
 
-    async def exchange_code(
-        self, code: str, code_verifier: str
-    ) -> dict | None:
+    async def exchange_code(self, code: str, code_verifier: str) -> dict | None:
         """Exchange authorization code for tokens."""
         assert self._session
         async with self._session.post(

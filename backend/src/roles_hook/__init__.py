@@ -9,7 +9,7 @@ import os
 
 import aiohttp
 
-from ..db import get_transient_token, store_transient_token, delete_transient_token
+from ..db import delete_transient_token, get_transient_token, store_transient_token
 from ..models import Role
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,9 @@ async def register_metadata() -> None:
     client_id = os.getenv("DISCORD_CLIENTID", "")
     bot_token = os.getenv("DISCORD_BOT_TOKEN", "")
     if not client_id or not bot_token:
-        logger.info("Discord Linked Roles: skipped (DISCORD_CLIENTID or DISCORD_BOT_TOKEN not set)")
+        logger.info(
+            "Discord Linked Roles: skipped (DISCORD_CLIENTID or DISCORD_BOT_TOKEN not set)"
+        )
         return
 
     url = f"https://discord.com/api/v10/applications/{client_id}/role-connections/metadata"
@@ -76,7 +78,9 @@ async def register_metadata() -> None:
                 logger.info("Discord Linked Roles: metadata registered successfully")
             else:
                 text = await resp.text()
-                logger.error(f"Discord Linked Roles: metadata registration failed ({resp.status}): {text}")
+                logger.error(
+                    f"Discord Linked Roles: metadata registration failed ({resp.status}): {text}"
+                )
 
 
 async def push_role_metadata(user, access_token: str) -> bool:
@@ -89,7 +93,10 @@ async def push_role_metadata(user, access_token: str) -> bool:
     platform_name, platform_username = build_platform_info(user)
 
     url = f"https://discord.com/api/v10/users/@me/applications/{client_id}/role-connection"
-    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
     body = {
         "platform_name": platform_name,
         "platform_username": platform_username,
@@ -99,7 +106,9 @@ async def push_role_metadata(user, access_token: str) -> bool:
     async with aiohttp.ClientSession() as session:
         async with session.put(url, json=body, headers=headers) as resp:
             if resp.status == 200:
-                logger.info(f"Discord Linked Roles: pushed metadata for user {user.uid}")
+                logger.info(
+                    f"Discord Linked Roles: pushed metadata for user {user.uid}"
+                )
                 return True
             text = await resp.text()
             logger.error(f"Discord Linked Roles: push failed ({resp.status}): {text}")
@@ -165,7 +174,10 @@ async def sync_user_discord_roles(user_uid: str) -> None:
 
         await store_transient_token(
             f"discord_rc:{user_uid}",
-            {"access_token": new_tokens["access_token"], "refresh_token": new_tokens.get("refresh_token", rt)},
+            {
+                "access_token": new_tokens["access_token"],
+                "refresh_token": new_tokens.get("refresh_token", rt),
+            },
             datetime.now(UTC) + timedelta(days=365),
         )
 

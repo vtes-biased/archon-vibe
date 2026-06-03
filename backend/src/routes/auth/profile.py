@@ -11,7 +11,9 @@ from pydantic import BaseModel
 from ...broadcast import broadcast_precomputed
 from ...db import get_auth_methods_for_user, get_user_by_uid, update_user
 from ...models import CommunityLink, CommunityLinkType, Role
-from ._tokens import TokenResponse, create_access_token, create_refresh_token, verify_token
+from ._tokens import (
+    verify_token,
+)
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()
@@ -122,7 +124,9 @@ async def update_current_user(
             user.city_geoname_id = None
             local_mods.add("city_geoname_id")
     if request.city_geoname_id is not None:
-        user.city_geoname_id = request.city_geoname_id if request.city_geoname_id else None
+        user.city_geoname_id = (
+            request.city_geoname_id if request.city_geoname_id else None
+        )
         local_mods.add("city_geoname_id")
     if request.contact_email is not None:
         user.contact_email = request.contact_email if request.contact_email else None
@@ -136,9 +140,7 @@ async def update_current_user(
                 status_code=403,
                 detail="VEKN membership required to add community links",
             )
-        is_official = any(
-            r in (Role.IC, Role.NC, Role.PRINCE) for r in user.roles
-        )
+        is_official = any(r in (Role.IC, Role.NC, Role.PRINCE) for r in user.roles)
         max_links = 10 if is_official else 5
         if len(request.community_links) > max_links:
             raise HTTPException(
@@ -157,17 +159,20 @@ async def update_current_user(
             except ValueError:
                 raise HTTPException(
                     status_code=422, detail=f"Invalid link type: {link.type}"
-                )
+                ) from None
             if not link.url.startswith(("http://", "https://")):
-                raise HTTPException(
-                    status_code=422, detail=f"Invalid URL: {link.url}"
-                )
+                raise HTTPException(status_code=422, detail=f"Invalid URL: {link.url}")
             # Preserve moderation state from existing link with same URL
             mod = existing_mod.get(link.url)
-            links.append(CommunityLink(
-                type=link_type, url=link.url, label=link.label,
-                language=link.language, moderation=mod,
-            ))
+            links.append(
+                CommunityLink(
+                    type=link_type,
+                    url=link.url,
+                    label=link.label,
+                    language=link.language,
+                    moderation=mod,
+                )
+            )
         user.community_links = links
 
     # Update modified timestamp and local modifications

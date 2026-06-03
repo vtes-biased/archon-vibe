@@ -99,12 +99,12 @@ build:
 lint-check:
     uv run ruff check .
     uv run ruff format --check .
-    (cd engine && cargo fmt --check && cargo clippy --all-targets --all-features)
+    (cd engine && cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings)
 
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
-    (cd engine && cargo fmt && cargo clippy --all-targets --all-features)
+    (cd engine && cargo fmt && cargo clippy --all-targets --all-features -- -D warnings)
 
 # Update VTES card data (downloads from krcg.org → engine/data/cards.json)
 cards:

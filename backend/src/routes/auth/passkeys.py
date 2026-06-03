@@ -35,7 +35,12 @@ from ...db import (
     update_auth_method,
 )
 from ...models import AuthMethod, AuthMethodType, User
-from ._tokens import TokenResponse, create_access_token, create_refresh_token, verify_token
+from ._tokens import (
+    TokenResponse,
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+)
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()

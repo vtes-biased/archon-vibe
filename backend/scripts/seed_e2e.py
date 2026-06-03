@@ -5,7 +5,6 @@ Run via: uv run python backend/scripts/seed_e2e.py [--output /path/to/seed.json]
 
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -69,14 +68,41 @@ PLAYER_ROLES: list[list[Role]] = [
 ]
 
 PLAYER_LINKS: list[list[CommunityLink]] = [
-    [CommunityLink(type=CommunityLinkType.BLOG, url="https://alice-vtes.blog", label="Alice's Blog", language="en")],
+    [
+        CommunityLink(
+            type=CommunityLinkType.BLOG,
+            url="https://alice-vtes.blog",
+            label="Alice's Blog",
+            language="en",
+        )
+    ],
     [],  # Bob
     [
-        CommunityLink(type=CommunityLinkType.DISCORD, url="https://discord.gg/vtes-france", label="VTES France"),
-        CommunityLink(type=CommunityLinkType.YOUTUBE, url="https://youtube.com/@vtes-fr", label="VTES FR", language="fr"),
+        CommunityLink(
+            type=CommunityLinkType.DISCORD,
+            url="https://discord.gg/vtes-france",
+            label="VTES France",
+        ),
+        CommunityLink(
+            type=CommunityLinkType.YOUTUBE,
+            url="https://youtube.com/@vtes-fr",
+            label="VTES FR",
+            language="fr",
+        ),
     ],
-    [CommunityLink(type=CommunityLinkType.TELEGRAM, url="https://t.me/vtes_germany", label="VTES Germany")],
-    [], [], [], [], [], [],  # Eve through Jack
+    [
+        CommunityLink(
+            type=CommunityLinkType.TELEGRAM,
+            url="https://t.me/vtes_germany",
+            label="VTES Germany",
+        )
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],  # Eve through Jack
 ]
 
 
@@ -100,8 +126,17 @@ async def seed() -> dict:
         roles=[Role.IC, Role.ETHICS],
         contact_email=ORGANIZER_EMAIL,
         community_links=[
-            CommunityLink(type=CommunityLinkType.DISCORD, url="https://discord.gg/vtes-global", label="VTES Global"),
-            CommunityLink(type=CommunityLinkType.YOUTUBE, url="https://youtube.com/@vtes-channel", label="VTES Channel", language="en"),
+            CommunityLink(
+                type=CommunityLinkType.DISCORD,
+                url="https://discord.gg/vtes-global",
+                label="VTES Global",
+            ),
+            CommunityLink(
+                type=CommunityLinkType.YOUTUBE,
+                url="https://youtube.com/@vtes-channel",
+                label="VTES Channel",
+                language="en",
+            ),
         ],
     )
     await insert_user(organizer)

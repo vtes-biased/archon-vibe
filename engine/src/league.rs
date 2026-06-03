@@ -241,7 +241,7 @@ mod tests {
         // GW/VP should include finals
         assert_eq!(parsed[0]["gw"].as_f64().unwrap(), 4.0); // 3 prelim + 1 final
         assert_eq!(parsed[0]["vp"].as_f64().unwrap(), 9.0); // 6 prelim + 3 final
-        // p3 has no finals data, unchanged
+                                                            // p3 has no finals data, unchanged
         assert_eq!(parsed[2]["gw"].as_f64().unwrap(), 1.0);
         assert_eq!(parsed[2]["vp"].as_f64().unwrap(), 2.0);
     }
@@ -373,7 +373,10 @@ mod tests {
         }"#;
         let result = compute_league_standings(config).unwrap();
         let parsed = json::parse(&result).unwrap();
-        let lionel = parsed.members().find(|e| e["user_uid"] == "lionel").unwrap();
+        let lionel = parsed
+            .members()
+            .find(|e| e["user_uid"] == "lionel")
+            .unwrap();
         // GP: prelim 2GW + finals 1GW = 3GW displayed
         assert_eq!(lionel["gw"].as_f64().unwrap(), 3.0);
         assert_eq!(lionel["vp"].as_f64().unwrap(), 11.5); // 6.5 + 5.0
@@ -407,7 +410,10 @@ mod tests {
         }"#;
         let result = compute_league_standings(config).unwrap();
         let parsed = json::parse(&result).unwrap();
-        let lionel = parsed.members().find(|e| e["user_uid"] == "lionel").unwrap();
+        let lionel = parsed
+            .members()
+            .find(|e| e["user_uid"] == "lionel")
+            .unwrap();
         // Score: prelim only = 2GW
         assert_eq!(lionel["gw"].as_f64().unwrap(), 2.0);
         assert_eq!(lionel["vp"].as_f64().unwrap(), 6.5);

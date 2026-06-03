@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
     get_user_by_uid,
@@ -31,8 +32,6 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
 # Encoder with decimal_format to handle all types properly
 encoder = msgspec.json.Encoder()
-
-from ..broadcast import broadcast_precomputed, broadcast_resync
 
 # Rust engine for permission checks
 _engine = PyEngine()
@@ -154,7 +153,6 @@ async def create_user(
     )
 
 
-
 @router.put("/{uid}")
 async def update_user(
     uid: str,
@@ -247,7 +245,9 @@ async def update_user(
             name=name if name is not None else user.name,
             country=country if country is not None else user.country,
             city=city if city is not None else user.city,
-            city_geoname_id=city_geoname_id if city_geoname_id is not None else user.city_geoname_id,
+            city_geoname_id=city_geoname_id
+            if city_geoname_id is not None
+            else user.city_geoname_id,
             state=state if state is not None else user.state,
             nickname=nickname if nickname is not None else user.nickname,
             roles=validated_roles if validated_roles is not None else user.roles,
@@ -419,7 +419,9 @@ async def moderate_community_link(
     is_ic = Role.IC in current_user.roles
     is_nc_prince = Role.NC in current_user.roles or Role.PRINCE in current_user.roles
     if not is_ic and not is_nc_prince:
-        raise HTTPException(status_code=403, detail="Only IC/NC/Prince can moderate links")
+        raise HTTPException(
+            status_code=403, detail="Only IC/NC/Prince can moderate links"
+        )
 
     # Get target user
     target = await get_user_by_uid(user_uid)
@@ -428,10 +430,14 @@ async def moderate_community_link(
 
     # NC/Prince can only moderate in their own country
     if is_nc_prince and not is_ic and current_user.country != target.country:
-        raise HTTPException(status_code=403, detail="Can only moderate links in your country")
+        raise HTTPException(
+            status_code=403, detail="Can only moderate links in your country"
+        )
 
     if request.action not in ("hide", "promote", "clear"):
-        raise HTTPException(status_code=422, detail="Action must be 'hide', 'promote', or 'clear'")
+        raise HTTPException(
+            status_code=422, detail="Action must be 'hide', 'promote', or 'clear'"
+        )
 
     # Find and update the link
     updated_links = []
@@ -440,20 +446,30 @@ async def moderate_community_link(
         if link.url == request.url:
             found = True
             if request.action == "clear":
-                updated_links.append(CommunityLink(
-                    type=link.type, url=link.url, label=link.label,
-                    language=link.language, moderation=None,
-                ))
+                updated_links.append(
+                    CommunityLink(
+                        type=link.type,
+                        url=link.url,
+                        label=link.label,
+                        language=link.language,
+                        moderation=None,
+                    )
+                )
             else:
                 mod = LinkModeration(
                     status="hidden" if request.action == "hide" else "promoted",
                     by=current_user.uid,
                     at=datetime.now(UTC),
                 )
-                updated_links.append(CommunityLink(
-                    type=link.type, url=link.url, label=link.label,
-                    language=link.language, moderation=mod,
-                ))
+                updated_links.append(
+                    CommunityLink(
+                        type=link.type,
+                        url=link.url,
+                        label=link.label,
+                        language=link.language,
+                        moderation=mod,
+                    )
+                )
         else:
             updated_links.append(link)
 

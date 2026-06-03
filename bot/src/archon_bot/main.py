@@ -3,7 +3,6 @@
 Manages online VTES tournaments inside Discord servers via the Archon webapp.
 """
 
-import asyncio
 import logging
 
 import hikari
@@ -13,7 +12,12 @@ import miru
 from . import config
 from .archon_api import ArchonAPI
 from .commands.judge import SanctionCommand
-from .commands.player import CheckinCommand, JudgeCommand, RegisterCommand, ReportCommand
+from .commands.player import (
+    CheckinCommand,
+    JudgeCommand,
+    RegisterCommand,
+    ReportCommand,
+)
 from .commands.setup import AnnounceCommand, SetupCommand, TeardownCommand
 from .oauth_callback import set_context, start_callback_server
 from .sse_listener import start_sse
@@ -71,8 +75,12 @@ def main() -> None:
         all_tournaments = await store.get_all_guild_tournaments()
         for gt in all_tournaments:
             await start_sse(
-                bot, api, store,
-                gt["guild_id"], gt["tournament_uid"], gt["organizer_discord_id"],
+                bot,
+                api,
+                store,
+                gt["guild_id"],
+                gt["tournament_uid"],
+                gt["organizer_discord_id"],
             )
         if all_tournaments:
             logger.info("Resumed SSE for %d tournament(s)", len(all_tournaments))

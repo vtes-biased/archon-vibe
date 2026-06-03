@@ -1669,10 +1669,10 @@ pub fn is_valid_table_count(n: usize) -> bool {
 fn find_equalization_target(n: usize) -> usize {
     // Hard-coded for the three awkward counts
     match n {
-        6 => 4,   // R1=4, R2=4, R3=4
-        7 => 5,   // R1=5, R2=5, R3=4
-        11 => 9,  // R1=9, R2=9, R3=4
-        _ => n,   // shouldn't be called for valid counts
+        6 => 4,  // R1=4, R2=4, R3=4
+        7 => 5,  // R1=5, R2=5, R3=4
+        11 => 9, // R1=9, R2=9, R3=4
+        _ => n,  // shouldn't be called for valid counts
     }
 }
 

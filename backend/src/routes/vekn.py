@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
     get_auth_methods_for_user,
@@ -24,14 +25,12 @@ from ..db import (
 )
 from ..middleware.auth import CurrentUser
 from ..models import Role, User
+from ..roles_hook import sync_user_discord_roles
 from .auth import create_access_token, create_refresh_token
 
 router = APIRouter(prefix="/vekn", tags=["vekn"])
 encoder = msgspec.json.Encoder()
 logger = logging.getLogger(__name__)
-
-from ..broadcast import broadcast_precomputed, broadcast_resync
-from ..roles_hook import sync_user_discord_roles
 
 
 def _can_manage_country(manager: User, target_country: str | None) -> bool:

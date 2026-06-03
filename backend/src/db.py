@@ -916,7 +916,8 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         contact_discord=delete_user_obj.contact_discord or keep_user.contact_discord,
         discord_id=delete_user_obj.discord_id or keep_user.discord_id,
         contact_phone=delete_user_obj.contact_phone or keep_user.contact_phone,
-        phone_is_whatsapp=delete_user_obj.phone_is_whatsapp or keep_user.phone_is_whatsapp,
+        phone_is_whatsapp=delete_user_obj.phone_is_whatsapp
+        or keep_user.phone_is_whatsapp,
         community_links=keep_user.community_links or delete_user_obj.community_links,
         coopted_by=keep_user.coopted_by or delete_user_obj.coopted_by,
         coopted_at=keep_user.coopted_at or delete_user_obj.coopted_at,

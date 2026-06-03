@@ -48,6 +48,7 @@ async def _ensure_auth(
 
 # --- VEKN ID Modal ---
 
+
 class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
     vekn_id = miru.TextInput(
         label="VEKN ID",
@@ -77,7 +78,9 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
         display_name = _get_display_name(ctx)
         archon_uid = claim.data.get("user", {}).get("uid", "")
         reg = await self._api.tournament_action(
-            discord_id, self._tournament_uid, "CheckIn",
+            discord_id,
+            self._tournament_uid,
+            "CheckIn",
             player_uid=archon_uid,
             display_name=display_name,
         )
@@ -96,6 +99,7 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
 
 # --- Sponsorship Modal ---
 
+
 class SponsorshipModal(miru.Modal, title="New Player Registration"):
     country = miru.TextInput(
         label="Country (ISO code, e.g., US, FR, DE)",
@@ -110,7 +114,9 @@ class SponsorshipModal(miru.Modal, title="New Player Registration"):
         required=False,
     )
 
-    def __init__(self, store: TokenStore, api: ArchonAPI, tournament_uid: str, guild_id: str) -> None:
+    def __init__(
+        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, guild_id: str
+    ) -> None:
         super().__init__()
         self._store = store
         self._api = api
@@ -127,7 +133,9 @@ class SponsorshipModal(miru.Modal, title="New Player Registration"):
             )
             return
 
-        link = await self._store.get_tournament_link(self._guild_id, self._tournament_uid)
+        link = await self._store.get_tournament_link(
+            self._guild_id, self._tournament_uid
+        )
         if not link:
             await ctx.respond(
                 "Tournament configuration not found. Ask an organizer to run `/setup` again.",
@@ -170,6 +178,7 @@ class SponsorshipModal(miru.Modal, title="New Player Registration"):
 
 
 # --- Sponsorship Approve/Deny Buttons ---
+
 
 class SponsorshipView(miru.View):
     def __init__(
@@ -228,7 +237,11 @@ class SponsorshipView(miru.View):
             "CheckIn",
             player_uid=self._player_uid,
         )
-        status = "Sponsored and checked in!" if reg.ok else f"Sponsored, but check-in failed: {reg.error}"
+        status = (
+            "Sponsored and checked in!"
+            if reg.ok
+            else f"Sponsored, but check-in failed: {reg.error}"
+        )
         await ctx.edit_response(
             f"**Approved** by <@{organizer_discord_id}>. {status}",
             components=[],
@@ -256,8 +269,11 @@ class SponsorshipView(miru.View):
 
 # --- VEKN Choice Buttons ---
 
+
 class VeknChoiceView(miru.View):
-    def __init__(self, store: TokenStore, api: ArchonAPI, tournament_uid: str, guild_id: str) -> None:
+    def __init__(
+        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, guild_id: str
+    ) -> None:
         super().__init__(timeout=300)
         self._store = store
         self._api = api
@@ -272,7 +288,9 @@ class VeknChoiceView(miru.View):
 
     @miru.button(label="I'm new", style=hikari.ButtonStyle.SECONDARY)
     async def is_new(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        modal = SponsorshipModal(self._store, self._api, self._tournament_uid, self._guild_id)
+        modal = SponsorshipModal(
+            self._store, self._api, self._tournament_uid, self._guild_id
+        )
         await ctx.respond_with_modal(modal)
         self.stop()
 
@@ -281,7 +299,11 @@ def _get_display_name(ctx) -> str | None:
     """Get Discord guild nickname for use as display_name (snapshot)."""
     member = getattr(ctx, "member", None)
     if member:
-        return member.nickname or getattr(member, "display_name", None) or ctx.author.username
+        return (
+            member.nickname
+            or getattr(member, "display_name", None)
+            or ctx.author.username
+        )
     return ctx.author.username
 
 
@@ -331,7 +353,11 @@ async def _handle_registration_pipeline(
 
             # Check for missing decklist warning
             player_entry = next(
-                (p for p in result.data.get("players", []) if p.get("user_uid") == archon_uid),
+                (
+                    p
+                    for p in result.data.get("players", [])
+                    if p.get("user_uid") == archon_uid
+                ),
                 None,
             )
             if player_entry and player_entry.get("missing_decklist"):
@@ -367,7 +393,9 @@ async def _handle_registration_pipeline(
         miru_client.start_view(view)
 
 
-class RegisterCommand(lightbulb.SlashCommand, name="register", description="Register for the tournament"):
+class RegisterCommand(
+    lightbulb.SlashCommand, name="register", description="Register for the tournament"
+):
     @lightbulb.invoke
     async def invoke(self, ctx: lightbulb.Context) -> None:
         store: TokenStore = ctx.client.d["store"]
@@ -380,7 +408,9 @@ class RegisterCommand(lightbulb.SlashCommand, name="register", description="Regi
         await _handle_registration_pipeline(ctx, store, api, tournament_uid, "register")
 
 
-class CheckinCommand(lightbulb.SlashCommand, name="checkin", description="Check in for the tournament"):
+class CheckinCommand(
+    lightbulb.SlashCommand, name="checkin", description="Check in for the tournament"
+):
     @lightbulb.invoke
     async def invoke(self, ctx: lightbulb.Context) -> None:
         store: TokenStore = ctx.client.d["store"]
@@ -399,7 +429,11 @@ _VP_CHOICES = [
 ]
 
 
-class ReportCommand(lightbulb.SlashCommand, name="report", description="Report your VP for the current round"):
+class ReportCommand(
+    lightbulb.SlashCommand,
+    name="report",
+    description="Report your VP for the current round",
+):
     vp = lightbulb.number("vp", "Your victory points", choices=_VP_CHOICES)
 
     @lightbulb.invoke
@@ -463,7 +497,9 @@ class ReportCommand(lightbulb.SlashCommand, name="report", description="Report y
             )
 
 
-class JudgeCommand(lightbulb.SlashCommand, name="judge", description="Call a judge to your table"):
+class JudgeCommand(
+    lightbulb.SlashCommand, name="judge", description="Call a judge to your table"
+):
     @lightbulb.invoke
     async def invoke(self, ctx: lightbulb.Context) -> None:
         store: TokenStore = ctx.client.d["store"]
@@ -498,7 +534,9 @@ class JudgeCommand(lightbulb.SlashCommand, name="judge", description="Call a jud
                 judges_id,
                 f"**Judge call!** {table_info} — {display_name} needs a judge",
             )
-            await ctx.respond("Judge has been called!", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                "Judge has been called!", flags=hikari.MessageFlag.EPHEMERAL
+            )
         except hikari.ForbiddenError:
             await ctx.respond(
                 "Cannot reach the judges channel. The bot may be missing permissions.",

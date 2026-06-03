@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from ..broadcast import broadcast_precomputed
 from ..db import (
     get_league_by_uid,
     get_sanction_by_uid,
@@ -29,12 +30,9 @@ from ..models import (
     SanctionSubcategory,
 )
 
-
 router = APIRouter(prefix="/sanctions", tags=["sanctions"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
-
-from ..broadcast import broadcast_precomputed
 
 # Rust engine for permission checks
 _engine = PyEngine()
@@ -509,5 +507,3 @@ async def delete_sanction_endpoint(
         content=encoder.encode({"message": "Sanction deleted"}),
         media_type="application/json",
     )
-
-
