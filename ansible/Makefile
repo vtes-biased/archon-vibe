@@ -53,10 +53,9 @@ build-backend: | $(BUILD_DIR) ## Build the backend wheel + export pinned require
 	cd $(REPO_ROOT) && uv export --frozen --no-dev --no-hashes --no-emit-project \
 	  -o $(BUILD_DIR)/backend-requirements.txt
 
-build-bot: | $(BUILD_DIR) ## Prepare bot source tree + pinned requirements
-	rm -rf $(BUILD_DIR)/bot-src
-	cp -R $(REPO_ROOT)/bot/src $(BUILD_DIR)/bot-src
-	cd $(REPO_ROOT)/bot && uv pip compile pyproject.toml --no-strip-markers \
+build-bot: | $(BUILD_DIR) ## Build the bot wheel + export pinned requirements
+	cd $(REPO_ROOT)/bot && uv build --wheel --out-dir $(BUILD_DIR)
+	cd $(REPO_ROOT)/bot && uv export --frozen --no-dev --no-hashes --no-emit-project \
 	  -o $(BUILD_DIR)/bot-requirements.txt
 
 build-frontend: | $(BUILD_DIR) ## Build the Svelte/Vite PWA (static dist)

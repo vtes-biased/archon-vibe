@@ -14,7 +14,9 @@
                 wantlist=True) | sort | last }}
     backend_requirements: "{{ build_dir }}/backend-requirements.txt"
     bot_requirements: "{{ build_dir }}/bot-requirements.txt"
-    bot_src_dir: "{{ build_dir }}/bot-src"
+    bot_wheel: >-
+      {{ lookup('ansible.builtin.fileglob', build_dir + '/archon_discord_bot-*.whl',
+                wantlist=True) | sort | last }}
     frontend_dist_dir: "{{ build_dir }}/frontend-dist"
 
   pre_tasks:
@@ -23,6 +25,7 @@
         that:
           - backend_wheel is string and backend_wheel | length > 0
           - engine_wheel is string and engine_wheel | length > 0
+          - bot_wheel is string and bot_wheel | length > 0
         fail_msg: "Run `make build-all` before deploying — build/ is missing wheels."
       delegate_to: localhost
       become: false
@@ -71,7 +74,7 @@
       r:
         service_name: "{{ bot_service }}"
         site_root: "{{ bot_site_root }}"
-        bot_src_dir: "{{ bot_src_dir }}"
+        bot_wheel_src: "{{ bot_wheel }}"
         requirements_src: "{{ bot_requirements }}"
         python_version: "{{ python_version }}"
         uv_python_install_dir: "{{ uv_python_install_dir }}"

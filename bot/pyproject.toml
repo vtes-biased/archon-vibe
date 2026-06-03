@@ -11,6 +11,14 @@ dependencies = [
     "aiosqlite>=0.20.0",
 ]
 
+# Console entry point installed into the venv (used by the systemd unit).
+[project.scripts]
+archon-bot = "archon_bot.main:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# src-layout: the importable package lives at bot/src/archon_bot/.
+[tool.hatch.build.targets.wheel]
+packages = ["src/archon_bot"]

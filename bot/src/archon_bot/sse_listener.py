@@ -159,39 +159,41 @@ async def _sse_loop(
                         tournament_uid,
                     )
 
-                    event_type = ""
+                    # The backend sends no `event:` field — every message is a
+                    # single `data: {"type":...}` line, so we dispatch on the
+                    # payload `type`, never on an SSE event name. `synced` flips
+                    # at `sync_complete`; before that we only seed state (no
+                    # announcements) so the catch-up replay doesn't spam.
+                    synced = False
                     data_lines: list[str] = []
 
                     async for line_bytes in resp.content:
                         line = line_bytes.decode("utf-8").rstrip("\n\r")
 
-                        if line.startswith("event:"):
-                            event_type = line[6:].strip()
-                        elif line.startswith("data:"):
+                        if line.startswith("data:"):
                             data_lines.append(line[5:].strip())
                         elif line == "":
-                            if data_lines:
-                                data_str = "\n".join(data_lines)
-                                try:
-                                    data = json.loads(data_str)
-                                except json.JSONDecodeError:
-                                    data = {}
-
-                                if event_type == "update":
-                                    await _handle_update(
-                                        bot, store, guild_id, tournament_uid, data
-                                    )
-                                elif event_type == "snapshot":
-                                    _handle_snapshot(
-                                        key, tournament_uid, data
-                                    )
-                                elif event_type == "judge_call":
-                                    await _handle_judge_call(
-                                        bot, store, guild_id, tournament_uid, data
-                                    )
-
-                            event_type = ""
+                            if not data_lines:
+                                continue
+                            data_str = "\n".join(data_lines)
                             data_lines = []
+                            try:
+                                data = json.loads(data_str)
+                            except json.JSONDecodeError:
+                                logger.warning("Unparseable SSE data: %s", data_str[:200])
+                                continue
+
+                            if data.get("type") == "resync":
+                                # Server wants a clean re-sync. Reconnect for a
+                                # fresh catch-up (the bot sends no `since`, so a
+                                # reconnect always replays full current state).
+                                logger.info("Resync requested, reconnecting SSE for %s", key)
+                                break
+
+                            synced = await _dispatch_event(
+                                bot, store, guild_id, tournament_uid, data, synced
+                            )
+                        # `:`-comment lines (": connected", ": keepalive") ignored
 
             except asyncio.CancelledError:
                 return
@@ -199,6 +201,58 @@ async def _sse_loop(
                 logger.error("SSE error: %s", e)
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)
+
+
+def _normalize_events(data: dict) -> list[dict]:
+    """Flatten one SSE message into a list of singular ``{type, data}`` events.
+
+    Catch-up and personal-overlay phases send plural arrays
+    (``{"type":"tournaments","data":[...]}``); the live phase sends singular
+    objects (``{"type":"tournament","data":{...}}``). Returns singular-typed
+    events uniformly either way (``users``→``user``, ``sanctions``→``sanction``).
+    """
+    msg_type = data.get("type", "")
+    payload = data.get("data")
+    if isinstance(payload, list):
+        singular = msg_type[:-1] if msg_type.endswith("s") else msg_type
+        return [{"type": singular, "data": obj} for obj in payload]
+    return [{"type": msg_type, "data": payload}]
+
+
+async def _dispatch_event(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+    data: dict,
+    synced: bool,
+) -> bool:
+    """Route one parsed SSE message; return the updated ``synced`` flag.
+
+    Until ``sync_complete`` arrives we only seed state (no announcements) so a
+    (re)connect's catch-up replay doesn't spam every past transition into the
+    channels. After it, tournament/sanction objects drive live announcements.
+    """
+    msg_type = data.get("type", "")
+
+    if msg_type == "sync_complete":
+        return True
+    if msg_type == "judge_call":
+        await _handle_judge_call(
+            bot, store, guild_id, tournament_uid, data.get("data") or {}
+        )
+        return synced
+
+    events = _normalize_events(data)
+
+    if not synced:
+        # Catch-up / overlay: seed tournament state, post nothing.
+        _handle_snapshot(_task_key(guild_id, tournament_uid), tournament_uid, events)
+        return synced
+
+    for ev in events:
+        await _handle_update(bot, store, guild_id, tournament_uid, ev)
+    return synced
 
 
 def _handle_snapshot(
@@ -750,7 +804,15 @@ async def _handle_judge_call(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    """Handle a judge_call ephemeral event."""
+    """Handle a judge_call ephemeral event.
+
+    ``data`` is the inner payload (``{tournament_uid, table, table_label,
+    player_name}``). One organizer token streams judge calls for all their
+    tournaments, so filter to this listener's tournament.
+    """
+    if data.get("tournament_uid") != tournament_uid:
+        return
+
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
         return

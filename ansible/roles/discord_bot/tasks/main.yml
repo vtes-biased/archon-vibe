@@ -4,7 +4,7 @@
     that:
       - r.service_name is defined
       - r.site_root is defined
-      - r.bot_src_dir is defined
+      - r.bot_wheel_src is defined
       - r.requirements_src is defined
       - r.python_version is defined
       - r.uv_python_install_dir is defined
@@ -20,6 +20,7 @@
   ansible.builtin.set_fact:
     _env_dir: "{{ r.env_dir | default(discord_bot_env_dir_default) }}"
     _venv_dir: "{{ r.site_root }}/.venv"
+    _wheels_dir: "{{ r.site_root }}/wheels"
 
 - name: Ensure site_root exists
   ansible.builtin.file:
@@ -37,17 +38,21 @@
     group: "{{ r.group }}"
     mode: "0750"
 
-- name: Rsync bot source tree
-  ansible.posix.synchronize:
-    src: "{{ r.bot_src_dir }}/"
-    dest: "{{ r.site_root }}/src/"
-    delete: true
-    recursive: true
-    rsync_opts:
-      - "--chmod=D755,F644"
-      - "--chown={{ r.user }}:{{ r.group }}"
-      - "--exclude=__pycache__"
-      - "--exclude=*.pyc"
+- name: Ensure wheels dir exists
+  ansible.builtin.file:
+    path: "{{ _wheels_dir }}"
+    state: directory
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Upload bot wheel
+  ansible.builtin.copy:
+    src: "{{ r.bot_wheel_src }}"
+    dest: "{{ _wheels_dir }}/"
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0644"
   notify: Restart bot service
 
 - name: Upload pinned requirements
@@ -88,6 +93,24 @@
     UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
   register: uv_install_deps
   changed_when: "'Installed' in uv_install_deps.stdout or 'Prepared' in uv_install_deps.stdout"
+  become: true
+  become_user: "{{ r.user }}"
+  notify: Restart bot service
+
+- name: Install bot wheel into venv (force reinstall)
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - pip
+      - install
+      - --python
+      - "{{ _venv_dir }}/bin/python"
+      - --reinstall
+      - "{{ _wheels_dir }}/{{ r.bot_wheel_src | basename }}"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
+  register: uv_install_bot_wheel
+  changed_when: true
   become: true
   become_user: "{{ r.user }}"
   notify: Restart bot service
