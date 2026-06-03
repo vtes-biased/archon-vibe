@@ -1539,8 +1539,7 @@ async def _resolve_or_create_offline_player(
                     user.coopted_at = datetime.now(UTC)
                     user.modified = datetime.now(UTC)
                     bd = await save_object_from_model(ObjectType.USER, user)
-                    if broadcast_user_event:
-                        broadcast_user_event(bd)
+                    broadcast_precomputed(bd)
                 return player_data.temp_uid, user
 
     # 3. Create new user with VEKN ID
