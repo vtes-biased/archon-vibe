@@ -124,6 +124,8 @@ Minimal indexes only:
 
 ### Offline Mode
 
+> **Open issues (pst):** #7 the offline lifecycle endpoints don't take the `FOR UPDATE` lock the action path uses (two devices can both acquire the lock); #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a DB-version bump wipes in-flight offline data.
+
 Offline tournaments use a device-lock model (no changes log needed):
 - Tournament locked to one device via `go-offline` endpoint
 - WASM engine processes all actions locally, updating IndexedDB directly
@@ -156,6 +158,8 @@ All objects have `deleted_at`. If `item.deleted_at` → delete from store, else 
 Single `isSynced` flag (no separate `isInitialSync`).
 
 ## Optimistic Updates
+
+> **Open issues (pst):** #8 a *rejected* server action emits no SSE, so the optimistic IndexedDB write is never corrected — the `/* SSE will correct */` in the example below is wrong for rejections; #6 the sync cursor only advances on `sync_complete`, not on live events; #5 the backend drops + evicts SSE connections on overflow without closing the stream. #17 will rewrite this section after the fixes land.
 
 ### Tournament Actions (WASM Engine)
 

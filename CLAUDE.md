@@ -1,3 +1,9 @@
+# Task Tracking — pst
+
+This repo tracks work in **pst** (`.pst/tickets`), not plan-mode plans or a `TODO.md`. The mechanics (read the board first, epic + `parent:#N` children, `wip`/`close` lifecycle, detail files, CLI-only writes) are auto-injected each session by the `.pst/mandate.md` SessionStart hook — `.pst/skill.md` has the full reference. Prefer pst over the harness Task tools.
+
+**Project convention:** several docs (ARCHITECTURE.md, SYNC.md, engine/TOURNAMENT.md, engine/README.md) carry inline `pst #N` pointers next to known-issue scopes. When you change code in such a scope, update the referenced ticket — and add a pointer when you record a new scoped issue.
+
 # Agent Workflow (PROACTIVE — do not wait for user to ask)
 
 When implementing features or making significant changes, follow this pipeline using the Task tool:

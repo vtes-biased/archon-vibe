@@ -1,5 +1,7 @@
 # Tournament Engine
 
+> ⚠️ **Stale — tracked by pst #16.** This doc predates the module split: the engine now lives in `src/tournament/` (not `src/tournament.rs`), `process_tournament_event` takes 5 args and returns `{tournament, deck_ops}`, and ~20 events are undocumented. Trust the code over this file until #16 rewrites it; update #16 when you change event semantics.
+
 This document describes the Rust tournament engine implementation in `src/tournament.rs`.
 
 ## Overview

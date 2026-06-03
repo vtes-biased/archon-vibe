@@ -123,6 +123,8 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 
 ## Offline Mode
 
+> **Open issues (pst):** #7 the offline lifecycle endpoints (`go-offline`/`go-online`/`force-takeover`/`sync-offline`/`force-unlock`) don't take the `FOR UPDATE` lock the action path uses — two devices can both acquire the device-lock; #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a frontend DB-version bump wipes in-flight offline data. Update these when changing offline sync.
+
 ### Device-Lock Model
 
 Offline mode uses primary device ownership — no CRUD log or conflict resolution needed:
@@ -156,6 +158,8 @@ Offline mode uses primary device ownership — no CRUD log or conflict resolutio
 - **IC force-unlock**: emergency unlock without syncing offline data
 
 ## Mutation Pipeline
+
+> **Open issues (pst):** #6 the sync cursor only advances on `sync_complete`, never on live events; #5 the backend drops + evicts SSE connections on queue overflow without closing the stream (client stays OPEN and deaf); #8 optimistic actions are not rolled back when the server rejects them. Update these tickets when changing the optimistic/SSE path.
 
 Tournament actions use optimistic updates via WASM:
 1. WASM processes locally → returns `{tournament, deck_ops}` → IndexedDB updated → UI reacts immediately
@@ -682,6 +686,8 @@ Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.
 **Key files**: `routes/oauth.py`, `db_oauth.py`, `models.py` (OAuth models), `middleware/auth.py` (token validation)
 
 ## Discord Tournament Bot
+
+> **Status / open issues (pst):** the bot is **pre-production — not live and not yet tested** — but in scope for prod prep. #2 the SSE listener dispatches on an `event:` field the backend never sends, so *every* event is ignored; #10 impersonation refresh tokens are stored in plaintext; #11 a token-refresh race can revoke an organizer's token chain. The 'snapshot on reconnect' described below assumes a wire format that does not exist yet (see #2/#16). Update these tickets when changing the bot.
 
 Standalone process (`bot/`) — manages online VTES tournaments inside Discord servers. Pure OAuth client to the Archon backend; no direct DB access, no business logic. All mutations go through `POST /{uid}/action` via `user:impersonate` tokens on behalf of real users.
 
