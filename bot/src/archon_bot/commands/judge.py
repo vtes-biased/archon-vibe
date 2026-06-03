@@ -97,6 +97,7 @@ BASELINE_PENALTIES = {
 
 # --- Step 1: Category select ---
 
+
 class CategorySelectView(miru.View):
     """First step: pick category, then show the sanction modal."""
 
@@ -117,11 +118,11 @@ class CategorySelectView(miru.View):
 
     @miru.text_select(
         placeholder="Select infraction category...",
-        options=[
-            miru.SelectOption(label=v, value=k) for k, v in CATEGORIES.items()
-        ],
+        options=[miru.SelectOption(label=v, value=k) for k, v in CATEGORIES.items()],
     )
-    async def category_select(self, ctx: miru.ViewContext, select: miru.TextSelect) -> None:
+    async def category_select(
+        self, ctx: miru.ViewContext, select: miru.TextSelect
+    ) -> None:
         category = select.values[0]
 
         # Build subcategory options for the modal
@@ -129,9 +130,13 @@ class CategorySelectView(miru.View):
         sub_options = [miru.SelectOption(label=v, value=k) for k, v in subs.items()]
 
         view = SubcategorySelectView(
-            self._store, self._api, self._tournament_uid,
-            self._target_uid, self._target_display,
-            category, sub_options,
+            self._store,
+            self._api,
+            self._tournament_uid,
+            self._target_uid,
+            self._target_display,
+            category,
+            sub_options,
         )
         await ctx.edit_response(
             f"**Sanction for {self._target_display}**\n"
@@ -146,6 +151,7 @@ class CategorySelectView(miru.View):
 
 # --- Step 2: Subcategory select ---
 
+
 class _SubcategorySelect(miru.TextSelect):
     """Dynamic subcategory select that opens the sanction details modal."""
 
@@ -156,13 +162,7 @@ class _SubcategorySelect(miru.TextSelect):
         view: SubcategorySelectView = self.view  # type: ignore
         subcategory = self.values[0]
         baseline = BASELINE_PENALTIES.get(subcategory, "")
-        modal = SanctionDetailsModal(
-            view._store, view._api, view._tournament_uid,
-            view._target_uid, view._target_display,
-            view._category, subcategory, baseline,
-        )
-        await ctx.respond_with_modal(modal)
-        view.stop()
+        await _open_level_select(ctx, view, subcategory, baseline)
 
 
 class SubcategorySelectView(miru.View):
@@ -188,35 +188,41 @@ class SubcategorySelectView(miru.View):
 
     @miru.button(label="Skip subcategory", style=hikari.ButtonStyle.SECONDARY, row=1)
     async def skip_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        await _open_level_select(ctx, self, None, "")
+
+
+# --- Step 3: Penalty level select ---
+
+
+class _LevelSelect(miru.TextSelect):
+    """Penalty-level select; opens the details modal once a level is chosen."""
+
+    def __init__(self, baseline: str, **kwargs) -> None:
+        options = [
+            miru.SelectOption(label=label, value=value, is_default=(value == baseline))
+            for value, label in LEVELS.items()
+        ]
+        super().__init__(
+            placeholder="Select penalty level...", options=options, **kwargs
+        )
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        view: LevelSelectView = self.view  # type: ignore
         modal = SanctionDetailsModal(
-            self._store, self._api, self._tournament_uid,
-            self._target_uid, self._target_display,
-            self._category, None, "",
+            view._store,
+            view._api,
+            view._tournament_uid,
+            view._target_uid,
+            view._target_display,
+            view._category,
+            view._subcategory,
+            self.values[0],
         )
         await ctx.respond_with_modal(modal)
-        self.stop()
+        view.stop()
 
 
-# --- Step 3: Details modal (level, round, description) ---
-
-class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
-    level = miru.TextInput(
-        label="Level (caution / warning / standings_adjustment / disqualification)",
-        placeholder="warning",
-        required=True,
-    )
-    round_number = miru.TextInput(
-        label="Round number (required for standings_adjustment)",
-        placeholder="1",
-        required=False,
-    )
-    description = miru.TextInput(
-        label="Description",
-        placeholder="Describe the infraction",
-        style=hikari.TextInputStyle.PARAGRAPH,
-        required=True,
-    )
-
+class LevelSelectView(miru.View):
     def __init__(
         self,
         store: TokenStore,
@@ -228,6 +234,57 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
         subcategory: str | None,
         baseline: str,
     ) -> None:
+        super().__init__(timeout=300)
+        self._store = store
+        self._api = api
+        self._tournament_uid = tournament_uid
+        self._target_uid = target_uid
+        self._target_display = target_display
+        self._category = category
+        self._subcategory = subcategory
+        self.add_item(_LevelSelect(baseline))
+
+
+async def _open_level_select(
+    ctx: miru.ViewContext,
+    prev: SubcategorySelectView,
+    subcategory: str | None,
+    baseline: str,
+) -> None:
+    """Transition from the subcategory step to the penalty-level select."""
+    level_view = LevelSelectView(
+        prev._store,
+        prev._api,
+        prev._tournament_uid,
+        prev._target_uid,
+        prev._target_display,
+        prev._category,
+        subcategory,
+        baseline,
+    )
+    await ctx.edit_response(
+        f"**Sanction for {prev._target_display}**\nSelect penalty level:",
+        components=level_view,
+    )
+    ctx.client.start_view(level_view)
+    prev.stop()
+
+
+# --- Step 4: Details modal (description + conditional round) ---
+
+
+class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
+    def __init__(
+        self,
+        store: TokenStore,
+        api: ArchonAPI,
+        tournament_uid: str,
+        target_uid: str,
+        target_display: str,
+        category: str,
+        subcategory: str | None,
+        level: str,
+    ) -> None:
         super().__init__()
         self._store = store
         self._api = api
@@ -236,25 +293,33 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
         self._target_display = target_display
         self._category = category
         self._subcategory = subcategory
-        # Pre-fill level with baseline penalty
-        if baseline:
-            self.level.value = baseline
+        self._level = level
+        # Round only applies to standings adjustments — show the field solely then.
+        self._round_input: miru.TextInput | None = None
+        if level == "standings_adjustment":
+            self._round_input = miru.TextInput(
+                label="Round number",
+                placeholder="1",
+                required=True,
+            )
+            self.add_item(self._round_input)
+        self._description_input = miru.TextInput(
+            label="Description",
+            placeholder="Describe the infraction",
+            style=hikari.TextInputStyle.PARAGRAPH,
+            required=True,
+        )
+        self.add_item(self._description_input)
 
     async def callback(self, ctx: miru.ModalContext) -> None:
         discord_id = str(ctx.author.id)
-        level_val = self.level.value.strip().lower()
-
-        if level_val not in LEVELS:
-            await ctx.respond(
-                f"Invalid level: `{level_val}`. Use: caution, warning, standings_adjustment, or disqualification.",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-            return
 
         round_num = None
-        if self.round_number.value and self.round_number.value.strip():
+        if self._round_input is not None:
             try:
-                round_num = int(self.round_number.value.strip()) - 1  # Convert 1-indexed to 0-indexed
+                round_num = (
+                    int(self._round_input.value.strip()) - 1
+                )  # Convert 1-indexed to 0-indexed
                 if round_num < 0:
                     raise ValueError
             except ValueError:
@@ -264,26 +329,19 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
                 )
                 return
 
-        if level_val == "standings_adjustment" and round_num is None:
-            await ctx.respond(
-                "Standings adjustment requires a round number.",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-            return
-
         result = await self._api.create_sanction(
             discord_id=discord_id,
             user_uid=self._target_uid,
             tournament_uid=self._tournament_uid,
-            level=level_val,
+            level=self._level,
             category=self._category,
-            description=self.description.value.strip(),
+            description=self._description_input.value.strip(),
             subcategory=self._subcategory,
             round_number=round_num,
         )
 
         if result.ok:
-            level_label = LEVELS.get(level_val, level_val)
+            level_label = LEVELS.get(self._level, self._level)
             await ctx.respond(
                 f"**{level_label}** issued to {self._target_display}.",
                 flags=hikari.MessageFlag.EPHEMERAL,
@@ -296,6 +354,7 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
 
 
 # --- /sanction command ---
+
 
 class SanctionCommand(
     lightbulb.SlashCommand,
@@ -349,8 +408,10 @@ class SanctionCommand(
         target_display = self.player.username
 
         # Show category selection (step 1 of the flow)
-        view = CategorySelectView(store, api, tournament_uid, target_uid, target_display)
-        resp = await ctx.respond(
+        view = CategorySelectView(
+            store, api, tournament_uid, target_uid, target_display
+        )
+        await ctx.respond(
             f"**Sanction for {target_display}**\nSelect infraction category:",
             components=view,
             flags=hikari.MessageFlag.EPHEMERAL,
