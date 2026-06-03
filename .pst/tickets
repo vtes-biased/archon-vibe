@@ -1,6 +1,6 @@
 open  	epic,review	EPIC: post-review remediation - sync/offline/bot correctness and docs (context in .pst/details/1)
-open  	p0,bug,bot,sync	Discord bot deaf to all SSE events: dispatch on payload data.type not the absent event: field and handle plural catch-up arrays - sse_listener.py:165-194 broadcast.py:43 parent:#1
-open  	p0,bug,backend,offline	go-online crashes NameError broadcast_user_event undefined at tournaments.py:1542 - replace with broadcast_precomputed(bd) parent:#1
+closed	p0,bug,bot,sync	Discord bot deaf to all SSE events: dispatch on payload data.type not the absent event: field and handle plural catch-up arrays - sse_listener.py:165-194 broadcast.py:43 parent:#1
+closed	p0,bug,backend,offline	go-online crashes NameError broadcast_user_event undefined at tournaments.py:1542 - replace with broadcast_precomputed(bd) parent:#1
 open  	p1,bug,backend,calendar	Personal calendar .ics feed always anonymous: compute_user_full strips calendar_token (access_levels.py:94) but get_user_by_calendar_token queries full->>calendar_token (db.py:640) - store token queryably without leaking via SSE parent:#1
 open  	p1,bug,sync,backend	SSE overflow drops events and evicts connection but keeps stream open so client stays OPEN and deaf (broadcast.py:82-85 main.py:690-703) - close stream on QueueFull so browser reconnects and catches up parent:#1
 open  	p1,bug,sync,frontend	Sync cursor only advances on sync_complete never on live events (sync.ts:207 vs 231-243) - persist last_sync_timestamp from each applied event modified parent:#1
@@ -22,3 +22,11 @@ open  	p2,legal,frontend	Create privacy policy and terms static Svelte routes at
 open  	p3,legal,frontend	Add footer links to /legal/terms and /legal/privacy on every page parent:#20
 open  	p3,legal,frontend	Add ToS and Privacy consent checkbox to the signup/consent flow (I agree to the ToS and Privacy Policy) parent:#20
 open  	p3,legal,ops	Set Terms of Service and Privacy Policy URLs in the Discord Developer Portal (becomes blocking for bot verification at 100 guilds) - optionally surface via ansible group_vars parent:#20
+open  	chore,lint,build	just lint-check red on main: 32 ruff check + 29 ruff format violations repo-wide (I001/F401/F541/F841/E402/E741/B904) plus verify cargo clippy - make just lint-check/just test green; pre-existing tech debt surfaced during review epic
+open  	epic,bot,build,deploy	EPIC: package Discord bot as a wheel + GitHub Release artifact (replace source-tree deploy; align with engine/backend wheels)
+closed	bot,build	Refactor bot/src flat modules into a real package bot/src/archon_bot/; add hatch wheel target + archon-bot console entry point in pyproject (revert tool.uv package=false stopgap) parent:#26
+closed	deploy,build	Update ansible/Makefile build-bot to uv build --wheel (like build-backend) emitting archon_discord_bot-*.whl to build/ parent:#26
+closed	deploy	Update ansible discord_bot role + deploy.yml: upload+uv pip install the bot wheel into venv (mirror fastapi_backend), ExecStart=archon-bot console script, drop rsync source-tree + bot_src_dir parent:#26
+closed	build,ci	Add GitHub Actions workflow: build bot wheel and attach to a GitHub Release (the downloadable artifact) parent:#26
+open  	deploy,ci,deferred	Follow-up: extend GitHub-Release wheel delivery to engine+backend for full consistency (currently built locally via ansible/Makefile + shipped from build/) - needs release-process decision parent:#26
+wip   	p1,bug,bot	Bot crashes at startup: miru TextInput labels exceed Discord 45-char limit in commands/judge.py (SanctionDetailsModal: 'Level (caution / warning / ...)' =67, 'Round number (required for standings_adjustment)' =48) - import-time ValueError so commands module never loads - shorten labels parent:#1
