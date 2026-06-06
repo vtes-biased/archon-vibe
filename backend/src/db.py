@@ -230,8 +230,21 @@ async def init_db() -> None:
                 deleted_at TIMESTAMP,
                 "public" JSONB,
                 "member" JSONB,
-                "full" JSONB NOT NULL
+                "full" JSONB NOT NULL,
+                -- calendar_token: per-user secret for the personal .ics feed.
+                -- It CANNOT live in public/member/full because all three
+                -- projections are broadcast over SSE (the "full" overlay reaches
+                -- the owner AND IC / same-country NC/Prince). It is therefore
+                -- more private than the most-private projection and gets its own
+                -- column, never serialized into any JSONB level. save_object
+                -- COALESCEs it (NULL writes preserve), so RMW keeps it; clearing
+                -- goes through clear_calendar_token().
+                calendar_token TEXT
             );
+        """)
+        # Migrate existing deployments to the dedicated column (see above).
+        await conn.execute("""
+            ALTER TABLE objects ADD COLUMN IF NOT EXISTS calendar_token TEXT;
         """)
         # Composite index for SSE catch-up queries (type + modified_at + uid)
         await conn.execute("""
@@ -249,10 +262,12 @@ async def init_db() -> None:
             ON objects(("full"->>'vekn_id'))
             WHERE type = 'user' AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != '';
         """)
+        # Drop the stale expression index (token is no longer in "full").
+        await conn.execute("DROP INDEX IF EXISTS idx_objects_user_calendar_token;")
         await conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_objects_user_calendar_token
-            ON objects(("full"->>'calendar_token'))
-            WHERE type = 'user' AND "full"->>'calendar_token' IS NOT NULL;
+            ON objects(calendar_token)
+            WHERE type = 'user' AND calendar_token IS NOT NULL;
         """)
         # Tournament VEKN external ID lookup
         await conn.execute("""
@@ -408,18 +423,28 @@ async def save_object(
     mem_json = _encoder.encode(mem).decode("utf-8") if mem is not None else None
     full_json = _encoder.encode(full).decode("utf-8")
 
+    # calendar_token is the only field persisted outside the JSONB projections
+    # (it must never be broadcast over SSE — see the objects table DDL). The
+    # token rarely travels in full_data (reads strip it), so the upsert below
+    # COALESCEs it: a NULL write PRESERVES the stored token. This makes every
+    # write path (profile edits, role changes, the nightly VEKN sync, …) safe
+    # without each loader having to re-read the secret. The two paths that must
+    # actually drop a token (strip/split VEKN) call clear_calendar_token().
+    cal_token = full_data.get("calendar_token") if obj_type == ObjectType.USER else None
+
     query = """
-        INSERT INTO objects (uid, type, deleted_at, "public", "member", "full")
-        VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb)
+        INSERT INTO objects (uid, type, deleted_at, "public", "member", "full", calendar_token)
+        VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb, %s)
         ON CONFLICT (uid) DO UPDATE SET
             type = EXCLUDED.type,
             deleted_at = EXCLUDED.deleted_at,
             "public" = EXCLUDED."public",
             "member" = EXCLUDED."member",
-            "full" = EXCLUDED."full"
+            "full" = EXCLUDED."full",
+            calendar_token = COALESCE(EXCLUDED.calendar_token, objects.calendar_token)
         RETURNING modified_at
     """
-    params = (uid, obj_type, deleted_at, pub_json, mem_json, full_json)
+    params = (uid, obj_type, deleted_at, pub_json, mem_json, full_json, cal_token)
 
     if conn:
         row = await (await conn.execute(query, params)).fetchone()
@@ -594,7 +619,13 @@ async def update_user(user: User) -> BroadcastData:
 
 
 async def get_user_by_uid(uid: str) -> User | None:
-    """Get a user by UID."""
+    """Get a user by UID.
+
+    Returns the "full" projection, which does NOT carry calendar_token (an
+    owner-only secret kept in its own column). Read-modify-write still preserves
+    the token because save_object COALESCEs it (see there) — loaders need not
+    re-read it. Owner display reads it explicitly via get_calendar_token().
+    """
     return await get_object_full(uid, User)
 
 
@@ -643,17 +674,52 @@ async def get_user_by_contact_email(email: str) -> User | None:
 
 
 async def get_user_by_calendar_token(token: str) -> User | None:
-    """Lookup user by calendar subscription token."""
+    """Lookup user by calendar subscription token (dedicated column, owner secret).
+
+    Skips soft-deleted users so a revoked/merged account's feed stops resolving.
+    The returned User has no calendar_token set (stripped from "full"); the
+    caller already holds the token and only needs the user identity.
+    """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'user' AND "full"->>'calendar_token' = %s LIMIT 1""",
+            WHERE type = 'user' AND calendar_token = %s
+              AND deleted_at IS NULL LIMIT 1""",
             (token,),
         )
         row = await result.fetchone()
         if row:
             return decode_json(row[0], User)
         return None
+
+
+async def get_calendar_token(uid: str) -> str | None:
+    """Read a user's calendar_token (owner-only secret) from its dedicated column.
+
+    Used to surface the token to the owner (e.g. /auth/me) without ever putting
+    it in the broadcast "full" projection.
+    """
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT calendar_token FROM objects WHERE uid = %s",
+            (uid,),
+        )
+        row = await result.fetchone()
+    return row[0] if row else None
+
+
+async def clear_calendar_token(uid: str) -> None:
+    """Explicitly clear a user's calendar_token.
+
+    save_object COALESCEs the token (a NULL write preserves the existing value),
+    so account surgery that orphans a record (strip/split VEKN) must clear the
+    feed token here rather than by writing None through the User model.
+    """
+    async with get_connection() as conn:
+        await conn.execute(
+            "UPDATE objects SET calendar_token = NULL WHERE uid = %s",
+            (uid,),
+        )
 
 
 async def get_user_by_vekn_id(vekn_id: str) -> User | None:
@@ -908,6 +974,12 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
     if not delete_user_obj:
         return keep_user  # Nothing to merge
 
+    # calendar_token is stripped from "full", so read it from its column
+    # (prefer the claiming/delete account's feed, like the contact fields below).
+    merged_calendar_token = await get_calendar_token(
+        delete_uid
+    ) or await get_calendar_token(keep_uid)
+
     # Merge user data - prefer keep_user for identity (name, vekn_id, roles),
     # but prefer delete_user (the claiming user) for contact info
     merged = User(
@@ -936,7 +1008,7 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         local_modifications=keep_user.local_modifications
         | delete_user_obj.local_modifications,
         vekn_prefix=keep_user.vekn_prefix or delete_user_obj.vekn_prefix,
-        calendar_token=delete_user_obj.calendar_token or keep_user.calendar_token,
+        calendar_token=merged_calendar_token,
         constructed_online=keep_user.constructed_online,
         constructed_offline=keep_user.constructed_offline,
         limited_online=keep_user.limited_online,
@@ -1006,6 +1078,9 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
         local_modifications=set(),
     )
     await update_user(stripped)
+    # COALESCE preserves a NULL token write, so drop the orphaned record's feed
+    # explicitly. The displaced (real) user starts with no token and regenerates.
+    await clear_calendar_token(user_uid)
 
     return displaced, stripped
 
@@ -1063,6 +1138,9 @@ async def split_user_from_vekn(user_uid: str) -> User | None:
         vekn_prefix=None,
     )
     await update_user(stripped)
+    # COALESCE preserves a NULL token write, so drop the orphaned record's feed
+    # explicitly. The new (real) user starts with no token and regenerates.
+    await clear_calendar_token(user_uid)
     await reassign_auth_methods(user_uid, new_uid)
     await reassign_sanctions(user_uid, new_uid)
 

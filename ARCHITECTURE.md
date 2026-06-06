@@ -56,7 +56,9 @@ CREATE TABLE objects (
     deleted_at TIMESTAMP,
     "public" JSONB,   -- NULL if not visible at this level
     "member" JSONB,   -- NULL if not visible at this level
-    "full" JSONB NOT NULL
+    "full" JSONB NOT NULL,
+    calendar_token TEXT  -- owner-only secret; never in any projection (would
+                         -- leak via SSE since "full" reaches IC/same-country NC)
 );
 
 CREATE INDEX idx_objects_type_modified ON objects(type, modified_at, uid);
@@ -67,6 +69,8 @@ Access-level projections (`public`/`member`/`full`) are computed by `access_leve
 - **Simplicity**: Single table, no migrations for schema changes
 - **Performance**: Pre-computed projections, zero per-viewer filtering at read time
 - **Flexibility**: Schema-less design for rapid iteration
+
+`calendar_token` is the single non-projected column: a per-user `.ics` feed secret that must never be broadcast (every projection is, and `full` reaches non-owners). It's a column rather than a separate table — unlike `auth_methods`/`oauth_*` (N:1) or `avatars` (large blobs), it's 1:1 with the row with no independent lifecycle, so a column avoids a join on the hot `get_user_by_uid` path. `save_object` COALESCEs it so writes that don't carry the token preserve it; `clear_calendar_token()` is the explicit drop path.
 
 ## Event System
 

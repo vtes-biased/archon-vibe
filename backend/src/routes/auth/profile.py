@@ -9,7 +9,12 @@ from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel
 
 from ...broadcast import broadcast_precomputed
-from ...db import get_auth_methods_for_user, get_user_by_uid, update_user
+from ...db import (
+    get_auth_methods_for_user,
+    get_calendar_token,
+    get_user_by_uid,
+    update_user,
+)
 from ...models import CommunityLink, CommunityLinkType, Role
 from ._tokens import (
     verify_token,
@@ -61,6 +66,9 @@ async def get_current_user(
     user = await get_user_by_uid(user_uid)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Surface the owner's calendar feed token (kept out of all projections).
+    user.calendar_token = await get_calendar_token(user_uid)
 
     # Get auth methods for this user (without credential hashes)
     auth_methods = await get_auth_methods_for_user(user_uid)
@@ -181,6 +189,9 @@ async def update_current_user(
 
     bd = await update_user(user)
     broadcast_precomputed(bd)
+
+    # Surface the owner's calendar feed token (preserved by COALESCE, not in "full").
+    user.calendar_token = await get_calendar_token(user_uid)
 
     # Return updated user with auth methods
     auth_methods = await get_auth_methods_for_user(user_uid)

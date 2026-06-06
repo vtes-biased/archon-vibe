@@ -8,12 +8,15 @@ Focuses on:
 
 from datetime import UTC, datetime
 
+import pytest
+from src import db
 from src.models import (
     Player,
     Tournament,
     TournamentFormat,
     TournamentRank,
     TournamentState,
+    User,
 )
 from src.routes.calendar import (
     _escape_ical,
@@ -21,6 +24,7 @@ from src.routes.calendar import (
     _matches_agenda,
     _tournament_to_vevent,
 )
+from uuid6 import uuid7
 
 NOW = datetime.now(UTC)
 JUNE_15_10AM = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -190,3 +194,121 @@ class TestTournamentToVevent:
         url_lines = [line for line in lines if "tournaments/t1" in line]
         assert len(url_lines) == 1
         assert url_lines[0].startswith("URL;VALUE=URI:")
+
+
+# ---------------------------------------------------------------------------
+# calendar_token storage round-trip (regression for the "always anonymous"
+# bug: the token must be queryable yet never leak into any SSE projection).
+# ---------------------------------------------------------------------------
+
+
+def _make_user(token: str | None = None) -> User:
+    return User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Cal Tester",
+        country="US",
+        calendar_token=token,
+    )
+
+
+@pytest.mark.asyncio
+async def test_calendar_token_lookup_round_trip(test_db):
+    user = _make_user(token="tok-abc123")
+    await db.insert_user(user)
+
+    found = await db.get_user_by_calendar_token("tok-abc123")
+    assert found is not None
+    assert found.uid == user.uid
+
+    assert await db.get_user_by_calendar_token("nope") is None
+
+
+@pytest.mark.asyncio
+async def test_calendar_token_survives_read_modify_write(test_db):
+    """A profile edit (load via get_user_by_uid → save) must not wipe the token.
+
+    get_user_by_uid does NOT carry the token (kept out of "full"); preservation
+    relies on save_object COALESCE, so the reloaded model has token=None yet the
+    stored token survives the write.
+    """
+    user = _make_user(token="keep-me")
+    await db.insert_user(user)
+
+    reloaded = await db.get_user_by_uid(user.uid)
+    assert reloaded is not None
+    assert reloaded.calendar_token is None  # stripped from "full"
+    reloaded.name = "Renamed"
+    await db.update_user(reloaded)
+
+    assert (await db.get_user_by_calendar_token("keep-me")).uid == user.uid
+    assert await db.get_calendar_token(user.uid) == "keep-me"
+
+
+@pytest.mark.asyncio
+async def test_calendar_token_preserved_by_unhydrated_writer(test_db):
+    """Regression: the nightly VEKN sync rebuilds a User (token=None) and saves it.
+
+    COALESCE must keep the stored token instead of nulling it.
+    """
+    user = _make_user(token="sync-safe")
+    await db.insert_user(user)
+
+    # Simulate vekn_sync: a fresh model for the same uid, no token field set.
+    rebuilt = User(
+        uid=user.uid,
+        modified=datetime.now(UTC),
+        name="From VEKN",
+        country="FR",
+    )
+    await db.update_user(rebuilt)
+
+    assert (await db.get_user_by_calendar_token("sync-safe")).uid == user.uid
+
+
+@pytest.mark.asyncio
+async def test_clear_calendar_token(test_db):
+    """clear_calendar_token drops the feed token even though save_object COALESCEs."""
+    user = _make_user(token="revoke-me")
+    await db.insert_user(user)
+
+    await db.clear_calendar_token(user.uid)
+
+    assert await db.get_calendar_token(user.uid) is None
+    assert await db.get_user_by_calendar_token("revoke-me") is None
+    # A later unhydrated update must not resurrect it.
+    reloaded = await db.get_user_by_uid(user.uid)
+    reloaded.name = "Renamed"
+    await db.update_user(reloaded)
+    assert await db.get_user_by_calendar_token("revoke-me") is None
+
+
+@pytest.mark.asyncio
+async def test_calendar_token_absent_from_all_projections(test_db):
+    """The token lives only in its column, never in public/member/full JSONB."""
+    user = _make_user(token="secret-xyz")
+    await db.insert_user(user)
+
+    async with db.get_connection() as conn:
+        row = await (
+            await conn.execute(
+                'SELECT "public"::text, "member"::text, "full"::text, calendar_token '
+                "FROM objects WHERE uid = %s",
+                (user.uid,),
+            )
+        ).fetchone()
+
+    public_json, member_json, full_json, col = row
+    assert col == "secret-xyz"
+    for level in (public_json, member_json, full_json):
+        assert level is None or "secret-xyz" not in level
+        assert level is None or "calendar_token" not in level
+
+
+@pytest.mark.asyncio
+async def test_calendar_token_not_resolved_for_deleted_user(test_db):
+    user = _make_user(token="ghost")
+    await db.insert_user(user)
+    await db.soft_delete_user(user.uid)
+
+    assert await db.get_user_by_calendar_token("ghost") is None
