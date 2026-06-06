@@ -1466,27 +1466,34 @@ async def go_offline(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+    # SELECT FOR UPDATE: serialize the offline-lock get-then-update (TOCTOU)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not _is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can take a tournament offline"
+        if not _is_organizer(current_user, tournament):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can take a tournament offline"
+            )
+
+        if tournament.offline_mode:
+            raise HTTPException(
+                status_code=409, detail="Tournament is already in offline mode"
+            )
+
+        tournament.offline_mode = True
+        tournament.offline_device_id = request.device_id
+        tournament.offline_user_uid = current_user.uid
+        tournament.offline_since = datetime.now(UTC)
+        tournament.modified = datetime.now(UTC)
+
+        bd = await save_object(
+            ObjectType.TOURNAMENT,
+            tournament.uid,
+            msgspec.to_builtins(tournament),
+            conn=tx_conn,
         )
 
-    if tournament.offline_mode:
-        raise HTTPException(
-            status_code=409, detail="Tournament is already in offline mode"
-        )
-
-    tournament.offline_mode = True
-    tournament.offline_device_id = request.device_id
-    tournament.offline_user_uid = current_user.uid
-    tournament.offline_since = datetime.now(UTC)
-    tournament.modified = datetime.now(UTC)
-
-    bd = await update_tournament(tournament)
     logger.info(
         f"Tournament {uid} went offline (device={request.device_id}, user={current_user.uid})"
     )
@@ -1591,62 +1598,67 @@ async def go_online(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    # Tournament might not exist on server (created offline)
-    if tournament and not _is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can bring a tournament online"
-        )
-
-    # Verify device lock
-    if tournament and tournament.offline_mode:
-        if tournament.offline_device_id != request.device_id and not request.force:
+    # SELECT FOR UPDATE: serialize the device-lock check with reconciliation (TOCTOU).
+    # A tournament created offline may not exist server-side yet; FOR UPDATE on a
+    # missing row yields None and the upsert below inserts it within the same tx.
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        # Tournament might not exist on server (created offline)
+        if tournament and not _is_organizer(current_user, tournament):
             raise HTTPException(
-                status_code=409,
-                detail="Tournament owned by another device. Use force to override.",
+                status_code=403, detail="Only organizers can bring a tournament online"
             )
 
-    # Validate tournament UID matches URL
-    if request.tournament.get("uid") and request.tournament["uid"] != uid:
-        raise HTTPException(status_code=400, detail="Tournament UID mismatch")
-    request.tournament["uid"] = uid  # Force correct UID
+        # Verify device lock
+        if tournament and tournament.offline_mode:
+            if tournament.offline_device_id != request.device_id and not request.force:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Tournament owned by another device. Use force to override.",
+                )
 
-    # Preserve original organizers (prevent client from removing them)
-    if tournament:
-        original_organizers = tournament.organizers_uids or []
-        client_organizers = request.tournament.get("organizers_uids", [])
-        merged = list(dict.fromkeys(original_organizers + client_organizers))
-        request.tournament["organizers_uids"] = merged
+        # Validate tournament UID matches URL
+        if request.tournament.get("uid") and request.tournament["uid"] != uid:
+            raise HTTPException(status_code=400, detail="Tournament UID mismatch")
+        request.tournament["uid"] = uid  # Force correct UID
 
-    # 1. Resolve offline players → real user accounts
-    uid_map: dict[str, str] = {}
-    for player_data in request.offline_players:
-        temp_uid, real_user = await _resolve_or_create_offline_player(
-            player_data, request.tournament.get("country"), current_user.uid
+        # Preserve original organizers (prevent client from removing them)
+        if tournament:
+            original_organizers = tournament.organizers_uids or []
+            client_organizers = request.tournament.get("organizers_uids", [])
+            merged = list(dict.fromkeys(original_organizers + client_organizers))
+            request.tournament["organizers_uids"] = merged
+
+        # 1. Resolve offline players → real user accounts
+        uid_map: dict[str, str] = {}
+        for player_data in request.offline_players:
+            temp_uid, real_user = await _resolve_or_create_offline_player(
+                player_data, request.tournament.get("country"), current_user.uid
+            )
+            uid_map[temp_uid] = real_user.uid
+
+        # 2. Remap UIDs throughout tournament data
+        tournament_data = request.tournament
+        if uid_map:
+            tournament_data = _remap_uids_in_tournament(tournament_data, uid_map)
+
+        # 3. Clear offline fields
+        tournament_data["offline_mode"] = False
+        tournament_data["offline_device_id"] = ""
+        tournament_data["offline_user_uid"] = ""
+        tournament_data["offline_since"] = None
+        tournament_data["modified"] = datetime.now(UTC).isoformat()
+
+        # 4. Save tournament within the locked transaction (upsert handles insert)
+        updated = decoder.decode(msgspec.json.encode(tournament_data))
+        updated.modified = datetime.now(UTC)
+        tournament_bd = await save_object(
+            ObjectType.TOURNAMENT,
+            updated.uid,
+            msgspec.to_builtins(updated),
+            conn=tx_conn,
         )
-        uid_map[temp_uid] = real_user.uid
 
-    # 2. Remap UIDs throughout tournament data
-    tournament_data = request.tournament
-    if uid_map:
-        tournament_data = _remap_uids_in_tournament(tournament_data, uid_map)
-
-    # 3. Clear offline fields
-    tournament_data["offline_mode"] = False
-    tournament_data["offline_device_id"] = ""
-    tournament_data["offline_user_uid"] = ""
-    tournament_data["offline_since"] = None
-    tournament_data["modified"] = datetime.now(UTC).isoformat()
-
-    # 4. Save tournament
-    updated = decoder.decode(msgspec.json.encode(tournament_data))
-    updated.modified = datetime.now(UTC)
-
-    if tournament:
-        tournament_bd = await update_tournament(updated)
-    else:
-        tournament_bd = await insert_tournament(updated)
-
+    # --- Transaction committed, row lock released ---
     logger.info(
         f"Tournament {uid} went back online (user={current_user.uid}, remapped={len(uid_map)} players)"
     )
@@ -1702,24 +1714,33 @@ async def force_takeover(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+    # SELECT FOR UPDATE: serialize the offline-lock get-then-update (TOCTOU)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not _is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can force-takeover"
+        if not _is_organizer(current_user, tournament):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can force-takeover"
+            )
+
+        if not tournament.offline_mode:
+            raise HTTPException(
+                status_code=400, detail="Tournament is not in offline mode"
+            )
+
+        old_device = tournament.offline_device_id
+        tournament.offline_device_id = request.device_id
+        tournament.offline_user_uid = current_user.uid
+        tournament.modified = datetime.now(UTC)
+
+        bd = await save_object(
+            ObjectType.TOURNAMENT,
+            tournament.uid,
+            msgspec.to_builtins(tournament),
+            conn=tx_conn,
         )
 
-    if not tournament.offline_mode:
-        raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
-
-    old_device = tournament.offline_device_id
-    tournament.offline_device_id = request.device_id
-    tournament.offline_user_uid = current_user.uid
-    tournament.modified = datetime.now(UTC)
-
-    bd = await update_tournament(tournament)
     logger.info(
         f"Tournament {uid} force-takeover: {old_device} → {request.device_id} by {current_user.uid}"
     )
@@ -1744,30 +1765,44 @@ async def sync_offline(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+    # SELECT FOR UPDATE: serialize device-lock check with the snapshot write (TOCTOU)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not tournament.offline_mode:
-        raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
+        if not tournament.offline_mode:
+            raise HTTPException(
+                status_code=400, detail="Tournament is not in offline mode"
+            )
 
-    if tournament.offline_device_id != request.device_id:
-        raise HTTPException(
-            status_code=409, detail="Device does not hold the offline lock"
+        if tournament.offline_device_id != request.device_id:
+            raise HTTPException(
+                status_code=409, detail="Device does not hold the offline lock"
+            )
+
+        # Pin the write to the locked row: the FOR UPDATE lock and device-lock
+        # check are keyed on the URL uid, so the snapshot must save there too.
+        if request.tournament.get("uid") and request.tournament["uid"] != uid:
+            raise HTTPException(status_code=400, detail="Tournament UID mismatch")
+        request.tournament["uid"] = uid
+
+        # Save tournament snapshot (keep offline_mode=True)
+        tournament_data = request.tournament
+        tournament_data["offline_mode"] = True
+        tournament_data["offline_device_id"] = tournament.offline_device_id
+        tournament_data["offline_user_uid"] = tournament.offline_user_uid
+        if tournament.offline_since:
+            tournament_data["offline_since"] = tournament.offline_since.isoformat()
+        tournament_data["modified"] = datetime.now(UTC).isoformat()
+
+        updated = decoder.decode(msgspec.json.encode(tournament_data))
+        updated.modified = datetime.now(UTC)
+        await save_object(
+            ObjectType.TOURNAMENT,
+            updated.uid,
+            msgspec.to_builtins(updated),
+            conn=tx_conn,
         )
-
-    # Save tournament snapshot (keep offline_mode=True)
-    tournament_data = request.tournament
-    tournament_data["offline_mode"] = True
-    tournament_data["offline_device_id"] = tournament.offline_device_id
-    tournament_data["offline_user_uid"] = tournament.offline_user_uid
-    if tournament.offline_since:
-        tournament_data["offline_since"] = tournament.offline_since.isoformat()
-    tournament_data["modified"] = datetime.now(UTC).isoformat()
-
-    updated = decoder.decode(msgspec.json.encode(tournament_data))
-    updated.modified = datetime.now(UTC)
-    await update_tournament(updated)
 
     now = datetime.now(UTC)
     logger.info(f"Tournament {uid} offline sync from device {request.device_id}")
@@ -1792,20 +1827,29 @@ async def force_unlock(
             status_code=403, detail="Only IC can force-unlock tournaments"
         )
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+    # SELECT FOR UPDATE: serialize the offline-lock get-then-update (TOCTOU)
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not tournament.offline_mode:
-        raise HTTPException(status_code=400, detail="Tournament is not in offline mode")
+        if not tournament.offline_mode:
+            raise HTTPException(
+                status_code=400, detail="Tournament is not in offline mode"
+            )
 
-    tournament.offline_mode = False
-    tournament.offline_device_id = ""
-    tournament.offline_user_uid = ""
-    tournament.offline_since = None
-    tournament.modified = datetime.now(UTC)
+        tournament.offline_mode = False
+        tournament.offline_device_id = ""
+        tournament.offline_user_uid = ""
+        tournament.offline_since = None
+        tournament.modified = datetime.now(UTC)
 
-    bd = await update_tournament(tournament)
+        bd = await save_object(
+            ObjectType.TOURNAMENT,
+            tournament.uid,
+            msgspec.to_builtins(tournament),
+            conn=tx_conn,
+        )
+
     logger.info(f"Tournament {uid} force-unlocked by IC {current_user.uid}")
 
     broadcast_precomputed(bd)

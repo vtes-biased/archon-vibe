@@ -147,7 +147,7 @@ Minimal indexes only:
 
 ### Offline Mode
 
-> **Open issues (pst):** #7 the offline lifecycle endpoints don't take the `FOR UPDATE` lock the action path uses (two devices can both acquire the lock); #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a DB-version bump wipes in-flight offline data.
+> **Open issues (pst):** #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a DB-version bump wipes in-flight offline data. (The offline lifecycle endpoints now take the `FOR UPDATE` lock the action path uses, via `tournament_transaction`.)
 
 Offline tournaments use a device-lock model (no changes log needed):
 - Tournament locked to one device via `go-offline` endpoint

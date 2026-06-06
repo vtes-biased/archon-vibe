@@ -127,7 +127,7 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 
 ## Offline Mode
 
-> **Open issues (pst):** #7 the offline lifecycle endpoints (`go-offline`/`go-online`/`force-takeover`/`sync-offline`/`force-unlock`) don't take the `FOR UPDATE` lock the action path uses — two devices can both acquire the device-lock; #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a frontend DB-version bump wipes in-flight offline data. Update these when changing offline sync.
+> **Open issues (pst):** #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a frontend DB-version bump wipes in-flight offline data. Update these when changing offline sync. (The offline lifecycle endpoints `go-offline`/`go-online`/`force-takeover`/`sync-offline`/`force-unlock` now take the `FOR UPDATE` lock via `tournament_transaction`, matching the action path.)
 
 ### Device-Lock Model
 
