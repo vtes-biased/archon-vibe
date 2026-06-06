@@ -89,3 +89,7 @@
 - League SSE is config only; standings derived client-side from IndexedDB tournaments
 - Meta-leagues: 2-level hierarchy max
 - `allow_no_finals` is a hint, not enforcement
+
+## Memory Files
+- [VEKN standings & toss scope](project_vekn_standings_toss_scope.md) — published rank = gw,vp,tp with skips; toss is cutoff-only, never a general tiebreak
+- [VEKN GP league points](project_vekn_gp_league_points.md) — GP is an app house rule; ties use best-position+skip; GP position should be final placement, not prelim order (see #43)

@@ -73,6 +73,31 @@ seeded from uid / caller seed) — no change needed there. Tests: added unit det
 green (131 + 1 ignored). Docs updated: ARCHITECTURE.md StartRound section, engine/README.md.
 principal-engineer review: LGTM. Closed. (#13 standings/card tiebreaks still open.)
 
+### Resolution (2026-06-06): #13 deterministic standings + tie handling + card lookup
+product-manager confirmed the VEKN tie rule: equal (GW, VP, TP) ⇒ SHARED standing
+(standard competition ranking with skips: 12, 12, 14); the toss is cutoff-only and must
+NOT split published non-finalist ranks. GP point values are an app house rule, not VEKN.
+Three fixes:
+- **standings.rs**: added `user_uid` as the terminal sort tiebreak (toss kept for the
+  finals cutoff, but it is NOT part of the GP rank key). Without it, fully-tied players
+  came out in nondeterministic HashMap order.
+- **league.rs (GP mode)**: GP points now key off the **shared standing rank** (standard
+  competition rank over the (gw,vp,tp) key), not the array index — so tied players get
+  EQUAL points and the next distinct score skips ranks (option (a), best-position points).
+- **cards.rs**: prefix lookup picks a deterministic winner (shortest matching name, then
+  lowest id) instead of arbitrary HashMap order; and the index now resolves ambiguous bare
+  names (e.g. all three "Theo Bell" printings index "theo bell") to the non-adv first
+  release (lowest id) instead of "last insert wins". Validated on real cards.json: 77
+  colliding keys, 0 won by an adv card. ADV/grouped lookups are unaffected (unique exact
+  keys). Typical TWDA lines resolve via exact match after crypt-tail stripping; prefix is
+  a rare fallback.
+Tests: standings tie-order determinism, GP shared-rank + skip, prefix determinism, bare-name
+collision. Full engine suite green (135 + 1 ignored).
+**Scope split:** filed #43 (p2) — GP "position" uses prelim standing order, not final
+placement, so a finalist who WINS the finals but didn't finish prelim-1st is scored 15 not
+25. RTP already handles finalists via `tournament["winner"]`; GP mode does not. Only the
+non-prelim-1st winner is mis-scored (positions 2–5 are a flat 15 band). Closed #13.
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 

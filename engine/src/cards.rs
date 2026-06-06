@@ -60,20 +60,48 @@ impl CardMap {
                 .map_err(|_| format!("Invalid card ID: {id_str}"))?;
             let card = parse_card(id, value)?;
 
-            // Index by normalized name
-            name_index.insert(normalize_name(&card.name), id);
-            name_index.insert(normalize_name(&card.printed_name), id);
-
-            // Index name variants
+            // Collect every normalized name this card answers to.
+            let mut keys = vec![
+                normalize_name(&card.name),
+                normalize_name(&card.printed_name),
+            ];
             if let JsonValue::Array(ref variants) = value["name_variants"] {
                 for v in variants {
                     if let Some(s) = v.as_str() {
-                        name_index.insert(normalize_name(s), id);
+                        keys.push(normalize_name(s));
                     }
                 }
             }
 
             cards.insert(id, card);
+
+            // Several crypt cards share an ambiguous bare name — e.g. all three
+            // "Theo Bell" printings (G2 / G2 ADV / G6) index "theo bell". Their
+            // adv/grouped forms also get distinct qualified keys ("theo bell g2",
+            // "theo bell g2 adv", "theo bell g6"); the bare key is the only
+            // collision. Resolve it deterministically by preference instead of
+            // "last insert wins": non-advanced first, then lowest id (first
+            // release) — so the parenthesis-less name defaults to the base card,
+            // and a later reprint never silently changes how it resolves.
+            for key in keys {
+                if key.is_empty() {
+                    continue;
+                }
+                match name_index.get(&key).copied() {
+                    Some(existing) if existing != id => {
+                        let prefer_new = match (cards.get(&existing), cards.get(&id)) {
+                            (Some(old), Some(new)) => name_pref(new) < name_pref(old),
+                            _ => true,
+                        };
+                        if prefer_new {
+                            name_index.insert(key, id);
+                        }
+                    }
+                    _ => {
+                        name_index.insert(key, id);
+                    }
+                }
+            }
         }
 
         Ok(CardMap { cards, name_index })
@@ -93,13 +121,19 @@ impl CardMap {
         if let Some(&id) = self.name_index.get(&normalized) {
             return self.cards.get(&id);
         }
-        // Prefix match (first match wins)
+        // Prefix match: HashMap iteration order is nondeterministic, so pick a
+        // stable winner — the shortest matching name (closest to the query),
+        // then the lowest id.
+        let mut best: Option<(usize, u32)> = None; // (name length, id)
         for (indexed_name, &id) in &self.name_index {
             if indexed_name.starts_with(&normalized) {
-                return self.cards.get(&id);
+                let cand = (indexed_name.len(), id);
+                if best.map_or(true, |b| cand < b) {
+                    best = Some(cand);
+                }
             }
         }
-        None
+        best.and_then(|(_, id)| self.cards.get(&id))
     }
 
     pub fn len(&self) -> usize {
@@ -109,6 +143,14 @@ impl CardMap {
     pub fn is_empty(&self) -> bool {
         self.cards.is_empty()
     }
+}
+
+/// Preference key for resolving an ambiguous (shared) normalized name. Lower is
+/// preferred: non-advanced before advanced, then lowest id. The lowest id is the
+/// vampire's first release, which is the non-advanced, lowest-group printing — so
+/// a bare, parenthesis-less name defaults to that base card.
+fn name_pref(card: &Card) -> (u8, u32) {
+    (card.adv as u8, card.id)
 }
 
 fn parse_card(id: u32, value: &JsonValue) -> Result<Card, String> {
@@ -203,5 +245,45 @@ mod tests {
         // Normalized lookup
         let magnum2 = cm.by_name("44 magnum").unwrap();
         assert_eq!(magnum2.id, 100001);
+    }
+
+    #[test]
+    fn test_prefix_lookup_is_deterministic() {
+        // Several names share the "gov"/"abc" prefixes. HashMap iteration order is
+        // nondeterministic, so the lookup must pick a stable winner: shortest
+        // matching name, then lowest id.
+        let json = r#"{
+            "10": { "name": "Govern" },
+            "20": { "name": "Governing" },
+            "5":  { "name": "Abcd" },
+            "9":  { "name": "Abce" }
+        }"#;
+        let cm = CardMap::load(json).unwrap();
+        // Shortest match wins: "govern" (6) over "governing" (9).
+        assert_eq!(cm.by_name("gov").unwrap().id, 10);
+        // Equal length => lowest id wins: "abcd"/"abce" both len 4 => id 5.
+        assert_eq!(cm.by_name("abc").unwrap().id, 5);
+        // Stable across repeated calls.
+        assert_eq!(cm.by_name("gov").unwrap().id, cm.by_name("gov").unwrap().id);
+    }
+
+    #[test]
+    fn test_ambiguous_bare_name_prefers_nonadv_first_release() {
+        // Mirrors real data: three "Theo Bell" printings all index the bare key
+        // "theo bell". File order puts G6 last, so "last insert wins" would pick
+        // G6; preference must instead pick the non-adv first release (lowest id,
+        // = G2 here). The (ADV) and (G6) qualifiers still resolve via their unique
+        // exact keys.
+        let json = r#"{
+            "201362": {"name":"Theo Bell (G2)","printed_name":"Theo Bell","adv":false,"group":"2","name_variants":["Theo Bell"]},
+            "201363": {"name":"Theo Bell (G2 ADV)","printed_name":"Theo Bell","adv":true,"group":"2","name_variants":["Theo Bell (ADV)"]},
+            "201613": {"name":"Theo Bell (G6)","printed_name":"Theo Bell","adv":false,"group":"6","name_variants":[]}
+        }"#;
+        let cm = CardMap::load(json).unwrap();
+        assert_eq!(cm.by_name("Theo Bell").unwrap().id, 201362, "bare name => non-adv first release (lowest id)");
+        assert_eq!(cm.by_name("Theo Bell (ADV)").unwrap().id, 201363, "(ADV) => advanced card");
+        assert_eq!(cm.by_name("Theo Bell (G2)").unwrap().id, 201362);
+        assert_eq!(cm.by_name("Theo Bell (G6)").unwrap().id, 201613);
+        assert_eq!(cm.by_name("Theo Bell (G2 ADV)").unwrap().id, 201363);
     }
 }

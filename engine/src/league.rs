@@ -54,6 +54,13 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
         let standings = &tournament["standings"];
         let standings_count = standings.members().count();
 
+        // GP: standard competition rank over the (gw, vp, tp) key so tied
+        // players share a rank (and thus equal GP points) and the next distinct
+        // score skips ranks (e.g. 12, 12, 14). The standings array is pre-sorted
+        // desc with user_uid as a deterministic terminal tiebreak.
+        let mut gp_rank = 0usize;
+        let mut gp_prev_key: Option<(i64, i64, i64)> = None;
+
         for (position, standing) in tournament["standings"].members().enumerate() {
             let uid = standing["user_uid"].as_str().unwrap_or("").to_string();
             if uid.is_empty() {
@@ -102,9 +109,14 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
                     entry.tp += tp;
                 }
                 "GP" => {
-                    // GP points based on final position (1-indexed)
-                    let pos = position + 1; // 1-based rank
-                    let gp = compute_gp_points(pos, standings_count);
+                    // GP points based on shared standing rank (not array index),
+                    // so players tied on (gw, vp, tp) receive equal points.
+                    let key = ((gw * 10.0) as i64, (vp * 10.0) as i64, tp as i64);
+                    if gp_prev_key != Some(key) {
+                        gp_rank = position + 1; // 1-based rank, skips after ties
+                        gp_prev_key = Some(key);
+                    }
+                    let gp = compute_gp_points(gp_rank, standings_count);
                     entry.points += gp;
                     entry.gw += gw;
                     entry.vp += vp;
@@ -301,6 +313,78 @@ mod tests {
     }
 
     #[test]
+    fn test_gp_mode_ties_share_rank_and_skip() {
+        // p6 & p7 are tied on (gw, vp, tp): both get 6th-place GP points (10),
+        // and rank 7 is skipped so p8 gets 8th-place points (8), not 9.
+        let config = r#"{
+            "standings_mode": "GP",
+            "tournaments": [{
+                "uid": "t1", "rank": "", "player_count": 8, "winner": "p1",
+                "standings": [
+                    {"user_uid": "p1", "gw": 3.0, "vp": 6.0, "tp": 180, "finalist": true},
+                    {"user_uid": "p2", "gw": 2.0, "vp": 5.0, "tp": 150, "finalist": true},
+                    {"user_uid": "p3", "gw": 2.0, "vp": 4.0, "tp": 140, "finalist": true},
+                    {"user_uid": "p4", "gw": 1.0, "vp": 3.0, "tp": 120, "finalist": true},
+                    {"user_uid": "p5", "gw": 1.0, "vp": 2.0, "tp": 100, "finalist": true},
+                    {"user_uid": "p6", "gw": 0.0, "vp": 1.0, "tp": 80, "finalist": false},
+                    {"user_uid": "p7", "gw": 0.0, "vp": 1.0, "tp": 80, "finalist": false},
+                    {"user_uid": "p8", "gw": 0.0, "vp": 0.0, "tp": 40, "finalist": false}
+                ],
+                "finals": []
+            }]
+        }"#;
+        let parsed = json::parse(&compute_league_standings(config).unwrap()).unwrap();
+        let pts = |uid: &str| -> i32 {
+            parsed
+                .members()
+                .find(|e| e["user_uid"].as_str() == Some(uid))
+                .unwrap_or_else(|| panic!("{uid} missing"))["points"]
+                .as_i32()
+                .unwrap()
+        };
+        assert_eq!(pts("p1"), 25);
+        assert_eq!(pts("p6"), 10, "tied 6th gets 6th-place points");
+        assert_eq!(pts("p7"), 10, "tied 6th gets 6th-place points");
+        assert_eq!(pts("p8"), 8, "rank 7 skipped, p8 is 8th");
+    }
+
+    #[test]
+    fn test_gp_rank_resets_between_tournaments() {
+        // Guards the per-tournament reset of gp_rank/gp_prev_key. T1 ends on a
+        // tie at rank 2 (b,c share key (10,30,60)); T2's first player d shares
+        // that exact key. If the rank state leaked across tournaments, d would
+        // keep rank 2 (15pts) instead of being T2's rank 1 (25pts).
+        let config = r#"{
+            "standings_mode": "GP",
+            "tournaments": [
+                {"uid":"t1","rank":"","player_count":3,"winner":"a","standings":[
+                    {"user_uid":"a","gw":2.0,"vp":6.0,"tp":120,"finalist":true},
+                    {"user_uid":"b","gw":1.0,"vp":3.0,"tp":60,"finalist":false},
+                    {"user_uid":"c","gw":1.0,"vp":3.0,"tp":60,"finalist":false}
+                ],"finals":[]},
+                {"uid":"t2","rank":"","player_count":2,"winner":"d","standings":[
+                    {"user_uid":"d","gw":1.0,"vp":3.0,"tp":60,"finalist":true},
+                    {"user_uid":"e","gw":0.0,"vp":0.0,"tp":0,"finalist":false}
+                ],"finals":[]}
+            ]
+        }"#;
+        let parsed = json::parse(&compute_league_standings(config).unwrap()).unwrap();
+        let pts = |uid: &str| -> i32 {
+            parsed
+                .members()
+                .find(|e| e["user_uid"].as_str() == Some(uid))
+                .unwrap_or_else(|| panic!("{uid} missing"))["points"]
+                .as_i32()
+                .unwrap()
+        };
+        assert_eq!(pts("d"), 25, "T2 leader must be rank 1, not carried-over rank 2");
+        assert_eq!(pts("a"), 25);
+        assert_eq!(pts("b"), 15);
+        assert_eq!(pts("c"), 15);
+        assert_eq!(pts("e"), 15);
+    }
+
+    #[test]
     fn test_gp_points() {
         assert_eq!(compute_gp_points(1, 20), 25);
         assert_eq!(compute_gp_points(2, 20), 15);
@@ -426,3 +510,4 @@ mod tests {
         assert_eq!(result, "[]");
     }
 }
+

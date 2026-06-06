@@ -2,7 +2,7 @@
 
 Lightweight Rust engine for business logic, compiled to both WebAssembly (frontend) and native Python library (backend).
 
-> **Open issues (pst):** #13 nondeterministic standings/card tiebreaks; #16 stale `TOURNAMENT.md`; #19 split oversized `seating.rs`. Update the relevant ticket when changing the engine in that scope.
+> **Open issues (pst):** #16 stale `TOURNAMENT.md`; #19 split oversized `seating.rs`; #43 GP league points use prelim standing order, not final placement. Update the relevant ticket when changing the engine in that scope.
 
 ## Build
 

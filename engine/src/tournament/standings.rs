@@ -82,12 +82,18 @@ pub(super) fn compute_standings(tournament: &JsonValue, sanctions: &JsonValue) -
         })
         .collect();
 
+    // Sort desc by score, then toss (finals cutoff tiebreak), then user_uid as a
+    // deterministic terminal key — without it, players fully tied on (gw, vp, tp,
+    // toss) come out in nondeterministic HashMap order, flipping rank-based GP
+    // league points. Note: toss decides the finals cutoff only; it does NOT split
+    // ranks for GP points (that key is gw/vp/tp — see league.rs).
     standings.sort_by(|a, b| {
         b.gw.partial_cmp(&a.gw)
             .unwrap()
             .then(b.vp.partial_cmp(&a.vp).unwrap())
             .then(b.tp.partial_cmp(&a.tp).unwrap())
             .then(b.toss.cmp(&a.toss))
+            .then(a.user_uid.cmp(&b.user_uid))
     });
 
     standings

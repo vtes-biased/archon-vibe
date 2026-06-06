@@ -276,6 +276,35 @@ fn test_start_round_computed_seating_is_deterministic() {
 }
 
 #[test]
+fn test_standings_tie_order_is_deterministic() {
+    // Four players finish fully tied (same gw/vp/tp/toss). Without the terminal
+    // user_uid tiebreak they come out in nondeterministic HashMap order; assert
+    // the order is stable across calls and sorted by user_uid ascending.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "pc", result: { gw: 0, vp: 1.0, tp: 24 } },
+            { player_uid: "pa", result: { gw: 0, vp: 1.0, tp: 24 } },
+            { player_uid: "pd", result: { gw: 0, vp: 1.0, tp: 24 } },
+            { player_uid: "pb", result: { gw: 0, vp: 1.0, tp: 24 } },
+        ],
+    }]];
+    tournament["players"] = json::array![
+        { user_uid: "pa", toss: 0 },
+        { user_uid: "pb", toss: 0 },
+        { user_uid: "pc", toss: 0 },
+        { user_uid: "pd", toss: 0 },
+    ];
+    let empty = json::array![];
+    let s1 = super::standings::compute_standings(&tournament, &empty);
+    let s2 = super::standings::compute_standings(&tournament, &empty);
+    let order1: Vec<&str> = s1.iter().map(|s| s.user_uid.as_str()).collect();
+    let order2: Vec<&str> = s2.iter().map(|s| s.user_uid.as_str()).collect();
+    assert_eq!(order1, order2, "tie order must be stable across calls");
+    assert_eq!(order1, vec!["pa", "pb", "pc", "pd"]);
+}
+
+#[test]
 fn test_start_round_drops_registered_players() {
     let mut tournament = make_tournament();
     tournament["state"] = "Waiting".into();
