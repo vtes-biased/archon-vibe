@@ -72,6 +72,18 @@ Access-level projections (`public`/`member`/`full`) are computed by `access_leve
 
 `calendar_token` is the single non-projected column: a per-user `.ics` feed secret that must never be broadcast (every projection is, and `full` reaches non-owners). It's a column rather than a separate table — unlike `auth_methods`/`oauth_*` (N:1) or `avatars` (large blobs), it's 1:1 with the row with no independent lifecycle, so a column avoids a join on the hot `get_user_by_uid` path. `save_object` COALESCEs it so writes that don't carry the token preserve it; `clear_calendar_token()` is the explicit drop path.
 
+### Database Access & Connection Model
+
+psycopg3 async, no ORM. The pool is small (`max_size=20`, autocommit) — sized for a ~2GB VPS — so connections must cycle quickly: helpers check one out, run a query, release. The one place a connection is held across multiple operations is a transaction.
+
+**`tournament_transaction(uid)`** is the unit of work for any tournament mutation (the action handler and every offline-lifecycle endpoint). It `SELECT ... FOR UPDATE`s the row — serializing concurrent writes to one tournament — and yields `(tournament, tx_conn)`. The caller saves through `tx_conn` so the read-modify-write is atomic.
+
+**Connection discipline (pst #12/#44).** A request must never check out a *second* pooled connection while holding `tx_conn`: with 20 concurrent in-flight actions pinning all connections via their locks, any further acquire blocks → deadlock. So while a transaction is open, **reads transparently reuse its connection** via an ambient `ContextVar` (`_tx_conn`, read by `_acquire`): every read helper called on that task runs on `tx_conn`, seeing the transaction's snapshot, with no extra checkout. An action therefore consumes exactly one connection start to finish.
+
+- **Reads** route through `_acquire` (explicit `conn=` → ambient `tx_conn` → pool). Inside a transaction they reuse automatically; no need to thread `conn` by hand.
+- **Writes** route through `get_connection` and pool **independently** by default — they do *not* ride the ambient connection. This is deliberate: go-online creates users in a loop where each `insert_user` must commit and be visible to the next `allocate_next_vekn_id` (which runs its own advisory-locked transaction); folding those inserts into the outer transaction would hide them and reissue duplicate VEKN IDs. A write joins the transaction only when passed `conn=tx_conn` explicitly (e.g. the action handler's single tournament save), keeping the read/write transaction boundary visible at the call site.
+- **Invariant:** never start a DB-touching `asyncio.create_task`/`gather` inside a transaction — the child task inherits the ContextVar and would interleave operations on the shared connection (single-threaded, but one `await execute` yields mid-flight) or outlive the `with` block. `_acquire` records the owner task and **raises** if the ambient connection is reached from another task, so this fails loudly. All spawned DB tasks today (Discord role sync, VEKN sync) fire post-commit, outside any transaction.
+
 ## Event System
 
 The system uses two types of events:
@@ -160,6 +172,8 @@ Offline mode uses primary device ownership — no CRUD log or conflict resolutio
 - **Force-takeover**: another organizer can claim the lock (warned about losing primary's unsaved data)
 - **Opportunistic sync**: primary device can background-sync without unlocking (`sync-offline`)
 - **IC force-unlock**: emergency unlock without syncing offline data
+
+> **Open issue (pst #44):** go-online resolves offline players inside the `tournament_transaction` lock; their *reads* reuse the connection (ambient), but each `insert_user`/`allocate_next_vekn_id` still checks out a short-lived independent connection (required — see Database Access). Rare (once per go-online), so low starvation risk; the clean fix is to resolve/create players *before* taking the lock.
 
 ## Mutation Pipeline
 

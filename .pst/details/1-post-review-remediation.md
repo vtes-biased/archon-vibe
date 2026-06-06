@@ -98,6 +98,59 @@ placement, so a finalist who WINS the finals but didn't finish prelim-1st is sco
 25. RTP already handles finalists via `tournament["winner"]`; GP mode does not. Only the
 non-prelim-1st winner is mis-scored (positions 2–5 are a flat 15 band). Closed #13.
 
+### Resolution (2026-06-06): #12 action handler no longer fans out pooled connections under lock
+The action handler (`tournament_action`) ran its read helpers — incl. a **per-player**
+`get_sanctions_for_user` loop — *inside* `tournament_transaction`'s `FOR UPDATE`, each
+grabbing its own pooled connection. With pool `max_size=20`, ~20 concurrent actions pin all
+connections via their `tx_conn`, then every in-lock acquire blocks → starvation/deadlock.
+**Chosen fix: connection reuse, NOT prefetch-before-lock.** Prefetch was the ticket's
+literal suggestion but would reintroduce a TOCTOU window — the per-player sanction set
+depends on the *locked* tournament's player list, so it can only be read after the FOR
+UPDATE resolves. Instead: added `db._acquire(conn=None)` (yields a passed-in conn, else
+pulls from the pool) and threaded an optional `conn` through the read helpers
+(`get_object_full`, `get_user_by_uid`, `get_tournament_by_uid`, `get_decks_for_tournament`,
+`get_sanctions_for_tournament`/`_for_user`, `get_all_leagues`). All ~55 connection-less
+callers are unchanged (default → pool); only the locked path passes `conn=tx_conn`, so one
+in-flight action consumes exactly one connection. Collapsed the per-player loop into a single
+batched `get_sanctions_for_users` (`user_uid = ANY(%s)`). Tests: `test_action_conn_reuse.py`
+(acquire-reuse, batched==per-user union, zero pool checkouts while locked). Full backend
+suite green (141). principal-engineer review: LGTM. **Note for future readers: keep it as
+connection-reuse — do not "fix" it back to prefetch (TOCTOU).** The lower-frequency
+per-player loop in the offline `sync-offline`/go-online path (writes new users) was left
+as-is — once-per-go-online, not the hot action path; overlaps #15's area. Closed #12.
+
+### Resolution (2026-06-06): #44 ambient transaction connection (reads reuse, writes independent)
+Generalised #12's manual `conn=` threading into an automatic, guarded mechanism so the
+"never acquire a second connection while holding the lock" invariant can't be forgotten.
+- **Ambient read reuse:** `tournament_transaction` publishes its `FOR UPDATE` connection in a
+  `ContextVar` (`_tx_conn`, holding `(conn, owner_task)`); `_acquire` (the read-helper path)
+  resolves explicit `conn=` → ambient → pool. Reads called inside a transaction now reuse
+  `tx_conn` automatically (snapshot-consistent, zero extra checkout) — incl. go-online's
+  per-player `get_user_by_vekn_id`/`get_auth_method_by_identifier`/`get_user_by_uid`.
+- **Writes stay independent (deliberate, load-bearing):** `get_connection` is NOT
+  ambient-aware. Discovered that making writes ambient would BREAK go-online: each new user's
+  `insert_user` must commit and be visible to the next `allocate_next_vekn_id` (its own
+  advisory-locked txn); folding inserts into the outer txn (uncommitted) → **duplicate VEKN
+  IDs**. So writes pool independently; a write joins the txn only via explicit `conn=tx_conn`
+  (the action handler's single tournament save). The global "request-scoped / take-conn-high"
+  idea was rejected for the same reason + because actions do heavy non-SQL work (PyO3 engine,
+  VEKN HTTP push, ratings, broadcasts) — holding a pooled conn across that defeats the small
+  pool on a 2GB VPS. Unit of work is the **transaction**, not the request.
+- **Cross-task guard:** `_acquire` raises if the ambient conn is reached from a task other than
+  the owner — catches a `create_task`/`gather` spawned inside a transaction (single-threaded,
+  but one `await execute` yields mid-flight → interleaving on the shared conn, or the child
+  outliving the `with` block). Verified none exist inside any `tournament_transaction` today
+  (spawned DB tasks — Discord/VEKN sync — all fire post-commit).
+Kept #12's explicit `conn=tx_conn` threading (PE: strictly safer, task-independent, makes the
+txn boundary visible at the call site — survives the exact failure the guard catches). Tests:
+`test_ambient_conn.py` (read reuses ambient / write pools independently / allocate→insert→
+allocate distinct ids / cross-task raises). Full backend suite green (145). principal-engineer
+review: LGTM. Documented in ARCHITECTURE.md "Database Access & Connection Model".
+**Deferred:** go-online still checks out a short-lived independent connection per new-user
+write inside the lock — pool pressure (not deadlock: different rows, short hold), rare
+(once per go-online). Clean fix = resolve/create players BEFORE taking the `FOR UPDATE` lock;
+tracked on #44's note + overlaps #15. Closed #44.
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 

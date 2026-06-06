@@ -1,9 +1,12 @@
 """Database connection and initialization."""
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import msgspec
 import psycopg
@@ -46,6 +49,32 @@ DB_URL = os.getenv(
 
 # Global connection pool
 _pool: AsyncConnectionPool | None = None
+
+
+class _ActiveTx(NamedTuple):
+    """The connection an open `tournament_transaction` owns, plus its owner task."""
+
+    conn: "psycopg.AsyncConnection"
+    task: "asyncio.Task | None"
+
+
+# Ambient transaction connection. `tournament_transaction` sets this to its
+# locked connection for the duration of the `async with` block; while it is set,
+# `get_connection()` (and therefore every DB helper that calls it) transparently
+# runs on that one connection instead of checking out a fresh one. This keeps a
+# single in-flight action to ONE pooled connection — it cannot starve the pool by
+# acquiring more while holding the FOR UPDATE lock — and makes every nested
+# read/write part of the same transaction. See `get_connection`. pst #12 #44
+#
+# INVARIANT: never start a DB-touching `asyncio.create_task`/`gather` inside a
+# transaction. A child task inherits this ContextVar (and the connection) and
+# would interleave operations on it with the parent and/or outlive the `with`
+# block. We do NOT rely on discipline alone: `get_connection` records the owner
+# task and raises if the ambient connection is reached from any other task, so
+# such misuse fails loudly instead of corrupting the wire protocol. (Today all
+# spawned DB tasks — Discord role sync, VEKN sync — fire post-commit, outside any
+# transaction, so the var is unset when their context is copied.)
+_tx_conn: ContextVar["_ActiveTx | None"] = ContextVar("_tx_conn", default=None)
 
 
 async def init_db() -> None:
@@ -332,11 +361,55 @@ async def close_db() -> None:
 
 @asynccontextmanager
 async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
-    """Get a database connection from the pool."""
+    """Check a connection out of the pool (the raw pool primitive).
+
+    This always pools — it is intentionally NOT ambient-aware, so writers that
+    must commit independently of an open `tournament_transaction` (e.g. the
+    go-online VEKN-ID allocation loop, where each new user must be committed and
+    visible before the next `allocate_next_vekn_id`) keep their own connection.
+    Reads that should join an open transaction go through `_acquire`. pst #12 #44
+    """
     if not _pool:
         raise RuntimeError("Database not initialized")
     async with _pool.connection() as conn:
         yield conn
+
+
+@asynccontextmanager
+async def _acquire(
+    conn: psycopg.AsyncConnection | None = None,
+) -> AsyncIterator[psycopg.AsyncConnection]:
+    """Resolve a connection for a READ by precedence: explicit ``conn`` → ambient
+    transaction connection → pool.
+
+    An explicit ``conn`` pins the read to a connection the caller already holds.
+    With none, if a `tournament_transaction` is open on THIS task its connection
+    is reused (so the action never checks out a second connection while holding
+    its FOR UPDATE lock, and the read sees the transaction's snapshot); otherwise
+    a pooled connection is used. Reaching the ambient connection from a *different*
+    task raises — that only happens if DB work was spawned inside a transaction
+    (`create_task`/`gather`), which would interleave operations on the shared
+    connection or outlive it. See `_tx_conn`. pst #12 #44
+
+    For WRITES inside a transaction, pass `conn=tx_conn` explicitly to join it, or
+    use `get_connection` to commit independently — never rely on the ambient path
+    for a write, so the read/write transaction boundary stays obvious at the call.
+    """
+    if conn is not None:
+        yield conn
+        return
+    active = _tx_conn.get()
+    if active is not None:
+        if active.task is not None and asyncio.current_task() is not active.task:
+            raise RuntimeError(
+                "ambient transaction connection reached from a different task — "
+                "do not run DB work in an asyncio task spawned inside a "
+                "tournament_transaction (it would race the locked connection)"
+            )
+        yield active.conn  # reuse; the transaction owns this connection's lifecycle
+        return
+    async with get_connection() as c:
+        yield c
 
 
 @asynccontextmanager
@@ -349,18 +422,26 @@ async def tournament_transaction(
     tournament. Yields (tournament, connection). The caller must use the
     yielded connection for any UPDATE within the same transaction.
     Commits on normal exit, rolls back on exception.
+
+    While this block is open, `_tx_conn` is set so every DB helper called on this
+    task transparently runs on `conn` (one pooled connection per action, all reads
+    and writes inside the one transaction) — see `get_connection`. pst #12 #44
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
     async with _pool.connection() as conn:
-        async with conn.transaction():
-            result = await conn.execute(
-                'SELECT "full" FROM objects WHERE uid = %s FOR UPDATE',
-                (uid,),
-            )
-            row = await result.fetchone()
-            tournament = decode_json(row[0], Tournament) if row else None
-            yield tournament, conn
+        token = _tx_conn.set(_ActiveTx(conn, asyncio.current_task()))
+        try:
+            async with conn.transaction():
+                result = await conn.execute(
+                    'SELECT "full" FROM objects WHERE uid = %s FOR UPDATE',
+                    (uid,),
+                )
+                row = await result.fetchone()
+                tournament = decode_json(row[0], Tournament) if row else None
+                yield tournament, conn
+        finally:
+            _tx_conn.reset(token)
 
 
 # JSON encoder/decoder
@@ -390,9 +471,11 @@ from .access_levels import compute_full, compute_member, compute_public  # noqa:
 from .models import DeckObject  # noqa: E402
 
 
-async def get_decks_for_tournament(tournament_uid: str) -> list[DeckObject]:
+async def get_decks_for_tournament(
+    tournament_uid: str, conn: psycopg.AsyncConnection | None = None
+) -> list[DeckObject]:
     """Get all DeckObjects for a tournament (uses idx_objects_deck_tournament)."""
-    async with get_connection() as conn:
+    async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full"::text FROM objects WHERE type = 'deck' AND "full"->>'tournament_uid' = %s""",
             (tournament_uid,),
@@ -522,9 +605,11 @@ async def get_object(uid: str, *, level: str = "full") -> dict | None:
         return None
 
 
-async def get_object_full[T](uid: str, type_: type[T]) -> T | None:
+async def get_object_full[T](
+    uid: str, type_: type[T], conn: psycopg.AsyncConnection | None = None
+) -> T | None:
     """Get an object from the objects table, decoded into a typed model."""
-    async with get_connection() as conn:
+    async with _acquire(conn) as conn:
         result = await conn.execute(
             'SELECT "full" FROM objects WHERE uid = %s',
             (uid,),
@@ -618,7 +703,9 @@ async def update_user(user: User) -> BroadcastData:
     return await save_object_from_model(ObjectType.USER, user)
 
 
-async def get_user_by_uid(uid: str) -> User | None:
+async def get_user_by_uid(
+    uid: str, conn: psycopg.AsyncConnection | None = None
+) -> User | None:
     """Get a user by UID.
 
     Returns the "full" projection, which does NOT carry calendar_token (an
@@ -626,7 +713,7 @@ async def get_user_by_uid(uid: str) -> User | None:
     the token because save_object COALESCEs it (see there) — loaders need not
     re-read it. Owner display reads it explicitly via get_calendar_token().
     """
-    return await get_object_full(uid, User)
+    return await get_object_full(uid, User, conn=conn)
 
 
 async def set_user_resync_after(user_uid: str) -> None:
@@ -722,9 +809,11 @@ async def clear_calendar_token(uid: str) -> None:
         )
 
 
-async def get_user_by_vekn_id(vekn_id: str) -> User | None:
+async def get_user_by_vekn_id(
+    vekn_id: str, conn: psycopg.AsyncConnection | None = None
+) -> User | None:
     """Get a user by VEKN ID."""
-    async with get_connection() as conn:
+    async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'user' AND "full"->>'vekn_id' = %s LIMIT 1""",
@@ -859,10 +948,12 @@ async def update_auth_method(auth_method: AuthMethod) -> None:
 
 
 async def get_auth_method_by_identifier(
-    method_type: str, identifier: str
+    method_type: str,
+    identifier: str,
+    conn: psycopg.AsyncConnection | None = None,
 ) -> AuthMethod | None:
     """Find an auth method by type and identifier (e.g., email address)."""
-    async with get_connection() as conn:
+    async with _acquire(conn) as conn:
         result = await conn.execute(
             """
             SELECT data FROM auth_methods
@@ -1167,9 +1258,11 @@ async def get_sanction_by_uid(uid: str) -> Sanction | None:
     return await get_object_full(uid, Sanction)
 
 
-async def get_sanctions_for_user(user_uid: str) -> list[Sanction]:
+async def get_sanctions_for_user(
+    user_uid: str, conn: psycopg.AsyncConnection | None = None
+) -> list[Sanction]:
     """Get all sanctions for a user."""
-    async with get_connection() as conn:
+    async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'sanction' AND "full"->>'user_uid' = %s
@@ -1180,9 +1273,31 @@ async def get_sanctions_for_user(user_uid: str) -> list[Sanction]:
         return [decode_json(row[0], Sanction) for row in rows]
 
 
-async def get_sanctions_for_tournament(tournament_uid: str) -> list[Sanction]:
+async def get_sanctions_for_users(
+    user_uids: list[str], conn: psycopg.AsyncConnection | None = None
+) -> list[Sanction]:
+    """Get all sanctions for a set of users in a single query.
+
+    Batched replacement for a per-user fan-out loop — one round-trip instead of
+    one per player, which matters when called while holding a row lock.
+    """
+    if not user_uids:
+        return []
+    async with _acquire(conn) as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'sanction' AND "full"->>'user_uid' = ANY(%s)""",
+            (list(user_uids),),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], Sanction) for row in rows]
+
+
+async def get_sanctions_for_tournament(
+    tournament_uid: str, conn: psycopg.AsyncConnection | None = None
+) -> list[Sanction]:
     """Get all non-deleted sanctions for a tournament."""
-    async with get_connection() as conn:
+    async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'sanction'
@@ -1246,9 +1361,11 @@ async def update_tournament(tournament: Tournament) -> BroadcastData:
     return await save_object_from_model(ObjectType.TOURNAMENT, tournament)
 
 
-async def get_tournament_by_uid(uid: str) -> Tournament | None:
+async def get_tournament_by_uid(
+    uid: str, conn: psycopg.AsyncConnection | None = None
+) -> Tournament | None:
     """Get a tournament by UID."""
-    return await get_object_full(uid, Tournament)
+    return await get_object_full(uid, Tournament, conn=conn)
 
 
 async def delete_tournament_db(uid: str) -> None:
@@ -1344,9 +1461,11 @@ async def update_league(league: League) -> BroadcastData:
     return await save_object_from_model(ObjectType.LEAGUE, league)
 
 
-async def get_all_leagues() -> list[League]:
+async def get_all_leagues(
+    conn: psycopg.AsyncConnection | None = None,
+) -> list[League]:
     """Get all leagues."""
-    async with get_connection() as conn:
+    async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'league' AND deleted_at IS NULL""",

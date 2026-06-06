@@ -22,6 +22,7 @@ from ..db import (
     get_league_by_uid,
     get_sanctions_for_tournament,
     get_sanctions_for_user,
+    get_sanctions_for_users,
     get_tournament_by_uid,
     get_user_by_uid,
     get_user_by_vekn_id,
@@ -79,9 +80,9 @@ def _is_organizer(user, tournament: Tournament) -> bool:
     return False
 
 
-async def _build_decks_json(tournament_uid: str) -> str:
+async def _build_decks_json(tournament_uid: str, conn=None) -> str:
     """Build deck metadata JSON for the engine's decks parameter."""
-    decks = await get_decks_for_tournament(tournament_uid)
+    decks = await get_decks_for_tournament(tournament_uid, conn=conn)
     return msgspec.json.encode(
         [{"user_uid": d.user_uid, "round": d.round, "uid": d.uid} for d in decks]
     ).decode()
@@ -273,11 +274,11 @@ def _build_actor_context(
     }
 
 
-async def _get_user_organizable_league_uids(user) -> list[str]:
+async def _get_user_organizable_league_uids(user, conn=None) -> list[str]:
     """Get league UIDs the user can organize (own leagues + NC same-country)."""
     if Role.IC in user.roles:
         return []  # IC bypasses league check in engine
-    leagues = await get_all_leagues()
+    leagues = await get_all_leagues(conn=conn)
     return [
         lg.uid
         for lg in leagues
@@ -292,7 +293,7 @@ def _can_manage_tournaments(user) -> bool:
 
 
 async def _check_player_barred(
-    player_uid: str, tournament_uid: str, tournament: Tournament
+    player_uid: str, tournament_uid: str, tournament: Tournament, conn=None
 ) -> None:
     """Check if a player is barred from participating (cross-tournament sanctions).
 
@@ -303,7 +304,7 @@ async def _check_player_barred(
     from datetime import UTC, datetime
 
     # Check active suspensions
-    user_sanctions = await get_sanctions_for_user(player_uid)
+    user_sanctions = await get_sanctions_for_user(player_uid, conn=conn)
     now = datetime.now(UTC)
     for s in user_sanctions:
         if s.deleted_at or s.lifted_at:
@@ -322,7 +323,7 @@ async def _check_player_barred(
                 continue
             if s.level == SanctionLevel.DISQUALIFICATION and s.tournament_uid:
                 # Check if the DQ sanction's tournament is in the same league
-                dq_tournament = await get_tournament_by_uid(s.tournament_uid)
+                dq_tournament = await get_tournament_by_uid(s.tournament_uid, conn=conn)
                 if dq_tournament and dq_tournament.league_uid == tournament.league_uid:
                     raise HTTPException(
                         status_code=400,
@@ -854,27 +855,33 @@ async def tournament_action(
                 detail="Tournament is in offline mode on another device",
             )
 
+        # Reads below run on tx_conn (the locked transaction connection) rather
+        # than acquiring extra pooled connections while holding FOR UPDATE — a
+        # single in-flight action consumes one pooled connection, so concurrent
+        # actions can't starve the small pool (see db._acquire). pst #12
         # Build actor context for Rust engine
         can_organize = None
         if request.type == "UpdateConfig" and request.config:
-            can_organize = await _get_user_organizable_league_uids(current_user)
+            can_organize = await _get_user_organizable_league_uids(
+                current_user, conn=tx_conn
+            )
         actor_data = _build_actor_context(current_user, tournament, can_organize)
 
         # Fetch sanctions for this tournament + user-level suspension/DQ
         # sanctions for all tournament players (needed for CheckInAll etc.)
-        tournament_sanctions = await get_sanctions_for_tournament(uid)
+        tournament_sanctions = await get_sanctions_for_tournament(uid, conn=tx_conn)
         seen_uids = {s.uid for s in tournament_sanctions}
-        player_uids = {p.user_uid for p in tournament.players}
-        for puid in player_uids:
-            for s in await get_sanctions_for_user(puid):
-                if s.uid in seen_uids or s.deleted_at or s.lifted_at:
-                    continue
-                if s.level in (
-                    SanctionLevel.SUSPENSION,
-                    SanctionLevel.DISQUALIFICATION,
-                ):
-                    tournament_sanctions.append(s)
-                    seen_uids.add(s.uid)
+        player_uids = {p.user_uid for p in tournament.players if p.user_uid}
+        # Single batched query (was one round-trip per player while locked)
+        for s in await get_sanctions_for_users(player_uids, conn=tx_conn):
+            if s.uid in seen_uids or s.deleted_at or s.lifted_at:
+                continue
+            if s.level in (
+                SanctionLevel.SUSPENSION,
+                SanctionLevel.DISQUALIFICATION,
+            ):
+                tournament_sanctions.append(s)
+                seen_uids.add(s.uid)
         sanctions_data = [
             {
                 "user_uid": s.user_uid,
@@ -888,11 +895,11 @@ async def tournament_action(
 
         # Inject authoritative vekn_id for Register/AddPlayer/CheckIn (server overrides client)
         if request.type in ("Register", "AddPlayer") and request.user_uid:
-            target_user = await get_user_by_uid(request.user_uid)
+            target_user = await get_user_by_uid(request.user_uid, conn=tx_conn)
             if target_user and target_user.vekn_id:
                 event_data["vekn_id"] = target_user.vekn_id
         elif request.type == "CheckIn" and request.player_uid:
-            target_user = await get_user_by_uid(request.player_uid)
+            target_user = await get_user_by_uid(request.player_uid, conn=tx_conn)
             if target_user and target_user.vekn_id:
                 event_data["vekn_id"] = target_user.vekn_id
 
@@ -901,13 +908,13 @@ async def tournament_action(
         event_json = msgspec.json.encode(event_data).decode("utf-8")
         actor_json = msgspec.json.encode(actor_data).decode("utf-8")
         sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
-        decks_json = await _build_decks_json(uid)
+        decks_json = await _build_decks_json(uid, conn=tx_conn)
 
         # Backend pre-checks for cross-tournament sanctions
         if request.type in ("CheckIn", "Register", "AddPlayer"):
             player_uid = request.player_uid or request.user_uid
             if player_uid:
-                await _check_player_barred(player_uid, uid, tournament)
+                await _check_player_barred(player_uid, uid, tournament, conn=tx_conn)
 
         # Call Rust engine
         engine = _engine
