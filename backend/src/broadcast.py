@@ -22,6 +22,10 @@ encoder = msgspec.json.Encoder()
 class SSEConnection:
     queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=100))
     user: User | None = None
+    # Set when the queue overflows: the SSE generator checks this and ends the
+    # stream so the browser EventSource reconnects and runs a catch-up sync,
+    # rather than staying OPEN on a queue that no longer receives events.
+    closed: bool = False
 
 
 _sse_connections: set[SSEConnection] = set()
@@ -40,7 +44,10 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
     """Broadcast pre-computed projections to SSE connections. No DB access."""
 
     def _make_msg(json_str: str) -> str:
-        return f'data: {{"type":"{bd.obj_type}","data":{json_str}}}\n\n'
+        # `ts` carries the authoritative modified_at so clients advance their
+        # sync cursor in the same value space as the `since` catch-up filter.
+        ts = f',"ts":"{bd.modified_at}"' if bd.modified_at else ""
+        return f'data: {{"type":"{bd.obj_type}","data":{json_str}{ts}}}\n\n'
 
     pub_msg = _make_msg(bd.pub_json) if bd.pub_json else None
     mem_msg = _make_msg(bd.mem_json) if bd.mem_json else None
@@ -80,7 +87,10 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
             if msg:
                 sse_conn.queue.put_nowait(msg)
         except asyncio.QueueFull:
-            logger.warning("SSE queue full for connection, dropping")
+            logger.warning(
+                "SSE queue full, closing connection so client reconnects and catches up"
+            )
+            sse_conn.closed = True
             disconnected.add(sse_conn)
     _sse_connections.difference_update(disconnected)
 
@@ -113,7 +123,8 @@ async def broadcast_judge_call(
             try:
                 conn.queue.put_nowait(message)
             except asyncio.QueueFull:
-                logger.warning("SSE queue full for judge_call, dropping")
+                logger.warning("SSE queue full for judge_call, closing connection")
+                conn.closed = True
                 disconnected.add(conn)
     _sse_connections.difference_update(disconnected)
 
@@ -127,4 +138,7 @@ async def broadcast_resync(user_uid: str) -> None:
             try:
                 conn.queue.put_nowait(message)
             except asyncio.QueueFull:
-                logger.warning(f"SSE queue full for resync user {user_uid}")
+                logger.warning(
+                    f"SSE queue full for resync user {user_uid}, closing connection"
+                )
+                conn.closed = True

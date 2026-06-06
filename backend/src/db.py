@@ -31,6 +31,11 @@ class BroadcastData:
     country: str | None = None
     org_uids: list[str] | None = None
     obj_user_uid: str | None = None
+    # Authoritative modified_at (DB clock) of the written row. Emitted in the
+    # live SSE envelope as `ts` so clients advance their sync cursor in the same
+    # value space the `since` catch-up filter uses (not the payload's `modified`,
+    # which is an independent app-clock value in a different format).
+    modified_at: str | None = None
 
 
 # Database connection string from environment
@@ -412,14 +417,18 @@ async def save_object(
             "public" = EXCLUDED."public",
             "member" = EXCLUDED."member",
             "full" = EXCLUDED."full"
+        RETURNING modified_at
     """
     params = (uid, obj_type, deleted_at, pub_json, mem_json, full_json)
 
     if conn:
-        await conn.execute(query, params)
+        row = await (await conn.execute(query, params)).fetchone()
     else:
         async with get_connection() as c:
-            await c.execute(query, params)
+            row = await (await c.execute(query, params)).fetchone()
+    # BEFORE trigger sets modified_at = CURRENT_TIMESTAMP, so RETURNING reflects
+    # the authoritative DB-clock value used by the `since`/sync_complete cursor.
+    modified_at = row[0].isoformat() if row and row[0] else None
 
     return BroadcastData(
         obj_type=obj_type,
@@ -430,6 +439,7 @@ async def save_object(
         country=full_data.get("country"),
         org_uids=full_data.get("organizers_uids"),
         obj_user_uid=full_data.get("user_uid"),
+        modified_at=modified_at,
     )
 
 

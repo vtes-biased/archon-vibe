@@ -159,11 +159,10 @@ Offline mode uses primary device ownership — no CRUD log or conflict resolutio
 
 ## Mutation Pipeline
 
-> **Open issues (pst):** #6 the sync cursor only advances on `sync_complete`, never on live events; #5 the backend drops + evicts SSE connections on queue overflow without closing the stream (client stays OPEN and deaf); #8 optimistic actions are not rolled back when the server rejects them. Update these tickets when changing the optimistic/SSE path.
-
 Tournament actions use optimistic updates via WASM:
 1. WASM processes locally → returns `{tournament, deck_ops}` → IndexedDB updated → UI reacts immediately
-2. Server POST sent async → SSE delivers authoritative state → overwrites if different
+2. Server POST sent async → on success SSE delivers authoritative state → overwrites if different
+3. On rejection (no SSE follows, `modified_at` unchanged) → roll back to the pre-action snapshot held in memory + surface error. See SYNC.md (Optimistic Updates, Sync Cursor) for the cursor (`since`/`ts` over `modified_at`) and queue-overflow stream-close behavior.
 
 ### StartRound Seating Forwarding
 

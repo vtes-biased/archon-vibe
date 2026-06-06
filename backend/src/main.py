@@ -688,6 +688,15 @@ async def stream_updates(
                 if _shutdown_event and _shutdown_event.is_set():
                     return
 
+                # Queue overflowed: end the stream so the browser EventSource
+                # reconnects and runs a catch-up sync instead of staying OPEN
+                # on a connection that no longer receives broadcasts.
+                if conn.closed:
+                    logger.warning(
+                        "SSE connection closed after queue overflow; ending stream for reconnect"
+                    )
+                    return
+
                 try:
                     message = await asyncio.wait_for(conn.queue.get(), timeout=1.0)
                     if message:

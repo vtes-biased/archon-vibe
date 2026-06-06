@@ -85,6 +85,13 @@ class SyncManager {
   private buffers: Map<string, any[]> = new Map();
   public isSynced = false;
 
+  // High-water mark of the sync cursor, mirrored to IndexedDB. Advanced on
+  // sync_complete AND on every applied live event so the `since=` catch-up
+  // window after a reconnect stays minimal (the server re-streams everything
+  // modified after this; if it only moved on sync_complete the backlog would
+  // grow unbounded and eventually trip the 3-day full-resync guard).
+  private lastTimestamp: string | null = null;
+
   /**
    * Fetch and load a gzip snapshot from the server.
    * Returns the snapshot timestamp, or null on failure.
@@ -172,6 +179,9 @@ class SyncManager {
       // If snapshot failed, fall back to full SSE sync (no since param)
     }
 
+    // Seed the in-memory high-water mark from the cursor we connect with.
+    this.lastTimestamp = lastSync;
+
     const params = new URLSearchParams();
     if (lastSync) params.set('since', lastSync);
     const token = getAccessToken();
@@ -204,7 +214,7 @@ class SyncManager {
         // Handle sync_complete
         if (message.type === 'sync_complete') {
           try { await this.flushAllBuffers(); } catch (e) { console.error('Flush failed:', e); }
-          try { if (message.timestamp) await setLastSyncTimestamp(message.timestamp); } catch (e) { console.error('Save timestamp failed:', e); }
+          try { if (message.timestamp) { this.lastTimestamp = message.timestamp; await setLastSyncTimestamp(message.timestamp); } } catch (e) { console.error('Save timestamp failed:', e); }
           this.isSynced = true;
           this.emit({ type: 'sync_complete', timestamp: message.timestamp });
           return;
@@ -238,6 +248,17 @@ class SyncManager {
               await spec.del(item.uid);
             } else {
               await spec.save(item);
+            }
+            // Advance the sync cursor past this applied event so a reconnect
+            // resumes from here rather than re-streaming since the last
+            // sync_complete. Use the envelope `ts` (authoritative modified_at,
+            // same value space as the server's `since` filter and sync_complete)
+            // — NOT item.modified, which is an app-clock payload value in a
+            // different format. Monotonic guard against any out-of-order event.
+            const ts: string | undefined = message.ts;
+            if (ts && (this.lastTimestamp === null || ts > this.lastTimestamp)) {
+              this.lastTimestamp = ts;
+              try { await setLastSyncTimestamp(ts); } catch (e) { console.error('Save cursor failed:', e); }
             }
             this.emit({ type: spec.singleType as SyncEventType, data: item });
             return;

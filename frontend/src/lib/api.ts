@@ -599,6 +599,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
       }
 
       // Queue server POST (serialized per tournament, prevents concurrent races)
+      const hadDeckOps = (result.deckOps?.length ?? 0) > 0;
       enqueueServerAction(uid, async () => {
         try {
           await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
@@ -606,7 +607,18 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
             body: JSON.stringify(serverEvent),
           });
         } catch (e) {
-          console.error('Server rejected action, SSE will correct:', e);
+          // A rejected action emits no SSE event, so the optimistic IDB write
+          // won't self-correct — roll back to the pre-action state locally.
+          console.error('Server rejected action, rolling back optimistic update:', e);
+          await rollbackTournamentAction(uid, current, decks, hadDeckOps);
+          // apiRequest already toasts HTTP errors with the server's reason;
+          // surface network-level failures (which don't toast) too.
+          if (!(e instanceof ApiError)) {
+            showToast({
+              type: 'error',
+              message: 'Action could not be saved — reverted to the previous state.',
+            });
+          }
         }
       });
 
@@ -669,6 +681,41 @@ async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDe
     }
   }
   return affectedUids;
+}
+
+/**
+ * Roll back an optimistic tournament action that the server rejected.
+ *
+ * A rejected action emits no SSE event, so the optimistic mutations written to
+ * IndexedDB would otherwise persist forever. We do NOT GET authoritative state
+ * from the server — reads are offline-first (IndexedDB only). Server actions are
+ * transactional (all-or-nothing), so on rejection the authoritative state equals
+ * the pre-action state we already held in memory: restore it locally.
+ */
+async function rollbackTournamentAction(
+  uid: string,
+  preActionTournament: Tournament,
+  preActionDecks: DeckObject[],
+  hadDeckOps: boolean,
+): Promise<void> {
+  try {
+    await saveTournament(preActionTournament);
+  } catch (e) {
+    console.error('Failed to roll back optimistic tournament state:', e);
+  }
+  if (!hadDeckOps) return;
+  try {
+    const current = await getDecksByTournament(uid);
+    const originalUids = new Set(preActionDecks.map((d) => d.uid));
+    // Remove decks the optimistic op newly created.
+    for (const d of current) {
+      if (!originalUids.has(d.uid)) await deleteDeck(d.uid);
+    }
+    // Restore prior versions (also re-creates any optimistically deleted decks).
+    for (const d of preActionDecks) await saveDeck(d);
+  } catch (e) {
+    console.error('Failed to roll back optimistic deck changes:', e);
+  }
 }
 
 /**

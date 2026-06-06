@@ -60,6 +60,27 @@ for obj_type in _STREAM_TYPES:
 
 No per-viewer filtering at read time — projections are pre-computed. After the catch-up phase, a **personal overlay** sends `full`-level data for the viewer's own objects and role-based full-access objects (NC/Prince same country, organizers).
 
+The stream then enters the **live phase**, relaying single-object events from `broadcast_precomputed()`:
+
+```
+data: {"type":"tournament","data":{...},"ts":"2026-06-03T12:00:00.123456"}
+```
+
+Note the envelope differences from the catch-up batches: singular `type` (`tournament` not `tournaments`), a single `data` object (not an array), and a `ts` field. See **Sync Cursor** below for what `ts` is and why it must not be confused with the payload's own `modified`.
+
+### Sync Cursor (`since`)
+
+The client reconnects with `?since=<cursor>`; the server filters `modified_at > since` (`stream_objects_new`) and re-streams everything newer. The cursor is therefore a high-water mark over the **`modified_at` column** (DB clock, naive `TIMESTAMP`, set by a `BEFORE` trigger), which is also what `sync_complete.timestamp` and the snapshot `meta.timestamp` report.
+
+**Two timestamps, do not confuse them:**
+
+| Field | Source | Format | Use |
+|-------|--------|--------|-----|
+| `modified` (in payload) | app clock, set in Python pre-write | `…123456Z` (tz-aware) | display/audit only |
+| `modified_at` (column) | DB clock, `BEFORE` trigger | `…123456` (naive) | **authoritative sync ordering** |
+
+Because live event payloads only carry `modified`, the authoritative `modified_at` is surfaced separately as the envelope `ts` field (plumbed `save_object … RETURNING modified_at` → `BroadcastData.modified_at` → `broadcast_precomputed`). The frontend advances its cursor from `ts`, never from `item.modified` — using the app-clock payload value would skip events under any clock skew and break string-comparison ordering (`"…Z" > "…"` is lexically true).
+
 ### Ephemeral SSE Events
 
 Not all SSE events are CRUD events. Ephemeral events are broadcast directly to specific connections without DB storage or IndexedDB writes.
@@ -96,6 +117,8 @@ Triggered when a viewer's data level changes (role or vekn_id change).
 ### Generic Broadcast
 
 Single `broadcast_precomputed()` function (in `broadcast.py`) with per-viewer filtering handles all object types.
+
+Each connection has a bounded `asyncio.Queue` (maxsize 100). On `QueueFull` (a slow/stalled consumer), the connection is marked `closed` and evicted from the broadcast set; the SSE generator sees the flag, **ends the stream**, and the browser's `EventSource` auto-reconnects with `?since=<cursor>` and catches up. This is deliberate: a dropped event must not leave the client OPEN on a queue that no longer receives broadcasts (silently "deaf"). Lossless catch-up depends on the cursor being accurate — see **Sync Cursor** above.
 
 ### Snapshot-Based Initial Sync
 
@@ -157,33 +180,45 @@ All objects have `deleted_at`. If `item.deleted_at` → delete from store, else 
 
 Single `isSynced` flag (no separate `isInitialSync`).
 
-## Optimistic Updates
+The cursor is a `lastTimestamp` high-water mark (mirrored to IndexedDB via `setLastSyncTimestamp`), seeded from the snapshot/last cursor on connect and advanced on **both** `sync_complete` **and every applied live event** (from the envelope `ts`, with a monotonic guard). Advancing only on `sync_complete` — the old behavior — left the catch-up window growing unbounded across a long live session, eventually tripping the server's 3-day stale-`since` full-resync guard. Catch-up batches don't carry `ts`; they're buffered and the cursor moves when their `sync_complete` arrives.
 
-> **Open issues (pst):** #8 a *rejected* server action emits no SSE, so the optimistic IndexedDB write is never corrected — the `/* SSE will correct */` in the example below is wrong for rejections; #6 the sync cursor only advances on `sync_complete`, not on live events; #5 the backend drops + evicts SSE connections on overflow without closing the stream. #17 will rewrite this section after the fixes land.
+## Optimistic Updates
 
 ### Tournament Actions (WASM Engine)
 
-1. Load current tournament + decks from IndexedDB
+1. Load current tournament + decks from IndexedDB (`current` = pre-action snapshot)
 2. Process via WASM `processTournamentEvent()` → returns `{tournament, deck_ops}` → save both to IndexedDB → UI reacts
-3. Send to backend async
-4. SSE delivers authoritative state (tournament + deck objects) → overwrites IndexedDB
+3. Send to backend async (serialized per tournament)
+4. **On success:** SSE delivers authoritative state (tournament + deck objects) → overwrites IndexedDB
+5. **On rejection:** roll back to the pre-action snapshot (see below)
 
 ```typescript
 export async function tournamentAction(uid, action, data) {
-  const current = await getTournament(uid);
+  const current = await getTournament(uid);                  // pre-action state
   const result = await processTournamentEvent(current, event, actor, sanctions, decks);
-  // result: { tournament, deck_ops }
-  await saveTournament(result.tournament);
+  await saveTournament(result.tournament);                   // optimistic
   // apply deck_ops to IndexedDB
-  await logChange('tournaments', 'update', uid, { event });
-  apiRequest(...).catch(() => { /* SSE will correct */ });
+  enqueueServerAction(uid, async () => {
+    try {
+      await apiRequest(`/api/tournaments/${uid}/action`, ...);
+    } catch (e) {
+      // A rejected action emits NO SSE event and does not advance modified_at,
+      // so the catch-up stream never re-delivers it — nothing self-corrects.
+      // Server actions are transactional, so authoritative == pre-action state:
+      // restore it locally (no GET — reads are offline-first from IndexedDB).
+      await rollbackTournamentAction(uid, current, decks, hadDeckOps);
+      // HTTP errors are toasted by apiRequest; toast network failures too.
+    }
+  });
   return result.tournament;
 }
 ```
 
+**Why rollback, not "SSE will correct":** a rejection produces no SSE event for that object, so deferring to the next sync would leave the bad optimistic state in IndexedDB indefinitely. Rollback also self-heals the one ambiguous case (network error *after* the server committed): there `modified_at` did advance, so the authoritative SSE — live or via the `since` catch-up — overwrites the rollback. This relies on **overwrite** apply semantics (`db.put` by uid, no field-merge); a merge would preserve the stale optimistic fields and never reconcile.
+
 ### Non-Tournament Mutations
 
-Apply to IndexedDB optimistically → send to server → SSE corrects if needed.
+Apply to IndexedDB optimistically → send to server → SSE corrects if needed. (These have no rollback path; a rejected mutation surfaces via the `apiRequest` error toast.)
 
 ## Tournament Field Visibility (Member Level)
 

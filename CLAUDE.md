@@ -124,7 +124,10 @@ Projections computed by `access_levels.py` at write time. SSE reads the matching
 
 Tournament actions use optimistic updates via WASM engine:
 1. WASM processes locally → returns `{tournament, deck_ops}` → IndexedDB updated → UI reacts immediately
-2. Server request sent async → SSE delivers authoritative state (tournament + deck objects) → overwrites if different
+2. Server request sent async → on success SSE delivers authoritative state (tournament + deck objects) → overwrites if different
+3. On **rejection** the server emits no SSE and `modified_at` does not advance, so nothing self-corrects — the frontend rolls back to the pre-action snapshot it still holds (no API GET; reads stay offline-first) and surfaces the error. Self-heals if the action actually committed (ambiguous network case), because SSE apply is overwrite-by-uid, not field-merge.
+
+**Sync cursor**: clients reconnect with `?since=<cursor>` over the `modified_at` column (DB clock). Live SSE events carry it as the envelope `ts` field — distinct from the payload's `modified` (app clock, different format). The cursor advances on every applied live event, not just `sync_complete`. See SYNC.md. (Two SSE failure modes are now handled: queue overflow closes the stream so the browser reconnects + catches up; rejected actions roll back.)
 
 Resync triggered when roles or vekn_id change (`resync_after` on User).
 
