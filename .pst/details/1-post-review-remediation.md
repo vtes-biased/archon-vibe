@@ -58,6 +58,21 @@ key-rotation semantics) is over-engineering. **Done instead:** `tokens.db` chmod
 (`token_store.py`) + systemd `UMask=0077` (covers `-wal`/`-shm`/`-journal` sidecars,
 `service.j2`). Real blast-radius control remains server-side token-chain revocation. Closed.
 
+### Resolution (2026-06-06): #9 seating made deterministic (seeded PRNG)
+Replaced `rand::thread_rng()` in the SA seating optimizer with a value-stable
+`rand_chacha::ChaCha8Rng` seeded via new `seating::seed_for_round(uid, round_index)`
+(FNV-1a over uid + LCG mix of round). Threaded `seed: u64` through
+`compute_seating`/`compute_next_round`/`optimize_sa`/`optimize_sa_multi`; the
+StartRound handler (`tournament/mod.rs`) derives the seed from `tournament["uid"]` +
+`previous_rounds.len()`, so WASM (offline), PyO3 (backend/bot), and the browser all
+compute byte-identical seating — the api.ts forwarding is now a safety net, not a
+requirement. `compute_seating_json` (preview, no live JS caller) derives the same seed
+from `tournament_uid`+`round`. **RandomToss/RaffleDraw were already deterministic** (LCG
+seeded from uid / caller seed) — no change needed there. Tests: added unit determinism
+(incl. n=7 staggered path) + a StartRound event-path determinism test; full engine suite
+green (131 + 1 ignored). Docs updated: ARCHITECTURE.md StartRound section, engine/README.md.
+principal-engineer review: LGTM. Closed. (#13 standings/card tiebreaks still open.)
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 

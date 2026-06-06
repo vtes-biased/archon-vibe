@@ -242,6 +242,40 @@ fn test_start_round_with_submitted_seating() {
 }
 
 #[test]
+fn test_start_round_computed_seating_is_deterministic() {
+    // No submitted seating => the engine computes it. The seed is derived from
+    // tournament uid + round, so running the same StartRound twice must yield
+    // byte-identical tables (WASM/PyO3/offline/bot agree).
+    let mut tournament = make_tournament();
+    tournament["state"] = "Waiting".into();
+    let mut players = json::array![];
+    for i in 0..8 {
+        players
+            .push(json::object! {
+                user_uid: format!("p{i}"),
+                state: "Checked-in",
+                payment_status: "Pending",
+                toss: 0,
+            })
+            .unwrap();
+    }
+    tournament["players"] = players;
+
+    let event = json::parse(r#"{"type": "StartRound"}"#).unwrap();
+    let actor = make_organizer();
+
+    let r1 = run_event(&tournament, &event, &actor).expect("StartRound 1");
+    let r2 = run_event(&tournament, &event, &actor).expect("StartRound 2");
+    let t1 = json::parse(&r1).unwrap();
+    let t2 = json::parse(&r2).unwrap();
+    assert_eq!(
+        t1["rounds"][0].dump(),
+        t2["rounds"][0].dump(),
+        "computed seating must be reproducible for the same tournament+round"
+    );
+}
+
+#[test]
 fn test_start_round_drops_registered_players() {
     let mut tournament = make_tournament();
     tournament["state"] = "Waiting".into();

@@ -2,7 +2,7 @@
 
 Lightweight Rust engine for business logic, compiled to both WebAssembly (frontend) and native Python library (backend).
 
-> **Open issues (pst):** #9 seating uses non-deterministic `thread_rng`; #13 nondeterministic standings/card tiebreaks; #16 stale `TOURNAMENT.md`; #19 split oversized `seating.rs`. Update the relevant ticket when changing the engine in that scope.
+> **Open issues (pst):** #13 nondeterministic standings/card tiebreaks; #16 stale `TOURNAMENT.md`; #19 split oversized `seating.rs`. Update the relevant ticket when changing the engine in that scope.
 
 ## Build
 
@@ -148,7 +148,8 @@ Events:
 ## Dependencies
 
 - `json` (0.12) - Lightweight JSON library
-- `rand` (0.8) - Random number generation (for seating algorithm)
+- `rand` (0.8) - Random number generation (seating shuffles, deterministic toss/raffle LCGs)
+- `rand_chacha` (0.3) - Value-stable `ChaCha8Rng` for seeded, reproducible seating across WASM/PyO3
 - `getrandom` (0.2, with `js` feature) - Entropy source for WASM
 - `wasm-bindgen` (0.2) - WASM bindings (optional, `--features wasm`)
 - `pyo3` (0.27) - Python bindings (optional, `--features python`)

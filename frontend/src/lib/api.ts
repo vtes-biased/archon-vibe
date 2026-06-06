@@ -589,8 +589,10 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
         return result.tournament;
       }
 
-      // For StartRound: forward WASM-computed seating so the server uses
-      // the same tables (seating computation is non-deterministic).
+      // For StartRound: forward WASM-computed seating so the server uses the
+      // same tables. Seating is now deterministic (seeded from tournament_uid +
+      // round), so the server would compute the same result — forwarding is a
+      // safety net guaranteeing agreement even if engine builds drift.
       let serverEvent: TournamentEvent = event;
       if (action === 'StartRound' && result.tournament.rounds &&
           result.tournament.rounds.length > (current.rounds?.length ?? 0)) {

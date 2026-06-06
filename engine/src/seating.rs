@@ -524,14 +524,20 @@ pub fn optimize_sa_multi(
     iterations_per_run: u32,
     restarts: u32,
     fixed_rounds: usize,
+    seed: u64,
 ) -> SeatingScore {
     use rand::prelude::*;
+    use rand_chacha::ChaCha8Rng;
+
+    // Master RNG seeded deterministically; each SA run draws its own sub-seed so
+    // WASM/PyO3/offline/bot all reproduce the same seating for the same input.
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
     // Keep original state for restarts
     let original_rounds = rounds.to_vec();
 
     let mut best_rounds = rounds.to_vec();
-    let mut best_score = optimize_sa(&mut best_rounds, iterations_per_run, fixed_rounds);
+    let mut best_score = optimize_sa(&mut best_rounds, iterations_per_run, fixed_rounds, rng.next_u64());
 
     if best_score.is_perfect() {
         for (i, r) in best_rounds.into_iter().enumerate() {
@@ -539,8 +545,6 @@ pub fn optimize_sa_multi(
         }
         return best_score;
     }
-
-    let mut rng = rand::thread_rng();
 
     for _ in 1..restarts {
         // Re-shuffle non-fixed rounds from original state
@@ -551,7 +555,7 @@ pub fn optimize_sa_multi(
             *r = build_round(&players);
         }
 
-        let score = optimize_sa(&mut trial, iterations_per_run, fixed_rounds);
+        let score = optimize_sa(&mut trial, iterations_per_run, fixed_rounds, rng.next_u64());
 
         if score.is_better(&best_score) {
             best_score = score.clone();
@@ -576,8 +580,10 @@ pub fn optimize_sa(
     rounds: &mut [Vec<Vec<String>>],
     iterations: u32,
     fixed_rounds: usize,
+    seed: u64,
 ) -> SeatingScore {
     use rand::prelude::*;
+    use rand_chacha::ChaCha8Rng;
 
     let rounds_count = rounds.len();
     if rounds_count == 0 || fixed_rounds >= rounds_count {
@@ -599,7 +605,7 @@ pub fn optimize_sa(
         reverse_mapping[idx] = name.clone();
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
     // Convert rounds to index-based representation for fast swapping
     let mut idx_rounds: Vec<Vec<Vec<usize>>> = rounds
@@ -1535,18 +1541,37 @@ pub fn score_rounds(rounds: &[Vec<Vec<String>>]) -> Result<SeatingScore, String>
 /// # Usage patterns
 ///
 /// Fresh tournament (no dropouts):
-///     `compute_seating(&players, 3, None)`
+///     `compute_seating(&players, 3, None, seed)`
 ///
 /// Adding a round after dropouts/additions:
-///     `compute_seating(&current_players, 2, Some(&[round1]))`
+///     `compute_seating(&current_players, 2, Some(&[round1]), seed)`
 ///
 /// Adding round 4+ to existing tournament:
-///     `compute_seating(&players, 4, Some(&prev_rounds))`
+///     `compute_seating(&players, 4, Some(&prev_rounds), seed)`
+///
+/// `seed` is typically `seed_for_round(tournament_uid, round_index)`.
 #[allow(clippy::type_complexity)]
+/// Derive a deterministic PRNG seed for a round's seating from the tournament
+/// uid and the (0-based) round index. The same uid+round always yields the same
+/// seed, so seating computed in the browser (WASM), the backend (PyO3), offline
+/// replay, and the bot all agree without forwarding the result.
+pub fn seed_for_round(tournament_uid: &str, round_index: usize) -> u64 {
+    // FNV-1a over the uid, then mix in the round index via an LCG step.
+    let base = tournament_uid
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325u64, |acc, b| {
+            (acc ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3)
+        });
+    base.wrapping_mul(6364136223846793005)
+        .wrapping_add(round_index as u64)
+        .wrapping_add(1)
+}
+
 pub fn compute_seating(
     players: &[String],
     rounds_count: usize,
     previous_rounds: Option<&[Vec<Vec<String>>]>,
+    seed: u64,
 ) -> Result<(Vec<Vec<Vec<String>>>, SeatingScore), String> {
     if players.len() < 4 {
         return Err("At least 4 players required".to_string());
@@ -1606,7 +1631,7 @@ pub fn compute_seating(
 
     // Simulated annealing parameters based on tournament size
     let (iterations, restarts) = get_sa_params(n);
-    optimize_sa_multi(&mut rounds, iterations, restarts, fixed);
+    optimize_sa_multi(&mut rounds, iterations, restarts, fixed, seed);
 
     // Compute final score
     let mapping = build_mapping(&rounds);
@@ -1636,10 +1661,11 @@ pub fn compute_seating(
 pub fn compute_next_round(
     current_players: &[String],
     previous_rounds: &[Vec<Vec<String>>],
+    seed: u64,
 ) -> Result<(Vec<Vec<String>>, SeatingScore), String> {
     let total_rounds = previous_rounds.len() + 1;
     let (all_rounds, score) =
-        compute_seating(current_players, total_rounds, Some(previous_rounds))?;
+        compute_seating(current_players, total_rounds, Some(previous_rounds), seed)?;
 
     // Return only the new round
     let new_round = all_rounds.into_iter().last().ok_or("No rounds generated")?;
@@ -1807,7 +1833,7 @@ mod tests {
     #[test]
     fn test_compute_seating_small() {
         let players = make_players(8);
-        let result = compute_seating(&players, 3, None);
+        let result = compute_seating(&players, 3, None, 42);
         assert!(result.is_ok());
 
         let (rounds, score) = result.unwrap();
@@ -1824,9 +1850,31 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_seating_is_deterministic() {
+        // Same players + same seed => byte-identical seating (WASM/PyO3/offline/bot agree).
+        // Use a non-precomputed size (e.g. 13) so the SA path actually runs.
+        let players = make_players(13);
+        let a = compute_seating(&players, 3, None, 12345).unwrap().0;
+        let b = compute_seating(&players, 3, None, 12345).unwrap().0;
+        assert_eq!(a, b, "same seed must reproduce identical seating");
+
+        // Staggered path (6/7/11 players) is also seed-deterministic.
+        let stag = make_players(7);
+        let s1 = compute_seating(&stag, 3, None, 999).unwrap().0;
+        let s2 = compute_seating(&stag, 3, None, 999).unwrap().0;
+        assert_eq!(s1, s2, "staggered seating must be deterministic");
+
+        // seed_for_round is stable for a given uid+round, and round-dependent.
+        let s0 = seed_for_round("tournament-xyz", 0);
+        assert_eq!(s0, seed_for_round("tournament-xyz", 0));
+        assert_ne!(s0, seed_for_round("tournament-xyz", 1));
+        assert_ne!(s0, seed_for_round("tournament-abc", 0));
+    }
+
+    #[test]
     fn test_compute_seating_medium() {
         let players = make_players(20);
-        let result = compute_seating(&players, 3, None);
+        let result = compute_seating(&players, 3, None, 42);
         assert!(result.is_ok());
 
         let (rounds, score) = result.unwrap();
@@ -1847,10 +1895,10 @@ mod tests {
         let players = make_players(8);
 
         // Generate first 2 rounds
-        let (initial_rounds, _) = compute_seating(&players, 2, None).unwrap();
+        let (initial_rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
 
         // Generate 3rd round with first 2 fixed
-        let result = compute_seating(&players, 3, Some(&initial_rounds));
+        let result = compute_seating(&players, 3, Some(&initial_rounds), 42);
         assert!(result.is_ok());
 
         let (rounds, _) = result.unwrap();
@@ -1864,21 +1912,21 @@ mod tests {
     #[test]
     fn test_error_on_few_players() {
         let players = make_players(3);
-        let result = compute_seating(&players, 3, None);
+        let result = compute_seating(&players, 3, None, 42);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_error_on_zero_rounds() {
         let players = make_players(8);
-        let result = compute_seating(&players, 0, None);
+        let result = compute_seating(&players, 0, None, 42);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_seating_50_players() {
         let players = make_players(50);
-        let result = compute_seating(&players, 3, None);
+        let result = compute_seating(&players, 3, None, 42);
         assert!(result.is_ok());
 
         let (rounds, score) = result.unwrap();
@@ -1897,13 +1945,13 @@ mod tests {
     fn test_compute_next_round_with_dropout() {
         // Start with 12 players
         let players = make_players(12);
-        let (rounds, _) = compute_seating(&players, 2, None).unwrap();
+        let (rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
 
         // Simulate 2 players dropping out for round 3
         let remaining: Vec<String> = (1..=10).map(|i| format!("P{}", i)).collect();
 
         // Compute round 3 with dropouts
-        let (round3, score) = compute_next_round(&remaining, &rounds).unwrap();
+        let (round3, score) = compute_next_round(&remaining, &rounds, 42).unwrap();
 
         // Should have correct table structure for 10 players
         let total: usize = round3.iter().map(|t| t.len()).sum();
@@ -1922,13 +1970,13 @@ mod tests {
     fn test_compute_next_round_with_addition() {
         // Start with 8 players
         let players = make_players(8);
-        let (rounds, _) = compute_seating(&players, 2, None).unwrap();
+        let (rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
 
         // Add 2 new players for round 3
         let expanded: Vec<String> = (1..=10).map(|i| format!("P{}", i)).collect();
 
         // Compute round 3 with new players
-        let (round3, score) = compute_next_round(&expanded, &rounds).unwrap();
+        let (round3, score) = compute_next_round(&expanded, &rounds, 42).unwrap();
 
         // Should have correct table structure for 10 players
         let total: usize = round3.iter().map(|t| t.len()).sum();
@@ -1947,7 +1995,7 @@ mod tests {
         for &count in &[8, 20, 50, 100] {
             let players = make_players(count);
             let start = Instant::now();
-            let result = compute_seating(&players, 3, None);
+            let result = compute_seating(&players, 3, None, 42);
             let elapsed = start.elapsed();
 
             assert!(result.is_ok());
@@ -1996,7 +2044,7 @@ mod tests {
     fn test_minimum_violations_multi_table() {
         // 8 players, 2 rounds, 2 tables of 4
         let players = make_players(8);
-        let (rounds, _) = compute_seating(&players, 2, None).unwrap();
+        let (rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
         let mins = compute_minimum_violations(&rounds);
 
         // With 2 tables and 8 players, pairs CAN be separated → min R2 = 0
@@ -2009,7 +2057,7 @@ mod tests {
     fn test_minimum_violations_forced_r4() {
         // 8 players, 3 rounds, 2 tables of 4 each
         let players = make_players(8);
-        let (rounds, _) = compute_seating(&players, 3, None).unwrap();
+        let (rounds, _) = compute_seating(&players, 3, None, 42).unwrap();
         let mins = compute_minimum_violations(&rounds);
 
         // total pair-slots = 3 * 12 = 36; C(8,2) = 28; excess = 8; min_R4 = ceil(8/2) = 4
@@ -2112,7 +2160,7 @@ mod tests {
     fn test_player_issues_optimal_seating_no_issues() {
         // Use precomputed optimal seating for 8 players -- should have zero issues
         let players = make_players(8);
-        let (rounds, score) = compute_seating(&players, 3, None).unwrap();
+        let (rounds, score) = compute_seating(&players, 3, None, 42).unwrap();
         // Precomputed seatings for 8 players are known optimal
         assert_eq!(
             score.rules[0], 0.0,

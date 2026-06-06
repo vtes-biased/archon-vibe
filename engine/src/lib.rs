@@ -78,8 +78,18 @@ mod shared {
                     .collect(),
             )
         };
+        // Seed: derive from tournament_uid + round so previews match what
+        // StartRound computes; fall back to an explicit `seed` or 0.
+        let seed = if let Some(uid) = config["tournament_uid"].as_str() {
+            let round_index = config["round"]
+                .as_usize()
+                .unwrap_or_else(|| previous_rounds.as_ref().map(|p| p.len()).unwrap_or(0));
+            seating::seed_for_round(uid, round_index)
+        } else {
+            config["seed"].as_u64().unwrap_or(0)
+        };
         let (rounds, score) =
-            seating::compute_seating(&players, rounds_count, previous_rounds.as_deref())?;
+            seating::compute_seating(&players, rounds_count, previous_rounds.as_deref(), seed)?;
         let rounds_json: Vec<JsonValue> = rounds
             .iter()
             .map(|r| {

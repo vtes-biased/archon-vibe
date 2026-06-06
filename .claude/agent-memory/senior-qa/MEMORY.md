@@ -1,5 +1,8 @@
 # Senior QA Agent Memory
 
+## Pointers
+- [Seating determinism](project_seating_determinism.md) — seeded ChaCha8Rng; which seating paths consume the seed + determinism test coverage/gaps
+
 ## Test Infrastructure
 
 ### How to Run Tests

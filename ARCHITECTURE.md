@@ -170,11 +170,11 @@ Tournament actions use optimistic updates via WASM:
 
 ### StartRound Seating Forwarding
 
-`StartRound` accepts optional `seating: Vec<Vec<String>>` (table → ordered player UIDs). When provided, the engine validates it and uses it directly instead of computing random seating.
+`StartRound` accepts optional `seating: Vec<Vec<String>>` (table → ordered player UIDs). When provided, the engine validates it and uses it directly instead of computing seating.
 
-**Problem solved**: WASM (`rand::thread_rng`) and PyO3 use separate RNG states, so an unconstrained `StartRound` produces different seatings on client and server — breaking the optimistic update.
+**Determinism**: seating computation is seeded — `seating::seed_for_round(tournament_uid, round_index)` feeds a `ChaCha8Rng` (value-stable across platforms), so WASM (offline), PyO3 (backend/bot), and the browser all compute byte-identical seating for the same tournament + round. The forwarding below is therefore a safety net (guaranteeing agreement even if engine builds drift), not a correctness requirement.
 
-**Solution** (`tournamentAction()` in `api.ts`): after WASM processes `StartRound`, extract the computed seating from the result and inject it into the server POST:
+**Forwarding** (`tournamentAction()` in `api.ts`): after WASM processes `StartRound`, extract the computed seating from the result and inject it into the server POST:
 
 ```typescript
 if (action === 'StartRound' && newRoundAdded) {
@@ -183,7 +183,7 @@ if (action === 'StartRound' && newRoundAdded) {
 }
 ```
 
-**Validation** (engine, `tournament.rs`):
+**Validation** (engine, `tournament/mod.rs`):
 - Each table must have 4–5 players
 - All checked-in players must appear exactly once
 - No duplicate player UIDs across tables

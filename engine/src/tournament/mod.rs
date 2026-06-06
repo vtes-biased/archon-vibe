@@ -690,8 +690,12 @@ fn apply_event(
                 }
                 submitted.clone()
             } else {
+                let seed = seating::seed_for_round(
+                    tournament["uid"].as_str().unwrap_or(""),
+                    previous_rounds.len(),
+                );
                 let (computed, _score) =
-                    seating::compute_next_round(&players_to_seat, &previous_rounds)?;
+                    seating::compute_next_round(&players_to_seat, &previous_rounds, seed)?;
                 computed
             };
 
