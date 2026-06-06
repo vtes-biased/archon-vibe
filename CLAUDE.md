@@ -30,9 +30,9 @@ Steps 3-6 should run in parallel when applicable. Skip agents only for trivial c
 
 # Architecture
 
-Core architecture reference for offline-first PWA. See ARCHITECTURE.md for details.
-
-**Sync implementation**: See SYNC.md for streaming patterns, IndexedDB optimization, and how to add new object types.
+Offline-first PWA. Keep deep design detail in the dedicated docs, not here:
+**ARCHITECTURE.md** (full design and per-subsystem mechanics) and **SYNC.md**
+(streaming, IndexedDB, access levels, and how to add an object type).
 
 ## Stack
 - **Frontend**: Svelte + Vite + TypeScript, PWA (service workers), IndexedDB local storage
@@ -40,101 +40,14 @@ Core architecture reference for offline-first PWA. See ARCHITECTURE.md for detai
 - **Bot**: Separate process — Discord bot (hikari + lightbulb + miru), pure OAuth client to backend, SQLite token/state storage
 - **Shared**: Rust core (business logic) → WASM (frontend) + PyO3 (backend)
 
-## Data Model
-All objects have (via `BaseObject`):
-- `uid`: UUID v7 (indexed, time-ordered)
-- `modified`: timestamp (indexed)
-- `deleted_at`: soft-delete timestamp (nullable)
-- Model-specific fields
+## Core model
+- All objects extend `BaseObject` (`uid` UUID v7, `modified`, `deleted_at` soft-delete) and live in one unified `objects` table.
+- Each row stores three pre-computed access projections — `public` / `member` / `full` — written at write time by `access_levels.py`. SSE reads the matching column directly; no per-viewer filtering at read time. (Levels and field visibility: SYNC.md.)
+- **Synced types**: User, Sanction, Tournament, DeckObject, League (via SSE). VtesCard is static data loaded into IndexedDB.
+- **Online**: action → Rust engine → PostgreSQL → CRUD event → SSE → IndexedDB → UI. **Offline**: tournament locks to one device, the WASM engine writes IndexedDB directly, and full state is pushed on go-online (server overwrites). No conflicts by construction (force-takeover / IC force-unlock are the escape hatches).
+- **Mutations are optimistic**: WASM applies locally, the server request follows; on success SSE delivers authoritative state, on rejection the frontend rolls back (no API GET — reads stay offline-first).
 
-**DB Storage**: Unified `objects` table with pre-computed access-level columns:
-```sql
-CREATE TABLE objects (
-    uid TEXT PRIMARY KEY, type TEXT NOT NULL,
-    modified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP,
-    "public" JSONB, "member" JSONB, "full" JSONB NOT NULL
-);
-```
-Access projections computed by `access_levels.py` at write time. No per-viewer filtering at read time.
-
-**Card/Deck Support**: VTES card database loaded into IndexedDB (`cards` store). Deck validation in Rust engine, integrated into tournament player workflow.
-
-**Object Types**: User, Sanction, Tournament, DeckObject, League (all synced via SSE). VtesCard (static data, loaded into IndexedDB).
-
-**Player model** (embedded in Tournament): includes `display_name: str | None` — Discord guild nickname set per-tournament. Shown in `playerInfo` and `seatDisplay` when present. Set via Register/AddPlayer/CheckIn events (Rust engine).
-
-**DeckObject fields**: `tournament_uid`, `user_uid`, `round`, `name`, `author`, `comments`, `cards` (dict card_id→count), `attribution`, `public` (bool — engine-managed, drives member-level visibility).
-- No deck REST endpoints. All mutations go through `POST /{uid}/action` (engine `deck_ops` side-effects).
-- `deck_ops` ops: `upsert` (create/update deck), `delete` (remove deck), `set_public` (flip public flag on existing deck by uid).
-- Engine `process_tournament_event` signature: `(tournament_json, event_json, actor_json, sanctions_json, decks_json) → {"tournament": {...}, "deck_ops": [...]}`
-
-**Tournament extra fields**: `external_ids` (dict, e.g. `{"vekn": "<event_id>"}`), `vekn_pushed_at` (datetime|None — set when results uploaded to VEKN).
-
-**Timer fields** (on Tournament, online-only):
-- `timer`: `TimerState` — `{started_at, elapsed_before_pause, paused}`. Clients compute countdown locally.
-- `table_extra_time`: `dict[str, int]` — table index → extra seconds granted
-- `table_paused_at`: `dict[str, str]` — table index → ISO datetime of clock-stop start
-
-**TournamentConfig timer fields**: `round_time` (int, seconds), `finals_time` (int, seconds, 0 = use round_time), `time_extension_policy` (`additions` | `clock_stop` | `both`).
-
-## Events
-
-### Business Events
-- Domain actions (e.g., `Member.New`, `Tournament.RoundStart`)
-- Processed by Rust engine (shared client/server)
-- Transform objects per business rules
-
-### CRUD Events
-- Sync database state (Create/Update/Delete)
-- Payload: full object with `uid` + `modified`
-- Used for SSE streaming and reconciliation
-
-### Ephemeral SSE Events
-- Not stored in DB; no IndexedDB update
-- `judge_call`: broadcast to organizers + IC only; payload `{tournament_uid, table, table_label, player_name}`
-
-## Modes
-
-### Online
-1. User action → business event → backend
-2. Backend Rust engine processes → updates PostgreSQL
-3. Backend generates CRUD event → broadcasts via SSE
-4. Frontend receives CRUD → updates IndexedDB → UI reacts
-
-### Offline
-1. Organizer takes tournament offline → locked to their device (primary device ownership)
-2. Business events processed by WASM Rust engine → IndexedDB updated directly
-3. Other devices see "offline" message — no mutations available
-4. On go-online: primary device sends full tournament state → server overwrites → SSE resumes
-
-**Ownership model**: No conflicts possible — tournament is locked to one device. Force-takeover available for other organizers (with data loss warning). IC can force-unlock in emergencies.
-
-## Access Model (Data Levels)
-
-Three pre-computed JSONB columns per object (see SYNC.md for field details):
-
-- **public**: no token or no vekn_id. Only Prince/NC users (with contact + community_links), IC (community_links only), minimal tournaments, no sanctions, no decks
-- **member**: has vekn_id. All users (no contact info); community_links included for NC/Prince/IC and any member with non-empty links; sanctions; most tournament fields; decks where `public=true` (own decks via personal overlay)
-- **full**: base level for all viewers; personal overlay sends full data for own objects + role-based access (IC, NC/Prince same country, organizer)
-
-Projections computed by `access_levels.py` at write time. SSE reads the matching column directly.
-
-## Mutation Pipeline
-
-Tournament actions use optimistic updates via WASM engine:
-1. WASM processes locally → returns `{tournament, deck_ops}` → IndexedDB updated → UI reacts immediately
-2. Server request sent async → on success SSE delivers authoritative state (tournament + deck objects) → overwrites if different
-3. On **rejection** the server emits no SSE and `modified_at` does not advance, so nothing self-corrects — the frontend rolls back to the pre-action snapshot it still holds (no API GET; reads stay offline-first) and surfaces the error. Self-heals if the action actually committed (ambiguous network case), because SSE apply is overwrite-by-uid, not field-merge.
-
-**Sync cursor**: clients reconnect with `?since=<cursor>` over the `modified_at` column (DB clock). Live SSE events carry it as the envelope `ts` field — distinct from the payload's `modified` (app clock, different format). The cursor advances on every applied live event, not just `sync_complete`. See SYNC.md. (Two SSE failure modes are now handled: queue overflow closes the stream so the browser reconnects + catches up; rejected actions roll back.)
-
-Resync triggered when roles or vekn_id change (`resync_after` on User).
-
-**StartRound seating forwarding**: `StartRound` accepts optional `seating: Vec<Vec<String>>`. WASM and PyO3 produce different random seatings; the frontend extracts the WASM result and injects it into the server POST so both sides use identical tables. Engine validates submitted seating (sizes 4–5, all checked-in players, no duplicates). See ARCHITECTURE.md for details.
-
-## Key Constraints
+## Key constraints
 - Server always wins conflicts
-- Each PWA maintains full dataset in IndexedDB
-- SSE for real-time sync when online
-- Rust ensures consistent business logic across stack
+- Each PWA keeps the full dataset in IndexedDB; SSE for real-time sync when online
+- Rust ensures consistent business logic across the stack
