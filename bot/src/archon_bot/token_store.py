@@ -1,5 +1,7 @@
 """SQLite-backed OAuth token storage keyed by Discord user ID."""
 
+import os
+
 import aiosqlite
 
 from . import config
@@ -12,6 +14,14 @@ class TokenStore:
 
     async def init(self) -> None:
         self._db = await aiosqlite.connect(self._db_path)
+        # This DB holds backend OAuth tokens (user:impersonate). Restrict it to
+        # owner-only at rest. systemd UMask=0077 covers the SQLite sidecar files
+        # (-wal/-shm/-journal); this best-effort chmod also hardens dev/non-systemd
+        # runs. No-op for ":memory:" or non-POSIX platforms.
+        try:
+            os.chmod(self._db_path, 0o600)
+        except OSError:
+            pass
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS tokens (
                 discord_id TEXT PRIMARY KEY,

@@ -45,6 +45,19 @@ Each finding is a child ticket with `parent:#1`. Severity: p0 (broken now) → p
 - **#18 internal-field overlay:** accepted for now (low sensitivity); deferred, not closed.
 - **Docs (#16 / #17):** fix the bugs first, then rewrite the behavior docs. Ticket *pointers* have been added to the affected docs (ARCHITECTURE.md, SYNC.md, engine/TOURNAMENT.md, engine/README.md) for discoverability in fresh sessions.
 
+### Decision (2026-06-06): #10 right-sized — Fernet declined, file perms hardened
+The `needs-verify` premise was **false**: the backend does *not* Fernet-encrypt Discord
+tokens — it stores them as plaintext JSONB in `transient_tokens` (`db.py:1439`); there is no
+`cryptography`/`Fernet` anywhere in `backend/` or `bot/`. Threat-model on the actual deploy:
+the bot's `tokens.db` holds backend OAuth tokens (`user:impersonate`, rotating, server-revocable
+via `revoke_oauth_token_chain`). An at-rest key would live in the systemd `EnvironmentFile`, so it
+co-locates with the data under host compromise / disk-snapshot theft → encryption would be theater
+there; the only genuine win (data file copied without the key, e.g. a future `state_dir`-scoped
+backup) is hypothetical for a not-yet-live bot. So full Fernet (new dep + vaulted secret +
+key-rotation semantics) is over-engineering. **Done instead:** `tokens.db` chmod `0600` on init
+(`token_store.py`) + systemd `UMask=0077` (covers `-wal`/`-shm`/`-journal` sidecars,
+`service.j2`). Real blast-radius control remains server-side token-chain revocation. Closed.
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 
