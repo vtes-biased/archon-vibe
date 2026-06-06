@@ -91,6 +91,10 @@
 - `saveDeck()` in db.ts deduplicates on `(tournament_uid, user_uid, round)`
 - `_process_deck_ops()` upsert also matches on `(tournament, player, round)` — consistent
 
+## Sync-Correctness Traps
+- [Sync cursor timestamp trap](sync-cursor-timestamp-trap.md) — objects table has TWO modified timestamps (column modified_at vs JSONB modified); diverge in value+format; never mix in since-cursor
+- [Tournament GET route prefix](tournament-get-route-prefix.md) — GET-by-uid lives under /api/v1, mutations under /api/tournaments; bare GET /api/tournaments/{uid} is a 404
+
 ## Recurring Bug Pattern: Sanction reconstruction
 - `main.py:run_sanction_cleanup()` reconstructs Sanction manually — must include ALL fields
 - Same pattern in `sanctions.py` delete endpoint — also manual reconstruction

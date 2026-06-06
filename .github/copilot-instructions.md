@@ -1,8 +1,4 @@
----
-description: pst work-tracking mandate
-alwaysApply: true
----
-
+<!-- pst-mandate:start -->
 ## Work tracking — use pst tickets
 
 If this repository has a `.pst/tickets` file, it uses **pst** as the single source of truth for
@@ -24,3 +20,4 @@ work tracking. In that case:
 
 See `.pst/skill.md` for the line format, shell read recipes, and the non-negotiable
 write rules (never delete/reorder lines; always write via the `pst` CLI).
+<!-- pst-mandate:end -->
