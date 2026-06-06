@@ -173,7 +173,7 @@ Offline mode uses primary device ownership — no CRUD log or conflict resolutio
 - **Opportunistic sync**: primary device can background-sync without unlocking (`sync-offline`)
 - **IC force-unlock**: emergency unlock without syncing offline data
 
-> **Open issue (pst #44):** go-online resolves offline players inside the `tournament_transaction` lock; their *reads* reuse the connection (ambient), but each `insert_user`/`allocate_next_vekn_id` still checks out a short-lived independent connection (required — see Database Access). Rare (once per go-online), so low starvation risk; the clean fix is to resolve/create players *before* taking the lock.
+go-online resolves/creates offline players (`insert_user`/`allocate_next_vekn_id`) **before** taking the `FOR UPDATE` lock (pst #45): an unlocked pre-check gates side effects (organizer + device lock), then the lock only re-verifies authoritatively, remaps temp UIDs, and saves — so no per-player connection is checked out while the row is locked. Benign race: if organizer rights are revoked between the pre-check and the lock, the re-check 403s after the users were already created (orphaned, harmless).
 
 ## Mutation Pipeline
 

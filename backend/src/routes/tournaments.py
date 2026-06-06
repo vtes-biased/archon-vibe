@@ -1605,28 +1605,63 @@ async def go_online(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # SELECT FOR UPDATE: serialize the device-lock check with reconciliation (TOCTOU).
-    # A tournament created offline may not exist server-side yet; FOR UPDATE on a
-    # missing row yields None and the upsert below inserts it within the same tx.
+    # Validate tournament UID matches URL (cheap, request-only — before any side effects)
+    if request.tournament.get("uid") and request.tournament["uid"] != uid:
+        raise HTTPException(status_code=400, detail="Tournament UID mismatch")
+    request.tournament["uid"] = uid  # Force correct UID
+
+    # Pre-lock gate: authorize and pre-check the device lock against current server
+    # state BEFORE creating any users, so player resolution (insert_user /
+    # allocate_next_vekn_id / invite emails) never runs for an unauthorized or
+    # wrong-device request. Re-checked authoritatively under the lock below; this
+    # unlocked read only fails fast and gates side effects. A tournament created
+    # offline may not exist server-side yet (existing is None → no org check, as
+    # before). pst #45
+    existing = await get_tournament_by_uid(uid)
+    if existing:
+        if not _is_organizer(current_user, existing):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can bring a tournament online"
+            )
+        if (
+            existing.offline_mode
+            and existing.offline_device_id != request.device_id
+            and not request.force
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Tournament owned by another device. Use force to override.",
+            )
+
+    # Resolve offline players → real user accounts. Done OUTSIDE the lock: each
+    # resolution may create a user and allocate a VEKN ID (its own advisory-locked
+    # transaction), so holding the FOR UPDATE lock here would check out extra
+    # pooled connections per player. pst #45
+    # Benign race: if the caller's organizer rights are revoked between the
+    # pre-check and the lock, the authoritative re-check below 403s after these
+    # users were created — leaving orphaned (real, coopted) accounts. Acceptable.
+    uid_map: dict[str, str] = {}
+    for player_data in request.offline_players:
+        temp_uid, real_user = await _resolve_or_create_offline_player(
+            player_data, request.tournament.get("country"), current_user.uid
+        )
+        uid_map[temp_uid] = real_user.uid
+
+    # SELECT FOR UPDATE: serialize the device-lock check with the save (TOCTOU) so
+    # two devices can't both reconcile. A missing row yields None and the upsert
+    # below inserts it within the same tx. Holds only tx_conn — no per-player work.
     async with tournament_transaction(uid) as (tournament, tx_conn):
-        # Tournament might not exist on server (created offline)
+        # Re-verify authorization + device lock authoritatively under the lock.
         if tournament and not _is_organizer(current_user, tournament):
             raise HTTPException(
                 status_code=403, detail="Only organizers can bring a tournament online"
             )
-
-        # Verify device lock
         if tournament and tournament.offline_mode:
             if tournament.offline_device_id != request.device_id and not request.force:
                 raise HTTPException(
                     status_code=409,
                     detail="Tournament owned by another device. Use force to override.",
                 )
-
-        # Validate tournament UID matches URL
-        if request.tournament.get("uid") and request.tournament["uid"] != uid:
-            raise HTTPException(status_code=400, detail="Tournament UID mismatch")
-        request.tournament["uid"] = uid  # Force correct UID
 
         # Preserve original organizers (prevent client from removing them)
         if tournament:
@@ -1635,27 +1670,19 @@ async def go_online(
             merged = list(dict.fromkeys(original_organizers + client_organizers))
             request.tournament["organizers_uids"] = merged
 
-        # 1. Resolve offline players → real user accounts
-        uid_map: dict[str, str] = {}
-        for player_data in request.offline_players:
-            temp_uid, real_user = await _resolve_or_create_offline_player(
-                player_data, request.tournament.get("country"), current_user.uid
-            )
-            uid_map[temp_uid] = real_user.uid
-
-        # 2. Remap UIDs throughout tournament data
+        # Remap temp UIDs → real user UIDs throughout tournament data
         tournament_data = request.tournament
         if uid_map:
             tournament_data = _remap_uids_in_tournament(tournament_data, uid_map)
 
-        # 3. Clear offline fields
+        # Clear offline fields
         tournament_data["offline_mode"] = False
         tournament_data["offline_device_id"] = ""
         tournament_data["offline_user_uid"] = ""
         tournament_data["offline_since"] = None
         tournament_data["modified"] = datetime.now(UTC).isoformat()
 
-        # 4. Save tournament within the locked transaction (upsert handles insert)
+        # Save tournament within the locked transaction (upsert handles insert)
         updated = decoder.decode(msgspec.json.encode(tournament_data))
         updated.modified = datetime.now(UTC)
         tournament_bd = await save_object(

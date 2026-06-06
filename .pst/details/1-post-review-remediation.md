@@ -151,6 +151,23 @@ write inside the lock — pool pressure (not deadlock: different rows, short hol
 (once per go-online). Clean fix = resolve/create players BEFORE taking the `FOR UPDATE` lock;
 tracked on #44's note + overlaps #15. Closed #44.
 
+### Resolution (2026-06-06): #45 go-online resolves players before the lock
+Restructured `go_online` (`tournaments.py`) so user creation no longer happens inside the
+`FOR UPDATE` lock. New order: (1) cheap request validation (UID match); (2) **pre-lock gate** —
+unlocked `get_tournament_by_uid` + `_is_organizer`/device-lock checks to fail fast and gate
+side effects; (3) **resolve/create players** (`_resolve_or_create_offline_player` loop:
+insert_user / allocate_next_vekn_id / invite emails) OUTSIDE any lock; (4) **lock** only to
+re-verify auth+device authoritatively (TOCTOU), merge organizers, remap temp UIDs, and
+`save_object(conn=tx_conn)`. The lock now holds only `tx_conn` — re-checks on the locked
+object (no DB), CPU remap, one write — zero per-player pooled-connection acquisition.
+TOCTOU protection preserved (the locked re-check is still the serialization point; sequential
+reconcile is last-writer-wins as before). Tests: `test_go_online.py` — non-organizer→403 and
+wrong-device→409 both create ZERO users (side-effect gating), organizer→200 resolves+creates+
+remaps the player and clears offline_mode. Full backend suite green (148). principal-engineer
+review: LGTM. **Known benign race (documented inline):** if the caller's organizer rights are
+revoked between the pre-check and the lock, the re-check 403s after users were created →
+orphaned real/coopted accounts. Accepted (rare, harmless). Closed #45.
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 

@@ -5,28 +5,50 @@ metadata:
   type: project
 ---
 
-`go_online` in `backend/src/routes/tournaments.py` runs the whole offline
-reconciliation inside `tournament_transaction(uid)` (db.py:343 — `SELECT "full"
-FROM objects WHERE uid=%s FOR UPDATE`). Inside that lock it calls
-`_resolve_or_create_offline_player`, which calls `allocate_next_vekn_id`
-(db.py:787). That function acquires a **second** pooled connection via
-`_pool.getconn()` and takes `pg_advisory_xact_lock(1)`.
+**pst #45 (2026-06) RESTRUCTURED go_online — the per-player nested-pool concern
+below is now RESOLVED.** `go_online` in `backend/src/routes/tournaments.py`
+(lines ~1598-1731) now resolves/creates offline players (the
+`_resolve_or_create_offline_player` loop → `allocate_next_vekn_id` +
+`insert_user` + invite emails) OUTSIDE `tournament_transaction`. Order: (1) cheap
+UID-match validation; (2) pre-lock gate — unlocked `get_tournament_by_uid`, then
+`_is_organizer` (403) + device-lock (409) checks that gate side effects; (3)
+resolve loop builds `uid_map` on independent pooled conns (lock not yet held, so
+`_tx_conn` unset); (4) `tournament_transaction` holds ONLY tx_conn — re-checks
+org+device authoritatively, merges organizers, remaps uids (CPU), single
+`save_object(conn=tx_conn)`; (5) post-lock sanctions/decks/broadcasts. So the
+lock no longer acquires any pooled conn per player — pool-starvation concern gone.
 
-So a single go_online request holds: pooled conn A (tx + tournament row lock,
-held for the whole reconciliation) + pooled conn B (advisory lock 1, short).
+**TOCTOU preserved, but new orphaned-user window (acceptable):** Two devices can
+still both pass the unlocked pre-check and both create users; only one holds the
+FOR UPDATE row lock at a time. First reconcile clears offline_mode; the second's
+locked re-check sees offline_mode=False so its device check is bypassed and it
+saves too (last-writer-wins upsert) — identical to pre-#45 behavior, fine under
+"server always wins / force-takeover escape hatch". NEW leak: if the requester is
+removed from organizers_uids by a concurrent reconcile between the pre-check and
+the lock, the locked re-check (line ~1652) 403s AFTER users were already created
+→ orphaned coopted User rows (+ possible sent invite emails), tournament not
+saved by this request. Old code created users inside the lock after the checks,
+so never had this window. Verdict: low-harm (orphans are valid VEKN-allocated
+User records, dedup by vekn/email on retry), rare race — acceptable trade-off for
+removing in-lock pool pressure. Document as known limitation; don't block.
 
-**Why:** Lock ordering is consistent (the FOR UPDATE row lock is per-tournament;
-the advisory lock is a single global id taken/released quickly), so no classic
-deadlock between two go_online calls. But it is a NESTED pool acquisition: every
-concurrent go_online with N offline players holds 2 pool slots and serializes on
-advisory_xact_lock(1). Pool is `max_size=20` (db.py:58). N concurrent go_online
-each needing 2 slots starves at ~10 concurrent, not 20.
+**How to apply:** Flag if anyone moves MULTI-CONNECTION write work back inside
+tournament_transaction, or adds a pre-lock side effect that's expensive to orphan.
+Do NOT take the advisory lock on tx_conn while inside the tx — real lock-ordering
+hazard. Related: [[tournament-get-route-prefix]], [[sync-cursor-timestamp-trap]].
 
-**How to apply:** This is acceptable for current scale (tournament go_online is
-rare, low concurrency). Flag if anyone moves MORE multi-connection work inside
-tournament_transaction, or if go_online concurrency rises. Do NOT take the
-advisory lock on conn A while inside the tx — it would create a real
-lock-ordering hazard. Related: [[tournament-get-route-prefix]].
+--- HISTORICAL (pre-#45 state, kept for the load-bearing rationale below) ---
+
+Before #45, `go_online` ran the whole offline reconciliation inside
+`tournament_transaction(uid)` (`SELECT "full" FROM objects WHERE uid=%s FOR
+UPDATE`). Inside that lock it called `_resolve_or_create_offline_player`, which
+calls `allocate_next_vekn_id`. That function acquires a **second** pooled
+connection and takes `pg_advisory_xact_lock(1)`. So a single go_online request
+held: pooled conn A (tx + tournament row lock, whole reconciliation) + pooled
+conn B (advisory lock 1, short). Every concurrent go_online with N offline
+players held 2 pool slots and serialized on advisory_xact_lock(1); pool
+`max_size=20`, so it starved at ~10 concurrent. #45 removed this by moving the
+resolve loop out of the lock (see above).
 
 **pst #12 resolution pattern (2026-06):** The `tournament_action` path (the
 common one — every CRUD action) was fixed NOT by prefetch but by
@@ -43,9 +65,10 @@ SELECTs on the autocommit conn inside its `conn.transaction()`, no nested
 transaction/pipeline (same idiom save_object(conn=) already used).
 
 The `go_online` / `allocate_next_vekn_id` second-pooled-conn-for-advisory-lock
-scope described above is a DIFFERENT path and is NOT addressed by that fix —
-`tournament_action` doesn't allocate vekn ids. That nested-pool concern remains
-open for go_online.
+scope was a DIFFERENT path, NOT addressed by the #12 fix —
+`tournament_action` doesn't allocate vekn ids. That nested-pool concern was
+RESOLVED separately by **pst #45** (resolve loop moved out of the lock — see top
+of this file).
 
 **pst #44 (2026-06): ambient ContextVar + the load-bearing read/write split.**
 #44 makes reuse automatic via a `ContextVar` `_tx_conn` holding
