@@ -1,5 +1,6 @@
 """Tournament API endpoints."""
 
+import json
 import logging
 import os
 from datetime import UTC, datetime
@@ -223,12 +224,10 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
         return
 
     try:
-        import json as json_mod
-
         from ..twda import submit_twda_pr
 
         engine = _engine
-        deck_json = json_mod.dumps(
+        deck_json = json.dumps(
             {
                 "name": winner_deck.name,
                 "author": winner_deck.author,
@@ -927,9 +926,7 @@ async def tournament_action(
             raise HTTPException(status_code=400, detail=str(e)) from e
 
         # Parse new result format: {"tournament": {...}, "deck_ops": [...]}
-        import json as json_mod
-
-        result = json_mod.loads(result_json)
+        result = json.loads(result_json)
         # Normalize datetime fields: frontend sends "YYYY-MM-DDTHH:MM" (no seconds)
         # but msgspec requires at least "YYYY-MM-DDTHH:MM:SS" for RFC3339 decoding
         t_data = result["tournament"]
@@ -1103,9 +1100,7 @@ async def export_deck_twda(
         raise HTTPException(status_code=404, detail="No deck found for player")
 
     engine = _engine
-    import json as json_mod
-
-    deck_json = json_mod.dumps(
+    deck_json = json.dumps(
         {
             "name": deck.name,
             "author": deck.author,
@@ -1163,8 +1158,6 @@ async def tournament_report(
             status_code=403, detail="Only organizers can download reports"
         )
 
-    import json as json_mod
-
     report = {
         "tournament": {
             "name": tournament.name,
@@ -1188,7 +1181,7 @@ async def tournament_report(
         ],
     }
     return Response(
-        content=json_mod.dumps(report, indent=2),
+        content=json.dumps(report, indent=2),
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{uid}-report.json"'},
     )
@@ -1586,13 +1579,19 @@ async def _resolve_or_create_offline_player(
 
 
 def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) -> dict:
-    """Replace all temp_uid references with real UIDs throughout tournament data."""
-    import json as json_mod
+    """Replace all temp_uid references with real UIDs throughout tournament data.
 
-    raw = json_mod.dumps(tournament_data)
+    A whole-JSON byte replace, intentionally: temp UIDs are full 36-char UUIDs,
+    so substring collisions are not a practical concern, and this covers every
+    UID-bearing field (players, seating, standings, finals seed_order, raffles,
+    winner) without having to enumerate — and miss — them. Decks and sanctions are
+    flat single objects, so `go_online` repoints their one UID field directly; a
+    deck's `attribution` (a vekn, not a UID) is repointed there too. pst #15
+    """
+    raw = msgspec.json.encode(tournament_data)
     for temp_uid, real_uid in uid_map.items():
-        raw = raw.replace(temp_uid, real_uid)
-    return json_mod.loads(raw)
+        raw = raw.replace(temp_uid.encode(), real_uid.encode())
+    return msgspec.json.decode(raw)
 
 
 @router.post("/{uid}/go-online")
@@ -1640,12 +1639,17 @@ async def go_online(
     # Benign race: if the caller's organizer rights are revoked between the
     # pre-check and the lock, the authoritative re-check below 403s after these
     # users were created — leaving orphaned (real, coopted) accounts. Acceptable.
-    uid_map: dict[str, str] = {}
+    uid_map: dict[str, str] = {}  # temp player UID → resolved user UID
+    vekn_remap: dict[
+        str, str
+    ] = {}  # offline TEMP- vekn → resolved real vekn (deck attribution)
     for player_data in request.offline_players:
         temp_uid, real_user = await _resolve_or_create_offline_player(
             player_data, request.tournament.get("country"), current_user.uid
         )
         uid_map[temp_uid] = real_user.uid
+        if (player_data.vekn_id or "").startswith("TEMP-") and real_user.vekn_id:
+            vekn_remap[player_data.vekn_id] = real_user.vekn_id
 
     # SELECT FOR UPDATE: serialize the device-lock check with the save (TOCTOU) so
     # two devices can't both reconcile. A missing row yields None and the upsert
@@ -1697,33 +1701,23 @@ async def go_online(
         f"Tournament {uid} went back online (user={current_user.uid}, remapped={len(uid_map)} players)"
     )
 
-    # 5. Save offline sanctions with remapped UIDs
+    # 5. Save offline sanctions, repointing the target to the resolved user
     for sanction_data in request.offline_sanctions:
-        if uid_map:
-            import json as json_mod
-
-            raw = json_mod.dumps(sanction_data)
-            for temp_uid, real_uid in uid_map.items():
-                raw = raw.replace(temp_uid, real_uid)
-            sanction_data = json_mod.loads(raw)
-
         sanction = msgspec.convert(sanction_data, Sanction)
+        sanction.user_uid = uid_map.get(sanction.user_uid, sanction.user_uid)
         bd = await insert_sanction(sanction)
         broadcast_precomputed(bd)
 
-    # 6. Save offline decks with remapped UIDs
+    # 6. Save offline decks, repointing the owner and the attribution. A deck's
+    # attribution is a vekn (the "designed by" credit), so a temp player's own-deck
+    # attribution is their offline TEMP- vekn; repoint it to their resolved real
+    # vekn (or drop it if the temp player wasn't resolved). pst #15
     for deck_data in request.offline_decks:
-        if uid_map:
-            import json as json_mod
-
-            raw = json_mod.dumps(deck_data)
-            for temp_uid, real_uid in uid_map.items():
-                raw = raw.replace(temp_uid, real_uid)
-            deck_data = json_mod.loads(raw)
-
-        # Ensure tournament_uid is correct
-        deck_data["tournament_uid"] = uid
         deck_obj = msgspec.convert(deck_data, DeckObject)
+        deck_obj.tournament_uid = uid
+        deck_obj.user_uid = uid_map.get(deck_obj.user_uid, deck_obj.user_uid)
+        if deck_obj.attribution and deck_obj.attribution.startswith("TEMP-"):
+            deck_obj.attribution = vekn_remap.get(deck_obj.attribution)
         bd = await save_object_from_model(ObjectType.DECK, deck_obj)
         bd.org_uids = updated.organizers_uids
         broadcast_precomputed(bd)

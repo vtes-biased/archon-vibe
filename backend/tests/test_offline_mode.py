@@ -28,21 +28,22 @@ class TestRemapUids:
         assert result["players"][1]["user_uid"] == "real-222"
 
     def test_remap_in_nested_structures(self):
-        """UIDs appear in seating, decks keys, standings, etc."""
+        """Temp UIDs appear in seating, standings, finals, raffles, winner."""
         data = {
             "uid": "t1",
             "players": [{"user_uid": "temp-aaa"}],
             "rounds": [[{"seating": [{"player_uid": "temp-aaa"}]}]],
-            "decks": {"temp-aaa": [{"name": "My Deck"}]},
+            "finals": {"seating": [{"player_uid": "temp-aaa"}]},
             "standings": [{"user_uid": "temp-aaa", "vp": 3.0}],
+            "raffles": [{"winners": ["temp-aaa", "real-existing"]}],
             "winner": "temp-aaa",
         }
         result = _remap_uids_in_tournament(data, {"temp-aaa": "real-111"})
         assert result["players"][0]["user_uid"] == "real-111"
         assert result["rounds"][0][0]["seating"][0]["player_uid"] == "real-111"
-        assert "real-111" in result["decks"]
-        assert "temp-aaa" not in result["decks"]
+        assert result["finals"]["seating"][0]["player_uid"] == "real-111"
         assert result["standings"][0]["user_uid"] == "real-111"
+        assert result["raffles"][0]["winners"] == ["real-111", "real-existing"]
         assert result["winner"] == "real-111"
 
     def test_empty_uid_map(self):
@@ -68,19 +69,3 @@ class TestRemapUids:
         assert result["name"] == "My Tournament"
         assert result["state"] == "Playing"
         assert result["players"][0]["state"] == "Registered"
-
-    def test_remap_does_not_collide_with_substring(self):
-        """UUID v7 values should not be substrings of each other.
-        Verify the function handles the case where a temp UID is a prefix of another."""
-        data = {
-            "players": [
-                {"user_uid": "abc"},
-                {"user_uid": "abcdef"},
-            ],
-        }
-        # If "abc" is remapped first, it could corrupt "abcdef".
-        # This is a known limitation of the string-replace approach.
-        result = _remap_uids_in_tournament(data, {"abc": "XYZ"})
-        # "abcdef" would become "XYZdef" -- this is the expected (flawed) behavior
-        assert result["players"][0]["user_uid"] == "XYZ"
-        assert result["players"][1]["user_uid"] == "XYZdef"

@@ -147,7 +147,7 @@ Minimal indexes only:
 
 ### Offline Mode
 
-> **Open issues (pst):** #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a DB-version bump wipes in-flight offline data. (The offline lifecycle endpoints now take the `FOR UPDATE` lock the action path uses, via `tournament_transaction`.)
+> **Open issues (pst):** #14 a DB-version bump wipes in-flight offline data. (The offline lifecycle endpoints now take the `FOR UPDATE` lock the action path uses, via `tournament_transaction`; go-online repoints temp player UIDs via a whole-JSON replace and recomputes a deck's `attribution` from the resolved user — the one field with a truncated `TEMP-` vekn the replace can't reach. #15 done.)
 
 Offline tournaments use a device-lock model (no changes log needed):
 - Tournament locked to one device via `go-offline` endpoint

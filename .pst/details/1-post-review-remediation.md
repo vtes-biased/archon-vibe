@@ -168,6 +168,36 @@ review: LGTM. **Known benign race (documented inline):** if the caller's organiz
 revoked between the pre-check and the lock, the re-check 403s after users were created →
 orphaned real/coopted accounts. Accepted (rare, harmless). Closed #45.
 
+### Resolution (2026-06-07): #15 temp-UID remap — verified premise wrong, fixed the real (deck) bug
+The ticket premise ("stale TEMP- vekn on **player** records") was **wrong** on verification:
+the engine's player object carries no vekn_id (`engine/tournament/mod.rs` AddPlayer stores only
+`user_uid`), and a player's `user_uid` is the *full* temp UUID, which the existing whole-JSON
+`str.replace(temp_uid, real_uid)` already remaps correctly (incl. nested seating, standings,
+`finals.seed_order`, raffles, winner). The **one real stale-`TEMP-`** case is a **deck's
+`attribution`**: `DeckUpload.svelte` sets a "self"-attributed deck's attribution to the player's
+vekn, which offline is `TEMP-<uid[:8]>` (the UID's 8-char *prefix*, not the full UID) — so the
+replace can't touch it, and the deck stays attributed to a non-existent vekn (matters for the
+winner-deck → TWDA path + display).
+**Decision (course-corrected mid-implementation):** an initial *structural* rewrite of the remap
+was abandoned — principal-engineer caught it silently dropping `finals.seed_order` (the
+enumerate-and-miss-a-field trap), and a whole-JSON replace is complete-by-construction for full
+UUIDs. Final shape:
+- **Tournament** (nested fields): whole-JSON **byte** replace via `msgspec.json.encode/decode`
+  (faster than stdlib `json`).
+- **Sanctions / decks** (flat single objects): repoint the one UID field directly on the typed
+  model (`uid_map.get(...)`) — no JSON round-trip at all.
+- **Deck `attribution`** is a vekn (the "designed by" credit, NOT redundant with `user_uid` =
+  who *played* it), so a temp player's own-deck attribution is their offline `TEMP-<uid[:8]>`
+  vekn. Repoint it to the resolved **real** vekn via a direct `TEMP-vekn → real-vekn` map
+  (`vekn_remap`, built in the resolve loop from `player_data.vekn_id` → `real_user.vekn_id`);
+  drop it if the temp player didn't resolve. We *preserve* attribution (don't null it) because
+  it's meaningful credit.
+Tests: `test_go_online.py::test_nested_uids_and_deck_attribution_remapped` (nested seating/winner
+remapped, deck attribution → real vekn, no `TEMP-`/temp UID survives) + the new-player real-VEKN
+assertions; removed the deprecated substring unit test. Full backend suite green (148).
+Docs (ARCHITECTURE.md/SYNC.md) updated. **Filed #46:** TWDA submission ignores `attribution` —
+it should emit the "designed by" credit into the TWDA header. Closed #15.
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 

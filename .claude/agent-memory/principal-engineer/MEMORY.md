@@ -95,6 +95,7 @@
 - [Sync cursor timestamp trap](sync-cursor-timestamp-trap.md) — objects table has TWO modified timestamps (column modified_at vs JSONB modified); diverge in value+format; never mix in since-cursor
 - [Tournament GET route prefix](tournament-get-route-prefix.md) — GET-by-uid lives under /api/v1, mutations under /api/tournaments; bare GET /api/tournaments/{uid} is a 404
 - [tournament_transaction nested pool](tournament-transaction-nested-pool.md) — pst #12 conn-reuse + #44 ambient ContextVar; reads join txn, writes pool independently (load-bearing: go_online VEKN collision)
+- [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — FinalsTable.seed_order holds player user_uids (top-5 seeding); easily missed in any per-player UID rewrite (pst #15 regression)
 
 ## Recurring Bug Pattern: Sanction reconstruction
 - `main.py:run_sanction_cleanup()` reconstructs Sanction manually — must include ALL fields

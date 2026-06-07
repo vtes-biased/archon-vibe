@@ -139,7 +139,7 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 
 ## Offline Mode
 
-> **Open issues (pst):** #15 temp-UID remap leaves stale `TEMP-` vekn_ids; #14 a frontend DB-version bump wipes in-flight offline data. Update these when changing offline sync. (The offline lifecycle endpoints `go-offline`/`go-online`/`force-takeover`/`sync-offline`/`force-unlock` now take the `FOR UPDATE` lock via `tournament_transaction`, matching the action path.)
+> **Open issues (pst):** #14 a frontend DB-version bump wipes in-flight offline data. Update these when changing offline sync. (The offline lifecycle endpoints `go-offline`/`go-online`/`force-takeover`/`sync-offline`/`force-unlock` now take the `FOR UPDATE` lock via `tournament_transaction`, matching the action path; go-online repoints temp player UIDs via a whole-JSON replace (safe: temp UIDs are full UUIDs) and separately recomputes a deck's `attribution` from the resolved user — that's the one field holding a truncated `TEMP-` vekn (the UID's 8-char prefix) the replace can't reach. #15 done.)
 
 ### Device-Lock Model
 
