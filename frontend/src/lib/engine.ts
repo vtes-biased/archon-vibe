@@ -7,6 +7,7 @@
 
 import type { DeckObject, Sanction, Tournament, User } from './types';
 import { getAllLeagues } from './db';
+import { markEngineReady } from './stores/engine-ready.svelte';
 
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
@@ -30,6 +31,7 @@ export async function initEngine(): Promise<WasmEngine> {
         const wasm = await import('../../../engine/pkg/archon_engine');
         await wasm.default();
         wasmEngine = new wasm.WasmEngine();
+        markEngineReady();
       } catch (e) {
         initError = e instanceof Error ? e : new Error(String(e));
         throw initError;
@@ -368,6 +370,25 @@ export async function computeLeagueStandings(
   const engine = await initEngine();
   const config = { standings_mode: standingsMode, tournaments };
   const resultJson = engine.computeLeagueStandings(JSON.stringify(config));
+  return JSON.parse(resultJson);
+}
+
+/**
+ * Reorder preliminary standings into final placement (winner first, other
+ * finalists tied for 2nd per VEKN §3.7.5, then non-finalists), tagging each with
+ * a 1-based `rank`. Single source of truth shared with league scoring.
+ *
+ * Synchronous (used inside `$derived`); returns [] if the engine isn't yet
+ * initialized. `standings` must be pre-sorted descending by preliminary score;
+ * "did a final happen?" is read from the `finalist` flags.
+ */
+export function computeFinalStandings(
+  standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean }>,
+  winner: string
+): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number }> {
+  const engine = getEngineSync();
+  if (!engine) return [];
+  const resultJson = engine.computeFinalStandings(JSON.stringify({ standings, winner }));
   return JSON.parse(resultJson);
 }
 

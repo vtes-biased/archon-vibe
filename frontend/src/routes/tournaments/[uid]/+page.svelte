@@ -8,7 +8,8 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { scoreSeatingSync, computeRatingPoints, validateDeck, type ValidationError } from "$lib/engine";
+  import { scoreSeatingSync, computeRatingPoints, computeFinalStandings, initEngine, validateDeck, type ValidationError } from "$lib/engine";
+  import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { formatScore } from "$lib/utils";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, type StandingEntry } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, getLastSyncTime } from "$lib/stores/offline.svelte";
@@ -168,138 +169,85 @@ import TournamentModals from "./TournamentModals.svelte";
   }
 
   // Standings
+  // Build preliminary entries, then let the engine assign final placement + ranks
+  // (winner 1st, other finalists tied for 2nd, non-finalists 6+). The engine is
+  // the single source of truth for placement — see compute_final_standings.
   function computeStandings(): StandingEntry[] {
+    engineReady(); // reactive dep: recompute placement once WASM finishes loading
     if (!tournament || !tournament.players) return [];
 
-    // VEKN-synced tournaments: no rounds, use tournament.standings directly
+    let prelim: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean }>;
+    let winnerUid = tournament.winner ?? "";
+    let finalsResults: Map<string, { gw: number; vp: number; tp: number }> | null = null;
+
     if (!tournament.rounds || tournament.rounds.length < 1) {
+      // VEKN-synced / imported: standings already carry totals + finalist flags.
       const finalistUids = new Set(
         tournament.players.filter(p => p.finalist && p.user_uid).map(p => p.user_uid!)
       );
-      // Prefer tournament.standings (populated by VEKN import), fall back to player.result
-      const entries: StandingEntry[] = (tournament.standings?.length
+      prelim = tournament.standings?.length
         ? tournament.standings.map(s => ({
-            user_uid: s.user_uid,
-            gw: s.gw ?? 0,
-            vp: s.vp ?? 0,
-            tp: s.tp ?? 0,
-            toss: s.toss ?? 0,
-            rank: 0,
+            user_uid: s.user_uid, gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0,
+            toss: s.toss ?? 0, finalist: s.finalist ?? finalistUids.has(s.user_uid),
           }))
         : tournament.players
-          .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
-          .map(p => ({
-            user_uid: p.user_uid!,
-            gw: p.result.gw ?? 0,
-            vp: p.result.vp ?? 0,
-            tp: p.result.tp ?? 0,
-            toss: p.toss ?? 0,
-            rank: 0,
-          }))
-      );
-      // Sort: winner first, then other finalists, then by score
-      entries.sort((a, b) => {
-        const aW = a.user_uid === tournament!.winner ? 2 : finalistUids.has(a.user_uid) ? 1 : 0;
-        const bW = b.user_uid === tournament!.winner ? 2 : finalistUids.has(b.user_uid) ? 1 : 0;
-        if (aW !== bW) return bW - aW;
-        return b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss;
-      });
-      // Rank: winner=1, other finalists=2, rest by position
-      const finalistCount = finalistUids.size;
-      for (let i = 0; i < entries.length; i++) {
-        const e = entries[i]!;
-        if (e.user_uid === tournament.winner) { e.rank = 1; }
-        else if (finalistUids.has(e.user_uid)) { e.rank = 2; }
-        else if (i === 0) { e.rank = finalistCount + 1; }
-        else {
-          const prev = entries[i - 1]!;
-          if (!finalistUids.has(prev.user_uid) && e.gw === prev.gw && e.vp === prev.vp && e.tp === prev.tp && e.toss === prev.toss) {
-            e.rank = prev.rank;
-          } else {
-            e.rank = i + 1;
+            .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
+            .map(p => ({
+              user_uid: p.user_uid!, gw: p.result.gw ?? 0, vp: p.result.vp ?? 0, tp: p.result.tp ?? 0,
+              toss: p.toss ?? 0, finalist: finalistUids.has(p.user_uid!),
+            }));
+    } else {
+      // Aggregate the preliminary rounds.
+      const map = new Map<string, { gw: number; vp: number; tp: number }>();
+      for (const round of tournament.rounds) {
+        for (const table of round) {
+          for (const seat of table.seating) {
+            if (!seat.player_uid) continue;
+            const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0, tp: 0 };
+            e.gw += seat.result.gw ?? 0;
+            e.vp += seat.result.vp ?? 0;
+            e.tp += seat.result.tp ?? 0;
+            map.set(seat.player_uid, e);
           }
         }
       }
-      return entries;
-    }
-
-    const map = new Map<string, { gw: number; vp: number; tp: number }>();
-    for (const round of tournament.rounds) {
-      for (const table of round) {
-        for (const seat of table.seating) {
-          if (!seat.player_uid) continue;
-          const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0, tp: 0 };
-          e.gw += seat.result.gw ?? 0;
-          e.vp += seat.result.vp ?? 0;
-          e.tp += seat.result.tp ?? 0;
-          map.set(seat.player_uid, e);
+      const tossMap = new Map<string, number>();
+      for (const p of tournament.players) {
+        if (p.user_uid) tossMap.set(p.user_uid, p.toss ?? 0);
+      }
+      // Finals count only once finished; otherwise show live preliminary ranking.
+      let finalistUids = new Set<string>();
+      if (tournament.state === "Finished" && tournament.finals) {
+        finalistUids = new Set(tournament.finals.seating.map(s => s.player_uid));
+        finalsResults = new Map(tournament.finals.seating.map(s => [s.player_uid, s.result]));
+        if (!winnerUid) {
+          const sorted = [...tournament.finals.seating].sort((a, b) => (b.result.gw - a.result.gw) || (b.result.vp - a.result.vp));
+          winnerUid = sorted[0]?.player_uid ?? "";
         }
+      } else {
+        winnerUid = ""; // finals not done yet → preliminary ranking only
       }
-    }
-    const tossMap = new Map<string, number>();
-    for (const p of tournament.players) {
-      if (p.user_uid) tossMap.set(p.user_uid, p.toss ?? 0);
-    }
-    const entries: StandingEntry[] = [...map.entries()].map(([uid, s]) => ({
-      user_uid: uid, ...s, toss: tossMap.get(uid) ?? 0, rank: 0,
-    }));
-
-    // For finished tournaments with finals, incorporate finals results into ranking
-    if (tournament.state === "Finished" && tournament.finals) {
-      const finalistUids = new Set(tournament.finals.seating.map(s => s.player_uid));
-      const finalsResults = new Map(tournament.finals.seating.map(s => [s.player_uid, s.result]));
-      // Determine winner: finalist with highest GW then VP
-      let winnerUid = tournament.winner;
-      if (!winnerUid) {
-        const sorted = [...tournament.finals.seating].sort((a, b) => (b.result.gw - a.result.gw) || (b.result.vp - a.result.vp));
-        winnerUid = sorted[0]?.player_uid ?? "";
-      }
-      // Set finals display string
-      for (const e of entries) {
-        const fr = finalsResults.get(e.user_uid);
-        if (fr) e.finals = formatScore(fr.gw, fr.vp, fr.tp);
-      }
-      // Sort: winner first, other finalists next, then non-finalists by prelim stats
-      entries.sort((a, b) => {
-        const aWinner = a.user_uid === winnerUid ? 1 : 0;
-        const bWinner = b.user_uid === winnerUid ? 1 : 0;
-        if (aWinner !== bWinner) return bWinner - aWinner;
-        const aFinalist = finalistUids.has(a.user_uid) ? 1 : 0;
-        const bFinalist = finalistUids.has(b.user_uid) ? 1 : 0;
-        if (aFinalist !== bFinalist) return bFinalist - aFinalist;
-        return b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss;
-      });
-      // Assign ranks: winner=1, other finalists=2, non-finalists=6+
-      for (let i = 0; i < entries.length; i++) {
-        const e = entries[i]!;
-        if (e.user_uid === winnerUid) { e.rank = 1; }
-        else if (finalistUids.has(e.user_uid)) { e.rank = 2; }
-        else {
-          const finalistCount = tournament.finals.seating.length;
-          if (i === 0) { e.rank = finalistCount + 1; }
-          else {
-            const prev = entries[i - 1]!;
-            if (!finalistUids.has(prev.user_uid) && e.gw === prev.gw && e.vp === prev.vp && e.tp === prev.tp && e.toss === prev.toss) {
-              e.rank = prev.rank;
-            } else {
-              e.rank = i + 1;
-            }
-          }
-        }
-      }
-      return entries;
+      prelim = [...map.entries()].map(([uid, s]) => ({
+        user_uid: uid, ...s, toss: tossMap.get(uid) ?? 0, finalist: finalistUids.has(uid),
+      }));
     }
 
-    entries.sort((a, b) => b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss);
-    for (let i = 0; i < entries.length; i++) {
-      if (i === 0) { entries[i]!.rank = 1; continue; }
-      const prev = entries[i - 1]!;
-      const cur = entries[i]!;
-      cur.rank = (cur.gw === prev.gw && cur.vp === prev.vp && cur.tp === prev.tp && cur.toss === prev.toss)
-        ? prev.rank
-        : i + 1;
+    // The engine assumes input pre-sorted descending by preliminary score.
+    prelim.sort((a, b) => b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss || a.user_uid.localeCompare(b.user_uid));
+    const ranked = computeFinalStandings(prelim, winnerUid);
+    if (!ranked.length) {
+      // Engine not ready (load() awaits initEngine, so this is a safety net):
+      // degrade to preliminary order so the table is never blank.
+      return prelim.map((e, i) => ({ ...e, rank: i + 1 }));
     }
-    return entries;
+    return ranked.map(e => {
+      const entry: StandingEntry = {
+        user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank, finalist: e.finalist,
+      };
+      const fr = finalsResults?.get(e.user_uid);
+      if (fr) entry.finals = formatScore(fr.gw, fr.vp, fr.tp);
+      return entry;
+    });
   }
 
   const standings = $derived(computeStandings());
@@ -308,12 +256,10 @@ import TournamentModals from "./TournamentModals.svelte";
   // Finals GW counts toward total GW for rating computation (VEKN rules)
   function getRatingPts(entry: StandingEntry): number {
     if (!tournament || tournament.state !== "Finished") return 0;
-    const isWinner = entry.user_uid === tournament.winner;
-    const finalistPos = isWinner ? 1
-      : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
-    const playerCount = standings.length;
+    const isWinner = entry.rank === 1;
+    const finalistPos = isWinner ? 1 : (entry.finalist ? 2 : 0);
     const gw = isWinner ? entry.gw + 1 : entry.gw;
-    return computeRatingPoints(entry.vp, gw, finalistPos, playerCount, tournament.rank);
+    return computeRatingPoints(entry.vp, gw, finalistPos, standings.length, tournament.rank);
   }
 
   const isFinished = $derived(tournament?.state === "Finished");
@@ -447,6 +393,7 @@ import TournamentModals from "./TournamentModals.svelte";
     if (!tournament) loading = true;
     error = null;
     try {
+      await initEngine(); // standings ranking is engine-computed; ensure it's ready
       const t = await getTournament(uid);
       if (t) {
         tournament = t;

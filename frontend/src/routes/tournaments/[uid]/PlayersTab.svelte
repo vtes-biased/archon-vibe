@@ -6,6 +6,7 @@
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff } from "lucide-svelte";
   import { slide } from "svelte/transition";
@@ -478,7 +479,7 @@
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5">
                 {#if playerSort === 'standings' && entry}
-                  <span class="text-ash-500 text-xs font-medium shrink-0">#{entry.rank}</span>
+                  <span class="text-ash-500 text-xs font-medium shrink-0"><RankCell rank={entry.rank} finalist={entry.finalist} hash /></span>
                 {/if}
                 <span class="truncate {isTop5 && playerSort === 'standings' ? 'text-bone-100 font-medium' : 'text-ash-300'} text-sm">
                   {playerInfo[puid]?.name ?? (puid || m.players_no_account())}

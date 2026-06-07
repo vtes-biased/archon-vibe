@@ -537,7 +537,12 @@ pub fn optimize_sa_multi(
     let original_rounds = rounds.to_vec();
 
     let mut best_rounds = rounds.to_vec();
-    let mut best_score = optimize_sa(&mut best_rounds, iterations_per_run, fixed_rounds, rng.next_u64());
+    let mut best_score = optimize_sa(
+        &mut best_rounds,
+        iterations_per_run,
+        fixed_rounds,
+        rng.next_u64(),
+    );
 
     if best_score.is_perfect() {
         for (i, r) in best_rounds.into_iter().enumerate() {
@@ -1567,12 +1572,15 @@ pub fn seed_for_round(tournament_uid: &str, round_index: usize) -> u64 {
         .wrapping_add(1)
 }
 
+/// `compute_seating` result: (rounds → tables → seats) plus the seating's score.
+type SeatingResult = Result<(Vec<Vec<Vec<String>>>, SeatingScore), String>;
+
 pub fn compute_seating(
     players: &[String],
     rounds_count: usize,
     previous_rounds: Option<&[Vec<Vec<String>>]>,
     seed: u64,
-) -> Result<(Vec<Vec<Vec<String>>>, SeatingScore), String> {
+) -> SeatingResult {
     if players.len() < 4 {
         return Err("At least 4 players required".to_string());
     }

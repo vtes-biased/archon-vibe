@@ -211,6 +211,17 @@ mod shared {
         league::compute_league_standings(config_json)
     }
 
+    /// Reorder preliminary standings into final placement (winner first, other
+    /// finalists tied for 2nd, then non-finalists), tagging each with `rank`.
+    /// Input: `{ "standings": [...], "winner": "<uid>" }`. Used by the
+    /// post-finals results display.
+    pub fn compute_final_standings_json(config_json: &str) -> Result<String, String> {
+        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+        let winner = config["winner"].as_str().unwrap_or("");
+        let ranked = super::tournament::compute_final_standings(&config["standings"], winner);
+        Ok(json::JsonValue::Array(ranked).dump())
+    }
+
     pub fn compute_player_issues_json(config_json: &str) -> Result<String, String> {
         let config = json::parse(config_json).map_err(|e| e.to_string())?;
         let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
@@ -358,6 +369,11 @@ mod wasm {
             compute_league_standings_json(config_json)
         }
 
+        #[wasm_bindgen(js_name = computeFinalStandings)]
+        pub fn compute_final_standings(&self, config_json: &str) -> Result<String, String> {
+            compute_final_standings_json(config_json)
+        }
+
         #[wasm_bindgen(js_name = computePlayerIssues)]
         pub fn compute_player_issues(&self, config_json: &str) -> Result<String, String> {
             compute_player_issues_json(config_json)
@@ -478,6 +494,10 @@ mod python {
 
         fn compute_league_standings(&self, config_json: &str) -> PyResult<String> {
             py_str(compute_league_standings_json(config_json))
+        }
+
+        fn compute_final_standings(&self, config_json: &str) -> PyResult<String> {
+            py_str(compute_final_standings_json(config_json))
         }
 
         fn compute_player_issues(&self, config_json: &str) -> PyResult<String> {

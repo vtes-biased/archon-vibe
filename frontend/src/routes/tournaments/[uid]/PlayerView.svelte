@@ -6,6 +6,7 @@
   import { computeRatingPoints } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel } from "lucide-svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import RankCell from "$lib/components/RankCell.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import PlayerDecksSection from "./PlayerDecksSection.svelte";
@@ -258,7 +259,7 @@
           <tbody>
             {#each playerStandings as entry, idx}
               <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
-                <td class="py-1 pr-2 text-ash-500">{entry.rank}</td>
+                <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
                 <td class="py-1 pr-2">
                   <span class="inline-flex items-center gap-1">
                     {seatDisplay(entry.user_uid)}
@@ -496,7 +497,7 @@
             <tbody>
               {#each standings as entry, idx}
                 <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
-                  <td class="py-1 pr-2 text-ash-500">{entry.rank}</td>
+                  <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
                   <td class="py-1 pr-2">
                     <span class="inline-flex items-center gap-1">
                       {seatDisplay(entry.user_uid)}

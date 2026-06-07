@@ -223,7 +223,7 @@ The frontend is the seating source; the server validates and stores it determini
 
 **Synced Object**: Leagues are streamed via SSE like tournaments/users. Stored in IndexedDB `leagues` store with `by-country` and `by-start` indexes.
 
-**Standings Modes**: RTP (rating points), Score (GW/VP/TP), GP (Grand Prix position-based).
+**Standings Modes**: RTP (rating points), Score (GW/VP/TP), GP (Grand Prix position-based). GP and RTP scoring use `compute_final_standings` to derive final placement (winner=1, other finalists=2) — fixes the bug where a non-prelim-1st finals winner was scored 15 instead of 25 GP points.
 
 ## Serialization
 
@@ -264,7 +264,8 @@ The Rust core defines the canonical object schemas and business logic:
 - `tournament.rs` - Tournament event processing (state machine, scoring, finals)
 - `deck.rs` - Deck parsing, validation, enrichment, TWDA export
 - `ratings.rs` - Rating points computation
-- `league.rs` - League standings computation (RTP/Score/GP)
+- `league.rs` - League standings computation (RTP/Score/GP); GP/RTP scoring delegates to `compute_final_standings` for final placement
+- `tournament/standings.rs` - `compute_preliminary_standings` (GW/VP/TP/toss sort), `compute_final_standings` (winner=rank 1; other finalists share rank 2 per VEKN §3.7.5; non-finalists competition-ranked from finalist_count+1). Whether a final happened is read from the per-player `finalist` flag, not from finals seating data.
 - `cards.rs` - Card database (lookup by ID/name, normalization)
 
 **Build Commands**:

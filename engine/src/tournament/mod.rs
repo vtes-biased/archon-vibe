@@ -19,6 +19,7 @@ mod types;
 
 // Re-export items used by lib.rs
 pub use scoring::{check_table_vps, compute_gw, compute_tp};
+pub use standings::compute_final_standings;
 pub use types::{
     ActorContext, PlayerState, SeatScore, TableState, TournamentEvent, TournamentState,
 };
@@ -35,7 +36,7 @@ use helpers::{
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{get_sa_sanctions, has_active_suspension, has_dq_sanction};
 use scoring::compute_gw_finals;
-use standings::{compute_standings, top5_has_ties, update_standings};
+use standings::{compute_preliminary_standings, top5_has_ties, update_standings};
 
 // ============================================================================
 // TOURNAMENT ENGINE
@@ -1473,7 +1474,7 @@ fn apply_event(
                 return Err("Need at least 2 rounds before random toss".to_string());
             }
 
-            let standings = compute_standings(tournament, sanctions);
+            let standings = compute_preliminary_standings(tournament, sanctions);
 
             // Find tied groups in top-5 cutoff zone that need toss
             // Group players by (gw, vp, tp) where toss == 0
@@ -1552,7 +1553,7 @@ fn apply_event(
                 return Err("Finals already started".to_string());
             }
 
-            let standings = compute_standings(tournament, sanctions);
+            let standings = compute_preliminary_standings(tournament, sanctions);
 
             // Filter out DQ'd players from finals consideration
             let eligible: Vec<&standings::Standing> = standings

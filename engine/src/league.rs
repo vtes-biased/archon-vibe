@@ -50,18 +50,21 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
         let rank = tournament["rank"].as_str().unwrap_or("");
         let player_count = tournament["player_count"].as_i32().unwrap_or(0);
 
-        // Process each player in the tournament standings
-        let standings = &tournament["standings"];
-        let standings_count = standings.members().count();
+        // GP and RTP score by *final* placement (winner 1st even if they did not
+        // lead the preliminaries; other finalists tie for 2nd). Resolve every
+        // player's final-placement rank once per tournament from the shared
+        // engine helper, then the loop below just looks it up.
+        let final_place: std::collections::HashMap<String, usize> = if mode == "Score" {
+            std::collections::HashMap::new()
+        } else {
+            let winner = tournament["winner"].as_str().unwrap_or("");
+            crate::tournament::compute_final_standings(&tournament["standings"], winner)
+                .iter()
+                .filter_map(|s| Some((s["user_uid"].as_str()?.to_string(), s["rank"].as_usize()?)))
+                .collect()
+        };
 
-        // GP: standard competition rank over the (gw, vp, tp) key so tied
-        // players share a rank (and thus equal GP points) and the next distinct
-        // score skips ranks (e.g. 12, 12, 14). The standings array is pre-sorted
-        // desc with user_uid as a deterministic terminal tiebreak.
-        let mut gp_rank = 0usize;
-        let mut gp_prev_key: Option<(i64, i64, i64)> = None;
-
-        for (position, standing) in tournament["standings"].members().enumerate() {
+        for standing in tournament["standings"].members() {
             let uid = standing["user_uid"].as_str().unwrap_or("").to_string();
             if uid.is_empty() {
                 continue;
@@ -83,17 +86,17 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
 
             match mode {
                 "Score" => {
-                    // Standings are prelim-only (compute_standings sums rounds only)
+                    // Standings are prelim-only (compute_preliminary_standings sums rounds only)
                     entry.gw += gw;
                     entry.vp += vp;
                     entry.tp += tp;
                 }
                 "RTP" => {
+                    // Finalist bonus is gated on the finalist flag (every data
+                    // source sets it when a final is played); winner (final rank
+                    // 1) = 1, other finalists = 2.
                     let finalist_position = if finalist {
-                        // Winner = position 0 in sorted standings among finalists
-                        // Check if this is the winner (first finalist in standings)
-                        let winner_uid = tournament["winner"].as_str().unwrap_or("");
-                        if uid == winner_uid {
+                        if final_place.get(&uid) == Some(&1) {
                             1
                         } else {
                             2
@@ -109,15 +112,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
                     entry.tp += tp;
                 }
                 "GP" => {
-                    // GP points based on shared standing rank (not array index),
-                    // so players tied on (gw, vp, tp) receive equal points.
-                    let key = ((gw * 10.0) as i64, (vp * 10.0) as i64, tp as i64);
-                    if gp_prev_key != Some(key) {
-                        gp_rank = position + 1; // 1-based rank, skips after ties
-                        gp_prev_key = Some(key);
-                    }
-                    let gp = compute_gp_points(gp_rank, standings_count);
-                    entry.points += gp;
+                    let place = final_place.get(&uid).copied().unwrap_or(0);
+                    entry.points += compute_gp_points(place, 0);
                     entry.gw += gw;
                     entry.vp += vp;
                     entry.tp += tp;
@@ -349,6 +345,56 @@ mod tests {
     }
 
     #[test]
+    fn test_gp_non_prelim_first_winner() {
+        // p2 wins the finals despite finishing 2nd in the prelims. The finals
+        // winner must score 25 (GP rank 1); the prelim leader who lost the
+        // finals drops into the flat 2nd-5th band (15). Non-finalists are
+        // unaffected. Guards the core of the bug: GP must follow final
+        // placement, not prelim order.
+        let config = r#"{
+            "standings_mode": "GP",
+            "tournaments": [{
+                "uid": "t1", "rank": "", "player_count": 10, "winner": "p2",
+                "standings": [
+                    {"user_uid": "p1", "gw": 3.0, "vp": 6.0, "tp": 180, "finalist": true},
+                    {"user_uid": "p2", "gw": 2.0, "vp": 5.0, "tp": 150, "finalist": true},
+                    {"user_uid": "p3", "gw": 2.0, "vp": 4.0, "tp": 140, "finalist": true},
+                    {"user_uid": "p4", "gw": 1.0, "vp": 3.0, "tp": 120, "finalist": true},
+                    {"user_uid": "p5", "gw": 1.0, "vp": 2.0, "tp": 100, "finalist": true},
+                    {"user_uid": "p6", "gw": 0.0, "vp": 1.0, "tp": 80, "finalist": false}
+                ],
+                "finals": [
+                    {"player_uid": "p2", "gw": 1, "vp": 3.0, "tp": 60},
+                    {"player_uid": "p1", "gw": 0, "vp": 2.0, "tp": 48}
+                ]
+            }]
+        }"#;
+        let parsed = json::parse(&compute_league_standings(config).unwrap()).unwrap();
+        let pts = |uid: &str| -> i32 {
+            parsed
+                .members()
+                .find(|e| e["user_uid"].as_str() == Some(uid))
+                .unwrap_or_else(|| panic!("{uid} missing"))["points"]
+                .as_i32()
+                .unwrap()
+        };
+        assert_eq!(
+            pts("p2"),
+            25,
+            "finals winner scores 25 even from prelim 2nd"
+        );
+        assert_eq!(
+            pts("p1"),
+            15,
+            "prelim leader who lost the finals drops to 15"
+        );
+        assert_eq!(pts("p3"), 15);
+        assert_eq!(pts("p4"), 15);
+        assert_eq!(pts("p5"), 15);
+        assert_eq!(pts("p6"), 10, "top non-finalist is 6th");
+    }
+
+    #[test]
     fn test_gp_rank_resets_between_tournaments() {
         // Guards the per-tournament reset of gp_rank/gp_prev_key. T1 ends on a
         // tie at rank 2 (b,c share key (10,30,60)); T2's first player d shares
@@ -377,7 +423,11 @@ mod tests {
                 .as_i32()
                 .unwrap()
         };
-        assert_eq!(pts("d"), 25, "T2 leader must be rank 1, not carried-over rank 2");
+        assert_eq!(
+            pts("d"),
+            25,
+            "T2 leader must be rank 1, not carried-over rank 2"
+        );
         assert_eq!(pts("a"), 25);
         assert_eq!(pts("b"), 15);
         assert_eq!(pts("c"), 15);
@@ -431,7 +481,8 @@ mod tests {
 
     #[test]
     fn test_real_data_gp_mode() {
-        // Exact data from DB: 5 players, 1 with 2GW, finals winner gets 1GW
+        // 5-player event, all 5 in the final (finalist flags set, as every
+        // importer/engine writer does). lionel has 2 prelim GW + the finals GW.
         let config = r#"{
             "standings_mode": "GP",
             "tournaments": [{
@@ -440,11 +491,11 @@ mod tests {
                 "player_count": 5,
                 "winner": "lionel",
                 "standings": [
-                    {"user_uid": "lionel", "gw": 2.0, "vp": 6.5, "tp": 120, "finalist": false},
-                    {"user_uid": "p2", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
-                    {"user_uid": "p3", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
-                    {"user_uid": "p4", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": false},
-                    {"user_uid": "p5", "gw": 0.0, "vp": 0.0, "tp": 42, "finalist": false}
+                    {"user_uid": "lionel", "gw": 2.0, "vp": 6.5, "tp": 120, "finalist": true},
+                    {"user_uid": "p2", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": true},
+                    {"user_uid": "p3", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": true},
+                    {"user_uid": "p4", "gw": 0.0, "vp": 0.5, "tp": 66, "finalist": true},
+                    {"user_uid": "p5", "gw": 0.0, "vp": 0.0, "tp": 42, "finalist": true}
                 ],
                 "finals": [
                     {"player_uid": "lionel", "gw": 1, "vp": 5.0, "tp": 60},
@@ -464,7 +515,14 @@ mod tests {
         // GP: prelim 2GW + finals 1GW = 3GW displayed
         assert_eq!(lionel["gw"].as_f64().unwrap(), 3.0);
         assert_eq!(lionel["vp"].as_f64().unwrap(), 11.5); // 6.5 + 5.0
-        assert_eq!(lionel["points"].as_i32().unwrap(), 25); // position 1
+        assert_eq!(lionel["points"].as_i32().unwrap(), 25); // winner = rank 1
+        let pts = |uid: &str| {
+            parsed.members().find(|e| e["user_uid"] == uid).unwrap()["points"]
+                .as_i32()
+                .unwrap()
+        };
+        assert_eq!(pts("p2"), 15, "other finalists tie for 2nd");
+        assert_eq!(pts("p5"), 15);
     }
 
     #[test]
@@ -510,4 +568,3 @@ mod tests {
         assert_eq!(result, "[]");
     }
 }
-

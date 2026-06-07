@@ -2,7 +2,7 @@
 
 Lightweight Rust engine for business logic, compiled to both WebAssembly (frontend) and native Python library (backend).
 
-> **Open issues (pst):** #16 stale `TOURNAMENT.md`; #19 split oversized `seating.rs`; #43 GP league points use prelim standing order, not final placement. Update the relevant ticket when changing the engine in that scope.
+> **Open issues (pst):** #16 stale `TOURNAMENT.md`; #19 split oversized `seating.rs`. Update the relevant ticket when changing the engine in that scope.
 
 ## Build
 
@@ -115,11 +115,11 @@ Entry points:
 - `compute_seating(players, rounds, history)` - Main seating computation
 - `score_seating(seating, history)` - Evaluate seating quality
 
-### Tournament (`src/tournament.rs`)
+### Tournament (`src/tournament/`)
 
 Tournament state machine and event processing for offline-first tournament management.
 
-See [TOURNAMENT.md](TOURNAMENT.md) for business requirements.
+See [TOURNAMENT.md](TOURNAMENT.md) for business requirements (note: that file is stale — pst #16).
 
 Features:
 - **State machine**: Planned → Registration → Waiting → Playing → Finished
@@ -128,7 +128,8 @@ Features:
 - **Seating integration**: Uses seating module for round generation
 
 Entry points:
-- `process_tournament_event(tournament, event, actor)` - Main event processor
+- `process_tournament_event(tournament, event, actor, sanctions, decks)` - Main event processor (returns `{tournament, deck_ops}`)
+- `compute_final_standings(standings, winner)` - Reorder preliminary standings into VEKN final placement; shared by league GP/RTP scoring and the post-finals display. Exposed as WASM `computeFinalStandings` and PyO3 `compute_final_standings`.
 
 Events:
 - `OpenRegistration`, `CloseRegistration`, `FinishTournament`

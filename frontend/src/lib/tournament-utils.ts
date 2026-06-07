@@ -9,6 +9,7 @@ export interface StandingEntry {
   toss: number;
   rank: number;
   finals?: string;
+  finalist?: boolean;
 }
 
 export function getStateBadgeClass(state: TournamentState): string {

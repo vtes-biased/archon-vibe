@@ -8,6 +8,7 @@
   import { generateResultsCard } from "$lib/social-card";
   import { generateResultsText } from "$lib/social-text";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
+  import RankCell from "$lib/components/RankCell.svelte";
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import { Share2, ClipboardCopy, Upload, Download, ChevronDown, ChevronRight } from "lucide-svelte";
@@ -126,9 +127,8 @@
 
   function getRatingPts(entry: StandingEntry): number {
     if (!isFinished) return 0;
-    const isWinner = entry.user_uid === tournament.winner;
-    const finalistPos = isWinner ? 1
-      : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
+    const isWinner = entry.rank === 1;
+    const finalistPos = isWinner ? 1 : (entry.finalist ? 2 : 0);
     const gw = isWinner ? entry.gw + 1 : entry.gw;
     return computeRatingPoints(entry.vp, gw, finalistPos, standings.length, tournament.rank);
   }
@@ -316,7 +316,7 @@
         <tbody>
           {#each standings.slice(0, 5) as entry}
             <tr class="text-bone-100 border-t border-ash-800">
-              <td class="py-1 pr-2 text-ash-500">{entry.rank}</td>
+              <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
               <td class="py-1 pr-2">{seatDisplay(entry.user_uid)}</td>
               <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
               {#if hasFinals}

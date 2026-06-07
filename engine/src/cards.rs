@@ -128,7 +128,7 @@ impl CardMap {
         for (indexed_name, &id) in &self.name_index {
             if indexed_name.starts_with(&normalized) {
                 let cand = (indexed_name.len(), id);
-                if best.map_or(true, |b| cand < b) {
+                if best.is_none_or(|b| cand < b) {
                     best = Some(cand);
                 }
             }
@@ -280,8 +280,16 @@ mod tests {
             "201613": {"name":"Theo Bell (G6)","printed_name":"Theo Bell","adv":false,"group":"6","name_variants":[]}
         }"#;
         let cm = CardMap::load(json).unwrap();
-        assert_eq!(cm.by_name("Theo Bell").unwrap().id, 201362, "bare name => non-adv first release (lowest id)");
-        assert_eq!(cm.by_name("Theo Bell (ADV)").unwrap().id, 201363, "(ADV) => advanced card");
+        assert_eq!(
+            cm.by_name("Theo Bell").unwrap().id,
+            201362,
+            "bare name => non-adv first release (lowest id)"
+        );
+        assert_eq!(
+            cm.by_name("Theo Bell (ADV)").unwrap().id,
+            201363,
+            "(ADV) => advanced card"
+        );
         assert_eq!(cm.by_name("Theo Bell (G2)").unwrap().id, 201362);
         assert_eq!(cm.by_name("Theo Bell (G6)").unwrap().id, 201613);
         assert_eq!(cm.by_name("Theo Bell (G2 ADV)").unwrap().id, 201363);

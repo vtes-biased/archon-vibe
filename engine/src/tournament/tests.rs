@@ -296,8 +296,8 @@ fn test_standings_tie_order_is_deterministic() {
         { user_uid: "pd", toss: 0 },
     ];
     let empty = json::array![];
-    let s1 = super::standings::compute_standings(&tournament, &empty);
-    let s2 = super::standings::compute_standings(&tournament, &empty);
+    let s1 = super::standings::compute_preliminary_standings(&tournament, &empty);
+    let s2 = super::standings::compute_preliminary_standings(&tournament, &empty);
     let order1: Vec<&str> = s1.iter().map(|s| s.user_uid.as_str()).collect();
     let order2: Vec<&str> = s2.iter().map(|s| s.user_uid.as_str()).collect();
     assert_eq!(order1, order2, "tie order must be stable across calls");

@@ -499,6 +499,7 @@
   "tournament_registration_not_open": "O registro não está aberto.",
   "tournament_registered_players": "Jogadores registrados ({count})",
   "tournament_winner": "Vencedor",
+  "tournament_finalist": "Finalista",
   "tournament_status_finished": "Finalizado",
   "tournament_status_dropped": "Desistiu",
   "tournament_col_rank": "#",
