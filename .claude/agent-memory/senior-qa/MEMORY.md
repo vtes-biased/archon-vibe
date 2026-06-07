@@ -2,6 +2,7 @@
 
 ## Pointers
 - [Seating determinism](project_seating_determinism.md) — seeded ChaCha8Rng; which seating paths consume the seed + determinism test coverage/gaps
+- [Engine test topology](project_engine_test_topology.md) — how to run engine/PyO3/WASM + backend-with-engine tests; expected link failures; what each layer validates
 
 ## Test Infrastructure
 

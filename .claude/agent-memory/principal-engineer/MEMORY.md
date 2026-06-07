@@ -97,6 +97,9 @@
 - [tournament_transaction nested pool](tournament-transaction-nested-pool.md) — pst #12 conn-reuse + #44 ambient ContextVar; reads join txn, writes pool independently (load-bearing: go_online VEKN collision)
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — FinalsTable.seed_order holds player user_uids (top-5 seeding); easily missed in any per-player UID rewrite (pst #15 regression)
 
+## Scoring & Standings
+- [Final standings helper](project_final_standings_helper.md) — compute_final_standings is the shared VEKN placement fn (winner=1, finalists tie 2nd) for league scoring + frontend
+
 ## Recurring Bug Pattern: Sanction reconstruction
 - `main.py:run_sanction_cleanup()` reconstructs Sanction manually — must include ALL fields
 - Same pattern in `sanctions.py` delete endpoint — also manual reconstruction
