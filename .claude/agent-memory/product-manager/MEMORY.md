@@ -93,3 +93,5 @@
 ## Memory Files
 - [VEKN standings & toss scope](project_vekn_standings_toss_scope.md) — published rank = gw,vp,tp with skips; toss is cutoff-only, never a general tiebreak
 - [VEKN GP league points](project_vekn_gp_league_points.md) — GP is an app house rule; ties use best-position+skip; GP position should be final placement, not prelim order (see #43)
+- [VEKN ID detach policy](project_vekn_id_detach_policy.md) — what stays with VEKN ID vs follows the human on abandon/displace; active suspension/probation follows the person (#59)
+- [Account-surgery bugs](project_vekn_account_surgery_bugs.md) — confirmed merge_users/strip/split defects + must-fixes for #59 (discord_id leak, missing resync/decks reassign)

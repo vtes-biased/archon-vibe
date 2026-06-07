@@ -13,15 +13,15 @@ from pydantic import BaseModel
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
+    detach_user_from_vekn,
     get_auth_methods_for_user,
     get_user_by_uid,
     get_user_by_vekn_id,
     is_vekn_id_claimed,
     merge_users,
     set_user_resync_after,
-    split_user_from_vekn,
-    strip_vekn_from_user,
     update_user,
+    user_has_active_suspension,
 )
 from ..middleware.auth import CurrentUser
 from ..models import Role, User
@@ -152,9 +152,18 @@ async def abandon_vekn_id(
             status_code=400, detail="You don't have a VEKN ID to abandon"
         )
 
-    new_user = await split_user_from_vekn(current_user.uid)
-    if not new_user:
+    # You can't abandon your way out of a suspension — the sanction stays with
+    # the VEKN record, so block the self-service detach while one is active.
+    if await user_has_active_suspension(current_user.uid):
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot abandon a VEKN ID while you hold an active suspension or probation",
+        )
+
+    result = await detach_user_from_vekn(current_user.uid)
+    if not result:
         raise HTTPException(status_code=500, detail="Failed to abandon VEKN ID")
+    new_user, _vekn_record = result
 
     logger.info(
         f"User abandoned VEKN ID {current_user.vekn_id}: old={current_user.uid} new={new_user.uid}"
@@ -319,9 +328,9 @@ async def link_vekn_to_user(
     # Check if VEKN ID is currently claimed
     if await is_vekn_id_claimed(request.vekn_id):
         # Need to displace the current holder
-        result = await strip_vekn_from_user(vekn_user.uid)
+        result = await detach_user_from_vekn(vekn_user.uid)
         if result:
-            displaced_user, _stripped_vekn = result
+            displaced_user, _vekn_record = result
             message = (
                 f"Displaced from {vekn_user.name} and linked VEKN ID {request.vekn_id}"
             )
@@ -403,9 +412,12 @@ async def force_abandon_vekn_id(
             detail="This VEKN ID is not claimed by anyone — no need to abandon",
         )
 
-    new_user = await split_user_from_vekn(target.uid)
-    if not new_user:
+    # Admin force-abandon is exempt from the active-suspension guard that blocks
+    # self-service /abandon — officials act deliberately.
+    result = await detach_user_from_vekn(target.uid)
+    if not result:
         raise HTTPException(status_code=500, detail="Failed to abandon VEKN ID")
+    new_user, _vekn_record = result
 
     logger.info(
         f"Force-abandoned VEKN ID {target.vekn_id} for user {target.uid} by {manager.uid}"

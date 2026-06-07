@@ -17,6 +17,7 @@ from .models import (
     League,
     ObjectType,
     Sanction,
+    SanctionLevel,
     Tournament,
     User,
 )
@@ -1027,6 +1028,25 @@ async def reassign_sanctions(from_user_uid: str, to_user_uid: str) -> int:
     return count
 
 
+async def reassign_decks(from_user_uid: str, to_user_uid: str) -> int:
+    """Reassign all decks from one user to another. Returns count updated."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full"::text FROM objects
+            WHERE type = 'deck' AND "full"->>'user_uid' = %s""",
+            (from_user_uid,),
+        )
+        rows = await result.fetchall()
+    count = 0
+    for row in rows:
+        deck = msgspec.json.decode(row[0].encode(), type=DeckObject)
+        await save_object_from_model(
+            ObjectType.DECK, msgspec.structs.replace(deck, user_uid=to_user_uid)
+        )
+        count += 1
+    return count
+
+
 async def reassign_coopted_by_references(from_user_uid: str, to_user_uid: str) -> int:
     """Update all users whose coopted_by references from_user_uid to point to to_user_uid."""
     async with get_connection() as conn:
@@ -1071,11 +1091,14 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         delete_uid
     ) or await get_calendar_token(keep_uid)
 
-    # Merge user data - prefer keep_user for identity (name, vekn_id, roles),
-    # but prefer delete_user (the claiming user) for contact info
-    merged = User(
-        uid=keep_user.uid,
-        modified=keep_user.modified,
+    # Merge from keep_user as the base so every field survives by default
+    # (identity, roles, ratings, wins, resync_after, and any future field) —
+    # building User(...) from scratch silently dropped unlisted fields. Only the
+    # fields with a real merge policy are overridden below: identity prefers
+    # keep_user, contact info prefers delete_user (the claiming account),
+    # roles/local_modifications union.
+    merged = msgspec.structs.replace(
+        keep_user,
         name=keep_user.name or delete_user_obj.name,
         country=keep_user.country or delete_user_obj.country,
         vekn_id=keep_user.vekn_id or delete_user_obj.vekn_id,
@@ -1100,28 +1123,60 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         | delete_user_obj.local_modifications,
         vekn_prefix=keep_user.vekn_prefix or delete_user_obj.vekn_prefix,
         calendar_token=merged_calendar_token,
-        constructed_online=keep_user.constructed_online,
-        constructed_offline=keep_user.constructed_offline,
-        limited_online=keep_user.limited_online,
-        limited_offline=keep_user.limited_offline,
-        wins=keep_user.wins,
     )
 
     await update_user(merged)
+    # Everything keyed to the dying delete_uid must migrate to the survivor.
     await reassign_auth_methods(delete_uid, keep_uid)
     await reassign_sanctions(delete_uid, keep_uid)
+    await reassign_decks(delete_uid, keep_uid)
     await reassign_coopted_by_references(delete_uid, keep_uid)
     await soft_delete_user(delete_uid)
 
     return merged
 
 
-async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
-    """Displace a user from their VEKN record.
+async def user_has_active_suspension(user_uid: str) -> bool:
+    """True if the user holds an active suspension or probation.
 
-    Creates a new user with auth methods and contact info.
-    The VEKN user keeps: uid, vekn_id, roles, name, country, city.
-    Returns (displaced_new_user, stripped_vekn_user) or None if not found.
+    Active = not soft-deleted, not lifted, and either permanent (no expiry) or
+    not yet expired. Used to block self-abandon of a VEKN ID (you can't abandon
+    your way out of a suspension — see .pst/details/59-vekn-detach.md).
+    """
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    for s in await get_sanctions_for_user(user_uid):
+        if s.deleted_at is not None or s.lifted_at is not None:
+            continue
+        if s.level not in (SanctionLevel.SUSPENSION, SanctionLevel.PROBATION):
+            continue
+        if s.expires_at is None or s.expires_at > now:
+            return True
+    return False
+
+
+async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
+    """Detach a person from their VEKN record (the strip/split operation).
+
+    Splits one account into two. The original record is **immovable**: it keeps
+    its uid and vekn_id plus everything keyed to that uid — roles, cooptation,
+    prefix, ratings, wins, community_links, and (untouched, because they key on
+    uid) sanctions, decks and tournament results. Only the human moves: a fresh
+    uid carrying the login (auth methods) and personal/contact data.
+
+    Used both to displace a holder before re-linking the VEKN ID to someone else
+    (caller then merges the freed record into the new owner) and to abandon a
+    VEKN ID (record left orphaned for a future claim). The two flows are
+    identical here; their only difference (the re-merge) lives in the caller.
+    See .pst/details/59-vekn-detach.md for the full rule.
+
+    Returns (personal_account, vekn_record) or None if the user is not found.
+
+    Adding a User field: only null it on `vekn_record` (and let it ride on
+    `personal`) if it is genuinely personal/login data; otherwise leave it on
+    `vekn_record` and null it on `personal` — the safe default is that VEKN
+    history never follows the person.
     """
     from datetime import UTC, datetime
 
@@ -1133,7 +1188,17 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
 
     new_uid = str(uuid7())
     now = datetime.now(UTC)
-    displaced = msgspec.structs.replace(
+
+    # The human's .ics feed follows the human: calendar_token lives in a dedicated
+    # column (stripped from "full"), so read it explicitly and carry it to the new
+    # personal account — their existing subscription URL keeps resolving. Same as
+    # merge_users; clear it on the orphan first so the token is never duplicated.
+    feed_token = await get_calendar_token(user_uid)
+    await clear_calendar_token(user_uid)
+
+    # The person walks away with login + personal data only — no VEKN identity,
+    # roles, cooptation, official links, ratings or wins.
+    personal = msgspec.structs.replace(
         user,
         uid=new_uid,
         modified=now,
@@ -1145,16 +1210,21 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
         vekn_synced_at=None,
         local_modifications=set(),
         vekn_prefix=None,
+        community_links=[],
+        calendar_token=feed_token,
         constructed_online=None,
         constructed_offline=None,
         limited_online=None,
         limited_offline=None,
         wins=[],
     )
-    await insert_user(displaced)
+    await insert_user(personal)
     await reassign_auth_methods(user_uid, new_uid)
 
-    stripped = msgspec.structs.replace(
+    # The VEKN record keeps everything; only the PII that moved out is wiped.
+    # Sanctions and decks are NOT reassigned — they key on this stable uid.
+    # (calendar_token already cleared above; the None here is a no-op via COALESCE.)
+    vekn_record = msgspec.structs.replace(
         user,
         modified=now,
         nickname=None,
@@ -1164,78 +1234,12 @@ async def strip_vekn_from_user(user_uid: str) -> tuple[User, User] | None:
         discord_id=None,
         contact_phone=None,
         phone_is_whatsapp=False,
-        community_links=[],
         calendar_token=None,
         local_modifications=set(),
     )
-    await update_user(stripped)
-    # COALESCE preserves a NULL token write, so drop the orphaned record's feed
-    # explicitly. The displaced (real) user starts with no token and regenerates.
-    await clear_calendar_token(user_uid)
+    await update_user(vekn_record)
 
-    return displaced, stripped
-
-
-async def split_user_from_vekn(user_uid: str) -> User | None:
-    """Split a user away from their VEKN record.
-
-    Creates a new user with the personal data and auth methods.
-    The old user becomes an orphaned VEKN record (no auth, no personal data).
-    Returns the new user (with auth methods) or None if not found.
-    """
-    from datetime import UTC, datetime
-
-    from uuid6 import uuid7
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        return None
-
-    new_uid = str(uuid7())
-    now = datetime.now(UTC)
-    new_user = msgspec.structs.replace(
-        user,
-        uid=new_uid,
-        modified=now,
-        vekn_id=None,
-        roles=[],
-        coopted_by=None,
-        coopted_at=None,
-        vekn_synced=False,
-        vekn_synced_at=None,
-        local_modifications=set(),
-        vekn_prefix=None,
-        constructed_online=None,
-        constructed_offline=None,
-        limited_online=None,
-        limited_offline=None,
-        wins=[],
-    )
-    await insert_user(new_user)
-
-    stripped = msgspec.structs.replace(
-        user,
-        nickname=None,
-        avatar_path=None,
-        contact_email=None,
-        contact_discord=None,
-        contact_phone=None,
-        phone_is_whatsapp=False,
-        community_links=[],
-        coopted_by=None,
-        coopted_at=None,
-        calendar_token=None,
-        local_modifications=set(),
-        vekn_prefix=None,
-    )
-    await update_user(stripped)
-    # COALESCE preserves a NULL token write, so drop the orphaned record's feed
-    # explicitly. The new (real) user starts with no token and regenerates.
-    await clear_calendar_token(user_uid)
-    await reassign_auth_methods(user_uid, new_uid)
-    await reassign_sanctions(user_uid, new_uid)
-
-    return new_user
+    return personal, vekn_record
 
 
 # ---------------------------------------------------------------------------

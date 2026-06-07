@@ -862,11 +862,20 @@ Canvas-rendered PNG card and plain text generator for sharing finished tournamen
 
 **UI**: Share button on `OverviewTab.svelte` for finished tournaments.
 
-## User Account Merging
+## User Account Surgery
 
-`POST /admin/users/merge` — merges two user accounts (IC/NC/Prince, same-country constraint).
+**Immovable-uid invariant**: a uid that carries a `vekn_id` is never re-keyed and never soft-deleted. Everything keyed to it — sanctions, decks, tournament results, ratings, wins, cooptation — stays attached. Only the account WITHOUT the `vekn_id` ever moves. See `.pst/details/59-vekn-detach.md` for the full rule.
 
-Consolidates all associated data: sanctions, tournament participation, deck ownership, league organizer roles, ratings, and wins.
+### Merge (`POST /admin/users/merge`)
+
+IC/NC/Prince only; same-country constraint. The VEKN-bearing uid is always the survivor (`keep_uid`). Migrates auth methods, sanctions, decks, and `coopted_by` references from the dying uid, then soft-deletes it. Consolidates ratings, wins, roles, and `local_modifications` (union). Implemented in `db.merge_users()`.
+
+### Detach (`detach_user_from_vekn`)
+
+Splits one account into two: the VEKN record keeps its uid and all keyed data (sanctions, decks, ratings, wins, cooptation, `community_links`); a fresh uid walks away with auth methods and personal/contact PII only. Two callers:
+
+- **Self-abandon** (`POST /vekn/me/abandon`): user drops their own VEKN ID. Blocked while an active suspension or probation is held — the sanction stays with the VEKN record and cannot be escaped this way. Admin force-abandon is exempt.
+- **Admin displace** (inside `POST /vekn/link`): frees a VEKN ID from its current holder before re-linking it to a new owner; the new owner account is then merged into the freed VEKN record.
 
 ## Scheduled Background Tasks
 
