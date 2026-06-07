@@ -7,7 +7,7 @@
 
 import type { DeckObject, Sanction, Tournament, User } from './types';
 import { getAllLeagues } from './db';
-import { markEngineReady } from './stores/engine-ready.svelte';
+import { engineReady, markEngineReady } from './stores/engine-ready.svelte';
 
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
@@ -52,7 +52,7 @@ export async function initEngine(): Promise<WasmEngine> {
 export function scoreSeatingSync(
   rounds: string[][][]
 ): { rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null {
-  const engine = getEngineSync();
+  const engine = getEngineReactive();
   if (!engine) return null;
   try {
     const resultJson = engine.scoreSeating(JSON.stringify({ rounds }));
@@ -240,6 +240,22 @@ function getEngineSync(): WasmEngine | null {
   return wasmEngine;
 }
 
+/**
+ * Subscribe the current reaction to WASM readiness and return the engine.
+ *
+ * `wasmEngine` is a plain module `let` Svelte can't track, so a sync wrapper
+ * called inside a `$derived`/render that only read `getEngineSync()` would
+ * compute once cold (engine null → fallback) and never recover. Reading
+ * `engineReady()` here registers a reactive dependency, so every sync wrapper
+ * below re-runs once the engine lands. Harmless outside a reaction (returns the
+ * flag, registers nothing). Async wrappers don't need this — they `await
+ * initEngine()` and so always resolve hot.
+ */
+function getEngineReactive(): WasmEngine | null {
+  engineReady();
+  return getEngineSync();
+}
+
 // Type for user context in permission checks
 type UserContext = { uid: string; roles: string[]; country?: string | null; vekn_id?: string | null };
 
@@ -252,7 +268,7 @@ export function canChangeRole(
   target: UserContext,
   role: string
 ): PermissionResult {
-  const engine = getEngineSync();
+  const engine = getEngineReactive();
   if (!engine) return { allowed: false, reason: null };
 
   const actorJson = JSON.stringify({
@@ -279,7 +295,7 @@ export function canManageVekn(
   actor: UserContext,
   target: UserContext
 ): PermissionResult {
-  const engine = getEngineSync();
+  const engine = getEngineReactive();
   if (!engine) return { allowed: false, reason: null };
 
   const actorJson = JSON.stringify({
@@ -307,7 +323,7 @@ export function canEditUser(
   targetUid: string,
   target: UserContext
 ): PermissionResult {
-  const engine = getEngineSync();
+  const engine = getEngineReactive();
   if (!engine) return { allowed: false, reason: null };
 
   const actorJson = JSON.stringify({
@@ -336,7 +352,7 @@ export function computeRatingPoints(
   playerCount: number,
   rank: string
 ): number {
-  const engine = getEngineSync();
+  const engine = getEngineReactive();
   if (!engine) return 0;
   return engine.computeRatingPoints(vp, gw, finalistPosition, playerCount, rank);
 }
@@ -386,7 +402,7 @@ export function computeFinalStandings(
   standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean }>,
   winner: string
 ): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number }> {
-  const engine = getEngineSync();
+  const engine = getEngineReactive();
   if (!engine) return [];
   const resultJson = engine.computeFinalStandings(JSON.stringify({ standings, winner }));
   return JSON.parse(resultJson);
@@ -399,7 +415,7 @@ export function computeFinalStandings(
 export function computePlayerIssuesSync(
   rounds: string[][][]
 ): { rule: number; players: string[] }[] | null {
-  const engine = getEngineSync();
+  const engine = getEngineReactive();
   if (!engine) return null;
   try {
     const resultJson = engine.computePlayerIssues(JSON.stringify({ rounds }));
