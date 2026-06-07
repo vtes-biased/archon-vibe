@@ -704,7 +704,7 @@ Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.
 
 ## Discord Tournament Bot
 
-> **Status / open issues (pst):** the bot is **pre-production — not live and not yet tested** — but in scope for prod prep. #2 the SSE listener dispatches on an `event:` field the backend never sends, so *every* event is ignored; #10 impersonation refresh tokens are stored in plaintext; #11 a token-refresh race can revoke an organizer's token chain. The 'snapshot on reconnect' described below assumes a wire format that does not exist yet (see #2/#16). Update these tickets when changing the bot.
+> **Status:** the bot is **pre-production — not live and not yet tested** — but in scope for prod prep. Keep the relevant pst tickets updated when changing the bot.
 
 Standalone process (`bot/`) — manages online VTES tournaments inside Discord servers. Pure OAuth client to the Archon backend; no direct DB access, no business logic. All mutations go through `POST /{uid}/action` via `user:impersonate` tokens on behalf of real users.
 
@@ -748,7 +748,7 @@ Subscribes to the Archon SSE stream using the organizer's `user:impersonate` tok
 - **Finish**: posts final standings; prompts `/teardown`
 - **Mid-round seating changes** (SwapSeats, AlterSeating, etc.): detected via `_last_seating` diff → re-syncs voice channel permissions
 - **`judge_call` ephemeral event**: posts to #judges channel
-- **`snapshot` event on reconnect**: initializes state tracking without re-posting announcements (restart resilience)
+- **Catch-up on (re)connect**: the bot sends no `since` cursor, so the backend replays full current state. Events seed state silently until a `sync_complete` message flips `synced`; only after that do events post announcements — so a restart/reconnect doesn't re-post past announcements. A `resync` message triggers a fresh reconnect.
 
 Uses a shared `aiohttp` session across SSE reconnects. State tracked in module-level dicts (`_sse_tasks`, `_last_state`, `_last_round_count`, `_last_tournament`, `_last_seating`, `_table_channels`). All state cleaned up on `stop_sse` and teardown.
 

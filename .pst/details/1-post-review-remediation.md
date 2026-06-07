@@ -198,6 +198,34 @@ assertions; removed the deprecated substring unit test. Full backend suite green
 Docs (ARCHITECTURE.md/SYNC.md) updated. **Filed #46:** TWDA submission ignores `attribution` —
 it should emit the "designed by" credit into the TWDA header. Closed #15.
 
+### Resolution (2026-06-07): #11 concurrent token refresh single-flighted per organizer
+Verified the `needs-verify` premise — it was **real**. The backend rotates refresh tokens
+with reuse-detection (`routes/oauth.py:350-406`): a refresh revokes the presented token and
+issues a new pair; replaying an already-revoked refresh token calls
+`revoke_oauth_token_chain(parent)` and kills the organizer's whole chain. The bot had two
+uncoordinated refreshers on one shared `ArchonAPI` (single asyncio process): the SSE loop on a
+`/stream` 401 (`sse_listener.py:145`) and any slash command on a 401 (`archon_api.py` `_request`).
+Both read the same stored refresh token and POSTed it → A rotates R0→R1, B replays stale R0 →
+reuse detected → chain revoked → organizer logged out, SSE stops.
+**Fix:** single-flight per `discord_id`. Added a `dict[str, asyncio.Lock]` (`_refresh_locks`,
+get-or-create in `_refresh_lock_for` — atomic, no await between get and assign). `_refresh_tokens`
+now takes `stale_access_token`, takes the lock, **re-reads the store**, and if the stored access
+token already differs from the one that 401'd (a concurrent refresher rotated while we waited)
+returns the fresh pair WITHOUT POSTing; otherwise calls the extracted `_do_refresh` (original
+POST+persist) under the lock. Both call sites pass the token that 401'd. The re-check is the load-
+bearing part: serializing the POST alone wouldn't help — the loser would still replay its stale
+token. Genuine-expiry path is correct: first waiter clears the store under the lock, later waiters
+find no tokens and return None without a second POST.
+Tests: `bot/tests/test_refresh_single_flight.py` — stdlib `unittest` (no pytest in the bot venv),
+a `FakeBackend` modeling rotation+reuse-detection, incl. a guard test proving the fake actually
+exhibits chain-revocation under double-spend (so the single-flight assertions aren't vacuous).
+5/5 pass; ruff clean; imports OK. Docs: ARCHITECTURE.md bot status pointer updated.
+principal-engineer review: **LGTM**. Notes: (a) the in-process `asyncio.Lock` is sufficient only
+because the bot is single-process/single-replica — horizontal scaling would need a DB-level CAS on
+the stored token (known boundary, out of scope); (b) pre-existing, unrelated to #11: the SSE 401
+path `continue`s with no backoff reset — minor, left as-is. Closed #11. (#2 SSE `event:` dispatch
+still open — the bot's reactive logic remains dead until that lands.)
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 

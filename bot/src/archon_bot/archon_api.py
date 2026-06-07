@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -40,6 +41,13 @@ class ArchonAPI:
     def __init__(self, store: TokenStore):
         self._store = store
         self._session: aiohttp.ClientSession | None = None
+        # Single-flight refresh: one lock per discord_id so concurrent refreshers
+        # (SSE loop + a slash command both hitting 401 at once) serialize instead
+        # of both replaying the same stored refresh token. Replaying a rotated-out
+        # token trips the backend's reuse-detection, which revokes the whole token
+        # chain and logs the organizer out. The map is unbounded but keyed by the
+        # small, bounded set of linked organizers — negligible. (#11)
+        self._refresh_locks: dict[str, asyncio.Lock] = {}
 
     async def init(self) -> None:
         self._session = aiohttp.ClientSession(base_url=config.ARCHON_URL)
@@ -50,16 +58,50 @@ class ArchonAPI:
 
     # --- Token refresh ---
 
-    async def refresh_tokens(self, discord_id: str) -> dict | None:
+    def _refresh_lock_for(self, discord_id: str) -> asyncio.Lock:
+        """Get-or-create the per-organizer refresh lock (atomic under asyncio)."""
+        lock = self._refresh_locks.get(discord_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._refresh_locks[discord_id] = lock
+        return lock
+
+    async def refresh_tokens(
+        self, discord_id: str, *, stale_access_token: str | None = None
+    ) -> dict | None:
         """Public wrapper to refresh tokens (for SSE listener reconnect)."""
-        return await self._refresh_tokens(discord_id)
+        return await self._refresh_tokens(
+            discord_id, stale_access_token=stale_access_token
+        )
 
-    async def _refresh_tokens(self, discord_id: str) -> dict | None:
-        """Refresh expired access token using refresh token."""
-        tokens = await self._store.get_tokens(discord_id)
-        if not tokens:
-            return None
+    async def _refresh_tokens(
+        self, discord_id: str, *, stale_access_token: str | None = None
+    ) -> dict | None:
+        """Refresh expired access token using refresh token.
 
+        Single-flight per ``discord_id``. ``stale_access_token`` is the access
+        token whose request 401'd; if another caller already refreshed while we
+        waited for the lock, the stored access token will differ from it and we
+        return the fresh tokens instead of replaying our now-rotated-out refresh
+        token (which would trip backend reuse-detection). (#11)
+        """
+        async with self._refresh_lock_for(discord_id):
+            tokens = await self._store.get_tokens(discord_id)
+            if not tokens:
+                return None
+
+            # A concurrent refresher beat us to it: the stored access token is no
+            # longer the one we tried to use, so a fresh pair already exists.
+            if (
+                stale_access_token is not None
+                and tokens["access_token"] != stale_access_token
+            ):
+                return tokens
+
+            return await self._do_refresh(discord_id, tokens)
+
+    async def _do_refresh(self, discord_id: str, tokens: dict) -> dict | None:
+        """POST the refresh grant and persist the rotated pair. Lock held."""
         assert self._session
         async with self._session.post(
             "/oauth/token",
@@ -136,8 +178,11 @@ class ArchonAPI:
             method, path, json=json_body, headers=headers
         ) as resp:
             if resp.status == 401:
-                # Try refresh
-                refreshed = await self._refresh_tokens(discord_id)
+                # Try refresh, passing the token that 401'd so a concurrent
+                # refresh is detected instead of double-spending the grant.
+                refreshed = await self._refresh_tokens(
+                    discord_id, stale_access_token=token
+                )
                 if not refreshed:
                     return ApiResult.fail(
                         "Your Archon session has expired. Run the command again to re-authenticate."

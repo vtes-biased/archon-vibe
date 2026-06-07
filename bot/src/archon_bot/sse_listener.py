@@ -142,7 +142,10 @@ async def _sse_loop(
                     timeout=aiohttp.ClientTimeout(total=None, sock_read=300),
                 ) as resp:
                     if resp.status == 401:
-                        refreshed = await api.refresh_tokens(organizer_discord_id)
+                        refreshed = await api.refresh_tokens(
+                            organizer_discord_id,
+                            stale_access_token=tokens["access_token"],
+                        )
                         if not refreshed:
                             logger.error("Token refresh failed for SSE, stopping")
                             return
