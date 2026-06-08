@@ -213,15 +213,41 @@ Three data levels control what each connected client sees:
 
 ### Tournament Field Visibility (Member Level)
 
-| Field | Finished | Ongoing (player) | Ongoing (non-player) |
-|-------|----------|-------------------|----------------------|
-| Config | Yes | Yes | Yes |
-| Players | Full | No per-player results | No per-player results |
-| Standings | Yes | Per standings_mode | Per standings_mode |
-| Decks | Per decklists_mode | No | No |
-| Finals | Yes | No | No |
-| My tables | Yes | Yes | N/A |
-| Rounds | No | No | No |
+**Access is enforced per-row, not per-viewer.** Each object stores three pre-computed
+projection columns (public/member/full); SSE reads the matching column. There is no
+per-viewer field filtering at read time. Consequently the member projection of a
+tournament (`compute_tournament_member`) ships the **entire** tournament object — all
+rounds, finals, and per-player results — to **every** member, excluding only
+`checkin_code` and `vekn_pushed_at`. During an ongoing event, full structural data
+lands in every member's IndexedDB.
+
+Two real server-side boundaries do exist within the member level:
+- **Decks** are a separate object type with their own per-deck member projection — a deck
+  is shipped only when the engine sets its `public` flag (from `decklists_mode` +
+  tournament state + winner/finalist status). This row *is* an access control.
+- **`checkin_code` / `vekn_pushed_at`** are stripped from the member projection.
+
+Everything else below is a **frontend display default**, not an access boundary —
+`standings_mode` (Private/Cutoff/Top 10/Public), the "my tables" view, and the
+ongoing-event hiding of per-player results are rendered by the client off data it
+already holds. They shape the UI; they do not gate what a member can read from IndexedDB.
+
+| Field | Server boundary? | Display default (frontend) |
+|-------|------------------|----------------------------|
+| Config | — (always shipped) | shown |
+| Players | No (full per-player data shipped) | per-player results hidden mid-event |
+| Standings | No | per `standings_mode` |
+| Decks | **Yes** — per-deck `public` flag (`decklists_mode`) | — |
+| Finals | No (shipped) | hidden until finished |
+| My tables | No (all tables shipped) | only the viewer's own tables shown |
+| Rounds | No (shipped) | hidden |
+| checkin_code / vekn_pushed_at | **Yes** — stripped | — |
+
+This is an accepted tradeoff: viewer-specific visibility ("my tables") cannot be expressed
+in pre-computed per-row columns, and frontend hiding suits the threat model (a local-event
+attendee is not expected to crack open IndexedDB to influence standings). Making any of the
+display defaults a real boundary would require a per-player overlay — more complexity than
+the risk warrants. Treat the matrix as UI defaults, not a security guarantee.
 
 ## 5. Feature Inventory
 
@@ -274,9 +300,7 @@ Three data levels control what each connected client sees:
 **Round Timer** (online-only):
 - Global round timer: start/pause/reset, visible to all connected players
 - Per-round and per-finals time configuration
-- Time extension policy: Additions (+N minutes per table), Clock Stop (per-table pause/resume), or Both
-- Per-table extra time (capped at 600s total)
-- Per-table clock stop/resume (pause duration converted to extra time on resume)
+- Per-table extra time additions (+N minutes, capped at 600s total)
 - Visual countdown with warning state (<5 min) and expired state
 - Timer state synced via normal SSE (no per-second broadcasts — clients compute locally)
 
