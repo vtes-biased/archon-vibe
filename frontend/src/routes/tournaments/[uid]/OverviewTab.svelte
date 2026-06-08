@@ -2,7 +2,7 @@
   import type { Tournament, TournamentState } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
-  import { getStateBadgeClass, seatDisplay as seatDisplayUtil, translateTournamentState, type StandingEntry } from "$lib/tournament-utils";
+  import { getStateBadgeClass, seatDisplay as seatDisplayUtil, translateTournamentState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { addTournamentOrganizer, removeTournamentOrganizer, importArchonFile, type ArchonImportResult } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { generateResultsCard } from "$lib/social-card";
@@ -27,7 +27,7 @@
     actionLoading,
   }: {
     tournament: Tournament;
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     isOrganizer: boolean;
     winnerHasDeck?: boolean;

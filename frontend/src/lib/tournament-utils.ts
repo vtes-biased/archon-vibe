@@ -1,4 +1,6 @@
-import type { TournamentState } from "./types";
+import type { Tournament, TournamentState } from "./types";
+import { computeFinalStandings } from "./engine";
+import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
 export interface StandingEntry {
@@ -12,6 +14,12 @@ export interface StandingEntry {
   finalist?: boolean;
 }
 
+/** Player display info keyed by user uid (built from User records + per-tournament display_name). */
+export type PlayerInfoMap = Record<
+  string,
+  { name: string; nickname: string | null; vekn: string | null; display_name?: string | null }
+>;
+
 export function getStateBadgeClass(state: TournamentState): string {
   switch (state) {
     case "Planned": return "bg-ash-800 text-ash-300";
@@ -23,10 +31,7 @@ export function getStateBadgeClass(state: TournamentState): string {
   }
 }
 
-export function seatDisplay(
-  uid: string,
-  playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null; display_name?: string | null }>,
-): string {
+export function seatDisplay(uid: string, playerInfo: PlayerInfoMap): string {
   const info = playerInfo[uid];
   if (!info) return uid;
   const display = info.display_name || info.nickname || info.name;
@@ -125,6 +130,94 @@ export function top5HasScoreTies(standings: StandingEntry[]): boolean {
     if (s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp) return true;
   }
   return false;
+}
+
+/**
+ * Build the ranked standings table for a tournament.
+ *
+ * Constructs preliminary entries (from rounds, or from synced/imported standings
+ * when no rounds exist), then lets the engine assign final placement + ranks
+ * (winner 1st, other finalists tied for 2nd, non-finalists 6+). The engine is the
+ * single source of truth for placement — see compute_final_standings.
+ *
+ * Pure over `tournament`; callers that need to recompute when WASM finishes loading
+ * should read the engine-ready signal in their reactive wrapper.
+ */
+export function computeStandings(tournament: Tournament | null): StandingEntry[] {
+  if (!tournament || !tournament.players) return [];
+
+  let prelim: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean }>;
+  let winnerUid = tournament.winner ?? "";
+  let finalsResults: Map<string, { gw: number; vp: number; tp: number }> | null = null;
+
+  if (!tournament.rounds || tournament.rounds.length < 1) {
+    // VEKN-synced / imported: standings already carry totals + finalist flags.
+    const finalistUids = new Set(
+      tournament.players.filter(p => p.finalist && p.user_uid).map(p => p.user_uid!)
+    );
+    prelim = tournament.standings?.length
+      ? tournament.standings.map(s => ({
+          user_uid: s.user_uid, gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0,
+          toss: s.toss ?? 0, finalist: s.finalist ?? finalistUids.has(s.user_uid),
+        }))
+      : tournament.players
+          .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
+          .map(p => ({
+            user_uid: p.user_uid!, gw: p.result.gw ?? 0, vp: p.result.vp ?? 0, tp: p.result.tp ?? 0,
+            toss: p.toss ?? 0, finalist: finalistUids.has(p.user_uid!),
+          }));
+  } else {
+    // Aggregate the preliminary rounds.
+    const map = new Map<string, { gw: number; vp: number; tp: number }>();
+    for (const round of tournament.rounds) {
+      for (const table of round) {
+        for (const seat of table.seating) {
+          if (!seat.player_uid) continue;
+          const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0, tp: 0 };
+          e.gw += seat.result.gw ?? 0;
+          e.vp += seat.result.vp ?? 0;
+          e.tp += seat.result.tp ?? 0;
+          map.set(seat.player_uid, e);
+        }
+      }
+    }
+    const tossMap = new Map<string, number>();
+    for (const p of tournament.players) {
+      if (p.user_uid) tossMap.set(p.user_uid, p.toss ?? 0);
+    }
+    // Finals count only once finished; otherwise show live preliminary ranking.
+    let finalistUids = new Set<string>();
+    if (tournament.state === "Finished" && tournament.finals) {
+      finalistUids = new Set(tournament.finals.seating.map(s => s.player_uid));
+      finalsResults = new Map(tournament.finals.seating.map(s => [s.player_uid, s.result]));
+      if (!winnerUid) {
+        const sorted = [...tournament.finals.seating].sort((a, b) => (b.result.gw - a.result.gw) || (b.result.vp - a.result.vp));
+        winnerUid = sorted[0]?.player_uid ?? "";
+      }
+    } else {
+      winnerUid = ""; // finals not done yet → preliminary ranking only
+    }
+    prelim = [...map.entries()].map(([uid, s]) => ({
+      user_uid: uid, ...s, toss: tossMap.get(uid) ?? 0, finalist: finalistUids.has(uid),
+    }));
+  }
+
+  // The engine assumes input pre-sorted descending by preliminary score.
+  prelim.sort((a, b) => b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss || a.user_uid.localeCompare(b.user_uid));
+  const ranked = computeFinalStandings(prelim, winnerUid);
+  if (!ranked.length) {
+    // Engine not ready (load() awaits initEngine, so this is a safety net):
+    // degrade to preliminary order so the table is never blank.
+    return prelim.map((e, i) => ({ ...e, rank: i + 1 }));
+  }
+  return ranked.map(e => {
+    const entry: StandingEntry = {
+      user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank, finalist: e.finalist,
+    };
+    const fr = finalsResults?.get(e.user_uid);
+    if (fr) entry.finals = formatScore(fr.gw, fr.vp, fr.tp);
+    return entry;
+  });
 }
 
 /** Strip leading markdown title if it matches the tournament name */

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Tournament, DeckObject, VtesCard } from "$lib/types";
+  import type { PlayerInfoMap } from "$lib/tournament-utils";
   import { getDecksByTournamentGrouped } from "$lib/db";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -17,7 +18,7 @@
     decksByUser: decksByUserProp,
   }: {
     tournament: Tournament;
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: PlayerInfoMap;
     decksByUser?: Record<string, DeckObject[]>;
   } = $props();
 

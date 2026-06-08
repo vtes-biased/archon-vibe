@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
-  import type { StandingEntry } from "$lib/tournament-utils";
+  import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
@@ -38,7 +38,7 @@
     decksByUser,
   }: {
     tournament: Tournament;
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     currentPlayerEntry: Player | null;
     playerStandings: StandingEntry[];

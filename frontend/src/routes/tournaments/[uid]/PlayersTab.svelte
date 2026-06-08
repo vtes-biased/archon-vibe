@@ -14,7 +14,7 @@
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import { sponsorVeknMember, createUser, isOnline } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, type StandingEntry } from "$lib/tournament-utils";
+  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -29,7 +29,7 @@
     decksByUser,
   }: {
     tournament: Tournament;
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     isOrganizer: boolean;
     actionLoading: boolean;

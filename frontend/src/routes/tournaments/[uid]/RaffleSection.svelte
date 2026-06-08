@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament, Standing, RafflePool } from "$lib/types";
-  import { seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
   import { Dices, Undo2, Trash2 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -13,7 +13,7 @@
     actionLoading,
   }: {
     tournament: Tournament;
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: PlayerInfoMap;
     standings: Standing[];
     isOrganizer: boolean;
     doAction?: (action: string, body?: any) => Promise<void>;

@@ -4,7 +4,7 @@
   import { tournamentAction, setTableScore } from "$lib/api";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import { GripVertical, ShieldCheck, Lock } from "lucide-svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -17,7 +17,7 @@
     loadPlayerNames,
   }: {
     tournament: Tournament;
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     isOrganizer: boolean;
     actionLoading: boolean;

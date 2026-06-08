@@ -7,7 +7,7 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock } from "lucide-svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -20,7 +20,7 @@
     tournamentSanctions,
   }: {
     tournament: Tournament;
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: PlayerInfoMap;
     isOrganizer: boolean;
     actionLoading: boolean;
     doAction: (action: string, body?: any) => Promise<void>;
