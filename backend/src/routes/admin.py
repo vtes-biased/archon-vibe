@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .. import permissions
+from ..broadcast import broadcast_precomputed
 from ..db import get_user_by_uid, merge_users
 from ..middleware.auth import CurrentUser
 from ..models import Role
@@ -138,9 +139,13 @@ async def merge_user_accounts(
         )
 
     # Perform merge
-    merged = await merge_users(request.keep_uid, request.delete_uid)
-    if not merged:
+    result = await merge_users(request.keep_uid, request.delete_uid)
+    if not result:
         raise HTTPException(status_code=500, detail="Failed to merge users")
+    merged, merge_bds = result
+    # Propagate the merge to other clients' caches live (pst #66).
+    for bd in merge_bds:
+        broadcast_precomputed(bd)
 
     logger.info(
         f"Merged users {request.delete_uid} into {request.keep_uid} by {manager.uid}"

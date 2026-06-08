@@ -11,6 +11,7 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from uuid6 import uuid7
 
+from ...broadcast import broadcast_precomputed
 from ...db import (
     delete_transient_token,
     get_auth_method_by_identifier,
@@ -202,12 +203,19 @@ async def discord_callback(
             else:
                 # Discord is linked to another account - merge accounts
                 # This reassigns all auth methods (including Discord) to keep_uid
-                merged = await merge_users(user_uid_from_state, existing_auth.user_uid)
-                if not merged:
+                merge_result = await merge_users(
+                    user_uid_from_state, existing_auth.user_uid
+                )
+                if not merge_result:
                     return RedirectResponse(
                         url=f"{frontend_url}{redirect_path}?error=merge_failed",
                         status_code=302,
                     )
+                # Push the merge to other clients' caches live (pst #66); the
+                # survivor's discord-field update broadcasts again below.
+                _merged, merge_bds = merge_result
+                for bd in merge_bds:
+                    broadcast_precomputed(bd)
                 # Auth method already reassigned by merge - don't create new one
         else:
             # No existing auth - create new auth method linking Discord to this user
@@ -240,7 +248,7 @@ async def discord_callback(
                 changed = True
             if changed:
                 user.modified = datetime.now(UTC)
-                await save_user(user)
+                broadcast_precomputed(await save_user(user))
 
         # Store Discord tokens and push Linked Roles metadata
         await _store_and_push_discord_roles(user_uid_from_state, discord_tokens)

@@ -72,10 +72,11 @@ partitioning the *embedded* `User` struct fields between the record and the depa
   lift the sanction if inappropriate. Only self-`/abandon` is guarded, because that's the one
   path where the *same* person tries to escape their *own* active sanction. We deliberately do
   NOT special-case the admin paths (keeps the rule pure; avoids the acrobatic branching #59 removed).
-- **Live SSE propagation lag (#66).** detach/merge only `broadcast_resync(owner_uid)`; the
-  orphan/merged record's `update_user` BroadcastData is discarded, so other connected clients
-  keep stale cached copies (incl. the now-nulled orphan discord_id) until reconnect. DB +
-  VEKN-push + fresh snapshots are correct. Pre-existing; tracked as #66.
+- **Live SSE propagation lag (#66) — FIXED.** detach/merge now return the per-record
+  `BroadcastData` they produce (survivor + soft-deleted dup for merge; new personal + nulled
+  orphan for detach); every caller (`vekn.py`, `admin.py`, `discord.py`) `broadcast_precomputed`s
+  them so other connected clients update cached copies live, not only on reconnect. The
+  `broadcast_resync(owner_uid)` calls remain (owner's data-level change). See #66's resolution.
 
 ## Out of scope / deferred
 - Whether `merge_users` should migrate other uid-keyed references beyond auth/sanction/deck/

@@ -1062,7 +1062,9 @@ async def reassign_coopted_by_references(from_user_uid: str, to_user_uid: str) -
     return count
 
 
-async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
+async def merge_users(
+    keep_uid: str, delete_uid: str
+) -> tuple[User, list[BroadcastData]] | None:
     """Merge two user accounts.
 
     Transfers all auth methods from delete_uid to keep_uid,
@@ -1070,7 +1072,11 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
     reassigns sanctions and coopted_by references,
     then deletes the duplicate account.
 
-    Returns the merged user or None if keep_uid doesn't exist.
+    Returns (merged_user, broadcasts) or None if keep_uid doesn't exist.
+    `broadcasts` are the BroadcastData for the survivor's update and the dying
+    account's soft-delete; the caller must `broadcast_precomputed` each so other
+    clients update their cached copies live, not only on their next reconnect
+    (db.py can't import broadcast — layering — so the route does it). pst #66.
     """
     keep_user = await get_user_by_uid(keep_uid)
     delete_user_obj = await get_user_by_uid(delete_uid)
@@ -1078,7 +1084,7 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
     if not keep_user:
         return None
     if not delete_user_obj:
-        return keep_user  # Nothing to merge
+        return keep_user, []  # Nothing to merge
 
     # calendar_token is stripped from "full", so read it from its column
     # (prefer the claiming/delete account's feed, like the contact fields below).
@@ -1120,15 +1126,18 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         calendar_token=merged_calendar_token,
     )
 
-    await save_user(merged)
+    merged_bd = await save_user(merged)
     # Everything keyed to the dying delete_uid must migrate to the survivor.
     await reassign_auth_methods(delete_uid, keep_uid)
     await reassign_sanctions(delete_uid, keep_uid)
     await reassign_decks(delete_uid, keep_uid)
     await reassign_coopted_by_references(delete_uid, keep_uid)
-    await soft_delete_user(delete_uid)
+    deleted = await soft_delete_user(delete_uid)
 
-    return merged
+    broadcasts = [merged_bd]
+    if deleted:
+        broadcasts.append(deleted[1])
+    return merged, broadcasts
 
 
 async def user_has_active_suspension(user_uid: str) -> bool:
@@ -1151,7 +1160,9 @@ async def user_has_active_suspension(user_uid: str) -> bool:
     return False
 
 
-async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
+async def detach_user_from_vekn(
+    user_uid: str,
+) -> tuple[User, User, list[BroadcastData]] | None:
     """Detach a person from their VEKN record (the strip/split operation).
 
     Splits one account into two. The original record is **immovable**: it keeps
@@ -1166,7 +1177,12 @@ async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
     identical here; their only difference (the re-merge) lives in the caller.
     See .pst/details/59-vekn-detach.md for the full rule.
 
-    Returns (personal_account, vekn_record) or None if the user is not found.
+    Returns (personal_account, vekn_record, broadcasts) or None if the user is
+    not found. `broadcasts` are the BroadcastData for the new personal account
+    and the nulled vekn_record; the caller must `broadcast_precomputed` each so
+    other clients drop the moved-out PII (e.g. the orphan's now-nulled
+    discord_id/contacts) live, not only on their next reconnect (db.py can't
+    import broadcast — layering — so the route does it). pst #66.
 
     Adding a User field: only null it on `vekn_record` (and let it ride on
     `personal`) if it is genuinely personal/login data; otherwise leave it on
@@ -1213,7 +1229,7 @@ async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
         limited_offline=None,
         wins=[],
     )
-    await save_user(personal)
+    personal_bd = await save_user(personal)
     await reassign_auth_methods(user_uid, new_uid)
 
     # The VEKN record keeps everything; only the PII that moved out is wiped.
@@ -1232,9 +1248,9 @@ async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
         calendar_token=None,
         local_modifications=set(),
     )
-    await save_user(vekn_record)
+    vekn_bd = await save_user(vekn_record)
 
-    return personal, vekn_record
+    return personal, vekn_record, [personal_bd, vekn_bd]
 
 
 # ---------------------------------------------------------------------------

@@ -95,11 +95,15 @@ async def claim_vekn_id(
         )
 
     # Merge: keep the VEKN user_uid (stable reference), transfer auth from current
-    merged = await merge_users(vekn_user.uid, current_user.uid)
-    if not merged:
+    result = await merge_users(vekn_user.uid, current_user.uid)
+    if not result:
         raise HTTPException(status_code=500, detail="Failed to merge accounts")
+    merged, merge_bds = result
 
-    # Trigger resync — user gained a vekn_id, data level changes
+    # Push the merge to other clients' caches live (pst #66), then resync the
+    # owner (their data level changed — they gained a vekn_id).
+    for bd in merge_bds:
+        broadcast_precomputed(bd)
     await set_user_resync_after(merged.uid)
     logger.info(f"User claimed VEKN ID {request.vekn_id}: {merged.uid}")
     await broadcast_resync(merged.uid)
@@ -151,11 +155,14 @@ async def abandon_vekn_id(
     result = await detach_user_from_vekn(current_user.uid)
     if not result:
         raise HTTPException(status_code=500, detail="Failed to abandon VEKN ID")
-    new_user, _vekn_record = result
+    new_user, _vekn_record, detach_bds = result
 
     logger.info(
         f"User abandoned VEKN ID {current_user.vekn_id}: old={current_user.uid} new={new_user.uid}"
     )
+    # Push the orphaned record's nulled PII to other clients' caches live (pst #66).
+    for bd in detach_bds:
+        broadcast_precomputed(bd)
     await set_user_resync_after(new_user.uid)
     await broadcast_resync(new_user.uid)
 
@@ -310,7 +317,11 @@ async def link_vekn_to_user(
         # Need to displace the current holder
         result = await detach_user_from_vekn(vekn_user.uid)
         if result:
-            displaced_user, _vekn_record = result
+            displaced_user, _vekn_record, displace_bds = result
+            # The displaced personal account + the freed record (the merge below
+            # repopulates the latter) propagate to other caches live (pst #66).
+            for bd in displace_bds:
+                broadcast_precomputed(bd)
             message = (
                 f"Displaced from {vekn_user.name} and linked VEKN ID {request.vekn_id}"
             )
@@ -319,9 +330,12 @@ async def link_vekn_to_user(
             )
 
     # Merge: keep the VEKN user_uid, transfer auth from target
-    merged = await merge_users(vekn_user.uid, target.uid)
-    if not merged:
+    result = await merge_users(vekn_user.uid, target.uid)
+    if not result:
         raise HTTPException(status_code=500, detail="Failed to link accounts")
+    merged, merge_bds = result
+    for bd in merge_bds:
+        broadcast_precomputed(bd)
 
     logger.info(
         f"Linked VEKN ID {request.vekn_id} to user {merged.uid} by {manager.uid}"
@@ -393,11 +407,14 @@ async def force_abandon_vekn_id(
     result = await detach_user_from_vekn(target.uid)
     if not result:
         raise HTTPException(status_code=500, detail="Failed to abandon VEKN ID")
-    new_user, _vekn_record = result
+    new_user, _vekn_record, detach_bds = result
 
     logger.info(
         f"Force-abandoned VEKN ID {target.vekn_id} for user {target.uid} by {manager.uid}"
     )
+    # Push the orphaned record's nulled PII to other clients' caches live (pst #66).
+    for bd in detach_bds:
+        broadcast_precomputed(bd)
     await set_user_resync_after(new_user.uid)
     await broadcast_resync(new_user.uid)
 

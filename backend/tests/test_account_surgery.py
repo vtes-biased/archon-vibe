@@ -141,9 +141,13 @@ async def test_merge_preserves_resync_after_and_identity(test_db):
     await db.save_user(keep)
     await db.save_user(delete)
 
-    merged = await db.merge_users(keep.uid, delete.uid)
+    result = await db.merge_users(keep.uid, delete.uid)
 
-    assert merged is not None
+    assert result is not None
+    merged, broadcasts = result
+    # pst #66: the survivor's update + the dying account's soft-delete are
+    # surfaced so the route can push them to other clients' caches live.
+    assert len(broadcasts) == 2
     # (a) resync_after PRESERVED from keep_user (the regression).
     assert merged.resync_after == resync
     # identity prefers keep_user.
@@ -240,7 +244,9 @@ async def test_detach_vekn_record_is_immovable(test_db):
 
         result = await db.detach_user_from_vekn(user.uid)
         assert result is not None
-        personal, vekn_record = result
+        personal, vekn_record, broadcasts = result
+        # pst #66: new personal account + nulled vekn_record surfaced for broadcast.
+        assert len(broadcasts) == 2
 
         # --- vekn_record is immovable: same uid, keeps competitive identity ---
         assert vekn_record.uid == user.uid
@@ -309,7 +315,7 @@ async def test_detach_moves_calendar_token_to_personal(test_db):
     async with _cleanup_surgery():
         result = await db.detach_user_from_vekn(user.uid)
         assert result is not None
-        personal, _vekn_record = result
+        personal, _vekn_record, _broadcasts = result
 
         # token gone from the VEKN record (no stale feed on the orphan)...
         assert await db.get_calendar_token(user.uid) is None
