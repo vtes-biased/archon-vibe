@@ -226,6 +226,88 @@ the stored token (known boundary, out of scope); (b) pre-existing, unrelated to 
 path `continue`s with no backoff reset — minor, left as-is. Closed #11. (#2 SSE `event:` dispatch
 still open — the bot's reactive logic remains dead until that lands.)
 
+### Resolution (2026-06-08): #14 destructive IDB upgrade now rescues unsynced offline data
+The frontend `getDB()` upgrade handler (`frontend/src/lib/db.ts`) dropped & recreated ALL
+object stores on any `DB_VERSION` bump (intended: force a full SSE resync of synced data). But
+an in-flight **offline** tournament is locked to this device and may hold changes not yet pushed
+to the server — a PWA auto-update bumping the version mid-offline-tournament silently destroyed
+unsynced work. Fix: rescue offline-pending data across the destructive rebuild.
+- **`db.ts`** — `rescueOfflineData(db, tx)` runs inside the (now `async`) versionchange
+  transaction BEFORE the drop loop; `restoreOfflineData(tx, rescued)` writes it back into the
+  freshly recreated stores. The `offline_*` metadata keys are the manifest; rescue pulls the
+  referenced rows: the offline tournament row, temp player user-stubs (from `offline_players`
+  `temp_uid`), offline sanction rows, offline deck rows. Synced data + `last_sync_timestamp` are
+  deliberately NOT preserved → clean resync. **Transaction-liveness:** awaits only IDB ops; the
+  manifest read is one `Promise.all`, then ALL per-row reads are issued in a single synchronous
+  burst and awaited via one `Promise.all` (a sequential await-per-row loop can let the
+  versionchange transaction go inactive — idb's documented "transaction lifetime" hazard).
+  Store-existence guards handle fresh installs / old schemas.
+- **`sync.ts`** — folded in the same-class bug the PE flagged (more common trigger):
+  `clearAllStores()` (resync/refresh path) rescued ONLY the tournament row, so a server-driven
+  `resync` for an offline device dropped the offline **sanction/deck rows** (metadata pointers
+  survived, but `goOnline()`'s `getSanction`/`getDeck` then returned undefined → silently dropped
+  from reconciliation) and player stubs. Now rescues+restores the full offline set.
+- The fix is preventive: `DB_VERSION` left at 15 (bumping it just to exercise the path would
+  needlessly churn every current user's synced data); the new handler runs on the next schema bump.
+Validated in a throwaway fake-indexeddb sandbox (per owner's "sandbox-only, no new test vertical"):
+offline rows + `offline_*` metadata preserved across a v14→v15 destructive upgrade, synced data +
+cursor wiped, restored rows reachable via recreated indexes, fresh-install no-op. `npm run check`
+(svelte-check) green, 0 errors. Docs: SYNC.md upgrade behavior updated, #14 pointers removed from
+SYNC.md/ARCHITECTURE.md. principal-engineer review: **LGTM** on the db.ts migration (all four
+design points sound); clearAllStores fold-in done at its recommendation. Closed #14.
+
+### Decision (2026-06-08): #18 closed won't-fix
+Re-examined the internal-field overlay leak in full and confirmed the original "accepted, low
+sensitivity" call stands. Findings from the re-trace:
+- **Leak surface is 3 sites, all emitting the User `full` representation:** (A) the `full.json.gz`
+  snapshot served to IC on first connect — IC sees these for *all* users, every country
+  (`snapshots.py` + `_viewer_level`→FULL); (B) the initial personal overlay for same-country users
+  (`main.py:611-617`); (C) the live broadcast to IC (all) + same-country NC/Prince
+  (`broadcast.py:65-73`). Broader than the ticket's "same-country NC/Prince" (IC is global).
+- **The genuinely-internal fields are 4:** `resync_after` (server-only; read off the loaded model
+  at `main.py:511`, not even in the frontend type), `local_modifications`, `vekn_synced`,
+  `vekn_synced_at` (backend bookkeeping; type-declared on the frontend but **no code reads them**).
+- **`discord_id` is NOT a real leak** (ticket mis-grouped it): it's a contact field the UI uses to
+  build `discord.com/users/{id}` links for officials (`User.svelte:564`, `CommunityTab.svelte`);
+  NC/Prince/IC are meant to have member contact info. Excluded from any fix.
+- **Constraint:** the `full` column is canonical storage (model round-trip + `vekn_push.py:288`
+  queries `"full"->>'vekn_synced'`), so the fields must stay in the column; only what's *emitted*
+  could change. A cheap migration-free fix exists (Postgres JSONB `-` to strip the 4 keys in the
+  snapshot/overlay SELECTs + a precomputed `full_broadcast_json` for the live path, ~30-40 lines).
+**Decision (owner): close won't-fix.** No secrets/credentials; zero client consumers (the fields
+just sit unused in IndexedDB); not worth touching the hot sync path. The cheap-fix recipe above is
+recorded here should the calculus change (e.g. if a future field on the User model IS sensitive,
+revisit the broadcast-vs-storage split). Closed #18.
+
+### Resolution (2026-06-08): #66 account-surgery writes now broadcast live to other clients
+`merge_users` / `detach_user_from_vekn` (`db.py`) write multiple user records via `save_user`
+(which returns `BroadcastData`) but DISCARDED those BDs; callers only `broadcast_resync(owner_uid)`
+(a full-resync signal to the *owner's own* SSE connection). So other connected clients
+(same-country NC/Prince, IC) that cache these records kept stale copies — notably the orphaned
+VEKN record's now-nulled `discord_id`/contacts — until their next reconnect/catch-up. DB +
+VEKN-push + fresh snapshots were already correct; only live propagation lagged. Pre-existing,
+surfaced by #59.
+**Fix (the layering-respecting shape the ticket prescribed — db.py can't import broadcast):**
+- `merge_users -> tuple[User, list[BroadcastData]] | None` returning `(merged, [merged_bd,
+  soft_delete_bd])`; `detach_user_from_vekn -> tuple[User, User, list[BroadcastData]] | None`
+  returning `(personal, vekn_record, [personal_bd, vekn_bd])`.
+- Every caller now `broadcast_precomputed`s each returned BD, then keeps the existing
+  `broadcast_resync(owner)` (owner's data-LEVEL change — gained/lost vekn_id): `vekn.py`
+  claim/abandon/link(displace+merge)/force-abandon, `admin.py` merge (previously broadcast
+  NOTHING), `auth/discord.py` link-merge (+ its follow-up discord-field save).
+- `/link` order is safe: detach writes then merge writes the same uid → strictly later
+  `modified_at`, broadcast later; frontend applies `saveUser` by uid unconditionally → last wins
+  (PE confirmed the cross-stack reasoning).
+Tests: `test_account_surgery.py` updated for the new return shapes + `len(broadcasts) == 2`
+assertions on both functions. Full backend suite green (158). Ruff clean. principal-engineer
+review: **LGTM**. Docs: `.pst/details/59-vekn-detach.md` #66 note marked fixed.
+**Filed two follow-ups the review flagged (both parent:#1):** #77 — frontend ignores user
+soft-deletes over SSE (`sync.ts` users `del` is a no-op, so the merged dup lingers until a
+snapshot resync; one-line fix, `deleteUser` exists); #78 — `merge_users` `reassign_*`
+(sanctions/decks/coopted_by) mutations still aren't broadcast (sanction staleness is
+correctness-visible to same-country NC/Prince). Both deliberately out of #66's user-record scope.
+Closed #66.
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 
