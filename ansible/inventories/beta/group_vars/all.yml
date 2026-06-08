@@ -15,6 +15,13 @@ domain_main: archon.krcg.org
 domain_bot: bot.archon.krcg.org
 site_url_base: "https://{{ domain_main }}"
 
+# --- legal page URLs ------------------------------------------------------
+# Canonical Terms / Privacy URLs. Set these in the Discord Developer Portal
+# (General Information -> Terms of Service URL + Privacy Policy URL); kept here
+# as the source of truth and for any future automation.
+legal_terms_url: "{{ site_url_base }}/legal/terms"
+legal_privacy_url: "{{ site_url_base }}/legal/privacy"
+
 # --- ports (localhost only, nginx proxies to them) ------------------------
 backend_port: 8007
 bot_port: 9007                    # matches bot default 9000 but differentiated per env

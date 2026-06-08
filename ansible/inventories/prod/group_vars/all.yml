@@ -15,6 +15,13 @@ domain_main: archon.vekn.net
 domain_bot: bot.archon.vekn.net
 site_url_base: "https://{{ domain_main }}"
 
+# --- legal page URLs ------------------------------------------------------
+# Canonical Terms / Privacy URLs. Set these in the Discord Developer Portal
+# (General Information -> Terms of Service URL + Privacy Policy URL); kept here
+# as the source of truth and for any future automation.
+legal_terms_url: "{{ site_url_base }}/legal/terms"
+legal_privacy_url: "{{ site_url_base }}/legal/privacy"
+
 # --- ports ----------------------------------------------------------------
 backend_port: 8007
 bot_port: 9007
