@@ -169,19 +169,15 @@ async def run_rating_recompute() -> None:
 
 async def run_vekn_push() -> None:
     """Run VEKN push batch (scheduled task)."""
-    if os.getenv("VEKN_PUSH", "").lower() != "true":
-        return
     try:
-        from .vekn_api import VEKNAPIClient
-        from .vekn_push import batch_push
+        from .vekn_push import batch_push, vekn_push_client
 
-        logger.info("Starting VEKN batch push")
-        client = VEKNAPIClient()
-        try:
+        async with vekn_push_client() as client:
+            if client is None:
+                return
+            logger.info("Starting VEKN batch push")
             stats = await batch_push(client)
             logger.info(f"VEKN batch push complete: {stats}")
-        finally:
-            await client.close()
     except Exception as e:
         logger.error(f"Error during VEKN batch push: {e}", exc_info=True)
 

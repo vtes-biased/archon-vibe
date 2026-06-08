@@ -2,6 +2,8 @@
 
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from .db import (
@@ -23,6 +25,24 @@ from .ratings import _compute_entry_sync
 from .vekn_api import VEKNAPIClient, VEKNAPIError
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def vekn_push_client() -> AsyncIterator[VEKNAPIClient | None]:
+    """Yield a VEKNAPIClient when VEKN_PUSH is enabled (else None); always closes it.
+
+    Folds the env-gate + construct + try/finally-close dance shared by every push
+    call site. Callers keep their own try/except for site-specific log messages.
+    """
+    if os.getenv("VEKN_PUSH", "").lower() != "true":
+        yield None
+        return
+    client = VEKNAPIClient()
+    try:
+        yield client
+    finally:
+        await client.close()
+
 
 # Reverse map: (format, rank) → VEKN event type ID
 # We pick the most common type for each combination

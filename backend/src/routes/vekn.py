@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 from datetime import UTC, datetime
 
 import msgspec
@@ -244,18 +243,14 @@ async def sponsor_new_member(
     asyncio.create_task(sync_user_discord_roles(updated.uid))
 
     # Push new member to VEKN registry
-    if os.getenv("VEKN_PUSH", "").lower() == "true":
-        try:
-            from ..vekn_api import VEKNAPIClient
-            from ..vekn_push import push_member
+    try:
+        from ..vekn_push import push_member, vekn_push_client
 
-            client = VEKNAPIClient()
-            try:
+        async with vekn_push_client() as client:
+            if client is not None:
                 await push_member(client, updated)
-            finally:
-                await client.close()
-        except Exception:
-            logger.exception("Failed to push new member to VEKN")
+    except Exception:
+        logger.exception("Failed to push new member to VEKN")
 
     return Response(
         content=encoder.encode(

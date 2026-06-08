@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -129,18 +128,14 @@ async def create_user(
             # Don't fail the request, user is already created
 
     # Push new member to VEKN (fire-and-forget, batch_push catches failures)
-    if os.getenv("VEKN_PUSH", "").lower() == "true":
-        try:
-            from ..vekn_api import VEKNAPIClient
-            from ..vekn_push import push_member
+    try:
+        from ..vekn_push import push_member, vekn_push_client
 
-            client = VEKNAPIClient()
-            try:
+        async with vekn_push_client() as client:
+            if client is not None:
                 await push_member(client, user)
-            finally:
-                await client.close()
-        except Exception:
-            logger.exception("Failed to push new member to VEKN")
+    except Exception:
+        logger.exception("Failed to push new member to VEKN")
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)

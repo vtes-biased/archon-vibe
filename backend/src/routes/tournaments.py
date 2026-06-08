@@ -152,34 +152,24 @@ async def _process_deck_ops(
 
 async def _maybe_push_vekn(tournament: Tournament) -> None:
     """Push tournament results to VEKN if VEKN_PUSH is enabled."""
-    if os.getenv("VEKN_PUSH", "").lower() != "true":
-        return
     try:
-        from ..vekn_api import VEKNAPIClient
-        from ..vekn_push import push_tournament_results
+        from ..vekn_push import push_tournament_results, vekn_push_client
 
-        client = VEKNAPIClient()
-        try:
-            await push_tournament_results(client, tournament)
-        finally:
-            await client.close()
+        async with vekn_push_client() as client:
+            if client is not None:
+                await push_tournament_results(client, tournament)
     except Exception:
         logger.exception("Failed to push VEKN results")
 
 
 async def _maybe_push_vekn_event(tournament: Tournament) -> None:
     """Create VEKN calendar event if VEKN_PUSH is enabled."""
-    if os.getenv("VEKN_PUSH", "").lower() != "true":
-        return
     try:
-        from ..vekn_api import VEKNAPIClient
-        from ..vekn_push import push_tournament_event
+        from ..vekn_push import push_tournament_event, vekn_push_client
 
-        client = VEKNAPIClient()
-        try:
-            await push_tournament_event(client, tournament)
-        finally:
-            await client.close()
+        async with vekn_push_client() as client:
+            if client is not None:
+                await push_tournament_event(client, tournament)
     except Exception:
         logger.exception("Failed to push VEKN event")
 
