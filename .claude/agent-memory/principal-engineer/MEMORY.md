@@ -92,13 +92,18 @@
 - `_process_deck_ops()` upsert also matches on `(tournament, player, round)` — consistent
 
 ## Sync-Correctness Traps
+- [Destructive store-wipe offline rescue](destructive-store-wipe-offline-rescue.md) — db.ts upgrade AND sync.ts clearAllStores both wipe stores; must rescue full offline set (tournament+sanctions+decks+player-stubs), pst #14
 - [Sync cursor timestamp trap](sync-cursor-timestamp-trap.md) — objects table has TWO modified timestamps (column modified_at vs JSONB modified); diverge in value+format; never mix in since-cursor
 - [Tournament GET route prefix](tournament-get-route-prefix.md) — GET-by-uid lives under /api/v1, mutations under /api/tournaments; bare GET /api/tournaments/{uid} is a 404
 - [tournament_transaction nested pool](tournament-transaction-nested-pool.md) — pst #12 conn-reuse + #44 ambient ContextVar; reads join txn, writes pool independently (load-bearing: go_online VEKN collision)
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — FinalsTable.seed_order holds player user_uids (top-5 seeding); easily missed in any per-player UID rewrite (pst #15 regression)
+- [User delete SSE no-op](user-delete-sse-noop.md) — sync.ts users spec `del` is a no-op; soft-deleted users never clear via SSE, only on snapshot resync (deleteUser exists, just unwired); broadcasting a user delete BD is inert
+- [Merge reassign not broadcast](merge-reassign-no-broadcast.md) — merge_users reassigns sanctions/decks/coopted_by but doesn't broadcast them; stale on other clients until snapshot (pst #66 scoped to user records only)
 
 ## Scoring & Standings
 - [Final standings helper](project_final_standings_helper.md) — compute_final_standings is the shared VEKN placement fn (winner=1, finalists tie 2nd) for league scoring + frontend
+- [SA penalty single-sourced in Rust](sa-penalty-duplicated-in-python.md) — SA scoring now lives only in engine.compute_rating_vp_gw; ratings.py/vekn_push.py delegate. Don't re-derive SA in Python (pst #67 resolved)
+- [Standings are prelim-only](standings-prelim-only-contract.md) — tournament.standings = SA-adjusted prelim, finals excluded; Python archon importer violates this (stores finals-inclusive) → league double-counts finals
 
 ## Authorization (cross-stack)
 - [Authz single source = Rust](project_authz_single_source_rust.md) — authz predicates live in engine/src/permissions.rs (PyO3+WASM), the agreed cross-stack-DRY exception; pst #51/#47 re-scoped off a Python-only module

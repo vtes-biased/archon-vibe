@@ -140,6 +140,18 @@ When Rust engine capabilities change:
   - Updated OAuth Flow: PKCE via `/oauth/token` with Discord ID
 - ARCHITECTURE.md "Discord Linked Roles": added constraint — metadata push requires target user's own OAuth token (can't push for users who never logged in via Discord OAuth)
 
+**Session 2026-06-08: pst #67 — SA scoring correctness fix**
+- ARCHITECTURE.md: updated `tournament/standings.rs` bullet in Key Modules to note SA adjustments applied uniformly before GW/TP/standings VP (table re-ranks/re-averages TP, adjusted total may go negative, `result.vp` stays raw)
+- `.pst/tickets`: closed ticket #67 (fix landed)
+- PRODUCT.md already updated by user (Sanctions bullet + rule #11); verified both read correctly against JG v2 §1.1.3 Examples 1 and 2
+- No changes needed: SYNC.md, engine/README.md, engine/TOURNAMENT.md (TOURNAMENT.md is already stale/pst #16), CLAUDE.md — none mentioned the old overflow carve-out behavior
+- Docs verified clean of: "overflow carve-out", "raw VP for TP", "TP ignores SA", "standings ignore SA"
+
+**Session 2026-06-08: pst #72 — authz unified in Rust engine**
+- ARCHITECTURE.md: expanded `permissions.rs` bullet to document the single-source-of-truth rule; added "Authorization" paragraph in Rust Integration section pointing to pst detail file; updated Frontend Usage code snippet to show `isOrganizer` fail-closed pattern
+- engine/README.md: rewrote Permissions section — lists all new predicates (`is_official`, `can_manage_country`, `can_manage_tournaments`, `can_manage_leagues`, `is_organizer`, `can_edit_league`, `can_issue_sanction`, `can_lift_sanction`), OwnedResource/SanctionContext descriptors, and cross-stack guardrails
+- No changes needed: CLAUDE.md (no authz mentions), SYNC.md (no authz mentions), no stale `insert_*/update_*` or `_identity` references found in any doc
+
 **Session 2026-02-16: Icon library migration (@iconify/svelte → lucide-svelte)**
 - Replaced @iconify/svelte (runtime icon fetching from api.iconify.design) with lucide-svelte (tree-shaken, build-time bundled)
 - Updated staff-frontend-engineer MEMORY.md stack dependencies (line 9)
