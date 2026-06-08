@@ -21,7 +21,7 @@ open  		EPIC: legal pages - privacy policy and terms of service for GDPR and Dis
 closed	p2	Create privacy policy and terms static Svelte routes at frontend/src/routes/legal/privacy/+page.svelte and frontend/src/routes/legal/terms/+page.svelte - content outline in .pst/details/20 parent:#20
 closed	p3	Add footer links to /legal/terms and /legal/privacy on every page parent:#20
 closed	p3	Add ToS and Privacy consent checkbox to the signup/consent flow (I agree to the ToS and Privacy Policy) parent:#20
-open  	p3	Set Terms of Service and Privacy Policy URLs in the Discord Developer Portal (becomes blocking for bot verification at 100 guilds) - optionally surface via ansible group_vars parent:#20
+open  	p3	Set Terms of Service and Privacy Policy URLs in the Discord Developer Portal (General Information). ansible group_vars legal_terms_url/legal_privacy_url recorded; remaining step is the manual portal entry, which depends:#35 (needs the stack live at its real domain - see Phase 1 #39 / cutover #40). Blocking for bot verification at 75 guilds. parent:#20
 closed	chore,lint,build	just lint-check red on main: 32 ruff check + 29 ruff format violations repo-wide (I001/F401/F541/F841/E402/E741/B904) plus verify cargo clippy - make just lint-check/just test green; pre-existing tech debt surfaced during review epic
 open  		EPIC: package Discord bot as a wheel + GitHub Release artifact (replace source-tree deploy; align with engine/backend wheels)
 closed	bot,build	Refactor bot/src flat modules into a real package bot/src/archon_bot/; add hatch wheel target + archon-bot console entry point in pyproject (revert tool.uv package=false stopgap) parent:#26
