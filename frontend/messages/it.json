@@ -186,6 +186,7 @@
   "error_suspended_cannot_checkin": "I giocatori sospesi non possono partecipare",
   "error_suspended_cannot_register": "Sospeso",
   "error_league_dq": "Il giocatore è squalificato da un torneo di lega",
+  "error_action_requires_online": "Questa azione richiede una connessione a internet.",
   "sanction_cat_procedural_error": "Errore Procedurale",
   "sanction_cat_tournament_error": "Errore di Torneo",
   "sanction_cat_unsportsmanlike_conduct": "Condotta Antisportiva",

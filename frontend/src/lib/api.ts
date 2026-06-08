@@ -9,6 +9,7 @@ import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
 import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
 import { addOfflineDeckUid } from '$lib/db';
+import * as m from './paraglide/messages.js';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -78,6 +79,13 @@ export function isOnline(): boolean {
 }
 
 /**
+ * Guard an online-only action: throws a localized error when offline.
+ */
+function requireOnline(): void {
+  if (!isOnline()) throw new Error(m.error_action_requires_online());
+}
+
+/**
  * Fetch users - always use IndexedDB for offline-first approach.
  */
 export async function fetchUsers(): Promise<User[]> {
@@ -93,9 +101,7 @@ export async function createUser(
   roles?: string[],
   city_geoname_id?: number | null,
 ): Promise<User> {
-  if (!isOnline()) {
-    throw new Error('Cannot create users while offline. Please connect to the internet.');
-  }
+  requireOnline();
 
   const params = new URLSearchParams();
   params.append('name', name);
@@ -120,9 +126,7 @@ export async function updateUser(
   roles?: string[],
   city_geoname_id?: number | null,
 ): Promise<User> {
-  if (!isOnline()) {
-    throw new Error('Cannot update users while offline. Please connect to the internet.');
-  }
+  requireOnline();
 
   const params = new URLSearchParams();
   if (name) params.append('name', name);
@@ -180,9 +184,7 @@ export interface VeknAbandonResponse {
  * Claim an unclaimed VEKN ID for the current user.
  */
 export async function claimVeknId(vekn_id: string): Promise<VeknClaimResponse> {
-  if (!isOnline()) {
-    throw new Error('Cannot claim VEKN ID while offline.');
-  }
+  requireOnline();
   return apiRequest<VeknClaimResponse>('/vekn/claim', {
     method: 'POST',
     body: JSON.stringify({ vekn_id }),
@@ -193,9 +195,7 @@ export async function claimVeknId(vekn_id: string): Promise<VeknClaimResponse> {
  * Abandon the current user's VEKN ID.
  */
 export async function abandonVeknId(): Promise<VeknAbandonResponse> {
-  if (!isOnline()) {
-    throw new Error('Cannot abandon VEKN ID while offline.');
-  }
+  requireOnline();
   return apiRequest<VeknAbandonResponse>('/vekn/abandon', {
     method: 'POST',
   });
@@ -205,9 +205,7 @@ export async function abandonVeknId(): Promise<VeknAbandonResponse> {
  * Sponsor a new VEKN member (allocates new sequential VEKN ID).
  */
 export async function sponsorVeknMember(user_uid: string): Promise<VeknSponsorResponse> {
-  if (!isOnline()) {
-    throw new Error('Cannot sponsor member while offline.');
-  }
+  requireOnline();
   return apiRequest<VeknSponsorResponse>('/vekn/sponsor', {
     method: 'POST',
     body: JSON.stringify({ user_uid }),
@@ -218,9 +216,7 @@ export async function sponsorVeknMember(user_uid: string): Promise<VeknSponsorRe
  * Link a VEKN ID to a user (may displace current holder).
  */
 export async function linkVeknId(vekn_id: string, user_uid: string): Promise<VeknLinkResponse> {
-  if (!isOnline()) {
-    throw new Error('Cannot link VEKN ID while offline.');
-  }
+  requireOnline();
   return apiRequest<VeknLinkResponse>('/vekn/link', {
     method: 'POST',
     body: JSON.stringify({ vekn_id, user_uid }),
@@ -231,9 +227,7 @@ export async function linkVeknId(vekn_id: string, user_uid: string): Promise<Vek
  * Force-abandon a user's VEKN ID (for NC/Prince/IC).
  */
 export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageResponse> {
-  if (!isOnline()) {
-    throw new Error('Cannot force-abandon VEKN ID while offline.');
-  }
+  requireOnline();
   return apiRequest<VeknMessageResponse>('/vekn/force-abandon', {
     method: 'POST',
     body: JSON.stringify({ user_uid }),
@@ -244,9 +238,7 @@ export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageR
  * Merge two user accounts (for NC/Prince/IC).
  */
 export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<{ user: User; message: string }> {
-  if (!isOnline()) {
-    throw new Error('Cannot merge users while offline.');
-  }
+  requireOnline();
   return apiRequest<{ user: User; message: string }>('/admin/users/merge', {
     method: 'POST',
     body: JSON.stringify({ keep_uid, delete_uid }),
@@ -270,9 +262,7 @@ export interface CreateSanctionData {
  * Create a new sanction (IC/Ethics only for SUSPENSION/PROBATION).
  */
 export async function createSanction(data: CreateSanctionData): Promise<Sanction> {
-  if (!isOnline()) {
-    throw new Error('Cannot create sanction while offline.');
-  }
+  requireOnline();
   return apiRequest<Sanction>('/sanctions/', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -283,9 +273,7 @@ export async function createSanction(data: CreateSanctionData): Promise<Sanction
  * Lift a sanction (sets lifted_at and lifted_by_uid).
  */
 export async function liftSanction(uid: string): Promise<Sanction> {
-  if (!isOnline()) {
-    throw new Error('Cannot lift sanction while offline.');
-  }
+  requireOnline();
   return apiRequest<Sanction>(`/sanctions/${uid}`, {
     method: 'PUT',
     body: JSON.stringify({ lifted: true }),
@@ -306,9 +294,7 @@ export interface UpdateSanctionData {
  * Update a sanction (level, category, description, expiry, or lift it).
  */
 export async function updateSanction(uid: string, data: UpdateSanctionData): Promise<Sanction> {
-  if (!isOnline()) {
-    throw new Error('Cannot update sanction while offline.');
-  }
+  requireOnline();
   return apiRequest<Sanction>(`/sanctions/${uid}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -319,9 +305,7 @@ export async function updateSanction(uid: string, data: UpdateSanctionData): Pro
  * Soft delete a sanction.
  */
 export async function deleteSanctionApi(uid: string): Promise<{ message: string }> {
-  if (!isOnline()) {
-    throw new Error('Cannot delete sanction while offline.');
-  }
+  requireOnline();
   return apiRequest<{ message: string }>(`/sanctions/${uid}`, {
     method: 'DELETE',
   });
@@ -335,9 +319,7 @@ export async function deleteSanctionApi(uid: string): Promise<{ message: string 
  * @param blob - The image blob (should be webp, max 1MB)
  */
 export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ success: boolean }> {
-  if (!isOnline()) {
-    throw new Error('Cannot upload avatar while offline.');
-  }
+  requireOnline();
 
   const token = getAccessToken();
   const formData = new FormData();
@@ -378,9 +360,7 @@ export interface ArchonImportResult {
 }
 
 export async function importArchonFile(tournamentUid: string, file: File): Promise<ArchonImportResult> {
-  if (!isOnline()) {
-    throw new Error('Cannot import while offline.');
-  }
+  requireOnline();
 
   const token = getAccessToken();
   const formData = new FormData();
@@ -431,9 +411,7 @@ export interface CreateTournamentData {
 }
 
 export async function createTournament(data: CreateTournamentData): Promise<Tournament> {
-  if (!isOnline()) {
-    throw new Error('Cannot create tournament while offline. Use createTournamentOffline().');
-  }
+  requireOnline();
   return apiRequest<Tournament>('/api/tournaments/', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -481,9 +459,7 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
 }
 
 export async function deleteTournamentApi(uid: string): Promise<{ message: string }> {
-  if (!isOnline()) {
-    throw new Error('Cannot delete tournament while offline.');
-  }
+  requireOnline();
   const result = await apiRequest<{ message: string }>(`/api/tournaments/${uid}`, {
     method: 'DELETE',
   });
@@ -631,9 +607,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
   }
 
   // Fallback: server-only
-  if (!isOnline()) {
-    throw new Error('Cannot perform tournament action while offline.');
-  }
+  requireOnline();
   return apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
     method: 'POST',
     body: JSON.stringify(event),
@@ -724,9 +698,7 @@ async function rollbackTournamentAction(
  * Self check-in via QR code (server-only, no optimistic path).
  */
 export async function qrCheckin(tournamentUid: string, code: string): Promise<Tournament> {
-  if (!isOnline()) {
-    throw new Error('Cannot check in while offline.');
-  }
+  requireOnline();
   return apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/qr-checkin`, {
     method: 'POST',
     body: JSON.stringify({ code }),
@@ -760,9 +732,7 @@ export interface CreateLeagueData {
 }
 
 export async function createLeague(data: CreateLeagueData): Promise<League> {
-  if (!isOnline()) {
-    throw new Error('Cannot create league while offline.');
-  }
+  requireOnline();
   const created = await apiRequest<League>('/api/leagues/', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -772,9 +742,7 @@ export async function createLeague(data: CreateLeagueData): Promise<League> {
 }
 
 export async function updateLeague(uid: string, data: Partial<CreateLeagueData>): Promise<League> {
-  if (!isOnline()) {
-    throw new Error('Cannot update league while offline.');
-  }
+  requireOnline();
   const updated = await apiRequest<League>(`/api/leagues/${uid}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -784,9 +752,7 @@ export async function updateLeague(uid: string, data: Partial<CreateLeagueData>)
 }
 
 export async function deleteLeagueApi(uid: string): Promise<void> {
-  if (!isOnline()) {
-    throw new Error('Cannot delete league while offline.');
-  }
+  requireOnline();
   await apiRequest<void>(`/api/leagues/${uid}`, {
     method: 'DELETE',
   });
@@ -866,9 +832,7 @@ export async function callJudge(uid: string, table: number): Promise<void> {
 }
 
 export async function deleteAvatar(userUid: string): Promise<{ success: boolean }> {
-  if (!isOnline()) {
-    throw new Error('Cannot delete avatar while offline.');
-  }
+  requireOnline();
 
   const result = await apiRequest<{ success: boolean }>(`/api/users/${userUid}/avatar`, {
     method: 'DELETE',

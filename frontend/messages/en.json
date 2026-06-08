@@ -186,6 +186,7 @@
   "error_suspended_cannot_checkin": "Suspended players cannot participate",
   "error_suspended_cannot_register": "Suspended",
   "error_league_dq": "Player is disqualified from a league tournament",
+  "error_action_requires_online": "This action requires an internet connection.",
   "sanction_cat_procedural_error": "Procedural Error",
   "sanction_cat_tournament_error": "Tournament Error",
   "sanction_cat_unsportsmanlike_conduct": "Unsportsmanlike Conduct",
