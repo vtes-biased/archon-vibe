@@ -6,11 +6,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from functools import cache
 from typing import NamedTuple
 
 import msgspec
 import psycopg
 from psycopg_pool import AsyncConnectionPool
+from uuid6 import uuid7
 
 from .models import (
     AuthMethod,
@@ -447,7 +450,12 @@ async def tournament_transaction(
 
 # JSON encoder/decoder
 _encoder = msgspec.json.Encoder()
-_decoder = msgspec.json.Decoder()
+
+
+@cache
+def _decoder_for(type_: type) -> msgspec.json.Decoder:
+    """Cached per-type msgspec Decoder (Decoders are reusable and meant to be shared)."""
+    return msgspec.json.Decoder(type_)
 
 
 def encode_json(obj: msgspec.Struct) -> str:
@@ -457,7 +465,7 @@ def encode_json(obj: msgspec.Struct) -> str:
 
 def decode_json[T](data: str | dict, type_: type[T]) -> T:
     """Decode JSON string or dict to a msgspec Struct."""
-    decoder = msgspec.json.Decoder(type_)
+    decoder = _decoder_for(type_)
     if isinstance(data, dict):
         # Convert dict back to JSON string for msgspec
         data = _encoder.encode(data).decode("utf-8")
@@ -714,8 +722,6 @@ async def get_user_by_uid(
 
 async def set_user_resync_after(user_uid: str) -> None:
     """Set resync_after to now() on a user, triggering full resync on next SSE connect."""
-    from datetime import UTC, datetime
-
     user = await get_user_by_uid(user_uid)
     if not user:
         return
@@ -730,8 +736,6 @@ async def delete_user(uid: str) -> None:
 
 async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
     """Soft-delete a user by setting deleted_at. Returns (user, BroadcastData) for SSE."""
-    from datetime import UTC, datetime
-
     user = await get_user_by_uid(uid)
     if not user:
         return None
@@ -1181,8 +1185,6 @@ async def user_has_active_suspension(user_uid: str) -> bool:
     not yet expired. Used to block self-abandon of a VEKN ID (you can't abandon
     your way out of a suspension — see .pst/details/59-vekn-detach.md).
     """
-    from datetime import UTC, datetime
-
     now = datetime.now(UTC)
     for s in await get_sanctions_for_user(user_uid):
         if s.deleted_at is not None or s.lifted_at is not None:
@@ -1223,10 +1225,6 @@ async def detach_user_from_vekn(
     `vekn_record` and null it on `personal` — the safe default is that VEKN
     history never follows the person.
     """
-    from datetime import UTC, datetime
-
-    from uuid6 import uuid7
-
     user = await get_user_by_uid(user_uid)
     if not user:
         return None
@@ -1414,8 +1412,6 @@ async def delete_tournament_db(uid: str) -> None:
 
 async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] | None:
     """Soft-delete a tournament. Returns (tournament, BroadcastData) for SSE."""
-    from datetime import UTC, datetime
-
     tournament = await get_tournament_by_uid(uid)
     if not tournament:
         return None
