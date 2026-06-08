@@ -100,6 +100,9 @@
 ## Scoring & Standings
 - [Final standings helper](project_final_standings_helper.md) — compute_final_standings is the shared VEKN placement fn (winner=1, finalists tie 2nd) for league scoring + frontend
 
+## Authorization (cross-stack)
+- [Authz single source = Rust](project_authz_single_source_rust.md) — authz predicates live in engine/src/permissions.rs (PyO3+WASM), the agreed cross-stack-DRY exception; pst #51/#47 re-scoped off a Python-only module
+
 ## Recurring Bug Pattern: Sanction reconstruction
 - `main.py:run_sanction_cleanup()` reconstructs Sanction manually — must include ALL fields
 - Same pattern in `sanctions.py` delete endpoint — also manual reconstruction
