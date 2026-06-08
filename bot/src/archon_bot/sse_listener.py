@@ -8,6 +8,13 @@ from collections import defaultdict
 import aiohttp
 
 from . import config
+from .announcements import (
+    format_finals,
+    format_round_seating,
+    format_sanction,
+    format_standings,
+    player_display,
+)
 from .channel_manager import (
     create_table_channels,
     delete_channels,
@@ -283,54 +290,12 @@ def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
         )
 
 
-def _format_standings(standings: list, standings_mode: str, players: list) -> str:
-    """Format standings respecting the tournament's standings_mode setting.
-
-    - Private: no standings shown
-    - Cutoff: only the 5th-place score threshold (no names)
-    - Top 10: top 10 players with scores
-    - Public: all players with scores
-    """
-    if standings_mode == "Private" or not standings:
-        return ""
-
-    if standings_mode == "Cutoff":
-        if len(standings) < 5:
-            return "\n**Top 5 cutoff:** Not enough players yet."
-        s = standings[4]
-        gw = s.get("gw", 0)
-        vp = s.get("vp", 0)
-        return f"\n**Top 5 cutoff score:** {gw}GW {vp}VP"
-
-    limit = {"Top 10": 10, "Public": len(standings)}.get(standings_mode, 0)
-    if limit == 0:
-        return ""
-
-    label = "Top 10" if standings_mode == "Top 10" else "Standings"
-    lines = [f"\n**{label}:**"]
-    for i, s in enumerate(standings[:limit]):
-        display = _player_display(s.get("user_uid", ""), players)
-        gw = s.get("gw", 0)
-        vp = s.get("vp", 0)
-        tp = s.get("tp", 0)
-        lines.append(f"{i + 1}. {display} — {gw}GW {vp}VP {tp}TP")
-    return "\n".join(lines)
-
-
 async def _post(bot, channel_id: int, content: str) -> None:
     """Post a message to a channel, logging failures."""
     try:
         await bot.rest.create_message(channel_id, content)
     except Exception as e:
         logger.warning("Failed to post to channel %s: %s", channel_id, e)
-
-
-def _player_display(puid: str, players: list) -> str:
-    """Get display name for a player UID."""
-    p = next((p for p in players if p.get("user_uid") == puid), None)
-    if p:
-        return p.get("display_name") or puid[:8]
-    return puid[:8]
 
 
 def _extract_round_seating(tournament: dict) -> list[set[str]] | None:
@@ -376,7 +341,7 @@ async def _warn_unlinked_players(
     unlinked = player_uids - set(discord_id_map.keys())
     if not unlinked:
         return
-    names = [_player_display(uid, players) for uid in unlinked]
+    names = [player_display(uid, players) for uid in unlinked]
     await _post(
         bot,
         judges_id,
@@ -486,7 +451,7 @@ async def _handle_update(
         standings_mode = obj.get("standings_mode", "Private")
 
         lines = [f"**Round {round_count} complete!**"]
-        lines.append(_format_standings(standings, standings_mode, players))
+        lines.append(format_standings(standings, standings_mode, players))
         lines.append(
             f"\nCheck-in for the next round is open — use `/checkin` in <#{lobby_id}>."
         )
@@ -509,20 +474,15 @@ async def _handle_update(
     # ── New round started ──
     if state == "Playing" and round_count > prev_round_count and rounds:
         current_round = rounds[-1]
-        tables_data: list[list[str]] = []
-
-        lines = [f"**Round {round_count} — Seating**\n"]
-        for ti, table in enumerate(current_round):
-            seating = table.get("seating", [])
-            player_uids = [s.get("player_uid", "") for s in seating]
-            tables_data.append(player_uids)
-            seat_names = [_player_display(uid, players) for uid in player_uids]
-            lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
-
-        lines.append(
-            "\nJoin your table's voice channel and use `/report` when the round ends."
+        tables_data: list[list[str]] = [
+            [s.get("player_uid", "") for s in table.get("seating", [])]
+            for table in current_round
+        ]
+        await _post(
+            bot,
+            announcement_id,
+            format_round_seating(round_count, tables_data, players),
         )
-        await _post(bot, announcement_id, "\n".join(lines))
 
         # Build discord_id_map for all players + organizers
         all_player_uids = {uid for table in tables_data for uid in table}
@@ -566,16 +526,9 @@ async def _handle_update(
         seating = finals.get("seating", [])
         seed_order = finals.get("seed_order", [])
 
-        lines = [f"**Finals — {name}**\n"]
-        lines.append("Seating order (prey → predator):")
-        for i, s in enumerate(seating):
-            uid = s.get("player_uid", "")
-            display = _player_display(uid, players)
-            seed = seed_order.index(uid) + 1 if uid in seed_order else "?"
-            lines.append(f"  {i + 1}. {display} (seed #{seed})")
-
-        lines.append("\nJoin the Finals voice channel. Good luck!")
-        await _post(bot, announcement_id, "\n".join(lines))
+        await _post(
+            bot, announcement_id, format_finals(name, seating, seed_order, players)
+        )
 
         finalists = [[s.get("player_uid", "") for s in seating]]
         finalist_uids = {s.get("player_uid", "") for s in seating}
@@ -687,7 +640,7 @@ async def _handle_update(
             lines = [f"**Seating updated — Round {round_count}**\n"]
             for ti, table in enumerate(current_round):
                 seat_names = [
-                    _player_display(s.get("player_uid", ""), players)
+                    player_display(s.get("player_uid", ""), players)
                     for s in table.get("seating", [])
                 ]
                 lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
@@ -706,10 +659,10 @@ async def _handle_update(
 
         lines = [f"**{name} is finished!**"]
         if winner:
-            winner_name = _player_display(winner, players)
+            winner_name = player_display(winner, players)
             lines.append(f"Congratulations to the winner: **{winner_name}**!")
 
-        lines.append(_format_standings(standings, standings_mode, players))
+        lines.append(format_standings(standings, standings_mode, players))
         lines.append(f"\nFull results: {webapp_url}")
         lines.append("Thank you all for playing!")
         await _post(bot, announcement_id, "\n".join(lines))
@@ -732,21 +685,6 @@ async def _handle_update(
     _last_state[key] = state
     _last_round_count[key] = round_count
     _last_tournament[key] = obj
-
-
-_SANCTION_LEVEL_LABELS = {
-    "caution": "Caution",
-    "warning": "Warning",
-    "standings_adjustment": "Standings Adjustment",
-    "disqualification": "Disqualification",
-}
-
-_SANCTION_LEVEL_EMOJI = {
-    "caution": "\u26a0\ufe0f",  # ⚠️
-    "warning": "\U0001f7e0",  # 🟠
-    "standings_adjustment": "\U0001f7e3",  # 🟣
-    "disqualification": "\U0001f534",  # 🔴
-}
 
 
 async def _handle_sanction_update(
@@ -786,20 +724,12 @@ async def _handle_sanction_update(
     round_number = obj.get("round_number")
     user_uid = obj.get("user_uid", "")
 
-    level_label = _SANCTION_LEVEL_LABELS.get(level, level)
-    level_emoji = _SANCTION_LEVEL_EMOJI.get(level, "")
-
     # Try to find the player's Discord mention
     player_discord_id = await store.get_discord_id_by_archon_uid(user_uid)
     player_mention = f"<@{player_discord_id}>" if player_discord_id else user_uid[:8]
 
-    round_info = f" (Round {round_number + 1})" if round_number is not None else ""
-    subcategory_info = f" — {subcategory.replace('_', ' ')}" if subcategory else ""
-
-    judges_msg = (
-        f"{level_emoji} **{level_label}** issued to {player_mention}{round_info}\n"
-        f"Category: {category}{subcategory_info}\n"
-        f"_{description}_"
+    judges_msg, player_msg = format_sanction(
+        level, category, subcategory, description, round_number, player_mention
     )
 
     # Post to judges channel
@@ -813,10 +743,6 @@ async def _handle_sanction_update(
     # - Otherwise, post to lobby
     key = _task_key(guild_id, tournament_uid)
     table_chs = _table_channels.get(key, [])
-    player_msg = (
-        f"{level_emoji} {player_mention} received a **{level_label}**{round_info}\n"
-        f"_{description}_"
-    )
 
     # Find the player's table channel if round is active
     posted_to_table = False
