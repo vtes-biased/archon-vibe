@@ -336,10 +336,15 @@ async def apply_archon_import(
 
     # 2. Build round data
     built_rounds: list[list[Table]] = []
-    # Accumulate per-player scores across rounds
-    player_scores: dict[str, dict] = {}  # user_uid → {gw, vp, tp}
+    # Accumulate per-player scores: `player_scores` is the full prelim+finals
+    # aggregate (for Player.result); `player_prelim` is prelim-only and feeds the
+    # standings. Engine standings are prelim-only and league scoring adds finals
+    # on top (league.rs), so finals must NOT be folded into the standings.
+    player_scores: dict[str, dict] = {}  # user_uid → {gw, vp, tp} (prelim+finals)
+    player_prelim: dict[str, dict] = {}  # user_uid → {gw, vp, tp} (prelim only)
     for user_uid in uid_by_number.values():
         player_scores[user_uid] = {"gw": 0.0, "vp": 0.0, "tp": 0}
+        player_prelim[user_uid] = {"gw": 0.0, "vp": 0.0, "tp": 0}
 
     for tables in data.rounds:
         round_tables: list[Table] = []
@@ -364,6 +369,9 @@ async def apply_archon_import(
                 player_scores[user_uid]["gw"] += gw
                 player_scores[user_uid]["vp"] += vp
                 player_scores[user_uid]["tp"] += tp
+                player_prelim[user_uid]["gw"] += gw
+                player_prelim[user_uid]["vp"] += vp
+                player_prelim[user_uid]["tp"] += tp
 
             round_tables.append(
                 Table(
@@ -435,12 +443,13 @@ async def apply_archon_import(
                 finalist=user_uid in finalist_uids,
             )
         )
+        prelim = player_prelim[user_uid]
         standings_list.append(
             Standing(
                 user_uid=user_uid,
-                gw=float(scores["gw"]),
-                vp=scores["vp"],
-                tp=int(scores["tp"]),
+                gw=float(prelim["gw"]),
+                vp=prelim["vp"],
+                tp=int(prelim["tp"]),
                 toss=0,
                 finalist=user_uid in finalist_uids,
             )

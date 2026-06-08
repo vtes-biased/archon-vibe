@@ -363,9 +363,17 @@ async def update_sanction_endpoint(
                 detail=f"Subcategory '{subcategory.value}' not valid for category '{category.value}'",
             )
 
-    # Update round_number if provided
+    # Update round_number if provided (mirror create: must reference an existing
+    # round, else the SA is silently inert — the engine recompute no-ops it).
     if request.round_number is not None:
         round_number = request.round_number
+        if sanction.tournament_uid is not None:
+            tournament = await get_tournament_by_uid(sanction.tournament_uid)
+            if tournament and round_number >= len(tournament.rounds):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"round_number {round_number} exceeds tournament rounds ({len(tournament.rounds)})",
+                )
 
     # Update description if provided
     if request.description is not None:
