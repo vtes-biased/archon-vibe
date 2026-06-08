@@ -167,16 +167,6 @@ def compute_sanction_public(d: dict) -> None:
     return None
 
 
-def compute_sanction_member(d: dict) -> dict:
-    """Members see full sanction data."""
-    return dict(d)
-
-
-def compute_sanction_full(d: dict) -> dict:
-    """Full sanction data (same as member)."""
-    return dict(d)
-
-
 # ---------------------------------------------------------------------------
 # Deck projections
 # ---------------------------------------------------------------------------
@@ -205,22 +195,16 @@ def compute_deck_full(d: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# League projections
+# Shared passthrough (identity projection)
 # ---------------------------------------------------------------------------
 
 
-def compute_league_public(d: dict) -> dict:
-    """Leagues are fully public."""
-    return dict(d)
+def _identity(d: dict) -> dict:
+    """Identity projection: object fully visible at this level (no filtering).
 
-
-def compute_league_member(d: dict) -> dict:
-    """Leagues are fully public."""
-    return dict(d)
-
-
-def compute_league_full(d: dict) -> dict:
-    """Leagues are fully public."""
+    Used where a type has no per-level field policy: leagues are fully public
+    at every level, and sanctions are fully visible to any member.
+    """
     return dict(d)
 
 
@@ -233,23 +217,23 @@ _PUBLIC_DISPATCH = {
     ObjectType.TOURNAMENT: compute_tournament_public,
     ObjectType.SANCTION: compute_sanction_public,
     ObjectType.DECK: compute_deck_public,
-    ObjectType.LEAGUE: compute_league_public,
+    ObjectType.LEAGUE: _identity,
 }
 
 _MEMBER_DISPATCH = {
     ObjectType.USER: compute_user_member,
     ObjectType.TOURNAMENT: compute_tournament_member,
-    ObjectType.SANCTION: compute_sanction_member,
+    ObjectType.SANCTION: _identity,
     ObjectType.DECK: compute_deck_member,
-    ObjectType.LEAGUE: compute_league_member,
+    ObjectType.LEAGUE: _identity,
 }
 
 _FULL_DISPATCH = {
     ObjectType.USER: compute_user_full,
     ObjectType.TOURNAMENT: compute_tournament_full,
-    ObjectType.SANCTION: compute_sanction_full,
+    ObjectType.SANCTION: _identity,
     ObjectType.DECK: compute_deck_full,
-    ObjectType.LEAGUE: compute_league_full,
+    ObjectType.LEAGUE: _identity,
 }
 
 
