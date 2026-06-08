@@ -1,4 +1,4 @@
-_Last updated: 8 June 2026_
+_Last updated: 8 June 2026 — provided in English, which is the authoritative version._
 
 Archon is a free, non-commercial service for organising and recording Vampire: The Eternal Struggle (VTES) tournaments and leagues, run as part of the Vampire: Elder Kindred Network (VEKN) organised-play programme and operated by **Black Chantry Productions Limited** (13 East Crescent, Beeston, Nottingham, NG9 1PZ, United Kingdom). By creating an account or using Archon you agree to these Terms. Questions: **orgplay@blackchantry.com**.
 

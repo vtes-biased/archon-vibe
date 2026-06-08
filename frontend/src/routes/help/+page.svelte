@@ -13,10 +13,10 @@
     clipboard: ClipboardList,
   };
 
-  const legalLinks = [
-    { href: "/legal/privacy", title: "Privacy Policy", description: "How we collect, use and protect your data.", icon: ShieldCheck },
-    { href: "/legal/terms", title: "Terms of Service", description: "The rules for using Archon.", icon: FileText },
-  ];
+  const legalLinks = $derived([
+    { href: "/legal/privacy", title: m.legal_privacy_title(), description: m.legal_privacy_description(), icon: ShieldCheck },
+    { href: "/legal/terms", title: m.legal_terms_title(), description: m.legal_terms_description(), icon: FileText },
+  ]);
 </script>
 
 <svelte:head>
@@ -79,7 +79,7 @@
 
     <!-- Legal -->
     <section>
-      <h2 class="text-lg font-medium text-bone-100 mb-4">Legal</h2>
+      <h2 class="text-lg font-medium text-bone-100 mb-4">{m.help_legal_section()}</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {#each legalLinks as link}
           {@const Icon = link.icon}
