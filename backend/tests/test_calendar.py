@@ -215,7 +215,7 @@ def _make_user(token: str | None = None) -> User:
 @pytest.mark.asyncio
 async def test_calendar_token_lookup_round_trip(test_db):
     user = _make_user(token="tok-abc123")
-    await db.insert_user(user)
+    await db.save_user(user)
 
     found = await db.get_user_by_calendar_token("tok-abc123")
     assert found is not None
@@ -233,13 +233,13 @@ async def test_calendar_token_survives_read_modify_write(test_db):
     stored token survives the write.
     """
     user = _make_user(token="keep-me")
-    await db.insert_user(user)
+    await db.save_user(user)
 
     reloaded = await db.get_user_by_uid(user.uid)
     assert reloaded is not None
     assert reloaded.calendar_token is None  # stripped from "full"
     reloaded.name = "Renamed"
-    await db.update_user(reloaded)
+    await db.save_user(reloaded)
 
     assert (await db.get_user_by_calendar_token("keep-me")).uid == user.uid
     assert await db.get_calendar_token(user.uid) == "keep-me"
@@ -252,7 +252,7 @@ async def test_calendar_token_preserved_by_unhydrated_writer(test_db):
     COALESCE must keep the stored token instead of nulling it.
     """
     user = _make_user(token="sync-safe")
-    await db.insert_user(user)
+    await db.save_user(user)
 
     # Simulate vekn_sync: a fresh model for the same uid, no token field set.
     rebuilt = User(
@@ -261,7 +261,7 @@ async def test_calendar_token_preserved_by_unhydrated_writer(test_db):
         name="From VEKN",
         country="FR",
     )
-    await db.update_user(rebuilt)
+    await db.save_user(rebuilt)
 
     assert (await db.get_user_by_calendar_token("sync-safe")).uid == user.uid
 
@@ -270,7 +270,7 @@ async def test_calendar_token_preserved_by_unhydrated_writer(test_db):
 async def test_clear_calendar_token(test_db):
     """clear_calendar_token drops the feed token even though save_object COALESCEs."""
     user = _make_user(token="revoke-me")
-    await db.insert_user(user)
+    await db.save_user(user)
 
     await db.clear_calendar_token(user.uid)
 
@@ -279,7 +279,7 @@ async def test_clear_calendar_token(test_db):
     # A later unhydrated update must not resurrect it.
     reloaded = await db.get_user_by_uid(user.uid)
     reloaded.name = "Renamed"
-    await db.update_user(reloaded)
+    await db.save_user(reloaded)
     assert await db.get_user_by_calendar_token("revoke-me") is None
 
 
@@ -287,7 +287,7 @@ async def test_clear_calendar_token(test_db):
 async def test_calendar_token_absent_from_all_projections(test_db):
     """The token lives only in its column, never in public/member/full JSONB."""
     user = _make_user(token="secret-xyz")
-    await db.insert_user(user)
+    await db.save_user(user)
 
     async with db.get_connection() as conn:
         row = await (
@@ -308,7 +308,7 @@ async def test_calendar_token_absent_from_all_projections(test_db):
 @pytest.mark.asyncio
 async def test_calendar_token_not_resolved_for_deleted_user(test_db):
     user = _make_user(token="ghost")
-    await db.insert_user(user)
+    await db.save_user(user)
     await db.soft_delete_user(user.uid)
 
     assert await db.get_user_by_calendar_token("ghost") is None

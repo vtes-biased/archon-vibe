@@ -13,8 +13,7 @@ from .db import (
     decode_json,
     get_connection,
     get_tournament_by_external_id,
-    insert_tournament,
-    update_tournament,
+    save_tournament,
 )
 from .models import (
     ObjectType,
@@ -456,13 +455,13 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         winner=tournament.winner,
                         standings=tournament.standings,
                     )
-                    bd = await update_tournament(tournament)
+                    bd = await save_tournament(tournament)
                     broadcast_precomputed(bd)
                     stats["updated"] += 1
                 else:
                     stats["unchanged"] += 1
             else:
-                bd = await insert_tournament(tournament)
+                bd = await save_tournament(tournament)
                 broadcast_precomputed(bd)
                 stats["created"] += 1
 

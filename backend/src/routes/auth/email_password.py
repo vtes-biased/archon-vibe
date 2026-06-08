@@ -11,7 +11,7 @@ from uuid6 import uuid7
 from ...db import (
     get_auth_method_by_identifier,
     insert_auth_method,
-    insert_user,
+    save_user,
     update_auth_method,
 )
 from ...models import AuthMethod, AuthMethodType, User
@@ -54,7 +54,7 @@ async def register(request: RegisterRequest) -> Response:
         modified=now,
         name=request.name,
     )
-    await insert_user(user)
+    await save_user(user)
 
     # Create auth method with hashed password
     password_hash = ph.hash(request.password)

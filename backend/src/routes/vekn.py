@@ -19,8 +19,8 @@ from ..db import (
     get_user_by_vekn_id,
     is_vekn_id_claimed,
     merge_users,
+    save_user,
     set_user_resync_after,
-    update_user,
     user_has_active_suspension,
 )
 from ..middleware.auth import CurrentUser
@@ -241,7 +241,7 @@ async def sponsor_new_member(
         vekn_synced_at=None,
     )
 
-    bd = await update_user(updated)
+    bd = await save_user(updated)
     broadcast_precomputed(bd)
     await set_user_resync_after(updated.uid)
     logger.info(

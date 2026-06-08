@@ -19,8 +19,8 @@ from .db import (
     get_sanctions_for_tournament,
     get_tournament_wins_for_users,
     get_user_by_uid,
+    save_user,
     stream_objects_new,
-    update_user,
 )
 from .models import (
     CategoryRating,
@@ -245,7 +245,7 @@ async def recompute_ratings_for_players(
         user.wins = wins_map.get(user_uid, [])
         user.modified = now
 
-        bd = await update_user(user)
+        bd = await save_user(user)
         updated_users.append((user, bd))
 
     logger.info(f"Recomputed {len(updated_users)} ratings for {category.value}")

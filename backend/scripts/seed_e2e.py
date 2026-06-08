@@ -21,7 +21,7 @@ from src.db import (  # noqa: E402
     get_connection,
     init_db,
     insert_auth_method,
-    insert_user,
+    save_user,
 )
 from src.models import (  # noqa: E402
     AuthMethod,
@@ -139,7 +139,7 @@ async def seed() -> dict:
             ),
         ],
     )
-    await insert_user(organizer)
+    await save_user(organizer)
 
     # Auth method (email + password)
     auth_uid = str(uuid7())
@@ -173,7 +173,7 @@ async def seed() -> dict:
             community_links=links,
             contact_email=f"{name.split()[0].lower()}@example.com" if roles else None,
         )
-        await insert_user(user)
+        await save_user(user)
 
     await generate_snapshots()
 

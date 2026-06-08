@@ -12,8 +12,7 @@ from ..broadcast import broadcast_precomputed
 from ..db import (
     get_child_leagues,
     get_league_by_uid,
-    insert_league,
-    update_league,
+    save_league,
 )
 from ..middleware.auth import OptionalUser
 from ..models import League, LeagueKind, LeagueStandingsMode, Role
@@ -100,7 +99,7 @@ async def create_league(
         organizers_uids=[user.uid],
         parent_uid=body.parent_uid,
     )
-    bd = await insert_league(league)
+    bd = await save_league(league)
     broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
@@ -146,7 +145,7 @@ async def update_league_endpoint(
         setattr(league, field, value)
 
     league.modified = datetime.now(UTC)
-    bd = await update_league(league)
+    bd = await save_league(league)
     broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
@@ -179,7 +178,7 @@ async def delete_league_endpoint(
 
     league.deleted_at = datetime.now(UTC)
     league.modified = datetime.now(UTC)
-    bd = await update_league(league)
+    bd = await save_league(league)
     broadcast_precomputed(bd)
     return Response(status_code=204)
 
@@ -206,7 +205,7 @@ async def add_organizer(
     if body.user_uid not in league.organizers_uids:
         league.organizers_uids.append(body.user_uid)
         league.modified = datetime.now(UTC)
-        bd = await update_league(league)
+        bd = await save_league(league)
         broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),
@@ -234,7 +233,7 @@ async def remove_organizer(
             raise HTTPException(400, "Cannot remove the last organizer")
         league.organizers_uids.remove(organizer_uid)
         league.modified = datetime.now(UTC)
-        bd = await update_league(league)
+        bd = await save_league(league)
         broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(league)),

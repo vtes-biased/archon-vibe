@@ -17,11 +17,10 @@ from ...db import (
     get_transient_token,
     get_user_by_uid,
     insert_auth_method,
-    insert_user,
     merge_users,
+    save_user,
     store_transient_token,
     update_auth_method,
-    update_user,
 )
 from ...models import AuthMethod, AuthMethodType, User
 from ._tokens import create_access_token, create_refresh_token, verify_token
@@ -241,7 +240,7 @@ async def discord_callback(
                 changed = True
             if changed:
                 user.modified = datetime.now(UTC)
-                await update_user(user)
+                await save_user(user)
 
         # Store Discord tokens and push Linked Roles metadata
         await _store_and_push_discord_roles(user_uid_from_state, discord_tokens)
@@ -277,7 +276,7 @@ async def discord_callback(
             if user and user.discord_id != discord_id:
                 user.discord_id = discord_id
                 user.modified = now
-                await update_user(user)
+                await save_user(user)
         else:
             # Check if verified email matches an existing EMAIL auth user
             email_auth_user_uid = None
@@ -322,7 +321,7 @@ async def discord_callback(
                         changed = True
                     if changed:
                         user.modified = now
-                        await update_user(user)
+                        await save_user(user)
             else:
                 # Create new account
                 user = User(
@@ -334,7 +333,7 @@ async def discord_callback(
                     contact_discord=discord_username,
                     contact_email=discord_email,
                 )
-                await insert_user(user)
+                await save_user(user)
                 user_uid = user.uid
 
                 # Create Discord auth method

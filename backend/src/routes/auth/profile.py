@@ -13,7 +13,7 @@ from ...db import (
     get_auth_methods_for_user,
     get_calendar_token,
     get_user_by_uid,
-    update_user,
+    save_user,
 )
 from ...models import CommunityLink, CommunityLinkType, Role
 from ._tokens import (
@@ -187,7 +187,7 @@ async def update_current_user(
     user.modified = datetime.now(UTC)
     user.local_modifications = local_mods
 
-    bd = await update_user(user)
+    bd = await save_user(user)
     broadcast_precomputed(bd)
 
     # Surface the owner's calendar feed token (preserved by COALESCE, not in "full").
@@ -235,7 +235,7 @@ async def generate_calendar_token(
     cal_token = secrets.token_urlsafe(32)
     user.calendar_token = cal_token
     user.modified = datetime.now(UTC)
-    await update_user(user)
+    await save_user(user)
 
     api_base = os.getenv("API_BASE_URL", "http://localhost:8000")
     calendar_url = f"{api_base}/api/calendar/tournaments.ics?token={cal_token}"

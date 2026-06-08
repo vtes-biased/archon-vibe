@@ -53,9 +53,9 @@ async def test_batched_sanctions_match_per_user_union(test_db):
     """get_sanctions_for_users returns the same set as per-user fan-out."""
     u1, u2, u3 = (str(uuid7()) for _ in range(3))
     async with _cleanup_sanctions():
-        await db.insert_sanction(_sanction(u1, SanctionLevel.SUSPENSION))
-        await db.insert_sanction(_sanction(u2, SanctionLevel.DISQUALIFICATION))
-        await db.insert_sanction(_sanction(u2, SanctionLevel.WARNING))
+        await db.save_sanction(_sanction(u1, SanctionLevel.SUSPENSION))
+        await db.save_sanction(_sanction(u2, SanctionLevel.DISQUALIFICATION))
+        await db.save_sanction(_sanction(u2, SanctionLevel.WARNING))
         # u3 has none
 
         batched = await db.get_sanctions_for_users([u1, u2, u3])
@@ -90,7 +90,7 @@ async def test_locked_reads_do_not_acquire_pool_connections(test_db, monkeypatch
     t_uid = str(uuid7())  # nonexistent row is fine; tx_conn is still yielded
 
     async with _cleanup_sanctions():
-        await db.insert_sanction(_sanction(u1, SanctionLevel.SUSPENSION))
+        await db.save_sanction(_sanction(u1, SanctionLevel.SUSPENSION))
 
         async with db.tournament_transaction(t_uid) as (_tournament, tx_conn):
             calls["n"] = 0  # ignore any setup checkouts

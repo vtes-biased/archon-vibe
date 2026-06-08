@@ -12,8 +12,7 @@ from .db import (
     get_princes_and_ncs,
     get_users_by_vekn_prefix,
     get_users_without_coopted_by,
-    insert_user,
-    update_user,
+    save_user,
 )
 from .geonames import match_city
 from .models import ObjectType, Role, User
@@ -647,7 +646,7 @@ class VEKNSyncService:
             **vekn_data,
         )
 
-        await insert_user(user)
+        await save_user(user)
         return user
 
     async def _update_user(
@@ -711,7 +710,7 @@ class VEKNSyncService:
         existing_user.vekn_synced_at = now
         existing_user.modified = now
 
-        await update_user(existing_user)
+        await save_user(existing_user)
 
         # If roles changed, update Discord Linked Roles metadata
         if sorted(new_roles) != sorted(old_roles):
@@ -844,7 +843,7 @@ class VEKNSyncService:
                     local_modifications=user.local_modifications,
                     vekn_prefix=user.vekn_prefix,
                 )
-                await update_user(updated)
+                await save_user(updated)
                 count += 1
 
         return count
@@ -900,7 +899,7 @@ class VEKNSyncService:
                 if sponsor_uid and sponsor_uid != user.uid:
                     user.coopted_by = sponsor_uid
                     user.modified = now
-                    await update_user(user)
+                    await save_user(user)
                     count += 1
                     continue
             still_orphan.append(user)
@@ -912,7 +911,7 @@ class VEKNSyncService:
                 if sponsor_uid and sponsor_uid != user.uid:
                     user.coopted_by = sponsor_uid
                     user.modified = now
-                    await update_user(user)
+                    await save_user(user)
                     count += 1
 
         return count

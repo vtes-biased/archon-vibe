@@ -161,7 +161,7 @@ async def main():
     # Generate and insert mock users
     users = generate_mock_users(300)
     for user in users:
-        await db.insert_user(user)
+        await db.save_user(user)
 
     print(f"✅ Populated database with {len(users)} users")
     await db.close_db()

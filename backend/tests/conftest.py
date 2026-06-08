@@ -93,6 +93,6 @@ async def populated_db(test_db) -> list:
 
     # Insert all users
     for user in users:
-        await db.insert_user(user)
+        await db.save_user(user)
 
     return users

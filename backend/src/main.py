@@ -28,7 +28,7 @@ from .db import (
     get_expired_sanctions,
     get_sanctions_for_cleanup,
     init_db,
-    update_sanction,
+    save_sanction,
 )
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .models import (
@@ -129,7 +129,7 @@ async def run_sanction_cleanup() -> None:
 
         for sanction in expired:
             updated = msgspec.structs.replace(sanction, modified=now, deleted_at=now)
-            bd = await update_sanction(updated)
+            bd = await save_sanction(updated)
             # Broadcast the soft-delete so clients can sync
             broadcast_precomputed(bd)
 

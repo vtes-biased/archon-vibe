@@ -694,13 +694,8 @@ async def purge_deleted_objects(days: int = 30) -> int:
 # ---------------------------------------------------------------------------
 
 
-async def insert_user(user: User) -> BroadcastData:
-    """Insert a new user into the database."""
-    return await save_object_from_model(ObjectType.USER, user)
-
-
-async def update_user(user: User) -> BroadcastData:
-    """Update an existing user in the database."""
+async def save_user(user: User) -> BroadcastData:
+    """Upsert a user into the objects table."""
     return await save_object_from_model(ObjectType.USER, user)
 
 
@@ -725,7 +720,7 @@ async def set_user_resync_after(user_uid: str) -> None:
     if not user:
         return
     user.resync_after = datetime.now(UTC)
-    await update_user(user)
+    await save_user(user)
 
 
 async def delete_user(uid: str) -> None:
@@ -743,7 +738,7 @@ async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
     now = datetime.now(UTC)
     user.deleted_at = now
     user.modified = now
-    bd = await update_user(user)
+    bd = await save_user(user)
     return user, bd
 
 
@@ -1023,7 +1018,7 @@ async def reassign_sanctions(from_user_uid: str, to_user_uid: str) -> int:
     count = 0
     for sanction in sanctions:
         updated = msgspec.structs.replace(sanction, user_uid=to_user_uid)
-        await update_sanction(updated)
+        await save_sanction(updated)
         count += 1
     return count
 
@@ -1061,7 +1056,7 @@ async def reassign_coopted_by_references(from_user_uid: str, to_user_uid: str) -
     for row in rows:
         user = decode_json(row[0], User)
         user.coopted_by = to_user_uid
-        await update_user(user)
+        await save_user(user)
         count += 1
 
     return count
@@ -1125,7 +1120,7 @@ async def merge_users(keep_uid: str, delete_uid: str) -> User | None:
         calendar_token=merged_calendar_token,
     )
 
-    await update_user(merged)
+    await save_user(merged)
     # Everything keyed to the dying delete_uid must migrate to the survivor.
     await reassign_auth_methods(delete_uid, keep_uid)
     await reassign_sanctions(delete_uid, keep_uid)
@@ -1218,7 +1213,7 @@ async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
         limited_offline=None,
         wins=[],
     )
-    await insert_user(personal)
+    await save_user(personal)
     await reassign_auth_methods(user_uid, new_uid)
 
     # The VEKN record keeps everything; only the PII that moved out is wiped.
@@ -1237,7 +1232,7 @@ async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
         calendar_token=None,
         local_modifications=set(),
     )
-    await update_user(vekn_record)
+    await save_user(vekn_record)
 
     return personal, vekn_record
 
@@ -1247,13 +1242,8 @@ async def detach_user_from_vekn(user_uid: str) -> tuple[User, User] | None:
 # ---------------------------------------------------------------------------
 
 
-async def insert_sanction(sanction: Sanction) -> BroadcastData:
-    """Insert a new sanction into the database."""
-    return await save_object_from_model(ObjectType.SANCTION, sanction)
-
-
-async def update_sanction(sanction: Sanction) -> BroadcastData:
-    """Update an existing sanction in the database."""
+async def save_sanction(sanction: Sanction) -> BroadcastData:
+    """Upsert a sanction into the objects table."""
     return await save_object_from_model(ObjectType.SANCTION, sanction)
 
 
@@ -1355,13 +1345,8 @@ async def delete_sanction_hard(uid: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def insert_tournament(tournament: Tournament) -> BroadcastData:
-    """Insert a new tournament into the database."""
-    return await save_object_from_model(ObjectType.TOURNAMENT, tournament)
-
-
-async def update_tournament(tournament: Tournament) -> BroadcastData:
-    """Update an existing tournament in the database."""
+async def save_tournament(tournament: Tournament) -> BroadcastData:
+    """Upsert a tournament into the objects table."""
     return await save_object_from_model(ObjectType.TOURNAMENT, tournament)
 
 
@@ -1387,7 +1372,7 @@ async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] |
     now = datetime.now(UTC)
     tournament.deleted_at = now
     tournament.modified = now
-    bd = await update_tournament(tournament)
+    bd = await save_tournament(tournament)
     return tournament, bd
 
 
@@ -1455,13 +1440,8 @@ async def get_finished_tournaments_for_category(
 # ---------------------------------------------------------------------------
 
 
-async def insert_league(league: League) -> BroadcastData:
-    """Insert a new league into the database."""
-    return await save_object_from_model(ObjectType.LEAGUE, league)
-
-
-async def update_league(league: League) -> BroadcastData:
-    """Update an existing league in the database."""
+async def save_league(league: League) -> BroadcastData:
+    """Upsert a league into the objects table."""
     return await save_object_from_model(ObjectType.LEAGUE, league)
 
 

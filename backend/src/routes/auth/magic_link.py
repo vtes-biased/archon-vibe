@@ -16,7 +16,7 @@ from ...db import (
     get_transient_token,
     get_user_by_contact_email,
     insert_auth_method,
-    insert_user,
+    save_user,
     store_transient_token,
     update_auth_method,
 )
@@ -273,7 +273,7 @@ async def set_password(request: SetPasswordRequest) -> Response:
                 name="",
                 contact_email=email,
             )
-            await insert_user(user)
+            await save_user(user)
             user_uid = user.uid
 
         # Create EMAIL auth method with password

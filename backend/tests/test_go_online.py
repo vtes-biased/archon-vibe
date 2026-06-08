@@ -58,7 +58,7 @@ async def _seed(org_uid: str) -> str:
     t = msgspec.convert(
         _offline_tournament_payload(uid, org_uid, "TEMP-seed"), Tournament
     )
-    await db.insert_tournament(t)
+    await db.save_tournament(t)
     return uid
 
 
@@ -66,8 +66,8 @@ async def _seed(org_uid: str) -> str:
 async def test_non_organizer_rejected_without_creating_users(test_client, test_db):
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
     intruder = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Intruder")
-    await db.insert_user(org)
-    await db.insert_user(intruder)
+    await db.save_user(org)
+    await db.save_user(intruder)
     uid = await _seed(org.uid)
 
     temp_uid = "TEMP-" + str(uuid7())
@@ -89,7 +89,7 @@ async def test_non_organizer_rejected_without_creating_users(test_client, test_d
 @pytest.mark.asyncio
 async def test_wrong_device_rejected_without_creating_users(test_client, test_db):
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
-    await db.insert_user(org)
+    await db.save_user(org)
     uid = await _seed(org.uid)
 
     temp_uid = "TEMP-" + str(uuid7())
@@ -111,7 +111,7 @@ async def test_wrong_device_rejected_without_creating_users(test_client, test_db
 @pytest.mark.asyncio
 async def test_organizer_resolves_players_and_goes_online(test_client, test_db):
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
-    await db.insert_user(org)
+    await db.save_user(org)
     uid = await _seed(org.uid)
 
     temp_uid = str(uuid7())  # frontend uses crypto.randomUUID()
@@ -150,7 +150,7 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
     """Structural remap reaches seating/winner; deck attribution is recomputed
     from the resolved user (pst #15) — no stale TEMP- survives reconciliation."""
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
-    await db.insert_user(org)
+    await db.save_user(org)
     base_uid = await _seed(org.uid)
 
     temp_uid = str(uuid7())  # frontend uses crypto.randomUUID()

@@ -30,7 +30,7 @@ from ...db import (
     get_transient_token,
     get_user_by_uid,
     insert_auth_method,
-    insert_user,
+    save_user,
     store_transient_token,
     update_auth_method,
 )
@@ -275,7 +275,7 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
         modified=now,
         name="",  # Empty name - user will complete profile later
     )
-    await insert_user(user)
+    await save_user(user)
 
     # Store the credential
     credential_id_b64 = (

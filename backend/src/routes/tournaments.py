@@ -27,15 +27,14 @@ from ..db import (
     get_tournament_by_uid,
     get_user_by_uid,
     get_user_by_vekn_id,
-    insert_sanction,
-    insert_tournament,
-    insert_user,
     save_object,
     save_object_from_model,
+    save_sanction,
+    save_tournament,
+    save_user,
     set_user_resync_after,
     soft_delete_tournament,
     tournament_transaction,
-    update_tournament,
 )
 from ..middleware.auth import OptionalUser
 from ..models import (
@@ -356,7 +355,7 @@ async def add_organizer(
     if body.user_uid not in tournament.organizers_uids:
         tournament.organizers_uids.append(body.user_uid)
         tournament.modified = datetime.now(UTC)
-        bd = await update_tournament(tournament)
+        bd = await save_tournament(tournament)
         broadcast_precomputed(bd)
 
     return Response(
@@ -391,7 +390,7 @@ async def remove_organizer(
             )
         tournament.organizers_uids.remove(organizer_uid)
         tournament.modified = datetime.now(UTC)
-        bd = await update_tournament(tournament)
+        bd = await save_tournament(tournament)
         broadcast_precomputed(bd)
         # Revoke access: force removed organizer to resync
         await set_user_resync_after(organizer_uid)
@@ -535,7 +534,7 @@ async def create_tournament(
         time_extension_policy=extension_policy,
     )
 
-    bd = await insert_tournament(tournament)
+    bd = await save_tournament(tournament)
     logger.info(f"Tournament {tournament.uid} created by {current_user.uid}")
 
     broadcast_precomputed(bd)
@@ -1559,7 +1558,7 @@ async def _resolve_or_create_offline_player(
         coopted_by=organizer_uid,
         coopted_at=now,
     )
-    bd = await insert_user(new_user)
+    bd = await save_user(new_user)
     logger.info(
         f"Created user {new_user.uid} (VEKN {vekn_id}) for offline player '{player_data.name}'"
     )
@@ -1610,7 +1609,7 @@ async def go_online(
     request.tournament["uid"] = uid  # Force correct UID
 
     # Pre-lock gate: authorize and pre-check the device lock against current server
-    # state BEFORE creating any users, so player resolution (insert_user /
+    # state BEFORE creating any users, so player resolution (save_user /
     # allocate_next_vekn_id / invite emails) never runs for an unauthorized or
     # wrong-device request. Re-checked authoritatively under the lock below; this
     # unlocked read only fails fast and gates side effects. A tournament created
@@ -1705,7 +1704,7 @@ async def go_online(
     for sanction_data in request.offline_sanctions:
         sanction = msgspec.convert(sanction_data, Sanction)
         sanction.user_uid = uid_map.get(sanction.user_uid, sanction.user_uid)
-        bd = await insert_sanction(sanction)
+        bd = await save_sanction(sanction)
         broadcast_precomputed(bd)
 
     # 6. Save offline decks, repointing the owner and the attribution. A deck's

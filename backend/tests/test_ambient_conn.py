@@ -63,7 +63,7 @@ async def test_write_inside_transaction_pools_independently(test_db, monkeypatch
             calls["n"] = 0
             await db.get_user_by_uid(str(uuid7()))  # read → ambient → 0
             assert calls["n"] == 0
-            await db.insert_user(
+            await db.save_user(
                 User(uid=str(uuid7()), modified=datetime.now(UTC), name="W")
             )
             assert calls["n"] == 1  # write → its own pooled connection
@@ -74,13 +74,13 @@ async def test_vekn_allocation_inside_transaction_no_collision(test_db):
     """allocate→insert→allocate inside a transaction yields distinct VEKN IDs.
 
     Direct regression for the bug avoided by keeping writes independent: if
-    insert_user joined the outer transaction, its row would be uncommitted and
+    save_user joined the outer transaction, its row would be uncommitted and
     the second allocation (a separate advisory-locked txn) would reissue the id.
     """
     t_uid = str(uuid7())
     async with db.tournament_transaction(t_uid) as (_t, _tx):
         id1 = await db.allocate_next_vekn_id()
-        await db.insert_user(
+        await db.save_user(
             User(uid=str(uuid7()), modified=datetime.now(UTC), name="P1", vekn_id=id1)
         )
         id2 = await db.allocate_next_vekn_id()

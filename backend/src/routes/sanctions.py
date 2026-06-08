@@ -15,9 +15,8 @@ from ..db import (
     get_sanction_by_uid,
     get_tournament_by_uid,
     get_user_by_uid,
-    insert_sanction,
-    update_sanction,
-    update_tournament,
+    save_sanction,
+    save_tournament,
 )
 from ..middleware.auth import OptionalUser
 from ..models import (
@@ -151,7 +150,7 @@ async def _set_player_dq_state(
         return  # Player not found in tournament
 
     tournament.modified = datetime.now(UTC)
-    bd = await update_tournament(tournament)
+    bd = await save_tournament(tournament)
     broadcast_precomputed(bd)
 
 
@@ -286,7 +285,7 @@ async def create_sanction(
         expires_at=expires_at,
     )
 
-    bd = await insert_sanction(sanction)
+    bd = await save_sanction(sanction)
     logger.info(
         f"Sanction {sanction.uid} ({level.value}) created for user {request.user_uid} "
         f"by {current_user.uid}"
@@ -442,7 +441,7 @@ async def update_sanction_endpoint(
         lifted_by_uid=lifted_by_uid,
     )
 
-    bd = await update_sanction(updated)
+    bd = await save_sanction(updated)
     logger.info(f"Sanction {uid} updated by {current_user.uid}")
 
     # If a DQ sanction was lifted, restore player state on the tournament
@@ -497,7 +496,7 @@ async def delete_sanction_endpoint(
     now = datetime.now(UTC)
     updated = msgspec.structs.replace(sanction, modified=now, deleted_at=now)
 
-    bd = await update_sanction(updated)
+    bd = await save_sanction(updated)
     logger.info(f"Sanction {uid} soft-deleted by {current_user.uid}")
 
     # Broadcast to SSE clients

@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 from .db import (
     get_connection,
     get_user_by_uid,
-    update_tournament,
-    update_user,
+    save_tournament,
+    save_user,
 )
 from .models import (
     ObjectType,
@@ -170,7 +170,7 @@ async def push_tournament_event(
     # Store the VEKN event ID
     tournament.external_ids["vekn"] = event_id
     tournament.modified = datetime.now(UTC)
-    await update_tournament(tournament)
+    await save_tournament(tournament)
     logger.info(f"Tournament {tournament.uid} → VEKN event {event_id}")
     return event_id
 
@@ -221,7 +221,7 @@ async def push_tournament_results(
     # Mark as pushed
     tournament.vekn_pushed_at = datetime.now(UTC)
     tournament.modified = datetime.now(UTC)
-    await update_tournament(tournament)
+    await save_tournament(tournament)
     logger.info(
         f"Tournament {tournament.uid} results pushed to VEKN event {vekn_event_id}"
     )
@@ -264,7 +264,7 @@ async def push_member(
     user.vekn_synced = True
     user.vekn_synced_at = datetime.now(UTC)
     user.modified = datetime.now(UTC)
-    await update_user(user)
+    await save_user(user)
     logger.info(f"Member {user.vekn_id} pushed to VEKN")
     return True
 

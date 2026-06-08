@@ -138,8 +138,8 @@ async def test_merge_preserves_resync_after_and_identity(test_db):
         contact_email="claimer@example.com",
         contact_phone="+15550001111",
     )
-    await db.insert_user(keep)
-    await db.insert_user(delete)
+    await db.save_user(keep)
+    await db.save_user(delete)
 
     merged = await db.merge_users(keep.uid, delete.uid)
 
@@ -170,15 +170,15 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
         uid=str(uuid7()), modified=datetime.now(UTC), name="Survivor", vekn_id="7654321"
     )
     delete = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Claimer")
-    await db.insert_user(keep)
-    await db.insert_user(delete)
+    await db.save_user(keep)
+    await db.save_user(delete)
 
     async with _cleanup_surgery():
         deck = _deck(delete.uid)
         sanction = _sanction(delete.uid, SanctionLevel.WARNING)
         auth = _auth(delete.uid, "claimer@example.com")
         await db.save_object_from_model(ObjectType.DECK, deck)
-        await db.insert_sanction(sanction)
+        await db.save_sanction(sanction)
         await db.insert_auth_method(auth)
 
         await db.merge_users(keep.uid, delete.uid)
@@ -228,14 +228,14 @@ async def test_detach_vekn_record_is_immovable(test_db):
         contact_email="holder@example.com",
         discord_id="discord-123",
     )
-    await db.insert_user(user)
+    await db.save_user(user)
 
     async with _cleanup_surgery():
         deck = _deck(user.uid)
         sanction = _sanction(user.uid, SanctionLevel.SUSPENSION)
         auth = _auth(user.uid, "holder@example.com")
         await db.save_object_from_model(ObjectType.DECK, deck)
-        await db.insert_sanction(sanction)
+        await db.save_sanction(sanction)
         await db.insert_auth_method(auth)
 
         result = await db.detach_user_from_vekn(user.uid)
@@ -303,7 +303,7 @@ async def test_detach_moves_calendar_token_to_personal(test_db):
         vekn_id="9000002",
         calendar_token="feed-token-xyz",
     )
-    await db.insert_user(user)
+    await db.save_user(user)
     assert await db.get_calendar_token(user.uid) == "feed-token-xyz"
 
     async with _cleanup_surgery():
@@ -329,7 +329,7 @@ async def test_detach_moves_calendar_token_to_personal(test_db):
 async def test_active_suspension_true_for_live_suspension(test_db):
     uid = str(uuid7())
     async with _cleanup_surgery():
-        await db.insert_sanction(_sanction(uid, SanctionLevel.SUSPENSION))
+        await db.save_sanction(_sanction(uid, SanctionLevel.SUSPENSION))
         assert await db.user_has_active_suspension(uid) is True
 
 
@@ -338,7 +338,7 @@ async def test_active_suspension_true_for_future_probation(test_db):
     uid = str(uuid7())
     future = datetime.now(UTC) + timedelta(days=30)
     async with _cleanup_surgery():
-        await db.insert_sanction(
+        await db.save_sanction(
             _sanction(uid, SanctionLevel.PROBATION, expires_at=future)
         )
         assert await db.user_has_active_suspension(uid) is True
@@ -348,8 +348,8 @@ async def test_active_suspension_true_for_future_probation(test_db):
 async def test_active_suspension_false_for_lower_levels(test_db):
     uid = str(uuid7())
     async with _cleanup_surgery():
-        await db.insert_sanction(_sanction(uid, SanctionLevel.CAUTION))
-        await db.insert_sanction(_sanction(uid, SanctionLevel.WARNING))
+        await db.save_sanction(_sanction(uid, SanctionLevel.CAUTION))
+        await db.save_sanction(_sanction(uid, SanctionLevel.WARNING))
         assert await db.user_has_active_suspension(uid) is False
 
 
@@ -358,11 +358,11 @@ async def test_active_suspension_false_when_lifted_expired_or_deleted(test_db):
     uid = str(uuid7())
     past = datetime.now(UTC) - timedelta(days=1)
     async with _cleanup_surgery():
-        await db.insert_sanction(_sanction(uid, SanctionLevel.SUSPENSION, lifted=True))
-        await db.insert_sanction(
+        await db.save_sanction(_sanction(uid, SanctionLevel.SUSPENSION, lifted=True))
+        await db.save_sanction(
             _sanction(uid, SanctionLevel.SUSPENSION, expires_at=past)
         )
-        await db.insert_sanction(_sanction(uid, SanctionLevel.PROBATION, deleted=True))
+        await db.save_sanction(_sanction(uid, SanctionLevel.PROBATION, deleted=True))
         assert await db.user_has_active_suspension(uid) is False
 
 
@@ -380,10 +380,10 @@ async def test_abandon_blocked_while_suspended(test_client):
         name="Suspended Player",
         vekn_id="9000003",
     )
-    await db.insert_user(user)
+    await db.save_user(user)
 
     async with _cleanup_surgery():
-        await db.insert_sanction(_sanction(user.uid, SanctionLevel.SUSPENSION))
+        await db.save_sanction(_sanction(user.uid, SanctionLevel.SUSPENSION))
 
         resp = await test_client.post(
             "/vekn/abandon", headers=make_auth_header(user.uid)
@@ -401,7 +401,7 @@ async def test_abandon_allowed_without_active_suspension(test_client):
         name="Clean Player",
         vekn_id="9000004",
     )
-    await db.insert_user(user)
+    await db.save_user(user)
 
     async with _cleanup_surgery():
         resp = await test_client.post(

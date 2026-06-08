@@ -20,8 +20,7 @@ from ..db import (
 )
 from ..db import delete_avatar as db_delete_avatar
 from ..db import get_avatar as db_get_avatar
-from ..db import insert_user as db_insert_user
-from ..db import update_user as db_update_user
+from ..db import save_user as db_save_user
 from ..db import upsert_avatar as db_upsert_avatar
 from ..middleware.auth import CurrentUser, OptionalUser
 from ..models import CommunityLink, LinkModeration, Role, User
@@ -118,7 +117,7 @@ async def create_user(
                 detail=f"You don't have permission to assign the {role.value} role",
             )
 
-    bd = await db_insert_user(user)
+    bd = await db_save_user(user)
 
     # Send invite email if provided
     if email:
@@ -255,7 +254,7 @@ async def update_user(
         )
 
     # Save to database
-    bd = await db_update_user(user)
+    bd = await db_save_user(user)
 
     # Trigger resync if roles changed
     if set(user.roles) != old_roles:
@@ -325,7 +324,7 @@ async def upload_avatar(
             modified=datetime.now(UTC),
             avatar_path=f"/api/users/{uid}/avatar",
         )
-        bd = await db_update_user(updated_user)
+        bd = await db_save_user(updated_user)
 
         # Broadcast user update via SSE
         broadcast_precomputed(bd)
@@ -385,7 +384,7 @@ async def delete_avatar(
             modified=datetime.now(UTC),
             avatar_path=None,
         )
-        bd = await db_update_user(updated_user)
+        bd = await db_save_user(updated_user)
 
         # Broadcast user update via SSE
         broadcast_precomputed(bd)
@@ -478,7 +477,7 @@ async def moderate_community_link(
 
     target.community_links = updated_links
     target.modified = datetime.now(UTC)
-    bd = await db_update_user(target)
+    bd = await db_save_user(target)
     broadcast_precomputed(bd)
 
     return Response(content=b'{"success": true}', media_type="application/json")

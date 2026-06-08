@@ -22,7 +22,7 @@ async def _insert_user(roles: list[Role], **kwargs) -> User:
         roles=roles,
         **kwargs,
     )
-    await db.insert_user(user)
+    await db.save_user(user)
     return user
 
 
