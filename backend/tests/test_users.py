@@ -17,7 +17,7 @@ async def test_create_user(test_client: AsyncClient, populated_db):
 
     response = await test_client.post(
         "/api/users/",
-        params={
+        json={
             "name": "Test User",
             "country": "US",
             "city": "New York",
@@ -104,7 +104,7 @@ async def test_update_user(test_client: AsyncClient, populated_db):
     # Update the user
     response = await test_client.put(
         f"/api/users/{target.uid}",
-        params={
+        json={
             "name": "Updated Name",
             "country": "CA",
         },
@@ -124,7 +124,7 @@ async def test_create_user_requires_auth(test_client: AsyncClient, populated_db)
     """Test that creating a user without auth returns 401."""
     response = await test_client.post(
         "/api/users/",
-        params={"name": "Test", "country": "US"},
+        json={"name": "Test", "country": "US"},
     )
     assert response.status_code == 401
 
@@ -134,6 +134,6 @@ async def test_update_user_requires_auth(test_client: AsyncClient, populated_db)
     """Test that updating a user without auth returns 401."""
     response = await test_client.put(
         f"/api/users/{populated_db[0].uid}",
-        params={"name": "Nope"},
+        json={"name": "Nope"},
     )
     assert response.status_code == 401

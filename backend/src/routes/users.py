@@ -3,11 +3,10 @@
 import json
 import logging
 from datetime import UTC, datetime
-from typing import Annotated
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 from uuid6 import uuid7
 
@@ -47,23 +46,43 @@ def _can_change_role(manager: User, role: Role, target_user: User) -> bool:
     return result["allowed"]
 
 
+class CreateUserRequest(BaseModel):
+    """JSON body for POST /api/users/."""
+
+    name: str
+    country: str
+    city: str | None = None
+    city_geoname_id: int | None = None
+    state: str | None = None
+    nickname: str | None = None
+    email: str | None = None
+    roles: list[str] | None = None
+
+
+class UpdateUserRequest(BaseModel):
+    """JSON body for PUT /api/users/{uid}. All fields optional (omit = leave unchanged)."""
+
+    name: str | None = None
+    country: str | None = None
+    city: str | None = None
+    city_geoname_id: int | None = None
+    state: str | None = None
+    nickname: str | None = None
+    roles: list[str] | None = None
+
+
 @router.post("/", status_code=201)
 async def create_user(
-    name: str,
-    country: str,
-    current_user: OptionalUser = None,
-    city: str | None = None,
-    city_geoname_id: int | None = None,
-    state: str | None = None,
-    nickname: str | None = None,
-    email: str | None = None,
-    roles: Annotated[list[str] | None, Query()] = None,
+    body: CreateUserRequest, current_user: OptionalUser = None
 ) -> Response:
     """Create a new user.
 
     Auto-allocates a VEKN ID for the new user.
     If email is provided, sends an invite email so they can log in.
     """
+    name, country = body.name, body.country
+    city, city_geoname_id = body.city, body.city_geoname_id
+    state, nickname, email, roles = body.state, body.nickname, body.email, body.roles
     # Authenticate current user
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -149,17 +168,12 @@ async def create_user(
 
 @router.put("/{uid}")
 async def update_user(
-    uid: str,
-    current_user: OptionalUser = None,
-    name: str | None = None,
-    country: str | None = None,
-    city: str | None = None,
-    city_geoname_id: int | None = None,
-    state: str | None = None,
-    nickname: str | None = None,
-    roles: Annotated[list[str] | None, Query()] = None,
+    uid: str, body: UpdateUserRequest, current_user: OptionalUser = None
 ) -> Response:
     """Update an existing user."""
+    name, country = body.name, body.country
+    city, city_geoname_id = body.city, body.city_geoname_id
+    state, nickname, roles = body.state, body.nickname, body.roles
     # Authenticate current user
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")

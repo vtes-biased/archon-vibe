@@ -103,18 +103,14 @@ export async function createUser(
 ): Promise<User> {
   requireOnline();
 
-  const params = new URLSearchParams();
-  params.append('name', name);
-  params.append('country', country);
-  if (city) params.append('city', city);
-  if (city_geoname_id != null) params.append('city_geoname_id', String(city_geoname_id));
-  if (nickname) params.append('nickname', nickname);
-  if (email) params.append('email', email);
-  if (roles !== undefined) {
-    roles.forEach(role => params.append('roles', role));
-  }
+  const body: Record<string, unknown> = { name, country };
+  if (city) body.city = city;
+  if (city_geoname_id != null) body.city_geoname_id = city_geoname_id;
+  if (nickname) body.nickname = nickname;
+  if (email) body.email = email;
+  if (roles !== undefined) body.roles = roles;
 
-  return apiRequest<User>(`/api/users/?${params}`, { method: 'POST' });
+  return apiRequest<User>('/api/users/', { method: 'POST', body: JSON.stringify(body) });
 }
 
 export async function updateUser(
@@ -128,22 +124,16 @@ export async function updateUser(
 ): Promise<User> {
   requireOnline();
 
-  const params = new URLSearchParams();
-  if (name) params.append('name', name);
-  if (country) params.append('country', country);
-  if (city !== undefined) params.append('city', city || '');
-  if (city_geoname_id !== undefined) params.append('city_geoname_id', city_geoname_id != null ? String(city_geoname_id) : '');
-  if (nickname !== undefined) params.append('nickname', nickname || '');
-  if (roles !== undefined) {
-    if (roles.length === 0) {
-      // Send empty string to explicitly clear all roles
-      params.append('roles', '');
-    } else {
-      roles.forEach(role => params.append('roles', role));
-    }
-  }
+  // Omit a field to leave it unchanged; '' clears a string, [] clears roles.
+  const body: Record<string, unknown> = {};
+  if (name) body.name = name;
+  if (country) body.country = country;
+  if (city !== undefined) body.city = city ?? '';
+  if (city_geoname_id != null) body.city_geoname_id = city_geoname_id;
+  if (nickname !== undefined) body.nickname = nickname ?? '';
+  if (roles !== undefined) body.roles = roles;
 
-  return apiRequest<User>(`/api/users/${uid}?${params}`, { method: 'PUT' });
+  return apiRequest<User>(`/api/users/${uid}`, { method: 'PUT', body: JSON.stringify(body) });
 }
 
 // VEKN ID Management API
@@ -321,31 +311,17 @@ export async function deleteSanctionApi(uid: string): Promise<{ message: string 
 export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ success: boolean }> {
   requireOnline();
 
-  const token = getAccessToken();
+  // apiRequest passes FormData through untouched (no JSON content-type) and
+  // handles auth + error extraction; the browser sets the multipart boundary.
   const formData = new FormData();
   formData.append('file', blob, 'avatar.webp');
 
-  const response = await fetch(`${API_URL}/api/users/${userUid}/avatar`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-
-  if (!response.ok) {
-    let detail: string | undefined;
-    try {
-      const data = await response.json();
-      detail = data.detail || data.message;
-    } catch {
-      // Ignore
-    }
-    const message = detail || `Failed to upload avatar: ${response.statusText}`;
-    showToast({ type: 'error', message });
-    throw new ApiError(message, response.status, detail);
-  }
-
+  const result = await apiRequest<{ success: boolean }>(
+    `/api/users/${userUid}/avatar`,
+    { method: 'POST', body: formData }
+  );
   showToast({ type: 'success', message: 'Avatar updated' });
-  return response.json();
+  return result;
 }
 
 // Archon Import API
