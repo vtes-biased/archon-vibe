@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament, Table, Sanction } from "$lib/types";
-  import { tournamentAction, setTableScore } from "$lib/api";
+  import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import { scoreSeatingSync, computePlayerIssuesSync } from "$lib/engine";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";

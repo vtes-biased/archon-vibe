@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
-  import { tournamentAction } from "$lib/api";
+  import { tournamentAction } from "$lib/tournament-actions";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { RefreshCw } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';

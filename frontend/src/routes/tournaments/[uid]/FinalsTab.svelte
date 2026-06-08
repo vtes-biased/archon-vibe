@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
   import { formatScore } from "$lib/utils";
-  import { tournamentAction, setTableScore } from "$lib/api";
+  import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import { GripVertical, ShieldCheck, Lock } from "lucide-svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";

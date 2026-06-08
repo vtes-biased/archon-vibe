@@ -128,7 +128,7 @@
     success = false;
 
     try {
-      const { tournamentAction } = await import('$lib/api');
+      const { tournamentAction } = await import('$lib/tournament-actions');
       const { fetchDeckFromUrl, parseDeckText } = await import('$lib/deck-fetch');
       const { getCards } = await import('$lib/cards');
 

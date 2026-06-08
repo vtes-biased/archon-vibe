@@ -2,7 +2,8 @@
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { untrack } from "svelte";
-  import { deleteTournamentApi, tournamentAction, setTableScore } from "$lib/api";
+  import { deleteTournamentApi } from "$lib/api";
+  import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";

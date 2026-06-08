@@ -108,7 +108,7 @@
     saving = true;
     saveError = null;
     try {
-      const { tournamentAction } = await import('$lib/api');
+      const { tournamentAction } = await import('$lib/tournament-actions');
       const auth = (await import('$lib/stores/auth.svelte')).getAuthState();
       const targetUid = playerUid || auth.user?.uid;
 

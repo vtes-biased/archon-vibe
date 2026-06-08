@@ -5,7 +5,7 @@
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { tournamentAction } from "$lib/api";
+  import { tournamentAction } from "$lib/tournament-actions";
   import { getCards } from "$lib/cards";
   import { ChevronDown, ChevronRight, CircleCheck, Lock } from "lucide-svelte";
   import { slide } from "svelte/transition";
