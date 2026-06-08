@@ -342,6 +342,44 @@ export function canEditUser(
 }
 
 /**
+ * Check if a user is an organizer of a tournament (sync).
+ * Fail-closed (false) until the WASM engine is loaded — never default-allow.
+ */
+export function isOrganizer(
+  user: { uid: string; roles?: string[]; country?: string | null } | null,
+  tournament: { country?: string | null; organizers_uids?: string[] }
+): boolean {
+  if (!user) return false;
+  const engine = getEngineReactive();
+  if (!engine) return false;
+  const actorJson = JSON.stringify({ uid: user.uid, roles: user.roles ?? [], country: user.country });
+  const tournamentJson = JSON.stringify({
+    country: tournament.country ?? null,
+    organizers_uids: tournament.organizers_uids ?? [],
+  });
+  return JSON.parse(engine.isOrganizer(actorJson, user.uid, tournamentJson)).allowed;
+}
+
+/**
+ * Check if a user can edit/organize a league (sync).
+ * Fail-closed (false) until the WASM engine is loaded.
+ */
+export function canEditLeague(
+  user: { uid: string; roles?: string[]; country?: string | null } | null,
+  league: { country?: string | null; organizers_uids?: string[] }
+): boolean {
+  if (!user) return false;
+  const engine = getEngineReactive();
+  if (!engine) return false;
+  const actorJson = JSON.stringify({ uid: user.uid, roles: user.roles ?? [], country: user.country });
+  const leagueJson = JSON.stringify({
+    country: league.country ?? null,
+    organizers_uids: league.organizers_uids ?? [],
+  });
+  return JSON.parse(engine.canEditLeague(actorJson, user.uid, leagueJson)).allowed;
+}
+
+/**
  * Compute rating points for a single tournament entry using the WASM engine.
  * Returns 0 if engine is not initialized.
  */
@@ -447,22 +485,21 @@ export async function buildActorContext(
   if (!user) {
     return { uid: '', roles: [], is_organizer: false, can_organize_league_uids: [] };
   }
+  // This context feeds engine action validation, so the checks must be
+  // authoritative — ensure WASM is loaded rather than fail-closed.
+  await initEngine();
   const isIC = user.roles?.includes('IC');
   let canOrganize: string[] = [];
+  // IC bypasses the per-league check in the engine, so it skips this filter
+  // entirely (empty list signals "no restriction") — keep the !isIC guard.
   if (actionType === 'UpdateConfig' && !isIC) {
     const leagues = await getAllLeagues();
-    canOrganize = leagues
-      .filter(l => (user.uid && l.organizers_uids?.includes(user.uid))
-        || (user.roles?.includes('NC') && l.country === user.country))
-      .map(l => l.uid);
+    canOrganize = leagues.filter(l => canEditLeague(user, l)).map(l => l.uid);
   }
   return {
     uid: user.uid,
     roles: user.roles || [],
-    is_organizer: !!(tournament.organizers_uids?.includes(user.uid) || isIC
-      || (user.roles?.includes('NC')
-        && user.country && tournament.country
-        && user.country === tournament.country)),
+    is_organizer: isOrganizer(user, tournament),
     can_organize_league_uids: canOrganize,
   };
 }

@@ -5,10 +5,10 @@
   import { updateLeague, deleteLeagueApi, addLeagueOrganizer, removeLeagueOrganizer } from "$lib/api";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
-  import { computeLeagueStandings } from "$lib/engine";
+  import { canEditLeague, computeLeagueStandings } from "$lib/engine";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
@@ -40,13 +40,7 @@
   }
   let standings = $state<StandingEntry[]>([]);
 
-  const isOrganizer = $derived(
-    league && auth.user && (
-      league.organizers_uids.includes(auth.user.uid) ||
-      hasAnyRole("IC") ||
-      (hasAnyRole("NC") && league.country === auth.user.country)
-    )
-  );
+  const isOrganizer = $derived(league ? canEditLeague(auth.user, league) : false);
 
   function standingsModeLabel(mode: LeagueStandingsMode): string {
     switch (mode) {

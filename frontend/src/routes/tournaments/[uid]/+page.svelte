@@ -8,7 +8,7 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { scoreSeatingSync, computeRatingPoints, computeFinalStandings, initEngine, validateDeck, type ValidationError } from "$lib/engine";
+  import { scoreSeatingSync, computeRatingPoints, computeFinalStandings, initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { formatScore } from "$lib/utils";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, type StandingEntry } from "$lib/tournament-utils";
@@ -44,11 +44,7 @@ import TournamentModals from "./TournamentModals.svelte";
   const auth = $derived(getAuthState());
   const uid = $derived($page.params.uid as string);
   const isOrganizer = $derived(
-    (tournament?.organizers_uids?.includes(auth.user?.uid ?? "") ||
-      auth.user?.roles?.includes("IC") ||
-      (auth.user?.roles?.includes("NC") &&
-        auth.user?.country && tournament?.country &&
-        auth.user.country === tournament.country)) ?? false
+    tournament ? engineIsOrganizer(auth.user, tournament) : false
   );
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
