@@ -69,3 +69,19 @@ Small direct findings:
 - api.ts `enqueueServerAction` per-tournament queue + rollback logic — compact and correct.
 - db.py `BroadcastData` pre-serialization (avoids a DB re-read) — a real optimization.
 - The 288-line precomputed seating tables — algorithm constant, not bloat.
+
+## Resolution notes
+
+- **#58 (engine tournament/mod.rs split): WONTFIX — locality wins.** `apply_event`
+  (mod.rs:181-1961) is a single 39-arm `match TournamentEvent`: the complete
+  tournament state machine, in lifecycle order, in one greppable place. The bulk is
+  intrinsic, not incidental. Splitting into phase-grouped handler files would
+  fragment the state machine across files (following a flow means file-hopping),
+  thread `(tournament, actor, sanctions, decks, deck_ops, state)` + destructured
+  event fields through ~39 new fn signatures (ceremony that could *grow* line count),
+  and churn the cross-stack correctness core (PyO3 + WASM; offline/online must agree)
+  with zero behavioural change — the highest-risk module to touch for the weakest
+  payoff. The sibling decomposition already done (scoring/standings/raffle/sanctions/
+  parsing/helpers/types) is layered; the arms are peers in one dispatch, not layers,
+  so the analogous split isn't natural. cf. #19 (seating.rs) where the split *was*
+  layered (measure/score/anneal). Discussed and confirmed with owner.
