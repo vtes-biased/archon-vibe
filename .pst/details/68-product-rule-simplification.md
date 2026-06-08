@@ -30,7 +30,7 @@ Lesson: the payoff is in grounding + rule-conformance audits, not prose-level "l
 | **SA scoring (G)** | "clean, just fix the doc" | **Broken**: TP + standings VP ignore the −1; only GW applies it | **Bug → #67** (fix also simplifies) |
 | **Timer (K)** | over-engineered | Confirmed + a latent uncapped-resume bug | **Simplify → #69** |
 | M — sanction escalation | "drop the auto-escalation engine" | ~14 lines of faithful, non-binding hints over JG-v2 reference tables; serves non-judge organizers | **Keep** |
-| O — raffle pools | trim 5→2 | Tiny code, but real menu clutter for explainability | **Trim → #71** (borderline) |
+| O — raffle pools | trim 5→2 | Pools are one-line read-only predicates, zero coupling, genuinely useful | **Keep** (#71 closed after discussion) |
 | J — multideck 2 finals methods | "soften / hide" | Two-method code **doesn't exist**; doc already describes a manual procedure | **Leave** (phantom) |
 
 ## Per-item verdicts
@@ -73,10 +73,22 @@ Lesson: the payoff is in grounding + rule-conformance audits, not prose-level "l
   titles, not permissions* (PRODUCT.md §2.1); events are often run by a Prince who isn't a certified
   judge. The hint helps exactly that non-expert. Removing it saves ~14 lines and *removes* value.
 
-### O — Raffle pools → #71 (borderline)
-- Trim 5→2 (AllPlayers, NonFinalists). Explainability win > code win. Close if the pools are wanted.
-- Separately: pool-filter logic is duplicated Rust↔frontend (self-flagged `raffle.rs:25`) — a
-  `#47`-style dedup, tracked there, not here.
+### O — Raffle pools → KEEP (#71 closed after discussion)
+- Reversed on discussion. Each pool is **one declarative read-only predicate** over data that
+  already exists (`played`, `standings.gw/vp`, `finalists`). Marginal cost of the 3 "extra" pools
+  beyond All+NonFinalists ≈ 3 Rust arms + 3 TS cases + 3 i18n labels. No mutation, no schema, no
+  migration risk, zero coupling to fragile subsystems. The 5 pools map to real prize-draw intents.
+- Trimming removes useful options for a rounding-error of code → worse product. **Keep all 5.**
+- The Rust↔frontend duplication (`get_raffle_pool` ↔ `eligibleForPool`, `raffle.rs:25`) is
+  **eliminable, not inherent**: `get_raffle_pool` is `pub(super)` and simply not exported in
+  `lib.rs`. The WASM engine is available to the frontend (same one used for offline
+  `processTournamentEvent`), with precedent for read-only exports (`compute_final_standings_json`,
+  `compute_player_issues_json`, …). A `computeRafflePools` export would delete `eligibleForPool` and
+  make the engine the single source of truth. It was kept in TS as a **locality tradeoff**: the WASM
+  boundary is stateless JSON-in/out (serialize the whole tournament per call), whereas the TS filter
+  works over data already in hand and needs all 5 counts reactively. Leave it (5 trivial predicates,
+  `feedback_locality_over_dry`); if the copies ever drift into a bug, export the fn rather than trim
+  pools.
 
 ### J — Multideck → LEAVE (no ticket)
 - No multideck-finals-method enum exists; `multideck` is a `bool` + per-round deck indexing. The
@@ -87,7 +99,7 @@ Lesson: the payoff is in grounding + rule-conformance audits, not prose-level "l
 - #67 — SA scoring bug (related; found here; fix simplifies)
 - #69 — timer additions-only
 - #70 — PRODUCT.md §4 visibility doc-fix
-- #71 — raffle pools 5→2 (borderline)
+- #71 — raffle pools 5→2 (CLOSED — discussed, decided keep all 5)
 - #47 — code-quality epic (sibling axis; raffle Rust↔frontend dup belongs there)
 - #19 — seating.rs refactor (candidates E/F were examined: stagger is one algorithm not 288 lines;
   the 9 priorities are the measurement tables — both load-bearing, no product-rule simplification)
