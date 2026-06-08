@@ -139,7 +139,7 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 
 ## Offline Mode
 
-> **Open issues (pst):** #14 a frontend DB-version bump wipes in-flight offline data. Update these when changing offline sync. (The offline lifecycle endpoints `go-offline`/`go-online`/`force-takeover`/`sync-offline`/`force-unlock` now take the `FOR UPDATE` lock via `tournament_transaction`, matching the action path; go-online repoints temp player UIDs via a whole-JSON replace (safe: temp UIDs are full UUIDs) and separately recomputes a deck's `attribution` from the resolved user — that's the one field holding a truncated `TEMP-` vekn (the UID's 8-char prefix) the replace can't reach. #15 done.)
+> **Open issue (pst #14):** a frontend DB-version bump can wipe in-flight offline data — guard/migrate before changing offline sync.
 
 ### Device-Lock Model
 
@@ -259,7 +259,7 @@ The Rust core defines the canonical object schemas and business logic:
 
 **Key Modules**:
 - `lib.rs` - Entry point, WASM/PyO3 bindings
-- `permissions.rs` - Role-based access control
+- `permissions.rs` - **Single source for all authorization predicates** (see below)
 - `seating.rs` - Tournament seating algorithm (simulated annealing + staggered seatings)
 - `tournament.rs` - Tournament event processing (state machine, scoring, finals)
 - `deck.rs` - Deck parsing, validation, enrichment, TWDA export
@@ -267,6 +267,8 @@ The Rust core defines the canonical object schemas and business logic:
 - `league.rs` - League standings computation (RTP/Score/GP); GP/RTP scoring delegates to `compute_final_standings` for final placement
 - `tournament/standings.rs` - `compute_preliminary_standings` (GW/VP/TP/toss sort), `compute_final_standings` (winner=rank 1; other finalists share rank 2 per VEKN §3.7.5; non-finalists competition-ranked from finalist_count+1). Whether a final happened is read from the per-player `finalist` flag, not from finals seating data.
 - `cards.rs` - Card database (lookup by ID/name, normalization)
+
+**Authorization (single source of truth)**: All role/country/uid/ownership predicates live in `engine/src/permissions.rs` and are consumed by both stacks — backend via PyO3, frontend via WASM. `backend/src/permissions.py` is a thin marshalling adapter (no logic); each route keeps its own `HTTPException(403, ...)` detail. The frontend wrappers (`isOrganizer()`, `canEditLeague()` in `engine.ts`) are UX-only and fail closed (`false`) until WASM loads — the backend remains the authoritative enforcement point. See `.pst/details/72-authz-rust-single-source.md` for the full design.
 
 **Build Commands**:
 ```bash
@@ -290,8 +292,9 @@ await initEngine();
 // Process tournament event (offline mode)
 const updated = await processTournamentEvent(tournament, event, actor);
 
-// Permission checks (sync, use pre-initialized engine)
+// Permission checks (sync, fail-closed on cold WASM engine)
 const result = canChangeRole(actor, target, 'Prince');
+const allowed = isOrganizer(user, tournament);  // false until WASM loads
 ```
 
 **Backend Usage**:

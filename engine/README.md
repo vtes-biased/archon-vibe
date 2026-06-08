@@ -91,13 +91,28 @@ const seating = engine.computeSeating(
 
 ### Permissions (`src/permissions.rs`)
 
-Role-based access control for VTES organization hierarchy:
-
-- **`can_change_role(manager, target, role)`** - Check if manager can grant/revoke a role
-- **`can_manage_vekn(manager, target)`** - Check if manager can manage target's VEKN ID
-- **`can_edit_user(manager, target)`** - Check if manager can edit target's profile
+**Single source of truth for all authorization predicates** — consumed by backend (PyO3) and frontend (WASM). See `.pst/details/72-authz-rust-single-source.md` for the design rationale.
 
 Role hierarchy: IC > NC > Prince (country-scoped) > Judge/Judgekin
+
+**User predicates** (take `UserContext {roles, country, vekn_id}`):
+- `can_change_role(actor, target, role)` — can actor grant/revoke a role
+- `can_manage_vekn(actor, target)` — can actor manage target's VEKN ID
+- `can_edit_user(actor, target)` — can actor edit target's profile
+- `is_official(actor)` — IC, NC, or Prince
+- `can_manage_country(actor, target_country)` — IC (any), or NC/Prince of that country
+- `can_manage_tournaments(actor)` — can create/manage tournaments (= `is_official`)
+- `can_manage_leagues(actor)` — IC or NC
+
+**Resource predicates** (take `OwnedResource {country, organizers_uids}`):
+- `is_organizer(actor, actor_uid, tournament)` — in organizers list, IC, or same-country NC
+- `can_edit_league(actor, actor_uid, league)` — IC, same-country NC, or a league organizer
+
+**Sanction predicates**:
+- `can_issue_sanction(actor, actor_uid, level, tournament)` — IC/Ethics, or a tournament organizer (caution/warning/SA/DQ); IC/Ethics only for suspension/probation
+- `can_lift_sanction(actor, actor_uid, ctx)` — takes a `SanctionContext` (level + tournament/league fields)
+
+All exposed via both PyO3 and WASM bindings in `lib.rs`.
 
 ### Seating (`src/seating.rs`)
 
