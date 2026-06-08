@@ -10,6 +10,7 @@ import calendar
 import logging
 from datetime import UTC, datetime
 
+import msgspec
 from archon_engine import PyEngine
 
 from .db import (
@@ -25,7 +26,6 @@ from .db import (
 from .models import (
     CategoryRating,
     RatingCategory,
-    SanctionLevel,
     Tournament,
     TournamentRatingEntry,
     User,
@@ -73,33 +73,6 @@ def _player_count(t: Tournament) -> int:
     return len(_players_with_rounds(t))
 
 
-def _player_stats(t: Tournament, user_uid: str) -> tuple[float, int]:
-    """Compute total VP and GW for a player across all rounds and finals.
-
-    For VEKN-synced tournaments (no rounds/finals), reads from standings.
-    """
-    if t.rounds or t.finals:
-        total_vp = 0.0
-        total_gw = 0
-        for round_tables in t.rounds:
-            for table in round_tables:
-                for seat in table.seating:
-                    if seat.player_uid == user_uid:
-                        total_vp += seat.result.vp
-                        total_gw += seat.result.gw
-        if t.finals:
-            for seat in t.finals.seating:
-                if seat.player_uid == user_uid:
-                    total_vp += seat.result.vp
-                    total_gw += seat.result.gw
-        return total_vp, total_gw
-    # VEKN-synced or rounds-less: read from standings
-    for s in t.standings:
-        if s.user_uid == user_uid:
-            return s.vp, int(s.gw)
-    return 0.0, 0
-
-
 def _finalist_position(t: Tournament, user_uid: str) -> int:
     """0=none, 1=winner, 2=runner-up."""
     if t.winner == user_uid:
@@ -117,49 +90,19 @@ def _finalist_position(t: Tournament, user_uid: str) -> int:
     return 0
 
 
-def _sa_overflow_penalty(
-    t: Tournament, user_uid: str, sanctions: list | None = None
-) -> float:
-    """Compute SA overflow VP penalty for a player.
-
-    If an SA sanction targets a round where the player's raw VP < 1.0,
-    the overflow (1.0 - raw_vp) is an additional VP penalty.
-    sanctions: pre-loaded sanctions for this tournament (avoids DB query).
-    """
-    if not t.rounds:
-        return 0.0
-    sa_sanctions = [
-        s
-        for s in (sanctions or [])
-        if s.level == SanctionLevel.STANDINGS_ADJUSTMENT
-        and s.user_uid == user_uid
-        and not s.lifted_at
-        and not s.deleted_at
-        and s.round_number is not None
-    ]
-    penalty = 0.0
-    for s in sa_sanctions:
-        rn = s.round_number
-        if rn >= len(t.rounds):
-            continue
-        round_vp = 0.0
-        for table in t.rounds[rn]:
-            for seat in table.seating:
-                if seat.player_uid == user_uid:
-                    round_vp = seat.result.vp
-        if round_vp < 1.0:
-            penalty += 1.0 - round_vp
-    return penalty
-
-
 def _compute_entry_sync(
     t: Tournament, user_uid: str, sanctions: list | None = None
 ) -> TournamentRatingEntry:
-    """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions)."""
+    """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions).
+
+    VP/GW (including finals and the SA penalty) come from the Rust engine so the
+    standings-adjustment scoring rule lives in one place — not re-implemented here.
+    """
     engine = _engine
-    vp, gw = _player_stats(t, user_uid)
-    overflow = _sa_overflow_penalty(t, user_uid, sanctions)
-    vp -= overflow
+    t_json = msgspec.json.encode(t).decode()
+    sanctions_json = msgspec.json.encode(sanctions or []).decode()
+    vp, gw = engine.compute_rating_vp_gw(t_json, sanctions_json, user_uid)
+    gw = int(gw)
     fp = _finalist_position(t, user_uid)
     pc = _player_count(t)
     points = engine.compute_rating_points(vp, gw, fp, pc, t.rank.value)

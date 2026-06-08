@@ -19,7 +19,7 @@ mod types;
 
 // Re-export items used by lib.rs
 pub use scoring::{check_table_vps, compute_gw, compute_tp};
-pub use standings::compute_final_standings;
+pub use standings::{compute_final_standings, compute_rating_vp_gw};
 pub use types::{
     ActorContext, PlayerState, SeatScore, TableState, TournamentEvent, TournamentState,
 };
@@ -34,7 +34,7 @@ use helpers::{
     validate_enum,
 };
 use raffle::{compute_deck_public, get_raffle_pool};
-use sanctions::{get_sa_sanctions, has_active_suspension, has_dq_sanction};
+use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
 use scoring::compute_gw_finals;
 use standings::{compute_preliminary_standings, top5_has_ties, update_standings};
 
@@ -1311,18 +1311,10 @@ fn apply_event(
                 vps.push(vp);
             }
 
-            // Build per-seat SA adjustments: -1.0 VP for each SA sanction on this round
-            let sa_sanctions = get_sa_sanctions(sanctions);
+            // Per-seat SA adjustments (-1.0 VP per SA on this round). Same helper the
+            // standings/rating recompute uses, so GW/TP stay consistent everywhere.
             let current_round = if is_finals { rounds_len } else { *round };
-            let mut adjustments = vec![0.0f64; table_size];
-            for i in 0..table_size {
-                let player_uid = t["seating"][i]["player_uid"].as_str().unwrap_or("");
-                for (sa_uid, sa_round) in &sa_sanctions {
-                    if sa_uid == player_uid && *sa_round == current_round {
-                        adjustments[i] -= 1.0;
-                    }
-                }
-            }
+            let adjustments = table_sa_adjustments(&t["seating"], current_round, sanctions);
 
             let gws = if is_finals {
                 let seating_uids: Vec<&str> = (0..table_size)
@@ -1336,7 +1328,7 @@ fn apply_event(
             } else {
                 compute_gw(&vps, &adjustments)
             };
-            let tps = compute_tp(table_size, &vps);
+            let tps = compute_tp(table_size, &vps, &adjustments);
 
             // Apply scores
             for i in 0..table_size {

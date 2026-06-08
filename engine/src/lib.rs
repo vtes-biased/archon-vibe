@@ -661,6 +661,26 @@ mod python {
             super::ratings::rating_category(format, online).to_string()
         }
 
+        /// Compute a player's SA-adjusted (vp, gw) for rating/VEKN-push, so the
+        /// backend does not re-implement SA scoring. Includes finals VP/GW.
+        fn compute_rating_vp_gw(
+            &self,
+            tournament_json: &str,
+            sanctions_json: &str,
+            user_uid: &str,
+        ) -> PyResult<(f64, f64)> {
+            use pyo3::exceptions::PyValueError;
+            let tournament =
+                json::parse(tournament_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            let sanctions =
+                json::parse(sanctions_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Ok(super::tournament::compute_rating_vp_gw(
+                &tournament,
+                &sanctions,
+                user_uid,
+            ))
+        }
+
         fn parse_deck(&self, text: &str, cards_json: &str) -> PyResult<String> {
             py_str(parse_deck_json(text, cards_json))
         }
@@ -731,8 +751,8 @@ mod python {
         }
 
         /// Compute tournament points for each player at a table.
-        fn compute_tp(&self, table_size: usize, vps: Vec<f64>) -> Vec<f64> {
-            super::tournament::compute_tp(table_size, &vps)
+        fn compute_tp(&self, table_size: usize, vps: Vec<f64>, adjustments: Vec<f64>) -> Vec<f64> {
+            super::tournament::compute_tp(table_size, &vps, &adjustments)
         }
     }
 

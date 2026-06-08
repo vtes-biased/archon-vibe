@@ -348,7 +348,7 @@ async def apply_archon_import(
             table_size = len(vps)
             adjustments = [0.0] * table_size
             gws = engine.compute_gw(vps, adjustments)
-            tps = engine.compute_tp(table_size, vps)
+            tps = engine.compute_tp(table_size, vps, adjustments)
 
             seats: list[Seat] = []
             for i, (player_num, vp) in enumerate(table.seats):
@@ -381,7 +381,7 @@ async def apply_archon_import(
         fsize = len(fvps)
         f_adjustments = [0.0] * fsize
         f_gws = engine.compute_gw(fvps, f_adjustments)
-        f_tps = engine.compute_tp(fsize, fvps)
+        f_tps = engine.compute_tp(fsize, fvps, f_adjustments)
 
         finals_seats: list[Seat] = []
         seed_order: list[str] = []

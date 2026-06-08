@@ -132,8 +132,11 @@ pub(crate) fn compute_gw_finals(
     gws
 }
 
-/// Compute TP based on VP rank within table. Ties average their positions.
-pub fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
+/// Compute TP based on adjusted-VP rank within the table. Ties average their
+/// positions. `adjustments` is same length as `vps` with negative values for SA
+/// penalties — TP ranks on `vp + adjustment`, so an SA can re-rank and re-average
+/// the table (JG v2 1.1.3, Example 2). Per-seat `result.vp` stays raw for display.
+pub fn compute_tp(table_size: usize, vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
     let base: &[f64] = match table_size {
         5 => &[60.0, 48.0, 36.0, 24.0, 12.0],
         4 => &[60.0, 48.0, 24.0, 12.0],
@@ -141,11 +144,17 @@ pub fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
         _ => return vec![0.0; vps.len()],
     };
 
-    // Create indices sorted by VP descending
+    let adjusted: Vec<f64> = vps
+        .iter()
+        .zip(adjustments.iter())
+        .map(|(v, a)| v + a)
+        .collect();
+
+    // Create indices sorted by adjusted VP descending
     let mut indices: Vec<usize> = (0..vps.len()).collect();
     indices.sort_by(|&a, &b| {
-        vps[b]
-            .partial_cmp(&vps[a])
+        adjusted[b]
+            .partial_cmp(&adjusted[a])
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
@@ -154,7 +163,7 @@ pub fn compute_tp(table_size: usize, vps: &[f64]) -> Vec<f64> {
     while i < indices.len() {
         // Find group of tied players
         let mut j = i + 1;
-        while j < indices.len() && vps[indices[j]] == vps[indices[i]] {
+        while j < indices.len() && adjusted[indices[j]] == adjusted[indices[i]] {
             j += 1;
         }
         // Average TP for positions i..j

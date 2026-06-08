@@ -586,6 +586,188 @@ fn test_gw_with_sa_still_above_threshold() {
 }
 
 #[test]
+fn test_tp_with_sa_reranks_table() {
+    // JG v2 1.1.3 Example 2: A sweeps a 5-player table (5VP); B/C/D/E at 0VP.
+    // E gets SA -> adjusted -1, dropping below the other 0VP players.
+    // A=60 (1st), B/C/D tie 2nd-4th = (48+36+24)/3 = 36 each, E=12 (5th).
+    let vps = vec![5.0, 0.0, 0.0, 0.0, 0.0];
+    let adj = vec![0.0, 0.0, 0.0, 0.0, -1.0];
+    let tps = compute_tp(5, &vps, &adj);
+    assert_eq!(tps, vec![60.0, 36.0, 36.0, 36.0, 12.0]);
+
+    // Without the penalty all four 0VP players tie 2nd-5th = (48+36+24+12)/4 = 30.
+    let flat = compute_tp(5, &vps, &vec![0.0; 5]);
+    assert_eq!(flat, vec![60.0, 30.0, 30.0, 30.0, 30.0]);
+}
+
+#[test]
+fn test_standings_vp_under_sa_goes_negative() {
+    // A 4-player table (VPs sum to 4). p1 has 2 raw VP, p2 has 0; both carry an SA
+    // on round 0. gw is 0 for everyone (p1's adjusted 1.0 < 2.0, so no GW — the
+    // engine would store exactly this). Standings VP: p1 -> 2-1 = 1.0, p2 -> 0-1 = -1.0.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 2.0, tp: 48 } },
+            { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 12 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 24 } },
+        ],
+    }]];
+    tournament["players"] = json::array![
+        { user_uid: "p1", toss: 0 },
+        { user_uid: "p2", toss: 0 },
+        { user_uid: "p3", toss: 0 },
+        { user_uid: "p4", toss: 0 },
+    ];
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
+        { user_uid: "p2", level: "standings_adjustment", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let standings = super::standings::compute_preliminary_standings(&tournament, &sanctions);
+    let vp_of = |uid: &str| {
+        standings
+            .iter()
+            .find(|s| s.user_uid == uid)
+            .unwrap_or_else(|| panic!("{uid} missing"))
+            .vp
+    };
+    assert_eq!(vp_of("p1"), 1.0, "raw 2 VP minus full 1.0 SA");
+    assert_eq!(vp_of("p2"), -1.0, "raw 0 VP minus full 1.0 SA goes negative");
+}
+
+#[test]
+fn test_rating_vp_gw_includes_finals_and_full_sa() {
+    // Rating recomputes prelim GW from raw VPs + sanctions and adds the stored
+    // finals GW. p1: round0 2.5VP (table-high -> GW), round1 0VP with an SA (-1, so
+    // no GW), finals 3VP/1GW (winner). VP = 2.5 + 0 + 3 - 1 = 4.5; GW = 1 + 0 + 1.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![
+        json::array![json::object! {
+            seating: [
+                { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
+                { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+                { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
+                { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+                { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+            ],
+        }],
+        json::array![json::object! {
+            seating: [
+                { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 12 } },
+                { player_uid: "p2", result: { gw: 0, vp: 2.0, tp: 60 } },
+                { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+                { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 } },
+                { player_uid: "p5", result: { gw: 0, vp: 1.0, tp: 36 } },
+            ],
+        }],
+    ];
+    tournament["finals"] = json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 3.0, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 } },
+        ],
+    };
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let (vp, gw) = super::compute_rating_vp_gw(&tournament, &sanctions, "p1");
+    assert_eq!(vp, 4.5, "prelim + finals VP minus full 1.0 SA");
+    assert_eq!(gw, 2.0, "round0 GW (recomputed) + finals GW (stored)");
+}
+
+#[test]
+fn test_rating_vp_gw_reads_standings_when_no_rounds() {
+    // VEKN-synced tournament: no rounds/finals -> read the player's standings row.
+    // An SA referencing a (nonexistent) round must not double-penalize the synced VP.
+    let mut tournament = make_tournament();
+    tournament["standings"] = json::array![
+        json::object! { user_uid: "p1", gw: 1.0, vp: 4.0, tp: 120 },
+    ];
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let (vp, gw) = super::compute_rating_vp_gw(&tournament, &sanctions, "p1");
+    assert_eq!(vp, 4.0, "synced standings VP used as-is");
+    assert_eq!(gw, 1.0);
+}
+
+#[test]
+fn test_standings_vp_sa_ignores_lifted_and_future_rounds() {
+    // A lifted SA must not penalize; an SA on a round that hasn't been played yet
+    // (index >= rounds played) is deferred. p1's VP stays its raw total.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 1.5, tp: 36 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.5, tp: 36 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 12 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+        ],
+    }]];
+    tournament["players"] = json::array![
+        { user_uid: "p1", toss: 0 },
+        { user_uid: "p2", toss: 0 },
+        { user_uid: "p3", toss: 0 },
+        { user_uid: "p4", toss: 0 },
+        { user_uid: "p5", toss: 0 },
+    ];
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 0, lifted_at: "2025-01-01T00:00:00Z", deleted_at: json::Null },
+        { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let standings = super::standings::compute_preliminary_standings(&tournament, &sanctions);
+    let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
+    assert_eq!(p1.vp, 1.5, "lifted SA and future-round SA leave VP unchanged");
+}
+
+#[test]
+fn test_standings_recompute_picks_up_late_sa() {
+    // The round was scored BEFORE the SA: p1's seat still stores the as-scored gw=1
+    // and tp=60. An SA is then issued on that round for p1, dropping adjusted VP to
+    // 1.5 (< 2.0). Standings must recompute from raw VP + the SA — p1 loses the GW
+    // and the table re-ranks TP — despite the stale stored seat values.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 } },
+        ],
+    }]];
+    tournament["players"] = json::array![
+        { user_uid: "p1", toss: 0 },
+        { user_uid: "p2", toss: 0 },
+        { user_uid: "p3", toss: 0 },
+        { user_uid: "p4", toss: 0 },
+        { user_uid: "p5", toss: 0 },
+    ];
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let standings = super::standings::compute_preliminary_standings(&tournament, &sanctions);
+    let get = |uid: &str| {
+        standings
+            .iter()
+            .find(|s| s.user_uid == uid)
+            .unwrap_or_else(|| panic!("{uid} missing"))
+    };
+    // Adjusted VPs: p1=1.5, p2=1.0, p3=p4=p5=0.5.
+    assert_eq!(get("p1").gw, 0.0, "late SA -> adjusted 1.5 (<2): GW removed");
+    assert_eq!(get("p1").vp, 1.5, "raw 2.5 - full 1.0 SA");
+    assert_eq!(get("p1").tp, 60.0, "p1 still ranks 1st on adjusted VP -> 60 TP");
+    assert_eq!(get("p2").tp, 48.0, "p2 2nd -> 48 TP");
+    // p3/p4/p5 tie 3rd-5th on adjusted 0.5 -> (36+24+12)/3 = 24 each.
+    assert_eq!(get("p3").tp, 24.0);
+}
+
+#[test]
 fn test_gw_finals_clear_winner() {
     // Clear winner with highest VP -- gets the GW regardless of seed
     let vps = vec![3.0, 1.0, 0.5, 0.5, 0.0];

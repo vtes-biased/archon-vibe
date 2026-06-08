@@ -2,7 +2,8 @@
 
 use json::JsonValue;
 
-use super::sanctions::get_sa_sanctions;
+use super::sanctions::{sa_vp_penalty, table_sa_adjustments};
+use super::scoring::{compute_gw, compute_tp};
 
 /// Player standing: (user_uid, gw, vp, tp, toss, finalist)
 pub(super) struct Standing {
@@ -15,8 +16,14 @@ pub(super) struct Standing {
 }
 
 /// Compute standings from all rounds. Sorted by GW desc, VP desc, TP desc, toss desc.
-/// Applies SA overflow: if a player has an SA sanction for a round where their raw VP < 1.0,
-/// the overflow (1.0 - raw_vp) is subtracted from their total VP.
+///
+/// GW and TP are **recomputed** per table from raw VPs + current sanctions (not
+/// summed from the stored seat values), so a standings_adjustment issued *after*
+/// a round was scored still re-decides who has the GW and re-ranks TP — the seat
+/// `result.gw`/`result.tp` are frozen at score time and would otherwise go stale.
+/// VP sums the raw per-seat VP, then the full SA penalty (`-1.0` per played-round
+/// SA, JG v2 1.1.3) is subtracted, which may take a player's total negative.
+/// Per-seat `result.vp` stays raw for display.
 pub(super) fn compute_preliminary_standings(
     tournament: &JsonValue,
     sanctions: &JsonValue,
@@ -24,41 +31,40 @@ pub(super) fn compute_preliminary_standings(
     let mut map: std::collections::HashMap<String, (f64, f64, f64)> =
         std::collections::HashMap::new();
 
-    // Sum results across all rounds
-    for round in tournament["rounds"].members() {
+    // Recompute GW/TP per table from raw VPs + current sanctions; sum raw VP.
+    for (round_index, round) in tournament["rounds"].members().enumerate() {
         for table in round.members() {
-            for seat in table["seating"].members() {
+            let seating = &table["seating"];
+            let vps: Vec<f64> = seating
+                .members()
+                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                .collect();
+            let adjustments = table_sa_adjustments(seating, round_index, sanctions);
+            let gws = compute_gw(&vps, &adjustments);
+            let tps = compute_tp(vps.len(), &vps, &adjustments);
+            for (i, seat) in seating.members().enumerate() {
                 let uid = seat["player_uid"].as_str().unwrap_or("").to_string();
                 if uid.is_empty() {
                     continue;
                 }
                 let entry = map.entry(uid).or_insert((0.0, 0.0, 0.0));
-                entry.0 += seat["result"]["gw"].as_f64().unwrap_or(0.0);
-                entry.1 += seat["result"]["vp"].as_f64().unwrap_or(0.0);
-                entry.2 += seat["result"]["tp"].as_f64().unwrap_or(0.0);
+                entry.0 += gws[i];
+                entry.1 += vps[i]; // raw VP; SA penalty applied to the total below
+                entry.2 += tps[i];
             }
         }
     }
 
-    // Apply SA overflow: for each SA sanction, if the player's raw VP in that round < 1.0,
-    // subtract the overflow from total VP
-    let sa_sanctions = get_sa_sanctions(sanctions);
-    for (sa_uid, sa_round) in &sa_sanctions {
-        if *sa_round >= tournament["rounds"].len() {
-            continue;
-        }
-        // Find the player's raw VP in that round
-        let mut round_vp = 0.0;
-        for table in tournament["rounds"][*sa_round].members() {
-            for seat in table["seating"].members() {
-                if seat["player_uid"].as_str() == Some(sa_uid.as_str()) {
-                    round_vp = seat["result"]["vp"].as_f64().unwrap_or(0.0);
-                }
-            }
-        }
-        if round_vp < 1.0 {
-            if let Some(entry) = map.get_mut(sa_uid) {
-                entry.1 -= 1.0 - round_vp; // subtract overflow
+    // Apply the full SA penalty (-1.0 per played-round SA; may go negative) to each
+    // penalized player, per JG v2 1.1.3. The per-round result.vp stays raw; the
+    // penalty lives only in the standings total. Same rule as the rating path —
+    // both go through sanctions::sa_vp_penalty.
+    let rounds_len = tournament["rounds"].len();
+    for uid in map.keys().cloned().collect::<Vec<_>>() {
+        let penalty = sa_vp_penalty(sanctions, &uid, rounds_len);
+        if penalty != 0.0 {
+            if let Some(entry) = map.get_mut(&uid) {
+                entry.1 -= penalty;
             }
         }
     }
@@ -208,6 +214,66 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
         out.push(with_rank(s, rank));
     }
     out
+}
+
+/// Compute a player's SA-adjusted rating VP and GW for a finished tournament.
+/// Prelim GW is **recomputed** per table from raw VPs + current sanctions (so a
+/// late SA that flips a GW is reflected, matching [`compute_preliminary_standings`]);
+/// finals GW is read from the stored seat (finals SA is disallowed). VP sums the
+/// raw per-seat VP across rounds and the finals table, then subtracts the full SA
+/// penalty ([`sa_vp_penalty`]; may go negative). For VEKN-synced tournaments (no
+/// rounds and no finals) reads the player's standings row.
+///
+/// Single source so the backend rating and VEKN-push paths consume the SA rule
+/// from Rust instead of re-implementing it. Unlike preliminary standings VP, this
+/// **includes finals** VP/GW (the rating counts the final table). Returns `(vp, gw)`.
+pub fn compute_rating_vp_gw(
+    tournament: &JsonValue,
+    sanctions: &JsonValue,
+    user_uid: &str,
+) -> (f64, f64) {
+    let has_play = !tournament["rounds"].is_empty() || !tournament["finals"].is_null();
+    if !has_play {
+        // VEKN-synced or rounds-less: standings already carry the authoritative totals.
+        for s in tournament["standings"].members() {
+            if s["user_uid"].as_str() == Some(user_uid) {
+                return (
+                    s["vp"].as_f64().unwrap_or(0.0),
+                    s["gw"].as_f64().unwrap_or(0.0),
+                );
+            }
+        }
+        return (0.0, 0.0);
+    }
+
+    let mut vp = 0.0;
+    let mut gw = 0.0;
+    for (round_index, round) in tournament["rounds"].members().enumerate() {
+        for table in round.members() {
+            let seating = &table["seating"];
+            let Some(i) = seating
+                .members()
+                .position(|s| s["player_uid"].as_str() == Some(user_uid))
+            else {
+                continue;
+            };
+            let vps: Vec<f64> = seating
+                .members()
+                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                .collect();
+            let adjustments = table_sa_adjustments(seating, round_index, sanctions);
+            vp += vps[i];
+            gw += compute_gw(&vps, &adjustments)[i];
+        }
+    }
+    for seat in tournament["finals"]["seating"].members() {
+        if seat["player_uid"].as_str() == Some(user_uid) {
+            vp += seat["result"]["vp"].as_f64().unwrap_or(0.0);
+            gw += seat["result"]["gw"].as_f64().unwrap_or(0.0);
+        }
+    }
+    vp -= sa_vp_penalty(sanctions, user_uid, tournament["rounds"].len());
+    (vp, gw)
 }
 
 /// Check if top 5 has unbroken ties (players at the cutoff boundary with same scores and no toss differentiation)

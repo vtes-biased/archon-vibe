@@ -1,10 +1,22 @@
 """Tests for rating computation helpers."""
 
 import msgspec
+from archon_engine import PyEngine
 from src.models import (
     Tournament,
 )
-from src.ratings import _finalist_position, _player_stats
+from src.ratings import _finalist_position
+
+_engine = PyEngine()
+
+
+def _rating_vp_gw(t: Tournament, user_uid: str, sanctions: list | None = None):
+    """Exercise the single-source Rust rating stat (VP/GW incl. finals + SA)."""
+    return _engine.compute_rating_vp_gw(
+        msgspec.json.encode(t).decode(),
+        msgspec.json.encode(sanctions or []).decode(),
+        user_uid,
+    )
 
 
 def _make_tournament(**overrides) -> Tournament:
@@ -31,11 +43,11 @@ def _seat(uid: str, vp: float = 0.0, gw: int = 0) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# _player_stats
+# compute_rating_vp_gw (single-source Rust rating stat)
 # ---------------------------------------------------------------------------
 
 
-class TestPlayerStats:
+class TestRatingVpGw:
     def test_prelim_only(self):
         """Player who only played prelims gets prelim VP/GW."""
         t = _make_tournament(
@@ -44,7 +56,7 @@ class TestPlayerStats:
                 [{"seating": [_seat("p1", 0.5, 0), _seat("p3", 1.5, 0)]}],
             ],
         )
-        vp, gw = _player_stats(t, "p1")
+        vp, gw = _rating_vp_gw(t, "p1")
         assert vp == 2.5
         assert gw == 1
 
@@ -59,7 +71,7 @@ class TestPlayerStats:
                 "seed_order": ["p1", "p2"],
             },
         )
-        vp, gw = _player_stats(t, "p1")
+        vp, gw = _rating_vp_gw(t, "p1")
         assert vp == 5.0
         assert gw == 2
 
@@ -74,7 +86,7 @@ class TestPlayerStats:
                 "seed_order": ["p1", "p2"],
             },
         )
-        vp, gw = _player_stats(t, "p3")
+        vp, gw = _rating_vp_gw(t, "p3")
         assert vp == 1.0
         assert gw == 0
 
@@ -90,9 +102,47 @@ class TestPlayerStats:
             },
             winner="p1",
         )
-        vp, gw = _player_stats(t, "p1")
+        vp, gw = _rating_vp_gw(t, "p1")
         assert vp == 3.0
         assert gw == 1  # 0 prelim + 1 finals
+
+    def test_sa_full_penalty(self):
+        """SA on a played round subtracts a full 1.0 VP (not the old overflow)."""
+        t = _make_tournament(
+            rounds=[
+                [{"seating": [_seat("p1", 2.0, 0), _seat("p2", 0.0, 0)]}],
+            ],
+        )
+        sanctions = [
+            {
+                "user_uid": "p1",
+                "level": "standings_adjustment",
+                "round_number": 0,
+                "lifted_at": None,
+                "deleted_at": None,
+            }
+        ]
+        vp, gw = _rating_vp_gw(t, "p1", sanctions)
+        assert vp == 1.0  # raw 2.0 - full 1.0 (old overflow would have been 0)
+
+    def test_sa_goes_negative(self):
+        """SA penalty can push the rating VP below zero."""
+        t = _make_tournament(
+            rounds=[
+                [{"seating": [_seat("p1", 0.0, 0), _seat("p2", 0.0, 0)]}],
+            ],
+        )
+        sanctions = [
+            {
+                "user_uid": "p1",
+                "level": "standings_adjustment",
+                "round_number": 0,
+                "lifted_at": None,
+                "deleted_at": None,
+            }
+        ]
+        vp, _ = _rating_vp_gw(t, "p1", sanctions)
+        assert vp == -1.0
 
     def test_vekn_synced_fallback(self):
         """No rounds/finals: falls back to standings."""
@@ -102,7 +152,7 @@ class TestPlayerStats:
                 {"user_uid": "p2", "vp": 4.0, "gw": 1.0, "tp": 24},
             ],
         )
-        vp, gw = _player_stats(t, "p1")
+        vp, gw = _rating_vp_gw(t, "p1")
         assert vp == 7.5
         assert gw == 3
 
@@ -111,7 +161,7 @@ class TestPlayerStats:
         t = _make_tournament(
             standings=[{"user_uid": "p1", "vp": 5.0, "gw": 2.0, "tp": 24}],
         )
-        vp, gw = _player_stats(t, "unknown")
+        vp, gw = _rating_vp_gw(t, "unknown")
         assert vp == 0.0
         assert gw == 0
 
@@ -123,7 +173,7 @@ class TestPlayerStats:
                 "seed_order": ["p1", "p2"],
             },
         )
-        vp, gw = _player_stats(t, "p1")
+        vp, gw = _rating_vp_gw(t, "p1")
         assert vp == 4.0
         assert gw == 1
 

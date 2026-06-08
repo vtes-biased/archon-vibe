@@ -324,7 +324,7 @@ Three data levels control what each connected client sees:
 - Event-level: Caution, Warning, Standings Adjustment, Disqualification
 - VEKN-wide: Suspension, Probation, Ban (IC/Ethics Committee only)
 - Judges Guide v2 categories and subcategories (Procedural Errors, Tournament Errors, Unsportsmanlike Conduct) with escalation guidance
-- SA score adjustments applied to round GW computation with overflow to standings
+- SA penalty: a full -1 VP applied uniformly to the penalized round's GW and TP and to the standings VP total (may go negative); the per-round VP shown stays raw
 - DQ barring: tournament-level, league-wide (DQ in any league tournament bars all others), suspension-wide
 - On-site suspension: 30-day national suspension for gross ethics violations (must be escalated within 5 days)
 - Barring enforced at check-in and finals qualification
@@ -506,7 +506,7 @@ These are situations that come up in real tournaments and that the app must hand
 
 10. **GW conditions**: Requires VP >= 2.0 AND strictly highest VP at table (no ties). Finals exception: winner gets GW even with < 2 VP.
 
-11. **Score adjustment overflow**: SA penalty applied to current round's VPs for GW determination. If VP-adjusted is negative or penalty cannot fully apply, remainder overflows to overall standings for finals seeding — never carried to next round.
+11. **Standings Adjustment (SA) penalty**: a full -1 VP for the penalized round, applied uniformly wherever VP feeds scoring — GW determination, TP rank (the table re-ranks/re-averages, JG v2 1.1.3 Ex. 2), and the standings VP total used for finals seeding. Standings recompute GW/TP from the adjusted VPs, so an SA issued *after* the round was scored still takes effect (re-decides the GW, re-ranks TP), not just the VP total. The adjusted total may go negative; the per-round VP displayed stays raw. Never carried to another round.
 
 ### Finals
 

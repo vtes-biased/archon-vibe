@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from .db import (
     get_connection,
+    get_sanctions_for_tournament,
     get_user_by_uid,
     save_tournament,
     save_user,
@@ -42,6 +43,7 @@ def tournament_to_vekn_type(fmt: TournamentFormat, rank: TournamentRank) -> int:
 def generate_archondata(
     tournament: Tournament,
     users_by_uid: dict[str, User],
+    sanctions: list | None = None,
 ) -> str:
     """Generate VEKN archondata string from tournament standings.
 
@@ -55,10 +57,9 @@ def generate_archondata(
         for seat in tournament.finals.seating:
             finals_vp[seat.player_uid] = seat.result.vp
 
-    # Pre-load sanctions for rating point calculation
-    # Note: this is called from an async context, but we pass sanctions in sync
-    # The caller should pre-load sanctions and pass via users_by_uid pattern
-    # For simplicity, we compute without SA overflow (matches legacy behavior)
+    # Sanctions feed the rating-point (rtp) calculation so the SA penalty is
+    # reflected in the pushed rating; the {vp} field below reads standing.vp,
+    # which the engine already SA-adjusts.
     parts: list[str] = []
     for rank_idx, standing in enumerate(tournament.standings, 1):
         user = users_by_uid.get(standing.user_uid)
@@ -78,7 +79,7 @@ def generate_archondata(
         vpf = finals_vp.get(standing.user_uid, 0.0)
 
         # Rating points
-        entry = _compute_entry_sync(tournament, standing.user_uid)
+        entry = _compute_entry_sync(tournament, standing.user_uid, sanctions)
         rtp = entry.points
 
         parts.append(
@@ -209,8 +210,9 @@ async def push_tournament_results(
             logger.error(f"Tournament {tournament.uid}: cannot create VEKN event")
             return False
 
-    # Generate and upload archondata
-    archondata = generate_archondata(tournament, users_by_uid)
+    # Generate and upload archondata (sanctions feed the SA-adjusted rating points)
+    sanctions = await get_sanctions_for_tournament(tournament.uid)
+    archondata = generate_archondata(tournament, users_by_uid, sanctions)
 
     try:
         await client.upload_results(vekn_event_id, archondata)
