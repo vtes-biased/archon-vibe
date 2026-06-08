@@ -206,3 +206,55 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
     assert decks[0].user_uid == real_uid
     assert decks[0].attribution == created.vekn_id
     assert not decks[0].attribution.startswith("TEMP-")
+
+
+@pytest.mark.asyncio
+async def test_duplicate_participant_rejected(test_client, test_db):
+    """pst #77: an offline temp player that resolves (by VEKN ID) to someone
+    already in the tournament must NOT create a duplicate participant. The only
+    real participant-into-existing-VEKN case is this offline sync, and we handle
+    it per-tournament by failing early (409) rather than auto-merging players.
+    """
+    org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
+    existing = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Already In",
+        vekn_id="9111111",
+    )
+    await db.save_user(org)
+    await db.save_user(existing)
+    uid = await _seed(org.uid)
+
+    temp_uid = str(uuid7())
+    # Tournament already lists `existing` as a player; offline added a temp whose
+    # vekn matches `existing` → both resolve to the same uid → duplicate.
+    t = Tournament(
+        uid=uid,
+        modified=datetime.now(UTC),
+        name="Offline T",
+        organizers_uids=[org.uid],
+        country="France",
+        offline_mode=True,
+        offline_device_id="devA",
+        players=[Player(user_uid=existing.uid), Player(user_uid=temp_uid)],
+    )
+    body = {
+        "device_id": "devA",
+        "tournament": json.loads(msgspec.json.encode(t)),
+        "offline_players": [
+            {"temp_uid": temp_uid, "name": "Dup", "vekn_id": "9111111"}
+        ],
+    }
+    before = await _count_users()
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/go-online",
+        json=body,
+        headers=make_auth_header(org.uid),
+    )
+    assert resp.status_code == 409
+    assert "duplicate" in resp.json()["detail"].lower()
+    # No user created, and the tournament stays offline (not reconciled).
+    assert await _count_users() == before
+    saved = await db.get_tournament_by_uid(uid)
+    assert saved.offline_mode is True

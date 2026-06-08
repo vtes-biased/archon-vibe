@@ -203,9 +203,15 @@ async def discord_callback(
             else:
                 # Discord is linked to another account - merge accounts
                 # This reassigns all auth methods (including Discord) to keep_uid
-                merge_result = await merge_users(
-                    user_uid_from_state, existing_auth.user_uid
-                )
+                # merge_users refuses to absorb a VEKN-bearing account (#59):
+                # re-linking Discord must not let one account swallow another's
+                # VEKN identity. Treat that refusal as a merge failure.
+                try:
+                    merge_result = await merge_users(
+                        user_uid_from_state, existing_auth.user_uid
+                    )
+                except ValueError:
+                    merge_result = None
                 if not merge_result:
                     return RedirectResponse(
                         url=f"{frontend_url}{redirect_path}?error=merge_failed",

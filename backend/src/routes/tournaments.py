@@ -1629,6 +1629,25 @@ async def go_online(
         if (player_data.vekn_id or "").startswith("TEMP-") and real_user.vekn_id:
             vekn_remap[player_data.vekn_id] = real_user.vekn_id
 
+    # If a temp player resolves (by VEKN ID) to someone already in the tournament,
+    # or two temps resolve to the same person, the remap below would create a
+    # duplicate participant. We deliberately do NOT auto-merge tournament players
+    # (pst #77) — fail early so the organizer removes the duplicate registration.
+    final_player_uids = [
+        uid_map.get(p.get("user_uid"), p.get("user_uid"))
+        for p in request.tournament.get("players", [])
+    ]
+    dupes = {u for u in final_player_uids if u and final_player_uids.count(u) > 1}
+    if dupes:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Offline sync would create {len(dupes)} duplicate participant(s) — "
+                "the same person is registered both offline and already in the "
+                "tournament. Remove the duplicate registration(s) before going online."
+            ),
+        )
+
     # SELECT FOR UPDATE: serialize the device-lock check with the save (TOCTOU) so
     # two devices can't both reconcile. A missing row yields None and the upsert
     # below inserts it within the same tx. Holds only tx_conn — no per-player work.

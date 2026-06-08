@@ -1012,19 +1012,28 @@ async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
         return count
 
 
-async def reassign_sanctions(from_user_uid: str, to_user_uid: str) -> int:
-    """Reassign all sanctions from one user to another. Returns count updated."""
+async def reassign_sanctions(
+    from_user_uid: str, to_user_uid: str
+) -> list[BroadcastData]:
+    """Reassign all sanctions from one user to another.
+
+    Returns the BroadcastData for each moved sanction so the caller can push the
+    new user_uid to other clients' caches live, not only on reconnect (pst #78).
+    """
     sanctions = await get_sanctions_for_user(from_user_uid)
-    count = 0
+    broadcasts = []
     for sanction in sanctions:
         updated = msgspec.structs.replace(sanction, user_uid=to_user_uid)
-        await save_sanction(updated)
-        count += 1
-    return count
+        broadcasts.append(await save_sanction(updated))
+    return broadcasts
 
 
-async def reassign_decks(from_user_uid: str, to_user_uid: str) -> int:
-    """Reassign all decks from one user to another. Returns count updated."""
+async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[BroadcastData]:
+    """Reassign all decks from one user to another.
+
+    Returns the BroadcastData for each moved deck so the caller can push the new
+    user_uid to other clients' caches live, not only on reconnect (pst #78).
+    """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full"::text FROM objects
@@ -1032,18 +1041,25 @@ async def reassign_decks(from_user_uid: str, to_user_uid: str) -> int:
             (from_user_uid,),
         )
         rows = await result.fetchall()
-    count = 0
+    broadcasts = []
     for row in rows:
         deck = msgspec.json.decode(row[0].encode(), type=DeckObject)
-        await save_object_from_model(
-            ObjectType.DECK, msgspec.structs.replace(deck, user_uid=to_user_uid)
+        broadcasts.append(
+            await save_object_from_model(
+                ObjectType.DECK, msgspec.structs.replace(deck, user_uid=to_user_uid)
+            )
         )
-        count += 1
-    return count
+    return broadcasts
 
 
-async def reassign_coopted_by_references(from_user_uid: str, to_user_uid: str) -> int:
-    """Update all users whose coopted_by references from_user_uid to point to to_user_uid."""
+async def reassign_coopted_by_references(
+    from_user_uid: str, to_user_uid: str
+) -> list[BroadcastData]:
+    """Repoint every user whose coopted_by references from_user_uid to to_user_uid.
+
+    Returns the BroadcastData for each repointed user so the caller can push the
+    change to other clients' caches live, not only on reconnect (pst #78).
+    """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -1052,14 +1068,13 @@ async def reassign_coopted_by_references(from_user_uid: str, to_user_uid: str) -
         )
         rows = await result.fetchall()
 
-    count = 0
+    broadcasts = []
     for row in rows:
         user = decode_json(row[0], User)
         user.coopted_by = to_user_uid
-        await save_user(user)
-        count += 1
+        broadcasts.append(await save_user(user))
 
-    return count
+    return broadcasts
 
 
 async def merge_users(
@@ -1073,18 +1088,35 @@ async def merge_users(
     then deletes the duplicate account.
 
     Returns (merged_user, broadcasts) or None if keep_uid doesn't exist.
-    `broadcasts` are the BroadcastData for the survivor's update and the dying
-    account's soft-delete; the caller must `broadcast_precomputed` each so other
-    clients update their cached copies live, not only on their next reconnect
-    (db.py can't import broadcast — layering — so the route does it). pst #66.
+    `broadcasts` are the BroadcastData for every synced row this changes — the
+    survivor's update, the reassigned sanctions/decks/coopted-by users, and the
+    dying account's soft-delete; the caller must `broadcast_precomputed` each so
+    other clients update their cached copies live, not only on their next
+    reconnect (db.py can't import broadcast — layering — so the route does it).
+    pst #66 (survivor + soft-delete) / #78 (reassigned objects).
     """
     keep_user = await get_user_by_uid(keep_uid)
     delete_user_obj = await get_user_by_uid(delete_uid)
 
     if not keep_user:
         return None
+    if keep_uid == delete_uid:
+        return keep_user, []  # Same account — nothing to merge
     if not delete_user_obj:
         return keep_user, []  # Nothing to merge
+    # #59 invariant: a uid carrying a vekn_id is immovable and is NEVER
+    # soft-deleted. merge soft-deletes delete_uid, so the absorbed account must
+    # not hold a VEKN ID — which also forbids merging two VEKN identities.
+    # /claim and /link structurally guarantee delete has no vekn_id; admin and
+    # discord-link do not, so this is the single chokepoint. A non-VEKN account
+    # can't be a tournament participant/organizer (engine requires a VEKN ID),
+    # so this guarantees the soft-deleted account leaves no orphaned tournament
+    # refs — the reason the deeper cross-tournament remap is unnecessary (pst #77).
+    if delete_user_obj.vekn_id:
+        raise ValueError(
+            "Cannot merge an account that holds a VEKN ID — VEKN identities are "
+            "immovable and are never merged away (keep the VEKN account as the survivor)"
+        )
 
     # calendar_token is stripped from "full", so read it from its column
     # (prefer the claiming/delete account's feed, like the contact fields below).
@@ -1128,13 +1160,15 @@ async def merge_users(
 
     merged_bd = await save_user(merged)
     # Everything keyed to the dying delete_uid must migrate to the survivor.
+    # auth_methods aren't synced objects (no SSE); the rest are, so collect their
+    # BroadcastData too (pst #78) — reassigned sanctions/decks/coopted-by users
+    # otherwise stay stale on other clients until reconnect.
     await reassign_auth_methods(delete_uid, keep_uid)
-    await reassign_sanctions(delete_uid, keep_uid)
-    await reassign_decks(delete_uid, keep_uid)
-    await reassign_coopted_by_references(delete_uid, keep_uid)
-    deleted = await soft_delete_user(delete_uid)
-
     broadcasts = [merged_bd]
+    broadcasts += await reassign_sanctions(delete_uid, keep_uid)
+    broadcasts += await reassign_decks(delete_uid, keep_uid)
+    broadcasts += await reassign_coopted_by_references(delete_uid, keep_uid)
+    deleted = await soft_delete_user(delete_uid)
     if deleted:
         broadcasts.append(deleted[1])
     return merged, broadcasts

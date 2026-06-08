@@ -185,7 +185,14 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
         await db.save_sanction(sanction)
         await db.insert_auth_method(auth)
 
-        await db.merge_users(keep.uid, delete.uid)
+        result = await db.merge_users(keep.uid, delete.uid)
+        assert result is not None
+        _merged, broadcasts = result
+        # pst #78: reassigned sanction + deck (and survivor + soft-delete) are all
+        # surfaced for broadcast so other clients don't keep stale copies. Auth
+        # methods aren't synced objects, so they don't appear here.
+        # survivor + sanction + deck + soft-delete == 4 (no coopted-by refs here).
+        assert len(broadcasts) == 4
 
         # decks reassigned to the survivor (the #64 fix).
         assert await _deck_uids_for_user(keep.uid) == {deck.uid}
@@ -199,6 +206,52 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
         keep_auth = await db.get_auth_methods_for_user(keep.uid)
         assert {a.uid for a in keep_auth} == {auth.uid}
         assert await db.get_auth_methods_for_user(delete.uid) == []
+
+
+@pytest.mark.asyncio
+async def test_merge_refuses_to_absorb_vekn_account(test_db):
+    """#77/#59: the absorbed (soft-deleted) account must NOT hold a VEKN ID.
+
+    VEKN uids are immovable and never soft-deleted, and this also forbids merging
+    two VEKN identities. Guards admin/discord (claim/link can't reach it). Because
+    a non-VEKN account can't be a tournament participant, this is what makes the
+    deeper cross-tournament reference remap unnecessary.
+    """
+    keep = User(
+        uid=str(uuid7()), modified=datetime.now(UTC), name="Survivor", vekn_id="8000001"
+    )
+    delete = User(
+        uid=str(uuid7()), modified=datetime.now(UTC), name="Has VEKN", vekn_id="8000002"
+    )
+    await db.save_user(keep)
+    await db.save_user(delete)
+
+    with pytest.raises(ValueError, match="VEKN"):
+        await db.merge_users(keep.uid, delete.uid)
+
+    # The guard runs before any write, so delete is left untouched (not soft-deleted).
+    still = await db.get_user_by_uid(delete.uid)
+    assert still is not None and still.deleted_at is None
+
+
+@pytest.mark.asyncio
+async def test_merge_same_account_is_noop(test_db):
+    """merge_users(x, x) is a no-op — never soft-deletes the lone account.
+
+    Covers the /link idempotent path (target already holds the linked VEKN ID).
+    """
+    user = User(
+        uid=str(uuid7()), modified=datetime.now(UTC), name="Solo", vekn_id="8000003"
+    )
+    await db.save_user(user)
+
+    result = await db.merge_users(user.uid, user.uid)
+    assert result is not None
+    merged, broadcasts = result
+    assert merged.uid == user.uid
+    assert broadcasts == []
+    still = await db.get_user_by_uid(user.uid)
+    assert still is not None and still.deleted_at is None
 
 
 # ---------------------------------------------------------------------------

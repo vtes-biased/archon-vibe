@@ -138,8 +138,12 @@ async def merge_user_accounts(
             status_code=403, detail="Cannot manage delete user from other country"
         )
 
-    # Perform merge
-    result = await merge_users(request.keep_uid, request.delete_uid)
+    # Perform merge. merge_users refuses to absorb a VEKN-bearing account
+    # (#59 invariant); surface that as a 400 rather than a generic 500.
+    try:
+        result = await merge_users(request.keep_uid, request.delete_uid)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
     if not result:
         raise HTTPException(status_code=500, detail="Failed to merge users")
     merged, merge_bds = result
