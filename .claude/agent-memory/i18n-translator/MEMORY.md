@@ -10,10 +10,6 @@
 - "check-in" in PT (BR): "check-in" is natural; "check-in realizado" = confirmed.
 - Avoid translating "failed" as "denied" (camera errors): use language-appropriate "failed access" phrasing.
 
-## Known Fixes Applied
-- EN `checkin_qr_scan_instruction`: "Archon app" → "the Archon app" (article required)
-- FR/ES/PT/IT `checkin_qr_camera_error`: corrected "denied" wording to "failed" wording
-
 ## Naming Conventions
 - `nav_*` — navigation items
 - `profile_*` — profile page strings

@@ -1,33 +1,32 @@
 ---
 name: vekn-account-surgery-bugs
-description: Confirmed defects in merge_users/strip/split account-surgery functions (ticket #59) and the must-fixes
+description: Regression watch-list for VEKN account-surgery (merge/detach) — the defect classes that #59/#65 fixed and must not return
 metadata:
   type: project
 ---
 
-# Account-surgery defects (ticket #59, backend/src/db.py)
+# Account-surgery regression watch-list (merge/detach, backend/src/db.py)
 
-Confirmed by reading code 2026-06-07. These motivate collapsing strip+split into
-`detach_user_from_vekn` and fixing merge_users. See policy: [[vekn-id-detach-policy]].
+The merge/detach rework (#59 collapsed strip+split into `detach_user_from_vekn`;
+#65 + #78 fixed merge) closed a set of subtle defects. They're easy to
+reintroduce, so when touching `merge_users` / `detach_user_from_vekn` /
+`reassign_*`, confirm none of these returns. Policy: [[vekn-id-detach-policy]].
 
-1. **merge_users hand-builds `User(...)` (~28 fields)** instead of `msgspec.structs.replace`
-   → omits `resync_after` (silently reset every merge); any future User field meets the
-   same fate. Latent data-drift bug. Fix: use structs.replace.
-2. **merge_users never reassigns decks** → a non-VEKN user with decks who /claims a VEKN
-   ID has decks left on their soon-soft-deleted uid = deck loss. Need reassign_decks
-   (DeckObject.user_uid: delete_uid -> keep_uid). No reassign_decks helper exists today.
-3. **split leaks discord_id** → orphan VEKN record keeps the departed person's discord_id,
-   which is in access_levels._USER_CONTACT_FIELDS (full projection) and gets re-broadcast,
-   plus kept alive via vekn_sync _infer_coopted_by rebuild. Real PII leak. strip nulls it.
-4. **split omits `modified=now` on orphan** → stripped personal data doesn't re-broadcast
-   over SSE; stale data lingers in clients' IndexedDB. strip sets it.
-5. **strip vs split inverted sanction/coopted handling**: split reassigns ALL sanctions to
-   the person + nulls coopted_by/at/vekn_prefix on orphan; strip keeps sanctions on record +
-   keeps coopted/prefix. Correct answer (per policy): sanctions split by LEVEL, coopted/prefix
-   always stay with record.
+1. **Field-by-field reconstruction drops new fields.** merge_users once hand-built
+   `User(...)` (~28 fields) and silently reset `resync_after` every merge. Use
+   `msgspec.structs.replace`, never hand-list fields.
+2. **Decks not reassigned.** A non-VEKN user with decks who claims a VEKN ID must
+   have decks repointed (`DeckObject.user_uid: old → keep`), or they're lost when
+   the old uid is soft-deleted.
+3. **PII leak on the orphan.** A detached/orphan VEKN record must NOT keep the
+   departed person's `discord_id` / contact fields — those are in the `full`
+   projection and get re-broadcast (and rebuilt by vekn_sync). Detach nulls them.
+4. **Missing `modified=now` on the orphan** → stripped data doesn't re-broadcast,
+   stale data lingers in clients' IndexedDB.
+5. **Sanctions/coopted ownership.** Per policy: sanctions ALWAYS stay with the
+   VEKN record (keyed on the stable uid); coopted_by/at + vekn_prefix always stay
+   with the record. Don't reassign these to the departing person.
 
-**How to apply:** ticket #59 should (a) collapse strip+split -> detach_user_from_vekn,
-(b) fix merge_users (structs.replace + reassign_decks), (c) make sanction reassignment
-level-aware. Items 1-2 are merge-side and beyond #59's literal scope but should ride along.
-Known limitation NOT fixed by #59: merge also doesn't reassign tournament results keyed to
-delete_uid (edge: claimant already had results under a non-VEKN account).
+Known unfixed edge (acceptable): merge does not reassign tournament *results* keyed
+to the dying uid (only matters if the claimant already had results under a separate
+non-VEKN account). See test infra in senior-qa's account-surgery memory.

@@ -13,4 +13,4 @@ The standings_adjustment (SA) VP penalty / GW-flip / TP-rerank rule is **single-
 
 **Why:** the earlier 3-impl divergence (engine vs ratings.py overflow model vs vekn_push SA-blind) silently desynced official ratings from engine standings. #67 collapsed it.
 
-**How to apply:** when reviewing SA / VP-penalty scoring changes, confirm Python still delegates to `engine.compute_rating_vp_gw` and never re-derives the penalty from raw seats. The remaining latent gap is the Python archon importer hand-building standings — see [[standings-prelim-only-contract]]. Same single-source-in-Rust principle as [[project_authz_single_source_rust]].
+**How to apply:** when reviewing SA / VP-penalty scoring changes, confirm Python still delegates to `engine.compute_rating_vp_gw` and never re-derives the penalty from raw seats. The remaining latent gap is the Python archon importer hand-building standings — see [[standings-prelim-only-contract]]. Same single-source-in-Rust principle as [[authz-single-source-rust]].

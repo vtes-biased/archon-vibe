@@ -13,4 +13,4 @@ Consumers that rely on prelim-only standings + add finals separately: `engine/sr
 
 **Why:** pst #67 single-sourced the SA scoring rule into Rust and made "standings = SA-adjusted prelim" the explicit engine contract; the Python importer builds state by hand instead of routing through the engine, so it drifted.
 
-**How to apply:** any change touching imported-tournament standings, league scoring, or the standings shape must keep stored standings prelim-only. Prefer routing imports through `engine.update_standings` over hand-summing in Python. See [[sa-penalty-duplicated-in-python.md]] and [[final-standings-helper]].
+**How to apply:** any change touching imported-tournament standings, league scoring, or the standings shape must keep stored standings prelim-only. Prefer routing imports through `engine.update_standings` over hand-summing in Python. See [[sa-penalty-duplicated-in-python]] and [[final-standings-helper]].

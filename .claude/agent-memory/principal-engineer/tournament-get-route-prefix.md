@@ -12,6 +12,6 @@ The single-object GET endpoints and the tournament mutation endpoints live on **
 
 So `GET /api/tournaments/{uid}` (without `/v1`) hits a nonexistent route (405/404), not the tournament.
 
-**Why:** discovered reviewing pst #8 (optimistic rollback) — `reconcileTournamentAfterRejection` in `frontend/src/lib/api.ts` fetched `/api/tournaments/${uid}` instead of `/api/v1/tournaments/${uid}`, so the authoritative re-fetch always failed and the rollback never ran. See [[p1-sync-fixes-review-2026-06]].
+**Why:** discovered reviewing pst #8 (optimistic rollback) — `reconcileTournamentAfterRejection` in `frontend/src/lib/api.ts` fetched `/api/tournaments/${uid}` instead of `/api/v1/tournaments/${uid}`, so the authoritative re-fetch always failed and the rollback never ran.
 
 **How to apply:** When code needs to re-fetch a single object by uid from the server (rare — offline-first means reads come from IDB), use the `/api/v1/...` prefix. Flag any frontend GET to `/api/tournaments/{uid}` (bare) as a bug. Also remember `api_v1.get_tournament` returns 404 when the object isn't visible or doesn't exist — callers must handle that (e.g. a rejected create leaves nothing to fetch; delete the local optimistic copy instead).

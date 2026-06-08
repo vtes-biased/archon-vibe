@@ -1,67 +1,32 @@
 # Senior QA Agent Memory
 
 ## Pointers
-- [Seating determinism](project_seating_determinism.md) — seeded ChaCha8Rng; which seating paths consume the seed + determinism test coverage/gaps
-- [Engine test topology](project_engine_test_topology.md) — how to run engine/PyO3/WASM + backend-with-engine tests; expected link failures; what each layer validates
-- [Account surgery](project_account_surgery.md) — merge/detach test infra (test_account_surgery.py) + key test-writing facts (calendar_token, fixture teardown, route prefixes)
+- [Seating determinism](project_seating_determinism.md) — seeded ChaCha8Rng; which seating paths consume the seed + determinism test coverage.
+- [Engine test topology](project_engine_test_topology.md) — how to run engine/PyO3/WASM + backend-with-engine tests; expected link failures; what each layer validates.
+- [Account surgery](project_account_surgery.md) — merge/detach test infra (`test_account_surgery.py`) + non-obvious test-writing facts (calendar_token, fixture teardown, route prefixes).
 
-## Test Infrastructure
+## How to Run Tests
+- **Backend**: `cd backend && uv run python3 -m pytest tests/ -v --tb=short`. Some suites need a test Postgres on port 5433 — skip with `--ignore` if unavailable (e.g. `test_users.py`). Pure-unit suites (SSE filters, offline mode, organizer access, access levels) need no DB.
+- **Rust engine**: `cd engine && cargo test --lib` is the authoritative logic suite. `cargo` may not be on the default PATH (shell profile should load it). See [engine test topology](project_engine_test_topology.md) for the PyO3/WASM link-failure gotchas.
+- **Frontend type check**: `cd frontend && npx svelte-check --tsconfig ./tsconfig.json`.
+- **Frontend E2E**: `cd frontend && npx playwright test` (not routine — needs a running app; real auth + real DB truncate/seed + IDB polling, see TESTING.md).
+- No frontend unit-test framework exists (Playwright E2E only).
 
-### How to Run Tests
-- **Backend**: `cd backend && uv run python3 -m pytest tests/ -v --tb=short`
-- **Rust engine**: `cd engine && cargo test`
-- **Frontend type check**: `cd frontend && npx svelte-check --tsconfig ./tsconfig.json`
-- **Frontend E2E**: `cd frontend && npx playwright test` (not run routinely -- requires running app)
+## What's Tested Where
+- Backend `backend/tests/test_*.py`: SSE filtering, access levels (all role permutations, pure unit), offline mode, organizer access, profile-update security boundary, ratings helpers, account surgery.
+- Rust engine: inline `#[cfg(test)]` modules — seating, deck parse/validate, tournament lifecycle, ratings, permissions, league scoring; one `#[ignore]` benchmark.
+- Frontend E2E: `tests/e2e/*.spec.ts` — `users.spec.ts` (SSE sync), `tournament.spec.ts` (full lifecycle).
 
-### Test File Locations
-- Backend: `backend/tests/test_*.py` (116 tests)
-  - `test_sse_filters.py` (pure unit, no DB), `test_users.py` (needs test DB), `test_offline_mode.py` (pure unit), `test_organizer_access.py` (pure unit, no DB)
-- Rust engine: `engine/src/` (120 tests, inline `#[cfg(test)]` modules)
-  - Coverage: seating, deck parsing/validation, tournament lifecycle, ratings, permissions, league scoring
-- Frontend E2E: `frontend/tests/e2e/*.spec.ts` (tournament.spec.ts, users.spec.ts)
-- No frontend unit tests exist (no vitest/jest setup)
+## Durable Testability Facts (not obvious from code)
+- Engine `ActorContext::from_json` gracefully defaults missing fields (empty vec / false) — `make_organizer()` omitting `can_organize_league_uids` parses as the "no league access" baseline.
+- Backend guards expensive queries (e.g. `get_all_leagues`) behind action-type checks before calling the engine.
+- Frontend `buildActorContext` is async (loads leagues from IndexedDB).
+- SSE filtering is now **write-time** (precomputed public/member/full columns), not the old per-viewer `_filter_*` functions — test the projection logic in `access_levels.py`, not a read-time filter.
+- Tournament offline fields (`offline_mode`, `offline_device_id`, …) are only in the full projection — non-full viewers never see them.
+- `_remap_uids_in_tournament` (tournaments.py) uses naive JSON string-replace for UID mapping — substring-collision risk mitigated only by UUID v7 length.
+- `_is_organizer`, `_build_actor_context` (tournaments.py) and `_map_vekn_to_tournament` (vekn_tournament_sync.py) are importable pure functions — unit-test directly.
+- Multi-role users (IC+NC): the NC/Prince branch comes first in the if/elif chain — correct semantics, no separate test needed.
 
-### Known Pre-existing Issues
-- `svelte-check` reports 1 error in `src/lib/api.ts:566` (null assignability) -- pre-existing, not a regression
-- 2 a11y warnings for `autofocus` in TournamentFields.svelte and leagues/new page -- pre-existing
-- `test_users.py` requires running test PostgreSQL on port 5433 -- skip with `--ignore=backend/tests/test_users.py` if DB unavailable
-
-## Visual QA Notes
-- **Global cursor bug**: ALL buttons across tournament pages have `cursor: default` instead of `cursor: pointer`. Links (`<a>`) are fine.
-- **Touch targets**: Filter pill buttons (Standings/Name/VEKN/All/Pending/Paid) are 24px tall -- well below 44px minimum. Toss number inputs are 48x22px, Set buttons are 33x22px. Action buttons (Reset Check-In, etc.) are 36px tall.
-- **Tab buttons**: Overview/Players/Rounds/Config tabs are 46px tall -- above minimum, OK.
-- **Pluralization bug**: English `overview_round_count` says "{count} rounds" always -- shows "1 rounds" for single round. All languages affected.
-- **Players table mobile**: Horizontal scroll works, but table is clipped with no visual affordance indicating more content to the right.
-- **Bottom nav**: 6-7 items -- "Developer" and last item may crowd at narrow widths.
-- **Tournament list mobile**: Correctly switches from table to card layout.
-
-## Key Patterns
-- Engine `ActorContext::from_json` gracefully defaults missing fields (empty vec for lists, false for bools)
-- `make_organizer()` omits `can_organize_league_uids` — parses as empty vec, used as "no league access" baseline
-- Backend guards expensive queries (e.g., `get_all_leagues`) behind action-type checks before calling engine
-- Frontend `buildActorContext` is async (loads leagues from IndexedDB)
-- PATCH /auth/me endpoint handles profile updates; community_links validation checks role, max count, type enum, URL scheme
-
-## Access Level Testing
-- `test_access_levels.py` covers all role permutations for public/member/full projections (pure unit tests, no DB)
-- `test_profile_update.py` covers PATCH /auth/me community_links security boundary (integration tests with real DB)
-- Multi-role users (e.g. IC+NC): NC/Prince check comes first in if/elif chain — correct semantics, no separate test needed
-
-## Authorization Architecture
-- Authorization checks happen at two layers: backend REST endpoint (create_tournament) and Rust engine (UpdateConfig)
-- IC role bypasses league organizer check in both layers
-- NC same-country check exists in backend `_get_user_organizable_league_uids` and frontend `buildActorContext`
-
-## Architecture Notes for Testing
-- SSE filter functions (`_filter_user`, `_filter_tournament`, `_filter_sanction`, `_filter_rating`) in `backend/src/main.py` are pure functions -- ideal for unit testing
-- Tournament offline fields (`offline_mode`, `offline_device_id`, etc.) are NOT copied in member-level or non-member SSE filter -- only full-access viewers see them
-- `_remap_uids_in_tournament` in `backend/src/routes/tournaments.py` uses naive JSON string-replace for UID mapping -- substring collision risk with short UIDs (mitigated by UUID v7 length)
-- `_is_organizer` and `_build_actor_context` in `backend/src/routes/tournaments.py` are importable pure functions -- easy to unit test
-- `_map_vekn_to_tournament` in `backend/src/vekn_tournament_sync.py` is a pure function (no DB) -- testable directly with dict input
-
-## Project Architecture Notes
-- Backend uses pytest with asyncio (pytest-asyncio strict mode)
-- Rust engine uses standard `#[test]` with one `#[ignore]` benchmark test
-- Frontend has Playwright for E2E but no unit test framework
-- Cargo may not be in default shell PATH — use `cargo test` (shell profile should load it)
-- Key pattern: SSE filter tests import functions directly from `src.main` and test pure logic without DB
+## Authorization (for test design)
+- Authz checks run at TWO layers: backend REST endpoint AND the Rust engine. Decisions are single-sourced in `engine/src/permissions.rs` (PyO3 + WASM); the backend still enforces server-side.
+- IC role bypasses the league-organizer check at both layers. NC same-country check exists in backend `_get_user_organizable_league_uids` and frontend `buildActorContext`.
