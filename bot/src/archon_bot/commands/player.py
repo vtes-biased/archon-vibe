@@ -12,6 +12,7 @@ from ..archon_api import ArchonAPI
 from ..oauth_utils import generate_pkce, make_oauth_url
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
+from ._common import fetch_userinfo
 
 logger = logging.getLogger(__name__)
 
@@ -125,12 +126,8 @@ class SponsorshipModal(miru.Modal, title="New Player Registration"):
 
     async def callback(self, ctx: miru.ModalContext) -> None:
         discord_id = str(ctx.author.id)
-        info = await self._api.get_userinfo(discord_id)
-        if not info.ok:
-            await ctx.respond(
-                f"Could not verify your account: {info.error}",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
+        info = await fetch_userinfo(self._api, ctx, discord_id)
+        if info is None:
             return
 
         link = await self._store.get_tournament_link(
@@ -204,12 +201,8 @@ class SponsorshipView(miru.View):
     async def approve(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         organizer_discord_id = str(ctx.author.id)
 
-        info = await self._api.get_userinfo(organizer_discord_id)
-        if not info.ok:
-            await ctx.respond(
-                f"Could not verify your account: {info.error}",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
+        info = await fetch_userinfo(self._api, ctx, organizer_discord_id)
+        if info is None:
             return
 
         roles = set(info.data.get("roles", []))
@@ -323,12 +316,8 @@ async def _handle_registration_pipeline(
         return
 
     # Step 2: Check VEKN ID
-    info = await api.get_userinfo(discord_id)
-    if not info.ok:
-        await ctx.respond(
-            f"Could not verify your account: {info.error}",
-            flags=hikari.MessageFlag.EPHEMERAL,
-        )
+    info = await fetch_userinfo(api, ctx, discord_id)
+    if info is None:
         return
 
     vekn_id = info.data.get("vekn_id")
@@ -453,12 +442,8 @@ class ReportCommand(
             return
 
         # Get user info for archon_uid
-        info = await api.get_userinfo(discord_id)
-        if not info.ok:
-            await ctx.respond(
-                f"Could not verify your account: {info.error}",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
+        info = await fetch_userinfo(api, ctx, discord_id)
+        if info is None:
             return
 
         archon_uid = info.data["sub"]

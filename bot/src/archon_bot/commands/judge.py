@@ -10,6 +10,7 @@ from .. import config
 from ..archon_api import ArchonAPI
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
+from ._common import fetch_userinfo
 
 logger = logging.getLogger(__name__)
 
@@ -385,12 +386,8 @@ class SanctionCommand(
             return
 
         # Verify issuer account
-        info = await api.get_userinfo(discord_id)
-        if not info.ok:
-            await ctx.respond(
-                f"Could not verify your account: {info.error}",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
+        info = await fetch_userinfo(api, ctx, discord_id)
+        if info is None:
             return
 
         # Find target player's Archon UID

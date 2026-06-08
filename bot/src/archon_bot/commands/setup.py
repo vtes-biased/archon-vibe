@@ -13,6 +13,7 @@ from ..oauth_utils import generate_pkce, make_oauth_url
 from ..sse_listener import start_sse, stop_sse
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
+from ._common import fetch_userinfo
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +81,8 @@ class SetupCommand(
             return
 
         # Check user has NC/Prince/IC role
-        info = await api.get_userinfo(discord_id)
-        if not info.ok:
-            await ctx.respond(
-                f"Could not verify your Archon account: {info.error}",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
+        info = await fetch_userinfo(api, ctx, discord_id, account="Archon account")
+        if info is None:
             return
 
         roles = set(info.data.get("roles", []))
