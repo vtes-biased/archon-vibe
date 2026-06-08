@@ -2,7 +2,7 @@
 
 Lightweight Rust engine for business logic, compiled to both WebAssembly (frontend) and native Python library (backend).
 
-> **Open issues (pst):** #16 stale `TOURNAMENT.md`; #19 split oversized `seating.rs`. Update the relevant ticket when changing the engine in that scope.
+> **Open issues (pst):** #16 stale `TOURNAMENT.md`. Update the relevant ticket when changing the engine in that scope.
 
 ## Build
 
@@ -114,7 +114,7 @@ Role hierarchy: IC > NC > Prince (country-scoped) > Judge/Judgekin
 
 All exposed via both PyO3 and WASM bindings in `lib.rs`.
 
-### Seating (`src/seating.rs`)
+### Seating (`src/seating/`)
 
 VEKN tournament seating algorithm per official rules:
 - [Official seating priorities](https://groups.google.com/g/rec.games.trading-cards.jyhad/c/4YivYLDVYQc/m/CCH-ZBU5UiUJ)

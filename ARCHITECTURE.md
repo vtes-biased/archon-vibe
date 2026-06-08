@@ -258,7 +258,7 @@ The Rust core defines the canonical object schemas and business logic:
 **Key Modules**:
 - `lib.rs` - Entry point, WASM/PyO3 bindings
 - `permissions.rs` - **Single source for all authorization predicates** (see below)
-- `seating.rs` - Tournament seating algorithm (simulated annealing + staggered seatings)
+- `seating/` - Tournament seating algorithm (simulated annealing + staggered seatings)
 - `tournament.rs` - Tournament event processing (state machine, scoring, finals)
 - `deck.rs` - Deck parsing, validation, enrichment, TWDA export
 - `ratings.rs` - Rating points computation

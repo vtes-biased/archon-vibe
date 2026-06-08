@@ -450,7 +450,7 @@ await queueTournamentSync(updated);
 
 ### Rust Engine
 - `engine/src/tournament.rs` - Event processing, state machine
-- `engine/src/seating.rs` - Seating algorithm
+- `engine/src/seating/` - Seating algorithm
 - `engine/src/lib.rs` - WASM/PyO3 bindings
 
 ### Backend

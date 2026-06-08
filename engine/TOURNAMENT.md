@@ -489,7 +489,7 @@ let (new_round, _score) = seating::compute_next_round(
 )?;
 ```
 
-See `src/seating.rs` for the simulated annealing algorithm details.
+See `src/seating/anneal.rs` for the simulated annealing algorithm details.
 
 ## Testing
 
