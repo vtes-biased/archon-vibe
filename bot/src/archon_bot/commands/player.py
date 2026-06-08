@@ -413,8 +413,7 @@ class CheckinCommand(
 
 
 _VP_CHOICES = [
-    hikari.CommandChoice(name=str(v), value=v)
-    for v in [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
+    lightbulb.Choice(str(v), v) for v in [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
 ]
 
 
