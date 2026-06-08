@@ -308,6 +308,53 @@ snapshot resync; one-line fix, `deleteUser` exists); #78 — `merge_users` `reas
 correctness-visible to same-country NC/Prince). Both deliberately out of #66's user-record scope.
 Closed #66.
 
+### Resolution (2026-06-08): #78 reassigned objects now broadcast live
+Follow-up to #66. `merge_users`' `reassign_sanctions` / `reassign_decks` /
+`reassign_coopted_by_references` (`db.py`) looped `save_*` (each returning a
+BroadcastData) but discarded them, so a reassigned sanction/deck's new `user_uid`
+and a repointed `coopted_by` stayed stale on other clients until reconnect. The
+three now return `list[BroadcastData]` (was `int` count — only `merge_users`
+called them, grep-confirmed), and `merge_users` folds them into its broadcasts
+list, which the routes already loop-broadcast (#66 plumbing). `reassign_auth_methods`
+stays `int` (auth_methods aren't synced objects). Test: `test_merge_reassigns_*`
+now asserts `len(broadcasts) == 4` (survivor + sanction + deck + soft-delete).
+Full backend suite green (150). Closed #78.
+
+### Resolution (2026-06-08): #77 ghost user fixed by frontend; deeper concern closed by guards
+The ticket's "wire deleteUser into the SSE `users` del" was **unsafe**: tournament
+players resolve names via `getUser(user_uid)`, and `merge_users` doesn't reassign
+tournament player refs, so a hard-delete breaks player-name display; and the
+current no-op DROPS the soft-delete event entirely, so the merged dup lingers as a
+live-looking ghost in lists until a snapshot resync. principal-engineer first
+designed a heavy cross-tournament reference remap (whole-JSON UUID replace +
+collision dedup + GIN index); the **owner's domain insight collapsed it**:
+- **Participants AND organizers require a VEKN ID** (engine-enforced:
+  `tournament/mod.rs:277/346/459`). A non-VEKN account can't be a participant.
+- `merge_users` only ever absorbs the non-VEKN dedup account (/claim, /link
+  guarantee it; admin/discord didn't). So the soft-deleted account has **zero**
+  tournament refs → nothing to remap.
+- The only real "participant matches an existing VEKN id" case is the offline
+  go-online sync, handled per-tournament by `_resolve_or_create_offline_player` +
+  `_remap_uids_in_tournament` — not `merge_users`.
+So the deeper fix is **guards that fail early**, not remapping:
+- **(a) `merge_users` guard** (`db.py`): `keep_uid == delete_uid` → no-op; and the
+  absorbed account must not hold a `vekn_id` → raise (enforces #59's "a vekn uid is
+  immovable, never soft-deleted"; also forbids merging two VEKN identities).
+  `admin.py` translates → 400, `discord.py` → merge_failed redirect. /claim, /link
+  can't trigger it (delete is non-VEKN by construction).
+- **(b) go-online guard** (`tournaments.py`): after resolving offline players, raise
+  409 if the post-remap player list has a duplicate uid (temp→already-present, or
+  two temps→same person) — the offline participant-merge case, handled per-tournament
+  by failing early rather than auto-merging players.
+- **Frontend (`sync.ts` + `db.ts`)**: the `users` `del` now SAVES the deleted_at-marked
+  row (not no-op, not hard-delete) so `getUser` still resolves it; `deleted_at` is
+  filtered from `getAllUsers`/`getFilteredUsers`/`getUsersByCountry` so the ghost
+  disappears from listings. `del` signature widened to `(uid, item?)`.
+Tests: `merge-refuses-vekn`, `merge-same-account-noop`, go-online
+`duplicate-participant-rejected`. Backend suite green (150), svelte-check clean.
+principal-engineer review of the actual implementation: **LGTM** (guards "strictly
+simpler/safer than the heavy reassignment design"; domain premise airtight). Closed #77.
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 
