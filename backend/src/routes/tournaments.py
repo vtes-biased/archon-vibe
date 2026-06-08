@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from .. import permissions
 from ..broadcast import broadcast_judge_call, broadcast_precomputed, broadcast_resync
 from ..db import (
     BroadcastData,
@@ -61,23 +62,6 @@ encoder = msgspec.json.Encoder()
 decoder = msgspec.json.Decoder(Tournament)
 
 _engine = PyEngine()
-
-
-def _is_organizer(user, tournament: Tournament) -> bool:
-    """Check if user is an organizer of this tournament.
-
-    Implicit organizers: IC (all tournaments), NC (same country).
-    """
-    if user.uid in tournament.organizers_uids or Role.IC in user.roles:
-        return True
-    if (
-        Role.NC in user.roles
-        and user.country
-        and tournament.country
-        and user.country == tournament.country
-    ):
-        return True
-    return False
 
 
 async def _build_decks_json(tournament_uid: str, conn=None) -> str:
@@ -267,7 +251,7 @@ def _build_actor_context(
     return {
         "uid": user.uid,
         "roles": [r.value if hasattr(r, "value") else str(r) for r in user.roles],
-        "is_organizer": _is_organizer(user, tournament),
+        "is_organizer": permissions.is_organizer(user, tournament),
         "can_organize_league_uids": can_organize_league_uids or [],
     }
 
@@ -283,11 +267,6 @@ async def _get_user_organizable_league_uids(user, conn=None) -> list[str]:
         if user.uid in lg.organizers_uids
         or (Role.NC in user.roles and lg.country == user.country)
     ]
-
-
-def _can_manage_tournaments(user) -> bool:
-    """Check if user can create/manage tournaments."""
-    return any(r in user.roles for r in (Role.IC, Role.NC, Role.PRINCE))
 
 
 async def _check_player_barred(
@@ -347,7 +326,7 @@ async def add_organizer(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not _is_organizer(current_user, tournament):
+    if not permissions.is_organizer(current_user, tournament):
         raise HTTPException(
             status_code=403, detail="Only organizers can manage organizers"
         )
@@ -378,7 +357,7 @@ async def remove_organizer(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not _is_organizer(current_user, tournament):
+    if not permissions.is_organizer(current_user, tournament):
         raise HTTPException(
             status_code=403, detail="Only organizers can manage organizers"
         )
@@ -443,7 +422,7 @@ async def create_tournament(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    if not _can_manage_tournaments(current_user):
+    if not permissions.is_official(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can create tournaments"
         )
@@ -612,7 +591,7 @@ async def delete_tournament_endpoint(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not _is_organizer(current_user, tournament):
+    if not permissions.is_organizer(current_user, tournament):
         raise HTTPException(
             status_code=403, detail="Only organizers can delete this tournament"
         )
@@ -649,7 +628,7 @@ async def archon_import(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not _is_organizer(current_user, tournament):
+    if not permissions.is_organizer(current_user, tournament):
         raise HTTPException(
             status_code=403,
             detail="Only organizers can import",
@@ -1152,7 +1131,7 @@ async def tournament_report(
     if tournament.state != TournamentState.FINISHED:
         raise HTTPException(status_code=400, detail="Tournament is not finished")
 
-    if not _is_organizer(user, tournament):
+    if not permissions.is_organizer(user, tournament):
         raise HTTPException(
             status_code=403, detail="Only organizers can download reports"
         )
@@ -1198,7 +1177,7 @@ def _validate_timer_tournament(user, tournament: Tournament | None):
     """Validate tournament state for timer operations (inside transaction)."""
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
-    if not _is_organizer(user, tournament):
+    if not permissions.is_organizer(user, tournament):
         raise HTTPException(status_code=403, detail="Organizer access required")
     if tournament.offline_mode:
         raise HTTPException(status_code=423, detail="Tournament is in offline mode")
@@ -1470,7 +1449,7 @@ async def go_offline(
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        if not _is_organizer(current_user, tournament):
+        if not permissions.is_organizer(current_user, tournament):
             raise HTTPException(
                 status_code=403, detail="Only organizers can take a tournament offline"
             )
@@ -1617,7 +1596,7 @@ async def go_online(
     # before). pst #45
     existing = await get_tournament_by_uid(uid)
     if existing:
-        if not _is_organizer(current_user, existing):
+        if not permissions.is_organizer(current_user, existing):
             raise HTTPException(
                 status_code=403, detail="Only organizers can bring a tournament online"
             )
@@ -1655,7 +1634,7 @@ async def go_online(
     # below inserts it within the same tx. Holds only tx_conn — no per-player work.
     async with tournament_transaction(uid) as (tournament, tx_conn):
         # Re-verify authorization + device lock authoritatively under the lock.
-        if tournament and not _is_organizer(current_user, tournament):
+        if tournament and not permissions.is_organizer(current_user, tournament):
             raise HTTPException(
                 status_code=403, detail="Only organizers can bring a tournament online"
             )
@@ -1746,7 +1725,7 @@ async def force_takeover(
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        if not _is_organizer(current_user, tournament):
+        if not permissions.is_organizer(current_user, tournament):
             raise HTTPException(
                 status_code=403, detail="Only organizers can force-takeover"
             )

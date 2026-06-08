@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from .. import permissions
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
@@ -24,7 +25,7 @@ from ..db import (
     user_has_active_suspension,
 )
 from ..middleware.auth import CurrentUser
-from ..models import Role, User
+from ..models import User
 from ..roles_hook import sync_user_discord_roles
 from .auth import create_access_token, create_refresh_token
 
@@ -33,22 +34,9 @@ encoder = msgspec.json.Encoder()
 logger = logging.getLogger(__name__)
 
 
-def _can_manage_country(manager: User, target_country: str | None) -> bool:
-    """Check if manager can manage users from target_country.
-
-    IC can manage any country.
-    NC/Prince can only manage their own country.
-    """
-    if Role.IC in manager.roles:
-        return True
-    if Role.NC in manager.roles or Role.PRINCE in manager.roles:
-        return manager.country == target_country
-    return False
-
-
 def _require_manager_for_user(manager: User, target: User) -> None:
     """Raise 403 if manager cannot manage target user."""
-    if not _can_manage_country(manager, target.country):
+    if not permissions.can_manage_country(manager, target.country):
         raise HTTPException(
             status_code=403, detail="Cannot manage users from other countries"
         )
@@ -205,11 +193,7 @@ async def sponsor_new_member(
     """
 
     # Check manager has appropriate role
-    if not (
-        Role.IC in manager.roles
-        or Role.NC in manager.roles
-        or Role.PRINCE in manager.roles
-    ):
+    if not permissions.is_official(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can sponsor new members"
         )
@@ -291,11 +275,7 @@ async def link_vekn_to_user(
     """
 
     # Check manager has appropriate role
-    if not (
-        Role.IC in manager.roles
-        or Role.NC in manager.roles
-        or Role.PRINCE in manager.roles
-    ):
+    if not permissions.is_official(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can link VEKN IDs"
         )
@@ -381,11 +361,7 @@ async def force_abandon_vekn_id(
     """
 
     # Check manager has appropriate role
-    if not (
-        Role.IC in manager.roles
-        or Role.NC in manager.roles
-        or Role.PRINCE in manager.roles
-    ):
+    if not permissions.is_official(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can force-abandon VEKN IDs"
         )

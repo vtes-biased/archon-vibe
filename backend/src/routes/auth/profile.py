@@ -8,6 +8,7 @@ import msgspec
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel
 
+from ... import permissions
 from ...broadcast import broadcast_precomputed
 from ...db import (
     get_auth_methods_for_user,
@@ -15,7 +16,7 @@ from ...db import (
     get_user_by_uid,
     save_user,
 )
-from ...models import CommunityLink, CommunityLinkType, Role
+from ...models import CommunityLink, CommunityLinkType
 from ._tokens import (
     verify_token,
 )
@@ -148,7 +149,7 @@ async def update_current_user(
                 status_code=403,
                 detail="VEKN membership required to add community links",
             )
-        is_official = any(r in (Role.IC, Role.NC, Role.PRINCE) for r in user.roles)
+        is_official = permissions.is_official(user)
         max_links = 10 if is_official else 5
         if len(request.community_links) > max_links:
             raise HTTPException(

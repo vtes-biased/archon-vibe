@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from .. import permissions
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
@@ -69,8 +70,7 @@ async def create_user(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     # Only IC, NC, or Prince can create users
-    allowed_roles = {Role.IC, Role.NC, Role.PRINCE}
-    if not any(role in current_user.roles for role in allowed_roles):
+    if not permissions.is_official(current_user):
         raise HTTPException(
             status_code=403,
             detail="Only IC, NC, or Prince can create users",

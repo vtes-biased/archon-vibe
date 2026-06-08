@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from .. import permissions
 from ..broadcast import broadcast_precomputed
 from ..db import (
     get_child_leagues,
@@ -15,7 +16,7 @@ from ..db import (
     save_league,
 )
 from ..middleware.auth import OptionalUser
-from ..models import League, LeagueKind, LeagueStandingsMode, Role
+from ..models import League, LeagueKind, LeagueStandingsMode
 
 router = APIRouter(prefix="/api/leagues", tags=["leagues"])
 logger = logging.getLogger(__name__)
@@ -45,20 +46,6 @@ class LeagueUpdate(BaseModel):
     parent_uid: str | None = None
 
 
-def _can_manage_leagues(user) -> bool:
-    """Check if user can create/delete leagues (NC/IC only)."""
-    return Role.IC in user.roles or Role.NC in user.roles
-
-
-def _can_edit_league(user, league: League) -> bool:
-    """Check if user can edit a league (organizer, NC, or IC)."""
-    if Role.IC in user.roles:
-        return True
-    if Role.NC in user.roles and league.country == user.country:
-        return True
-    return user.uid in league.organizers_uids
-
-
 @router.post("/")
 async def create_league(
     body: LeagueCreate,
@@ -67,7 +54,7 @@ async def create_league(
     """Create a new league. NC/IC only."""
     if not user:
         raise HTTPException(401, "Authentication required")
-    if not _can_manage_leagues(user):
+    if not permissions.can_manage_leagues(user):
         raise HTTPException(403, "Only NC and IC can create leagues")
 
     # Validate parent for child leagues
@@ -120,7 +107,7 @@ async def update_league_endpoint(
     league = await get_league_by_uid(uid)
     if not league:
         raise HTTPException(404, "League not found")
-    if not _can_edit_league(user, league):
+    if not permissions.can_edit_league(user, league):
         raise HTTPException(403, "Not authorized to edit this league")
 
     # Validate parent_uid if provided
@@ -164,7 +151,7 @@ async def delete_league_endpoint(
     league = await get_league_by_uid(uid)
     if not league:
         raise HTTPException(404, "League not found")
-    if not _can_edit_league(user, league):
+    if not permissions.can_edit_league(user, league):
         raise HTTPException(403, "Not authorized to delete this league")
 
     # Block deletion of meta-league with children
@@ -199,7 +186,7 @@ async def add_organizer(
     league = await get_league_by_uid(uid)
     if not league:
         raise HTTPException(404, "League not found")
-    if not _can_edit_league(user, league):
+    if not permissions.can_edit_league(user, league):
         raise HTTPException(403, "Not authorized")
 
     if body.user_uid not in league.organizers_uids:
@@ -225,7 +212,7 @@ async def remove_organizer(
     league = await get_league_by_uid(uid)
     if not league:
         raise HTTPException(404, "League not found")
-    if not _can_edit_league(user, league):
+    if not permissions.can_edit_league(user, league):
         raise HTTPException(403, "Not authorized")
 
     if organizer_uid in league.organizers_uids:

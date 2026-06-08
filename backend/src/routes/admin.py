@@ -7,9 +7,10 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from .. import permissions
 from ..db import get_user_by_uid, merge_users
 from ..middleware.auth import CurrentUser
-from ..models import Role, User
+from ..models import Role
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +25,6 @@ def set_sync_service(sync_service) -> None:
     """Set the sync service instance."""
     global _sync_service
     _sync_service = sync_service
-
-
-def _can_manage_country(manager: User, target_country: str | None) -> bool:
-    """Check if manager can manage users from target_country."""
-    if Role.IC in manager.roles:
-        return True
-    if Role.NC in manager.roles or Role.PRINCE in manager.roles:
-        return manager.country == target_country
-    return False
 
 
 class MergeRequest(BaseModel):
@@ -121,11 +113,7 @@ async def merge_user_accounts(
     """
 
     # Check manager has appropriate role
-    if not (
-        Role.IC in manager.roles
-        or Role.NC in manager.roles
-        or Role.PRINCE in manager.roles
-    ):
+    if not permissions.is_official(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can merge users"
         )
@@ -140,11 +128,11 @@ async def merge_user_accounts(
         raise HTTPException(status_code=404, detail="Delete user not found")
 
     # Check manager can manage both users' countries
-    if not _can_manage_country(manager, keep_user.country):
+    if not permissions.can_manage_country(manager, keep_user.country):
         raise HTTPException(
             status_code=403, detail="Cannot manage keep user from other country"
         )
-    if not _can_manage_country(manager, delete_user.country):
+    if not permissions.can_manage_country(manager, delete_user.country):
         raise HTTPException(
             status_code=403, detail="Cannot manage delete user from other country"
         )
