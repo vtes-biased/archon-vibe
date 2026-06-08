@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import src.accounts as accounts
 import src.db as db
 from src.models import (
     AuthMethod,
@@ -141,7 +142,7 @@ async def test_merge_preserves_resync_after_and_identity(test_db):
     await db.save_user(keep)
     await db.save_user(delete)
 
-    result = await db.merge_users(keep.uid, delete.uid)
+    result = await accounts.merge_users(keep.uid, delete.uid)
 
     assert result is not None
     merged, broadcasts = result
@@ -185,7 +186,7 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
         await db.save_sanction(sanction)
         await db.insert_auth_method(auth)
 
-        result = await db.merge_users(keep.uid, delete.uid)
+        result = await accounts.merge_users(keep.uid, delete.uid)
         assert result is not None
         _merged, broadcasts = result
         # pst #78: reassigned sanction + deck (and survivor + soft-delete) are all
@@ -227,7 +228,7 @@ async def test_merge_refuses_to_absorb_vekn_account(test_db):
     await db.save_user(delete)
 
     with pytest.raises(ValueError, match="VEKN"):
-        await db.merge_users(keep.uid, delete.uid)
+        await accounts.merge_users(keep.uid, delete.uid)
 
     # The guard runs before any write, so delete is left untouched (not soft-deleted).
     still = await db.get_user_by_uid(delete.uid)
@@ -245,7 +246,7 @@ async def test_merge_same_account_is_noop(test_db):
     )
     await db.save_user(user)
 
-    result = await db.merge_users(user.uid, user.uid)
+    result = await accounts.merge_users(user.uid, user.uid)
     assert result is not None
     merged, broadcasts = result
     assert merged.uid == user.uid
@@ -295,7 +296,7 @@ async def test_detach_vekn_record_is_immovable(test_db):
         await db.save_sanction(sanction)
         await db.insert_auth_method(auth)
 
-        result = await db.detach_user_from_vekn(user.uid)
+        result = await accounts.detach_user_from_vekn(user.uid)
         assert result is not None
         personal, vekn_record, broadcasts = result
         # pst #66: new personal account + nulled vekn_record surfaced for broadcast.
@@ -366,7 +367,7 @@ async def test_detach_moves_calendar_token_to_personal(test_db):
     assert await db.get_calendar_token(user.uid) == "feed-token-xyz"
 
     async with _cleanup_surgery():
-        result = await db.detach_user_from_vekn(user.uid)
+        result = await accounts.detach_user_from_vekn(user.uid)
         assert result is not None
         personal, _vekn_record, _broadcasts = result
 
@@ -389,7 +390,7 @@ async def test_active_suspension_true_for_live_suspension(test_db):
     uid = str(uuid7())
     async with _cleanup_surgery():
         await db.save_sanction(_sanction(uid, SanctionLevel.SUSPENSION))
-        assert await db.user_has_active_suspension(uid) is True
+        assert await accounts.user_has_active_suspension(uid) is True
 
 
 @pytest.mark.asyncio
@@ -400,7 +401,7 @@ async def test_active_suspension_true_for_future_probation(test_db):
         await db.save_sanction(
             _sanction(uid, SanctionLevel.PROBATION, expires_at=future)
         )
-        assert await db.user_has_active_suspension(uid) is True
+        assert await accounts.user_has_active_suspension(uid) is True
 
 
 @pytest.mark.asyncio
@@ -409,7 +410,7 @@ async def test_active_suspension_false_for_lower_levels(test_db):
     async with _cleanup_surgery():
         await db.save_sanction(_sanction(uid, SanctionLevel.CAUTION))
         await db.save_sanction(_sanction(uid, SanctionLevel.WARNING))
-        assert await db.user_has_active_suspension(uid) is False
+        assert await accounts.user_has_active_suspension(uid) is False
 
 
 @pytest.mark.asyncio
@@ -422,7 +423,7 @@ async def test_active_suspension_false_when_lifted_expired_or_deleted(test_db):
             _sanction(uid, SanctionLevel.SUSPENSION, expires_at=past)
         )
         await db.save_sanction(_sanction(uid, SanctionLevel.PROBATION, deleted=True))
-        assert await db.user_has_active_suspension(uid) is False
+        assert await accounts.user_has_active_suspension(uid) is False
 
 
 # ---------------------------------------------------------------------------

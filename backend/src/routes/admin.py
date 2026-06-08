@@ -8,8 +8,9 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .. import permissions
+from ..accounts import merge_users
 from ..broadcast import broadcast_precomputed
-from ..db import get_user_by_uid, merge_users
+from ..db import get_user_by_uid
 from ..middleware.auth import CurrentUser
 from ..models import Role
 

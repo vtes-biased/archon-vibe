@@ -10,18 +10,20 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .. import permissions
+from ..accounts import (
+    detach_user_from_vekn,
+    merge_users,
+    user_has_active_suspension,
+)
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
-    detach_user_from_vekn,
     get_auth_methods_for_user,
     get_user_by_uid,
     get_user_by_vekn_id,
     is_vekn_id_claimed,
-    merge_users,
     save_user,
     set_user_resync_after,
-    user_has_active_suspension,
 )
 from ..middleware.auth import CurrentUser
 from ..models import User

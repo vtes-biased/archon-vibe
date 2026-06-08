@@ -11,6 +11,7 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from uuid6 import uuid7
 
+from ...accounts import merge_users
 from ...broadcast import broadcast_precomputed
 from ...db import (
     delete_transient_token,
@@ -18,7 +19,6 @@ from ...db import (
     get_transient_token,
     get_user_by_uid,
     insert_auth_method,
-    merge_users,
     save_user,
     store_transient_token,
     update_auth_method,

@@ -860,7 +860,7 @@ Canvas-rendered PNG card and plain text generator for sharing finished tournamen
 
 ### Merge (`POST /admin/users/merge`)
 
-IC/NC/Prince only; same-country constraint. The VEKN-bearing uid is always the survivor (`keep_uid`). Migrates auth methods, sanctions, decks, and `coopted_by` references from the dying uid, then soft-deletes it. Consolidates ratings, wins, roles, and `local_modifications` (union). Implemented in `db.merge_users()`.
+IC/NC/Prince only; same-country constraint. The VEKN-bearing uid is always the survivor (`keep_uid`). Migrates auth methods, sanctions, decks, and `coopted_by` references from the dying uid, then soft-deletes it. Consolidates ratings, wins, roles, and `local_modifications` (union). Implemented in `accounts.merge_users()`.
 
 ### Detach (`detach_user_from_vekn`)
 
