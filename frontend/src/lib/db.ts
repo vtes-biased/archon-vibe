@@ -3,7 +3,7 @@
  * Stores objects with uid and modified fields for sync.
  */
 
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
 import type { User, Role, Sanction, Tournament, DeckObject, League, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch } from './utils';
@@ -76,6 +76,118 @@ let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 // Version 15: new sync — replace ratings with decks store, remove changes store
 const DB_VERSION = 15;
 
+type UpgradeTx = IDBPTransaction<ArchonDB, ArrayLike<StoreNames<ArchonDB>>, 'versionchange'>;
+
+/**
+ * Unsynced offline-tournament data lifted out of the old stores so it survives
+ * the destructive version upgrade below. Synced data is re-fetched from SSE, but
+ * an offline tournament is locked to this device and may hold changes not yet
+ * pushed to the server — dropping it loses real work (pst #14). The `offline_*`
+ * metadata keys are the manifest of what is unsynced; the referenced rows live
+ * in the tournaments / users / sanctions / decks stores.
+ */
+interface RescuedOfflineData {
+  metadata: [string, string][];
+  tournaments: Tournament[];
+  users: User[];
+  sanctions: Sanction[];
+  decks: DeckObject[];
+}
+
+const EMPTY_RESCUE: RescuedOfflineData = { metadata: [], tournaments: [], users: [], sanctions: [], decks: [] };
+
+function safeParseArray(value: string): unknown[] {
+  try {
+    const v = JSON.parse(value);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Read unsynced offline-tournament data out of the existing stores before they
+ * are dropped. Runs inside the versionchange transaction and awaits ONLY IDB
+ * operations (never a non-IDB promise) so the transaction stays alive. Uses the
+ * raw upgrade transaction, NOT the getDB() helpers (which would recurse).
+ * Returns empty on a fresh DB or a pre-metadata schema.
+ */
+async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Promise<RescuedOfflineData> {
+  if (!db.objectStoreNames.contains('metadata')) return EMPTY_RESCUE;
+
+  const metaStore = tx.objectStore('metadata');
+  const [keys, values] = await Promise.all([metaStore.getAllKeys(), metaStore.getAll()]);
+
+  const metadata: [string, string][] = [];
+  const tournamentUids = new Set<string>();
+  const userUids = new Set<string>();
+  const sanctionUids = new Set<string>();
+  const deckUids = new Set<string>();
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const value = values[i];
+    if (typeof key !== 'string' || !key.startsWith('offline_') || typeof value !== 'string') continue;
+    metadata.push([key, value]);
+    if (key.startsWith('offline_tournament:')) {
+      tournamentUids.add(key.slice('offline_tournament:'.length));
+    } else if (key.startsWith('offline_players:')) {
+      for (const p of safeParseArray(value)) {
+        const uid = (p as { temp_uid?: string })?.temp_uid;
+        if (uid) userUids.add(uid);
+      }
+    } else if (key.startsWith('offline_sanctions:')) {
+      for (const uid of safeParseArray(value)) if (typeof uid === 'string') sanctionUids.add(uid);
+    } else if (key.startsWith('offline_decks:')) {
+      for (const uid of safeParseArray(value)) if (typeof uid === 'string') deckUids.add(uid);
+    }
+  }
+
+  // No offline tournaments → nothing to keep (drop any stray offline_* metadata).
+  if (tournamentUids.size === 0) return EMPTY_RESCUE;
+
+  // Issue every row read in one synchronous burst, then await once. A sequential
+  // await-per-row loop can let the versionchange transaction go inactive between
+  // awaits (idb's documented "transaction lifetime" hazard); a single batched
+  // await keeps it alive.
+  const tournamentReads = db.objectStoreNames.contains('tournaments')
+    ? [...tournamentUids].map((uid) => tx.objectStore('tournaments').get(uid)) : [];
+  const userReads = db.objectStoreNames.contains('users')
+    ? [...userUids].map((uid) => tx.objectStore('users').get(uid)) : [];
+  const sanctionReads = db.objectStoreNames.contains('sanctions')
+    ? [...sanctionUids].map((uid) => tx.objectStore('sanctions').get(uid)) : [];
+  const deckReads = db.objectStoreNames.contains('decks')
+    ? [...deckUids].map((uid) => tx.objectStore('decks').get(uid)) : [];
+  const [tournaments, users, sanctions, decks] = await Promise.all([
+    Promise.all(tournamentReads),
+    Promise.all(userReads),
+    Promise.all(sanctionReads),
+    Promise.all(deckReads),
+  ]);
+
+  return {
+    metadata,
+    tournaments: tournaments.filter((t): t is Tournament => !!t),
+    users: users.filter((u): u is User => !!u),
+    sanctions: sanctions.filter((s): s is Sanction => !!s),
+    decks: decks.filter((d): d is DeckObject => !!d),
+  };
+}
+
+/** Write rescued offline data back into the freshly recreated stores. */
+function restoreOfflineData(tx: UpgradeTx, rescued: RescuedOfflineData): void {
+  const meta = tx.objectStore('metadata');
+  for (const [key, value] of rescued.metadata) meta.put(value, key);
+  const tournaments = tx.objectStore('tournaments');
+  for (const t of rescued.tournaments) tournaments.put(t);
+  const users = tx.objectStore('users');
+  for (const u of rescued.users) users.put(u);
+  const sanctions = tx.objectStore('sanctions');
+  for (const s of rescued.sanctions) sanctions.put(s);
+  const decks = tx.objectStore('decks');
+  for (const d of rescued.decks) decks.put(d);
+}
+
 export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
   if (dbPromise) {
     return dbPromise;
@@ -90,7 +202,12 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       // Connection was abnormally closed — reset so next getDB() retries.
       dbPromise = null;
     },
-    upgrade(db, oldVersion, _newVersion, transaction) {
+    async upgrade(db, _oldVersion, _newVersion, transaction) {
+
+      // Rescue unsynced offline-tournament data before the destructive rebuild
+      // (pst #14). Read everything first, then drop/recreate stores, then write
+      // it back — all in this versionchange transaction, awaiting only IDB ops.
+      const rescued = await rescueOfflineData(db, transaction);
 
       // On ANY version upgrade: delete all existing stores and recreate fresh.
       // This triggers a full resync from SSE on next connect.
@@ -130,6 +247,12 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
 
       // Metadata store for sync state
       db.createObjectStore('metadata');
+
+      // Restore the rescued offline data into the fresh stores.
+      restoreOfflineData(transaction, rescued);
+      if (rescued.tournaments.length > 0) {
+        console.info(`[IDB] Preserved ${rescued.tournaments.length} offline tournament(s) across upgrade.`);
+      }
 
     },
   });

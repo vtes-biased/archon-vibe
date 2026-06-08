@@ -131,7 +131,10 @@ After the snapshot loads, the SSE stream picks up from the snapshot's timestamp,
 ### Single Tournament Store
 
 One `tournaments` store holds all data levels. No separate `tournament_details` store.
-Version 11 upgrade: deletes all stores and recreates fresh → triggers full resync.
+A DB-version upgrade deletes all stores and recreates fresh → triggers full resync.
+Exception: unsynced offline-tournament data (the offline tournament row, its temp
+player stubs, offline sanctions/decks, and the `offline_*` metadata) is rescued
+within the upgrade transaction and written back, since it isn't re-fetchable from SSE.
 
 ### Index Strategy
 
@@ -146,8 +149,6 @@ Minimal indexes only:
 | leagues | `by-country`, `by-start` |
 
 ### Offline Mode
-
-> **Open issues (pst):** #14 a DB-version bump wipes in-flight offline data. (The offline lifecycle endpoints now take the `FOR UPDATE` lock the action path uses, via `tournament_transaction`; go-online repoints temp player UIDs via a whole-JSON replace and recomputes a deck's `attribution` from the resolved user — the one field with a truncated `TEMP-` vekn the replace can't reach. #15 done.)
 
 Offline tournaments use a device-lock model (no changes log needed):
 - Tournament locked to one device via `go-offline` endpoint

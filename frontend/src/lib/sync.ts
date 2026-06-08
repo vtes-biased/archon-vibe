@@ -32,6 +32,12 @@ import {
   getLastSyncTimestamp,
   clearLastSyncTimestamp,
   getTournament,
+  getUser,
+  getSanction,
+  getDeck,
+  getOfflinePlayers,
+  getOfflineSanctionUids,
+  getOfflineDeckUids,
 } from './db';
 import { getAccessToken } from '$lib/stores/auth.svelte';
 import { isOffline, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
@@ -310,12 +316,32 @@ class SyncManager {
    * Preserves offline tournament data to avoid data loss.
    */
   private async clearAllStores(): Promise<void> {
-    // Preserve offline tournaments before clearing
+    // Preserve unsynced offline-tournament data before clearing — it isn't
+    // re-fetchable from SSE (offline tournaments are locked to this device).
+    // The offline_* metadata keys survive (only last_sync_timestamp is removed),
+    // but the rows they point to live in the cleared stores, so rescue them too —
+    // otherwise go-online's getSanction/getDeck lookups return undefined and the
+    // offline sanctions/decks are silently dropped from reconciliation (pst #14).
     const offlineUids = getOfflineTournamentUids();
-    const preserved: any[] = [];
+    const tournaments: Tournament[] = [];
+    const users: User[] = [];
+    const sanctions: Sanction[] = [];
+    const decks: DeckObject[] = [];
     for (const uid of offlineUids) {
       const t = await getTournament(uid);
-      if (t) preserved.push(t);
+      if (t) tournaments.push(t);
+      for (const p of await getOfflinePlayers(uid)) {
+        const u = await getUser(p.temp_uid);
+        if (u) users.push(u);
+      }
+      for (const sUid of await getOfflineSanctionUids(uid)) {
+        const s = await getSanction(sUid);
+        if (s) sanctions.push(s);
+      }
+      for (const dUid of await getOfflineDeckUids(uid)) {
+        const d = await getDeck(dUid);
+        if (d) decks.push(d);
+      }
     }
 
     await clearAllUsers();
@@ -325,10 +351,11 @@ class SyncManager {
     await clearAllLeagues();
     await clearLastSyncTimestamp();
 
-    // Restore offline tournaments
-    if (preserved.length > 0) {
-      await saveTournamentsBatch(preserved);
-    }
+    // Restore preserved offline data.
+    if (tournaments.length > 0) await saveTournamentsBatch(tournaments);
+    if (users.length > 0) await saveUsersBatch(users);
+    if (sanctions.length > 0) await saveSanctionsBatch(sanctions);
+    if (decks.length > 0) await saveDecksBatch(decks);
   }
 
   /**

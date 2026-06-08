@@ -139,8 +139,6 @@ See [TOURNAMENTS.md](TOURNAMENTS.md) for a complete example of business event pr
 
 ## Offline Mode
 
-> **Open issue (pst #14):** a frontend DB-version bump can wipe in-flight offline data — guard/migrate before changing offline sync.
-
 ### Device-Lock Model
 
 Offline mode uses primary device ownership — no CRUD log or conflict resolution needed:
