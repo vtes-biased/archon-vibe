@@ -6,6 +6,7 @@
   import { getRoleClasses } from "$lib/roles";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
+  import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunitySocialSection from "./CommunitySocialSection.svelte";
@@ -19,20 +20,6 @@
 
   const SOCIAL_TYPES = new Set(["discord", "telegram", "whatsapp", "forum", "facebook", "reddit"]);
   const CONTENT_TYPES = new Set(["youtube", "twitch", "blog", "website", "instagram", "other"]);
-
-  // Country → primary language mapping
-  const COUNTRY_LANGUAGE: Record<string, string> = {
-    US: "en", GB: "en", AU: "en", CA: "en", NZ: "en", IE: "en", ZA: "en",
-    FR: "fr", BE: "fr", CH: "fr", MC: "fr",
-    ES: "es", MX: "es", AR: "es", CO: "es", CL: "es", PE: "es", VE: "es", EC: "es", UY: "es", PY: "es", BO: "es", CR: "es", PA: "es", GT: "es", HN: "es", SV: "es", NI: "es", CU: "es", DO: "es", PR: "es",
-    PT: "pt", BR: "pt",
-    IT: "it",
-    DE: "de", AT: "de", LI: "de",
-    PL: "pl", FI: "fi", SE: "sv", NL: "nl", NO: "no", DK: "da",
-    JP: "ja", CN: "zh", TW: "zh", KR: "ko", RU: "ru",
-    CZ: "cs", HU: "hu", RO: "ro", BG: "bg", HR: "hr", GR: "el", TR: "tr",
-    TH: "th", VN: "vi",
-  };
 
   let allUsersWithLinks = $state<User[]>([]);
   let icUsers = $state<User[]>([]);

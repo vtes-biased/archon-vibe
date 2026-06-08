@@ -5,6 +5,7 @@
   import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
   import { updateProfile } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
+  import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import type { CommunityLinkType } from "$lib/types";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -42,18 +43,6 @@
     (initial.community_links || []).map((l: any) => ({ type: l.type, url: l.url, label: l.label, language: l.language || "" }))
   );
 
-  // Country → default language
-  const COUNTRY_LANGUAGE: Record<string, string> = {
-    US: "en", GB: "en", AU: "en", CA: "en", NZ: "en", IE: "en", ZA: "en",
-    FR: "fr", BE: "fr", CH: "fr",
-    ES: "es", MX: "es", AR: "es", CO: "es", CL: "es", PE: "es", VE: "es",
-    PT: "pt", BR: "pt",
-    IT: "it",
-    DE: "de", AT: "de",
-    PL: "pl", FI: "fi", SE: "sv", NL: "nl", NO: "no", DK: "da",
-    JP: "ja", CN: "zh", TW: "zh", KR: "ko", RU: "ru",
-    CZ: "cs", HU: "hu", RO: "ro", BG: "bg", HR: "hr", GR: "el", TR: "tr",
-  };
   const defaultLanguage = $derived(COUNTRY_LANGUAGE[editCountry] || "en");
 
   const CONTENT_TYPES = new Set(["youtube", "twitch", "blog", "website", "instagram", "other"]);
