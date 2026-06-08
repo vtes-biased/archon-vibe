@@ -2,8 +2,6 @@
 
 Lightweight Rust engine for business logic, compiled to both WebAssembly (frontend) and native Python library (backend).
 
-> **Open issues (pst):** #16 stale `TOURNAMENT.md`. Update the relevant ticket when changing the engine in that scope.
-
 ## Build
 
 ### For Python (Backend)
@@ -134,7 +132,7 @@ Entry points:
 
 Tournament state machine and event processing for offline-first tournament management.
 
-See [TOURNAMENT.md](TOURNAMENT.md) for business requirements (note: that file is stale — pst #16).
+See [../TOURNAMENTS.md](../TOURNAMENTS.md) for the behavioral reference (state machine, full event catalog, scoring/oust-order, permissions, privacy projections). This README covers the engine's build, bindings, and entry-point signatures.
 
 Features:
 - **State machine**: Planned → Registration → Waiting → Playing → Finished
@@ -146,12 +144,7 @@ Entry points:
 - `process_tournament_event(tournament, event, actor, sanctions, decks)` - Main event processor (returns `{tournament, deck_ops}`)
 - `compute_final_standings(standings, winner)` - Reorder preliminary standings into VEKN final placement; shared by league GP/RTP scoring and the post-finals display. Exposed as WASM `computeFinalStandings` and PyO3 `compute_final_standings`.
 
-Events:
-- `OpenRegistration`, `CloseRegistration`, `FinishTournament`
-- `Register`, `AddPlayer`, `RemovePlayer`
-- `CheckIn`, `CheckInAll`
-- `StartRound`, `FinishRound`
-- `SetScore`
+The event enum lives in `tournament/types.rs`; the full catalog (with required state and permissions) is documented in [../TOURNAMENTS.md](../TOURNAMENTS.md).
 
 ## Design
 

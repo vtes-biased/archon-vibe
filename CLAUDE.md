@@ -2,7 +2,7 @@
 
 This repo tracks work in **pst** (`.pst/tickets`), not plan-mode plans or a `TODO.md`. The mechanics (read the board first, epic + `parent:#N` children, `wip`/`close` lifecycle, detail files, CLI-only writes) are auto-injected each session by the `.pst/mandate.md` SessionStart hook — `.pst/skill.md` has the full reference. Prefer pst over the harness Task tools.
 
-**Project convention:** several docs (ARCHITECTURE.md, SYNC.md, engine/TOURNAMENT.md, engine/README.md) carry inline `pst #N` pointers next to known-issue scopes. When you change code in such a scope, update the referenced ticket — and add a pointer when you record a new scoped issue.
+**Tags — priority only.** The sole tag axis is priority, one per ticket: `p1` (do it ASAP), `p2` (important), `p3` (nice-to-have, not urgent). Everything else — stack, kind, subsystem — goes in the ticket **body**, not as a tag (a label only earns a tag when you filter the board by it *and* it isn't already in the prose; only priority qualifies). There is no `deferred`/parked tag: anything on the board must be looked into, so `p3` is the floor, not a graveyard.
 
 # Agent Workflow (PROACTIVE — do not wait for user to ask)
 

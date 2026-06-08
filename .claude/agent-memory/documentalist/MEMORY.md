@@ -4,9 +4,8 @@
 - `CLAUDE.md` — top-level project guidelines (lean; deep design lives in the docs below)
 - `ARCHITECTURE.md` — full design + per-subsystem mechanics (data model, Rust integration, calendar, leagues, community links, Discord bot + linked roles, TWDA in/out)
 - `SYNC.md` — SSE streaming, IndexedDB, access levels, "adding a new object type"
-- `TOURNAMENTS.md` — tournament state machine, scoring, seating
-- `engine/TOURNAMENT.md` — engine-side tournament reference (**known stale, pst #16** — don't trust without checking code)
-- `engine/README.md` — engine module + permissions reference
+- `TOURNAMENTS.md` — single behavioral reference for the tournament domain: state machine, full event catalog (required state + permissions), scoring/oust-order, data model, permissions, SSE privacy. (Former `engine/TOURNAMENT.md` was deleted under pst #16 — it duplicated this doc and went stale; do not recreate an engine-side tournament behavior doc.)
+- `engine/README.md` — engine build, bindings, module map + entry-point signatures (the engine *integration* reference, not behavior)
 - `PRODUCT.md` — domain rules, roles, features, constraints
 - `frontend/DESIGN.md` — UI styling guidelines
 - `CONTEXT7.md` — library IDs for context7 MCP
@@ -15,8 +14,7 @@
 
 ## Working Principle
 - **Trust code over docs.** Verify every claim against current source before writing it; many docs drift.
-- Per project convention, several docs carry inline `pst #N` pointers next to known-issue scopes — when code in that scope changes, update the referenced ticket (and add a pointer when recording a new scoped issue).
-- On fixing a tracked issue, **remove** its mention from ARCHITECTURE.md (don't annotate "Resolved"); resolution detail belongs in the pst detail file.
+- **Keep ticket numbers out of the prose docs.** Don't add `pst #N` pointers to ARCHITECTURE.md/SYNC.md/TOURNAMENTS.md/etc. — tracking lives in pst, and stale numbers clash with GitHub issue refs. On fixing a tracked issue, **remove** any mention from ARCHITECTURE.md (don't annotate "Resolved"); resolution detail belongs in the pst detail file.
 
 ## Terminology (use consistently)
 - Abbreviations: SSE, CRUD, PWA, WASM, PyO3, IC (Inner Circle), NC (National Coordinator), VEKN, VTES.

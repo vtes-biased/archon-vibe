@@ -359,29 +359,8 @@ const result = await computeSeating(playerUids, roundCount, previousRounds);
 
 ## Frontend Integration
 
-### Engine Wrapper (`frontend/src/lib/engine.ts`)
-
-```typescript
-// Initialize engine (called in layout)
-await initEngine();
-
-// Process tournament event (offline mode)
-const updated = await processTournamentEvent(tournament, event, actor);
-
-// Compute seating
-const { rounds, score } = await computeSeating(players, 3, previousRounds);
-```
-
-### Tournament Actions
-
-```typescript
-// API client (online mode)
-import { tournamentAction } from '$lib/api';
-
-// Delegates to backend which uses Rust engine
-await tournamentAction(uid, 'rounds/start');
-await tournamentAction(uid, 'checkin', { player_uid: 'xxx' });
-```
+- **Offline mode**: `frontend/src/lib/engine.ts` wraps the WASM engine — `processTournamentEvent(tournament, event, actor, sanctions, decks)` and `computeSeating(players, rounds, previousRounds)`.
+- **Online mode**: `tournamentAction()` in `frontend/src/lib/api.ts` POSTs the event to the backend (which runs the same engine via PyO3) and applies the optimistic update. See ARCHITECTURE.md (Mutation Pipeline).
 
 ## Permission Model
 
@@ -423,33 +402,12 @@ Personal overlay additionally sends `full`-level data for own tournaments (organ
 
 ## Offline Support
 
-1. **IndexedDB Store**: `tournaments` store with `uid` key, `state` index
-2. **WASM Engine**: Same Rust code as backend
-3. **Sync**: Tournament events sent to backend on reconnect
-
-### Offline Flow
-
-```typescript
-// 1. Get tournament from IndexedDB
-const tournament = await getTournament(uid);
-
-// 2. Build actor context
-const actor = buildActorContext(currentUser, tournament);
-
-// 3. Process event locally
-const updated = await processTournamentEvent(tournament, event, actor);
-
-// 4. Save to IndexedDB
-await saveTournament(updated);
-
-// 5. Queue for sync (when online)
-await queueTournamentSync(updated);
-```
+Offline uses a device-lock model (no CRUD log / conflict resolution): the organizer locks the tournament to one device, the WASM engine applies events directly to the `tournaments` IndexedDB store (same Rust code as the backend), and full state is pushed to the server on go-online. See ARCHITECTURE.md (Offline Mode) and SYNC.md for the lock lifecycle and temp-UID remapping.
 
 ## Files
 
 ### Rust Engine
-- `engine/src/tournament.rs` - Event processing, state machine
+- `engine/src/tournament/` - Event processing, state machine, scoring, standings, raffle (entry point `process_tournament_event(tournament, event, actor, sanctions, decks)` → `{tournament, deck_ops}`)
 - `engine/src/seating/` - Seating algorithm
 - `engine/src/lib.rs` - WASM/PyO3 bindings
 

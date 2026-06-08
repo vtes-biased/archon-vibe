@@ -355,6 +355,18 @@ Tests: `merge-refuses-vekn`, `merge-same-account-noop`, go-online
 principal-engineer review of the actual implementation: **LGTM** (guards "strictly
 simpler/safer than the heavy reassignment design"; domain premise airtight). Closed #77.
 
+### Resolution (2026-06-08): #16 deleted the duplicate engine doc instead of rewriting it
+`engine/TOURNAMENT.md` (602 lines) was stale (`src/tournament.rs`, 3-arg signature, ~13 of
+the events) **and** near-duplicated the root `TOURNAMENTS.md` "Tournament System" doc — two
+files one `S` apart. Discussed with owner: rather than rewrite the stale file in place,
+**deleted it**. `TOURNAMENTS.md` is now the single behavioral reference (state machine, full
+event catalog, scoring/oust-order, permissions, privacy); `engine/README.md` is the engine
+*integration* reference (build, bindings, module map, entry-point signatures). Refreshed
+`TOURNAMENTS.md` stale bits (`tournament/` module, 5-arg + `deck_ops`), trimmed two
+code-readable/stale frontend snippets, repointed `engine/README.md` cross-refs, dropped the
+partial event list there (drift trap), and updated `CLAUDE.md` + documentalist memory.
+Closed #16. (#17 SSE-doc work still open.)
+
 ## Suggested order
 p0 first (#2, #3), then the sync/offline correctness cluster (#5, #6, #7, #8, #4), then engine determinism (#9, #13) and bot security (#10, #11). Answer #18 before touching projections. Docs (#16, #17) trail the code fixes.
 
