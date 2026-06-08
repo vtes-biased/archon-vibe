@@ -268,8 +268,11 @@ export async function getUser(uid: string): Promise<User | undefined> {
 
 export async function getAllUsers(): Promise<User[]> {
   const db = await getDB();
-  // Use the name index to get pre-sorted results
-  return db.getAllFromIndex('users', 'by-name');
+  // Use the name index to get pre-sorted results. Exclude soft-deleted users
+  // (e.g. merge_users dups) from listings — getUser still resolves them so
+  // tournament player references keep rendering (pst #77).
+  const users = await db.getAllFromIndex('users', 'by-name');
+  return users.filter(u => !u.deleted_at);
 }
 
 export async function hasAnyUsers(): Promise<boolean> {
@@ -300,7 +303,8 @@ export async function getUsersByCountry(country: string): Promise<User[]> {
   const db = await getDB();
   // Use compound index to get sorted by name
   const range = IDBKeyRange.bound([country, ''], [country, '\uffff']);
-  return db.getAllFromIndex('users', 'by-country-name', range);
+  const users = await db.getAllFromIndex('users', 'by-country-name', range);
+  return users.filter(u => !u.deleted_at);
 }
 
 /**
@@ -342,16 +346,19 @@ export async function getFilteredUsers(
     return users.filter(u => u.roles && expandedRoles.some(role => u.roles!.includes(role)));
   };
 
+  // Soft-deleted users (e.g. merge_users dups) never appear in listings (pst #77).
+  const notDeleted = (users: User[]): User[] => users.filter(u => !u.deleted_at);
+
   // Case 1: No country filter - get all sorted by name, then filter in JS
   if (!country) {
     const allUsers = await db.getAllFromIndex('users', 'by-name');
-    return applyNameFilter(applyRolesFilter(allUsers));
+    return applyNameFilter(applyRolesFilter(notDeleted(allUsers)));
   }
 
   // Case 2: Country filter - use compound index, then filter in JS
   const range = IDBKeyRange.bound([country, ''], [country, '\uffff']);
   const usersInCountry = await db.getAllFromIndex('users', 'by-country-name', range);
-  return applyNameFilter(applyRolesFilter(usersInCountry));
+  return applyNameFilter(applyRolesFilter(notDeleted(usersInCountry)));
 }
 
 export async function clearAllUsers(): Promise<void> {

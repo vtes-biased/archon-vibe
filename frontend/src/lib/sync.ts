@@ -68,11 +68,18 @@ interface ObjectSpec<T> {
   singleType: string;    // "user", "sanction", "tournament", "deck", "league"
   save: (item: T) => Promise<void>;
   saveBatch: (items: T[]) => Promise<void>;
-  del: (uid: string) => Promise<void>;
+  // `item` carries the full (soft-deleted) payload when available. Most types
+  // hard-delete by uid; users instead persist the deleted_at-marked row (see
+  // the users spec) so getUser still resolves it for tournament player refs.
+  del: (uid: string, item?: T) => Promise<void>;
 }
 
 const SPECS: ObjectSpec<any>[] = [
-  { batchType: 'users', singleType: 'user', save: saveUser, saveBatch: saveUsersBatch, del: async () => { /* users not deleted via SSE currently */ } },
+  // Users are never hard-deleted from the cache: a soft-deleted user (e.g. a
+  // merge_users dup) may still be referenced by tournament players, so we keep
+  // the row (saving its deleted_at) for getUser to resolve, and filter it out of
+  // the list/search queries instead (pst #77). Without the payload we no-op.
+  { batchType: 'users', singleType: 'user', save: saveUser, saveBatch: saveUsersBatch, del: async (_uid, item) => { if (item) await saveUser(item); } },
   { batchType: 'sanctions', singleType: 'sanction', save: saveSanction, saveBatch: saveSanctionsBatch, del: deleteSanction },
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
   { batchType: 'decks', singleType: 'deck', save: saveDeck, saveBatch: saveDecksBatch, del: deleteDeck },
@@ -251,7 +258,7 @@ class SyncManager {
               return;
             }
             if (item.deleted_at) {
-              await spec.del(item.uid);
+              await spec.del(item.uid, item);
             } else {
               await spec.save(item);
             }
@@ -293,17 +300,17 @@ class SyncManager {
         try {
           // Separate deleted items; skip offline tournaments from batch sync
           const toSave: any[] = [];
-          const toDelete: string[] = [];
+          const toDelete: any[] = [];
           for (const item of buf) {
             if (spec.batchType === 'tournaments' && isOffline(item.uid)) continue;
             if (item.deleted_at) {
-              toDelete.push(item.uid);
+              toDelete.push(item);
             } else {
               toSave.push(item);
             }
           }
           if (toSave.length > 0) await spec.saveBatch(toSave);
-          for (const uid of toDelete) await spec.del(uid);
+          for (const item of toDelete) await spec.del(item.uid, item);
         } catch (e) {
           console.error(`Flush ${spec.batchType} failed:`, e);
         }
