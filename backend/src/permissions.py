@@ -10,7 +10,7 @@ import json
 
 from archon_engine import PyEngine
 
-from .models import League, Tournament, User
+from .models import League, Sanction, SanctionLevel, Tournament, User
 from .utils import user_to_context
 
 _engine = PyEngine()
@@ -59,4 +59,38 @@ def can_edit_league(user: User, league: League) -> bool:
         _engine.can_edit_league(
             json.dumps(user_to_context(user)), user.uid, _resource(league)
         )
+    )
+
+
+def can_issue_sanction(
+    issuer: User, level: SanctionLevel, tournament: Tournament | None
+) -> bool:
+    """Suspension/probation: IC or Ethics. Else: IC, Ethics, or tournament organizer."""
+    organizers = json.dumps(
+        {"organizers_uids": tournament.organizers_uids if tournament else []}
+    )
+    return _allowed(
+        _engine.can_issue_sanction(
+            json.dumps(user_to_context(issuer)), issuer.uid, str(level), organizers
+        )
+    )
+
+
+def can_lift_sanction(
+    user: User,
+    sanction: Sanction,
+    tournament: Tournament | None,
+    league: League | None,
+) -> bool:
+    """IC/Ethics for suspension/probation; else IC/Rulemonger, NC of the
+    tournament's country, or a league organizer (for a DQ)."""
+    ctx = json.dumps(
+        {
+            "level": str(sanction.level),
+            "tournament_country": tournament.country if tournament else None,
+            "league_organizers_uids": league.organizers_uids if league else [],
+        }
+    )
+    return _allowed(
+        _engine.can_lift_sanction(json.dumps(user_to_context(user)), user.uid, ctx)
     )

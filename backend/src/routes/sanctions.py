@@ -4,11 +4,11 @@ import logging
 from datetime import UTC, date, datetime, timedelta
 
 import msgspec
-from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from uuid6 import uuid7
 
+from .. import permissions
 from ..broadcast import broadcast_precomputed
 from ..db import (
     get_league_by_uid,
@@ -33,9 +33,6 @@ router = APIRouter(prefix="/sanctions", tags=["sanctions"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
-# Rust engine for permission checks
-_engine = PyEngine()
-
 # Maximum expiry for probation/suspension (18 months)
 MAX_EXPIRY_MONTHS = 18
 
@@ -43,62 +40,28 @@ MAX_EXPIRY_MONTHS = 18
 async def _can_issue_sanction(
     issuer, level: SanctionLevel, tournament_uid: str | None
 ) -> bool:
-    """Check if issuer can create a sanction of this level.
-
-    Rules:
-    - SUSPENSION/PROBATION: IC or Ethics only
-    - CAUTION/WARNING/SA/DQ: IC, Ethics, or tournament organizer (requires tournament_uid)
-    """
-    is_ic_or_ethics = Role.IC in issuer.roles or Role.ETHICS in issuer.roles
-
-    if level in (SanctionLevel.SUSPENSION, SanctionLevel.PROBATION):
-        return is_ic_or_ethics
-
-    if is_ic_or_ethics:
-        return True
-
-    # Tournament organizers can issue in-tournament sanctions
-    if tournament_uid:
-        tournament = await get_tournament_by_uid(tournament_uid)
-        if tournament and issuer.uid in tournament.organizers_uids:
-            return True
-
-    return False
+    """Fetch the tournament (for the organizer check) and delegate the decision
+    to the engine — see permissions.can_issue_sanction."""
+    tournament = await get_tournament_by_uid(tournament_uid) if tournament_uid else None
+    return permissions.can_issue_sanction(issuer, level, tournament)
 
 
 async def _can_lift_sanction(user, sanction: Sanction) -> bool:
-    """Check if user can lift a sanction.
-
-    Rules:
-    - SUSPENSION/PROBATION: IC or Ethics
-    - CAUTION/WARNING/SA/DQ: IC, Rulemonger, NC (same country as tournament), or
-      league organizer (for DQ in a league tournament)
-    """
-    if sanction.level in (SanctionLevel.SUSPENSION, SanctionLevel.PROBATION):
-        return Role.IC in user.roles or Role.ETHICS in user.roles
-
-    # Tournament-level sanctions: IC, Rulemonger always
-    if Role.IC in user.roles or Role.RULEMONGER in user.roles:
-        return True
-
-    # Fetch tournament once for both NC and league organizer checks
-    tournament = None
-    if sanction.tournament_uid:
-        tournament = await get_tournament_by_uid(sanction.tournament_uid)
-
-    # NC can lift if same country as the tournament
-    if Role.NC in user.roles and tournament:
-        if tournament.country and user.country == tournament.country:
-            return True
-
-    # League organizer can lift DQ from their league tournaments
-    if sanction.level == SanctionLevel.DISQUALIFICATION and tournament:
-        if tournament.league_uid:
-            league = await get_league_by_uid(tournament.league_uid)
-            if league and user.uid in (league.organizers_uids or []):
-                return True
-
-    return False
+    """Fetch the tournament/league context and delegate the decision to the
+    engine — see permissions.can_lift_sanction."""
+    tournament = (
+        await get_tournament_by_uid(sanction.tournament_uid)
+        if sanction.tournament_uid
+        else None
+    )
+    league = None
+    if (
+        sanction.level == SanctionLevel.DISQUALIFICATION
+        and tournament
+        and tournament.league_uid
+    ):
+        league = await get_league_by_uid(tournament.league_uid)
+    return permissions.can_lift_sanction(user, sanction, tournament, league)
 
 
 def _validate_expiry(

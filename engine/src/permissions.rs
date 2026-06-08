@@ -305,6 +305,88 @@ pub fn can_edit_league(
     }
 }
 
+/// Context for a sanction-lift decision: the sanction level plus the relevant
+/// fields of the (caller-fetched) tournament and league.
+#[derive(Debug, Clone, Default)]
+pub struct SanctionContext {
+    pub level: String,
+    pub tournament_country: Option<String>,
+    pub league_organizers_uids: Vec<String>,
+}
+
+impl SanctionContext {
+    pub fn from_json(value: &JsonValue) -> Self {
+        SanctionContext {
+            level: value["level"].as_str().unwrap_or("").to_string(),
+            tournament_country: value["tournament_country"].as_str().map(|s| s.to_string()),
+            league_organizers_uids: value["league_organizers_uids"]
+                .members()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect(),
+        }
+    }
+}
+
+/// Check if actor can issue a sanction of `level`.
+///
+/// - SUSPENSION/PROBATION: IC or Ethics only.
+/// - Otherwise (CAUTION/WARNING/SA/DQ): IC, Ethics, or an organizer of the
+///   tournament the sanction is attached to.
+pub fn can_issue_sanction(
+    issuer: &UserContext,
+    issuer_uid: &str,
+    level: &str,
+    tournament: &OwnedResource,
+) -> PermissionResult {
+    let is_ic_or_ethics = issuer.has_role(Role::IC) || issuer.has_role(Role::Ethics);
+    if level == "suspension" || level == "probation" {
+        return if is_ic_or_ethics {
+            PermissionResult::allow()
+        } else {
+            PermissionResult::deny("Only IC or Ethics can issue suspensions or probations")
+        };
+    }
+    if is_ic_or_ethics || tournament.organizers_uids.iter().any(|u| u == issuer_uid) {
+        return PermissionResult::allow();
+    }
+    PermissionResult::deny("Only IC, Ethics, or a tournament organizer can issue this sanction")
+}
+
+/// Check if actor can lift a sanction.
+///
+/// - SUSPENSION/PROBATION: IC or Ethics.
+/// - Otherwise: IC or Rulemonger (any); NC of the tournament's country; or a
+///   league organizer (for a DQ in a league tournament).
+pub fn can_lift_sanction(
+    user: &UserContext,
+    user_uid: &str,
+    ctx: &SanctionContext,
+) -> PermissionResult {
+    if ctx.level == "suspension" || ctx.level == "probation" {
+        return if user.has_role(Role::IC) || user.has_role(Role::Ethics) {
+            PermissionResult::allow()
+        } else {
+            PermissionResult::deny("Only IC or Ethics can lift suspensions or probations")
+        };
+    }
+    if user.has_role(Role::IC) || user.has_role(Role::Rulemonger) {
+        return PermissionResult::allow();
+    }
+    // NC of the same country as the tournament
+    if user.has_role(Role::NC)
+        && user.country.is_some()
+        && ctx.tournament_country.is_some()
+        && user.country.as_deref() == ctx.tournament_country.as_deref()
+    {
+        return PermissionResult::allow();
+    }
+    // League organizer can lift a DQ in their league tournament
+    if ctx.level == "disqualification" && ctx.league_organizers_uids.iter().any(|u| u == user_uid) {
+        return PermissionResult::allow();
+    }
+    PermissionResult::deny("You don't have permission to lift this sanction")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -547,5 +629,100 @@ mod tests {
         // Prince is not a league editor by role
         assert!(!can_edit_league(&ctx(vec![Role::Prince], Some("FR")), "x", &league).allowed);
         assert!(!can_edit_league(&ctx(vec![], Some("FR")), "nobody", &league).allowed);
+    }
+
+    #[test]
+    fn test_can_issue_sanction() {
+        let no_t = OwnedResource::default();
+        let t = OwnedResource {
+            country: None,
+            organizers_uids: vec!["org-1".to_string()],
+        };
+        // Suspension/probation: IC or Ethics only
+        assert!(can_issue_sanction(&ctx(vec![Role::IC], None), "x", "suspension", &no_t).allowed);
+        assert!(
+            can_issue_sanction(&ctx(vec![Role::Ethics], None), "x", "probation", &no_t).allowed
+        );
+        assert!(!can_issue_sanction(&ctx(vec![Role::NC], None), "x", "suspension", &no_t).allowed);
+        // Organizer cannot issue a suspension
+        assert!(!can_issue_sanction(&ctx(vec![], None), "org-1", "suspension", &t).allowed);
+        // Tournament-level: IC/Ethics or an organizer
+        assert!(can_issue_sanction(&ctx(vec![Role::IC], None), "x", "caution", &no_t).allowed);
+        assert!(can_issue_sanction(&ctx(vec![], None), "org-1", "warning", &t).allowed);
+        // Non-organizer, no privileged role
+        assert!(!can_issue_sanction(&ctx(vec![], None), "nobody", "caution", &t).allowed);
+    }
+
+    #[test]
+    fn test_can_lift_sanction() {
+        let lift = |roles, country, uid: &str, level: &str, t_country, league_orgs: Vec<&str>| {
+            can_lift_sanction(
+                &ctx(roles, country),
+                uid,
+                &SanctionContext {
+                    level: level.to_string(),
+                    tournament_country: t_country,
+                    league_organizers_uids: league_orgs.iter().map(|s| s.to_string()).collect(),
+                },
+            )
+            .allowed
+        };
+        // Suspension/probation: IC or Ethics
+        assert!(lift(vec![Role::IC], None, "x", "suspension", None, vec![]));
+        assert!(lift(
+            vec![Role::Ethics],
+            None,
+            "x",
+            "probation",
+            None,
+            vec![]
+        ));
+        assert!(!lift(
+            vec![Role::Rulemonger],
+            None,
+            "x",
+            "suspension",
+            None,
+            vec![]
+        ));
+        // Tournament-level: IC or Rulemonger always
+        assert!(lift(
+            vec![Role::Rulemonger],
+            None,
+            "x",
+            "caution",
+            None,
+            vec![]
+        ));
+        // NC of the tournament's country
+        assert!(lift(
+            vec![Role::NC],
+            Some("FR"),
+            "x",
+            "warning",
+            Some("FR".to_string()),
+            vec![]
+        ));
+        assert!(!lift(
+            vec![Role::NC],
+            Some("US"),
+            "x",
+            "warning",
+            Some("FR".to_string()),
+            vec![]
+        ));
+        // League organizer can lift a DQ
+        assert!(lift(
+            vec![],
+            None,
+            "org-1",
+            "disqualification",
+            None,
+            vec!["org-1"]
+        ));
+        // ...but not a non-DQ sanction
+        assert!(!lift(vec![], None, "org-1", "warning", None, vec!["org-1"]));
+        // Nobody
+        assert!(!lift(vec![], None, "nobody", "caution", None, vec![]));
     }
 }

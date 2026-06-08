@@ -11,9 +11,9 @@ pub mod tournament;
 
 // Re-export permissions module items
 pub use permissions::{
-    can_change_role, can_edit_league, can_edit_user, can_manage_country, can_manage_leagues,
-    can_manage_tournaments, can_manage_vekn, is_organizer, OwnedResource, PermissionResult, Role,
-    UserContext,
+    can_change_role, can_edit_league, can_edit_user, can_issue_sanction, can_lift_sanction,
+    can_manage_country, can_manage_leagues, can_manage_tournaments, can_manage_vekn, is_organizer,
+    OwnedResource, PermissionResult, Role, SanctionContext, UserContext,
 };
 
 // ============================================================================
@@ -102,6 +102,30 @@ mod shared {
         let league =
             OwnedResource::from_json(&json::parse(league_json).map_err(|e| e.to_string())?);
         Ok(can_edit_league(&actor, actor_uid, &league).to_json().dump())
+    }
+
+    pub fn can_issue_sanction_json(
+        actor_json: &str,
+        actor_uid: &str,
+        level: &str,
+        tournament_json: &str,
+    ) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let tournament =
+            OwnedResource::from_json(&json::parse(tournament_json).map_err(|e| e.to_string())?);
+        Ok(can_issue_sanction(&actor, actor_uid, level, &tournament)
+            .to_json()
+            .dump())
+    }
+
+    pub fn can_lift_sanction_json(
+        actor_json: &str,
+        actor_uid: &str,
+        ctx_json: &str,
+    ) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let ctx = SanctionContext::from_json(&json::parse(ctx_json).map_err(|e| e.to_string())?);
+        Ok(can_lift_sanction(&actor, actor_uid, &ctx).to_json().dump())
     }
 
     pub fn compute_seating_json(config_json: &str) -> Result<String, String> {
@@ -381,6 +405,27 @@ mod wasm {
             can_edit_league_json(actor_json, actor_uid, league_json)
         }
 
+        #[wasm_bindgen(js_name = canIssueSanction)]
+        pub fn can_issue_sanction(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            level: &str,
+            tournament_json: &str,
+        ) -> Result<String, String> {
+            can_issue_sanction_json(actor_json, actor_uid, level, tournament_json)
+        }
+
+        #[wasm_bindgen(js_name = canLiftSanction)]
+        pub fn can_lift_sanction(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            ctx_json: &str,
+        ) -> Result<String, String> {
+            can_lift_sanction_json(actor_json, actor_uid, ctx_json)
+        }
+
         #[wasm_bindgen(js_name = computeSeating)]
         pub fn compute_seating(&self, config_json: &str) -> Result<String, String> {
             compute_seating_json(config_json)
@@ -550,6 +595,30 @@ mod python {
             league_json: &str,
         ) -> PyResult<String> {
             py_str(can_edit_league_json(actor_json, actor_uid, league_json))
+        }
+
+        fn can_issue_sanction(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            level: &str,
+            tournament_json: &str,
+        ) -> PyResult<String> {
+            py_str(can_issue_sanction_json(
+                actor_json,
+                actor_uid,
+                level,
+                tournament_json,
+            ))
+        }
+
+        fn can_lift_sanction(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            ctx_json: &str,
+        ) -> PyResult<String> {
+            py_str(can_lift_sanction_json(actor_json, actor_uid, ctx_json))
         }
 
         fn compute_seating(&self, config_json: &str) -> PyResult<String> {
