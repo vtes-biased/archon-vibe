@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Tournament, TimeExtensionPolicy } from "$lib/types";
-  import { timerStart, timerPause, timerReset, timerAddTime, timerClockStop, timerClockResume } from "$lib/api";
-  import { Play, Pause, RotateCcw, Clock, PauseCircle, PlayCircle } from "lucide-svelte";
+  import type { Tournament } from "$lib/types";
+  import { timerStart, timerPause, timerReset, timerAddTime } from "$lib/api";
+  import { Play, Pause, RotateCcw, Clock } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -49,12 +49,7 @@
     if (tableIndex == null) return baseRemaining;
     const key = String(tableIndex);
     const extra = tournament.table_extra_time?.[key] ?? 0;
-    const pausedAt = tournament.table_paused_at?.[key];
-    let clockStopBonus = 0;
-    if (pausedAt) {
-      clockStopBonus = (now - new Date(pausedAt).getTime()) / 1000;
-    }
-    return Math.max(0, roundTime - baseElapsed + extra + clockStopBonus);
+    return Math.max(0, roundTime - baseElapsed + extra);
   });
 
   const displaySeconds = $derived(tableIndex != null ? tableRemaining : baseRemaining);
@@ -68,11 +63,7 @@
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  const policy = $derived(tournament.time_extension_policy ?? "additions");
-  const showAdditions = $derived(policy === "additions" || policy === "both");
-  const showClockStop = $derived(policy === "clock_stop" || policy === "both");
   const tableKey = $derived(tableIndex != null ? String(tableIndex) : "");
-  const tableIsPaused = $derived(tableKey ? !!tournament.table_paused_at?.[tableKey] : false);
   const tableExtraTime = $derived(tableKey ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0);
   const isPaused = $derived(tournament.timer?.paused ?? true);
 
@@ -92,14 +83,6 @@
     loading = true;
     try { await timerAddTime(tournament.uid, tableKey, secs); } catch {} finally { loading = false; }
   }
-  async function doClockStop() {
-    loading = true;
-    try { await timerClockStop(tournament.uid, tableKey); } catch {} finally { loading = false; }
-  }
-  async function doClockResume() {
-    loading = true;
-    try { await timerClockResume(tournament.uid, tableKey); } catch {} finally { loading = false; }
-  }
 </script>
 
 {#if timerActive}
@@ -109,7 +92,7 @@
       <Clock class="w-4 h-4 {expired ? 'text-crimson-400' : warning ? 'text-amber-400' : 'text-emerald-400'}" />
       <span class="font-mono text-2xl font-bold tabular-nums {expired ? 'text-crimson-400 animate-pulse' : warning ? 'text-amber-400' : 'text-emerald-400'}">
         {#if expired}
-          -{formatTime(baseElapsed - roundTime - (tableIndex != null ? (tournament.table_extra_time?.[tableKey] ?? 0) + (tableIsPaused ? (now - new Date(tournament.table_paused_at![tableKey]!).getTime()) / 1000 : 0) : 0))}
+          -{formatTime(baseElapsed - roundTime - (tableIndex != null ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0))}
         {:else}
           {formatTime(displaySeconds)}
         {/if}
@@ -120,14 +103,9 @@
     </div>
 
     <!-- Table extensions info -->
-    {#if tableIndex != null && (tableExtraTime > 0 || tableIsPaused)}
+    {#if tableIndex != null && tableExtraTime > 0}
       <div class="text-xs text-ash-400 flex items-center gap-2">
-        {#if tableExtraTime > 0}
-          <span>+{Math.floor(tableExtraTime / 60)}:{(tableExtraTime % 60).toString().padStart(2, '0')} {m.timer_extra_time()}</span>
-        {/if}
-        {#if tableIsPaused}
-          <span class="badge-amber px-1.5 py-0.5 rounded">{m.timer_clock_stopped()}</span>
-        {/if}
+        <span>+{Math.floor(tableExtraTime / 60)}:{(tableExtraTime % 60).toString().padStart(2, '0')} {m.timer_extra_time()}</span>
       </div>
     {/if}
 
@@ -152,27 +130,12 @@
     <!-- Organizer per-table controls -->
     {#if isOrganizer && tableIndex != null}
       <div class="flex items-center gap-1 flex-wrap">
-        {#if showAdditions}
-          {#each [60, 120, 180, 300] as secs}
-            <button onclick={() => doAddTime(secs)} disabled={loading || tableExtraTime + secs > 600}
-              class="px-2 py-1 text-xs text-ash-300 hover:text-bone-100 border border-ash-700 hover:border-ash-600 rounded transition-colors">
-              +{secs / 60}min
-            </button>
-          {/each}
-        {/if}
-        {#if showClockStop}
-          {#if tableIsPaused}
-            <button onclick={doClockResume} disabled={loading}
-              class="px-2 py-1 text-xs btn-emerald rounded flex items-center gap-1">
-              <PlayCircle class="w-3 h-3" /> {m.timer_clock_resume()}
-            </button>
-          {:else}
-            <button onclick={doClockStop} disabled={loading}
-              class="px-2 py-1 text-xs btn-amber rounded flex items-center gap-1">
-              <PauseCircle class="w-3 h-3" /> {m.timer_clock_stop()}
-            </button>
-          {/if}
-        {/if}
+        {#each [60, 120, 180, 300] as secs}
+          <button onclick={() => doAddTime(secs)} disabled={loading || tableExtraTime + secs > 600}
+            class="px-2 py-1 text-xs text-ash-300 hover:text-bone-100 border border-ash-700 hover:border-ash-600 rounded transition-colors">
+            +{secs / 60}min
+          </button>
+        {/each}
       </div>
     {/if}
   </div>

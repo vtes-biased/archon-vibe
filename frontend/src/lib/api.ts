@@ -407,7 +407,6 @@ export interface CreateTournamentData {
   league_uid?: string | null;
   round_time?: number;
   finals_time?: number;
-  time_extension_policy?: string;
 }
 
 export async function createTournament(data: CreateTournamentData): Promise<Tournament> {
@@ -805,20 +804,6 @@ export async function timerAddTime(uid: string, table: string, seconds: number):
   await apiRequest(`/api/tournaments/${uid}/timer/add-time`, {
     method: 'POST',
     body: JSON.stringify({ table, seconds }),
-  });
-}
-
-export async function timerClockStop(uid: string, table: string): Promise<void> {
-  await apiRequest(`/api/tournaments/${uid}/timer/clock-stop`, {
-    method: 'POST',
-    body: JSON.stringify({ table }),
-  });
-}
-
-export async function timerClockResume(uid: string, table: string): Promise<void> {
-  await apiRequest(`/api/tournaments/${uid}/timer/clock-resume`, {
-    method: 'POST',
-    body: JSON.stringify({ table }),
   });
 }
 

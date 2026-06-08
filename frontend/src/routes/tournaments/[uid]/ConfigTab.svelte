@@ -48,7 +48,6 @@
     league_uid: tournament.league_uid ?? "",
     round_time: tournament.round_time ?? 0,
     finals_time: tournament.finals_time ?? 0,
-    time_extension_policy: tournament.time_extension_policy ?? "additions",
   });
 
   // Sync from tournament when it changes externally (but not while user is editing)
@@ -80,7 +79,6 @@
         league_uid: t.league_uid ?? "",
         round_time: t.round_time ?? 0,
         finals_time: t.finals_time ?? 0,
-        time_extension_policy: t.time_extension_policy ?? "additions",
       };
     }
   });

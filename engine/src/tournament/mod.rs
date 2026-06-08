@@ -71,13 +71,6 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), String> {
             }
         }
     }
-    if let Some(p) = config["time_extension_policy"].as_str() {
-        validate_enum(
-            p,
-            &["additions", "clock_stop", "both"],
-            "time_extension_policy",
-        )?;
-    }
     Ok(())
 }
 
@@ -129,7 +122,6 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         "league_uid" => config["league_uid"].clone(),
         "round_time" => config["round_time"].as_u32().unwrap_or(0),
         "finals_time" => config["finals_time"].as_u32().unwrap_or(0),
-        "time_extension_policy" => config["time_extension_policy"].as_str().unwrap_or("additions"),
         "players" => json::array![],
         "rounds" => json::array![],
         "finals" => json::JsonValue::Null,
@@ -1933,7 +1925,6 @@ fn apply_event(
                 "league_uid",
                 "round_time",
                 "finals_time",
-                "time_extension_policy",
             ];
             for field in config_fields {
                 if config.has_key(field) {

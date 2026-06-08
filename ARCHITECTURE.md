@@ -442,26 +442,19 @@ class TimerState(msgspec.Struct):
     started_at: datetime | None = None        # UTC, when timer was started/resumed
     elapsed_before_pause: float = 0.0         # seconds accumulated before last pause
     paused: bool = True
-
-class TimeExtensionPolicy(StrEnum):
-    ADDITIONS  = "additions"   # +N min per table
-    CLOCK_STOP = "clock_stop"  # per-table clock pause/resume
-    BOTH       = "both"        # both mechanisms available
 ```
 
 **Tournament fields** (timer state):
 - `timer: TimerState` — global round timer
 - `table_extra_time: dict[str, int]` — table_idx → extra seconds
-- `table_paused_at: dict[str, str]` — table_idx → ISO datetime of clock-stop
 
 **TournamentConfig fields**:
 - `round_time: int` — round duration in seconds (0 = no timer)
 - `finals_time: int` — finals override (0 = use round_time)
-- `time_extension_policy: TimeExtensionPolicy`
 
 ### Sync Pattern
 
-Server updates `tournament.timer` / `table_extra_time` / `table_paused_at` and broadcasts the full Tournament CRUD event via SSE. Clients receive the state update and recompute the countdown from `started_at` + `elapsed_before_pause` using a local `setInterval(1000)`. No streaming of individual tick values.
+Server updates `tournament.timer` / `table_extra_time` and broadcasts the full Tournament CRUD event via SSE. Clients receive the state update and recompute the countdown from `started_at` + `elapsed_before_pause` using a local `setInterval(1000)`. No streaming of individual tick values.
 
 ### Endpoints (organizer-only, online-only, tournament must be in Playing state)
 
@@ -470,9 +463,7 @@ Server updates `tournament.timer` / `table_extra_time` / `table_paused_at` and b
 | POST | `/{uid}/timer/start` | Resume/start global timer |
 | POST | `/{uid}/timer/pause` | Pause global timer |
 | POST | `/{uid}/timer/reset` | Reset timer + clear all table extensions |
-| POST | `/{uid}/timer/add-time` | Add extra seconds to one table (max 600s total, policy must allow) |
-| POST | `/{uid}/timer/clock-stop` | Pause a table's clock (clock-stop) |
-| POST | `/{uid}/timer/clock-resume` | Resume table clock (converts pause duration → extra_time) |
+| POST | `/{uid}/timer/add-time` | Add extra seconds to one table (max 600s total) |
 
 All timer endpoints save-and-broadcast the updated tournament object.
 

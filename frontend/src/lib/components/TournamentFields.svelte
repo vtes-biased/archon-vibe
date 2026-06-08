@@ -31,7 +31,6 @@
     league_uid: string;
     round_time: number;
     finals_time: number;
-    time_extension_policy: string;
   }
 
   let {
@@ -465,21 +464,6 @@
         <option value="10800">3h</option>
       </select>
     </div>
-  </div>
-  <div class="mt-3">
-    <label class="block text-sm text-ash-400 mb-1" for={id("extension-policy")}>{m.timer_extension_policy()}</label>
-    <select
-      id={id("extension-policy")}
-      value={values.time_extension_policy ?? "additions"}
-      {disabled}
-      onchange={(e) => handleInput("time_extension_policy", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
-    >
-      <option value="additions">{m.timer_policy_additions()}</option>
-      <option value="clock_stop">{m.timer_policy_clock_stop()}</option>
-      <option value="both">{m.timer_policy_both()}</option>
-    </select>
-    <p class="text-xs text-ash-500 mt-1">{m.timer_extension_policy_desc()}</p>
   </div>
 </div>
 

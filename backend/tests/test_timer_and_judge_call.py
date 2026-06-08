@@ -82,16 +82,14 @@ class TestTimerLifecycleHooks:
 
     def test_start_round_creates_fresh_timer(self):
         """Simulating the effect of the StartRound hook."""
-        # The hook code (resets timer/extra/paused from previous round):
+        # The hook code (resets timer/extra from previous round):
         new_timer = TimerState()
         new_extra: dict = {}
-        new_paused: dict = {}
 
         assert new_timer.paused is True
         assert new_timer.started_at is None
         assert new_timer.elapsed_before_pause == 0.0
         assert new_extra == {}
-        assert new_paused == {}
 
     def test_finish_round_pauses_running_timer(self):
         """Simulating the effect of FinishRound when timer is running."""

@@ -35,7 +35,6 @@
     league_uid: "",
     round_time: 7200,
     finals_time: 0,
-    time_extension_policy: "additions",
   });
 
   let isSubmitting = $state(false);
@@ -86,7 +85,6 @@
         league_uid: values.league_uid || null,
         round_time: values.round_time,
         finals_time: values.finals_time,
-        time_extension_policy: values.time_extension_policy,
       });
       await saveTournament(tournament);
       goto(`/tournaments/${tournament.uid}`);

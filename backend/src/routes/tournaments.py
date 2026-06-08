@@ -46,7 +46,6 @@ from ..models import (
     Sanction,
     SanctionLevel,
     StandingsMode,
-    TimeExtensionPolicy,
     TimerState,
     Tournament,
     TournamentFormat,
@@ -404,7 +403,6 @@ class CreateTournamentRequest(BaseModel):
     league_uid: str | None = None
     round_time: int = 0
     finals_time: int = 0
-    time_extension_policy: str = "additions"
 
 
 def _parse_datetime(s: str | None) -> datetime | None:
@@ -460,13 +458,6 @@ async def create_tournament(
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid decklists_mode") from e
 
-    try:
-        extension_policy = TimeExtensionPolicy(request.time_extension_policy)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail="Invalid time_extension_policy"
-        ) from e
-
     # Validate league_uid: only league organizers (or IC) can link
     if request.league_uid:
         league = await get_league_by_uid(request.league_uid)
@@ -510,7 +501,6 @@ async def create_tournament(
         organizers_uids=[current_user.uid],
         round_time=request.round_time,
         finals_time=request.finals_time,
-        time_extension_policy=extension_policy,
     )
 
     bd = await save_tournament(tournament)
@@ -927,7 +917,6 @@ async def tournament_action(
             if in_progress <= 1:
                 updated.timer = TimerState()  # Fresh paused timer
                 updated.table_extra_time = {}
-                updated.table_paused_at = {}
         elif request.type in ("FinishRound", "CancelRound", "FinishTournament"):
             # Only reset timer if tournament left Playing state (all rounds done)
             if updated.state != "Playing":
@@ -942,7 +931,6 @@ async def tournament_action(
                         paused=True,
                     )
                 updated.table_extra_time = {}
-                updated.table_paused_at = {}
 
         # Save within the same transaction (row is still locked)
         tournament_bd = await save_object(
@@ -1257,7 +1245,6 @@ async def timer_reset(
         assert tournament is not None
         tournament.timer = TimerState()
         tournament.table_extra_time = {}
-        tournament.table_paused_at = {}
         bd = await _save_timer_tx(tournament, tx_conn)
     broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
@@ -1280,13 +1267,6 @@ async def timer_add_time(
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
-        if tournament.time_extension_policy not in (
-            TimeExtensionPolicy.ADDITIONS,
-            TimeExtensionPolicy.BOTH,
-        ):
-            raise HTTPException(
-                status_code=400, detail="Time additions not allowed by policy"
-            )
         if request.seconds <= 0:
             raise HTTPException(status_code=400, detail="Seconds must be positive")
         current = tournament.table_extra_time.get(request.table, 0)
@@ -1295,71 +1275,6 @@ async def timer_add_time(
                 status_code=400, detail="Max 600s (10 min) extra time per table"
             )
         tournament.table_extra_time[request.table] = current + request.seconds
-        bd = await _save_timer_tx(tournament, tx_conn)
-    broadcast_precomputed(bd)
-    return Response(content=encoder.encode(tournament), media_type="application/json")
-
-
-class ClockStopRequest(BaseModel):
-    table: str
-
-
-@router.post("/{uid}/timer/clock-stop")
-async def timer_clock_stop(
-    uid: str,
-    request: ClockStopRequest,
-    user: OptionalUser = None,
-) -> Response:
-    """Pause a table's clock (clock-stop)."""
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    async with tournament_transaction(uid) as (tournament, tx_conn):
-        _validate_timer_tournament(user, tournament)
-        assert tournament is not None
-        if tournament.time_extension_policy not in (
-            TimeExtensionPolicy.CLOCK_STOP,
-            TimeExtensionPolicy.BOTH,
-        ):
-            raise HTTPException(
-                status_code=400, detail="Clock stops not allowed by policy"
-            )
-        if request.table in tournament.table_paused_at:
-            raise HTTPException(
-                status_code=400, detail="Table clock is already stopped"
-            )
-        tournament.table_paused_at[request.table] = datetime.now(UTC).isoformat()
-        bd = await _save_timer_tx(tournament, tx_conn)
-    broadcast_precomputed(bd)
-    return Response(content=encoder.encode(tournament), media_type="application/json")
-
-
-@router.post("/{uid}/timer/clock-resume")
-async def timer_clock_resume(
-    uid: str,
-    request: ClockStopRequest,
-    user: OptionalUser = None,
-) -> Response:
-    """Resume a table's clock (converts pause duration to extra_time)."""
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    async with tournament_transaction(uid) as (tournament, tx_conn):
-        _validate_timer_tournament(user, tournament)
-        assert tournament is not None
-        if tournament.time_extension_policy not in (
-            TimeExtensionPolicy.CLOCK_STOP,
-            TimeExtensionPolicy.BOTH,
-        ):
-            raise HTTPException(
-                status_code=400, detail="Clock stops not allowed by policy"
-            )
-        paused_at_str = tournament.table_paused_at.get(request.table)
-        if not paused_at_str:
-            raise HTTPException(status_code=400, detail="Table clock is not stopped")
-        paused_at = datetime.fromisoformat(paused_at_str)
-        pause_duration = int((datetime.now(UTC) - paused_at).total_seconds())
-        current_extra = tournament.table_extra_time.get(request.table, 0)
-        tournament.table_extra_time[request.table] = current_extra + pause_duration
-        del tournament.table_paused_at[request.table]
         bd = await _save_timer_tx(tournament, tx_conn)
     broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")

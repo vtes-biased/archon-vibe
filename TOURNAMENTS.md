@@ -335,7 +335,7 @@ Request body:
 | `POST` | `/{uid}/archon-import` | Import from legacy Archon Excel |
 | `GET` | `/{uid}/report` | Download tournament report (text/JSON) |
 | `GET` | `/{uid}/decks/{player_uid}/twda` | Export deck in TWDA format |
-| `POST` | `/{uid}/timer/*` | Timer controls (start/pause/reset/add-time/clock-stop/clock-resume) |
+| `POST` | `/{uid}/timer/*` | Timer controls (start/pause/reset/add-time) |
 | `POST` | `/{uid}/call-judge` | Player requests judge at table |
 | `POST` | `/{uid}/go-offline` | Lock tournament for offline mode |
 | `POST` | `/{uid}/go-online` | Submit offline changes and unlock |

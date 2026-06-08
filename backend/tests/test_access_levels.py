@@ -295,7 +295,6 @@ def _make_tournament(**overrides) -> dict:
         "table_rooms": [],
         "round_time": 7200,
         "finals_time": 0,
-        "time_extension_policy": "additions",
         "external_ids": {"vekn": "12345"},
         "checkin_code": "secret_checkin",
         "players": [],
@@ -311,7 +310,6 @@ def _make_tournament(**overrides) -> dict:
         "offline_since": None,
         "timer": {"started_at": None, "elapsed_before_pause": 0.0, "paused": True},
         "table_extra_time": {},
-        "table_paused_at": {},
     }
     base.update(overrides)
     return base

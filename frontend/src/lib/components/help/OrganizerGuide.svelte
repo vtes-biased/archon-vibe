@@ -63,7 +63,6 @@
     <dl class="space-y-1.5 text-sm">
       <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_round_time()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_round_time_desc()}</dd></div>
       <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_finals_time()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_finals_time_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_extension_policy()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_extension_policy_desc()}</dd></div>
     </dl>
   </div>
   <div class="rounded-lg border border-ash-700 bg-dusk-900/40 p-4 sm:col-span-2">

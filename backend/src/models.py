@@ -211,14 +211,6 @@ class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
     moderation: LinkModeration | None = None
 
 
-class TimeExtensionPolicy(StrEnum):
-    """Time extension method per VEKN Judges Guide v2 section 1.2.4."""
-
-    ADDITIONS = "additions"  # Manual +N min per table
-    CLOCK_STOP = "clock_stop"  # Pause/resume per table
-    BOTH = "both"  # Both mechanisms available
-
-
 class TimerState(msgspec.Struct, kw_only=True):
     """Global round timer state. Clients compute countdown locally."""
 
@@ -470,7 +462,6 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     # Timer config
     round_time: int = 0  # Round duration in seconds (0 = no timer)
     finals_time: int = 0  # Finals duration in seconds (0 = use round_time)
-    time_extension_policy: TimeExtensionPolicy = TimeExtensionPolicy.ADDITIONS
 
 
 class PlayerState(StrEnum):
@@ -604,9 +595,6 @@ class Tournament(TournamentConfig, kw_only=True):
     table_extra_time: dict[str, int] = msgspec.field(
         default_factory=dict
     )  # table_idx → extra seconds
-    table_paused_at: dict[str, str] = msgspec.field(
-        default_factory=dict
-    )  # table_idx → ISO datetime
 
 
 # OAuth 2.0 models
