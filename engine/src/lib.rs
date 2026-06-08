@@ -11,7 +11,9 @@ pub mod tournament;
 
 // Re-export permissions module items
 pub use permissions::{
-    can_change_role, can_edit_user, can_manage_vekn, PermissionResult, Role, UserContext,
+    can_change_role, can_edit_league, can_edit_user, can_manage_country, can_manage_leagues,
+    can_manage_tournaments, can_manage_vekn, is_organizer, OwnedResource, PermissionResult, Role,
+    UserContext,
 };
 
 // ============================================================================
@@ -50,6 +52,56 @@ mod shared {
         Ok(can_edit_user(&actor, actor_uid, target_uid, &target)
             .to_json()
             .dump())
+    }
+
+    pub fn can_manage_country_json(
+        actor_json: &str,
+        target_country: &str,
+    ) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let country = if target_country.is_empty() {
+            None
+        } else {
+            Some(target_country)
+        };
+        Ok(can_manage_country(&actor, country).to_json().dump())
+    }
+
+    pub fn can_manage_tournaments_json(actor_json: &str) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        Ok(can_manage_tournaments(&actor).to_json().dump())
+    }
+
+    pub fn can_manage_leagues_json(actor_json: &str) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        Ok(can_manage_leagues(&actor).to_json().dump())
+    }
+
+    pub fn is_organizer_json(
+        actor_json: &str,
+        actor_uid: &str,
+        tournament_json: &str,
+    ) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let tournament =
+            OwnedResource::from_json(&json::parse(tournament_json).map_err(|e| e.to_string())?);
+        let result = if is_organizer(&actor, actor_uid, &tournament) {
+            PermissionResult::allow()
+        } else {
+            PermissionResult::deny("You are not an organizer of this tournament")
+        };
+        Ok(result.to_json().dump())
+    }
+
+    pub fn can_edit_league_json(
+        actor_json: &str,
+        actor_uid: &str,
+        league_json: &str,
+    ) -> Result<String, String> {
+        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+        let league =
+            OwnedResource::from_json(&json::parse(league_json).map_err(|e| e.to_string())?);
+        Ok(can_edit_league(&actor, actor_uid, &league).to_json().dump())
     }
 
     pub fn compute_seating_json(config_json: &str) -> Result<String, String> {
@@ -290,6 +342,45 @@ mod wasm {
             can_edit_user_json(actor_json, actor_uid, target_uid, target_json)
         }
 
+        #[wasm_bindgen(js_name = canManageCountry)]
+        pub fn can_manage_country(
+            &self,
+            actor_json: &str,
+            target_country: &str,
+        ) -> Result<String, String> {
+            can_manage_country_json(actor_json, target_country)
+        }
+
+        #[wasm_bindgen(js_name = canManageTournaments)]
+        pub fn can_manage_tournaments(&self, actor_json: &str) -> Result<String, String> {
+            can_manage_tournaments_json(actor_json)
+        }
+
+        #[wasm_bindgen(js_name = canManageLeagues)]
+        pub fn can_manage_leagues(&self, actor_json: &str) -> Result<String, String> {
+            can_manage_leagues_json(actor_json)
+        }
+
+        #[wasm_bindgen(js_name = isOrganizer)]
+        pub fn is_organizer(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            tournament_json: &str,
+        ) -> Result<String, String> {
+            is_organizer_json(actor_json, actor_uid, tournament_json)
+        }
+
+        #[wasm_bindgen(js_name = canEditLeague)]
+        pub fn can_edit_league(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            league_json: &str,
+        ) -> Result<String, String> {
+            can_edit_league_json(actor_json, actor_uid, league_json)
+        }
+
         #[wasm_bindgen(js_name = computeSeating)]
         pub fn compute_seating(&self, config_json: &str) -> Result<String, String> {
             compute_seating_json(config_json)
@@ -429,6 +520,36 @@ mod python {
                 target_uid,
                 target_json,
             ))
+        }
+
+        fn can_manage_country(&self, actor_json: &str, target_country: &str) -> PyResult<String> {
+            py_str(can_manage_country_json(actor_json, target_country))
+        }
+
+        fn can_manage_tournaments(&self, actor_json: &str) -> PyResult<String> {
+            py_str(can_manage_tournaments_json(actor_json))
+        }
+
+        fn can_manage_leagues(&self, actor_json: &str) -> PyResult<String> {
+            py_str(can_manage_leagues_json(actor_json))
+        }
+
+        fn is_organizer(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            tournament_json: &str,
+        ) -> PyResult<String> {
+            py_str(is_organizer_json(actor_json, actor_uid, tournament_json))
+        }
+
+        fn can_edit_league(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            league_json: &str,
+        ) -> PyResult<String> {
+            py_str(can_edit_league_json(actor_json, actor_uid, league_json))
         }
 
         fn compute_seating(&self, config_json: &str) -> PyResult<String> {
