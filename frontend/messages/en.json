@@ -68,7 +68,7 @@
   "login_discord_signup": "Sign Up with Discord",
   "login_or_signup_email": "or sign up with email",
   "login_email_signup": "Continue with Email",
-  "login_terms_agreement": "By creating an account, you agree to our terms of service.",
+  "login_consent_html": "I agree to the {terms} and {privacy}. I am 16 or older, or a parent or guardian consenting on behalf of a younger player.",
   "login_placeholder_email": "you@example.com",
   "login_placeholder_password": "Enter your password",
   "login_placeholder_signup_email": "Enter your email",

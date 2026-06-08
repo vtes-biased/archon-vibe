@@ -37,7 +37,20 @@
   let forgotPassword = $state(false);
   let resetEmailSent = $state(false);
 
+  // Signup consent: ToS + Privacy + age/parental self-attestation. Gates all signup methods.
+  let consentChecked = $state(false);
+  const linkClass = "text-crimson-400 hover:text-crimson-300 focus-visible:text-crimson-300 underline";
+  // First-party only: our Paraglide message + anchors built from our own titles. No untrusted
+  // input flows in, so {@html} below is safe (no sanitizer needed).
+  const consentHtml = $derived(
+    m.login_consent_html({
+      terms: `<a href="/legal/terms" target="_blank" rel="noopener noreferrer" class="${linkClass}">${m.legal_terms_title()}</a>`,
+      privacy: `<a href="/legal/privacy" target="_blank" rel="noopener noreferrer" class="${linkClass}">${m.legal_privacy_title()}</a>`,
+    }),
+  );
+
   async function handleCreateAccount() {
+    if (!consentChecked) return;
     const success = await createAccountWithPasskey();
     if (success) {
       goto("/");
@@ -64,7 +77,7 @@
   }
 
   async function handleSignupMagicLink() {
-    if (!email.trim()) return;
+    if (!email.trim() || !consentChecked) return;
     const success = await requestMagicLink(email.trim(), "signup");
     if (success) {
       magicLinkSent = true;
@@ -144,7 +157,7 @@
       {#if !magicLinkSent && !resetEmailSent && !forgotPassword}
         <div class="flex mb-6 bg-dusk-900 rounded-lg p-1">
           <button
-            onclick={() => (mode = "login")}
+            onclick={() => { mode = "login"; consentChecked = false; }}
             class="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors {mode === 'login'
               ? 'bg-crimson-700 text-white'
               : 'text-ash-400 hover:text-ash-200'}"
@@ -152,7 +165,7 @@
             {m.login_tab_login()}
           </button>
           <button
-            onclick={() => (mode = "signup")}
+            onclick={() => { mode = "signup"; consentChecked = false; }}
             class="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors {mode === 'signup'
               ? 'bg-crimson-700 text-white'
               : 'text-ash-400 hover:text-ash-200'}"
@@ -354,10 +367,22 @@
             {m.login_create_account_msg()}
           </p>
 
+          <!-- Consent gate: ToS + Privacy + age/parental self-attestation -->
+          <div class="flex items-start gap-2 text-xs text-ash-300 leading-snug">
+            <input
+              id="signup-consent"
+              type="checkbox"
+              bind:checked={consentChecked}
+              disabled={auth.isLoading}
+              class="mt-0.5 shrink-0 w-5 h-5 accent-crimson-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-crimson-500"
+            />
+            <label for="signup-consent">{@html consentHtml}</label>
+          </div>
+
           {#if passkeySupported}
             <button
               onclick={handleCreateAccount}
-              disabled={auth.isLoading}
+              disabled={auth.isLoading || !consentChecked}
               class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if auth.isLoading}
@@ -372,7 +397,7 @@
           <!-- Discord OAuth -->
           <button
             onclick={handleDiscordLogin}
-            disabled={auth.isLoading}
+            disabled={auth.isLoading || !consentChecked}
             class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
           >
             <DiscordIcon class="w-5 h-5" />
@@ -404,7 +429,7 @@
             />
             <button
               type="submit"
-              disabled={auth.isLoading || !email.trim()}
+              disabled={auth.isLoading || !email.trim() || !consentChecked}
               class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {#if auth.isLoading}
@@ -421,10 +446,6 @@
               {m.login_passkey_not_supported()}
             </p>
           {/if}
-
-          <p class="text-center text-xs text-ash-500 mt-4">
-            {m.login_terms_agreement()}
-          </p>
         </div>
       {/if}
     </div>
