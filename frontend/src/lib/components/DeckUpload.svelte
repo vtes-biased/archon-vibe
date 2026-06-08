@@ -165,6 +165,7 @@
       let authorValue = deck.author;
       if (attribution === 'anonymous') {
         attrValue = null;
+        authorValue = ''; // anonymous: never persist a designer name
       } else if (attribution === 'self' && playerUid) {
         attrValue = playerVekn || playerName || null;
         if (playerName) authorValue = playerName;

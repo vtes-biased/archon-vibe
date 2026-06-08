@@ -117,6 +117,7 @@
       let authorValue = deck.author;
       if (attrMode === 'anonymous') {
         attrValue = null;
+        authorValue = ''; // anonymous: never persist a designer name
       } else if (attrMode === 'self') {
         const selfVekn = playerVekn || auth.user?.vekn_id;
         const selfName = playerName || auth.user?.name;
@@ -246,7 +247,7 @@
   {#if deck.name}
     <h4 class="text-sm font-semibold text-bone-200 mb-1">{deck.name}</h4>
   {/if}
-  {#if deck.author}
+  {#if deck.author && deck.attribution !== null}
     <p class="text-xs text-ash-400 mb-2">{m.deck_by_author({ author: deck.author })}</p>
   {/if}
 

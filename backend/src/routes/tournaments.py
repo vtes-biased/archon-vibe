@@ -209,17 +209,35 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
         from ..twda import submit_twda_pr
 
         engine = _engine
+
+        player_user = await get_user_by_uid(tournament.winner)
+        player_name = player_user.name if player_user else "Unknown"
+
+        # Resolve the TWDA "Created by:" designer credit from the deck's
+        # attribution (the "designed by" reference), not the raw author text.
+        #   None              -> anonymous (null) or unset/self: omit the credit
+        #                        (never leak a stored author the designer hid)
+        #   "twda"            -> historical import; author already holds the name
+        #   player's own id   -> self: omit (redundant with the header player line)
+        #   other vekn / name -> credit that member; resolve a vekn -> display name
+        attribution = winner_deck.attribution
+        self_ids = {i for i in (getattr(player_user, "vekn_id", ""), player_name) if i}
+        if attribution == "twda":
+            designer_credit = winner_deck.author
+        elif not attribution or attribution in self_ids:
+            designer_credit = ""
+        else:
+            designer = await get_user_by_vekn_id(attribution)
+            designer_credit = (designer.name if designer else "") or winner_deck.author
+
         deck_json = json.dumps(
             {
                 "name": winner_deck.name,
-                "author": winner_deck.author,
+                "author": designer_credit,
                 "comments": winner_deck.comments,
                 "cards": winner_deck.cards,
             }
         )
-
-        player_user = await get_user_by_uid(tournament.winner)
-        player_name = player_user.name if player_user else "Unknown"
         player_count = len(tournament.players)
         tournament_date = tournament.start or tournament.modified.isoformat()
         rounds_count = len(tournament.rounds)
