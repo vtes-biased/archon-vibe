@@ -22,6 +22,7 @@
   const CONTENT_TYPES = new Set(["youtube", "twitch", "blog", "website", "instagram", "other"]);
 
   let allUsersWithLinks = $state<User[]>([]);
+  let officials = $state<User[]>([]);
   let icUsers = $state<User[]>([]);
   let expandedCountries = $state<Set<string>>(new Set());
   let loaded = $state(false);
@@ -133,9 +134,7 @@
   }
   const officialGroups = $derived.by(() => {
     const grouped = new Map<string, User[]>();
-    for (const u of allUsersWithLinks) {
-      if (!u.roles?.some(r => r === "NC" || r === "Prince")) continue;
-      if (!u.contact_email && !u.discord_id && !u.contact_phone) continue;
+    for (const u of officials) {
       const c = u.country || "??";
       if (!grouped.has(c)) grouped.set(c, []);
       grouped.get(c)!.push(u);
@@ -171,6 +170,13 @@
     // All users with community links
     allUsersWithLinks = allUsers.filter(u =>
       !u.deleted_at && u.community_links?.length
+    );
+    // Officials directory: NC/Prince reachable by contact info — independent of
+    // community_links (an official with an email but no link must still show).
+    officials = allUsers.filter(u =>
+      !u.deleted_at &&
+      u.roles?.some(r => r === "NC" || r === "Prince") &&
+      (u.contact_email || u.discord_id || u.contact_phone)
     );
     // Auto-expand user's country
     if (auth.user?.country) {
