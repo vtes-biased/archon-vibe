@@ -126,8 +126,12 @@ fn score_measure(measure: &Measure, rounds_count: usize) -> ([f64; 9], f64, f64)
         let mean_vps = vps_sum / pc;
         let mean_transfers = transfers_sum / pc;
         let r3 = (vps_list.iter().map(|v| (v - mean_vps).powi(2)).sum::<f64>() / pc).sqrt();
-        let r8 =
-            (transfers_list.iter().map(|t| (t - mean_transfers).powi(2)).sum::<f64>() / pc).sqrt();
+        let r8 = (transfers_list
+            .iter()
+            .map(|t| (t - mean_transfers).powi(2))
+            .sum::<f64>()
+            / pc)
+            .sqrt();
         (mean_vps, mean_transfers, r3, r8)
     } else {
         (0.0, 0.0, 0.0, 0.0)
@@ -184,7 +188,11 @@ fn score_measure(measure: &Measure, rounds_count: usize) -> ([f64; 9], f64, f64)
         }
     }
 
-    ([r1, r2, r3, r4, r5, r6, r7, r8, r9], mean_vps, mean_transfers)
+    (
+        [r1, r2, r3, r4, r5, r6, r7, r8, r9],
+        mean_vps,
+        mean_transfers,
+    )
 }
 
 /// Compute lexicographic score for optimization (hot path)
@@ -205,10 +213,12 @@ pub(crate) fn compute_score(measure: &Measure, rounds_count: usize) -> SeatingSc
 /// Total-measure a full set of rounds and score it.
 pub(crate) fn score_total(rounds: &[Vec<Vec<String>>]) -> SeatingScore {
     let mapping = build_mapping(rounds);
-    let total = rounds.iter().fold(Measure::new(mapping.len()), |mut acc, r| {
-        acc.add(&measure_round(&mapping, r));
-        acc
-    });
+    let total = rounds
+        .iter()
+        .fold(Measure::new(mapping.len()), |mut acc, r| {
+            acc.add(&measure_round(&mapping, r));
+            acc
+        });
     compute_score(&total, rounds.len())
 }
 

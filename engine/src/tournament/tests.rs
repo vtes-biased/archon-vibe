@@ -596,7 +596,7 @@ fn test_tp_with_sa_reranks_table() {
     assert_eq!(tps, vec![60.0, 36.0, 36.0, 36.0, 12.0]);
 
     // Without the penalty all four 0VP players tie 2nd-5th = (48+36+24+12)/4 = 30.
-    let flat = compute_tp(5, &vps, &vec![0.0; 5]);
+    let flat = compute_tp(5, &vps, &[0.0; 5]);
     assert_eq!(flat, vec![60.0, 30.0, 30.0, 30.0, 30.0]);
 }
 
@@ -633,7 +633,11 @@ fn test_standings_vp_under_sa_goes_negative() {
             .vp
     };
     assert_eq!(vp_of("p1"), 1.0, "raw 2 VP minus full 1.0 SA");
-    assert_eq!(vp_of("p2"), -1.0, "raw 0 VP minus full 1.0 SA goes negative");
+    assert_eq!(
+        vp_of("p2"),
+        -1.0,
+        "raw 0 VP minus full 1.0 SA goes negative"
+    );
 }
 
 #[test]
@@ -684,9 +688,8 @@ fn test_rating_vp_gw_reads_standings_when_no_rounds() {
     // VEKN-synced tournament: no rounds/finals -> read the player's standings row.
     // An SA referencing a (nonexistent) round must not double-penalize the synced VP.
     let mut tournament = make_tournament();
-    tournament["standings"] = json::array![
-        json::object! { user_uid: "p1", gw: 1.0, vp: 4.0, tp: 120 },
-    ];
+    tournament["standings"] =
+        json::array![json::object! { user_uid: "p1", gw: 1.0, vp: 4.0, tp: 120 },];
     let sanctions = json::array![
         { user_uid: "p1", level: "standings_adjustment", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
     ];
@@ -722,7 +725,10 @@ fn test_standings_vp_sa_ignores_lifted_and_future_rounds() {
     ];
     let standings = super::standings::compute_preliminary_standings(&tournament, &sanctions);
     let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
-    assert_eq!(p1.vp, 1.5, "lifted SA and future-round SA leave VP unchanged");
+    assert_eq!(
+        p1.vp, 1.5,
+        "lifted SA and future-round SA leave VP unchanged"
+    );
 }
 
 #[test]
@@ -759,9 +765,17 @@ fn test_standings_recompute_picks_up_late_sa() {
             .unwrap_or_else(|| panic!("{uid} missing"))
     };
     // Adjusted VPs: p1=1.5, p2=1.0, p3=p4=p5=0.5.
-    assert_eq!(get("p1").gw, 0.0, "late SA -> adjusted 1.5 (<2): GW removed");
+    assert_eq!(
+        get("p1").gw,
+        0.0,
+        "late SA -> adjusted 1.5 (<2): GW removed"
+    );
     assert_eq!(get("p1").vp, 1.5, "raw 2.5 - full 1.0 SA");
-    assert_eq!(get("p1").tp, 60.0, "p1 still ranks 1st on adjusted VP -> 60 TP");
+    assert_eq!(
+        get("p1").tp,
+        60.0,
+        "p1 still ranks 1st on adjusted VP -> 60 TP"
+    );
     assert_eq!(get("p2").tp, 48.0, "p2 2nd -> 48 TP");
     // p3/p4/p5 tie 3rd-5th on adjusted 0.5 -> (36+24+12)/3 = 24 each.
     assert_eq!(get("p3").tp, 24.0);

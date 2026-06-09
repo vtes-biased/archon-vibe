@@ -80,9 +80,13 @@ async def test_import_standings_are_prelim_only(test_db):
             for i in range(5)
         ]
         # Prelim: p1=2 (GW), p2=1, p3=1, p4=0.5, p5=0.5 (sum 5).
-        prelim = ArchonRoundTable(seats=[(1, 2.0), (2, 1.0), (3, 1.0), (4, 0.5), (5, 0.5)])
+        prelim = ArchonRoundTable(
+            seats=[(1, 2.0), (2, 1.0), (3, 1.0), (4, 0.5), (5, 0.5)]
+        )
         # Finals: p1=3 (winner), p2=1, p3=0.5, p4=0.5, p5=0 (sum 5).
-        finals = ArchonRoundTable(seats=[(1, 3.0), (2, 1.0), (3, 0.5), (4, 0.5), (5, 0.0)])
+        finals = ArchonRoundTable(
+            seats=[(1, 3.0), (2, 1.0), (3, 0.5), (4, 0.5), (5, 0.0)]
+        )
         data = ArchonData(
             event_name="Import Test",
             num_rounds=1,

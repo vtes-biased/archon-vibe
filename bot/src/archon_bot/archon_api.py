@@ -262,9 +262,7 @@ class ArchonAPI:
             payload["subcategory"] = subcategory
         if round_number is not None:
             payload["round_number"] = round_number
-        return await self._request(
-            "POST", "/sanctions/", discord_id, json_body=payload
-        )
+        return await self._request("POST", "/sanctions/", discord_id, json_body=payload)
 
     async def exchange_code(self, code: str, code_verifier: str) -> dict | None:
         """Exchange authorization code for tokens."""

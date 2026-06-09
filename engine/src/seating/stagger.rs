@@ -6,7 +6,10 @@ use std::collections::HashMap;
 use super::measure::build_round;
 
 /// Get initial rounds for staggered player counts (6, 7, 11)
-pub(crate) fn get_staggered_rounds(players: &[String], rounds_count: usize) -> Vec<Vec<Vec<String>>> {
+pub(crate) fn get_staggered_rounds(
+    players: &[String],
+    rounds_count: usize,
+) -> Vec<Vec<Vec<String>>> {
     let players_count = players.len();
 
     if players_count < 4 {

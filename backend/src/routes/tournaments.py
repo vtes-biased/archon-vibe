@@ -1032,6 +1032,7 @@ async def qr_checkin(
 # Deck endpoints
 # ============================================================================
 
+
 def _load_cards_json() -> str:
     """Load cards.json for the Rust engine (cached in memory by card_data)."""
     text = cards_json_text()
