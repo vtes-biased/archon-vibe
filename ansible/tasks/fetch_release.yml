@@ -2,7 +2,7 @@
 # Download CI-built artifacts straight from the GitHub Release onto the control
 # node (the roles then copy them to the hosts). Self-contained: no make, no gh
 # CLI — so the deploy playbooks run identically from a laptop or a CI runner.
-# Skipped for artifact_source=local (deploy a local `make build-all`). Shared by
+# Skipped for artifact_source=local (deploy a local `just build-all`). Shared by
 # playbooks/deploy.yml (prod) and playbooks/deploy-beta.yml.
 - name: Fetch release artifacts
   when: artifact_source == 'release'
@@ -77,7 +77,7 @@
     fail_msg: >-
       build/ is missing wheels. For artifact_source=release the Release has no
       attached wheels yet (run the release-artifacts workflow); for SOURCE=local
-      run `make build-all` first.
+      run `just build-all` first.
   delegate_to: localhost
   become: false
   run_once: true

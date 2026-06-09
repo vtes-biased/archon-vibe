@@ -9,7 +9,7 @@ collections:
 
 roles:
   # Shared server foundation. Provides the reusable nginx_site (proxy/spa/static)
-  # and postgres_db roles consumed by the beta (frankfurt) deploy. `make galaxy`
+  # and postgres_db roles consumed by the beta (frankfurt) deploy. `just galaxy`
   # installs it into galaxy_roles/ (git-ignored); ansible.cfg's roles_path points
   # at galaxy_roles/server-setup/roles so the roles resolve as nginx_site /
   # postgres_db. Pin to a tag/SHA once server-setup cuts releases.

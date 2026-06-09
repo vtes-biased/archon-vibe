@@ -3,10 +3,10 @@
 Provisions and deploys `archon-vibe` (FastAPI backend, Svelte/Vite PWA frontend,
 Discord bot, PostgreSQL 17, nginx + Let's Encrypt) to one of two targets:
 
-| env  | host                 | main domain          | bot domain                 |
-|------|----------------------|----------------------|----------------------------|
-| beta | `krcg.org` VPS       | `archon.krcg.org`    | `bot.archon.krcg.org`      |
-| prod | `vekn.net` VPS       | `archon.vekn.net`    | `bot.archon.vekn.net`      |
+| env  | host                     | main domain             | bot domain                 |
+|------|--------------------------|-------------------------|----------------------------|
+| beta | server-setup (frankfurt) | `new.archon.krcg.org`   | `bot.archon.krcg.org`      |
+| prod | `vekn.net` VPS           | `archon.vekn.net`       | `bot.archon.vekn.net`      |
 
 Build strategy: all deployable artifacts (Rust engine wheel, backend wheel, bot
 wheel, frontend static dist) are built **by GitHub Actions** (`.github/workflows/
@@ -14,12 +14,12 @@ release-artifacts.yml`) and attached to the published Release. The **deploy
 playbook fetches them itself** (a `delegate_to: localhost` pre_task downloads the
 Release assets via the GitHub API — no `gh` CLI), so CI is the single source of
 deployed builds and the servers never run `cargo`, `maturin`, `npm`, or `uv
-build`. `make deploy-*` is just a friendly wrapper over `ansible-playbook`, and
-`ansible-playbook playbooks/deploy.yml` is self-contained (runs the same from a
-laptop or a CI runner).
+build`. `just deploy-*` (run from `ansible/`) is a friendly wrapper over
+`ansible-playbook`, and `ansible-playbook playbooks/deploy.yml` is self-contained
+(runs the same from a laptop or a CI runner).
 
-The `make build-*` targets still build everything locally for development, and
-`make deploy-<env> SOURCE=local` deploys a local build instead of the Release
+The `just build-*` recipes still build everything locally for development, and
+`SOURCE=local just deploy-<env>` deploys a local build instead of the Release
 (handy for testing an un-released change on beta).
 
 Runtime Python is managed by **uv** (same version on both hosts, pinned via
@@ -36,12 +36,13 @@ the same major version.
 On your workstation:
 - Python 3.13 + `uv` (`brew install uv`)
 - `uv sync --group dev` from the repo root — installs pinned `ansible-core`,
-  `ansible-lint`, `yamllint` and everything else the Makefile needs.
+  `ansible-lint`, `yamllint` and everything else the deploy recipes need.
+- `just` (`brew install just`) — the ansible task runner (recipes in `ansible/justfile`).
 - Network access to GitHub (the deploy playbook downloads Release assets).
 - Only for `SOURCE=local` builds: Docker Desktop (manylinux PyO3 wheel),
   Node 22 (matches CI), and `wasm-pack` (frontend WASM engine).
 
-On each server (first time only, before `make bootstrap-<env>`):
+On each server (first time only, before `just bootstrap-<env>`):
 - A non-root admin user with passwordless sudo (see `inventories/<env>/hosts.ini`
   — `ansible_user` must be that account).
 - SSH key auth already set up.
@@ -52,7 +53,7 @@ On each server (first time only, before `make bootstrap-<env>`):
 
 ```bash
 cd ansible
-make galaxy                               # install ansible collections
+just galaxy                               # ansible collections + server-setup roles
 
 # Create the vault password file (git-ignored) and encrypt the vault
 echo '<your vault password>' > .vault_pass
@@ -62,16 +63,16 @@ chmod 600 .vault_pass
 ansible-vault edit inventories/beta/group_vars/vault.yml
 ansible-vault edit inventories/prod/group_vars/vault.yml
 
-make bootstrap-beta                        # provision beta end-to-end
+just bootstrap-beta                        # provision beta end-to-end
 ```
 
 ## Routine updates
 
 ```bash
-make deploy-beta                           # deploy latest Release to beta
-make deploy-prod                           # same for prod
-make deploy-prod RELEASE_TAG=v1.2.3        # deploy a specific Release
-make deploy-beta SOURCE=local              # build locally + deploy (un-released change)
+just deploy-beta                           # deploy latest Release to beta
+just deploy-prod                           # same for prod
+RELEASE_TAG=v1.2.3 just deploy-prod        # deploy a specific Release
+SOURCE=local just deploy-beta              # build locally + deploy (un-released change)
 ```
 
 The playbook prints the concrete tag it resolved (so `latest` is auditable) and,
@@ -117,9 +118,9 @@ shipped; `beta` allows blank (= latest).
 ## System updates / kernel upgrades
 
 ```bash
-make upgrade-beta                          # apt upgrade; warns if reboot needed
-make upgrade-beta REBOOT=1                 # also reboot if /var/run/reboot-required
-make upgrade-beta FULL=1 REBOOT=1          # dist-upgrade + reboot (major kernel bumps)
+just upgrade-beta                          # apt upgrade; warns if reboot needed
+REBOOT=1 just upgrade-beta                 # also reboot if /var/run/reboot-required
+FULL=1 REBOOT=1 just upgrade-beta          # dist-upgrade + reboot (major kernel bumps)
 ```
 
 The `system_upgrade` role stops `archon-backend` + `archon-bot` before rebooting
@@ -130,7 +131,7 @@ and restarts + health-checks them afterwards.
 Prod currently runs PostgreSQL 16. Run this **once** after a full on-disk backup:
 
 ```bash
-make migrate-postgres-prod
+just migrate-postgres-prod
 ```
 
 The playbook takes a `pg_dumpall` backup, stands up PG17 in parallel on port
@@ -140,17 +141,21 @@ The playbook takes a `pg_dumpall` backup, stands up PG17 in parallel on port
 
 ```
 ansible/
-├── ansible.cfg           # defaults (inventory path, vault, SSH multiplex)
-├── requirements.yml      # collection pins
-├── Makefile              # deploy + local-build entrypoints (wraps ansible-playbook)
+├── ansible.cfg           # defaults (roles_path, vault, SSH multiplex)
+├── requirements.yml      # collection + server-setup role pins
+├── justfile              # deploy + local-build recipes (wraps ansible-playbook)
+├── galaxy_roles/         # server-setup roles installed by `just galaxy` (git-ignored)
 ├── inventories/<env>/    # hosts.ini + group_vars/{all.yml, vault.yml}
 ├── playbooks/
 │   ├── bootstrap.yml     # common role only
 │   ├── database.yml      # postgresql role
-│   ├── deploy.yml        # backend + frontend + bot
+│   ├── deploy.yml        # prod: backend + frontend + bot (standalone)
+│   ├── deploy-beta.yml   # beta: app on the server-setup foundation (frankfurt)
 │   ├── upgrade.yml       # system_upgrade role
 │   ├── migrate_postgres.yml   # PG16 -> PG17 migration (prod)
 │   └── site.yml          # bootstrap + database + deploy
+├── tasks/                # fetch_release.yml (shared self-fetch) + app_user.yml (beta)
+├── vars/                 # release_artifacts.yml (shared artifact resolution)
 ├── roles/
 │   ├── common/           # base packages, admin user, ufw, unattended-upgrades
 │   ├── system_upgrade/   # apt upgrade + safe reboot flow

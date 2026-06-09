@@ -19,5 +19,7 @@ rules:
 
 ignore: |
   build/
+  .ansible/
   .ansible_facts/
+  galaxy_roles/
   inventories/*/group_vars/vault.yml

@@ -4,7 +4,7 @@
 # into it on port 5433, swaps ports. The 16 cluster is left stopped on disk
 # for ~48h as a rollback path.
 #
-# Run with: make migrate-postgres-prod
+# Run with: just migrate-postgres-prod
 # Requires: PG16 already running, archon services running off it.
 
 - name: "PG16 -> PG17 migration"
