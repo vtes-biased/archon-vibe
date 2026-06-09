@@ -51,6 +51,9 @@ let authState = $state<AuthState>({
 // Timer for auto-refresh
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Guard so the cross-tab storage listener is registered only once.
+let crossTabSyncRegistered = false;
+
 /**
  * Update auth state with partial values.
  */
@@ -127,6 +130,68 @@ function clearTokens() {
  */
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+/**
+ * React to auth changes made in *other* same-origin tabs.
+ *
+ * Tokens live in shared localStorage, so a login/logout/claim in one tab changes
+ * the effective access level for every tab — but only the tab that made the
+ * change knows. A tab that doesn't notice keeps its old-level SSE writing into
+ * the *shared* IndexedDB, clobbering the other tab's data and silently dropping
+ * it to a lower-access view (pst #94). Here we converge this tab to the new
+ * auth level so all same-origin tabs stay at one level and write identical
+ * projections.
+ *
+ * The handler never writes to localStorage (the other tab already did), so it
+ * can't trigger a storage-event cascade. Same-user token rotation (an auto
+ * refresh in another tab) only re-arms our refresh timer — the access level is
+ * unchanged, so the cached data is still valid and no resync is needed.
+ */
+async function handleCrossTabAuthChange(): Promise<void> {
+  const token = getAccessToken();
+
+  // Logout in another tab → drop to anonymous and resync the public view.
+  if (!token) {
+    if (!authState.isAuthenticated) return;
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+    setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
+    await syncManager.refresh();
+    return;
+  }
+
+  // Same user, rotated token (another tab refreshed): keep our timer in sync but
+  // leave the cache alone — the access level hasn't changed.
+  const payload = parseJwt(token);
+  if (payload && authState.user && payload.sub === authState.user.uid) {
+    scheduleRefresh(payload.exp - Math.floor(Date.now() / 1000));
+    return;
+  }
+
+  // Login / claim / user switch in another tab → adopt it and resync at the new
+  // access level.
+  if (payload) scheduleRefresh(payload.exp - Math.floor(Date.now() / 1000));
+  const result = await fetchCurrentUser();
+  if (result) {
+    setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
+    await syncManager.refresh();
+  }
+}
+
+/**
+ * Register the cross-tab auth listener once (client-side only).
+ */
+function registerCrossTabAuthSync(): void {
+  if (crossTabSyncRegistered || typeof window === "undefined") return;
+  crossTabSyncRegistered = true;
+  window.addEventListener("storage", (event) => {
+    // storage fires only on the *other* tabs; key === null is localStorage.clear().
+    if (event.key !== null && event.key !== ACCESS_TOKEN_KEY) return;
+    void handleCrossTabAuthChange();
+  });
 }
 
 /**
@@ -238,6 +303,7 @@ export async function fetchCurrentUser(): Promise<MeResponse | null> {
  */
 export async function initAuth(): Promise<void> {
   setAuthState({ isLoading: true });
+  registerCrossTabAuthSync();
 
   const token = getAccessToken();
   if (!token) {
