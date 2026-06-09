@@ -30,6 +30,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["backend/src"]
 
+# cards.json is generated into engine/data (outside the package) — ship it as
+# package data so /api/cards and deck validation work in the wheel. Target tracks
+# `packages` above: backend/src -> top-level `src`, so data lands at src/data/.
+[tool.hatch.build.targets.wheel.force-include]
+"engine/data/cards.json" = "src/data/cards.json"
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"
