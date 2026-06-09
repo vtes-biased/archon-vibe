@@ -192,6 +192,7 @@
   "engine_load_error": "Impossible de charger le moteur de score. Certaines fonctions sont indisponibles — rechargez pour réessayer.",
   "sync_error_disconnected": "Connexion perdue — les données peuvent être obsolètes.",
   "sync_reconnect": "Se reconnecter",
+  "league_standings_error": "Impossible de calculer le classement.",
   "sanction_cat_procedural_error": "Erreur de Procédure",
   "sanction_cat_tournament_error": "Erreur de Tournoi",
   "sanction_cat_unsportsmanlike_conduct": "Conduite Antisportive",

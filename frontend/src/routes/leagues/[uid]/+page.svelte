@@ -40,6 +40,7 @@
     name?: string;
   }
   let standings = $state<StandingEntry[]>([]);
+  let standingsError = $state(false);
 
   const isOrganizer = $derived(league ? canEditLeague(auth.user, league) : false);
 
@@ -111,6 +112,7 @@
     organizerNames = names;
 
     // Compute standings from finished tournaments
+    standingsError = false;
     const finishedTournaments = leagueTournaments.filter(t => t.state === "Finished" && t.standings?.length);
     if (finishedTournaments.length > 0) {
       try {
@@ -141,8 +143,10 @@
         }
         standings = result as StandingEntry[];
       } catch (e) {
+        // Was console-only: standings silently rendered empty with no recourse.
         console.error("Failed to compute league standings:", e);
         standings = [];
+        standingsError = true;
       }
     } else {
       standings = [];
@@ -546,6 +550,11 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        {:else if standingsError}
+          <div class="bg-dusk-950 rounded-lg shadow p-8 border border-crimson-800/50 text-center">
+            <p class="text-crimson-300 mb-3">{m.league_standings_error()}</p>
+            <button onclick={loadLeague} class="px-4 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg text-sm font-medium">{m.common_retry()}</button>
           </div>
         {:else}
           <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">

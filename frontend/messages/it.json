@@ -192,6 +192,7 @@
   "engine_load_error": "Impossibile caricare il motore di punteggio. Alcune funzioni non sono disponibili — ricarica per riprovare.",
   "sync_error_disconnected": "Connessione persa — i dati potrebbero non essere aggiornati.",
   "sync_reconnect": "Riconnetti",
+  "league_standings_error": "Impossibile calcolare la classifica.",
   "sanction_cat_procedural_error": "Errore Procedurale",
   "sanction_cat_tournament_error": "Errore di Torneo",
   "sanction_cat_unsportsmanlike_conduct": "Condotta Antisportiva",

@@ -192,6 +192,7 @@
   "engine_load_error": "Couldn't load the scoring engine. Some features are unavailable — reload to retry.",
   "sync_error_disconnected": "Connection lost — data may be out of date.",
   "sync_reconnect": "Reconnect",
+  "league_standings_error": "Couldn't compute standings.",
   "sanction_cat_procedural_error": "Procedural Error",
   "sanction_cat_tournament_error": "Tournament Error",
   "sanction_cat_unsportsmanlike_conduct": "Unsportsmanlike Conduct",
