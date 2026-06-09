@@ -33,6 +33,28 @@ as a separate post-beta effort.
   (`routes/admin.py:39/61/85`) — IC-only manual wrappers around jobs the apscheduler already
   runs (`main.py`). No UI; curl-only break-glass. (`/admin/users/merge` IS frontend-used.)
 
+### #98 resolution (decided + implemented)
+Both halves got IC-only UI (owner's call), behind strong confirm modals:
+- **Admin sync ×3** → new IC-gated `AdminSection` on `/profile` + reusable
+  `ConfirmActionModal` (loading/stats/error) + `api.ts` helpers. (staff-frontend-engineer
+  picked /profile over CommunityTab/`/admin`.)
+- **force-unlock** → IC-gated crimson button in the offline locked banner + inline confirm.
+
+Guards verified DB-sourced (roles from `get_user_by_uid`, never JWT) + new
+`test_admin_guards.py`. principal-engineer review then found force-unlock was
+**broken even as the curl endpoint** — fixed:
+- **C1 (graceful):** the wedged lock-holder never received the unlock (SSE drops
+  updates for locally-offline tournaments). Added `lostOfflineLock`/`handleOfflineLockLost`
+  in `offline.svelte.ts`; the 3 sync.ts offline-skip filters now reconcile + warn when
+  the server shows this device lost the lock (force-unlock OR force-takeover) — so a
+  lost/recovered device "gets the memo" on reconnect and discards its orphaned offline state.
+- **C2 (corruption):** go-online's device-lock check sat inside `if offline_mode:`, so a
+  stale device could blind-overwrite after an unlock. Now returns **410** (pre-lock +
+  in-tx) when the server isn't in offline mode; client un-wedges on 410. Test:
+  `test_go_online_refused_when_server_not_offline`.
+- **I2 (privilege):** force-unlock now rejects OAuth tokens (`request.state.oauth_client_id`),
+  matching the `/admin/*` lockdown.
+
 ### Bucket C — orphaned / superseded
 - `GET /api/tournaments/{uid}/decks/{player_uid}/twda` (`routes/tournaments.py:1045`) —
   server-side per-player TWDA export via Rust engine. Never wired into any client (frontend
