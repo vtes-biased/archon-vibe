@@ -1,14 +1,26 @@
 # ============================================================================
-# Archon ansible deploy — local build + remote provision/deploy
+# Archon ansible deploy — remote provision/deploy entrypoints
 # ----------------------------------------------------------------------------
-# Build pipeline runs on the dev laptop (macOS supported, Linux x86_64 wheel
-# produced via manylinux docker). Build artifacts land in ./build/ and are
-# rsynced to the target hosts by the roles.
+# Deployed artifacts are built by GitHub Actions (.github/workflows/
+# release-artifacts.yml) and attached to the published Release. The deploy
+# playbook fetches them itself (see playbooks/deploy.yml), so CI is the single
+# source of deployed builds and the servers never run cargo/maturin/npm/uv.
+# `make deploy-*` is just a friendly wrapper over `ansible-playbook`.
+#
+# The `build-*` targets remain for local development and for deploying a local
+# build: `make deploy-beta SOURCE=local` builds everything here (macOS supported;
+# Linux engine wheel via manylinux docker) and the playbook deploys build/.
 # ============================================================================
 
 REPO_ROOT := $(abspath $(CURDIR)/..)
 BUILD_DIR := $(CURDIR)/build
 MANYLINUX := quay.io/pypa/manylinux_2_28_x86_64
+
+# Release to deploy; empty = latest published release. Override: RELEASE_TAG=vX.Y.Z
+RELEASE_TAG ?=
+# deploy-* var passthrough: pin a release and/or deploy a local build-all output.
+DEPLOY_VARS := $(if $(RELEASE_TAG),-e release_tag=$(RELEASE_TAG),) $(if $(filter local,$(SOURCE)),-e artifact_source=local,)
+LOCAL_BUILD := $(if $(filter local,$(SOURCE)),build-all,)
 
 ANSIBLE := uv run --project $(REPO_ROOT) ansible-playbook
 UV_RUN := uv run --project $(REPO_ROOT)
@@ -29,7 +41,7 @@ clean: ## Remove local build artifacts
 	rm -rf $(BUILD_DIR)
 	mkdir -p $(BUILD_DIR)
 
-# ---- build -----------------------------------------------------------------
+# ---- build (local development / `SOURCE=local` deploys) --------------------
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
@@ -79,11 +91,13 @@ database-prod: ## Install/configure PostgreSQL + archon DB/user on prod
 	$(ANSIBLE) -i inventories/prod playbooks/database.yml
 
 # ---- app deploy (routine updates) ------------------------------------------
-deploy-beta: build-all ## Build artifacts and deploy backend/frontend/bot to beta
-	$(ANSIBLE) -i inventories/beta playbooks/deploy.yml
+# The playbook self-fetches the Release artifacts. RELEASE_TAG=vX.Y.Z pins a
+# release (default: latest); SOURCE=local builds here and deploys that instead.
+deploy-beta: $(LOCAL_BUILD) ## Deploy backend/frontend/bot to beta (RELEASE_TAG=… / SOURCE=local)
+	$(ANSIBLE) -i inventories/beta playbooks/deploy.yml $(DEPLOY_VARS)
 
-deploy-prod: build-all ## Build artifacts and deploy backend/frontend/bot to prod
-	$(ANSIBLE) -i inventories/prod playbooks/deploy.yml
+deploy-prod: $(LOCAL_BUILD) ## Deploy backend/frontend/bot to prod (RELEASE_TAG=… / SOURCE=local)
+	$(ANSIBLE) -i inventories/prod playbooks/deploy.yml $(DEPLOY_VARS)
 
 # ---- system maintenance ----------------------------------------------------
 # Pass FULL=1 for dist-upgrade (major kernel bumps); REBOOT=1 to actually reboot
