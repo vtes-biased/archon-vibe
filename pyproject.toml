@@ -28,13 +28,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend/src"]
+# only-include (not `packages`, which would collapse to a generic top-level `src`)
+# ships backend/src at its full path → importable as `backend.src`, matching the
+# ansible ExecStart and dev uvicorn entrypoint (backend.src.main:app). Excludes
+# tests/scripts (only backend/src ships).
+only-include = ["backend/src"]
 
-# cards.json is generated into engine/data (outside the package) — ship it as
-# package data so /api/cards and deck validation work in the wheel. Target tracks
-# `packages` above: backend/src -> top-level `src`, so data lands at src/data/.
+# cards.json is generated outside the package (engine/data); bundle it as package
+# data (under backend/src so it sits inside the backend.src package).
 [tool.hatch.build.targets.wheel.force-include]
-"engine/data/cards.json" = "src/data/cards.json"
+"engine/data/cards.json" = "backend/src/data/cards.json"
 
 [tool.ruff]
 line-length = 88
