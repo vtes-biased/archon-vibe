@@ -139,6 +139,20 @@ test-e2e:
     docker compose -p archon-vibe-e2e --profile test up --build \
         --abort-on-container-exit --exit-code-from frontend-test frontend-test
 
+# release.yml runs e2e on the pushed tag and, only if green, creates the GitHub
+# Release (which then triggers the artifact build).
+#
+# Cut a release: push a vX.Y.Z tag (e2e-gated; see release.yml)
+release tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{ tag }}" in v*) ;; *) echo "tag must start with 'v' (e.g. v1.2.3)"; exit 1 ;; esac
+    [ -z "$(git status --porcelain)" ] || { echo "working tree not clean — commit or stash first"; exit 1; }
+    git rev-parse "{{ tag }}" >/dev/null 2>&1 && { echo "tag {{ tag }} already exists"; exit 1; }
+    git tag "{{ tag }}"
+    git push origin "{{ tag }}"
+    echo "Pushed {{ tag }}. CI: e2e → (green) create release → artifacts. Watch the Actions tab."
+
 # Clean all build artifacts
 clean:
     cd engine && cargo clean

@@ -1,0 +1,89 @@
+name: Release
+
+# Tag-gated release pipeline. Pushing a `v*` tag runs the full Playwright E2E
+# suite against an isolated, ephemeral stack; only if it passes does the next job
+# create the GitHub Release. Publishing that release then fires release-artifacts.yml
+# (the wheel/dist build). So the chain is:
+#
+#   git push origin v1.2.3  ->  e2e  ->  (green) create release  ->  artifacts  ->  manual deploy
+#
+# A tag that fails e2e never becomes a release. Nothing auto-deploys — deploy.yml
+# stays manual + approval-gated. `just release <tag>` wraps the tag-and-push step.
+#
+# workflow_dispatch runs the E2E suite ad hoc (e.g. on main) WITHOUT creating a
+# release — the create-release job is guarded to tag pushes only.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # never cancel an in-flight release pipeline
+
+jobs:
+  # The E2E suite against the docker-compose `test` profile (db-test on tmpfs +
+  # backend-test + populate-db seed + frontend-test runner). The test DB lives in
+  # RAM and dies with the container — nothing here touches real data.
+  e2e:
+    name: Playwright E2E (isolated stack)
+    runs-on: ubuntu-latest
+    # The full stack builds WASM + two images then runs Playwright; cap the job so
+    # a hung health-check or deadlocked test can't ride GitHub's 360-minute default.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      # Build + run the isolated test stack in its own compose project; the
+      # job's exit code is the Playwright runner's exit code.
+      - name: Run E2E suite
+        run: >-
+          docker compose -p archon-vibe-e2e --profile test up --build
+          --abort-on-container-exit --exit-code-from frontend-test
+          frontend-test
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      # Traces/screenshots/videos (Playwright outputDir) — only written on failure
+      # and the most useful thing to pull down when a run goes red.
+      - name: Upload failure traces
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces
+          path: test-results/
+          retention-days: 7
+
+      - name: Tear down
+        if: ${{ always() }}
+        # Own compose project → `down -v` only removes archon-vibe-e2e_* volumes,
+        # never the dev postgres_data. (Moot in CI, but keeps the pattern safe.)
+        run: docker compose -p archon-vibe-e2e --profile test down -v
+
+  # Gate: create the GitHub Release from the tag only after E2E is green. Skipped
+  # on workflow_dispatch (no tag ref) so ad-hoc suite runs never cut a release.
+  # Publishing the release triggers release-artifacts.yml to build + attach assets.
+  create-release:
+    name: Create release (gated on e2e)
+    needs: e2e
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the Release
+    steps:
+      - name: Create GitHub Release from the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        # --verify-tag aborts if the tag somehow isn't on the remote; --generate-notes
+        # auto-builds release notes. Non-prerelease so release-artifacts attaches assets.
+        run: gh release create "${{ github.ref_name }}" --verify-tag --generate-notes
