@@ -81,6 +81,39 @@ lift the API rate limit. Note: re-running the release workflow re-uploads
 as the deployed bytes and cut a new release rather than re-running to change what
 ships.
 
+## Deploy from CI (GitHub Actions)
+
+`.github/workflows/deploy.yml` runs the deploy from a runner — `beta` →
+`deploy-beta.yml` (server-setup host), `prod` → `deploy.yml` (standalone). It is
+**manual-only** (`workflow_dispatch`, pick `beta`/`prod` + an optional
+`release_tag`) and **approval-gated**: the job binds to a GitHub Environment whose
+required-reviewer rule pauses the run until someone approves. Nothing
+auto-deploys.
+
+For **beta**, server-setup owns the config — `just sync` (from the server-setup
+repo) pushes `DEPLOY_HOST` + `DEPLOY_HOST_KEY` and `just sync-key ~/.ssh/deploy`
+pushes `DEPLOY_SSH_KEY` to this repo's `beta` environment. One-time setup:
+
+1. **Environments** (Settings → Environments): create `beta` and `prod`, each with
+   **Required reviewers** enabled.
+2. **Per-environment variables** (Variables — not sensitive; `just sync` sets these
+   for beta):
+   - `DEPLOY_HOST` — the real server host/IP (the committed inventory ships a
+     placeholder; CI overrides it via `-e ansible_host`).
+   - `DEPLOY_HOST_KEY` — a `known_hosts` line for `DEPLOY_HOST` (e.g.
+     `ssh-keyscan "$DEPLOY_HOST"`); its host field must match `DEPLOY_HOST`
+     **exactly** (same hostname-or-IP form) — a mismatch is a hard connect failure
+     since `host_key_checking` is on.
+3. **Per-environment secrets** (Secrets):
+   - `DEPLOY_SSH_KEY` — the deploy keypair's private half (LF newlines); its public
+     half is in the deploy user's `authorized_keys` (`just sync-key` for beta).
+   - `ANSIBLE_VAULT_PASSWORD` — the vault password for that env's `vault.yml`.
+4. The VPS must accept SSH from GitHub-hosted runner IPs (port 22 open).
+
+`prod` deploys require an explicit `release_tag` (a pre-check fails a blank prod
+dispatch before the approval gate), so the reviewer sees the exact tag being
+shipped; `beta` allows blank (= latest).
+
 ## System updates / kernel upgrades
 
 ```bash
