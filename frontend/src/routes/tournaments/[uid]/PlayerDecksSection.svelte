@@ -6,6 +6,8 @@
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { tournamentAction } from "$lib/tournament-actions";
+  import { showToast } from "$lib/stores/toast.svelte";
+  import { toUserMessage } from "$lib/errors";
   import { getCards } from "$lib/cards";
   import { ChevronDown, ChevronRight, CircleCheck, Lock } from "lucide-svelte";
   import { slide } from "svelte/transition";
@@ -126,7 +128,10 @@
         multideck: isMultideck,
       });
     } catch (e) {
+      // Surface to the user (not console-only): tournamentAction's server-only
+      // fallback no longer toasts, so this is the delete's error surface.
       console.error('Delete deck error:', e);
+      showToast({ type: 'error', message: toUserMessage(e, m.tournament_error_action()) });
     }
   }
 

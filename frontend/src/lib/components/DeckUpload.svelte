@@ -98,6 +98,7 @@
       await scanner.start();
       qrScanning = true;
     } catch (e: any) {
+      console.error('Camera start failed:', e); // keep the raw reason for diagnostics
       error = m.deck_error_camera();
     }
   }

@@ -174,12 +174,13 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
     }
   }
 
-  // Fallback: server-only
-  requireOnline();
+  // Fallback: server-only. Every caller surfaces the error itself (inline message
+  // or its own toast), so suppress apiRequest's duplicate toast here.
+  requireOnline({ suppressErrorToast: true });
   return apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
     method: 'POST',
     body: JSON.stringify(event),
-  });
+  }, { suppressErrorToast: true });
 }
 
 /**
