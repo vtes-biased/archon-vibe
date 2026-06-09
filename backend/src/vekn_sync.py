@@ -3,7 +3,7 @@
 import json
 import logging
 from datetime import UTC, datetime
-from pathlib import Path
+from importlib.resources import files
 from typing import Any
 
 from uuid6 import uuid7
@@ -23,16 +23,15 @@ from .vekn_api import VEKNAPIClient, VEKNAPIError
 
 logger = logging.getLogger(__name__)
 
+
 # NC/Prince public contact emails scraped from the vekn.net official lists
 # (national-coordinators + prince-list), keyed by vekn_id. The member API does
 # not expose these (cloaked on the site), so we inject them during sync. See
 # data/officials_contacts.json and scripts/backfill_officials_contacts.py.
-_OFFICIALS_CONTACTS_PATH = Path(__file__).parent / "data" / "officials_contacts.json"
-
-
 def _load_officials_emails() -> dict[str, str]:
+    data_file = files(__package__).joinpath("data", "officials_contacts.json")
     try:
-        entries = json.loads(_OFFICIALS_CONTACTS_PATH.read_text(encoding="utf-8"))
+        entries = json.loads(data_file.read_text(encoding="utf-8"))
     except FileNotFoundError:
         logger.warning("officials_contacts.json not found; skipping email injection")
         return {}

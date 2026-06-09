@@ -27,6 +27,7 @@ Steps 3-6 should run in parallel when applicable. Skip agents only for trivial c
 - Follow frontend/DESIGN.md for UI styling guidelines
 - **Component splitting**: When a Svelte page file exceeds ~1000 lines, extract logical sections into child components (e.g., `PlayerList.svelte`, `StandingsTable.svelte`). Pass data via props; keep state ownership in the parent. This keeps files navigable and editable by both humans and AI agents.
 - **Offline-first reads**: All UI reads come from IndexedDB. The backend API is only for mutations (actions). SSE pushes data changes to IndexedDB per-user with role-appropriate data. No API GET calls for data display.
+- **Packaged data files** (backend): load bundled data (JSON/SQL/xlsx under `backend/src/data/`) via `importlib.resources.files(__package__).joinpath(...).read_text()` — never `Path(__file__).parent`. `files()` resolves correctly when the backend runs as an installed wheel (CI artifact), not just from the source tree; `Path(__file__)` is the `#80`-class runtime-path bug. See `geonames.py`, `card_data.py`, `db.py` for the pattern.
 
 # Architecture
 

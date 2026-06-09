@@ -2,9 +2,9 @@
 
 The recurring path is vekn_sync, which injects contact_email from
 src/data/officials_contacts.json during member sync. This script applies the
-same data to users that already exist, so officials become reachable in the
-Community → Officials Directory immediately, without waiting for (or paying the
-cost of) a full VEKN member re-sync.
+same data (reusing vekn_sync's loader) to users that already exist, so officials
+become reachable in the Community → Officials Directory immediately, without
+waiting for (or paying the cost of) a full VEKN member re-sync.
 
 Idempotent. Never overwrites a user-edited address (contact_email listed in
 local_modifications). save_user recomputes the access projections, so SSE
@@ -27,8 +27,7 @@ if str(backend_dir) not in sys.path:
 
 from src.db import decode_json, get_connection, init_db, save_user  # noqa: E402
 from src.models import ObjectType, User  # noqa: E402
-
-CONTACTS_PATH = backend_dir / "src" / "data" / "officials_contacts.json"
+from src.vekn_sync import OFFICIALS_EMAILS  # noqa: E402
 
 
 async def _get_user_by_vekn_id(vekn_id: str) -> User | None:
@@ -45,13 +44,8 @@ async def _get_user_by_vekn_id(vekn_id: str) -> User | None:
 
 async def main() -> None:
     await init_db()
-    entries = json.loads(CONTACTS_PATH.read_text(encoding="utf-8"))
-
     stats = {"updated": 0, "unchanged": 0, "missing_user": 0, "skipped_local": 0}
-    for e in entries:
-        vekn_id, email = e.get("vekn_id"), e.get("email")
-        if not vekn_id or not email:
-            continue
+    for vekn_id, email in OFFICIALS_EMAILS.items():
         user = await _get_user_by_vekn_id(vekn_id)
         if user is None:
             stats["missing_user"] += 1
@@ -67,7 +61,7 @@ async def main() -> None:
         await save_user(user)
         stats["updated"] += 1
 
-    print(json.dumps({"total": len(entries), **stats}))
+    print(json.dumps({"total": len(OFFICIALS_EMAILS), **stats}))
 
 
 if __name__ == "__main__":
