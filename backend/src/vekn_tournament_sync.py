@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
+import msgspec
 from uuid6 import uuid7
 
 from .broadcast import broadcast_precomputed
@@ -325,58 +326,101 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
             # Check if already exists
             existing = await get_tournament_by_external_id("vekn", str(event_id))
             if existing:
-                # Only update if data actually changed
-                changed = (
-                    existing.state != tournament.state
-                    or existing.name != tournament.name
-                    or existing.format != tournament.format
-                    or existing.rank != tournament.rank
-                    or existing.start != tournament.start
-                    or existing.finish != tournament.finish
-                    or existing.timezone != tournament.timezone
-                    or existing.country != tournament.country
-                    or existing.online != tournament.online
-                    or existing.winner != tournament.winner
-                    or existing.venue != tournament.venue
-                    or existing.address != tournament.address
-                    or existing.venue_url != tournament.venue_url
-                    or existing.map_url != tournament.map_url
-                    or len(existing.players) != len(tournament.players)
+                merged_organizers = list(
+                    dict.fromkeys(existing.organizers_uids + tournament.organizers_uids)
                 )
-                if changed:
-                    # Merge organizers: keep existing + add VEKN organizer
-                    merged_organizers = list(
-                        dict.fromkeys(
-                            existing.organizers_uids + tournament.organizers_uids
+                if existing.rounds or existing.finals is not None:
+                    # Tournament was run in-app (it has play data). VEKN.net is NOT
+                    # authoritative for its rounds/finals/standings/players/winner/state
+                    # — only for descriptive event metadata. Refresh metadata only and
+                    # NEVER overwrite the play data (doing so would silently wipe rounds
+                    # and corrupt standings/ratings).
+                    meta_changed = (
+                        existing.name != tournament.name
+                        or existing.format != tournament.format
+                        or existing.rank != tournament.rank
+                        or existing.start != tournament.start
+                        or existing.finish != tournament.finish
+                        or existing.timezone != tournament.timezone
+                        or existing.country != tournament.country
+                        or existing.online != tournament.online
+                        or existing.venue != tournament.venue
+                        or existing.address != tournament.address
+                        or existing.venue_url != tournament.venue_url
+                        or existing.map_url != tournament.map_url
+                        or merged_organizers != existing.organizers_uids
+                    )
+                    if meta_changed:
+                        updated = msgspec.structs.replace(
+                            existing,
+                            modified=datetime.now(UTC),
+                            name=tournament.name,
+                            format=tournament.format,
+                            rank=tournament.rank,
+                            online=tournament.online,
+                            start=tournament.start,
+                            finish=tournament.finish,
+                            timezone=tournament.timezone,
+                            country=tournament.country,
+                            venue=tournament.venue,
+                            venue_url=tournament.venue_url,
+                            address=tournament.address,
+                            map_url=tournament.map_url,
+                            organizers_uids=merged_organizers,
                         )
-                    )
-                    tournament = Tournament(
-                        uid=existing.uid,
-                        modified=datetime.now(UTC),
-                        name=tournament.name,
-                        format=tournament.format,
-                        rank=tournament.rank,
-                        online=tournament.online,
-                        start=tournament.start,
-                        finish=tournament.finish,
-                        timezone=tournament.timezone,
-                        country=tournament.country,
-                        state=tournament.state,
-                        venue=tournament.venue,
-                        venue_url=tournament.venue_url,
-                        address=tournament.address,
-                        map_url=tournament.map_url,
-                        external_ids=tournament.external_ids,
-                        organizers_uids=merged_organizers,
-                        players=tournament.players,
-                        winner=tournament.winner,
-                        standings=tournament.standings,
-                    )
-                    bd = await save_tournament(tournament)
-                    broadcast_precomputed(bd)
-                    stats["updated"] += 1
+                        bd = await save_tournament(updated)
+                        broadcast_precomputed(bd)
+                        stats["updated"] += 1
+                    else:
+                        stats["unchanged"] += 1
                 else:
-                    stats["unchanged"] += 1
+                    # vekn-origin import (no play data): VEKN.net is authoritative for
+                    # everything, including players/standings/winner.
+                    changed = (
+                        existing.state != tournament.state
+                        or existing.name != tournament.name
+                        or existing.format != tournament.format
+                        or existing.rank != tournament.rank
+                        or existing.start != tournament.start
+                        or existing.finish != tournament.finish
+                        or existing.timezone != tournament.timezone
+                        or existing.country != tournament.country
+                        or existing.online != tournament.online
+                        or existing.winner != tournament.winner
+                        or existing.venue != tournament.venue
+                        or existing.address != tournament.address
+                        or existing.venue_url != tournament.venue_url
+                        or existing.map_url != tournament.map_url
+                        or len(existing.players) != len(tournament.players)
+                    )
+                    if changed:
+                        tournament = Tournament(
+                            uid=existing.uid,
+                            modified=datetime.now(UTC),
+                            name=tournament.name,
+                            format=tournament.format,
+                            rank=tournament.rank,
+                            online=tournament.online,
+                            start=tournament.start,
+                            finish=tournament.finish,
+                            timezone=tournament.timezone,
+                            country=tournament.country,
+                            state=tournament.state,
+                            venue=tournament.venue,
+                            venue_url=tournament.venue_url,
+                            address=tournament.address,
+                            map_url=tournament.map_url,
+                            external_ids=tournament.external_ids,
+                            organizers_uids=merged_organizers,
+                            players=tournament.players,
+                            winner=tournament.winner,
+                            standings=tournament.standings,
+                        )
+                        bd = await save_tournament(tournament)
+                        broadcast_precomputed(bd)
+                        stats["updated"] += 1
+                    else:
+                        stats["unchanged"] += 1
             else:
                 bd = await save_tournament(tournament)
                 broadcast_precomputed(bd)
