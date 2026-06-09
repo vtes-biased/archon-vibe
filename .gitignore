@@ -96,3 +96,7 @@ ansible/.ansible_facts/
 ansible/.ansible/
 ansible/*.retry
 ansible/galaxy_roles/
+
+# Local prod DB dump for migration dry-runs (never commit)
+archondb.dump.gz
+*.dump.gz
