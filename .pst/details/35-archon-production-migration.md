@@ -1,11 +1,11 @@
 # Production migration: archon → archon-vibe (epic #35)
 
 Migrated from `MIGRATION.md` (2026-06-06). **Status: shelved / draft for future execution.**
-Depends on a production-ready deployment path for archon-vibe (see ansible work, ticket #37).
+The production deployment path is ready: the standalone systemd ansible stack (prod inventory + roles + `just *-prod` recipes) was delivered by epics #81/#85 — #37 (its prereq ticket) is closed. Residual execution-time config is folded into Phase 1 (#39).
 
 ## Children (phases + gating work)
 - **#36** Resolve open questions before Phase 0 (decisions below)
-- **#37** Prereq: ansible systemd-deploy playbook for the VEKN VPS (blocks Phase 1)
+- **#37** ✅ done — ansible systemd-deploy playbook (delivered by #81/#85; residual config → #39)
 - **#38** Phase 0 — build the ETL + validation harness, dry-run on a prod dump
 - **#39** Phase 1 — parallel domain (`new.archon.vekn.net`), VEKN-sync only, IC/NC validation
 - **#40** Phase 2 — authoritative migration window + DNS cutover
@@ -109,7 +109,10 @@ Old archon is a **superset** of vekn.net (it synced from vekn.net and added loca
 ### Phase 1 (#39) — Deploy archon-vibe at parallel domain, validate the full ETL→sync path
 
 Stand up the new stack at `new.archon.vekn.net`:
-- Deployed via archon-vibe's ansible playbook (systemd-based, no Docker in prod — ticket #37).
+- Deployed via archon-vibe's ansible playbook (systemd-based, no Docker — the standalone prod path: `inventories/prod` + `playbooks/{site,database,deploy}.yml`, `just bootstrap-prod`/`database-prod`/`deploy-prod`). The playbook itself was delivered by epics #81/#85 (#37 closed); only execution-time config remains for this phase:
+  - fill the real VEKN-VPS host in `ansible/inventories/prod/hosts.ini` (currently the placeholder `archon-prod.example`)
+  - populate `ansible/inventories/prod/group_vars/vault.yml` (db/jwt/mail/discord/vekn secrets)
+  - for the parallel domain, override `domain_main` → `new.archon.vekn.net` (group_vars/`--extra-vars`) so nginx_tls + static_site + redirect URIs target the beta host, not prod `archon.vekn.net`
 - Fresh PostgreSQL 17 instance (do not share the old DB).
 - **Run the ETL from a recent prod dump** (`migrate_from_archon.py`), then **enable VEKN sync** so it reconciles on top — exercise the real Phase-2 ordering and dataset on the VPS. (See the data-flow note below: ETL first, then sync, no wipe.)
 - Enable Discord OAuth against a **new** redirect URI (`new.archon.vekn.net/auth/discord`) to avoid colliding with the prod one. Same Discord client ID is fine if you add the second redirect URI.
@@ -178,7 +181,7 @@ Post-cutover work, shipped as incremental versions of archon-vibe:
 
 - **NEW**: `backend/scripts/migrate_from_archon.py` — the ETL, connects to both DBs, streams in batches
 - **NEW**: `backend/scripts/migrate_validate.py` — post-ETL integrity checks
-- **PREREQ** (#37): ansible playbook to deploy archon-vibe via systemd on the VEKN VPS
+- **DONE** (#37): ansible systemd deploy stack — `ansible/{inventories/prod,roles,playbooks}`, `just deploy-prod` (built by #81/#85)
 - **MODIFY (old repo)**: `/Users/lpanhaleux/Developer/archon/src/archon/app/main.py` — add a read-only middleware flag for Phase 2 freeze
 - **REUSE** (read-only, as references for the ETL transformation):
   - `/Users/lpanhaleux/Developer/archon/src/archon/models.py` — source shapes
