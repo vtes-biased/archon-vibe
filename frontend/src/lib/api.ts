@@ -29,7 +29,12 @@ export class ApiError extends Error {
  */
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  // apiRequest auto-toasts HTTP error responses. Callers that surface errors
+  // themselves (their own catch toast — which ALSO covers network failures that
+  // never reach the block below — or an inline message) pass this to avoid a
+  // duplicate toast.
+  { suppressErrorToast = false }: { suppressErrorToast?: boolean } = {}
 ): Promise<T> {
   const token = getAccessToken();
   const headers: Record<string, string> = {
@@ -58,7 +63,7 @@ export async function apiRequest<T>(
       // Ignore JSON parse errors
     }
     const message = detail || `Request failed: ${response.statusText}`;
-    showToast({ type: 'error', message });
+    if (!suppressErrorToast) showToast({ type: 'error', message });
     throw new ApiError(message, response.status, detail);
   }
 
@@ -241,19 +246,20 @@ export interface AdminSyncResult {
 /** IC-only: trigger a VEKN member sync now (also runs on a 6h schedule). */
 export async function syncVeknMembers(): Promise<AdminSyncResult> {
   requireOnline();
-  return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' });
+  // Errors surface inline in ConfirmActionModal — suppress the duplicate toast.
+  return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 /** IC-only: trigger a VEKN tournament sync now (also runs on a 6h schedule). */
 export async function syncVeknTournaments(): Promise<AdminSyncResult> {
   requireOnline();
-  return apiRequest<AdminSyncResult>('/admin/sync-vekn-tournaments', { method: 'POST' });
+  return apiRequest<AdminSyncResult>('/admin/sync-vekn-tournaments', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 /** IC-only: trigger a TWDA decklist import now (also runs on a 24h schedule). */
 export async function syncTwdaDecks(): Promise<AdminSyncResult> {
   requireOnline();
-  return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' });
+  return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 // Sanctions API

@@ -151,16 +151,22 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
 
   let result: Tournament;
   try {
-    result = await apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/go-online`, {
-      method: 'POST',
-      body: JSON.stringify({
-        device_id: deviceId,
-        tournament,
-        offline_players: offlinePlayers,
-        offline_sanctions: offlineSanctions,
-        offline_decks: offlineDecks,
-      }),
-    });
+    result = await apiRequest<Tournament>(
+      `/api/tournaments/${tournamentUid}/go-online`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          device_id: deviceId,
+          tournament,
+          offline_players: offlinePlayers,
+          offline_sanctions: offlineSanctions,
+          offline_decks: offlineDecks,
+        }),
+      },
+      // handleGoOnline's catch toasts (incl. the localized 410 lock-lost
+      // message) and covers network errors — suppress apiRequest's duplicate.
+      { suppressErrorToast: true },
+    );
   } catch (e) {
     // 410: the server is no longer in offline mode (admin force-unlocked it, or
     // it was already brought online). Don't leave the device wedged — drop the
@@ -201,9 +207,13 @@ export async function forceTakeover(tournamentUid: string): Promise<void> {
  * server broadcasts the unlocked tournament over SSE, which reconciles IDB.
  */
 export async function forceUnlock(tournamentUid: string): Promise<void> {
-  await apiRequest(`/api/tournaments/${tournamentUid}/force-unlock`, {
-    method: 'POST',
-  });
+  // handleForceUnlock's catch toasts on failure (and covers network errors) —
+  // suppress apiRequest's duplicate.
+  await apiRequest(
+    `/api/tournaments/${tournamentUid}/force-unlock`,
+    { method: 'POST' },
+    { suppressErrorToast: true },
+  );
 }
 
 /** Add an offline player to the registry and create a local user stub. */
