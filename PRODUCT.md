@@ -454,11 +454,11 @@ the risk warrants. Treat the matrix as UI defaults, not a security guarantee.
 
 ### 5.2 Not Yet Implemented / Planned
 
-See `development-plan.md` for implementation phasing.
+Planned work is tracked in pst tickets.
 
-#### Discord Integration (Phase 12)
+#### Discord Integration
 
-- **Tournament butler bot**: Full tournament management via Discord slash commands (see `development-plan.md` Phase 12.2)
+- **Tournament butler bot**: Full tournament management via Discord slash commands
 
 #### Tournament Features
 
@@ -632,4 +632,3 @@ Player removed from rankings after 12 months of inactivity; rating preserved ind
 | Sync | `SYNC.md` | SSE streaming and IndexedDB sync patterns |
 | Tournaments | `TOURNAMENTS.md` | Tournament system implementation details |
 | Design | `frontend/DESIGN.md` | UI design guidelines |
-| Development Plan | `development-plan.md` | Implementation roadmap and phasing (maintained by product manager) |

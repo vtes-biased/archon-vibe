@@ -1,4 +1,4 @@
-"""Regression tests for VEKN account-surgery (pst #59 / #64).
+"""Regression tests for VEKN account-surgery.
 
 Covers the three db-layer primitives the detach/merge invariant rests on
 (.pst/details/59-vekn-detach.md) plus the self-abandon suspension guard:
@@ -146,10 +146,10 @@ async def test_merge_preserves_resync_after_and_identity(test_db):
 
     assert result is not None
     merged, broadcasts = result
-    # pst #66: the survivor's update + the dying account's soft-delete are
-    # surfaced so the route can push them to other clients' caches live.
+    # The survivor's update + the dying account's soft-delete are surfaced so
+    # the route can push them to other clients' caches live.
     assert len(broadcasts) == 2
-    # (a) resync_after PRESERVED from keep_user (the regression).
+    # (a) resync_after PRESERVED from keep_user.
     assert merged.resync_after == resync
     # identity prefers keep_user.
     assert merged.uid == keep.uid
@@ -167,7 +167,7 @@ async def test_merge_preserves_resync_after_and_identity(test_db):
 
 @pytest.mark.asyncio
 async def test_merge_reassigns_decks_sanctions_auth(test_db):
-    """#64: decks (and sanctions, auth) on the dying uid migrate to the survivor.
+    """Decks (and sanctions, auth) on the dying uid migrate to the survivor.
 
     The /claim bug orphaned the claimer's decks on their soon-deleted uid.
     """
@@ -189,13 +189,13 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
         result = await accounts.merge_users(keep.uid, delete.uid)
         assert result is not None
         _merged, broadcasts = result
-        # pst #78: reassigned sanction + deck (and survivor + soft-delete) are all
+        # Reassigned sanction + deck (and survivor + soft-delete) are all
         # surfaced for broadcast so other clients don't keep stale copies. Auth
         # methods aren't synced objects, so they don't appear here.
         # survivor + sanction + deck + soft-delete == 4 (no coopted-by refs here).
         assert len(broadcasts) == 4
 
-        # decks reassigned to the survivor (the #64 fix).
+        # decks reassigned to the survivor.
         assert await _deck_uids_for_user(keep.uid) == {deck.uid}
         assert await _deck_uids_for_user(delete.uid) == set()
 
@@ -211,7 +211,7 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
 
 @pytest.mark.asyncio
 async def test_merge_refuses_to_absorb_vekn_account(test_db):
-    """#77/#59: the absorbed (soft-deleted) account must NOT hold a VEKN ID.
+    """The absorbed (soft-deleted) account must NOT hold a VEKN ID.
 
     VEKN uids are immovable and never soft-deleted, and this also forbids merging
     two VEKN identities. Guards admin/discord (claim/link can't reach it). Because
@@ -299,7 +299,7 @@ async def test_detach_vekn_record_is_immovable(test_db):
         result = await accounts.detach_user_from_vekn(user.uid)
         assert result is not None
         personal, vekn_record, broadcasts = result
-        # pst #66: new personal account + nulled vekn_record surfaced for broadcast.
+        # New personal account + nulled vekn_record surfaced for broadcast.
         assert len(broadcasts) == 2
 
         # --- vekn_record is immovable: same uid, keeps competitive identity ---

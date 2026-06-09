@@ -1,12 +1,12 @@
 """Tests for SSE broadcast envelope + overflow handling.
 
-Covers two post-review sync-correctness fixes:
+Covers two sync-correctness invariants:
 - broadcast_precomputed emits the authoritative modified_at as the envelope
   `ts` field, so clients advance their sync cursor in the same value space as
-  the server's `since` catch-up filter (pst #6).
+  the server's `since` catch-up filter.
 - On asyncio.QueueFull the connection is marked closed and evicted, so the SSE
   generator ends the stream and the browser reconnects + catches up instead of
-  staying OPEN on a queue that no longer receives events (pst #5).
+  staying OPEN on a queue that no longer receives events.
 """
 
 import asyncio
@@ -30,7 +30,7 @@ def _bd(modified_at: str | None = MODIFIED_AT) -> BroadcastData:
 
 
 def test_broadcast_precomputed_includes_ts():
-    """Live envelope carries `ts` = authoritative modified_at (pst #6)."""
+    """Live envelope carries `ts` = authoritative modified_at."""
     conn = SSEConnection(user=None)  # no user -> public projection
     _sse_connections.clear()
     _sse_connections.add(conn)
@@ -58,7 +58,7 @@ def test_broadcast_precomputed_omits_ts_when_missing():
 
 
 def test_broadcast_precomputed_closes_connection_on_overflow():
-    """QueueFull marks the connection closed and evicts it (pst #5)."""
+    """QueueFull marks the connection closed and evicts it."""
     conn = SSEConnection(user=None)
     # Saturate the bounded queue so the next put_nowait raises QueueFull.
     while True:

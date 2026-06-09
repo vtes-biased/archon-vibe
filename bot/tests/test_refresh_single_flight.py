@@ -1,4 +1,4 @@
-"""Single-flight token-refresh tests for ArchonAPI (#11).
+"""Single-flight token-refresh tests for ArchonAPI.
 
 Reproduces the backend's refresh-token *rotation + reuse-detection* in a fake
 backend, then asserts that concurrent refreshers (SSE loop + a slash command

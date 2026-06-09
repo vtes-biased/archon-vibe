@@ -221,7 +221,7 @@ The frontend is the seating source; the server validates and stores it determini
 
 **Synced Object**: Leagues are streamed via SSE like tournaments/users. Stored in IndexedDB `leagues` store with `by-country` and `by-start` indexes.
 
-**Standings Modes**: RTP (rating points), Score (GW/VP/TP), GP (Grand Prix position-based). GP and RTP scoring use `compute_final_standings` to derive final placement (winner=1, other finalists=2) — fixes the bug where a non-prelim-1st finals winner was scored 15 instead of 25 GP points.
+**Standings Modes**: RTP (rating points), Score (GW/VP/TP), GP (Grand Prix position-based). GP and RTP scoring use `compute_final_standings` to derive final placement (winner=1, other finalists=2).
 
 ## Serialization
 

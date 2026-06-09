@@ -1,4 +1,4 @@
-"""Tests for the TWDA submission designer credit (pst #46).
+"""Tests for the TWDA submission designer credit.
 
 When a sanctioned tournament finishes, the winner's deck is auto-submitted to
 the TWDA. The generated entry must credit the deck *designer* via the deck's
@@ -14,7 +14,6 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from src.models import (
     DeckObject,
     Tournament,

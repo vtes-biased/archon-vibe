@@ -1,4 +1,4 @@
-"""Integration tests for pst #45: go-online resolves/creates offline players
+"""Integration tests for go-online: it resolves/creates offline players
 BEFORE taking the FOR UPDATE lock.
 
 The restructure moves user creation out of the lock, so the pre-lock checks must
@@ -148,7 +148,7 @@ async def test_organizer_resolves_players_and_goes_online(test_client, test_db):
 @pytest.mark.asyncio
 async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
     """Structural remap reaches seating/winner; deck attribution is recomputed
-    from the resolved user (pst #15) — no stale TEMP- survives reconciliation."""
+    from the resolved user — no stale TEMP- survives reconciliation."""
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
     await db.save_user(org)
     base_uid = await _seed(org.uid)
@@ -210,7 +210,7 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
 
 @pytest.mark.asyncio
 async def test_duplicate_participant_rejected(test_client, test_db):
-    """pst #77: an offline temp player that resolves (by VEKN ID) to someone
+    """An offline temp player that resolves (by VEKN ID) to someone
     already in the tournament must NOT create a duplicate participant. The only
     real participant-into-existing-VEKN case is this offline sync, and we handle
     it per-tournament by failing early (409) rather than auto-merging players.

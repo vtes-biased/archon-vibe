@@ -5,7 +5,6 @@ Covers:
 - _is_organizer: NC same-country grants implicit organizer access
 - _build_actor_context: IC/NC role sets is_organizer=True
 - _map_vekn_to_tournament: organizer_veknid mapped to organizers_uids
-- sync_all_tournaments: organizer merge on update preserves existing + adds VEKN
 """
 
 from datetime import UTC, datetime
@@ -211,30 +210,3 @@ class TestVeknOrganizerMapping:
         assert t is not None
         assert t.organizers_uids == ["uid-org"]
         assert t.state == TournamentState.PLANNED
-
-
-# ============================================================================
-# Organizer merge on update (unit test for the merge logic)
-# ============================================================================
-
-
-class TestOrganizerMerge:
-    def test_merge_deduplicates(self):
-        """The merge logic: list(dict.fromkeys(existing + new)) deduplicates."""
-        existing = ["uid-a", "uid-b"]
-        new = ["uid-b", "uid-c"]
-        merged = list(dict.fromkeys(existing + new))
-        assert merged == ["uid-a", "uid-b", "uid-c"]
-
-    def test_merge_preserves_existing_when_vekn_empty(self):
-        """If VEKN sync has no organizer, existing ones are preserved."""
-        existing = ["uid-a", "uid-b"]
-        new = []
-        merged = list(dict.fromkeys(existing + new))
-        assert merged == ["uid-a", "uid-b"]
-
-    def test_merge_adds_new_when_existing_empty(self):
-        existing = []
-        new = ["uid-c"]
-        merged = list(dict.fromkeys(existing + new))
-        assert merged == ["uid-c"]

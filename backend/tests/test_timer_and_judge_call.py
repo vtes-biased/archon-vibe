@@ -1,8 +1,6 @@
-"""Tests for timer + judge call features.
+"""Tests for table-label resolution and judge-call routing.
 
 Covers:
-- Timer data visibility in SSE filter (member must see timer fields)
-- Timer lifecycle hooks in tournament_action (StartRound resets, FinishRound pauses)
 - resolveTableLabelPy (room label resolution)
 - broadcast_judge_call targeting (only explicit organizers receive)
 """
@@ -13,7 +11,6 @@ from src.broadcast import SSEConnection, broadcast_judge_call
 from src.models import (
     Role,
     Room,
-    TimerState,
     User,
 )
 from src.routes.tournaments import resolveTableLabelPy
@@ -65,56 +62,6 @@ class TestResolveTableLabel:
     def test_index_beyond_rooms_falls_back(self):
         rooms = [Room(name="Small", count=2)]
         assert resolveTableLabelPy(rooms, 5) == "Table 6"
-
-
-# ============================================================================
-# Timer lifecycle hooks (unit-level assertions on the state transitions)
-# ============================================================================
-
-
-class TestTimerLifecycleHooks:
-    """Verify the timer state transitions done inline in tournament_action.
-
-    These test the logic at lines 741-754 of tournaments.py:
-    - StartRound/StartFinals: fresh paused timer, clear table extensions
-    - FinishRound/CancelRound/FinishTournament: accumulate elapsed, pause, clear table extensions
-    """
-
-    def test_start_round_creates_fresh_timer(self):
-        """Simulating the effect of the StartRound hook."""
-        # The hook code (resets timer/extra from previous round):
-        new_timer = TimerState()
-        new_extra: dict = {}
-
-        assert new_timer.paused is True
-        assert new_timer.started_at is None
-        assert new_timer.elapsed_before_pause == 0.0
-        assert new_extra == {}
-
-    def test_finish_round_pauses_running_timer(self):
-        """Simulating the effect of FinishRound when timer is running."""
-        timer = TimerState(started_at=NOW, elapsed_before_pause=100.0, paused=False)
-
-        # The hook code (paraphrased):
-        if not timer.paused and timer.started_at:
-            elapsed = (datetime.now(UTC) - timer.started_at).total_seconds()
-            result = TimerState(
-                elapsed_before_pause=timer.elapsed_before_pause + elapsed,
-                paused=True,
-            )
-            assert result.paused is True
-            assert result.elapsed_before_pause > 100.0
-            assert result.started_at is None
-
-    def test_finish_round_already_paused_noop(self):
-        """If timer was already paused, FinishRound should not change elapsed."""
-        timer = TimerState(elapsed_before_pause=500.0, paused=True)
-
-        # The hook code: condition not met, timer stays as-is
-        if not timer.paused and timer.started_at:
-            pass  # not entered
-        # Only table extensions are cleared
-        assert timer.elapsed_before_pause == 500.0
 
 
 # ============================================================================

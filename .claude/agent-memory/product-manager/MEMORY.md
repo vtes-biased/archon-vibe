@@ -3,7 +3,7 @@
 ## Project Overview
 - Archon: offline-first PWA for VTES tournament management + VEKN membership
 - Primary user: tournament organizer on mobile, under time pressure
-- `PRODUCT.md` (root) is the comprehensive domain + product reference; `development-plan.md` is the 12-phase roadmap.
+- `PRODUCT.md` (root) is the comprehensive domain + product reference; planned/outstanding work is tracked in pst tickets.
 
 ## Key Reference Docs
 - `PRODUCT.md` — domain rules, user roles, features, constraints
@@ -34,9 +34,9 @@
 - Meta-leagues: 2-level hierarchy max. `allow_no_finals` is a hint, not enforcement.
 
 ## Roadmap Status (as of 2026-06)
-Most of phases 1–11 have shipped (decklists+TWDA, leagues, sanctions v2, ratings/HoF, QR check-in, online features, offline mode, help/docs, ratings push to VEKN). Treat `development-plan.md` + `PRODUCT.md` as the source of truth; don't re-track shipped features here. **Still outstanding / forward-looking:**
-- Phase 12 Discord tournament bot — partially built (slash commands + SSE listener exist), not a finished phase.
-- Table labels (phase 7 remainder), Pretix integration (phase 9 remainder), VEKN venue import (phase 10 remainder).
+Most core features have shipped (decklists+TWDA, leagues, sanctions v2, ratings/HoF, QR check-in, online features, offline mode, help/docs, ratings push to VEKN). Treat `PRODUCT.md` + pst tickets as the source of truth; don't re-track shipped features here. **Still outstanding / forward-looking:**
+- Discord tournament bot — partially built (slash commands + SSE listener exist), not finished.
+- Table labels, Pretix integration, VEKN venue import.
 
 ## Agent Conventions
 - Principal engineer: guards offline-first, Rust pipeline, data sync model.

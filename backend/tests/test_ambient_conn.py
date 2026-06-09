@@ -1,4 +1,4 @@
-"""Tests for pst #44: the ambient transaction connection.
+"""Tests for the ambient transaction connection.
 
 While a `tournament_transaction` is open, READ helpers (those routed through
 `db._acquire`) transparently reuse its connection instead of checking out a

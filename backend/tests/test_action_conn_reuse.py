@@ -1,4 +1,4 @@
-"""Regression tests for pst #12: the tournament action handler must not acquire
+"""Regression tests: the tournament action handler must not acquire
 extra pooled connections while holding the FOR UPDATE row lock.
 
 Reads inside ``tournament_transaction`` now run on the locked ``tx_conn`` instead
