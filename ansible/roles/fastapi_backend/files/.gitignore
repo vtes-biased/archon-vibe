@@ -1,0 +1,3 @@
+# Never commit the plaintext officials contacts — only the ansible-vault file.
+officials_contacts.json
+!officials_contacts.json.vault

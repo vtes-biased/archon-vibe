@@ -134,6 +134,20 @@
     mode: "0640"
   notify: Restart backend service
 
+# Personal data (scraped NC/Prince contacts). Provide it as an ansible-vault
+# file at files/officials_contacts.json.vault (see role README); copy decrypts
+# it to the runtime path the backend reads (OFFICIALS_CONTACTS_FILE in env.j2).
+# fileglob → no-op when the vault file isn't present, so deploys never break.
+- name: Deploy officials contacts (ansible-vault, optional)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ _env_dir }}/officials_contacts.json"
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0640"
+  loop: "{{ query('ansible.builtin.fileglob', 'officials_contacts.json.vault') }}"
+  notify: Restart backend service
+
 - name: Render systemd unit
   ansible.builtin.template:
     src: service.j2

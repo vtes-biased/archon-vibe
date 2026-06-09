@@ -2,8 +2,9 @@
 
 import json
 import logging
+import os
 from datetime import UTC, datetime
-from importlib.resources import files
+from pathlib import Path
 from typing import Any
 
 from uuid6 import uuid7
@@ -24,16 +25,27 @@ from .vekn_api import VEKNAPIClient, VEKNAPIError
 logger = logging.getLogger(__name__)
 
 
-# NC/Prince public contact emails scraped from the vekn.net official lists
+# NC/Prince contact emails scraped from the vekn.net official lists
 # (national-coordinators + prince-list), keyed by vekn_id. The member API does
-# not expose these (cloaked on the site), so we inject them during sync. See
-# data/officials_contacts.json and scripts/backfill_officials_contacts.py.
+# not expose these (cloaked on the site), so we inject them during sync.
+#
+# This is personal data, so it is NOT bundled in the repo/wheel. It is delivered
+# out of band: at deploy time ansible decrypts an ansible-vault file to
+# OFFICIALS_CONTACTS_FILE (default `/etc/archon/officials_contacts.json`); in dev
+# it is an untracked file next to this package. Missing file -> no injection.
+# See scripts/backfill_officials_contacts.py and the ansible fastapi_backend role.
+def _officials_contacts_path() -> Path:
+    env = os.environ.get("OFFICIALS_CONTACTS_FILE")
+    if env:
+        return Path(env)
+    return Path(__file__).parent / "data" / "officials_contacts.json"
+
+
 def _load_officials_emails() -> dict[str, str]:
-    data_file = files(__package__).joinpath("data", "officials_contacts.json")
     try:
-        entries = json.loads(data_file.read_text(encoding="utf-8"))
+        entries = json.loads(_officials_contacts_path().read_text(encoding="utf-8"))
     except FileNotFoundError:
-        logger.warning("officials_contacts.json not found; skipping email injection")
+        logger.info("officials contacts file not present; skipping email injection")
         return {}
     return {
         e["vekn_id"]: e["email"] for e in entries if e.get("vekn_id") and e.get("email")

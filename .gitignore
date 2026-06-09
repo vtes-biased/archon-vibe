@@ -99,3 +99,7 @@ ansible/galaxy_roles/
 # Local prod DB dump for migration dry-runs (never commit)
 archondb.dump.gz
 *.dump.gz
+
+# Personal data (scraped NC/Prince contacts) — never commit plaintext.
+# Dev keeps an untracked copy here; prod gets it via ansible-vault at deploy.
+backend/src/data/officials_contacts.json
