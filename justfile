@@ -11,6 +11,10 @@ default:
 dev:
     #!/usr/bin/env bash
     set -e
+    # wasm-pack shells out to whatever `cargo`/`rustc` is first on PATH. If a
+    # Homebrew rust is ahead of rustup's, it has no wasm32 target and the build
+    # fails — so force rustup's toolchain (which has wasm32) to the front.
+    export PATH="$HOME/.cargo/bin:$PATH"
     just dev-stop
     echo "Building engine..."
     (cd engine && wasm-pack build --target web --release -- --features wasm)
@@ -87,6 +91,8 @@ test-backend *ARGS='-v':
 build:
     #!/usr/bin/env bash
     set -e
+    # Force rustup's toolchain (has wasm32) ahead of any Homebrew rust on PATH.
+    export PATH="$HOME/.cargo/bin:$PATH"
     (cd engine && wasm-pack build --target web --release -- --features wasm)
     uv run maturin develop --release --manifest-path engine/Cargo.toml
     docker compose build
@@ -120,15 +126,18 @@ dev-reset:
     just dev-stop
     docker compose down -v
 
-# Run E2E tests (Docker)
+# Run E2E tests (Docker, isolated compose project — teardown can't touch dev DB)
 test-e2e:
     #!/usr/bin/env bash
+    # Own compose project so volumes are project-name-prefixed: `down -v` here
+    # only removes archon-vibe-e2e_* — never archon-vibe_postgres_data (dev DB).
     cleanup() {
-        docker compose --profile test down
+        docker compose -p archon-vibe-e2e --profile test down -v >/dev/null 2>&1
         echo "Test report: playwright-report/index.html"
     }
     trap cleanup EXIT
-    docker compose --profile test up --build --abort-on-container-exit frontend-test
+    docker compose -p archon-vibe-e2e --profile test up --build \
+        --abort-on-container-exit --exit-code-from frontend-test frontend-test
 
 # Clean all build artifacts
 clean:
