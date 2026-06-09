@@ -1,0 +1,94 @@
+---
+# Beta deploy — archon-vibe on the server-setup-provisioned frankfurt host.
+# server-setup owns the foundation (base packages incl. Postgres + nginx +
+# certbot, ssh/ufw/tuning, PG backups, Grafana Alloy observability); this play
+# only ships the app. Frontend keeps archon's own PWA vhost (nginx_site's spa
+# mode would immutable-cache the service worker); the bot uses server-setup's
+# shared nginx_site (proxy + journald tag). Runs as the `deploy` user.
+- name: Deploy archon-vibe (beta — server-setup foundation)
+  hosts: archon
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../vars/release_artifacts.yml
+
+  pre_tasks:
+    - name: Fetch release artifacts (shared)
+      ansible.builtin.import_tasks: ../tasks/fetch_release.yml
+
+    - name: Ensure runtime user + app dirs
+      ansible.builtin.import_tasks: ../tasks/app_user.yml
+
+  roles:
+    # 1. Database + owner role (server-setup). Runs as the postgres OS user for
+    #    peer auth over the unix socket; the runtime user (== db_user) connects
+    #    the same way, so the DATABASE_URL password is vestigial.
+    - role: postgres_db
+      become: true
+      become_user: postgres
+      vars:
+        postgres_db_name: "{{ db_name }}"
+        postgres_db_user: "{{ db_user }}"
+        postgres_db_password: "{{ db_password }}"
+
+    # 2. TLS cert for the main domain (archon's certbot webroot role).
+    - role: nginx_tls
+      r:
+        server_name: "{{ domain_main }}"
+        contact_email: "{{ contact_email }}"
+
+    # 3. Backend uvicorn service (localhost only; the frontend vhost proxies to it).
+    - role: fastapi_backend
+      r:
+        service_name: "{{ backend_service }}"
+        site_root: "{{ backend_site_root }}"
+        port: "{{ backend_port }}"
+        asgi_entrypoint: "backend.src.main:app"
+        python_version: "{{ python_version }}"
+        uv_python_install_dir: "{{ uv_python_install_dir }}"
+        user: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        backend_wheel_src: "{{ backend_wheel }}"
+        engine_wheel_src: "{{ engine_wheel }}"
+        requirements_src: "{{ backend_requirements }}"
+        env: "{{ backend_env }}"
+        env_dir: "{{ env_dir }}"
+
+    # 4. Frontend dist + PWA-correct vhost (archon's own role manages this nginx).
+    - role: static_site
+      r:
+        server_name: "{{ domain_main }}"
+        site_root: "{{ frontend_site_root }}"
+        dist_src: "{{ frontend_dist_dir }}"
+        owner: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        backend_port: "{{ backend_port }}"
+
+    # 5. Bot service only — vhost delegated to nginx_site below.
+    - role: discord_bot
+      r:
+        manage_nginx: false
+        service_name: "{{ bot_service }}"
+        site_root: "{{ bot_site_root }}"
+        bot_wheel_src: "{{ bot_wheel }}"
+        requirements_src: "{{ bot_requirements }}"
+        python_version: "{{ python_version }}"
+        uv_python_install_dir: "{{ uv_python_install_dir }}"
+        user: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        port: "{{ bot_port }}"
+        state_dir: "{{ bot_state_dir }}"
+        env: "{{ bot_env }}"
+        env_dir: "{{ env_dir }}"
+
+    # 6. Bot vhost via server-setup's shared nginx_site (proxy + cert + journald
+    #    tag nginx_<name>). The bot is a plain reverse proxy, so spa-mode caveats
+    #    don't apply here.
+    - role: nginx_site
+      vars:
+        nginx_site_name: "{{ service_name }}_bot"
+        nginx_site_domain: "{{ domain_bot }}"
+        nginx_site_type: proxy
+        nginx_site_upstream: "http://127.0.0.1:{{ bot_port }}"
+        nginx_site_client_max_body_size: "1m"

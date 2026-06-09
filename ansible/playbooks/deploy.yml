@@ -4,104 +4,12 @@
   become: true
   gather_facts: true
 
-  vars:
-    # Artifact source: 'release' (default) downloads CI-built wheels from the
-    # GitHub Release; 'local' deploys a local `make build-all` output in build/.
-    artifact_source: release
-    github_repo: vtes-biased/archon-vibe
-    # Release to deploy; empty = latest published (non-prerelease). Override with
-    # -e release_tag=vX.Y.Z (the Makefile passes RELEASE_TAG through).
-    release_tag: ""
-    # Optional token to lift GitHub API rate limits (the CI deploy workflow can
-    # set GITHUB_TOKEN); the repo is public so asset downloads need no auth.
-    github_token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN', default='') }}"
-
-    build_dir: "{{ playbook_dir }}/../build"
-    backend_wheel: >-
-      {{ lookup('ansible.builtin.fileglob', build_dir + '/archon-*.whl',
-                wantlist=True) | sort | last }}
-    engine_wheel: >-
-      {{ lookup('ansible.builtin.fileglob', build_dir + '/archon_engine-*.whl',
-                wantlist=True) | sort | last }}
-    backend_requirements: "{{ build_dir }}/backend-requirements.txt"
-    bot_requirements: "{{ build_dir }}/bot-requirements.txt"
-    bot_wheel: >-
-      {{ lookup('ansible.builtin.fileglob', build_dir + '/archon_discord_bot-*.whl',
-                wantlist=True) | sort | last }}
-    frontend_dist_dir: "{{ build_dir }}/frontend-dist"
+  vars_files:
+    - ../vars/release_artifacts.yml
 
   pre_tasks:
-    # Download CI-built artifacts straight from the GitHub Release onto the
-    # control node (the roles then copy them to the hosts). Self-contained: no
-    # make, no gh CLI — so `ansible-playbook deploy.yml` runs identically from a
-    # laptop or a CI runner. Skipped for artifact_source=local.
-    - name: Fetch release artifacts
-      when: artifact_source == 'release'
-      delegate_to: localhost
-      become: false
-      run_once: true
-      block:
-        - name: Reset local artifact dir
-          ansible.builtin.file:
-            path: "{{ build_dir }}"
-            state: "{{ item }}"
-            mode: "0755"
-          loop:
-            - absent
-            - directory
-
-        - name: Resolve release metadata
-          ansible.builtin.uri:
-            url: >-
-              https://api.github.com/repos/{{ github_repo }}/releases/{{
-              'latest' if (release_tag | length == 0) else 'tags/' ~ release_tag }}
-            headers: >-
-              {{ {'Accept': 'application/vnd.github+json'}
-                 | combine({'Authorization': 'Bearer ' ~ github_token}
-                           if github_token else {}) }}
-            return_content: true
-          register: _release
-
-        - name: Report resolved release
-          ansible.builtin.debug:
-            msg: >-
-              Deploying release {{ _release.json.tag_name }}
-              ({{ _release.json.assets | length }} assets) from {{ github_repo }}
-
-        - name: Download release assets into build/
-          ansible.builtin.get_url:
-            url: "{{ item.browser_download_url }}"
-            dest: "{{ build_dir }}/{{ item.name }}"
-            mode: "0644"
-          loop: "{{ _release.json.assets }}"
-          loop_control:
-            label: "{{ item.name }}"
-
-        - name: Create frontend dist dir
-          ansible.builtin.file:
-            path: "{{ frontend_dist_dir }}"
-            state: directory
-            mode: "0755"
-
-        - name: Unpack frontend dist
-          ansible.builtin.unarchive:
-            src: "{{ build_dir }}/frontend-dist.tar.gz"
-            dest: "{{ frontend_dist_dir }}"
-            remote_src: true
-
-    - name: Assert build artifacts are present
-      ansible.builtin.assert:
-        that:
-          - backend_wheel is string and backend_wheel | length > 0
-          - engine_wheel is string and engine_wheel | length > 0
-          - bot_wheel is string and bot_wheel | length > 0
-        fail_msg: >-
-          build/ is missing wheels. For artifact_source=release the Release has no
-          attached wheels yet (run the release-artifacts workflow); for SOURCE=local
-          run `make build-all` first.
-      delegate_to: localhost
-      become: false
-      run_once: true
+    - name: Fetch release artifacts (shared)
+      ansible.builtin.import_tasks: ../tasks/fetch_release.yml
 
   roles:
     # 1. TLS certs for main + bot domain (certbot webroot, idempotent)

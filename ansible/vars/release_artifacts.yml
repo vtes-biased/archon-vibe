@@ -1,0 +1,23 @@
+---
+# Shared release-artifact resolution for the deploy playbooks (prod deploy.yml +
+# beta deploy-beta.yml). The fetch logic itself lives in tasks/fetch_release.yml.
+artifact_source: release          # 'release' = download from the GitHub Release; 'local' = use build/
+github_repo: vtes-biased/archon-vibe
+release_tag: ""                   # empty = latest (non-prerelease); -e release_tag=vX.Y.Z to pin
+# Optional token to lift the GitHub API rate limit (the CI deploy workflow sets
+# GITHUB_TOKEN); the repo is public so asset downloads need no auth.
+github_token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN', default='') }}"
+
+build_dir: "{{ playbook_dir }}/../build"
+backend_wheel: >-
+  {{ lookup('ansible.builtin.fileglob', build_dir + '/archon-*.whl',
+            wantlist=True) | sort | last }}
+engine_wheel: >-
+  {{ lookup('ansible.builtin.fileglob', build_dir + '/archon_engine-*.whl',
+            wantlist=True) | sort | last }}
+backend_requirements: "{{ build_dir }}/backend-requirements.txt"
+bot_requirements: "{{ build_dir }}/bot-requirements.txt"
+bot_wheel: >-
+  {{ lookup('ansible.builtin.fileglob', build_dir + '/archon_discord_bot-*.whl',
+            wantlist=True) | sort | last }}
+frontend_dist_dir: "{{ build_dir }}/frontend-dist"

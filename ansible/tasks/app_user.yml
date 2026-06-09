@@ -1,0 +1,36 @@
+---
+# Create the unprivileged runtime user/group + app dirs for the beta deploy.
+# Prod gets these from the `common` role at bootstrap; the beta box is
+# server-setup-provisioned (which doesn't know archon's app user), so the deploy
+# playbook owns them. The user name == the DB role so Postgres peer auth over the
+# unix socket works (DATABASE_URL's password is then vestigial).
+- name: Ensure runtime group exists
+  ansible.builtin.group:
+    name: "{{ archon_group }}"
+    state: present
+    system: true
+
+- name: Ensure runtime user exists
+  ansible.builtin.user:
+    name: "{{ archon_user }}"
+    group: "{{ archon_group }}"
+    state: present
+    shell: /usr/sbin/nologin
+    system: true
+    home: "{{ opt_root }}"
+    create_home: false
+
+- name: Ensure app directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ archon_group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ opt_root }}", owner: "{{ archon_user }}", mode: "0755" }
+    - { path: "{{ env_dir }}", owner: "root", mode: "0750" }
+    - { path: "{{ app_lib_dir }}", owner: "{{ archon_user }}", mode: "0750" }
+    - { path: "{{ app_lib_dir }}/snapshots", owner: "{{ archon_user }}", mode: "0750" }
+  loop_control:
+    label: "{{ item.path }}"

@@ -5,13 +5,17 @@
 # ----------------------------------------------------------------------------
 
 # --- identity -------------------------------------------------------------
+# Beta runs alongside the legacy `archon` on the server-setup frankfurt host, so
+# everything is namespaced `new_archon` to avoid collisions (user, paths, db,
+# services, domain). service_name flows to the shared nginx_site role.
 admin_user: lpanhaleux           # sudo-capable human account used by ansible
-archon_user: archon              # unprivileged runtime user owning /opt/archon
-archon_group: archon
+service_name: new_archon         # shared identifier (nginx_site tag, db name)
+archon_user: new_archon          # unprivileged runtime user (== db role for PG peer auth)
+archon_group: new_archon
 contact_email: "lionel.panhaleux@gmail.com"
 
 # --- domains --------------------------------------------------------------
-domain_main: archon.krcg.org
+domain_main: new.archon.krcg.org
 domain_bot: bot.archon.krcg.org
 site_url_base: "https://{{ domain_main }}"
 
@@ -27,16 +31,17 @@ backend_port: 8007
 bot_port: 9007                    # matches bot default 9000 but differentiated per env
 
 # --- filesystem paths -----------------------------------------------------
-opt_root: /opt/archon
+opt_root: /opt/new_archon
 backend_site_root: "{{ opt_root }}/backend"
 bot_site_root: "{{ opt_root }}/bot"
-frontend_site_root: /var/www/archon
-bot_state_dir: /var/lib/archon-bot
-env_dir: /etc/archon
+frontend_site_root: /var/www/new_archon
+bot_state_dir: /var/lib/new_archon-bot
+env_dir: /etc/new_archon
+app_lib_dir: /var/lib/new_archon          # backend snapshots etc. (created by tasks/app_user.yml)
 
 # --- service names --------------------------------------------------------
-backend_service: archon-backend
-bot_service: archon-bot
+backend_service: new-archon-backend
+bot_service: new-archon-bot
 
 # --- versions -------------------------------------------------------------
 # PostgreSQL pinned via PGDG repo. Python is managed by uv (downloaded from
@@ -47,8 +52,8 @@ python_version: "3.13"
 uv_python_install_dir: /opt/uv/python
 
 # --- database -------------------------------------------------------------
-db_name: archon
-db_user: archon
+db_name: new_archon
+db_user: new_archon
 db_password: "{{ vault_db_password }}"
 
 # --- backend env vars (non-secret) ----------------------------------------
@@ -87,7 +92,7 @@ backend_env:
   VEKN_API_PASSWORD: "{{ vault_vekn_password }}"
   VEKN_PUSH: "false"           # beta does not push results back to VEKN
   # --- misc ---------------------------------------------------------------
-  SNAPSHOT_DIR: /var/lib/archon/snapshots
+  SNAPSHOT_DIR: "{{ app_lib_dir }}/snapshots"
   TWDA_GITHUB_APP_ID: "{{ vault_twda_github_app_id | default('') }}"
   TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
   TWDA_GITHUB_PRIVATE_KEY: "{{ vault_twda_github_private_key | default('') }}"

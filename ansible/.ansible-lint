@@ -8,6 +8,7 @@ exclude_paths:
   - build/
   - .ansible_facts/
   - .cache/
+  - galaxy_roles/           # third-party roles installed via `make galaxy` (server-setup)
   - inventories/beta/group_vars/vault.yml
   - inventories/prod/group_vars/vault.yml
 

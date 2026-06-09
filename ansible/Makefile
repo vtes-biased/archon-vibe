@@ -94,8 +94,10 @@ database-prod: ## Install/configure PostgreSQL + archon DB/user on prod
 # ---- app deploy (routine updates) ------------------------------------------
 # The playbook self-fetches the Release artifacts. RELEASE_TAG=vX.Y.Z pins a
 # release (default: latest); SOURCE=local builds here and deploys that instead.
-deploy-beta: $(LOCAL_BUILD) ## Deploy backend/frontend/bot to beta (RELEASE_TAG=… / SOURCE=local)
-	$(ANSIBLE) -i inventories/beta playbooks/deploy.yml $(DEPLOY_VARS)
+# Beta rides the server-setup foundation on frankfurt (deploy-beta.yml); prod is
+# the standalone vekn.net target (deploy.yml).
+deploy-beta: $(LOCAL_BUILD) ## Deploy archon-vibe to beta/frankfurt (RELEASE_TAG=… / SOURCE=local)
+	$(ANSIBLE) -i inventories/beta playbooks/deploy-beta.yml $(DEPLOY_VARS)
 
 deploy-prod: $(LOCAL_BUILD) ## Deploy backend/frontend/bot to prod (RELEASE_TAG=… / SOURCE=local)
 	$(ANSIBLE) -i inventories/prod playbooks/deploy.yml $(DEPLOY_VARS)

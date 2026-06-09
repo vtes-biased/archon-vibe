@@ -93,5 +93,6 @@ INCOMING/
 ansible/build/
 ansible/.vault_pass
 ansible/.ansible_facts/
+ansible/.ansible/
 ansible/*.retry
 ansible/galaxy_roles/
