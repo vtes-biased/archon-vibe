@@ -66,6 +66,27 @@ ansible-vault edit inventories/prod/group_vars/vault.yml
 just bootstrap-beta                        # provision beta end-to-end
 ```
 
+## Cutting a release
+
+```bash
+just release v1.2.3    # tags + pushes; CI runs e2e and, if green, creates the GitHub Release
+```
+
+`just release <tag>` validates the tag starts with `v`, the working tree is clean,
+and the tag doesn't already exist, then runs `git tag` + `git push origin <tag>`.
+From there:
+
+1. `.github/workflows/release.yml` runs the full Playwright E2E suite (isolated
+   stack). A failing suite aborts — no Release is created.
+2. On success, the workflow runs `gh release create <tag> --verify-tag
+   --generate-notes` to publish the GitHub Release.
+3. Publishing the Release triggers `release-artifacts.yml` to build and attach
+   the wheel / frontend dist assets.
+4. Deploy is manual + approval-gated (`deploy.yml`) — nothing auto-deploys.
+
+To run the E2E suite without cutting a release (e.g. on `main`), use
+`workflow_dispatch` on `release.yml` in the Actions tab.
+
 ## Routine updates
 
 ```bash
