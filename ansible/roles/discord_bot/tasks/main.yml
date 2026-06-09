@@ -11,7 +11,9 @@
       - r.user is defined
       - r.group is defined
       - r.port is defined
-      - r.server_name is defined
+      # server_name drives the nginx vhost — only required when this role manages
+      # nginx (prod). Beta sets manage_nginx=false and uses nginx_site.
+      - (not (r.manage_nginx | default(true))) or (r.server_name is defined)
       - r.state_dir is defined
       - r.env is defined
     fail_msg: "discord_bot role missing required r.* inputs"
@@ -152,4 +154,5 @@
     src: https.conf.j2
     dest: "/etc/nginx/sites-enabled/{{ r.server_name }}.https.conf"
     mode: "0644"
+  when: r.manage_nginx | default(true)
   notify: Reload nginx (discord_bot)
