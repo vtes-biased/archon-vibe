@@ -48,4 +48,4 @@ Shell: macOS zsh — use `python3`, POSIX flags, no `timeout`.
 
 ## Anti-Patterns
 
-Don't mock the database or Rust engine. Don't test framework behavior. Don't snapshot dynamic content. Don't add tests just for coverage numbers. Don't write tests longer than the code they test.
+Don't mock the database or Rust engine. Don't test framework behavior. Don't snapshot dynamic content. Don't add tests just for coverage numbers. Don't write tests longer than the code they test. Don't propose a whole new test vertical (a unit runner like vitest, a new harness) to cover one function or a marginal gap — weigh setup + ongoing upkeep against the existing layers (svelte-check, e2e), remember a one-test vertical bit-rots, and check whether pending work (e.g. a planned refactor) supersedes the gap before recommending it.
