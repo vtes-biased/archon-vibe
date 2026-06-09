@@ -53,7 +53,10 @@ def load_countries() -> dict[str, Country]:
     Returns:
         Dictionary mapping ISO codes to Country objects
     """
-    data_file = files("backend.src.data.geonames").joinpath("countries.json")
+    # Anchor on this module's own package so it resolves both in dev (`src`) and in
+    # the wheel (also `src` — pyproject packages = ["backend/src"]); a hardcoded
+    # "backend.src..." has no `backend` top-level once installed as a wheel.
+    data_file = files(__package__).joinpath("data", "geonames", "countries.json")
     return json.loads(data_file.read_text(encoding="utf-8"))
 
 
@@ -64,7 +67,7 @@ def load_cities() -> list[City]:
     Returns:
         List of City objects sorted by population (descending)
     """
-    data_file = files("backend.src.data.geonames").joinpath("cities.json")
+    data_file = files(__package__).joinpath("data", "geonames", "cities.json")
     return json.loads(data_file.read_text(encoding="utf-8"))
 
 
