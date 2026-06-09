@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import { scoreSeatingSync, computePlayerIssuesSync } from "$lib/engine";
@@ -227,7 +228,7 @@
       await loadPlayerNames();
       computeSeatingScore();
     } catch (e) {
-      error = e instanceof Error ? e.message : m.rounds_error_save();
+      error = toUserMessage(e, m.rounds_error_save());
     } finally {
       scoreSaving = null;
     }
@@ -247,7 +248,7 @@
       overrideTable_ = null;
       overrideComment = "";
     } catch (e) {
-      error = e instanceof Error ? e.message : m.override_error();
+      error = toUserMessage(e, m.override_error());
     } finally {
       overrideSaving = false;
     }
@@ -263,7 +264,7 @@
       await loadPlayerNames();
       computeSeatingScore();
     } catch (e) {
-      error = e instanceof Error ? e.message : m.override_remove_error();
+      error = toUserMessage(e, m.override_remove_error());
     } finally {
       overrideSaving = false;
     }

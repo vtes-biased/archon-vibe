@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { onDestroy } from 'svelte';
   import { qrCheckin } from '$lib/api';
   import { saveTournament } from '$lib/db';
@@ -44,7 +45,7 @@
         stopScanner();
         setTimeout(() => onclose(), 1500);
       } catch (e: any) {
-        error = e.detail || e.message || m.checkin_qr_error();
+        error = toUserMessage(e, m.checkin_qr_error());
       } finally {
         loading = false;
       }

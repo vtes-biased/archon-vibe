@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { onDestroy } from 'svelte';
   import type { User } from '$lib/types';
   import { getFilteredUsers } from '$lib/db';
@@ -201,7 +202,7 @@
       deckName = '';
       onuploaded?.();
     } catch (e: any) {
-      error = e.message || 'Upload failed';
+      error = toUserMessage(e, 'Upload failed');
     } finally {
       loading = false;
     }

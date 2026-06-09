@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import type { Tournament } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
@@ -74,7 +75,7 @@
       tournament = await setTableScore(tournament.uid, roundIndex, 0, scores);
       await loadPlayerNames();
     } catch (e) {
-      error = e instanceof Error ? e.message : m.finals_error_save();
+      error = toUserMessage(e, m.finals_error_save());
     } finally {
       scoreSaving = null;
     }
@@ -198,7 +199,7 @@
                     await loadPlayerNames();
                     overrideTable_ = null;
                     overrideComment = "";
-                  } catch (e) { error = e instanceof Error ? e.message : m.override_error(); } finally { overrideSaving = false; }
+                  } catch (e) { error = toUserMessage(e, m.override_error()); } finally { overrideSaving = false; }
                 }}
                 disabled={overrideSaving || !overrideComment.trim()}
                 class="px-3 py-1 text-xs font-medium btn-amber rounded transition-colors"
@@ -228,7 +229,7 @@
               try {
                 tournament = await tournamentAction(tournament.uid, "Unoverride", { round: tournament.rounds!.length, table: 0 });
                 await loadPlayerNames();
-              } catch (e) { error = e instanceof Error ? e.message : m.override_remove_error(); } finally { overrideSaving = false; }
+              } catch (e) { error = toUserMessage(e, m.override_remove_error()); } finally { overrideSaving = false; }
             }}
             disabled={overrideSaving}
             class="px-2 py-1 text-xs text-ash-500 hover:text-crimson-400 transition-colors"

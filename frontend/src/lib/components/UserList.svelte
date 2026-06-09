@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
   import { goto } from "$app/navigation";
   import User from "./User.svelte";
@@ -106,7 +107,7 @@
       // Update pagination context with currently visible users
       updatePaginationContext();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load users";
+      error = toUserMessage(e, "Failed to load users");
       console.error("Error loading users:", e);
     } finally {
       isLoadingUsers = false;

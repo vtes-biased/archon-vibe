@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { getLeague, getAllTournaments, getAllLeagues } from "$lib/db";
@@ -200,7 +201,7 @@
       editing = false;
       await loadLeague();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to update";
+      error = toUserMessage(e, "Failed to update");
     }
   }
 
@@ -210,7 +211,7 @@
       await deleteLeagueApi(league.uid);
       goto("/leagues");
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to delete";
+      error = toUserMessage(e, "Failed to delete");
     }
   }
 
@@ -222,7 +223,7 @@
       addChildUid = "";
       await loadLeague();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to add child league";
+      error = toUserMessage(e, "Failed to add child league");
     }
   }
 
@@ -232,7 +233,7 @@
       await updateLeague(childUid, { parent_uid: null });
       await loadLeague();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to remove child league";
+      error = toUserMessage(e, "Failed to remove child league");
     }
   }
 

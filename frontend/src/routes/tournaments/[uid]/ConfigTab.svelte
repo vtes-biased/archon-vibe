@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import type { Tournament } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
@@ -90,7 +91,7 @@
     try {
       tournament = await tournamentAction(tournament.uid, 'UpdateConfig', { config: { [field]: value } });
     } catch (e) {
-      error = e instanceof Error ? e.message : m.config_error_save();
+      error = toUserMessage(e, m.config_error_save());
     } finally {
       saving = false;
     }
@@ -103,7 +104,7 @@
     try {
       tournament = await tournamentAction(tournament.uid, 'UpdateConfig', { config: fields });
     } catch (e) {
-      error = e instanceof Error ? e.message : m.config_error_save();
+      error = toUserMessage(e, m.config_error_save());
     } finally {
       saving = false;
     }

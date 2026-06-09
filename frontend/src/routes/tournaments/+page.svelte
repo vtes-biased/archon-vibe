@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
   import { getFilteredTournaments, getAgendaTournaments, getLeague } from "$lib/db";
   import { syncManager } from "$lib/sync";
@@ -107,7 +108,7 @@
         totalCount = result.total;
       }
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load tournaments";
+      error = toUserMessage(e, "Failed to load tournaments");
     } finally {
       loaded = true;
     }

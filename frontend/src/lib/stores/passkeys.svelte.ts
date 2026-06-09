@@ -5,6 +5,7 @@
  * and conditional UI (autofill) via the WebAuthn API.
  */
 
+import { toUserMessage } from '$lib/errors';
 import { getAccessToken, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -130,7 +131,7 @@ export async function registerPasskey(): Promise<boolean> {
     return true;
   } catch (e) {
     setAuthState({
-      error: e instanceof Error ? e.message : "Passkey registration failed",
+      error: toUserMessage(e, "Passkey registration failed"),
     });
     return false;
   }
@@ -214,7 +215,7 @@ export async function createAccountWithPasskey(): Promise<boolean> {
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: e instanceof Error ? e.message : "Account creation failed",
+      error: toUserMessage(e, "Account creation failed"),
     });
     return false;
   }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import type { User, Role } from "$lib/types";
   import { createUser, updateUser, uploadAvatar } from "$lib/api";
   import { getCountries, getCountryFlag } from "$lib/geonames";
@@ -139,7 +140,7 @@
       );
       onupdated?.(updated);
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save";
+      error = toUserMessage(e, "Failed to save");
     } finally {
       saving = false;
     }
@@ -248,7 +249,7 @@
         onupdated?.(updated);
       }
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to save user";
+      error = toUserMessage(e, "Failed to save user");
     } finally {
       saving = false;
     }

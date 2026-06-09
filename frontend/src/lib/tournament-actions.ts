@@ -30,7 +30,7 @@ import {
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAuthState } from '$lib/stores/auth.svelte';
 import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
-import { apiRequest, ApiError, requireOnline } from './api';
+import { apiRequest, ApiError, requireOnline, isOnline } from './api';
 
 /**
  * Per-tournament action queue to serialize server POSTs.
@@ -164,8 +164,12 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
       });
 
       return result.tournament;
-    } catch {
-      // WASM engine failed (unknown action, etc.) — fall through to server-only
+    } catch (e) {
+      // WASM rejected. When this tournament is offline (or the device is), there's
+      // no server to defer to — surface the engine's actual reason (thrown as a
+      // string) instead of falling through to a misleading "requires online".
+      // Otherwise fall through to server-only (covers genuine unknown-action drift).
+      if (isOffline(uid) || !isOnline()) throw e;
     }
   }
 

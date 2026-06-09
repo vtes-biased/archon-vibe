@@ -26,6 +26,7 @@
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
   import ConfigTab from "./ConfigTab.svelte";
+import { toUserMessage } from '$lib/errors';
 import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
   import JudgeCallBanner from "./JudgeCallBanner.svelte";
@@ -286,7 +287,7 @@ import TournamentModals from "./TournamentModals.svelte";
       tournament = await setTableScore(uid, roundIndex, tableIndex, scores);
       await loadPlayerNames();
     } catch (e) {
-      error = e instanceof Error ? e.message : m.tournament_error_save_scores();
+      error = toUserMessage(e, m.tournament_error_save_scores());
     } finally {
       scoreSaving = null;
     }
@@ -304,7 +305,7 @@ import TournamentModals from "./TournamentModals.svelte";
       tournament = await setTableScore(uid, roundIndex, 0, scores);
       await loadPlayerNames();
     } catch (e) {
-      error = e instanceof Error ? e.message : m.tournament_error_save_finals();
+      error = toUserMessage(e, m.tournament_error_save_finals());
     } finally {
       scoreSaving = null;
     }
@@ -325,7 +326,7 @@ import TournamentModals from "./TournamentModals.svelte";
         error = m.tournament_error_not_synced();
       }
     } catch (e) {
-      error = e instanceof Error ? e.message : m.tournament_error_load();
+      error = toUserMessage(e, m.tournament_error_load());
     } finally {
       loading = false;
     }
@@ -339,7 +340,7 @@ import TournamentModals from "./TournamentModals.svelte";
       if (action === 'StartRound') activeTab = 'rounds';
       else if (action === 'StartFinals') activeTab = 'finals';
     } catch (e) {
-      error = e instanceof Error ? e.message : m.tournament_error_action();
+      error = toUserMessage(e, m.tournament_error_action());
     } finally {
       actionLoading = false;
     }
@@ -351,7 +352,7 @@ import TournamentModals from "./TournamentModals.svelte";
       showDeleteConfirm = false;
       goto("/tournaments");
     } catch (e) {
-      error = e instanceof Error ? e.message : m.tournament_error_delete();
+      error = toUserMessage(e, m.tournament_error_delete());
       showDeleteConfirm = false;
     }
   }
@@ -363,7 +364,7 @@ import TournamentModals from "./TournamentModals.svelte";
       showGoOfflineConfirm = false;
       showToast({ type: 'success', message: m.offline_now_offline() });
     } catch (e) {
-      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_go_offline() });
+      showToast({ type: 'error', message: toUserMessage(e, m.offline_error_go_offline()) });
     } finally {
       offlineActionLoading = false;
     }
@@ -377,7 +378,7 @@ import TournamentModals from "./TournamentModals.svelte";
       showGoOnlineConfirm = false;
       showToast({ type: 'success', message: m.offline_back_online() });
     } catch (e) {
-      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_go_online() });
+      showToast({ type: 'error', message: toUserMessage(e, m.offline_error_go_online()) });
     } finally {
       offlineActionLoading = false;
     }
@@ -390,7 +391,7 @@ import TournamentModals from "./TournamentModals.svelte";
       showForceTakeoverConfirm = false;
       showToast({ type: 'success', message: m.offline_takeover_success() });
     } catch (e) {
-      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_takeover() });
+      showToast({ type: 'error', message: toUserMessage(e, m.offline_error_takeover()) });
     } finally {
       offlineActionLoading = false;
     }
@@ -403,7 +404,7 @@ import TournamentModals from "./TournamentModals.svelte";
       showForceUnlockConfirm = false;
       showToast({ type: 'success', message: m.offline_unlock_success() });
     } catch (e) {
-      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_unlock() });
+      showToast({ type: 'error', message: toUserMessage(e, m.offline_error_unlock()) });
     } finally {
       offlineActionLoading = false;
     }

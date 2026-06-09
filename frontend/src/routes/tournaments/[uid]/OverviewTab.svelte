@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import type { Tournament, TournamentState } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
@@ -77,7 +78,7 @@
     } catch (e) {
       archonResult = {
         success: false,
-        errors: [e instanceof Error ? e.message : "Unknown error"],
+        errors: [toUserMessage(e, "Unknown error")],
         warnings: [],
         players_matched: 0,
         rounds_imported: 0,

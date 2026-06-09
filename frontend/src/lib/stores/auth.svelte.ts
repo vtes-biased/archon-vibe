@@ -6,6 +6,7 @@
  */
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { toUserMessage } from '$lib/errors';
 import type { User } from "$lib/types";
 import { syncManager } from "$lib/sync";
 
@@ -392,7 +393,7 @@ export async function register(
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: e instanceof Error ? e.message : "Registration failed",
+      error: toUserMessage(e, "Registration failed"),
     });
     return false;
   }
@@ -433,7 +434,7 @@ export async function login(email: string, password: string): Promise<boolean> {
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: e instanceof Error ? e.message : "Login failed",
+      error: toUserMessage(e, "Login failed"),
     });
     return false;
   }
@@ -503,7 +504,7 @@ export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
     return true;
   } catch (e) {
     setAuthState({
-      error: e instanceof Error ? e.message : "Update failed",
+      error: toUserMessage(e, "Update failed"),
     });
     return false;
   }
@@ -575,7 +576,7 @@ export async function requestMagicLink(
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: e instanceof Error ? e.message : "Failed to send email",
+      error: toUserMessage(e, "Failed to send email"),
     });
     return false;
   }
@@ -624,7 +625,7 @@ export async function verifyMagicLink(
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: e instanceof Error ? e.message : "Verification failed",
+      error: toUserMessage(e, "Verification failed"),
     });
     return null;
   }
@@ -673,7 +674,7 @@ export async function setPassword(token: string, password: string): Promise<bool
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: e instanceof Error ? e.message : "Failed to set password",
+      error: toUserMessage(e, "Failed to set password"),
     });
     return false;
   }

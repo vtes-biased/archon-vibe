@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { goto } from "$app/navigation";
   import { createLeague } from "$lib/api";
   import { saveLeague, getAllLeagues } from "$lib/db";
@@ -63,7 +64,7 @@
       await saveLeague(league);
       goto(`/leagues/${league.uid}`);
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to create league";
+      error = toUserMessage(e, "Failed to create league");
     } finally {
       isSubmitting = false;
     }

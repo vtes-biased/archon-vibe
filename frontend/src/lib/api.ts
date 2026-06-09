@@ -30,12 +30,22 @@ export class ApiError extends Error {
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
-  // apiRequest auto-toasts HTTP error responses. Callers that surface errors
-  // themselves (their own catch toast — which ALSO covers network failures that
-  // never reach the block below — or an inline message) pass this to avoid a
-  // duplicate toast.
+  // apiRequest is the single toast authority for its own failures: it auto-toasts
+  // offline, transport (network), AND HTTP error responses. Callers that surface
+  // the error themselves (inline message or their own catch toast) pass this to
+  // avoid a duplicate toast.
   { suppressErrorToast = false }: { suppressErrorToast?: boolean } = {}
 ): Promise<T> {
+  // Offline guard: every apiRequest is a mutation (reads are offline-first from
+  // IndexedDB), so there's no point attempting the fetch. Toast + throw an
+  // ApiError (status 0 = never left the device) so empty-catch callers aren't
+  // silent and inline callers can still distinguish it.
+  if (!isOnline()) {
+    const message = m.error_action_requires_online();
+    if (!suppressErrorToast) showToast({ type: 'error', message });
+    throw new ApiError(message, 0);
+  }
+
   const token = getAccessToken();
   const headers: Record<string, string> = {
     ...((options.headers as Record<string, string>) || {}),
@@ -49,10 +59,19 @@ export async function apiRequest<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (e) {
+    // fetch() rejects with a TypeError on a transport failure (dropped mid-flight,
+    // DNS, CORS, server down). This never reached the !response.ok block below, so
+    // it used to escape untoasted and get swallowed by empty catches — toast it.
+    if (!suppressErrorToast) showToast({ type: 'error', message: m.error_network_unreachable() });
+    throw e instanceof Error ? e : new Error(m.error_network_unreachable());
+  }
 
   if (!response.ok) {
     let detail: string | undefined;
@@ -81,10 +100,16 @@ export function isOnline(): boolean {
 }
 
 /**
- * Guard an online-only action: throws a localized error when offline.
+ * Guard an online-only action: toasts + throws a localized error when offline.
+ * Toasts so the many empty-catch callers (sanctions, VEKN, avatar — which relied
+ * on apiRequest's toast but threw here, before it) aren't silent offline. Callers
+ * that render the error themselves pass `suppressErrorToast`.
  */
-export function requireOnline(): void {
-  if (!isOnline()) throw new Error(m.error_action_requires_online());
+export function requireOnline({ suppressErrorToast = false }: { suppressErrorToast?: boolean } = {}): void {
+  if (isOnline()) return;
+  const message = m.error_action_requires_online();
+  if (!suppressErrorToast) showToast({ type: 'error', message });
+  throw new ApiError(message, 0);
 }
 
 /**
@@ -245,20 +270,20 @@ export interface AdminSyncResult {
 
 /** IC-only: trigger a VEKN member sync now (also runs on a 6h schedule). */
 export async function syncVeknMembers(): Promise<AdminSyncResult> {
-  requireOnline();
+  requireOnline({ suppressErrorToast: true });
   // Errors surface inline in ConfirmActionModal — suppress the duplicate toast.
   return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 /** IC-only: trigger a VEKN tournament sync now (also runs on a 6h schedule). */
 export async function syncVeknTournaments(): Promise<AdminSyncResult> {
-  requireOnline();
+  requireOnline({ suppressErrorToast: true });
   return apiRequest<AdminSyncResult>('/admin/sync-vekn-tournaments', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 /** IC-only: trigger a TWDA decklist import now (also runs on a 24h schedule). */
 export async function syncTwdaDecks(): Promise<AdminSyncResult> {
-  requireOnline();
+  requireOnline({ suppressErrorToast: true });
   return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });
 }
 

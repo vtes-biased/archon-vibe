@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
@@ -76,7 +77,7 @@
       clientId = data.client_id;
       codeChallenge = data.code_challenge;
     } catch (e) {
-      error = e instanceof Error ? e.message : m.oauth_error_load_failed();
+      error = toUserMessage(e, m.oauth_error_load_failed());
     }
 
     loading = false;
@@ -113,7 +114,7 @@
       const data = await response.json();
       window.location.href = data.redirect_url;
     } catch (e) {
-      error = e instanceof Error ? e.message : "Authorization failed";
+      error = toUserMessage(e, "Authorization failed");
       submitting = false;
     }
   }

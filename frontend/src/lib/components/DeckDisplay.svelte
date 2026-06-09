@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import type { Deck, VtesCard } from "$lib/types";
   import { getCards } from "$lib/cards";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
@@ -150,7 +151,7 @@
       editedName = '';
       onsaved?.();
     } catch (e: any) {
-      saveError = e.message || 'Save failed';
+      saveError = toUserMessage(e, 'Save failed');
     } finally {
       saving = false;
     }

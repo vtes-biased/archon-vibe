@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { goto } from "$app/navigation";
   import { createTournament } from "$lib/api";
   import { saveTournament } from "$lib/db";
@@ -89,7 +90,7 @@
       await saveTournament(tournament);
       goto(`/tournaments/${tournament.uid}`);
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to create tournament";
+      error = toUserMessage(e, "Failed to create tournament");
     } finally {
       isSubmitting = false;
     }

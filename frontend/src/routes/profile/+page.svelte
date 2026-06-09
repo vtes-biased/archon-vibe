@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import {
@@ -87,7 +88,7 @@
       await syncManager.refresh();
       showToast({ type: "success", message: m.profile_resync_success() });
     } catch (e) {
-      showToast({ type: "error", message: e instanceof Error ? e.message : m.profile_resync_failed() });
+      showToast({ type: "error", message: toUserMessage(e, m.profile_resync_failed()) });
     }
   }
 

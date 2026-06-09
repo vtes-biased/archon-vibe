@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toUserMessage } from '$lib/errors';
   import * as m from '$lib/paraglide/messages.js';
   import { Loader2, CircleCheck, TriangleAlert } from 'lucide-svelte';
 
@@ -38,7 +39,7 @@
       stats = data && typeof data === 'object' ? Object.entries(data) : [];
       status = 'success';
     } catch (e) {
-      errorMsg = e instanceof Error ? e.message : String(e);
+      errorMsg = toUserMessage(e, String(e));
       status = 'error';
     }
   }
