@@ -94,6 +94,14 @@ class SyncManager {
   private reconnectDelay = 1000;
   private maxReconnectDelay = 120_000; // 2 minutes ceiling
 
+  // Monotonic connect generation. Bumped at the top of every connect(); a
+  // cycle whose epoch is stale aborts at its next await instead of mutating
+  // shared state. Guards against overlapping refresh()/connect() cycles
+  // (e.g. logout→login→claim in quick succession) racing on IndexedDB and
+  // this.eventSource, which could otherwise leave a stale lower-access-level
+  // stream's data installed on top of the newest one's.
+  private connectEpoch = 0;
+
   // Generic buffers keyed by batch type
   private buffers: Map<string, any[]> = new Map();
   public isSynced = false;
@@ -105,11 +113,18 @@ class SyncManager {
   // grow unbounded and eventually trip the 3-day full-resync guard).
   private lastTimestamp: string | null = null;
 
+  /** True if a newer connect() has started since `epoch` was captured. */
+  private superseded(epoch: number): boolean {
+    return epoch !== this.connectEpoch;
+  }
+
   /**
    * Fetch and load a gzip snapshot from the server.
-   * Returns the snapshot timestamp, or null on failure.
+   * Returns the snapshot timestamp, or null on failure (or if superseded).
+   * `epoch` is the connect generation that requested this snapshot; if a newer
+   * connect() starts while we're in flight we bail before touching IndexedDB.
    */
-  private async fetchSnapshot(): Promise<string | null> {
+  private async fetchSnapshot(epoch: number): Promise<string | null> {
     const token = getAccessToken();
     const params = new URLSearchParams();
     if (token) params.set('token', token);
@@ -118,6 +133,7 @@ class SyncManager {
 
     try {
       const response = await fetch(url);
+      if (this.superseded(epoch)) return null;
       if (!response.ok) {
         console.error(`Snapshot fetch failed: ${response.status}`);
         return null;
@@ -140,12 +156,19 @@ class SyncManager {
 
       const sections = JSON.parse(text) as { type: string; data?: any[]; timestamp?: string }[];
 
+      // A newer connect() may have superseded us while the snapshot was in
+      // flight; bail before touching IndexedDB so we don't clear/clobber the
+      // data the newer cycle is loading.
+      if (this.superseded(epoch)) return null;
+
       // Clear stores before loading (preserve offline tournaments)
       await this.clearAllStores();
+      if (this.superseded(epoch)) return null;
 
       // Load each section into IDB
       let timestamp: string | null = null;
       for (const section of sections) {
+        if (this.superseded(epoch)) return null;
         if (section.type === 'meta') {
           timestamp = section.timestamp || null;
           continue;
@@ -162,6 +185,7 @@ class SyncManager {
         }
       }
 
+      if (this.superseded(epoch)) return null;
       if (timestamp) {
         await setLastSyncTimestamp(timestamp);
       }
@@ -180,15 +204,23 @@ class SyncManager {
    * After clearAllStores(), lastSync is null so connect() naturally fetches snapshot first.
    */
   async connect(): Promise<void> {
+    // Each connect() supersedes any still-running earlier one. After every
+    // await we re-check the epoch and bail if a newer connect()/refresh() has
+    // started, so a slow stale cycle (e.g. the pre-claim public-level stream)
+    // can't clear IndexedDB or install its EventSource on top of newer data.
+    const epoch = ++this.connectEpoch;
     await this.disconnect();
+    if (this.superseded(epoch)) return;
     this.isSynced = false;
     this.emit({ type: 'syncing' });
 
     let lastSync: string | null = await getLastSyncTimestamp();
+    if (this.superseded(epoch)) return;
 
     // If no sync timestamp, fetch snapshot first
     if (!lastSync) {
-      lastSync = await this.fetchSnapshot();
+      lastSync = await this.fetchSnapshot(epoch);
+      if (this.superseded(epoch)) return;
       // If snapshot failed, fall back to full SSE sync (no since param)
     }
 
