@@ -5,6 +5,7 @@
  * and conditional UI (autofill) via the WebAuthn API.
  */
 
+import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
 import { getAccessToken, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
 
@@ -49,18 +50,18 @@ export function isPasskeySupported(): boolean {
 export async function registerPasskey(): Promise<boolean> {
   const authState = getAuthState();
   if (!authState.isAuthenticated) {
-    setAuthState({ error: "Must be logged in to register passkey" });
+    setAuthState({ error: m.passkey_error_must_login() });
     return false;
   }
 
   if (!isPasskeySupported()) {
-    setAuthState({ error: "Passkeys not supported in this browser" });
+    setAuthState({ error: m.passkey_error_not_supported() });
     return false;
   }
 
   const token = getAccessToken();
   if (!token) {
-    setAuthState({ error: "No access token" });
+    setAuthState({ error: m.auth_error_not_authenticated() });
     return false;
   }
 
@@ -73,7 +74,7 @@ export async function registerPasskey(): Promise<boolean> {
 
     if (!optionsResponse.ok) {
       const data = await optionsResponse.json();
-      setAuthState({ error: data.detail || "Failed to get passkey options" });
+      setAuthState({ error: data.detail || m.passkey_error_options() });
       return false;
     }
 
@@ -97,7 +98,7 @@ export async function registerPasskey(): Promise<boolean> {
     })) as PublicKeyCredential | null;
 
     if (!credential) {
-      setAuthState({ error: "Passkey creation cancelled" });
+      setAuthState({ error: m.passkey_error_cancelled() });
       return false;
     }
 
@@ -124,14 +125,14 @@ export async function registerPasskey(): Promise<boolean> {
 
     if (!verifyResponse.ok) {
       const data = await verifyResponse.json();
-      setAuthState({ error: data.detail || "Passkey registration failed" });
+      setAuthState({ error: data.detail || m.passkey_error_registration() });
       return false;
     }
 
     return true;
   } catch (e) {
     setAuthState({
-      error: toUserMessage(e, "Passkey registration failed"),
+      error: toUserMessage(e, m.passkey_error_registration()),
     });
     return false;
   }
@@ -142,7 +143,7 @@ export async function registerPasskey(): Promise<boolean> {
  */
 export async function createAccountWithPasskey(): Promise<boolean> {
   if (!isPasskeySupported()) {
-    setAuthState({ error: "Passkeys not supported in this browser" });
+    setAuthState({ error: m.passkey_error_not_supported() });
     return false;
   }
 
@@ -156,7 +157,7 @@ export async function createAccountWithPasskey(): Promise<boolean> {
 
     if (!optionsResponse.ok) {
       const data = await optionsResponse.json();
-      setAuthState({ isLoading: false, error: data.detail || "Failed to get passkey options" });
+      setAuthState({ isLoading: false, error: data.detail || m.passkey_error_options() });
       return false;
     }
 
@@ -172,7 +173,7 @@ export async function createAccountWithPasskey(): Promise<boolean> {
     })) as PublicKeyCredential | null;
 
     if (!credential) {
-      setAuthState({ isLoading: false, error: "Passkey creation cancelled" });
+      setAuthState({ isLoading: false, error: m.passkey_error_cancelled() });
       return false;
     }
 
@@ -196,7 +197,7 @@ export async function createAccountWithPasskey(): Promise<boolean> {
 
     if (!verifyResponse.ok) {
       const data = await verifyResponse.json();
-      setAuthState({ isLoading: false, error: data.detail || "Account creation failed" });
+      setAuthState({ isLoading: false, error: data.detail || m.passkey_error_account_creation() });
       return false;
     }
 
@@ -210,12 +211,12 @@ export async function createAccountWithPasskey(): Promise<boolean> {
       return true;
     }
 
-    setAuthState({ isLoading: false, error: "Failed to fetch user data" });
+    setAuthState({ isLoading: false, error: m.auth_error_fetch_user() });
     return false;
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: toUserMessage(e, "Account creation failed"),
+      error: toUserMessage(e, m.passkey_error_account_creation()),
     });
     return false;
   }
@@ -312,7 +313,7 @@ export async function startConditionalUI(
 
     if (!verifyResponse.ok) {
       const data = await verifyResponse.json();
-      setAuthState({ isLoading: false, error: data.detail || "Passkey login failed" });
+      setAuthState({ isLoading: false, error: data.detail || m.passkey_error_login() });
       return null;
     }
 
@@ -324,7 +325,7 @@ export async function startConditionalUI(
       setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
       onSuccess();
     } else {
-      setAuthState({ isLoading: false, error: "Failed to fetch user data" });
+      setAuthState({ isLoading: false, error: m.auth_error_fetch_user() });
     }
 
     return null;
@@ -347,7 +348,7 @@ export function stopConditionalUI(): void {
  */
 export async function loginWithPasskey(): Promise<boolean> {
   if (!isPasskeySupported()) {
-    setAuthState({ error: "Passkeys not supported in this browser" });
+    setAuthState({ error: m.passkey_error_not_supported() });
     return false;
   }
 
@@ -361,7 +362,7 @@ export async function loginWithPasskey(): Promise<boolean> {
 
     if (!optionsResponse.ok) {
       const data = await optionsResponse.json();
-      setAuthState({ isLoading: false, error: data.detail || "Failed to get passkey options" });
+      setAuthState({ isLoading: false, error: data.detail || m.passkey_error_options() });
       return false;
     }
 
@@ -412,7 +413,7 @@ export async function loginWithPasskey(): Promise<boolean> {
 
     if (!verifyResponse.ok) {
       const data = await verifyResponse.json();
-      setAuthState({ isLoading: false, error: data.detail || "Passkey login failed" });
+      setAuthState({ isLoading: false, error: data.detail || m.passkey_error_login() });
       return false;
     }
 
@@ -426,7 +427,7 @@ export async function loginWithPasskey(): Promise<boolean> {
       return true;
     }
 
-    setAuthState({ isLoading: false, error: "Failed to fetch user data" });
+    setAuthState({ isLoading: false, error: m.auth_error_fetch_user() });
     return false;
   } catch {
     setAuthState({ isLoading: false, error: null });

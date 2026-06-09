@@ -205,7 +205,7 @@
       editing = false;
       await loadLeague();
     } catch (e) {
-      error = toUserMessage(e, "Failed to update");
+      error = toUserMessage(e, m.league_error_update());
     }
   }
 
@@ -215,7 +215,7 @@
       await deleteLeagueApi(league.uid);
       goto("/leagues");
     } catch (e) {
-      error = toUserMessage(e, "Failed to delete");
+      error = toUserMessage(e, m.league_error_delete());
     }
   }
 
@@ -227,7 +227,7 @@
       addChildUid = "";
       await loadLeague();
     } catch (e) {
-      error = toUserMessage(e, "Failed to add child league");
+      error = toUserMessage(e, m.league_error_add_child());
     }
   }
 
@@ -237,7 +237,7 @@
       await updateLeague(childUid, { parent_uid: null });
       await loadLeague();
     } catch (e) {
-      error = toUserMessage(e, "Failed to remove child league");
+      error = toUserMessage(e, m.league_error_remove_child());
     }
   }
 

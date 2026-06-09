@@ -64,7 +64,7 @@
       await saveLeague(league);
       goto(`/leagues/${league.uid}`);
     } catch (e) {
-      error = toUserMessage(e, "Failed to create league");
+      error = toUserMessage(e, m.league_error_create());
     } finally {
       isSubmitting = false;
     }

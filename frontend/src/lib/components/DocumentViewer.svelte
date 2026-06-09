@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from '$lib/paraglide/messages.js';
   import { onMount } from "svelte";
   import { replaceState } from "$app/navigation";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -70,7 +71,7 @@
         e.preventDefault();
         const url = new URL(anchor.href, window.location.href);
         navigator.clipboard.writeText(url.toString()).then(() => {
-          showToast({ type: "success", message: "Link copied" });
+          showToast({ type: "success", message: m.common_link_copied() });
         });
         return;
       }

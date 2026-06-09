@@ -8,6 +8,7 @@
  * which this module builds on (one-way import — api.ts never imports back).
  */
 
+import * as m from '$lib/paraglide/messages.js';
 import type { Tournament, DeckObject } from '$lib/types';
 import {
   getUser,
@@ -157,7 +158,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
           if (!(e instanceof ApiError)) {
             showToast({
               type: 'error',
-              message: 'Action could not be saved — reverted to the previous state.',
+              message: m.tournament_action_reverted(),
             });
           }
         }

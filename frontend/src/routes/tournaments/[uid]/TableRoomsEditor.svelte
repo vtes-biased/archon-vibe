@@ -37,7 +37,7 @@
       const updated = await tournamentAction(tournamentUid, 'UpdateConfig', { config: { table_rooms: cleaned } });
       onupdate(updated);
     } catch {
-      showToast({ type: "error", message: "Failed to save rooms" });
+      showToast({ type: "error", message: m.table_rooms_error_save() });
     } finally {
       saving = false;
     }

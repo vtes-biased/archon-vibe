@@ -106,7 +106,7 @@
 
       if (!response.ok) {
         const data = await response.json();
-        error = data.detail || "Authorization failed";
+        error = data.detail || m.oauth_error_authorize();
         submitting = false;
         return;
       }
@@ -114,7 +114,7 @@
       const data = await response.json();
       window.location.href = data.redirect_url;
     } catch (e) {
-      error = toUserMessage(e, "Authorization failed");
+      error = toUserMessage(e, m.oauth_error_authorize());
       submitting = false;
     }
   }

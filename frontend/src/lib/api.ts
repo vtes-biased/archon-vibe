@@ -372,7 +372,7 @@ export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ succe
     `/api/users/${userUid}/avatar`,
     { method: 'POST', body: formData }
   );
-  showToast({ type: 'success', message: 'Avatar updated' });
+  showToast({ type: 'success', message: m.profile_avatar_updated() });
   return result;
 }
 
@@ -617,6 +617,6 @@ export async function deleteAvatar(userUid: string): Promise<{ success: boolean 
     method: 'DELETE',
   });
 
-  showToast({ type: 'success', message: 'Avatar removed' });
+  showToast({ type: 'success', message: m.profile_avatar_removed() });
   return result;
 }

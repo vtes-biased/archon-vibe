@@ -151,7 +151,7 @@
       editedName = '';
       onsaved?.();
     } catch (e: any) {
-      saveError = toUserMessage(e, 'Save failed');
+      saveError = toUserMessage(e, m.deck_error_save());
     } finally {
       saving = false;
     }

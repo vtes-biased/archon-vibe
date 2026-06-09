@@ -98,7 +98,7 @@
       await scanner.start();
       qrScanning = true;
     } catch (e: any) {
-      error = `Camera access failed: ${e.message || e}`;
+      error = m.deck_error_camera();
     }
   }
 
@@ -202,7 +202,7 @@
       deckName = '';
       onuploaded?.();
     } catch (e: any) {
-      error = toUserMessage(e, 'Upload failed');
+      error = toUserMessage(e, m.deck_error_upload());
     } finally {
       loading = false;
     }

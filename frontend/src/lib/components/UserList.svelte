@@ -107,7 +107,7 @@
       // Update pagination context with currently visible users
       updatePaginationContext();
     } catch (e) {
-      error = toUserMessage(e, "Failed to load users");
+      error = toUserMessage(e, m.user_error_load_users());
       console.error("Error loading users:", e);
     } finally {
       isLoadingUsers = false;

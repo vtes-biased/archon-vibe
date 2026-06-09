@@ -140,7 +140,7 @@
       );
       onupdated?.(updated);
     } catch (e) {
-      error = toUserMessage(e, "Failed to save");
+      error = toUserMessage(e, m.user_error_save());
     } finally {
       saving = false;
     }
@@ -249,7 +249,7 @@
         onupdated?.(updated);
       }
     } catch (e) {
-      error = toUserMessage(e, "Failed to save user");
+      error = toUserMessage(e, m.user_error_save_user());
     } finally {
       saving = false;
     }

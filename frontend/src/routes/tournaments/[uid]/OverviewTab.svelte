@@ -78,7 +78,7 @@
     } catch (e) {
       archonResult = {
         success: false,
-        errors: [toUserMessage(e, "Unknown error")],
+        errors: [toUserMessage(e, m.common_error_unknown())],
         warnings: [],
         players_matched: 0,
         rounds_imported: 0,

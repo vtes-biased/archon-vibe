@@ -108,7 +108,7 @@
         totalCount = result.total;
       }
     } catch (e) {
-      error = toUserMessage(e, "Failed to load tournaments");
+      error = toUserMessage(e, m.tournament_error_load_list());
     } finally {
       loaded = true;
     }

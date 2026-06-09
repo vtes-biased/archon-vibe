@@ -90,7 +90,7 @@
       await saveTournament(tournament);
       goto(`/tournaments/${tournament.uid}`);
     } catch (e) {
-      error = toUserMessage(e, "Failed to create tournament");
+      error = toUserMessage(e, m.tournament_error_create());
     } finally {
       isSubmitting = false;
     }

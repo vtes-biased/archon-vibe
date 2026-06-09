@@ -6,6 +6,7 @@
  */
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
 import type { User } from "$lib/types";
 import { syncManager } from "$lib/sync";
@@ -373,7 +374,7 @@ export async function register(
 
     if (!response.ok) {
       const data = await response.json();
-      setAuthState({ isLoading: false, error: data.detail || "Registration failed" });
+      setAuthState({ isLoading: false, error: data.detail || m.auth_error_registration() });
       return false;
     }
 
@@ -388,12 +389,12 @@ export async function register(
       return true;
     }
 
-    setAuthState({ isLoading: false, error: "Failed to fetch user data" });
+    setAuthState({ isLoading: false, error: m.auth_error_fetch_user() });
     return false;
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: toUserMessage(e, "Registration failed"),
+      error: toUserMessage(e, m.auth_error_registration()),
     });
     return false;
   }
@@ -414,7 +415,7 @@ export async function login(email: string, password: string): Promise<boolean> {
 
     if (!response.ok) {
       const data = await response.json();
-      setAuthState({ isLoading: false, error: data.detail || "Login failed" });
+      setAuthState({ isLoading: false, error: data.detail || m.auth_error_login() });
       return false;
     }
 
@@ -429,12 +430,12 @@ export async function login(email: string, password: string): Promise<boolean> {
       return true;
     }
 
-    setAuthState({ isLoading: false, error: "Failed to fetch user data" });
+    setAuthState({ isLoading: false, error: m.auth_error_fetch_user() });
     return false;
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: toUserMessage(e, "Login failed"),
+      error: toUserMessage(e, m.auth_error_login()),
     });
     return false;
   }
@@ -470,7 +471,7 @@ export interface ProfileUpdate {
 export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
   const token = getAccessToken();
   if (!token) {
-    setAuthState({ error: "Not authenticated" });
+    setAuthState({ error: m.auth_error_not_authenticated() });
     return false;
   }
 
@@ -487,7 +488,7 @@ export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
     if (response.status === 401) {
       const refreshed = await refreshTokens();
       if (!refreshed) {
-        setAuthState({ error: "Session expired" });
+        setAuthState({ error: m.auth_error_session_expired() });
         return false;
       }
       return updateProfile(data);
@@ -495,7 +496,7 @@ export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
 
     if (!response.ok) {
       const errorData = await response.json();
-      setAuthState({ error: errorData.detail || "Update failed" });
+      setAuthState({ error: errorData.detail || m.auth_error_update() });
       return false;
     }
 
@@ -504,7 +505,7 @@ export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
     return true;
   } catch (e) {
     setAuthState({
-      error: toUserMessage(e, "Update failed"),
+      error: toUserMessage(e, m.auth_error_update()),
     });
     return false;
   }
@@ -567,7 +568,7 @@ export async function requestMagicLink(
 
     if (!response.ok) {
       const data = await response.json();
-      setAuthState({ isLoading: false, error: data.detail || "Failed to send email" });
+      setAuthState({ isLoading: false, error: data.detail || m.auth_error_send_email() });
       return false;
     }
 
@@ -576,7 +577,7 @@ export async function requestMagicLink(
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: toUserMessage(e, "Failed to send email"),
+      error: toUserMessage(e, m.auth_error_send_email()),
     });
     return false;
   }
@@ -625,7 +626,7 @@ export async function verifyMagicLink(
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: toUserMessage(e, "Verification failed"),
+      error: toUserMessage(e, m.auth_error_verification()),
     });
     return null;
   }
@@ -648,7 +649,7 @@ export async function setPassword(token: string, password: string): Promise<bool
 
     if (!response.ok) {
       const data = await response.json();
-      setAuthState({ isLoading: false, error: data.detail || "Failed to set password" });
+      setAuthState({ isLoading: false, error: data.detail || m.auth_error_set_password() });
       return false;
     }
 
@@ -669,12 +670,12 @@ export async function setPassword(token: string, password: string): Promise<bool
       return true;
     }
 
-    setAuthState({ isLoading: false, error: "Failed to fetch user data" });
+    setAuthState({ isLoading: false, error: m.auth_error_fetch_user() });
     return false;
   } catch (e) {
     setAuthState({
       isLoading: false,
-      error: toUserMessage(e, "Failed to set password"),
+      error: toUserMessage(e, m.auth_error_set_password()),
     });
     return false;
   }
