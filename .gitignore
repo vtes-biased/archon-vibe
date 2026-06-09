@@ -59,7 +59,6 @@ frontend/.vite/
 # Rust / Engine
 engine/target/
 engine/pkg/
-engine/data/cards.json
 
 # Local dev logs
 backend.log
