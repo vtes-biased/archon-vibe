@@ -35,10 +35,11 @@ RUN rm -rf src/lib/data/geonames
 COPY backend/src/data/geonames/ src/lib/data/geonames/
 
 # Wait for backend, start dev server (skip npm setup — geonames copied at
-# build time), and run tests
+# build time), and run tests. Backend host comes from VITE_API_URL so it
+# tracks the compose wiring (backend-test in the isolated test profile).
 CMD ["sh", "-c", "\
-    echo 'Waiting for backend...' && \
-    timeout 60 sh -c 'until curl -sf http://backend:8000/ > /dev/null; do sleep 1; done' && \
+    echo \"Waiting for backend at ${VITE_API_URL}...\" && \
+    timeout 60 sh -c 'until curl -sf ${VITE_API_URL}/ > /dev/null; do sleep 1; done' && \
     echo 'Backend ready. Starting Vite dev server...' && \
     npx vite dev --host 0.0.0.0 & \
     sleep 5 && \

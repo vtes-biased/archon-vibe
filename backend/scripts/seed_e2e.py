@@ -5,6 +5,7 @@ Run via: uv run python backend/scripts/seed_e2e.py [--output /path/to/seed.json]
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -109,6 +110,21 @@ PLAYER_LINKS: list[list[CommunityLink]] = [
 async def seed() -> dict:
     await init_db()
     now = datetime.now(UTC)
+
+    # Destructive-op guard: this wipes ALL objects/auth_methods. Refuse to run
+    # against a non-empty DB unless explicitly forced (E2E_FORCE=1), so a stray
+    # DATABASE_URL pointing at a real DB can't be silently truncated.
+    if os.environ.get("E2E_FORCE") != "1":
+        async with get_connection() as conn:
+            result = await conn.execute("SELECT count(*) FROM objects")
+            (count,) = await result.fetchone()
+        if count:
+            raise SystemExit(
+                f"Refusing to seed: target DB has {count} objects and this script "
+                "runs DELETE FROM objects/auth_methods.\n"
+                "Point DATABASE_URL at a throwaway DB (e.g. create a fresh "
+                "archon_e2e database), or set E2E_FORCE=1 to override."
+            )
 
     # Truncate all objects so the test DB only contains our mock data.
     async with get_connection() as conn:
