@@ -15,6 +15,7 @@ from uuid6 import uuid7
 
 from .. import permissions
 from ..broadcast import broadcast_judge_call, broadcast_precomputed, broadcast_resync
+from ..card_data import cards_json_text
 from ..db import (
     BroadcastData,
     allocate_next_vekn_id,
@@ -1031,27 +1032,14 @@ async def qr_checkin(
 # Deck endpoints
 # ============================================================================
 
-_cards_json: str | None = None
-
-
 def _load_cards_json() -> str:
-    """Load cards.json for the Rust engine (cached in memory)."""
-    global _cards_json
-    if _cards_json is None:
-        from pathlib import Path
-
-        cards_path = (
-            Path(__file__).resolve().parent.parent.parent.parent
-            / "engine"
-            / "data"
-            / "cards.json"
+    """Load cards.json for the Rust engine (cached in memory by card_data)."""
+    text = cards_json_text()
+    if text is None:
+        raise HTTPException(
+            status_code=503, detail="Cards data not available. Run: just cards"
         )
-        if not cards_path.exists():
-            raise HTTPException(
-                status_code=503, detail="Cards data not available. Run: just cards"
-            )
-        _cards_json = cards_path.read_text(encoding="utf-8")
-    return _cards_json
+    return text
 
 
 @router.get("/{uid}/decks/{player_uid}/twda")

@@ -1,30 +1,25 @@
 """Cards API endpoint: serve cards.json with ETag caching."""
 
 import hashlib
-from pathlib import Path
 
 from fastapi import APIRouter, Request, Response
 
+from ..card_data import cards_json_bytes
+
 router = APIRouter(prefix="/api", tags=["cards"])
 
-_cards_data: bytes | None = None
 _cards_etag: str | None = None
 
 
 def _load_cards():
-    global _cards_data, _cards_etag
-    if _cards_data is None:
-        cards_path = (
-            Path(__file__).resolve().parent.parent.parent.parent
-            / "engine"
-            / "data"
-            / "cards.json"
-        )
-        if not cards_path.exists():
-            return None, None
-        _cards_data = cards_path.read_bytes()
-        _cards_etag = hashlib.md5(_cards_data).hexdigest()
-    return _cards_data, _cards_etag
+    """Return (bytes, etag) for cards.json, or (None, None) if unavailable."""
+    global _cards_etag
+    data = cards_json_bytes()
+    if data is None:
+        return None, None
+    if _cards_etag is None:
+        _cards_etag = hashlib.md5(data).hexdigest()
+    return data, _cards_etag
 
 
 @router.get("/cards")
