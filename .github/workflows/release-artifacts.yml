@@ -1,0 +1,173 @@
+name: Release Artifacts
+
+# Builds every deployable artifact in CI and attaches it to the published
+# GitHub Release. The ansible deploy (`make fetch-release`) downloads these
+# assets instead of building locally — CI is the single source of deployed
+# builds. Card data freshness is owned by update-cards.yml (daily).
+on:
+  release:
+    types: [published]   # attach artifacts to the published release
+  workflow_dispatch: {}  # manual build → downloadable workflow artifacts
+
+# Least privilege by default; each job re-grants contents:write only because it
+# attaches assets to the Release on the `release` event.
+permissions:
+  contents: read
+
+# Serialize per release tag so two close-together publishes don't race to upload.
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  engine:
+    name: Engine wheel (PyO3, manylinux_2_28, cp313)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build engine wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          working-directory: engine
+          target: x86_64-unknown-linux-gnu
+          manylinux: '2_28'
+          args: --release -i python3.13 --out dist
+
+      - name: Attach wheel to the GitHub Release
+        if: github.event_name == 'release' && github.event.release.prerelease == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" engine/dist/*.whl --clobber
+
+      - name: Upload wheel as a workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: archon-engine-wheel
+          path: engine/dist/*.whl
+
+  backend:
+    name: Backend wheel + pinned requirements
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Build backend wheel + export pinned requirements
+        run: |
+          uv build --wheel --out-dir dist
+          uv export --frozen --no-dev --no-hashes --no-emit-project \
+            -o dist/backend-requirements.txt
+
+      - name: Attach to the GitHub Release
+        if: github.event_name == 'release' && github.event.release.prerelease == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            dist/archon-*.whl dist/backend-requirements.txt --clobber
+
+      - name: Upload as a workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: archon-backend
+          path: |
+            dist/archon-*.whl
+            dist/backend-requirements.txt
+
+  bot:
+    name: Bot wheel + pinned requirements
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Build bot wheel + export pinned requirements
+        working-directory: bot
+        run: |
+          uv build --wheel --out-dir ../dist
+          uv export --frozen --no-dev --no-hashes --no-emit-project \
+            -o ../dist/bot-requirements.txt
+
+      - name: Attach to the GitHub Release
+        if: github.event_name == 'release' && github.event.release.prerelease == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            dist/archon_discord_bot-*.whl dist/bot-requirements.txt --clobber
+
+      - name: Upload as a workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: archon-bot
+          path: |
+            dist/archon_discord_bot-*.whl
+            dist/bot-requirements.txt
+
+  frontend:
+    name: Frontend PWA (static dist + WASM engine)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack   # crates.io build → guaranteed on ~/.cargo/bin (PATH); matches justfile
+
+      - name: Build WASM engine
+        working-directory: engine
+        run: wasm-pack build --target web --release -- --features wasm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build frontend (paraglide + vite, adapter-static → build/)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package static dist tarball
+        run: tar czf frontend-dist.tar.gz -C frontend/build .
+
+      - name: Attach to the GitHub Release
+        if: github.event_name == 'release' && github.event.release.prerelease == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" frontend-dist.tar.gz --clobber
+
+      - name: Upload as a workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: archon-frontend-dist
+          path: frontend-dist.tar.gz
