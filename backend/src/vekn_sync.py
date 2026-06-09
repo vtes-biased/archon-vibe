@@ -1,7 +1,9 @@
 """VEKN member synchronization service."""
 
+import json
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from uuid6 import uuid7
@@ -20,6 +22,26 @@ from .models import ObjectType, Role, User
 from .vekn_api import VEKNAPIClient, VEKNAPIError
 
 logger = logging.getLogger(__name__)
+
+# NC/Prince public contact emails scraped from the vekn.net official lists
+# (national-coordinators + prince-list), keyed by vekn_id. The member API does
+# not expose these (cloaked on the site), so we inject them during sync. See
+# data/officials_contacts.json and scripts/backfill_officials_contacts.py.
+_OFFICIALS_CONTACTS_PATH = Path(__file__).parent / "data" / "officials_contacts.json"
+
+
+def _load_officials_emails() -> dict[str, str]:
+    try:
+        entries = json.loads(_OFFICIALS_CONTACTS_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        logger.warning("officials_contacts.json not found; skipping email injection")
+        return {}
+    return {
+        e["vekn_id"]: e["email"] for e in entries if e.get("vekn_id") and e.get("email")
+    }
+
+
+OFFICIALS_EMAILS: dict[str, str] = _load_officials_emails()
 
 # City name corrections by country (VEKN database has typos/inconsistencies)
 FIX_CITIES: dict[str, dict[str, str]] = {
@@ -534,7 +556,7 @@ class VEKNSyncService:
         elif vekn_player.get("coordinatorid"):
             vekn_prefix = str(vekn_player.get("coordinatorid"))
 
-        return {
+        fields: dict[str, Any] = {
             "name": name or "Unknown",
             "country": vekn_player.get("countrycode") or None,
             "vekn_id": vekn_id,
@@ -544,6 +566,13 @@ class VEKNSyncService:
             "roles": roles,
             "vekn_prefix": vekn_prefix,
         }
+        # Officials' contact email comes from the scraped vekn.net lists, not the
+        # member API. Only set when present so non-officials' emails (and any
+        # self-edited address, guarded by local_modifications) are left alone.
+        official_email = OFFICIALS_EMAILS.get(vekn_id)
+        if official_email:
+            fields["contact_email"] = official_email
+        return fields
 
     async def _get_user_by_vekn_id(self, vekn_id: str) -> User | None:
         """
@@ -626,6 +655,9 @@ class VEKNSyncService:
         new_state = update_fields.get("state", existing_user.state)
         new_roles = update_fields.get("roles", existing_user.roles)
         new_vekn_prefix = update_fields.get("vekn_prefix", existing_user.vekn_prefix)
+        new_contact_email = update_fields.get(
+            "contact_email", existing_user.contact_email
+        )
 
         has_changes = (
             new_name != existing_user.name
@@ -635,6 +667,7 @@ class VEKNSyncService:
             or new_state != existing_user.state
             or sorted(new_roles) != sorted(existing_user.roles)
             or new_vekn_prefix != existing_user.vekn_prefix
+            or new_contact_email != existing_user.contact_email
         )
 
         # Skip DB update if no changes (preserves original modified timestamp)
@@ -650,6 +683,7 @@ class VEKNSyncService:
         existing_user.state = new_state
         existing_user.roles = new_roles
         existing_user.vekn_prefix = new_vekn_prefix
+        existing_user.contact_email = new_contact_email
         existing_user.vekn_synced = True
         existing_user.vekn_synced_at = now
         existing_user.modified = now
