@@ -94,3 +94,4 @@ ansible/build/
 ansible/.vault_pass
 ansible/.ansible_facts/
 ansible/*.retry
+ansible/galaxy_roles/

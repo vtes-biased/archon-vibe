@@ -34,8 +34,9 @@ UV_RUN := uv run --project $(REPO_ROOT)
 help:
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-galaxy: ## Install Ansible collection dependencies
+galaxy: ## Install Ansible collection + role dependencies
 	$(UV_RUN) ansible-galaxy collection install -r requirements.yml
+	$(UV_RUN) ansible-galaxy role install -r requirements.yml -p galaxy_roles
 
 clean: ## Remove local build artifacts
 	rm -rf $(BUILD_DIR)
