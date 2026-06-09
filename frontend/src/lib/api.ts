@@ -127,8 +127,10 @@ export async function createUser(
   email?: string | null,
   roles?: string[],
   city_geoname_id?: number | null,
+  // Pass { suppressErrorToast: true } from callers that render the error inline.
+  opts?: { suppressErrorToast?: boolean },
 ): Promise<User> {
-  requireOnline();
+  requireOnline(opts);
 
   const body: Record<string, unknown> = { name, country };
   if (city) body.city = city;
@@ -137,7 +139,7 @@ export async function createUser(
   if (email) body.email = email;
   if (roles !== undefined) body.roles = roles;
 
-  return apiRequest<User>('/api/users/', { method: 'POST', body: JSON.stringify(body) });
+  return apiRequest<User>('/api/users/', { method: 'POST', body: JSON.stringify(body) }, opts);
 }
 
 export async function updateUser(
@@ -148,8 +150,10 @@ export async function updateUser(
   nickname?: string | null,
   roles?: string[],
   city_geoname_id?: number | null,
+  // Pass { suppressErrorToast: true } from callers that render the error inline.
+  opts?: { suppressErrorToast?: boolean },
 ): Promise<User> {
-  requireOnline();
+  requireOnline(opts);
 
   // Omit a field to leave it unchanged; '' clears a string, [] clears roles.
   const body: Record<string, unknown> = {};
@@ -160,7 +164,7 @@ export async function updateUser(
   if (nickname !== undefined) body.nickname = nickname ?? '';
   if (roles !== undefined) body.roles = roles;
 
-  return apiRequest<User>(`/api/users/${uid}`, { method: 'PUT', body: JSON.stringify(body) });
+  return apiRequest<User>(`/api/users/${uid}`, { method: 'PUT', body: JSON.stringify(body) }, opts);
 }
 
 // VEKN ID Management API
@@ -437,12 +441,12 @@ export interface CreateTournamentData {
   finals_time?: number;
 }
 
-export async function createTournament(data: CreateTournamentData): Promise<Tournament> {
-  requireOnline();
+export async function createTournament(data: CreateTournamentData, opts?: { suppressErrorToast?: boolean }): Promise<Tournament> {
+  requireOnline(opts);
   return apiRequest<Tournament>('/api/tournaments/', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, opts);
 }
 
 /** Create a tournament locally when offline. Saved to IndexedDB, reconciled on go-online. */
@@ -485,11 +489,11 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
   return tournament;
 }
 
-export async function deleteTournamentApi(uid: string): Promise<{ message: string }> {
-  requireOnline();
+export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<{ message: string }> {
+  requireOnline(opts);
   const result = await apiRequest<{ message: string }>(`/api/tournaments/${uid}`, {
     method: 'DELETE',
-  });
+  }, opts);
   // Optimistic IDB delete so UI updates immediately instead of waiting for SSE
   const { deleteTournament } = await import('./db');
   await deleteTournament(uid);
@@ -524,31 +528,31 @@ export interface CreateLeagueData {
   parent_uid?: string | null;
 }
 
-export async function createLeague(data: CreateLeagueData): Promise<League> {
-  requireOnline();
+export async function createLeague(data: CreateLeagueData, opts?: { suppressErrorToast?: boolean }): Promise<League> {
+  requireOnline(opts);
   const created = await apiRequest<League>('/api/leagues/', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, opts);
   await saveLeague(created);
   return created;
 }
 
-export async function updateLeague(uid: string, data: Partial<CreateLeagueData>): Promise<League> {
-  requireOnline();
+export async function updateLeague(uid: string, data: Partial<CreateLeagueData>, opts?: { suppressErrorToast?: boolean }): Promise<League> {
+  requireOnline(opts);
   const updated = await apiRequest<League>(`/api/leagues/${uid}`, {
     method: 'PUT',
     body: JSON.stringify(data),
-  });
+  }, opts);
   await saveLeague(updated);
   return updated;
 }
 
-export async function deleteLeagueApi(uid: string): Promise<void> {
-  requireOnline();
+export async function deleteLeagueApi(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<void> {
+  requireOnline(opts);
   await apiRequest<void>(`/api/leagues/${uid}`, {
     method: 'DELETE',
-  });
+  }, opts);
   // Optimistic IDB delete so UI updates immediately instead of waiting for SSE
   const { deleteLeague } = await import('./db');
   await deleteLeague(uid);

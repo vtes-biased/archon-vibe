@@ -201,7 +201,7 @@
         finish: editFinish || null,
         description: editDescription,
         standings_mode: editStandingsMode,
-      });
+      }, { suppressErrorToast: true });
       editing = false;
       await loadLeague();
     } catch (e) {
@@ -212,7 +212,7 @@
   async function handleDelete() {
     if (!league || !confirm("Delete this league? This cannot be undone.")) return;
     try {
-      await deleteLeagueApi(league.uid);
+      await deleteLeagueApi(league.uid, { suppressErrorToast: true });
       goto("/leagues");
     } catch (e) {
       error = toUserMessage(e, m.league_error_delete());
@@ -223,7 +223,7 @@
     if (!addChildUid) return;
     error = null;
     try {
-      await updateLeague(addChildUid, { parent_uid: uid });
+      await updateLeague(addChildUid, { parent_uid: uid }, { suppressErrorToast: true });
       addChildUid = "";
       await loadLeague();
     } catch (e) {
@@ -234,7 +234,7 @@
   async function removeChildLeague(childUid: string) {
     error = null;
     try {
-      await updateLeague(childUid, { parent_uid: null });
+      await updateLeague(childUid, { parent_uid: null }, { suppressErrorToast: true });
       await loadLeague();
     } catch (e) {
       error = toUserMessage(e, m.league_error_remove_child());

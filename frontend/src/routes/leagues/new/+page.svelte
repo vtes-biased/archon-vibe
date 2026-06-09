@@ -60,7 +60,7 @@
         finish: finishDate || null,
         description,
         parent_uid: parentUid || null,
-      });
+      }, { suppressErrorToast: true });
       await saveLeague(league);
       goto(`/leagues/${league.uid}`);
     } catch (e) {

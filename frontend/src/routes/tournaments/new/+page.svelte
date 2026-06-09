@@ -86,7 +86,7 @@
         league_uid: values.league_uid || null,
         round_time: values.round_time,
         finals_time: values.finals_time,
-      });
+      }, { suppressErrorToast: true });
       await saveTournament(tournament);
       goto(`/tournaments/${tournament.uid}`);
     } catch (e) {

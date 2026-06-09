@@ -348,7 +348,7 @@ import TournamentModals from "./TournamentModals.svelte";
 
   async function handleDelete() {
     try {
-      await deleteTournamentApi(uid);
+      await deleteTournamentApi(uid, { suppressErrorToast: true });
       showDeleteConfirm = false;
       goto("/tournaments");
     } catch (e) {

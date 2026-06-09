@@ -137,6 +137,7 @@
         editNickname.trim() || null,
         editRoles,
         editCity.trim() ? editCityGeonameId : null,
+        { suppressErrorToast: true },
       );
       onupdated?.(updated);
     } catch (e) {
@@ -233,6 +234,7 @@
           editEmail.trim() || null,
           editRoles,
           editCity.trim() ? editCityGeonameId : null,
+          { suppressErrorToast: true },
         );
         oncreated?.(created);
       } else if (user) {
@@ -244,6 +246,7 @@
           editNickname.trim() || null,
           editRoles,
           editCity.trim() ? editCityGeonameId : null,
+          { suppressErrorToast: true },
         );
         _isEditingLocal = false;
         onupdated?.(updated);
