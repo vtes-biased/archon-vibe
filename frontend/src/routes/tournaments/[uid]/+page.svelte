@@ -12,7 +12,7 @@
   import { scoreSeatingSync, computeRatingPoints, initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { isOffline, goOffline, goOnline, forceTakeover, getLastSyncTime } from "$lib/stores/offline.svelte";
+  import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin, QrCode } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -63,6 +63,8 @@ import TournamentModals from "./TournamentModals.svelte";
   let showGoOfflineConfirm = $state(false);
   let showGoOnlineConfirm = $state(false);
   let showForceTakeoverConfirm = $state(false);
+  let showForceUnlockConfirm = $state(false);
+  const isIC = $derived(hasAnyRole('IC'));
   let offlineActionLoading = $state(false);
   const lastSync = $derived(getLastSyncTime(uid));
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
@@ -394,6 +396,19 @@ import TournamentModals from "./TournamentModals.svelte";
     }
   }
 
+  async function handleForceUnlock() {
+    offlineActionLoading = true;
+    try {
+      await forceUnlock(uid);
+      showForceUnlockConfirm = false;
+      showToast({ type: 'success', message: m.offline_unlock_success() });
+    } catch (e) {
+      showToast({ type: 'error', message: e instanceof Error ? e.message : m.offline_error_unlock() });
+    } finally {
+      offlineActionLoading = false;
+    }
+  }
+
   const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   function formatDate(iso: string | null): string {
@@ -502,15 +517,26 @@ import TournamentModals from "./TournamentModals.svelte";
               <Lock class="w-5 h-5 text-ash-400 shrink-0" />
               <span class="text-ash-300 text-sm">{m.offline_locked_banner()}</span>
             </div>
-            {#if isOrganizer}
-              <button
-                onclick={() => showForceTakeoverConfirm = true}
-                disabled={offlineActionLoading}
-                class="px-3 py-1.5 text-sm text-amber-400 hover:text-amber-300 border border-amber-800 hover:border-amber-700 rounded-lg transition-colors shrink-0"
-              >
-                {m.offline_force_takeover()}
-              </button>
-            {/if}
+            <div class="flex items-center gap-2 shrink-0">
+              {#if isOrganizer}
+                <button
+                  onclick={() => showForceTakeoverConfirm = true}
+                  disabled={offlineActionLoading}
+                  class="px-3 py-1.5 text-sm text-amber-400 hover:text-amber-300 border border-amber-800 hover:border-amber-700 rounded-lg transition-colors"
+                >
+                  {m.offline_force_takeover()}
+                </button>
+              {/if}
+              {#if isIC}
+                <button
+                  onclick={() => showForceUnlockConfirm = true}
+                  disabled={offlineActionLoading}
+                  class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
+                >
+                  {m.offline_force_unlock()}
+                </button>
+              {/if}
+            </div>
           </div>
         </div>
       {/if}
@@ -922,9 +948,11 @@ import TournamentModals from "./TournamentModals.svelte";
   bind:showGoOfflineConfirm
   bind:showGoOnlineConfirm
   bind:showForceTakeoverConfirm
+  bind:showForceUnlockConfirm
   {offlineActionLoading}
   onDelete={handleDelete}
   onGoOffline={handleGoOffline}
   onGoOnline={handleGoOnline}
   onForceTakeover={handleForceTakeover}
+  onForceUnlock={handleForceUnlock}
 />

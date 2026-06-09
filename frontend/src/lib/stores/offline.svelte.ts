@@ -12,7 +12,9 @@ import {
   getOfflineDeckUids, getDeck,
   getSanction, saveUser, deleteUser,
 } from '$lib/db';
-import { apiRequest } from '$lib/api';
+import { apiRequest, ApiError } from '$lib/api';
+import { showToast } from '$lib/stores/toast.svelte';
+import * as m from '$lib/paraglide/messages.js';
 
 // Reactive set of offline tournament UIDs
 let offlineTournamentUids = $state<Set<string>>(new Set());
@@ -87,6 +89,32 @@ export async function clearOfflineState(tournamentUid: string): Promise<void> {
   }
 }
 
+/**
+ * True if a locally-offline tournament has lost its lock on the server — i.e.
+ * this device went offline but an organizer/IC has since force-unlocked (cleared
+ * offline_mode) or force-taken-over (moved the lock to another device). When
+ * true, this device's unsynced offline work can no longer be committed.
+ */
+export function lostOfflineLock(t: {
+  uid: string;
+  offline_mode?: boolean;
+  offline_device_id?: string;
+}): boolean {
+  if (!isOffline(t.uid)) return false;
+  return t.offline_mode !== true || t.offline_device_id !== getDeviceId();
+}
+
+/**
+ * Reconcile after this device lost its offline lock: drop the now-orphaned local
+ * offline state and warn the holder that its unsynced changes are gone. Called
+ * from the SSE/snapshot path the moment the authoritative (unlocked) tournament
+ * reaches the device — so a lost/recovered device "gets the memo" on reconnect.
+ */
+export async function handleOfflineLockLost(tournamentUid: string): Promise<void> {
+  await clearOfflineState(tournamentUid);
+  showToast({ type: 'error', message: m.offline_lock_lost_warning() });
+}
+
 /** Request the server to lock a tournament for offline use. */
 export async function goOffline(tournamentUid: string): Promise<void> {
   const deviceId = getDeviceId();
@@ -121,16 +149,29 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
     if (d) offlineDecks.push(d);
   }
 
-  const result = await apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/go-online`, {
-    method: 'POST',
-    body: JSON.stringify({
-      device_id: deviceId,
-      tournament,
-      offline_players: offlinePlayers,
-      offline_sanctions: offlineSanctions,
-      offline_decks: offlineDecks,
-    }),
-  });
+  let result: Tournament;
+  try {
+    result = await apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/go-online`, {
+      method: 'POST',
+      body: JSON.stringify({
+        device_id: deviceId,
+        tournament,
+        offline_players: offlinePlayers,
+        offline_sanctions: offlineSanctions,
+        offline_decks: offlineDecks,
+      }),
+    });
+  } catch (e) {
+    // 410: the server is no longer in offline mode (admin force-unlocked it, or
+    // it was already brought online). Don't leave the device wedged — drop the
+    // orphaned offline state and surface the data-loss; SSE delivers the
+    // authoritative state. (Distinct from the 409 device-mismatch, which offers force.)
+    if (e instanceof ApiError && e.status === 410) {
+      await clearOfflineState(tournamentUid);
+      throw new Error(m.offline_lock_lost_warning());
+    }
+    throw e;
+  }
 
   // Clean up temp user stubs (server created real users with uuid7 UIDs)
   for (const p of offlinePlayers) {
@@ -152,6 +193,17 @@ export async function forceTakeover(tournamentUid: string): Promise<void> {
     body: JSON.stringify({ device_id: deviceId }),
   });
   await markOffline(tournamentUid);
+}
+
+/**
+ * IC-only emergency unlock: clears a wedged offline lock WITHOUT syncing the
+ * holding device's offline changes (potential data loss — last resort). The
+ * server broadcasts the unlocked tournament over SSE, which reconciles IDB.
+ */
+export async function forceUnlock(tournamentUid: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${tournamentUid}/force-unlock`, {
+    method: 'POST',
+  });
 }
 
 /** Add an offline player to the registry and create a local user stub. */

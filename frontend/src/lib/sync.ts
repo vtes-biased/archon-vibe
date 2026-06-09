@@ -40,7 +40,7 @@ import {
   getOfflineDeckUids,
 } from './db';
 import { getAccessToken } from '$lib/stores/auth.svelte';
-import { isOffline, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
+import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLockLost } from '$lib/stores/offline.svelte';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -177,9 +177,20 @@ class SyncManager {
         const spec = SPECS.find(s => s.singleType === section.type);
         if (spec && section.data && section.data.length > 0) {
           let items = section.data;
-          // Skip offline tournaments
+          // Skip tournaments this device holds offline — UNLESS the server shows
+          // we've lost the lock (force-unlock / takeover), in which case reconcile
+          // and apply the authoritative copy so the device "gets the memo".
           if (spec.batchType === 'tournaments') {
-            items = items.filter((t: any) => !isOffline(t.uid));
+            const kept: any[] = [];
+            for (const t of items) {
+              if (lostOfflineLock(t)) {
+                await handleOfflineLockLost(t.uid);
+                kept.push(t);
+              } else if (!isOffline(t.uid)) {
+                kept.push(t);
+              }
+            }
+            items = kept;
           }
           if (items.length > 0) await spec.saveBatch(items);
         }
@@ -285,9 +296,15 @@ class SyncManager {
           // Single event (real-time update)
           if (message.type === spec.singleType) {
             const item = message.data as any;
-            // Skip SSE updates for tournaments in local offline mode
+            // Skip SSE updates for tournaments in local offline mode — unless the
+            // server shows we've lost the lock (force-unlock / takeover): then
+            // reconcile and fall through to apply the authoritative update.
             if (spec.singleType === 'tournament' && isOffline(item.uid)) {
-              return;
+              if (lostOfflineLock(item)) {
+                await handleOfflineLockLost(item.uid);
+              } else {
+                return;
+              }
             }
             if (item.deleted_at) {
               await spec.del(item.uid, item);
@@ -334,7 +351,13 @@ class SyncManager {
           const toSave: any[] = [];
           const toDelete: any[] = [];
           for (const item of buf) {
-            if (spec.batchType === 'tournaments' && isOffline(item.uid)) continue;
+            if (spec.batchType === 'tournaments' && isOffline(item.uid)) {
+              if (lostOfflineLock(item)) {
+                await handleOfflineLockLost(item.uid);
+              } else {
+                continue;
+              }
+            }
             if (item.deleted_at) {
               toDelete.push(item);
             } else {

@@ -232,6 +232,30 @@ export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<
   });
 }
 
+/** Result of an IC manual-sync trigger: a status plus a free-form stats map. */
+export interface AdminSyncResult {
+  status: string;
+  stats: Record<string, unknown>;
+}
+
+/** IC-only: trigger a VEKN member sync now (also runs on a 6h schedule). */
+export async function syncVeknMembers(): Promise<AdminSyncResult> {
+  requireOnline();
+  return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' });
+}
+
+/** IC-only: trigger a VEKN tournament sync now (also runs on a 6h schedule). */
+export async function syncVeknTournaments(): Promise<AdminSyncResult> {
+  requireOnline();
+  return apiRequest<AdminSyncResult>('/admin/sync-vekn-tournaments', { method: 'POST' });
+}
+
+/** IC-only: trigger a TWDA decklist import now (also runs on a 24h schedule). */
+export async function syncTwdaDecks(): Promise<AdminSyncResult> {
+  requireOnline();
+  return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' });
+}
+
 // Sanctions API
 
 export interface CreateSanctionData {

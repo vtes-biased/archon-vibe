@@ -6,21 +6,25 @@
     showGoOfflineConfirm = $bindable(false),
     showGoOnlineConfirm = $bindable(false),
     showForceTakeoverConfirm = $bindable(false),
+    showForceUnlockConfirm = $bindable(false),
     offlineActionLoading,
     onDelete,
     onGoOffline,
     onGoOnline,
     onForceTakeover,
+    onForceUnlock,
   }: {
     showDeleteConfirm: boolean;
     showGoOfflineConfirm: boolean;
     showGoOnlineConfirm: boolean;
     showForceTakeoverConfirm: boolean;
+    showForceUnlockConfirm: boolean;
     offlineActionLoading: boolean;
     onDelete: () => void;
     onGoOffline: () => void;
     onGoOnline: () => void;
     onForceTakeover: () => void;
+    onForceUnlock: () => void;
   } = $props();
 </script>
 
@@ -171,6 +175,45 @@
           >{offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}</button>
           <button
             onclick={() => (showForceTakeoverConfirm = false)}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >{m.common_cancel()}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Force Unlock Confirmation Modal (IC emergency: clears the lock WITHOUT syncing) -->
+{#if showForceUnlockConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
+    onclick={() => (showForceUnlockConfirm = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showForceUnlockConfirm = false; }}
+  >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 class="text-xl font-medium text-crimson-400">{m.offline_force_unlock_title()}</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-6">{m.offline_force_unlock_msg()}</p>
+        <div class="flex gap-2">
+          <button
+            onclick={onForceUnlock}
+            disabled={offlineActionLoading}
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
+          >{offlineActionLoading ? m.common_loading() : m.offline_force_unlock_confirm()}</button>
+          <button
+            onclick={() => (showForceUnlockConfirm = false)}
             class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >{m.common_cancel()}</button>
         </div>

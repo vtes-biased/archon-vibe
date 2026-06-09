@@ -19,12 +19,14 @@
   import LinkedAccounts from "./LinkedAccounts.svelte";
   import AppSettings from "./AppSettings.svelte";
   import DeveloperSection from "./DeveloperSection.svelte";
+  import AdminSection from "./AdminSection.svelte";
   import DataSection from "./DataSection.svelte";
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
   const auth = $derived(getAuthState());
   const isDev = $derived(hasAnyRole('DEV', 'IC'));
+  const isIC = $derived(hasAnyRole('IC'));
 
   let discordMessage = $state("");
   let discordError = $state("");
@@ -207,6 +209,9 @@
         <AppSettings />
         {#if isDev}
           <DeveloperSection />
+        {/if}
+        {#if isIC}
+          <AdminSection />
         {/if}
         <DataSection onResync={handleResync} onLogout={handleLogout} />
       </div>
