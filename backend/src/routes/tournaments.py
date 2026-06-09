@@ -8,7 +8,7 @@ from pathlib import Path
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from uuid6 import uuid7
@@ -1454,6 +1454,15 @@ async def go_online(
             raise HTTPException(
                 status_code=403, detail="Only organizers can bring a tournament online"
             )
+        if not existing.offline_mode:
+            raise HTTPException(
+                status_code=410,
+                detail=(
+                    "This tournament is no longer in offline mode — it was unlocked "
+                    "by an admin or already brought online. Your offline changes "
+                    "cannot be synced; reload to get the current state."
+                ),
+            )
         if (
             existing.offline_mode
             and existing.offline_device_id != request.device_id
@@ -1510,6 +1519,21 @@ async def go_online(
         if tournament and not permissions.is_organizer(current_user, tournament):
             raise HTTPException(
                 status_code=403, detail="Only organizers can bring a tournament online"
+            )
+        # The server is no longer in offline mode (an IC force-unlocked it, or it
+        # was already brought online). Refuse to blind-overwrite the authoritative
+        # state with this device's stale offline snapshot — without this guard the
+        # device-lock check below is skipped and the upsert clobbers. 410 Gone
+        # distinguishes "offline session ended, discard + resync" from the
+        # device-mismatch 409 (which offers a force override).
+        if tournament and not tournament.offline_mode:
+            raise HTTPException(
+                status_code=410,
+                detail=(
+                    "This tournament is no longer in offline mode — it was unlocked "
+                    "by an admin or already brought online. Your offline changes "
+                    "cannot be synced; reload to get the current state."
+                ),
             )
         if tournament and tournament.offline_mode:
             if tournament.offline_device_id != request.device_id and not request.force:
@@ -1695,11 +1719,21 @@ async def sync_offline(
 @router.post("/{uid}/force-unlock")
 async def force_unlock(
     uid: str,
+    request: Request,
     current_user: OptionalUser = None,
 ) -> Response:
     """IC-only emergency unlock. Clears offline mode entirely."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
+
+    # Break-glass: first-party IC sessions only. An OAuth token (even
+    # user:impersonate) must not be able to discard another organizer's offline
+    # work — get_current_user stamps oauth_client_id on the request for any
+    # OAuth token, so its presence flags a delegated credential.
+    if getattr(request.state, "oauth_client_id", None):
+        raise HTTPException(
+            status_code=403, detail="OAuth tokens cannot force-unlock tournaments"
+        )
 
     if Role.IC not in current_user.roles:
         raise HTTPException(

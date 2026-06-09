@@ -157,6 +157,10 @@ Offline tournaments use a device-lock model (no changes log needed):
 - Server overwrites its state with the primary device's authoritative data
 - Temp UIDs (offline-created players) are remapped to real UIDs on sync
 
+**Lock-loss reconciliation** — the three offline-skip filters in `sync.ts` (snapshot batch, live SSE, flush buffer) check `lostOfflineLock()` before dropping a tournament update. A tournament is "lock-lost" when the local device holds it offline but the authoritative copy shows `offline_mode===false` or `offline_device_id !== myDeviceId` (i.e. a force-unlock or force-takeover already happened on the server). When detected, `handleOfflineLockLost()` clears local offline state, toasts a data-loss warning, and falls through to apply the authoritative copy — so a previously isolated device "gets the memo" on reconnect.
+
+**go-online 410 guard** — `POST .../go-online` returns **410 Gone** if the server is no longer in offline mode (already unlocked or already brought online by another path). The client catches 410, clears orphaned local offline state, and re-raises. This prevents a stale device from blind-overwriting the authoritative state with its snapshot; SSE delivers the current state instead.
+
 ## Frontend: Sync Manager
 
 ### Spec-Based Buffers

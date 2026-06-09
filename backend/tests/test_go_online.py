@@ -109,6 +109,45 @@ async def test_wrong_device_rejected_without_creating_users(test_client, test_db
 
 
 @pytest.mark.asyncio
+async def test_go_online_refused_when_server_not_offline(test_client, test_db):
+    """If the server is no longer in offline mode (e.g. an IC force-unlocked it),
+    a stale device's go-online must be refused with 410 — never blind-overwrite
+    the authoritative state with the device's offline snapshot."""
+    org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
+    await db.save_user(org)
+
+    # An ONLINE tournament (offline_mode defaults False) owned by org.
+    uid = str(uuid7())
+    await db.save_tournament(
+        Tournament(
+            uid=uid,
+            modified=datetime.now(UTC),
+            name="Online T",
+            organizers_uids=[org.uid],
+            country="France",
+        )
+    )
+
+    temp_uid = "TEMP-" + str(uuid7())
+    body = {
+        "device_id": "devA",
+        "tournament": _offline_tournament_payload(uid, org.uid, temp_uid),
+        "offline_players": [{"temp_uid": temp_uid, "name": "Should Not Persist"}],
+    }
+    before = await _count_users()
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/go-online",
+        json=body,
+        headers=make_auth_header(org.uid),
+    )
+    assert resp.status_code == 410
+    # Refused before any reconciliation side effects.
+    assert await _count_users() == before
+    saved = await db.get_tournament_by_uid(uid)
+    assert saved.name == "Online T"  # not clobbered by the stale "Offline T" payload
+
+
+@pytest.mark.asyncio
 async def test_organizer_resolves_players_and_goes_online(test_client, test_db):
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
     await db.save_user(org)

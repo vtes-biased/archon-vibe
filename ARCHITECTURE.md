@@ -169,7 +169,8 @@ Offline mode uses primary device ownership — no CRUD log or conflict resolutio
 - **Primary device** is authoritative — server accepts its full state on go-online
 - **Force-takeover**: another organizer can claim the lock (warned about losing primary's unsaved data)
 - **Opportunistic sync**: primary device can background-sync without unlocking (`sync-offline`)
-- **IC force-unlock**: emergency unlock without syncing offline data
+- **IC force-unlock**: emergency unlock without syncing offline data (first-party IC sessions only — OAuth tokens rejected). UI: crimson button in the "locked by another device" banner.
+- **Lock-loss reconciliation**: when a force-unlock or takeover reaches the previously isolated device via SSE/snapshot, it clears local offline state and warns the user their unsynced changes are discarded. `go-online` returns 410 if the server is no longer in offline mode, preventing a stale snapshot from clobbering authoritative state. See SYNC.md (Offline Mode) for the full mechanics.
 
 go-online resolves/creates offline players (`save_user`/`allocate_next_vekn_id`) **before** taking the `FOR UPDATE` lock: an unlocked pre-check gates side effects (organizer + device lock), then the lock only re-verifies authoritatively, remaps temp UIDs, and saves — so no per-player connection is checked out while the row is locked. Benign race: if organizer rights are revoked between the pre-check and the lock, the re-check 403s after the users were already created (orphaned, harmless).
 
