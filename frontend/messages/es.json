@@ -190,6 +190,8 @@
   "error_action_requires_online": "Esta acción requiere conexión a Internet.",
   "error_network_unreachable": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
   "engine_load_error": "No se pudo cargar el motor de puntuación. Algunas funciones no están disponibles; recarga para reintentar.",
+  "sync_error_disconnected": "Conexión perdida: los datos pueden estar desactualizados.",
+  "sync_reconnect": "Reconectar",
   "sanction_cat_procedural_error": "Error de Procedimiento",
   "sanction_cat_tournament_error": "Error de Torneo",
   "sanction_cat_unsportsmanlike_conduct": "Conducta Antideportiva",

@@ -20,7 +20,15 @@
   // Connection status
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
-  let syncError = $state<string | null>(null);
+  let syncError = $state(false);
+
+  // Manual recovery from a terminal sync failure (the auto-retry gives up after a
+  // few attempts) — the banner exposes this so the user isn't stuck on stale data.
+  function reconnectSync() {
+    syncError = false;
+    isSyncing = true;
+    syncManager.connect();
+  }
 
   // Navigation items - fixed 6 items, no conditional developer
   const navItems = [
@@ -77,12 +85,16 @@
     const handleSyncEvent = (event: { type: string; error?: string }) => {
       if (event.type === 'syncing') {
         isSyncing = true;
+        syncError = false;
       } else if (event.type === 'connected') {
-        syncError = null;
+        syncError = false;
       } else if (event.type === 'sync_complete') {
         isSyncing = false;
       } else if (event.type === 'error') {
-        syncError = event.error || 'Sync error occurred';
+        // Keep the raw reason in the console for diagnostics; the user sees a
+        // localized banner with a manual Reconnect instead of raw error text.
+        if (event.error) console.error('Sync error:', event.error);
+        syncError = true;
         isSyncing = false;
       } else if (event.type === 'disconnected') {
         isSyncing = false;
@@ -137,7 +149,10 @@
           {m.status_offline_banner()}
         </span>
       {:else if syncError}
-        <span>{syncError}</span>
+        <span class="inline-flex items-center gap-2">
+          {m.sync_error_disconnected()}
+          <button onclick={reconnectSync} class="underline hover:no-underline font-medium">{m.sync_reconnect()}</button>
+        </span>
       {/if}
     </div>
   {/if}
