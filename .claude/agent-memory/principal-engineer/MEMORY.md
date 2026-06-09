@@ -15,7 +15,6 @@
 - `backend/src/permissions.py` — thin PyO3 wrapper over engine authz (decision lives in Rust)
 - `backend/src/routes/auth/` — auth flows split into a package (email_password, discord, passkeys, magic_link, profile, _tokens)
 - `backend/src/routes/tournaments.py` — tournament create/action/delete + go_online
-- `backend/src/routes/api_v1.py` — the ONLY single-object GET-by-uid routes (`/api/v1/...`)
 - `frontend/src/lib/sync.ts` — SSE SyncManager singleton, spec-based buffering
 - `frontend/src/lib/db.ts` — IndexedDB wrapper, batch ops, by-tournament indexes
 - `frontend/src/lib/api.ts` — API client, optimistic updates + rollback for tournament actions
@@ -50,7 +49,6 @@
 ## Sync-correctness traps
 - [Destructive store-wipe offline rescue](destructive-store-wipe-offline-rescue.md) — db.ts upgrade AND sync.ts clearAllStores both wipe stores; must rescue the FULL offline set (tournament + sanctions + decks + player-stubs).
 - [Sync cursor timestamp trap](sync-cursor-timestamp-trap.md) — objects table has TWO modified timestamps (column `modified_at` vs JSONB `modified`); diverge in value AND format; never mix in a since-cursor.
-- [Tournament GET route prefix](tournament-get-route-prefix.md) — GET-by-uid is under `/api/v1`, mutations under `/api/tournaments`; bare `GET /api/tournaments/{uid}` is a 404.
 - [tournament_transaction nested pool](tournament-transaction-nested-pool.md) — reads join the txn (ambient `_tx_conn`), writes acquire the pool independently; the asymmetry is load-bearing (go_online VEKN-id collision).
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — holds player user_uids; easily missed in any per-player UID remap.
 - [User delete SSE](user-delete-sse-noop.md) — soft-deleted users are SAVED (not removed) so by-uid refs resolve; filtered only from listing queries.

@@ -458,52 +458,6 @@ async def _issue_token_pair(
     }
 
 
-# --- Revocation ---
-
-
-@router.post("/revoke")
-async def revoke_token(body: dict):
-    """Revoke a token by JTI (RFC 7009). Client authenticates via body."""
-    client_id = body.get("client_id", "")
-    client_secret = body.get("client_secret", "")
-    token_jti = body.get("token_jti", "")
-
-    if not token_jti:
-        raise HTTPException(400, "Missing token_jti")
-
-    client = await get_oauth_client_by_client_id(client_id)
-    if not client or not client.active:
-        raise HTTPException(401, "Invalid client credentials")
-
-    try:
-        ph.verify(client.client_secret_hash, client_secret)
-    except VerifyMismatchError:
-        raise HTTPException(401, "Invalid client credentials") from None
-
-    token_record = await get_oauth_token_by_jti(token_jti)
-    if not token_record or token_record.client_id != client.client_id:
-        # Per RFC 7009, return 200 even if token not found
-        return {"status": "ok"}
-
-    if not token_record.revoked:
-        now = datetime.now(UTC)
-        revoked = OAuthToken(
-            uid=token_record.uid,
-            modified=now,
-            token_jti=token_record.token_jti,
-            client_id=token_record.client_id,
-            user_uid=token_record.user_uid,
-            scopes=token_record.scopes,
-            token_type=token_record.token_type,
-            expires_at=token_record.expires_at,
-            revoked=True,
-            parent_token_uid=token_record.parent_token_uid,
-        )
-        await update_oauth_token(revoked)
-
-    return {"status": "ok"}
-
-
 # --- UserInfo ---
 
 
@@ -605,27 +559,6 @@ async def list_clients(user: User = Depends(require_role(Role.DEV))):
         }
         for c in clients
     ]
-
-
-@router.get("/clients/{client_id}")
-async def get_client(
-    client_id: str,
-    user: User = Depends(require_role(Role.DEV)),
-):
-    """Get details of own OAuth client."""
-    client = await get_oauth_client_by_client_id(client_id)
-    if not client or client.created_by_uid != user.uid:
-        raise HTTPException(404, "Client not found")
-
-    return {
-        "uid": client.uid,
-        "name": client.name,
-        "client_id": client.client_id,
-        "redirect_uris": client.redirect_uris,
-        "scopes": [s.value for s in client.scopes],
-        "active": client.active,
-        "modified": client.modified.isoformat(),
-    }
 
 
 @router.post("/clients/{client_id}/regenerate-secret")

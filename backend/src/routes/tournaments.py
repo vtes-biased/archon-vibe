@@ -1042,63 +1042,6 @@ def _load_cards_json() -> str:
     return text
 
 
-@router.get("/{uid}/decks/{player_uid}/twda")
-async def export_deck_twda(
-    uid: str,
-    player_uid: str,
-    current_user: OptionalUser = None,
-) -> Response:
-    """Export a player's deck in TWDA text format."""
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # Find deck from DeckObject store
-    all_decks = await get_decks_for_tournament(uid)
-    deck = next((d for d in all_decks if d.user_uid == player_uid), None)
-    if not deck:
-        raise HTTPException(status_code=404, detail="No deck found for player")
-
-    engine = _engine
-    deck_json = json.dumps(
-        {
-            "name": deck.name,
-            "author": deck.author,
-            "comments": deck.comments,
-            "cards": deck.cards,
-        }
-    )
-
-    # Get player name
-    player_user = await get_user_by_uid(player_uid)
-    player_name = player_user.name if player_user else "Unknown"
-    player_count = len(tournament.players)
-    tournament_date = tournament.start or tournament.modified.isoformat()
-
-    # Build tournament format string (e.g. "2R+F")
-    rounds_count = len(tournament.rounds)
-    has_finals = tournament.finals is not None
-    tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
-
-    # Build tournament URL
-    tournament_url = ""  # Can be set to app URL when deployed
-
-    text = engine.export_twda(
-        deck_json,
-        _load_cards_json(),
-        tournament.name,
-        str(tournament_date),
-        tournament.country or "",
-        tournament_format,
-        tournament_url,
-        player_count,
-        player_name,
-    )
-    return Response(content=text, media_type="text/plain")
-
-
 @router.get("/{uid}/report")
 async def tournament_report(
     uid: str,

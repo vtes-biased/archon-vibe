@@ -335,7 +335,6 @@ the risk warrants. Treat the matrix as UI defaults, not a security guarantee.
 - Card quantity adjustment buttons in deck editor
 - Collapsible decklists in player view
 - CORS proxy fallback for deck URL fetching
-- TWDA-format deck export per player (`GET /{uid}/decks/{player_uid}/twda`)
 - TWDA auto-PR: on tournament finish, winner's deck submitted as GitHub PR to TWDA repository
 
 **Result Reporting**:

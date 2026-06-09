@@ -683,7 +683,7 @@ Pushes VEKN role metadata to Discord so server admins can gate roles based on Ar
 
 Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.
 
-**Endpoints**: `/oauth/authorize` (GET+POST), `/oauth/token`, `/oauth/revoke`, `/oauth/userinfo`
+**Endpoints**: `/oauth/authorize` (GET+POST), `/oauth/token`, `/oauth/userinfo`
 
 **Client Management** (DEV role): `/oauth/clients` CRUD + secret regeneration
 
@@ -807,7 +807,6 @@ Auto-submits winner's decklists to the [Tournament Winning Deck Archive](https:/
 **Trigger**: On `FinishTournament`, if winner has a deck, `twda.py` creates a GitHub PR against the TWDA repository.
 
 **Features**:
-- TWDA-format text export per player (`GET /{uid}/decks/{player_uid}/twda`)
 - Updates PR if decklist is modified after finish
 - Late uploads (winner adds deck post-tournament) trigger PR at that point
 

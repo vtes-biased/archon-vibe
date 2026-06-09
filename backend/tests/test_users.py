@@ -1,5 +1,7 @@
 """Tests for user API endpoints."""
 
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
 from src.models import Role
@@ -37,69 +39,14 @@ async def test_create_user(test_client: AsyncClient, populated_db):
 
 
 @pytest.mark.asyncio
-async def test_list_users(test_client: AsyncClient, populated_db):
-    """Test listing users via v1 API (requires auth)."""
-    admin = next(
-        u
-        for u in populated_db
-        if (Role.NC in u.roles or Role.PRINCE in u.roles) and u.vekn_id
-    )
-    response = await test_client.get(
-        "/api/v1/users/", headers=make_auth_header(admin.uid)
-    )
-
-    assert response.status_code == 200
-    users = response.json()
-
-    # All users visible at member level
-    assert len(users) == 400
-
-    # Check structure of first user
-    first_user = users[0]
-    assert "uid" in first_user
-    assert "name" in first_user
-    assert "modified" in first_user
-
-
-@pytest.mark.asyncio
-async def test_get_user(test_client: AsyncClient, populated_db):
-    """Test getting a specific user by UID via v1 API (requires auth)."""
-    admin = next(
-        u
-        for u in populated_db
-        if (Role.NC in u.roles or Role.PRINCE in u.roles) and u.vekn_id
-    )
-    # Target must have vekn_id to be visible at member level via v1 API
-    test_uid = next(u.uid for u in populated_db if u.vekn_id)
-
-    response = await test_client.get(
-        f"/api/v1/users/{test_uid}", headers=make_auth_header(admin.uid)
-    )
-
-    assert response.status_code == 200
-    user = response.json()
-    assert user["uid"] == test_uid
-    assert "name" in user
-    assert "country" in user
-
-
-@pytest.mark.asyncio
 async def test_update_user(test_client: AsyncClient, populated_db):
     """Test updating a user's information (requires auth)."""
-    # Find an admin who can update users (must have vekn_id for v1 API access)
+    # Find an admin who can update users
     admin = next(
-        u
-        for u in populated_db
-        if (Role.NC in u.roles or Role.PRINCE in u.roles) and u.vekn_id
+        u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles
     )
-    # Target must have a vekn_id to be visible at member level
-    target = next(u for u in populated_db if u.vekn_id and u.uid != admin.uid)
+    target = next(u for u in populated_db if u.uid != admin.uid)
     headers = make_auth_header(admin.uid)
-
-    # First get the user via v1 API
-    response = await test_client.get(f"/api/v1/users/{target.uid}", headers=headers)
-    assert response.status_code == 200
-    original_user = response.json()
 
     # Update the user
     response = await test_client.put(
@@ -116,7 +63,7 @@ async def test_update_user(test_client: AsyncClient, populated_db):
     assert updated_user["uid"] == target.uid
     assert updated_user["name"] == "Updated Name"
     assert updated_user["country"] == "CA"
-    assert updated_user["modified"] != original_user["modified"]
+    assert datetime.fromisoformat(updated_user["modified"]) > target.modified
 
 
 @pytest.mark.asyncio
