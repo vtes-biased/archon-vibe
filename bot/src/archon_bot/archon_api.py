@@ -225,7 +225,7 @@ class ArchonAPI:
     async def claim_vekn_id(self, discord_id: str, vekn_id: str) -> ApiResult:
         """Claim a VEKN ID via POST /vekn/claim."""
         return await self._request(
-            "POST", "/api/vekn/claim", discord_id, json_body={"vekn_id": vekn_id}
+            "POST", "/vekn/claim", discord_id, json_body={"vekn_id": vekn_id}
         )
 
     async def sponsor_player(
@@ -236,7 +236,7 @@ class ArchonAPI:
         if city:
             payload["city"] = city
         return await self._request(
-            "POST", "/api/vekn/sponsor", organizer_discord_id, json_body=payload
+            "POST", "/vekn/sponsor", organizer_discord_id, json_body=payload
         )
 
     async def create_sanction(
@@ -263,7 +263,7 @@ class ArchonAPI:
         if round_number is not None:
             payload["round_number"] = round_number
         return await self._request(
-            "POST", "/api/sanctions/", discord_id, json_body=payload
+            "POST", "/sanctions/", discord_id, json_body=payload
         )
 
     async def exchange_code(self, code: str, code_verifier: str) -> dict | None:
