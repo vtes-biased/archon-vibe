@@ -189,6 +189,7 @@
   "error_league_dq": "Il giocatore è squalificato da un torneo di lega",
   "error_action_requires_online": "Questa azione richiede una connessione a internet.",
   "error_network_unreachable": "Impossibile raggiungere il server. Controlla la connessione e riprova.",
+  "engine_load_error": "Impossibile caricare il motore di punteggio. Alcune funzioni non sono disponibili — ricarica per riprovare.",
   "sanction_cat_procedural_error": "Errore Procedurale",
   "sanction_cat_tournament_error": "Errore di Torneo",
   "sanction_cat_unsportsmanlike_conduct": "Condotta Antisportiva",

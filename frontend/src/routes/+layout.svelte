@@ -4,6 +4,8 @@
   import { syncManager } from '$lib/sync';
   import { initAuth } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine';
+  import { engineLoadFailed } from '$lib/stores/engine-ready.svelte';
+  import { showToast } from '$lib/stores/toast.svelte';
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState } from '$lib/stores/offline.svelte';
   import { onMount } from 'svelte';
@@ -38,6 +40,21 @@
   // Keep <html lang> in sync with locale
   $effect(() => {
     document.documentElement.lang = getLocale();
+  });
+
+  // Surface a WASM engine load failure once. Without this the app silently
+  // degrades (permissions vanish, optimistic writes disabled, empty standings).
+  let engineErrorShown = false;
+  $effect(() => {
+    if (engineLoadFailed() && !engineErrorShown) {
+      engineErrorShown = true;
+      showToast({
+        type: 'error',
+        duration: 0, // persistent — this is a degraded-app state, not a transient blip
+        message: m.engine_load_error(),
+        action: { label: m.update_refresh(), onClick: () => location.reload() },
+      });
+    }
   });
 
   onMount(() => {

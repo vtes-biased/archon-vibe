@@ -189,6 +189,7 @@
   "error_league_dq": "Player is disqualified from a league tournament",
   "error_action_requires_online": "This action requires an internet connection.",
   "error_network_unreachable": "Couldn't reach the server. Check your connection and try again.",
+  "engine_load_error": "Couldn't load the scoring engine. Some features are unavailable — reload to retry.",
   "sanction_cat_procedural_error": "Procedural Error",
   "sanction_cat_tournament_error": "Tournament Error",
   "sanction_cat_unsportsmanlike_conduct": "Unsportsmanlike Conduct",

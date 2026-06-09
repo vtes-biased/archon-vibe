@@ -7,7 +7,7 @@
 
 import type { DeckObject, Sanction, Tournament, User } from './types';
 import { getAllLeagues } from './db';
-import { engineReady, markEngineReady } from './stores/engine-ready.svelte';
+import { engineReady, markEngineReady, markEngineLoadFailed } from './stores/engine-ready.svelte';
 
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
@@ -34,6 +34,7 @@ export async function initEngine(): Promise<WasmEngine> {
         markEngineReady();
       } catch (e) {
         initError = e instanceof Error ? e : new Error(String(e));
+        markEngineLoadFailed(); // reactive signal so the UI can surface the degraded state
         throw initError;
       }
     })();
