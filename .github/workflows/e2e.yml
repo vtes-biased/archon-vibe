@@ -6,6 +6,9 @@ name: E2E
 # the test DB lives in RAM and dies with the container.
 on:
   pull_request:
+  # Kept deliberately: work also lands by pushing straight to main (trunk-based),
+  # which fires no pull_request event — so this is the gate for direct-to-main
+  # pushes, not a redundant re-run of an already-validated PR merge.
   push:
     branches: [main]
   workflow_dispatch: {}
@@ -21,6 +24,9 @@ jobs:
   e2e:
     name: Playwright E2E (isolated stack)
     runs-on: ubuntu-latest
+    # The full stack builds WASM + two images then runs Playwright; cap the job so
+    # a hung health-check or deadlocked test can't ride GitHub's 360-minute default.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -38,6 +44,16 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 7
+
+      # Traces/screenshots/videos (Playwright outputDir) — only written on failure
+      # and the most useful thing to pull down when a run goes red.
+      - name: Upload failure traces
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces
+          path: test-results/
           retention-days: 7
 
       - name: Tear down
