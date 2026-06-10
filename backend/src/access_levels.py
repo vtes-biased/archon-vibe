@@ -20,6 +20,8 @@ _PUBLIC_OBFUSCATED_FIELDS = ("contact_email", "contact_phone")
 
 
 def _obfuscate(value: str) -> str:
+    if value.startswith(_OBFUSCATED_PREFIX):
+        return value  # already cloaked — never double-encode
     return _OBFUSCATED_PREFIX + base64.b64encode(value.encode("utf-8")).decode("ascii")
 
 

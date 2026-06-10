@@ -30,9 +30,11 @@ logger = logging.getLogger(__name__)
 # not expose these (cloaked on the site), so we inject them during sync.
 #
 # This is personal data, so it is NOT bundled in the repo/wheel. It is delivered
-# out of band: at deploy time ansible decrypts an ansible-vault file to
-# OFFICIALS_CONTACTS_FILE (default `/etc/archon/officials_contacts.json`); in dev
-# it is an untracked file next to this package. Missing file -> no injection.
+# out of band: at deploy time ansible decrypts an ansible-vault file and points
+# OFFICIALS_CONTACTS_FILE at it (the role sets this to
+# `{env_dir}/officials_contacts.json`). In dev, with the env var unset, it falls
+# back to an untracked file next to this package. A missing/unreadable file means
+# no injection (and never wipes already-stored emails — see _update_user).
 # See scripts/backfill_officials_contacts.py and the ansible fastapi_backend role.
 def _officials_contacts_path() -> Path:
     env = os.environ.get("OFFICIALS_CONTACTS_FILE")
@@ -46,6 +48,11 @@ def _load_officials_emails() -> dict[str, str]:
         entries = json.loads(_officials_contacts_path().read_text(encoding="utf-8"))
     except FileNotFoundError:
         logger.info("officials contacts file not present; skipping email injection")
+        return {}
+    except (OSError, ValueError) as e:
+        # Present but unreadable/corrupt (partial deploy, bad JSON). Runs at
+        # import, so log and skip rather than crash backend startup.
+        logger.warning("officials contacts file unreadable (%s); skipping", e)
         return {}
     return {
         e["vekn_id"]: e["email"] for e in entries if e.get("vekn_id") and e.get("email")
