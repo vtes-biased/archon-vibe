@@ -50,3 +50,5 @@ Most core features have shipped (decklists+TWDA, leagues, sanctions v2, ratings/
 - [VEKN ID detach policy](project_vekn_id_detach_policy.md) — what stays with the VEKN ID vs follows the human on abandon/displace/merge; self-abandon blocked while suspended.
 - [Account-surgery regression watch-list](project_vekn_account_surgery_bugs.md) — the merge/detach defect classes #59/#65/#78 fixed; check none return when touching that code.
 - [TWDA designer credit](project_twda_designer_credit.md) — `Created by:` label, anonymity = omit the line (no "Anonymous" string), names only no VEKN ids, winner always in header.
+- [Sponsor (coopted_by) visibility](project_vekn_sponsor_visibility.md) — full-projection-only, but the SSE personal overlay already delivers it to IC/NC/Prince/self, so surfacing is frontend-only (presence = permission); detail-view + own-profile, never a list column; p3.
+- [Seating alteration validation](project_seating_alteration_validation.md) — hard-block <4/>5/empty tables on save, warn-only on pred-prey repeats, add-table belongs in the edit-seating draft.
