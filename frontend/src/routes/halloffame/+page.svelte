@@ -2,6 +2,7 @@
   import { getAllUsers, getSanctionsForUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
+  import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import type { User, Sanction } from "$lib/types";
   import { ArrowLeft, Loader2, Trophy, ChevronLeft, ChevronRight } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -133,7 +134,7 @@
               <td class="py-2 px-3 text-ash-400">{rank}</td>
               <td class="py-2 px-3">
                 <a href="/users/{user.uid}" class="text-ash-100 hover:text-crimson-400">
-                  {user.name}
+                  <DeceasedIcon deceased={user.deceased_at} />{user.name}
                 </a>
               </td>
               <td class="py-2 px-3 text-ash-300">

@@ -44,6 +44,15 @@ def can_manage_leagues(user: User) -> bool:
     return _allowed(_engine.can_manage_leagues(json.dumps(user_to_context(user))))
 
 
+def can_mark_deceased(actor: User, target_country: str | None) -> bool:
+    """IC manages any country; NC only their own (Prince excluded)."""
+    return _allowed(
+        _engine.can_mark_deceased(
+            json.dumps(user_to_context(actor)), target_country or ""
+        )
+    )
+
+
 def is_organizer(user: User, tournament: Tournament) -> bool:
     """Explicit organizer, or implicit: IC (any) or NC (same country)."""
     return _allowed(

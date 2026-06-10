@@ -255,6 +255,26 @@ pub fn can_manage_country(actor: &UserContext, target_country: Option<&str>) -> 
     }
 }
 
+/// Check if actor can mark/clear a member's deceased status.
+///
+/// IC manages any country; NC only their own (Prince excluded — a deceased
+/// flag is an administrative member-status call, reserved to IC/NC). Set and
+/// clear are symmetric (same permission).
+pub fn can_mark_deceased(actor: &UserContext, target_country: Option<&str>) -> PermissionResult {
+    if actor.has_role(Role::IC) {
+        return PermissionResult::allow();
+    }
+    if actor.has_role(Role::NC)
+        && actor.country.is_some()
+        && actor.country.as_deref() == target_country
+    {
+        return PermissionResult::allow();
+    }
+    PermissionResult::deny(
+        "Only IC, or the member's national coordinator, can change deceased status",
+    )
+}
+
 /// Check if actor can create/manage tournaments (IC/NC/Prince).
 pub fn can_manage_tournaments(actor: &UserContext) -> PermissionResult {
     if is_official(actor) {
@@ -599,6 +619,21 @@ mod tests {
         assert!(!can_manage_country(&ctx(vec![Role::NC], None), None).allowed);
         // Non-official → never
         assert!(!can_manage_country(&ctx(vec![Role::Judge], Some("FR")), Some("FR")).allowed);
+    }
+
+    #[test]
+    fn test_can_mark_deceased() {
+        // IC: any country
+        assert!(can_mark_deceased(&ctx(vec![Role::IC], Some("US")), Some("FR")).allowed);
+        // NC: same country only
+        assert!(can_mark_deceased(&ctx(vec![Role::NC], Some("FR")), Some("FR")).allowed);
+        assert!(!can_mark_deceased(&ctx(vec![Role::NC], Some("FR")), Some("US")).allowed);
+        // Prince is excluded, even in their own country
+        assert!(!can_mark_deceased(&ctx(vec![Role::Prince], Some("FR")), Some("FR")).allowed);
+        // NC with no country cannot manage
+        assert!(!can_mark_deceased(&ctx(vec![Role::NC], None), None).allowed);
+        // Non-official never
+        assert!(!can_mark_deceased(&ctx(vec![Role::Judge], Some("FR")), Some("FR")).allowed);
     }
 
     #[test]

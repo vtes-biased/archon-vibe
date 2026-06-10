@@ -39,6 +39,9 @@ def _make_user(**overrides) -> dict:
         "vekn_prefix": None,
         "resync_after": None,
         "calendar_token": "cal_secret_token",
+        # In-memoriam marker (deceased member feature)
+        "deceased_at": "2026-05-01T00:00:00",
+        "deceased_by_uid": "u-nc-fr",
         # Rating fields (after merge)
         "constructed_online": {"total": 100, "tournaments": []},
         "constructed_offline": None,
@@ -268,6 +271,34 @@ class TestUserFull:
         user = _make_user(calendar_token="secret123")
         result = compute_full(ObjectType.USER, user)
         assert "calendar_token" not in result
+
+
+# ---------------------------------------------------------------------------
+# User: in-memoriam privacy boundary (deceased member feature)
+# ---------------------------------------------------------------------------
+
+
+class TestUserDeceasedPrivacyBoundary:
+    """The in-memoriam marker is split by access level: members see the public
+    fact of death (deceased_at), but the administrative actor (deceased_by_uid,
+    "who marked this person dead") stays full-only. A regression that leaks
+    deceased_by_uid into the member projection exposes admin attribution to
+    every member; one that drops deceased_at from member hides the marker.
+    Asserted on a regular (no-role) user so neither field rides in on a
+    role-specific field set.
+    """
+
+    def test_member_sees_date_not_actor(self):
+        user = _make_user(roles=[], community_links=[])
+        result = compute_member(ObjectType.USER, user)
+        assert result["deceased_at"] == "2026-05-01T00:00:00"
+        assert "deceased_by_uid" not in result
+
+    def test_full_sees_both(self):
+        user = _make_user(roles=[], community_links=[])
+        result = compute_full(ObjectType.USER, user)
+        assert result["deceased_at"] == "2026-05-01T00:00:00"
+        assert result["deceased_by_uid"] == "u-nc-fr"
 
 
 # ---------------------------------------------------------------------------

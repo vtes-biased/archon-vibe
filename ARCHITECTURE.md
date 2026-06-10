@@ -286,7 +286,7 @@ The Rust core defines the canonical object schemas and business logic:
 
 App-level checks that mirror engine rules reuse engine codes so the same condition localizes identically on every path: the backend `_check_player_barred` raises `EngineRejection` directly, and its frontend twin `checkPlayerBarred` (tournament-actions.ts) throws a coded `EngineError` — keeping the offline path localized too.
 
-**Authorization (single source of truth)**: All role/country/uid/ownership predicates live in `engine/src/permissions.rs` and are consumed by both stacks — backend via PyO3, frontend via WASM. `backend/src/permissions.py` is a thin marshalling adapter (no logic); each route keeps its own `HTTPException(403, ...)` detail. The frontend wrappers (`isOrganizer()`, `canEditLeague()` in `engine.ts`) are UX-only and fail closed (`false`) until WASM loads — the backend remains the authoritative enforcement point. See `.pst/details/72-authz-rust-single-source.md` for the full design.
+**Authorization (single source of truth)**: All role/country/uid/ownership predicates live in `engine/src/permissions.rs` and are consumed by both stacks — backend via PyO3, frontend via WASM. `backend/src/permissions.py` is a thin marshalling adapter (no logic); each route keeps its own `HTTPException(403, ...)` detail. The frontend wrappers (`isOrganizer()`, `canEditLeague()`, `canMarkDeceased()` in `engine.ts`) are UX-only and fail closed (`false`) until WASM loads — the backend remains the authoritative enforcement point. See `.pst/details/72-authz-rust-single-source.md` for the full design.
 
 **Build Commands**:
 ```bash
@@ -926,6 +926,15 @@ Canvas-rendered PNG card and plain text generator for sharing finished tournamen
 **UI**: Share button on `OverviewTab.svelte` for finished tournaments.
 
 ## User Account Surgery
+
+### Deceased Members
+
+`User` carries two fields: `deceased_at: datetime | None` (the in-memoriam flag + date) and `deceased_by_uid: str | None` (audit, full-only). This is **not** a soft-delete — tournament history, ratings, and rankings are preserved; the record stays active in the system.
+
+- **Set/cleared** via `PATCH /api/users/{uid}/deceased` (`{ deceased: bool }`). Reversible.
+- **Permission**: IC (any country) or NC (same country only); Prince excluded. Engine: `can_mark_deceased` / WASM: `canMarkDeceased`.
+- **VEKN sync**: never pushed to VEKN; `"deceased_at"` tracked in `local_modifications` to prevent VEKN-sync overwrite.
+- **Access levels**: `deceased_at` visible at member+; `deceased_by_uid` full-only.
 
 **Immovable-uid invariant**: a uid that carries a `vekn_id` is never re-keyed and never soft-deleted. Everything keyed to it — sanctions, decks, tournament results, ratings, wins, cooptation — stays attached. Only the account WITHOUT the `vekn_id` ever moves. See `.pst/details/59-vekn-detach.md` for the full rule.
 

@@ -301,6 +301,11 @@ class User(BaseObject, kw_only=True):
     coopted_by: str | None = None  # user_uid of Prince/NC/IC who granted VEKN ID
     coopted_at: datetime | None = None
 
+    # Deceased status (set/cleared by IC or same-country NC). NOT a soft-delete:
+    # history and ratings are preserved. deceased_at presence is the flag.
+    deceased_at: datetime | None = None
+    deceased_by_uid: str | None = None  # who marked it (audit; full projection only)
+
     # VEKN sync tracking
     vekn_synced: bool = False  # True if user data came from VEKN API
     vekn_synced_at: datetime | None = None  # Last sync timestamp

@@ -190,6 +190,11 @@ export interface User extends BaseObject {
   coopted_by?: string | null; // user_uid of Prince/NC/IC who granted VEKN ID
   coopted_at?: string | null;
 
+  // Deceased status (set/cleared by IC or same-country NC). Not a soft-delete:
+  // history/ratings preserved. Member projection carries deceased_at only.
+  deceased_at?: string | null;
+  deceased_by_uid?: string | null; // full projection only
+
   // VEKN sync tracking
   vekn_synced?: boolean;
   vekn_synced_at?: string | null;

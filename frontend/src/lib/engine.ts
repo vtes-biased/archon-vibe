@@ -332,6 +332,28 @@ export function canManageVekn(
 }
 
 /**
+ * Check if actor can mark/clear a member's deceased status (sync version).
+ * IC anywhere, NC in the target's country (Prince excluded).
+ * Returns {allowed: false, reason: null} if engine not initialized.
+ */
+export function canMarkDeceased(
+  actor: UserContext,
+  targetCountry: string | null
+): PermissionResult {
+  const engine = getEngineReactive();
+  if (!engine) return { allowed: false, reason: null };
+
+  const actorJson = JSON.stringify({
+    uid: actor.uid,
+    roles: actor.roles,
+    country: actor.country,
+  });
+
+  const resultJson = callEngine(() => engine.canMarkDeceased(actorJson, targetCountry ?? ""));
+  return JSON.parse(resultJson);
+}
+
+/**
  * Check if actor can edit target user's profile (sync version).
  * Returns {allowed: false, reason: null} if engine not initialized.
  */

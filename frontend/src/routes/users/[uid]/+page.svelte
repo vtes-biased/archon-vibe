@@ -3,7 +3,7 @@
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn } from "$lib/engine";
+  import { canEditUser, canManageVekn, canMarkDeceased } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
@@ -52,6 +52,16 @@
     if (!auth.user || !user || !isOnline) return false;
     try {
       return canManageVekn(auth.user, user).allowed;
+    } catch {
+      return false;
+    }
+  });
+
+  const canManageDeceased = $derived(() => {
+    if (!auth.user || !user || !isOnline || !engineReady()) return false;
+    if (auth.user.uid === user.uid) return false;
+    try {
+      return canMarkDeceased(auth.user, user.country ?? null).allowed;
     } catch {
       return false;
     }
@@ -145,7 +155,7 @@
 
     {#if canManage()}
       <div class="mt-6">
-        <VeknManagement {user} onaction={handleUserUpdated} />
+        <VeknManagement {user} onaction={handleUserUpdated} canMarkDeceased={canManageDeceased()} />
       </div>
     {/if}
 

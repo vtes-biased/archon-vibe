@@ -498,3 +498,50 @@ async def moderate_community_link(
     broadcast_precomputed(bd)
 
     return Response(content=b'{"success": true}', media_type="application/json")
+
+
+class DeceasedRequest(BaseModel):
+    """JSON body for PATCH /api/users/{uid}/deceased."""
+
+    deceased: bool
+
+
+@router.patch("/{uid}/deceased")
+async def set_deceased(
+    uid: str, body: DeceasedRequest, current_user: CurrentUser
+) -> Response:
+    """Mark or clear a member's deceased status.
+
+    IC anywhere, NC in the same country as the target (Prince excluded).
+    Not a soft-delete: history and ratings are preserved. Reversible.
+    """
+    if current_user.uid == uid:
+        raise HTTPException(
+            status_code=403, detail="You cannot change your own deceased status"
+        )
+
+    target = await get_user_by_uid(uid)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not permissions.can_mark_deceased(current_user, target.country):
+        raise HTTPException(
+            status_code=403,
+            detail="Only IC, or the member's national coordinator, can change deceased status",
+        )
+
+    # Deceased is archon-local and must always win over VEKN, set or cleared —
+    # so the field stays flagged local even on clear (append-only is intentional).
+    local_mods = set(target.local_modifications)
+    local_mods.add("deceased_at")
+    target = msgspec.structs.replace(
+        target,
+        modified=datetime.now(UTC),
+        deceased_at=datetime.now(UTC) if body.deceased else None,
+        deceased_by_uid=current_user.uid if body.deceased else None,
+        local_modifications=local_mods,
+    )
+
+    bd = await db_save_user(target)
+    broadcast_precomputed(bd)
+    return Response(content=encoder.encode(target), media_type="application/json")

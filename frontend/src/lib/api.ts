@@ -181,6 +181,15 @@ export async function updateUser(
   return apiRequest<User>(`/api/users/${uid}`, { method: 'PUT', body: JSON.stringify(body) }, opts);
 }
 
+/** Mark or clear a member's deceased status (IC or same-country NC). */
+export async function setMemberDeceased(uid: string, deceased: boolean): Promise<User> {
+  requireOnline();
+  return apiRequest<User>(
+    `/api/users/${uid}/deceased`,
+    { method: 'PATCH', body: JSON.stringify({ deceased }) },
+  );
+}
+
 // VEKN ID Management API
 
 export interface VeknClaimResponse {

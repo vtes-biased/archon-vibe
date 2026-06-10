@@ -16,8 +16,8 @@ pub use error::EngineError;
 pub use permissions::{
     can_change_role, can_delete_sanction, can_edit_league, can_edit_user, can_issue_sanction,
     can_lift_sanction, can_manage_country, can_manage_leagues, can_manage_tournaments,
-    can_manage_vekn, is_organizer, OwnedResource, PermissionResult, Role, SanctionContext,
-    UserContext,
+    can_manage_vekn, can_mark_deceased, is_organizer, OwnedResource, PermissionResult, Role,
+    SanctionContext, UserContext,
 };
 
 // ============================================================================
@@ -74,6 +74,19 @@ mod shared {
             Some(target_country)
         };
         Ok(can_manage_country(&actor, country).to_json().dump())
+    }
+
+    pub fn can_mark_deceased_json(
+        actor_json: &str,
+        target_country: &str,
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let country = if target_country.is_empty() {
+            None
+        } else {
+            Some(target_country)
+        };
+        Ok(can_mark_deceased(&actor, country).to_json().dump())
     }
 
     pub fn can_manage_tournaments_json(actor_json: &str) -> Result<String, EngineError> {
@@ -410,6 +423,15 @@ mod wasm {
             js_str(can_manage_country_json(actor_json, target_country))
         }
 
+        #[wasm_bindgen(js_name = canMarkDeceased)]
+        pub fn can_mark_deceased(
+            &self,
+            actor_json: &str,
+            target_country: &str,
+        ) -> Result<String, String> {
+            js_str(can_mark_deceased_json(actor_json, target_country))
+        }
+
         #[wasm_bindgen(js_name = canManageTournaments)]
         pub fn can_manage_tournaments(&self, actor_json: &str) -> Result<String, String> {
             js_str(can_manage_tournaments_json(actor_json))
@@ -621,6 +643,10 @@ mod python {
 
         fn can_manage_country(&self, actor_json: &str, target_country: &str) -> PyResult<String> {
             py_str(can_manage_country_json(actor_json, target_country))
+        }
+
+        fn can_mark_deceased(&self, actor_json: &str, target_country: &str) -> PyResult<String> {
+            py_str(can_mark_deceased_json(actor_json, target_country))
         }
 
         fn can_manage_tournaments(&self, actor_json: &str) -> PyResult<String> {

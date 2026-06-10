@@ -3,6 +3,7 @@
   import { untrack } from "svelte";
   import { goto } from "$app/navigation";
   import User from "./User.svelte";
+  import DeceasedIcon from "./DeceasedIcon.svelte";
   import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses } from "$lib/roles";
@@ -461,7 +462,7 @@
                   <div class="flex items-start justify-between">
                     <div>
                       <div class="user-name font-semibold text-bone-100">
-                        {user.name}
+                        <DeceasedIcon deceased={user.deceased_at} />{user.name}
                         {#if user.nickname}
                           <span class="text-sm text-ash-500"
                             >({user.nickname})</span
@@ -499,7 +500,7 @@
                 <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                   <div class="col-span-3">
                     <div class="user-name font-semibold text-bone-100">
-                      {user.name}
+                      <DeceasedIcon deceased={user.deceased_at} />{user.name}
                     </div>
                     {#if user.nickname}
                       <div class="text-sm text-ash-500">

@@ -1,17 +1,21 @@
 <script lang="ts">
   import type { User } from "$lib/types";
-  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers } from "$lib/api";
+  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff } from "lucide-svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
     user,
     onaction,
+    canMarkDeceased = false,
   }: {
     user: User;
     onaction: (user: User) => void;
+    canMarkDeceased?: boolean;
   } = $props();
+
+  const isDeceased = $derived(!!user.deceased_at);
 
   const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
   // Strict false: undefined means the viewer's projection omits the field
@@ -68,6 +72,23 @@
       const result = await forceAbandonVeknId(user.uid);
       showToast({ type: "success", message: result.message });
       showForceAbandonConfirm = false;
+    } catch {
+      // Error toast shown by apiRequest
+    } finally {
+      processingAction = false;
+    }
+  }
+
+  async function handleDeceased() {
+    // No confirmation: marking/clearing is trivially reversible.
+    processingAction = true;
+    try {
+      const updated = await setMemberDeceased(user.uid, !isDeceased);
+      showToast({
+        type: "success",
+        message: isDeceased ? m.deceased_cleared_toast() : m.deceased_marked_toast(),
+      });
+      onaction(updated);
     } catch {
       // Error toast shown by apiRequest
     } finally {
@@ -153,6 +174,31 @@
         {m.vekn_merge()}
       </button>
     </div>
+
+    <!-- Deceased status: mention only when set; no indication otherwise -->
+    {#if isDeceased || canMarkDeceased}
+      <div class="mt-3 pt-3 border-t border-ash-800 flex items-center justify-between gap-2">
+        {#if isDeceased}
+          <span class="text-sm text-ash-300 inline-flex items-center gap-1.5">
+            <Flower2 class="w-4 h-4 text-ash-400" aria-hidden="true" />
+            {m.deceased_status_set()}
+          </span>
+        {:else}
+          <span></span>
+        {/if}
+        {#if canMarkDeceased}
+          <button
+            type="button"
+            onclick={handleDeceased}
+            disabled={processingAction}
+            class="px-3 py-1.5 text-sm bg-ash-700 hover:bg-ash-600 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded transition-colors inline-flex items-center gap-1.5 shrink-0"
+          >
+            {#if !isDeceased}<Flower2 class="w-3.5 h-3.5" aria-hidden="true" />{/if}
+            {isDeceased ? m.deceased_clear() : m.deceased_mark()}
+          </button>
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
 

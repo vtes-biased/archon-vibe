@@ -67,6 +67,9 @@ _USER_LINKS_ONLY_FIELDS = {
 _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
     | {"vekn_id", "city", "city_geoname_id", "state", "nickname", "avatar_path"}
+    # In-memoriam marker — members see the flag/date (not deceased_by_uid, which
+    # is administrative and stays full-only).
+    | {"deceased_at"}
     # Rating fields (embedded in user after merge)
     | {
         "constructed_online",

@@ -2,7 +2,7 @@
   import type { User, Tournament } from "$lib/types";
   import { getFilteredUsers, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
-  import { Ban, TriangleAlert } from "lucide-svelte";
+  import { Ban, TriangleAlert, Flower2 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -20,6 +20,7 @@
   let searchTotal = $state(0);
   let selectedIndex = $state(-1);
   let suspendedUids = $state<Set<string>>(new Set());
+  let pendingDeceased = $state<User | null>(null);
   const SEARCH_LIMIT = 10;
 
   async function searchPlayers() {
@@ -54,8 +55,23 @@
     } else if (e.key === "Enter" && selectedIndex >= 0) {
       e.preventDefault();
       const user = searchResults[selectedIndex];
-      if (user && !suspendedUids.has(user.uid)) selectUser(user);
+      if (user && !suspendedUids.has(user.uid)) chooseUser(user);
     }
+  }
+
+  // Deceased members are warned, not blocked: backfilling a past (finished)
+  // event can legitimately add a member who has since passed away.
+  function chooseUser(user: User) {
+    if (user.deceased_at) {
+      pendingDeceased = user;
+      return;
+    }
+    selectUser(user);
+  }
+
+  function confirmDeceased() {
+    if (pendingDeceased) selectUser(pendingDeceased);
+    pendingDeceased = null;
   }
 
   function selectUser(user: User) {
@@ -63,6 +79,7 @@
     playerSearch = "";
     searchResults = [];
     suspendedUids = new Set();
+    pendingDeceased = null;
   }
 </script>
 
@@ -85,12 +102,15 @@
       {#each searchResults as user, i}
         {@const isSuspended = suspendedUids.has(user.uid)}
         <button
-          onclick={() => !isSuspended && selectUser(user)}
+          onclick={() => !isSuspended && chooseUser(user)}
           disabled={isSuspended}
           class="w-full px-3 py-2 text-left text-sm transition-colors {isSuspended ? 'text-ash-500 cursor-not-allowed' : 'text-ash-200'} {i === selectedIndex && !isSuspended ? 'bg-ash-700' : isSuspended ? '' : 'hover:bg-ash-800'}"
         >
           <span class="inline-flex items-center gap-1">
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
+            {#if user.deceased_at}
+              <Flower2 class="w-3.5 h-3.5 text-ash-400 ml-1" />
+            {/if}
             {#if user.vekn_id}
               <span class="text-ash-500 ml-2">({user.vekn_id})</span>
             {:else}
@@ -122,3 +142,44 @@
     </div>
   {/if}
 </div>
+
+{#if pendingDeceased}
+  <div
+    role="presentation"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) pendingDeceased = null; }}
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="deceased-warn-title"
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 id="deceased-warn-title" class="text-xl font-medium text-bone-100 inline-flex items-center gap-2">
+          <Flower2 class="w-5 h-5 text-ash-400" aria-hidden="true" />
+          {m.deceased_badge()}
+        </h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-4">
+          {m.add_player_deceased_warn({ name: pendingDeceased.name })}
+        </p>
+        <div class="flex gap-2">
+          <button
+            onclick={confirmDeceased}
+            class="flex-1 px-4 py-2 bg-ash-700 hover:bg-ash-600 text-bone-100 rounded font-medium transition-colors"
+          >
+            {m.add_player_deceased_confirm()}
+          </button>
+          <button
+            onclick={() => (pendingDeceased = null)}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >
+            {m.common_cancel()}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
