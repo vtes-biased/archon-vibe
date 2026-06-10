@@ -11,8 +11,8 @@
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { canEditLeague, computeLeagueStandings } from "$lib/engine";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
+  import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X } from "lucide-svelte";
-  import { renderMarkdown } from "$lib/markdown";
   import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);
@@ -422,9 +422,7 @@
       </div>
 
       {#if league.description}
-        <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800 mb-6">
-          <div class="prose dark:prose-invert prose-sm max-w-none">{@html renderMarkdown(league.description)}</div>
-        </div>
+        <FoldableDescription description={league.description} title={league.name} />
       {/if}
 
       <!-- Child leagues (meta-league) -->

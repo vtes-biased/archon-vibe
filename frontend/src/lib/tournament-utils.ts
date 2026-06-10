@@ -220,59 +220,6 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
   });
 }
 
-/** Strip leading markdown title if it matches the tournament name */
-export function stripLeadingTitle(description: string, name: string): string {
-  const lines = description.split('\n');
-  if (lines.length === 0) return description;
-  const first = lines[0]!.trim();
-  // Match "# Title" where Title matches the tournament name (case-insensitive)
-  if (first.startsWith('#')) {
-    const titleText = first.replace(/^#+\s*/, '').trim();
-    if (titleText.toLowerCase() === name.toLowerCase()) {
-      const rest = lines.slice(1).join('\n').trimStart();
-      return rest || description;
-    }
-  }
-  return description;
-}
-
-/**
- * Plain-text teaser for a markdown description, derived from the source
- * (clamping rendered HTML breaks: -webkit-line-clamp needs inline content).
- * Skips a leading heading, takes the first paragraph, caps at maxChars on
- * a word boundary. `truncated` is true only if something was actually hidden.
- */
-export function descriptionExcerpt(md: string, maxChars = 140): { text: string; truncated: boolean } {
-  const lines = md.replace(/\r\n/g, '\n').split('\n');
-  let i = 0;
-  let heading = '';
-  while (i < lines.length && lines[i]!.trim() === '') i++;
-  if (i < lines.length && /^#{1,6}\s/.test(lines[i]!.trim())) {
-    heading = lines[i]!.trim().replace(/^#+\s*/, '');
-    i++;
-    while (i < lines.length && lines[i]!.trim() === '') i++;
-  }
-  const para: string[] = [];
-  while (i < lines.length && lines[i]!.trim() !== '') para.push(lines[i++]!.trim());
-  if (!para.length && heading) para.push(heading); // heading-only description
-  const hasMore = lines.slice(i).some(l => l.trim() !== '');
-  let text = para.join(' ')
-    .replace(/^#{1,6}\s+/, '')                // stray heading marks
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')     // images: drop
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')  // links: keep label
-    .replace(/[*_`~]/g, '')                   // emphasis/code marks
-    .replace(/\s+/g, ' ')
-    .trim();
-  let truncated = hasMore;
-  if (text.length > maxChars) {
-    const cut = text.slice(0, maxChars);
-    const sp = cut.lastIndexOf(' ');
-    text = (sp > 0 ? cut.slice(0, sp) : cut).trimEnd();
-    truncated = true;
-  }
-  return { text, truncated };
-}
-
 export function translateTournamentState(state: TournamentState): string {
   switch (state) {
     case "Planned": return m.state_planned();
