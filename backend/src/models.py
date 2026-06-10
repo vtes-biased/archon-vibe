@@ -199,7 +199,7 @@ class LinkModeration(msgspec.Struct, kw_only=True, frozen=True):
     status: str  # "hidden" | "promoted"
     by: str  # moderator user_uid
     at: datetime
-    scope: str | None = None  # promoted only: "international" (IC) | "national" (NC)
+    scope: str | None = None  # promoted only: "global" (IC) | "national" (NC)
 
 
 class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):

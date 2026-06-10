@@ -565,7 +565,7 @@ class LinkModeration(msgspec.Struct):
     status: str        # "hidden" | "promoted"
     by: str            # moderator user_uid
     at: datetime
-    scope: str | None  # promoted only: "international" (IC) | "national" (NC)
+    scope: str | None  # promoted only: "global" (IC) | "national" (NC)
 
 class CommunityLink(msgspec.Struct):
     type: CommunityLinkType
@@ -592,7 +592,7 @@ Language validation: backend enforces two-letter shape only. The curated selecta
 | `hide` | yes | yes | yes |
 | `clear` | yes | yes | yes |
 | `promote_national` | yes | yes | — |
-| `promote_international` | yes | — | — |
+| `promote_global` | yes | — | — |
 
 Self-moderation allowed: officials pin their own links.
 
@@ -609,9 +609,9 @@ Handled by `compute_user_public()` and `compute_user_member()` in `access_levels
 ### Frontend Display
 
 `CommunityTab.svelte` renders 3 sections:
-- **Global Resources** — IC-owned links + any link with `scope="international"`; international pins sort first
+- **Global Resources** — only links with `scope="global"` (IC global pin), from any owner
 - **Communities** (`CommunitySocialSection.svelte`) — social links grouped by country; pinned (any scope) sort first within each country group
-- **Content** (`CommunityContentSection.svelte`) — content links; language filter defaults to "All"; within each language group sorted: international pin → national pin → promoted → officials → rest
+- **Content** (`CommunityContentSection.svelte`) — content links; language filter defaults to "All"; within each language group sorted: global pin → national pin → promoted → officials → rest
 - **Officials Directory** — NC/Prince/IC contact info
 
 `CommunityModerationActions.svelte` — inline hide/promote/clear controls for moderators.

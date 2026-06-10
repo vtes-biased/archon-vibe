@@ -66,15 +66,23 @@
                     {/if}
                   </div>
                 {/if}
-                <CommunityLinkPills {links} />
                 {#if isModerator}
-                  <CommunityModerationActions
-                    userUid={user.uid}
-                    {links}
-                    {onModerate}
-                    canPromoteNational={isIC || (isNC && userCountry === user.country)}
-                    canPromoteInternational={isIC}
-                  />
+                  <div class="flex flex-wrap gap-3">
+                    {#each links as link}
+                      <div class="flex flex-col items-center gap-1">
+                        <CommunityLinkPills links={[link]} />
+                        <CommunityModerationActions
+                          userUid={user.uid}
+                          {link}
+                          {onModerate}
+                          canPromoteNational={isIC || (isNC && userCountry === user.country)}
+                          canPromoteGlobal={isIC}
+                        />
+                      </div>
+                    {/each}
+                  </div>
+                {:else}
+                  <CommunityLinkPills {links} />
                 {/if}
               </div>
             {/each}

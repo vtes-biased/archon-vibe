@@ -26,7 +26,7 @@ export interface LinkModeration {
   status: "hidden" | "promoted";
   by: string; // moderator user_uid
   at: string; // ISO datetime
-  scope?: "international" | "national" | null; // promoted only: IC | NC pin level
+  scope?: "global" | "national" | null; // promoted only: IC | NC pin level
 }
 
 export interface CommunityLink {

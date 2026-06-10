@@ -58,9 +58,9 @@
           <div class="flex items-center gap-2 text-xs text-ash-400 flex-wrap">
             {#if scope(link)}
               <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium
-                {scope(link) === 'international' ? 'badge-blue' : 'badge-teal'}">
+                {scope(link) === 'global' ? 'badge-blue' : 'badge-teal'}">
                 <Pin class="w-3 h-3" />
-                {scope(link) === 'international' ? m.community_scope_international() : m.community_scope_national()}
+                {scope(link) === 'global' ? m.community_scope_global() : m.community_scope_national()}
               </span>
             {/if}
             {#if user.name}
@@ -80,10 +80,10 @@
         {#if isModerator}
           <CommunityModerationActions
             userUid={user.uid}
-            links={[link]}
+            {link}
             {onModerate}
             canPromoteNational={isIC || (isNC && viewerCountry === user.country)}
-            canPromoteInternational={isIC}
+            canPromoteGlobal={isIC}
           />
         {/if}
       </div>

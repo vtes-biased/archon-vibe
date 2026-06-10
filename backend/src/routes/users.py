@@ -403,7 +403,7 @@ async def delete_avatar(
 
 class LinkModerationRequest(BaseModel):
     url: str  # link URL to moderate
-    action: str  # "hide" | "promote_national" | "promote_international" | "clear"
+    action: str  # "hide" | "promote_national" | "promote_global" | "clear"
 
 
 @router.patch("/{user_uid}/community-link-moderation")
@@ -417,7 +417,7 @@ async def moderate_community_link(
     Hide/clear: IC anywhere, NC/Prince in the same country as the target.
     promote_national: IC anywhere, NC in the same country (not Prince —
     "top level for country" is the NC's call).
-    promote_international: IC only.
+    promote_global: IC only.
     Self-moderation is allowed: officials pin their own links this way.
     """
     is_ic = Role.IC in current_user.roles
@@ -461,22 +461,22 @@ async def moderate_community_link(
                 at=datetime.now(UTC),
                 scope="national",
             )
-        case "promote_international":
+        case "promote_global":
             if not is_ic:
                 raise HTTPException(
-                    status_code=403, detail="Only IC can promote internationally"
+                    status_code=403, detail="Only IC can promote globally"
                 )
             mod = LinkModeration(
                 status="promoted",
                 by=current_user.uid,
                 at=datetime.now(UTC),
-                scope="international",
+                scope="global",
             )
         case _:
             raise HTTPException(
                 status_code=422,
                 detail="Action must be 'hide', 'promote_national',"
-                " 'promote_international', or 'clear'",
+                " 'promote_global', or 'clear'",
             )
 
     # Find and update the link

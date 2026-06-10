@@ -23,7 +23,6 @@
 
   let allUsersWithLinks = $state<User[]>([]);
   let officials = $state<User[]>([]);
-  let icUsers = $state<User[]>([]);
   let expandedCountries = $state<Set<string>>(new Set());
   let loaded = $state(false);
   let searchQuery = $state("");
@@ -39,31 +38,21 @@
   const pinScope = (l: CommunityLink) =>
     l.moderation?.status === "promoted" ? l.moderation.scope : null;
 
-  // Global resources: IC links, plus internationally-promoted links from any owner
-  const icLinks = $derived.by(() => {
+  // Global resources: links a moderator (IC) has pinned globally, from any owner.
+  const globalLinks = $derived.by(() => {
     const links: CommunityLink[] = [];
-    for (const u of icUsers) {
-      if (u.community_links) {
-        for (const l of u.community_links) {
-          if (l.moderation?.status !== "hidden" || isModerator) links.push(l);
-        }
-      }
-    }
     for (const u of allUsersWithLinks) {
-      if (u.roles?.includes("IC")) continue;
       for (const l of u.community_links || []) {
-        if (pinScope(l) === "international") links.push(l);
+        if (pinScope(l) === "global") links.push(l);
       }
     }
-    const rank = (l: CommunityLink) => (pinScope(l) === "international" ? 0 : 1);
-    return links.sort((a, b) => rank(a) - rank(b));
+    return links;
   });
 
   // Social links grouped by country
   const socialGroups = $derived.by(() => {
     const grouped = new Map<string, { user: User; links: CommunityLink[] }[]>();
     for (const u of allUsersWithLinks) {
-      if (u.roles?.includes("IC")) continue; // IC links shown in global section
       const country = u.country || "??";
       const socialLinks = (u.community_links || []).filter(l =>
         SOCIAL_TYPES.has(l.type) && (l.moderation?.status !== "hidden" || isModerator)
@@ -112,10 +101,10 @@
         items.push({ user: u, link: l });
       }
     }
-    // Sort: international pin, national pin, promoted, officials, then by user name
+    // Sort: global pin, national pin, promoted, officials, then by user name
     const rank = (l: CommunityLink) => {
       if (l.moderation?.status !== "promoted") return 3;
-      if (l.moderation.scope === "international") return 0;
+      if (l.moderation.scope === "global") return 0;
       if (l.moderation.scope === "national") return 1;
       return 2;
     };
@@ -180,10 +169,6 @@
 
   async function loadData() {
     const allUsers = await getAllUsers();
-    // IC users (for global resources)
-    icUsers = allUsers.filter(u =>
-      !u.deleted_at && u.roles?.includes("IC") && u.community_links?.length
-    );
     // All users with community links
     allUsersWithLinks = allUsers.filter(u =>
       !u.deleted_at && u.community_links?.length
@@ -243,14 +228,14 @@
 {#if !loaded}
   <div class="text-center py-8 text-ash-400">{m.common_loading()}</div>
 {:else}
-  <!-- Global Resources (IC links) -->
-  {#if icLinks.length > 0}
+  <!-- Global Resources: links pinned globally by a moderator -->
+  {#if globalLinks.length > 0}
     <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 p-5 mb-6">
       <div class="flex items-center gap-2 mb-3">
         <Globe class="w-5 h-5 text-crimson-500" />
         <h2 class="text-lg font-medium text-bone-100">{m.community_global_resources()}</h2>
       </div>
-      <CommunityLinkPills links={icLinks} />
+      <CommunityLinkPills links={globalLinks} />
     </div>
   {/if}
 
@@ -418,7 +403,7 @@
   {/if}
 
   <!-- Empty state -->
-  {#if socialGroups.length === 0 && contentItems.length === 0 && officialGroups.length === 0 && icLinks.length === 0}
+  {#if socialGroups.length === 0 && contentItems.length === 0 && officialGroups.length === 0 && globalLinks.length === 0}
     <div class="text-center py-12">
       <Users class="mx-auto h-12 w-12 text-ash-600 mb-4" />
       <h3 class="text-lg font-medium text-bone-100 mb-2">{m.community_no_officials()}</h3>
