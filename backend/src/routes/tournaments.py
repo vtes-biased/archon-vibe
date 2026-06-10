@@ -915,6 +915,15 @@ async def tournament_action(
                 t_data[dt_field] = v + ":00"
         updated = decoder.decode(msgspec.json.encode(t_data))
         updated.modified = datetime.now(UTC)
+        # Stamp the actual end time when entering Finished without an explicit
+        # finish date — the engine never sets finish, and ratings/VEKN push
+        # rely on it (server-side hook, same as modified and the timer below)
+        if (
+            updated.state == TournamentState.FINISHED
+            and tournament.state != TournamentState.FINISHED
+            and updated.finish is None
+        ):
+            updated.finish = datetime.now(UTC)
         deck_ops = result.get("deck_ops", [])
 
         # Timer lifecycle hooks (online-only, not handled by Rust engine)
@@ -1569,6 +1578,10 @@ async def go_online(
         # Save tournament within the locked transaction (upsert handles insert)
         updated = decoder.decode(msgspec.json.encode(tournament_data))
         updated.modified = datetime.now(UTC)
+        # A tournament finished offline arrives without a finish date (the
+        # engine never stamps it) — use the sync time as the actual end time
+        if updated.state == TournamentState.FINISHED and updated.finish is None:
+            updated.finish = datetime.now(UTC)
         tournament_bd = await save_object(
             ObjectType.TOURNAMENT,
             updated.uid,
