@@ -272,6 +272,9 @@
     onchange={(e) => {
       const checked = (e.target as HTMLInputElement).checked;
       handleInput("online", checked);
+      if (checked) {
+        handleInput("proxies", false);
+      }
       if (checked && !values.venue) {
         handleInput("venue", "VEKN Discord");
         handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
@@ -394,16 +397,18 @@
 
 <!-- Boolean toggles -->
 <div class="space-y-3">
-  <label class="flex items-center gap-3 cursor-pointer">
-    <input
-      type="checkbox"
-      checked={values.proxies}
-      {disabled}
-      onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
-    />
-    <span class="text-sm text-ash-200">{m.tfield_allow_proxies()}</span>
-  </label>
+  {#if !values.online}
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={values.proxies}
+        {disabled}
+        onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
+        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
+      />
+      <span class="text-sm text-ash-200">{m.tfield_allow_proxies()}</span>
+    </label>
+  {/if}
   <label class="flex items-center gap-3 cursor-pointer">
     <input
       type="checkbox"
