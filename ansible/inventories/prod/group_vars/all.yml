@@ -37,6 +37,10 @@ env_dir: /etc/archon
 # --- service names --------------------------------------------------------
 backend_service: archon-backend
 bot_service: archon-bot
+# Legacy archon stack sharing the vekn.net VPS during the parallel run; it
+# writes to the same PG cluster, so migrate_postgres.yml must stop/start it
+# around the dump + port swap. Decommissioned at Phase 4.
+legacy_web_service: archon_web
 
 # --- versions -------------------------------------------------------------
 # PostgreSQL pinned via PGDG repo. Python is managed by uv (downloaded from

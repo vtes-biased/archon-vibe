@@ -149,14 +149,26 @@ and restarts + health-checks them afterwards.
 
 ## One-shot PG16 → PG17 migration (prod only)
 
-Prod currently runs PostgreSQL 16. Run this **once** after a full on-disk backup:
+Prod currently runs PostgreSQL 16. Run this **once** after a full on-disk
+backup, **before** the Phase-1 stand-up:
 
 ```bash
-just migrate-postgres-prod
+just migrate-postgres-prod   # 1. archondb → PG17, back on port 5432
+# verify legacy archon runs clean on PG17, then:
+just database-prod           # 2. new archon db/user/tunings in the PG17 cluster
 ```
 
-The playbook takes a `pg_dumpall` backup, stands up PG17 in parallel on port
-5433, restores, swaps the ports, and restarts archon services.
+The order matters: with PG16 still holding 5432, apt puts the 17 cluster on
+5433 while the postgresql role tasks and `DATABASE_URL` (unix socket, no
+port) silently target 5432 — the legacy cluster. Migrating first puts PG17 on
+5432, so everything that follows lands in the one shared cluster (which also
+halves PG RAM on the ~2GB box).
+
+The playbook stops both stacks (legacy `archon_web` included — it would
+otherwise keep writing to the cluster being dumped), takes a `pg_dumpall`
+backup, stands up PG17 in parallel on port 5433, restores, swaps the ports,
+and restarts the services. PG16 stays on disk, stopped, as a ~48h rollback
+path.
 
 ## Layout
 
