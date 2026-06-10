@@ -960,9 +960,18 @@ fn apply_event(
                 }
 
                 // Validation phase (immutable borrows)
+                // The payload is positional: tables 0..table_count match the existing
+                // tables by index (results/overrides are preserved per index), extra
+                // tables are appended. Empty tables are draft workspaces, dropped after
+                // the rebuild; non-empty tables must seat 4 or 5 players.
                 let table_count = tournament["rounds"][*round].len();
-                if seating.len() != table_count {
+                if seating.len() < table_count {
                     return Err(EngineError::TableCountMismatch);
+                }
+                for table in seating.iter() {
+                    if !table.is_empty() && !(4..=5).contains(&table.len()) {
+                        return Err(EngineError::InvalidTableSize { size: table.len() });
+                    }
                 }
 
                 // Build map: player_uid -> (old_table, old_result, judge_uid) from current state
@@ -1025,6 +1034,13 @@ fn apply_event(
 
                 // Rebuild each table's seating
                 for t in 0..seating.len() {
+                    if t >= round_data.len() {
+                        round_data.push(json::object! {
+                            seating: [],
+                            state: "In Progress",
+                            override: json::Null,
+                        })?;
+                    }
                     let new_players = &seating[t];
                     let mut new_seating = Vec::new();
                     for uid in new_players {
@@ -1062,6 +1078,13 @@ fn apply_event(
                             round_data[t]["state"] = "In Progress".into();
                         }
                         // If not all zero, keep existing state (scores were preserved for same-table)
+                    }
+                }
+
+                // Drop empty tables (draft workspaces, or tables emptied by moves)
+                for t in (0..round_data.len()).rev() {
+                    if round_data[t]["seating"].is_empty() {
+                        round_data.array_remove(t);
                     }
                 }
             }

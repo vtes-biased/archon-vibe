@@ -150,6 +150,11 @@
     Array.from(playerIssues.values()).some(i => i.level === 0)
   );
 
+  // Tables with 1-3 players are illegal (VEKN: tables seat 4 or 5); empty tables are a draft workspace
+  const hasUndersizedTable = $derived(
+    alterTables.some(t => t.length > 0 && t.length < 4)
+  );
+
   const canEditSeating = $derived(
     isOrganizer && tournament.rounds!.length > 0
     && (tournament.state === "Playing" || tournament.state === "Finished" || tournament.state === "Waiting")
@@ -191,6 +196,11 @@
   async function saveAlterSeating() {
     await doAction("AlterSeating", { round: alterRoundIdx, seating: alterTables });
     cancelAlterMode();
+  }
+
+  // Draft-only: empty tables left at save time are dropped by the engine
+  function addTableInAlter() {
+    alterTables = [...alterTables, []];
   }
 
   function recomputeIssues() {
@@ -326,6 +336,24 @@
 </script>
 
 <div class="space-y-4">
+  {#snippet cancelConfirmBox()}
+    <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4 space-y-3">
+      <p class="text-crimson-300 text-sm font-medium">{m.rounds_cancel_title()}</p>
+      <p class="text-ash-400 text-sm">{m.rounds_cancel_msg()}</p>
+      <div class="flex gap-2">
+        <button
+          onclick={cancelRound}
+          disabled={actionLoading}
+          class="px-4 py-2 text-sm font-medium text-white bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
+        >{m.rounds_cancel_yes()}</button>
+        <button
+          onclick={() => showCancelConfirm = false}
+          class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+        >{m.rounds_cancel_keep()}</button>
+      </div>
+    </div>
+  {/snippet}
+
   {#if error}
     <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-3">
       <p class="text-crimson-300 text-sm">{error}</p>
@@ -368,13 +396,6 @@
           {/if}
         </div>
         <div class="flex gap-2">
-          <button
-            onclick={() => doAction("AddTable")}
-            disabled={actionLoading}
-            class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-          >
-            <SquarePlus class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
-          </button>
           <button
             onclick={() => showCancelConfirm = true}
             disabled={actionLoading}
@@ -423,21 +444,7 @@
 
       <!-- Cancel round confirmation -->
       {#if showCancelConfirm}
-        <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4 space-y-3">
-          <p class="text-crimson-300 text-sm font-medium">{m.rounds_cancel_title()}</p>
-          <p class="text-ash-400 text-sm">{m.rounds_cancel_msg()}</p>
-          <div class="flex gap-2">
-            <button
-              onclick={cancelRound}
-              disabled={actionLoading}
-              class="px-4 py-2 text-sm font-medium text-white bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
-            >{m.rounds_cancel_yes()}</button>
-            <button
-              onclick={() => showCancelConfirm = false}
-              class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-            >{m.rounds_cancel_keep()}</button>
-          </div>
-        </div>
+        {@render cancelConfirmBox()}
       {/if}
 
     {/if}
@@ -474,6 +481,7 @@
     {#each tournament.rounds as round, r}
       {@const isCurrent = isCurrentRound(r)}
       {@const isEditable = canEditSeating}
+      {@const isLast = r === tournament.rounds!.length - 1}
       {@const isExpanded = expandedRounds.has(r)}
       <div class="bg-ash-900/30 rounded-lg border border-ash-800">
         <div class="flex items-center">
@@ -513,6 +521,23 @@
               {#if round.some(t => t.seating.some(s => s.result.vp > 0))}
                 <p class="text-sm text-amber-400">{m.rounds_alter_scores_warning()}</p>
               {/if}
+              {#if hasR1Issue}
+                <p class="text-sm text-crimson-400">{m.rounds_alter_r1_error()}</p>
+              {/if}
+              {#if hasUndersizedTable}
+                <p class="text-sm text-crimson-400">{m.rounds_alter_size_error()}</p>
+              {/if}
+              <div class="flex gap-2 flex-wrap">
+                <button
+                  onclick={saveAlterSeating}
+                  disabled={actionLoading || hasR1Issue || hasUndersizedTable}
+                  class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
+                >{m.rounds_save_seating()}</button>
+                <button
+                  onclick={cancelAlterMode}
+                  class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                >{m.common_cancel()}</button>
+              </div>
               <SeatingSortable
                 bind:tables={alterTables}
                 {playerInfo}
@@ -521,21 +546,44 @@
                 tableRooms={tournament.table_rooms}
                 onchange={recomputeIssues}
               />
-              {#if hasR1Issue}
-                <p class="text-sm text-crimson-400">{m.rounds_alter_r1_error()}</p>
-              {/if}
-              <div class="flex gap-2">
-                <button
-                  onclick={saveAlterSeating}
-                  disabled={actionLoading || hasR1Issue}
-                  class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-                >{m.rounds_save_seating()}</button>
-                <button
-                  onclick={cancelAlterMode}
-                  class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                >{m.common_cancel()}</button>
-              </div>
+              <button
+                onclick={addTableInAlter}
+                disabled={actionLoading}
+                class="px-3 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+              >
+                <SquarePlus class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
+              </button>
             {:else}
+            {#if isOrganizer}
+              <div class="flex gap-2 flex-wrap">
+                {#if isEditable && !alterMode}
+                  <button
+                    onclick={() => enterAlterMode(r)}
+                    disabled={actionLoading}
+                    class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+                  >
+                    <GripVertical class="w-4 h-4 inline mr-1" />{m.rounds_alter_seating()}
+                  </button>
+                {/if}
+                {#if hasParallelRounds && isRoundAllFinished(r)}
+                  <button
+                    onclick={() => doAction("FinishRound", { round: r })}
+                    disabled={actionLoading}
+                    class="px-3 py-1.5 text-sm font-medium btn-amber rounded-lg transition-colors"
+                  >{m.rounds_finish_round_n({ n: String(r + 1) })}</button>
+                {/if}
+                {#if hasParallelRounds && isLast && tournament.state === "Playing" && !tournament.finals}
+                  <button
+                    onclick={() => showCancelConfirm = true}
+                    disabled={actionLoading}
+                    class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
+                  >{m.rounds_cancel_round()}</button>
+                {/if}
+              </div>
+              {#if showCancelConfirm && hasParallelRounds && isLast}
+                {@render cancelConfirmBox()}
+              {/if}
+            {/if}
             {#each round as table, i}
               <div class="bg-ash-900/50 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-2">
@@ -549,7 +597,7 @@
                     <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-emerald' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
                       {translateTableState(table.state)}
                     </span>
-                    {#if isEditable && r === tournament.rounds!.length - 1 && table.seating.length === 0}
+                    {#if isEditable && isLast && table.seating.length === 0}
                       <button
                         onclick={() => doAction("RemoveTable", { table: i })}
                         class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors"
@@ -598,7 +646,7 @@
                             </select>
                         {/if}
                         <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
-                        {#if isEditable}
+                        {#if isEditable && isLast}
                           <button
                             onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
                             class="p-2 sm:p-0.5 text-ash-500 hover:text-crimson-400 transition-colors"
@@ -667,7 +715,7 @@
                   </div>
                 {/if}
                 <!-- Seat a player -->
-                {#if isEditable && unseatedPlayers.length > 0 && table.seating.length < 5}
+                {#if isEditable && isLast && unseatedPlayers.length > 0 && table.seating.length < 5}
                   <div class="mt-2 pt-2 border-t border-ash-800">
                     {#if seatTargetTable === i}
                       <div class="flex flex-wrap gap-1">
@@ -692,33 +740,6 @@
                 {/if}
               </div>
             {/each}
-            <div class="flex gap-2 flex-wrap">
-              {#if isEditable && r === tournament.rounds!.length - 1}
-                <button
-                  onclick={() => doAction("AddTable")}
-                  disabled={actionLoading}
-                  class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                >
-                  <SquarePlus class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
-                </button>
-              {/if}
-              {#if isEditable && !alterMode}
-                <button
-                  onclick={() => enterAlterMode(r)}
-                  disabled={actionLoading}
-                  class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                >
-                  <GripVertical class="w-4 h-4 inline mr-1" />{m.rounds_alter_seating()}
-                </button>
-              {/if}
-              {#if hasParallelRounds && isOrganizer && isRoundAllFinished(r)}
-                <button
-                  onclick={() => doAction("FinishRound", { round: r })}
-                  disabled={actionLoading}
-                  class="px-3 py-1.5 text-sm font-medium btn-amber rounded-lg transition-colors"
-                >{m.rounds_finish_round_n({ n: String(r + 1) })}</button>
-              {/if}
-            </div>
             {/if}
           </div>
         {/if}

@@ -622,6 +622,8 @@
   "rounds_remove_empty_table": "Remover mesa vazia",
   "rounds_error_save": "Falha ao salvar pontuações",
   "rounds_alter_r1_error": "Não é possível salvar: repetição predador-presa (violação R1).",
+  "rounds_alter_size_error": "Não é possível salvar: as mesas devem ter 4 ou 5 jogadores.",
+  "rounds_drop_here": "Soltar um jogador aqui",
   "rounds_print_seating": "Imprimir disposição",
   "rounds_alter_scores_warning": "Mover jogadores entre mesas redefinirá suas pontuações.",
   "rounds_finish_round_n": "Concluir Rodada {n}",

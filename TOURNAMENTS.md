@@ -107,9 +107,9 @@ Events are processed by the Rust engine. Each event includes:
 | `FinishRound` | - | Ends current round |
 | `CancelRound` | - | Cancels current round, players return to Checked-in |
 | `SwapSeats` | `round`, `table`, `seat_a`, `seat_b` | Swap two players within a table |
-| `AlterSeating` | `round`, `seating` | Replace entire round or finals seating |
-| `SeatPlayer` | `round`, `table`, `player_uid` | Add player to a specific table |
-| `UnseatPlayer` | `player_uid` | Remove player from their current table |
+| `AlterSeating` | `round`, `seating` | Positional prefix match: existing tables matched by index (results preserved same-table, reset cross-table); extra payload tables appended fresh; each table must seat 0/4/5 players (0 = empty draft workspace, dropped after rebuild). Finals: replaces seat order, same player set. |
+| `SeatPlayer` | `table`, `player_uid`, `seat` | Add player to a table in the **last** round |
+| `UnseatPlayer` | `player_uid` | Remove player from their seat in the **last** round |
 | `AddTable` | - | Add empty table to current round |
 | `RemoveTable` | `table` | Remove a table from current round |
 

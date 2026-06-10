@@ -622,6 +622,8 @@
   "rounds_remove_empty_table": "Retirer la table vide",
   "rounds_error_save": "Échec de l'enregistrement des scores",
   "rounds_alter_r1_error": "Impossible d'enregistrer : répétition prédateur-proie (violation R1).",
+  "rounds_alter_size_error": "Impossible d'enregistrer : les tables doivent accueillir 4 ou 5 joueurs.",
+  "rounds_drop_here": "Déposer un joueur ici",
   "rounds_print_seating": "Imprimer le placement",
   "rounds_alter_scores_warning": "Déplacer des joueurs entre les tables réinitialisera leurs scores.",
   "rounds_finish_round_n": "Terminer la ronde {n}",

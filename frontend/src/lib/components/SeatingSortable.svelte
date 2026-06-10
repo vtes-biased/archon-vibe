@@ -22,6 +22,8 @@
 
   // Drag state
   let dragOrigin: { table: number; seat: number } | null = $state(null);
+  // Cross-table operations commit on drop, not on hover; seat -1 = phantom (move)
+  let dropTarget: { table: number; seat: number } | null = $state(null);
   let scrollDirection = 0;
   let scrollInterval: ReturnType<typeof setInterval> | null = null;
   let scrollHandler: ((ev: DragEvent) => void) | null = null;
@@ -54,22 +56,48 @@
   function handleDragEnter(e: DragEvent, tableIdx: number, seatIdx: number) {
     e.preventDefault();
     if (!dragOrigin) return;
-    if (dragOrigin.table === tableIdx && dragOrigin.seat === seatIdx) return;
+    if (dragOrigin.table === tableIdx && dragOrigin.seat === seatIdx) {
+      dropTarget = null;
+      return;
+    }
 
     if (dragOrigin.table === tableIdx) {
-      // Same table: only swap with adjacent (continuous reorder)
+      // Same table: live adjacent swap (continuous reorder)
+      dropTarget = null;
       if (Math.abs(seatIdx - dragOrigin.seat) !== 1) return;
       const t = tables[tableIdx]!;
       [t[dragOrigin.seat], t[seatIdx]] = [t[seatIdx]!, t[dragOrigin.seat]!];
       dragOrigin = { table: tableIdx, seat: seatIdx };
+      // Trigger Svelte reactivity
+      tables = [...tables];
     } else {
-      // Cross table: simple swap
-      const src = tables[dragOrigin.table]!;
-      const dst = tables[tableIdx]!;
-      [src[dragOrigin.seat], dst[seatIdx]] = [dst[seatIdx]!, src[dragOrigin.seat]!];
-      dragOrigin = { table: tableIdx, seat: seatIdx };
+      // Cross table: highlight only — the swap commits on drop
+      dropTarget = { table: tableIdx, seat: seatIdx };
     }
-    // Trigger Svelte reactivity
+  }
+
+  // Phantom seat: highlight only — the move commits on drop
+  function handleDragEnterPhantom(e: DragEvent, tableIdx: number) {
+    e.preventDefault();
+    if (!dragOrigin || dragOrigin.table === tableIdx) return;
+    if (tables[tableIdx]!.length >= 5) return;
+    dropTarget = { table: tableIdx, seat: -1 };
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    if (!dragOrigin || !dropTarget) return;
+    const src = tables[dragOrigin.table]!;
+    const dst = tables[dropTarget.table]!;
+    if (dropTarget.seat === -1) {
+      // Move: remove from source, append to target
+      const [uid] = src.splice(dragOrigin.seat, 1);
+      dst.push(uid!);
+    } else {
+      // Swap with the occupied target seat
+      [src[dragOrigin.seat], dst[dropTarget.seat]] = [dst[dropTarget.seat]!, src[dragOrigin.seat]!];
+    }
+    dropTarget = null;
     tables = [...tables];
   }
 
@@ -80,6 +108,7 @@
 
   function handleDragEnd() {
     dragOrigin = null;
+    dropTarget = null;
     // Cleanup auto-scroll
     if (scrollHandler) {
       document.removeEventListener('dragover', scrollHandler);
@@ -112,18 +141,23 @@
 
 {#each tables as table, t}
   <div class="bg-ash-900/50 rounded-lg p-4">
-    <h3 class="text-sm font-medium text-bone-100 mb-2">
+    <h3 class="text-sm font-medium text-bone-100 mb-2 flex items-center gap-2">
       {isFinals ? m.finals_table() : resolveTableLabel(tableRooms, t) ?? m.rounds_table_n({ n: String(t + 1) })}
+      {#if !isFinals && table.length > 0 && table.length < 4}
+        <span class="text-xs font-normal text-crimson-400">{m.rounds_n_players({ count: String(table.length) })}</span>
+      {/if}
     </h3>
     <div class="divide-y divide-ash-800">
       {#each table as uid, s (uid)}
         {@const issue = playerIssues.get(uid)}
         {@const isDragging = dragOrigin?.table === t && dragOrigin?.seat === s}
+        {@const isDropTarget = dropTarget?.table === t && dropTarget?.seat === s}
         <div
-          class="seat-row py-1.5 flex items-center gap-2 text-sm {isDragging ? 'opacity-50' : ''}"
+          class="seat-row py-1.5 flex items-center gap-2 text-sm {isDragging ? 'opacity-50' : ''} {isDropTarget ? 'bg-emerald-900/30 rounded' : ''}"
           role="listitem"
           ondragenter={(e) => handleDragEnter(e, t, s)}
           ondragover={handleDragOver}
+          ondrop={handleDrop}
         >
           <!-- Drag handle -->
           <span
@@ -147,6 +181,18 @@
           {/if}
         </div>
       {/each}
+      {#if !isFinals && table.length < 5}
+        {@const isPhantomTarget = dropTarget?.table === t && dropTarget?.seat === -1}
+        <div
+          class="py-3 min-h-[44px] flex items-center justify-center text-xs text-ash-500 border border-dashed border-ash-700 rounded mt-1.5 {isPhantomTarget ? 'border-emerald-500 bg-emerald-900/30 text-emerald-300' : dragOrigin && dragOrigin.table !== t ? 'border-emerald-700 text-emerald-400' : ''}"
+          role="listitem"
+          ondragenter={(e) => handleDragEnterPhantom(e, t)}
+          ondragover={handleDragOver}
+          ondrop={handleDrop}
+        >
+          {m.rounds_drop_here()}
+        </div>
+      {/if}
     </div>
   </div>
 {/each}

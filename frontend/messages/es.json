@@ -622,6 +622,8 @@
   "rounds_remove_empty_table": "Eliminar mesa vacía",
   "rounds_error_save": "Error al guardar puntuaciones",
   "rounds_alter_r1_error": "No se puede guardar: repetición depredador-presa (violación R1).",
+  "rounds_alter_size_error": "No se puede guardar: las mesas deben tener 4 o 5 jugadores.",
+  "rounds_drop_here": "Soltar un jugador aquí",
   "rounds_print_seating": "Imprimir la disposición",
   "rounds_alter_scores_warning": "Mover jugadores entre mesas restablecerá sus puntuaciones.",
   "rounds_finish_round_n": "Finalizar ronda {n}",

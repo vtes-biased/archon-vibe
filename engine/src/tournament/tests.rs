@@ -1112,9 +1112,26 @@ fn test_alter_seating_cross_table_swap_resets_results() {
 }
 
 #[test]
-fn test_alter_seating_wrong_table_count_fails() {
+fn test_alter_seating_fewer_tables_fails() {
     let tournament = tournament_with_round();
-    // Provide 3 tables instead of 2
+    // Payload tables match existing tables by position: fewer than existing is rejected
+    let event = json::object! {
+        type: "AlterSeating",
+        round: 0,
+        seating: [["p1", "p2", "p3", "p4"]],
+    };
+    let actor = make_organizer();
+    let result = run_event(&tournament, &event, &actor);
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Table count mismatch"));
+}
+
+#[test]
+fn test_alter_seating_undersized_table_fails() {
+    let tournament = tournament_with_round();
     let event = json::object! {
         type: "AlterSeating",
         round: 0,
@@ -1126,7 +1143,42 @@ fn test_alter_seating_wrong_table_count_fails() {
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("Table count mismatch"));
+        .contains("Invalid table size"));
+}
+
+#[test]
+fn test_alter_seating_added_table_and_empty_drop() {
+    let tournament = tournament_with_round();
+    // Table 0 emptied (dropped on save), table 1 keeps p5-p8, appended table 2 gets p1-p4
+    let event = json::object! {
+        type: "AlterSeating",
+        round: 0,
+        seating: [[], ["p5", "p6", "p7", "p8"], ["p1", "p2", "p3", "p4"]],
+    };
+    let actor = make_organizer();
+    let result = run_event(&tournament, &event, &actor);
+    let updated = json::parse(&result.unwrap()).unwrap();
+
+    // Empty table dropped: 2 tables remain
+    assert_eq!(updated["rounds"][0].len(), 2);
+    // Table 1 (unchanged players, same position) keeps its results
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][0]["player_uid"].as_str(),
+        Some("p5")
+    );
+    // p1-p4 moved to a new table: results reset, state In Progress
+    assert_eq!(
+        updated["rounds"][0][1]["seating"][0]["player_uid"].as_str(),
+        Some("p1")
+    );
+    assert_eq!(
+        updated["rounds"][0][1]["seating"][0]["result"]["vp"].as_f64(),
+        Some(0.0)
+    );
+    assert_eq!(
+        updated["rounds"][0][1]["state"].as_str(),
+        Some("In Progress")
+    );
 }
 
 #[test]

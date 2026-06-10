@@ -622,6 +622,8 @@
   "rounds_remove_empty_table": "Rimuovi tavolo vuoto",
   "rounds_error_save": "Salvataggio punteggi fallito",
   "rounds_alter_r1_error": "Impossibile salvare: ripetizione predatore-preda (violazione R1).",
+  "rounds_alter_size_error": "Impossibile salvare: i tavoli devono avere 4 o 5 giocatori.",
+  "rounds_drop_here": "Trascina un giocatore qui",
   "rounds_print_seating": "Stampa la disposizione",
   "rounds_alter_scores_warning": "Spostare giocatori tra i tavoli azzererà i loro punteggi.",
   "rounds_finish_round_n": "Termina Round {n}",
