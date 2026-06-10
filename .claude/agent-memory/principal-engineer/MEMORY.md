@@ -52,6 +52,7 @@
 - [tournament_transaction nested pool](tournament-transaction-nested-pool.md) — reads join the txn (ambient `_tx_conn`), writes acquire the pool independently; the asymmetry is load-bearing (go_online VEKN-id collision).
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — holds player user_uids; easily missed in any per-player UID remap.
 - [User delete SSE](user-delete-sse-noop.md) — soft-deleted users are SAVED (not removed) so by-uid refs resolve; filtered only from listing queries.
+- [Error localization offline-path trap](error-localization-offline-path-trap.md) — localizing engine errors must cover the offline WASM path + JS pre-checks (toUserMessage has no EngineError branch), not just the HTTP body, or offline-first stays English.
 
 ## Scoring & Standings
 - [Final standings helper](project_final_standings_helper.md) — `compute_final_standings` is the shared VEKN placement fn (winner=1, finalists tie 2nd).
@@ -61,6 +62,9 @@
 
 ## Authorization (cross-stack)
 - [Authz single source = Rust](project_authz_single_source_rust.md) — predicates live in `engine/src/permissions.rs` (PyO3 + WASM), the agreed cross-stack-DRY exception.
+
+## Error handling (cross-stack)
+- [Error-codes contract](error-codes-contract.md) — `EngineError` enum = single error taxonomy; `{code,params,message}` wire JSON across WASM/PyO3/HTTP; domain rejection MUST be an explicit variant (From-impls silently demote to internal); EngineRejection-in-transaction is sound FastAPI.
 
 ## Legacy-archon merge (#115)
 - [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; tournament meta + officials' contact_email can oscillate daily unless single-writer enforced (member side is, tournament side isn't).

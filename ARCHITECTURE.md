@@ -267,6 +267,25 @@ The Rust core defines the canonical object schemas and business logic:
 - `tournament/standings.rs` - `compute_preliminary_standings` (GW/VP/TP/toss sort). GW and TP are **recomputed** per table from raw VPs + current sanctions (`sanctions::table_sa_adjustments` → `compute_gw`/`compute_tp`), so an SA issued *after* a round was scored still re-decides the GW and re-ranks/re-averages TP — the frozen seat `result.gw`/`result.tp` would otherwise go stale. VP sums raw per-seat VP then subtracts the full SA penalty (`-1` per played-round SA, `sa_vp_penalty`), which may go negative; per-seat `result.vp` stays raw for display. `compute_rating_vp_gw` (single source for the backend rating/VEKN-push paths) applies the same rule and additionally includes finals VP/GW. `compute_final_standings` (winner=rank 1; other finalists share rank 2 per VEKN §3.7.5; non-finalists competition-ranked from finalist_count+1). Whether a final happened is read from the per-player `finalist` flag, not from finals seating data.
 - `cards.rs` - Card database (lookup by ID/name, normalization)
 
+**Engine Error Contract**: `engine/src/error.rs` is the single taxonomy for all engine rejections — it defines the `EngineError` enum (~70 variants) with stable `code()` strings (e.g. `"tournament.already_registered"`) and `params()` for i18n interpolation. `Display` renders canonical English kept byte-identical to `frontend/messages/en.json` `err_*` values. New error sites must use an explicit variant; `From<&str>`/`From<String>` exist only for genuine deserialization failures and `.ok_or("x required")?`-style internal notes — they collapse to `Internal { detail }`.
+
+**Wire shapes per surface**:
+
+| Surface | Shape | Notes |
+|---------|-------|-------|
+| WASM (frontend) | JS string thrown: `{"code","params","message"}` | `callEngine()` in `engine.ts` wraps raw WASM calls, re-throws as typed `EngineError` |
+| PyO3 (backend) | `ValueError` with same JSON body | `EngineRejection.from_engine()` in `engine_errors.py` parses it |
+| HTTP 400 (backend→frontend) | `{"detail": "<English>", "code": "...", "params": {...}}` | `detail` stays a string for Discord bot + legacy clients; handler in `main.py` |
+
+**Frontend fallback order** (`toUserMessage` in `errors.ts`; the same mapping localizes `apiRequest` toasts):
+1. `code` present → `errorCodeToMessage(code, params)` → paraglide `err_*` key (5 locales)
+2. No code or unknown code → server `detail` string (English)
+3. Neither → `"Request failed: <statusText>"`
+- `internal` code → generic localized message + `console.error` of raw detail (parse/invariant noise never shown to user)
+- Unknown future code (version skew) → falls through silently to step 2
+
+App-level checks that mirror engine rules reuse engine codes so the same condition localizes identically on every path: the backend `_check_player_barred` raises `EngineRejection` directly, and its frontend twin `checkPlayerBarred` (tournament-actions.ts) throws a coded `EngineError` — keeping the offline path localized too.
+
 **Authorization (single source of truth)**: All role/country/uid/ownership predicates live in `engine/src/permissions.rs` and are consumed by both stacks — backend via PyO3, frontend via WASM. `backend/src/permissions.py` is a thin marshalling adapter (no logic); each route keeps its own `HTTPException(403, ...)` detail. The frontend wrappers (`isOrganizer()`, `canEditLeague()` in `engine.ts`) are UX-only and fail closed (`false`) until WASM loads — the backend remains the authoritative enforcement point. See `.pst/details/72-authz-rust-single-source.md` for the full design.
 
 **Build Commands**:

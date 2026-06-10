@@ -284,7 +284,7 @@ async def _check_player_barred(
 ) -> None:
     """Check if a player is barred from participating (cross-tournament sanctions).
 
-    Raises HTTPException(400) if:
+    Raises EngineRejection (-> 400 with engine error code) if:
     - Player has an active suspension
     - Player is DQ'd in a sibling league tournament (league-wide DQ)
     """
