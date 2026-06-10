@@ -199,6 +199,7 @@ class LinkModeration(msgspec.Struct, kw_only=True, frozen=True):
     status: str  # "hidden" | "promoted"
     by: str  # moderator user_uid
     at: datetime
+    scope: str | None = None  # promoted only: "international" (IC) | "national" (NC)
 
 
 class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
@@ -207,7 +208,9 @@ class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
     type: CommunityLinkType
     url: str
     label: str = ""
-    language: str = ""  # ISO 639-1 code (e.g., "en", "es"). Empty = unset.
+    # ISO 639-1 codes (e.g., ["en", "fr"]). Empty = shows under every filter.
+    # The selectable list lives frontend-side (lib/data/languages.ts).
+    languages: list[str] = msgspec.field(default_factory=list)
     moderation: LinkModeration | None = None
 
 

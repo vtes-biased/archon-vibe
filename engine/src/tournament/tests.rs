@@ -1,6 +1,7 @@
 //! Tests for tournament engine.
 
 use super::*;
+use crate::error::EngineError;
 
 fn make_tournament() -> JsonValue {
     json::object! {
@@ -46,7 +47,7 @@ fn run_event(
     tournament: &JsonValue,
     event: &JsonValue,
     actor: &JsonValue,
-) -> Result<String, String> {
+) -> Result<String, EngineError> {
     let raw = process_tournament_event(
         &tournament.dump(),
         &event.dump(),
@@ -64,7 +65,7 @@ fn run_event_with_decks(
     event: &JsonValue,
     actor: &JsonValue,
     decks_json: &str,
-) -> Result<(String, JsonValue), String> {
+) -> Result<(String, JsonValue), EngineError> {
     let raw = process_tournament_event(
         &tournament.dump(),
         &event.dump(),
@@ -121,7 +122,7 @@ fn test_register_without_vekn_id_rejected() {
     let actor = make_player("player-1");
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("VEKN ID"));
+    assert!(result.unwrap_err().to_string().contains("VEKN ID"));
 
     // Also reject empty string
     let event2 = json::object! {
@@ -131,7 +132,7 @@ fn test_register_without_vekn_id_rejected() {
     };
     let result2 = run_event(&tournament, &event2, &actor);
     assert!(result2.is_err());
-    assert!(result2.unwrap_err().contains("VEKN ID"));
+    assert!(result2.unwrap_err().to_string().contains("VEKN ID"));
 }
 
 #[test]
@@ -146,7 +147,7 @@ fn test_add_player_without_vekn_id_rejected() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("VEKN ID"));
+    assert!(result.unwrap_err().to_string().contains("VEKN ID"));
 }
 
 #[test]
@@ -202,7 +203,7 @@ fn test_start_round_insufficient_players() {
     let result = run_event(&tournament, &event, &actor);
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("at least 4"));
+    assert!(result.unwrap_err().to_string().contains("at least 4"));
 }
 
 #[test]
@@ -342,7 +343,7 @@ fn test_non_organizer_cannot_open_registration() {
     let result = run_event(&tournament, &event, &actor);
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("organizers"));
+    assert!(result.unwrap_err().to_string().contains("organizers"));
 }
 
 // --- Deck lifecycle tests ---
@@ -385,7 +386,7 @@ fn test_player_blocked_during_playing_with_existing_deck() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("in progress"));
+    assert!(result.unwrap_err().to_string().contains("in progress"));
 }
 
 #[test]
@@ -431,7 +432,7 @@ fn test_player_cannot_replace_deck_after_finish() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("finished"));
+    assert!(result.unwrap_err().to_string().contains("finished"));
 }
 
 #[test]
@@ -447,7 +448,7 @@ fn test_player_blocked_upsert_during_playing() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("in progress"));
+    assert!(result.unwrap_err().to_string().contains("in progress"));
 }
 
 #[test]
@@ -514,7 +515,10 @@ fn test_set_payment_status_invalid() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Invalid payment status"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid payment status"));
 }
 
 #[test]
@@ -556,7 +560,7 @@ fn test_non_organizer_cannot_set_payment() {
     let actor = make_player("p1");
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("organizers"));
+    assert!(result.unwrap_err().to_string().contains("organizers"));
 }
 
 // ================================================================
@@ -887,7 +891,7 @@ fn test_dq_player_cannot_checkin() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Disqualified"));
+    assert_eq!(result.unwrap_err(), EngineError::PlayerDisqualified);
 }
 
 #[test]
@@ -910,7 +914,7 @@ fn test_dq_sanction_blocks_checkin() {
         &no_decks(),
     );
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("disqualification"));
+    assert_eq!(result.unwrap_err(), EngineError::PlayerDisqualified);
 }
 
 #[test]
@@ -933,7 +937,7 @@ fn test_suspension_blocks_checkin() {
         &no_decks(),
     );
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("suspended"));
+    assert!(result.unwrap_err().to_string().contains("suspended"));
 }
 
 #[test]
@@ -1119,7 +1123,10 @@ fn test_alter_seating_wrong_table_count_fails() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Table count mismatch"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Table count mismatch"));
 }
 
 #[test]
@@ -1133,7 +1140,7 @@ fn test_alter_seating_unknown_player_fails() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("not found"));
+    assert!(result.unwrap_err().to_string().contains("not found"));
 }
 
 #[test]
@@ -1147,7 +1154,7 @@ fn test_alter_seating_requires_organizer() {
     let actor = make_player("p1");
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("organizers"));
+    assert!(result.unwrap_err().to_string().contains("organizers"));
 }
 
 #[test]
@@ -1162,7 +1169,10 @@ fn test_alter_seating_invalid_state_fails() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Cannot alter seating"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Cannot alter seating"));
 }
 
 #[test]
@@ -1212,7 +1222,7 @@ fn test_update_config_invalid_format() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Invalid format"));
+    assert!(result.unwrap_err().to_string().contains("Invalid format"));
 }
 
 #[test]
@@ -1241,7 +1251,7 @@ fn test_update_config_non_organizer_fails() {
     let actor = make_player("player-1");
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("organizers"));
+    assert!(result.unwrap_err().to_string().contains("organizers"));
 }
 
 #[test]
@@ -1254,7 +1264,10 @@ fn test_update_config_empty_name_fails() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("name cannot be empty"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("name cannot be empty"));
 }
 
 #[test]
@@ -1303,7 +1316,10 @@ fn test_update_config_league_uid_unauthorized() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Only league organizers"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Only league organizers"));
 }
 
 #[test]
@@ -1392,7 +1408,7 @@ fn test_checkin_auto_register_blocked_by_dq() {
         &no_decks(),
     );
     assert!(raw.is_err());
-    assert!(raw.unwrap_err().contains("disqualification"));
+    assert_eq!(raw.unwrap_err(), EngineError::PlayerDisqualified);
 }
 
 #[test]
@@ -1414,7 +1430,7 @@ fn test_checkin_auto_register_blocked_by_suspension() {
         &no_decks(),
     );
     assert!(raw.is_err());
-    assert!(raw.unwrap_err().contains("suspended"));
+    assert!(raw.unwrap_err().to_string().contains("suspended"));
 }
 
 #[test]
@@ -1429,7 +1445,7 @@ fn test_checkin_auto_register_requires_vekn_id() {
 
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("VEKN ID to check in"));
+    assert_eq!(result.unwrap_err(), EngineError::VeknIdRequired);
 }
 
 // ================================================================
@@ -1465,7 +1481,10 @@ fn test_delete_deck_auth_failure() {
     let actor = make_player("other-player");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("organizers or the player"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("organizers or the player"));
 }
 
 #[test]
@@ -1481,7 +1500,7 @@ fn test_delete_deck_playing_blocked() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("in progress"));
+    assert!(result.unwrap_err().to_string().contains("in progress"));
 }
 
 #[test]
@@ -1497,7 +1516,7 @@ fn test_delete_deck_finished_blocked() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("finished"));
+    assert!(result.unwrap_err().to_string().contains("finished"));
 }
 
 #[test]
@@ -1588,7 +1607,7 @@ fn test_multideck_upsert_locked_round_blocked() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, "[]");
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("already started"));
+    assert!(result.unwrap_err().to_string().contains("already started"));
 }
 
 #[test]
@@ -1622,7 +1641,7 @@ fn test_multideck_delete_locked_blocked() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("already started"));
+    assert!(result.unwrap_err().to_string().contains("already started"));
 }
 
 #[test]
@@ -1639,7 +1658,10 @@ fn test_multideck_delete_requires_index() {
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("deck_index required"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("deck_index required"));
 }
 
 #[test]
@@ -1685,7 +1707,10 @@ fn test_multideck_lifecycle() {
     let decks = r#"[{"user_uid": "p0", "round": 0, "uid": "d0"}]"#;
     let delete_result = run_event_with_decks(&updated, &delete_event, &actor_p0, decks);
     assert!(delete_result.is_err());
-    assert!(delete_result.unwrap_err().contains("already started"));
+    assert!(delete_result
+        .unwrap_err()
+        .to_string()
+        .contains("already started"));
 }
 
 // --- Judge-locked score tests ---
@@ -1708,7 +1733,7 @@ fn test_player_blocked_from_scoring_after_organizer_sets_score() {
     let player = make_player("p5");
     let result = run_event(&t, &event, &player);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("set by organiser"));
+    assert!(result.unwrap_err().to_string().contains("set by organiser"));
 }
 
 #[test]

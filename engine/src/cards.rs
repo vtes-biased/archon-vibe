@@ -1,5 +1,6 @@
 //! Card database: load from JSON, lookup by ID or name.
 
+use crate::error::EngineError;
 use json::JsonValue;
 use std::collections::HashMap;
 
@@ -49,7 +50,7 @@ pub struct CardMap {
 
 impl CardMap {
     /// Load cards from JSON string (output of update_cards.py).
-    pub fn load(json_str: &str) -> Result<Self, String> {
+    pub fn load(json_str: &str) -> Result<Self, EngineError> {
         let data = json::parse(json_str).map_err(|e| format!("JSON parse error: {e}"))?;
         let mut cards = HashMap::new();
         let mut name_index = HashMap::new();
@@ -153,7 +154,7 @@ fn name_pref(card: &Card) -> (u8, u32) {
     (card.adv as u8, card.id)
 }
 
-fn parse_card(id: u32, value: &JsonValue) -> Result<Card, String> {
+fn parse_card(id: u32, value: &JsonValue) -> Result<Card, EngineError> {
     let kind = match value["kind"].as_str().unwrap_or("library") {
         "crypt" => CardKind::Crypt,
         _ => CardKind::Library,

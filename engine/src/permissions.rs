@@ -1,3 +1,4 @@
+use crate::error::EngineError;
 use json::JsonValue;
 
 /// Roles that users can have
@@ -58,7 +59,7 @@ pub struct UserContext {
 }
 
 impl UserContext {
-    pub fn from_json(value: &JsonValue) -> Result<Self, String> {
+    pub fn from_json(value: &JsonValue) -> Result<Self, EngineError> {
         let roles: Vec<Role> = value["roles"]
             .members()
             .filter_map(|r| r.as_str().and_then(Role::from_str))

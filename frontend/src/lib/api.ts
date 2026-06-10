@@ -6,18 +6,23 @@ import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcatego
 import { getAllUsers, saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
+import { errorCodeToMessage } from './error-codes';
 import * as m from './paraglide/messages.js';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /**
  * API error class with message extraction.
+ * `code`/`params` carry the engine's structured rejection when the 400 body
+ * has them (#107) — `toUserMessage` maps the code to a localized message.
  */
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public detail?: string
+    public detail?: string,
+    public code?: string,
+    public params?: Record<string, string>
   ) {
     super(message);
     this.name = 'ApiError';
@@ -75,15 +80,24 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     let detail: string | undefined;
+    let code: string | undefined;
+    let params: Record<string, string> | undefined;
     try {
       const data = await response.json();
       detail = data.detail || data.message;
+      // Engine rejection bodies carry top-level code+params next to detail (#107)
+      if (typeof data.code === 'string') {
+        code = data.code;
+        params = data.params ?? {};
+      }
     } catch {
       // Ignore JSON parse errors
     }
-    const message = detail || `Request failed: ${response.statusText}`;
+    // Prefer the code-mapped localized message over the server's English detail
+    const localized = code ? errorCodeToMessage(code, params) : undefined;
+    const message = localized || detail || `Request failed: ${response.statusText}`;
     if (!suppressErrorToast) showToast({ type: 'error', message });
-    throw new ApiError(message, response.status, detail);
+    throw new ApiError(message, response.status, detail, code, params);
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {

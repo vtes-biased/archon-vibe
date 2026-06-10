@@ -8,9 +8,24 @@
 import type { DeckObject, Sanction, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { engineReady, markEngineReady, markEngineLoadFailed } from './stores/engine-ready.svelte';
+import { engineErrorFromThrown } from './error-codes';
 
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
+
+/**
+ * Run a raw WASM engine call. wasm-bindgen throws the `Err` arm as a JS string
+ * primitive — since #107 that string is the engine's `{code,params,message}`
+ * wire JSON — so re-throw it as a typed `EngineError` for localized display.
+ * The catch wraps the call itself, NOT the `JSON.parse` of its success result.
+ */
+export function callEngine<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    throw engineErrorFromThrown(e) ?? e;
+  }
+}
 
 let wasmEngine: WasmEngine | null = null;
 let initPromise: Promise<void> | null = null;
@@ -56,7 +71,7 @@ export function scoreSeatingSync(
   const engine = getEngineReactive();
   if (!engine) return null;
   try {
-    const resultJson = engine.scoreSeating(JSON.stringify({ rounds }));
+    const resultJson = callEngine(() => engine.scoreSeating(JSON.stringify({ rounds })));
     return JSON.parse(resultJson);
   } catch {
     return null;
@@ -210,7 +225,9 @@ export async function processTournamentEvent(
   const sanctionsJson = buildSanctionsPayload(sanctions);
   const decksJson = buildDecksPayload(decks);
 
-  const resultJson = engine.processTournamentEvent(tournamentJson, eventJson, actorJson, sanctionsJson, decksJson);
+  const resultJson = callEngine(() =>
+    engine.processTournamentEvent(tournamentJson, eventJson, actorJson, sanctionsJson, decksJson)
+  );
   const result = JSON.parse(resultJson);
   return {
     tournament: result.tournament,
@@ -284,7 +301,7 @@ export function canChangeRole(
     vekn_id: target.vekn_id ?? null,
   });
 
-  const resultJson = engine.canChangeRole(actorJson, targetJson, role);
+  const resultJson = callEngine(() => engine.canChangeRole(actorJson, targetJson, role));
   return JSON.parse(resultJson);
 }
 
@@ -310,7 +327,7 @@ export function canManageVekn(
     country: target.country,
   });
 
-  const resultJson = engine.canManageVekn(actorJson, targetJson);
+  const resultJson = callEngine(() => engine.canManageVekn(actorJson, targetJson));
   return JSON.parse(resultJson);
 }
 
@@ -338,7 +355,7 @@ export function canEditUser(
     country: target.country,
   });
 
-  const resultJson = engine.canEditUser(actorJson, actorUid, targetUid, targetJson);
+  const resultJson = callEngine(() => engine.canEditUser(actorJson, actorUid, targetUid, targetJson));
   return JSON.parse(resultJson);
 }
 
@@ -358,7 +375,7 @@ export function isOrganizer(
     country: tournament.country ?? null,
     organizers_uids: tournament.organizers_uids ?? [],
   });
-  return JSON.parse(engine.isOrganizer(actorJson, user.uid, tournamentJson)).allowed;
+  return JSON.parse(callEngine(() => engine.isOrganizer(actorJson, user.uid, tournamentJson))).allowed;
 }
 
 /**
@@ -377,7 +394,7 @@ export function canEditLeague(
     country: league.country ?? null,
     organizers_uids: league.organizers_uids ?? [],
   });
-  return JSON.parse(engine.canEditLeague(actorJson, user.uid, leagueJson)).allowed;
+  return JSON.parse(callEngine(() => engine.canEditLeague(actorJson, user.uid, leagueJson))).allowed;
 }
 
 /**
@@ -424,7 +441,7 @@ export async function computeLeagueStandings(
 }>> {
   const engine = await initEngine();
   const config = { standings_mode: standingsMode, tournaments };
-  const resultJson = engine.computeLeagueStandings(JSON.stringify(config));
+  const resultJson = callEngine(() => engine.computeLeagueStandings(JSON.stringify(config)));
   return JSON.parse(resultJson);
 }
 
@@ -443,7 +460,7 @@ export function computeFinalStandings(
 ): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number }> {
   const engine = getEngineReactive();
   if (!engine) return [];
-  const resultJson = engine.computeFinalStandings(JSON.stringify({ standings, winner }));
+  const resultJson = callEngine(() => engine.computeFinalStandings(JSON.stringify({ standings, winner })));
   return JSON.parse(resultJson);
 }
 
@@ -457,7 +474,7 @@ export function computePlayerIssuesSync(
   const engine = getEngineReactive();
   if (!engine) return null;
   try {
-    const resultJson = engine.computePlayerIssues(JSON.stringify({ rounds }));
+    const resultJson = callEngine(() => engine.computePlayerIssues(JSON.stringify({ rounds })));
     return JSON.parse(resultJson);
   } catch (e) {
     console.error('computePlayerIssues failed:', e);
@@ -473,7 +490,7 @@ export async function createTournamentWithEngine(
   actor: { uid: string; roles: string[]; is_organizer: boolean; can_organize_league_uids: string[] }
 ): Promise<Record<string, unknown>> {
   const engine = await initEngine();
-  const result = engine.createTournament(JSON.stringify(config), JSON.stringify(actor));
+  const result = callEngine(() => engine.createTournament(JSON.stringify(config), JSON.stringify(actor)));
   return JSON.parse(result);
 }
 
@@ -529,7 +546,7 @@ export async function validateDeck(
     if (!cardsJson) return [];
 
     const deckJson = JSON.stringify({ name: deck.name || '', cards: deck.cards });
-    const resultJson = engine.validateDeck(deckJson, cardsJson, format);
+    const resultJson = callEngine(() => engine.validateDeck(deckJson, cardsJson, format));
     return JSON.parse(resultJson);
   } catch {
     return [];

@@ -539,29 +539,43 @@ Member-contributed links to external community resources (social channels, conte
 
 ```python
 class CommunityLinkType(StrEnum):
-    DISCORD | TELEGRAM | WHATSAPP | FACEBOOK | INSTAGRAM | YOUTUBE | TWITCH | BLOG | OTHER
+    DISCORD | TELEGRAM | WHATSAPP | FORUM | FACEBOOK | WEBSITE | TWITCH | YOUTUBE
+    | REDDIT | INSTAGRAM | BLOG | OTHER
 
 class LinkModeration(msgspec.Struct):
-    status: str   # "hidden" | "promoted"
-    by: str       # moderator user_uid
+    status: str        # "hidden" | "promoted"
+    by: str            # moderator user_uid
     at: datetime
+    scope: str | None  # promoted only: "international" (IC) | "national" (NC)
 
 class CommunityLink(msgspec.Struct):
     type: CommunityLinkType
     url: str
     label: str = ""
-    language: str = ""          # ISO 639-1 (e.g. "en", "es"). Empty = unset.
+    languages: list[str] = []   # ISO 639-1 codes, cap 5. Empty = shows under every filter.
     moderation: LinkModeration | None = None
 ```
 
 `community_links: list[CommunityLink]` is a field on `User` (default `[]`).
 
+Language validation: backend enforces two-letter shape only. The curated selectable list lives in `frontend/src/lib/data/languages.ts` (single source of truth for the UI).
+
 ### Access Control
 
 - **Who can add links**: any user with `vekn_id` (VEKN member)
 - **Link limit**: 5 for regular members; 10 for IC/NC/Prince
-- **Moderation**: IC and NC/Prince (same country) can hide, promote, or clear moderation on any user's links via `PATCH /api/users/{user_uid}/community-link-moderation`
-- **Moderation state preserved**: when a user updates their links, existing moderation state is re-applied by URL match
+- **Moderation state preserved**: when a user updates their links, existing moderation is re-applied by URL match
+
+**Moderation actions** via `PATCH /api/users/{user_uid}/community-link-moderation` (`{ url, action }`):
+
+| Action | IC | NC (same country) | Prince (same country) |
+|--------|----|-------------------|-----------------------|
+| `hide` | yes | yes | yes |
+| `clear` | yes | yes | yes |
+| `promote_national` | yes | yes | — |
+| `promote_international` | yes | — | — |
+
+Self-moderation allowed: officials pin their own links.
 
 ### Access-Level Projection
 
@@ -573,15 +587,12 @@ class CommunityLink(msgspec.Struct):
 
 Handled by `compute_user_public()` and `compute_user_member()` in `access_levels.py`.
 
-### Mutation Endpoint
-
-`PATCH /api/users/{uid}/community-link-moderation` — body: `{ url, action: "hide" | "promote" | "clear" }`. Saves and broadcasts updated user.
-
-### Frontend
+### Frontend Display
 
 `CommunityTab.svelte` renders 3 sections:
-- **Communities** (`CommunitySocialSection.svelte`) — social links grouped by country
-- **Content** (`CommunityContentSection.svelte`) — content links filtered by language
+- **Global Resources** — IC-owned links + any link with `scope="international"`; international pins sort first
+- **Communities** (`CommunitySocialSection.svelte`) — social links grouped by country; pinned (any scope) sort first within each country group
+- **Content** (`CommunityContentSection.svelte`) — content links; language filter defaults to "All"; within each language group sorted: international pin → national pin → promoted → officials → rest
 - **Officials Directory** — NC/Prince/IC contact info
 
 `CommunityModerationActions.svelte` — inline hide/promote/clear controls for moderators.

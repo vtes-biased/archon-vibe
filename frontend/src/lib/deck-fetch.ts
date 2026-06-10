@@ -5,7 +5,7 @@
  * Text parsing: uses WASM engine's parse_deck function.
  */
 
-import { initEngine } from './engine';
+import { callEngine, initEngine } from './engine';
 
 export interface ParsedDeck {
   name: string;
@@ -72,7 +72,7 @@ export async function parseDeckText(text: string): Promise<ParsedDeck> {
   const cardsJson = await getCardsJson();
   if (!cardsJson) throw new Error('Cards data not loaded');
 
-  const resultJson = engine.parseDeck(text, cardsJson);
+  const resultJson = callEngine(() => engine.parseDeck(text, cardsJson));
   const result = JSON.parse(resultJson);
   const warnings: string[] = [];
   if (result.unrecognized_lines?.length) {

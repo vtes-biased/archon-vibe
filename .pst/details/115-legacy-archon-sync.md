@@ -36,21 +36,33 @@ Decided with owner 2026-06-10. Supersedes the wipe+re-ETL design in `#35`
 ## Roles (owner-confirmed model, 2026-06-10: seed once, then app-managed only)
 
 - **Seed**: the initial population (ETL, old archon first) imports old-archon
-  roles (mapped `Admin`→`IC`, `Playtester`→`PT`). That is the one and only time
-  roles are written by anything other than the new app.
-- **From then on, no sync ever writes roles.** The VEKN member sync's role
-  derivation/overwrite (Prince/NC/IC inference + `JUDGES` map,
-  `vekn_sync.py:557-584,702`) stops being applied — permanently, not behind an
-  era flag, so beta and prod behave identically by construction. This (recurring
-  archon) sync excludes roles from its field set.
+  roles (mapped `Admin`→`IC`, `Playtester`→`PT`). With the prod DB ETL-populated,
+  that is in practice the one time roles are written by anything other than the
+  new app — but the seed clause extends to *whichever sync first imports a
+  member* (see the amendment below).
+- **From then on, no sync ever UPDATES roles.** The VEKN member sync's role
+  overwrite on update (Prince/NC/IC inference + `JUDGES` map applied via
+  `_update_user`) stops being applied — permanently, not behind an era flag, so
+  beta and prod behave identically by construction. This (recurring archon)
+  sync excludes roles from its field set.
+- **Amendment (#134, 2026-06-10)**: the original cut removed the VEKN member
+  sync's derivation *outright*, which left any environment populated without
+  the legacy DB (dev after `dev-reset`, a post-decommission rebuild) with zero
+  roles and a locked-out role-edit API (it needs an IC caller). Restored as a
+  **create-path-only seed** (`_derive_role_seeds` + restored
+  `data/vekn_roster.py`): when the member sync *creates* a user it seeds
+  Prince/NC from `princeid`/`coordinatorid` and IC/judge roles from the static
+  roster — symmetric with this merge sync's own "or on first merge insert"
+  clause. `_update_user` remains role-free, so ETL-seeded and app-granted roles
+  are never touched. In prod the ETL runs first, so the roster effectively only
+  matters where this sync is the sole importer.
 - Consequences (accepted): role changes made on old archon during the parallel
   run do NOT propagate — role management moves to the new app at Phase-1 start
   (mirror manually on old archon only if needed for its own authz during the
   window). Post-seed appointments on vekn.net's lists likewise need an in-app
   grant; archon is the authoritative point for archon behavior.
 - The ETL needs no `local_modifications={"roles"}` trick (nothing to protect
-  against anymore); in-app role edits still record it, harmlessly. The old
-  vekn-sync role code becomes dead and should be removed with this work.
+  against anymore); in-app role edits still record it, harmlessly.
 
 ## Tournament matching (the vekn-first / archon-first question)
 

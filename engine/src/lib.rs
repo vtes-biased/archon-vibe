@@ -3,11 +3,14 @@ use json::JsonValue;
 // Modules
 pub mod cards;
 pub mod deck;
+pub mod error;
 pub mod league;
 mod permissions;
 pub mod ratings;
 pub mod seating;
 pub mod tournament;
+
+pub use error::EngineError;
 
 // Re-export permissions module items
 pub use permissions::{
@@ -23,21 +26,26 @@ pub use permissions::{
 #[allow(dead_code)]
 mod shared {
     use super::*;
+    use crate::error::EngineError;
 
     pub fn can_change_role_json(
         actor_json: &str,
         target_json: &str,
         role_str: &str,
-    ) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
-        let target = UserContext::from_json(&json::parse(target_json).map_err(|e| e.to_string())?)?;
-        let role = Role::from_str(role_str).ok_or_else(|| format!("Unknown role: {}", role_str))?;
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let target = UserContext::from_json(&json::parse(target_json)?)?;
+        let role = Role::from_str(role_str)
+            .ok_or_else(|| EngineError::internal(format!("Unknown role: {}", role_str)))?;
         Ok(can_change_role(&actor, &target, role).to_json().dump())
     }
 
-    pub fn can_manage_vekn_json(actor_json: &str, target_json: &str) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
-        let target = UserContext::from_json(&json::parse(target_json).map_err(|e| e.to_string())?)?;
+    pub fn can_manage_vekn_json(
+        actor_json: &str,
+        target_json: &str,
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let target = UserContext::from_json(&json::parse(target_json)?)?;
         Ok(can_manage_vekn(&actor, &target).to_json().dump())
     }
 
@@ -46,9 +54,9 @@ mod shared {
         actor_uid: &str,
         target_uid: &str,
         target_json: &str,
-    ) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
-        let target = UserContext::from_json(&json::parse(target_json).map_err(|e| e.to_string())?)?;
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let target = UserContext::from_json(&json::parse(target_json)?)?;
         Ok(can_edit_user(&actor, actor_uid, target_uid, &target)
             .to_json()
             .dump())
@@ -57,8 +65,8 @@ mod shared {
     pub fn can_manage_country_json(
         actor_json: &str,
         target_country: &str,
-    ) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         let country = if target_country.is_empty() {
             None
         } else {
@@ -67,13 +75,13 @@ mod shared {
         Ok(can_manage_country(&actor, country).to_json().dump())
     }
 
-    pub fn can_manage_tournaments_json(actor_json: &str) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+    pub fn can_manage_tournaments_json(actor_json: &str) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         Ok(can_manage_tournaments(&actor).to_json().dump())
     }
 
-    pub fn can_manage_leagues_json(actor_json: &str) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+    pub fn can_manage_leagues_json(actor_json: &str) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         Ok(can_manage_leagues(&actor).to_json().dump())
     }
 
@@ -81,10 +89,9 @@ mod shared {
         actor_json: &str,
         actor_uid: &str,
         tournament_json: &str,
-    ) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
-        let tournament =
-            OwnedResource::from_json(&json::parse(tournament_json).map_err(|e| e.to_string())?);
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let tournament = OwnedResource::from_json(&json::parse(tournament_json)?);
         let result = if is_organizer(&actor, actor_uid, &tournament) {
             PermissionResult::allow()
         } else {
@@ -97,10 +104,9 @@ mod shared {
         actor_json: &str,
         actor_uid: &str,
         league_json: &str,
-    ) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
-        let league =
-            OwnedResource::from_json(&json::parse(league_json).map_err(|e| e.to_string())?);
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let league = OwnedResource::from_json(&json::parse(league_json)?);
         Ok(can_edit_league(&actor, actor_uid, &league).to_json().dump())
     }
 
@@ -109,10 +115,9 @@ mod shared {
         actor_uid: &str,
         level: &str,
         tournament_json: &str,
-    ) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
-        let tournament =
-            OwnedResource::from_json(&json::parse(tournament_json).map_err(|e| e.to_string())?);
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let tournament = OwnedResource::from_json(&json::parse(tournament_json)?);
         Ok(can_issue_sanction(&actor, actor_uid, level, &tournament)
             .to_json()
             .dump())
@@ -122,14 +127,14 @@ mod shared {
         actor_json: &str,
         actor_uid: &str,
         ctx_json: &str,
-    ) -> Result<String, String> {
-        let actor = UserContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
-        let ctx = SanctionContext::from_json(&json::parse(ctx_json).map_err(|e| e.to_string())?);
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let ctx = SanctionContext::from_json(&json::parse(ctx_json)?);
         Ok(can_lift_sanction(&actor, actor_uid, &ctx).to_json().dump())
     }
 
-    pub fn compute_seating_json(config_json: &str) -> Result<String, String> {
-        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+    pub fn compute_seating_json(config_json: &str) -> Result<String, EngineError> {
+        let config = json::parse(config_json)?;
         let players: Vec<String> = config["players"]
             .members()
             .filter_map(|p| p.as_str().map(|s| s.to_string()))
@@ -179,8 +184,8 @@ mod shared {
         Ok(json::object! { rounds: rounds_json, score: score.to_json() }.dump())
     }
 
-    pub fn score_seating_json(config_json: &str) -> Result<String, String> {
-        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+    pub fn score_seating_json(config_json: &str) -> Result<String, EngineError> {
+        let config = json::parse(config_json)?;
         let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
             .members()
             .map(|r| {
@@ -201,7 +206,10 @@ mod shared {
     }
 
     /// Parse deck JSON into a Deck struct (shared helper for validate/enrich/export).
-    pub fn deck_from_json(value: &JsonValue, with_metadata: bool) -> Result<deck::Deck, String> {
+    pub fn deck_from_json(
+        value: &JsonValue,
+        with_metadata: bool,
+    ) -> Result<deck::Deck, EngineError> {
         let mut d = deck::Deck::new();
         d.name = value["name"].as_str().unwrap_or("").to_string();
         if with_metadata {
@@ -211,13 +219,13 @@ mod shared {
         for (id_str, count_val) in value["cards"].entries() {
             let id: u32 = id_str
                 .parse()
-                .map_err(|_| format!("Invalid card ID: {id_str}"))?;
+                .map_err(|_| EngineError::internal(format!("Invalid card ID: {id_str}")))?;
             d.cards.insert(id, count_val.as_u32().unwrap_or(0));
         }
         Ok(d)
     }
 
-    pub fn parse_deck_json(text: &str, cards_json: &str) -> Result<String, String> {
+    pub fn parse_deck_json(text: &str, cards_json: &str) -> Result<String, EngineError> {
         let card_map = cards::CardMap::load(cards_json)?;
         let result = deck::parse_deck(text, &card_map)?;
         let mut json = result.deck.to_json();
@@ -236,17 +244,17 @@ mod shared {
         deck_json: &str,
         cards_json: &str,
         format: &str,
-    ) -> Result<String, String> {
+    ) -> Result<String, EngineError> {
         let card_map = cards::CardMap::load(cards_json)?;
-        let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+        let value = json::parse(deck_json)?;
         let d = deck_from_json(&value, false)?;
         let errors = deck::validate_deck(&d, &card_map, format);
         Ok(JsonValue::Array(errors.iter().map(|e| e.to_json()).collect()).dump())
     }
 
-    pub fn enrich_deck_json(deck_json: &str, cards_json: &str) -> Result<String, String> {
+    pub fn enrich_deck_json(deck_json: &str, cards_json: &str) -> Result<String, EngineError> {
         let card_map = cards::CardMap::load(cards_json)?;
-        let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+        let value = json::parse(deck_json)?;
         let d = deck_from_json(&value, true)?;
         Ok(deck::enrich_deck(&d, &card_map).dump())
     }
@@ -262,9 +270,9 @@ mod shared {
         tournament_url: &str,
         player_count: u32,
         player_name: &str,
-    ) -> Result<String, String> {
+    ) -> Result<String, EngineError> {
         let card_map = cards::CardMap::load(cards_json)?;
-        let value = json::parse(deck_json).map_err(|e| e.to_string())?;
+        let value = json::parse(deck_json)?;
         let d = deck_from_json(&value, true)?;
         Ok(deck::export_twda(
             &d,
@@ -279,11 +287,14 @@ mod shared {
         ))
     }
 
-    pub fn create_tournament_json(config_json: &str, actor_json: &str) -> Result<String, String> {
+    pub fn create_tournament_json(
+        config_json: &str,
+        actor_json: &str,
+    ) -> Result<String, EngineError> {
         super::tournament::create_tournament(config_json, actor_json)
     }
 
-    pub fn compute_league_standings_json(config_json: &str) -> Result<String, String> {
+    pub fn compute_league_standings_json(config_json: &str) -> Result<String, EngineError> {
         league::compute_league_standings(config_json)
     }
 
@@ -291,15 +302,15 @@ mod shared {
     /// finalists tied for 2nd, then non-finalists), tagging each with `rank`.
     /// Input: `{ "standings": [...], "winner": "<uid>" }`. Used by the
     /// post-finals results display.
-    pub fn compute_final_standings_json(config_json: &str) -> Result<String, String> {
-        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+    pub fn compute_final_standings_json(config_json: &str) -> Result<String, EngineError> {
+        let config = json::parse(config_json)?;
         let winner = config["winner"].as_str().unwrap_or("");
         let ranked = super::tournament::compute_final_standings(&config["standings"], winner);
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
-    pub fn compute_player_issues_json(config_json: &str) -> Result<String, String> {
-        let config = json::parse(config_json).map_err(|e| e.to_string())?;
+    pub fn compute_player_issues_json(config_json: &str) -> Result<String, EngineError> {
+        let config = json::parse(config_json)?;
         let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
             .members()
             .map(|r| {
@@ -328,6 +339,12 @@ mod wasm {
     #[wasm_bindgen]
     pub struct WasmEngine;
 
+    /// Err arm crosses into JS as a thrown string carrying the EngineError wire
+    /// JSON ({"code","params","message"}); engine.ts re-throws it as a typed error.
+    fn js_str(r: Result<String, super::EngineError>) -> Result<String, String> {
+        r.map_err(|e| e.to_json())
+    }
+
     #[wasm_bindgen]
     impl WasmEngine {
         #[wasm_bindgen(constructor)]
@@ -343,7 +360,7 @@ mod wasm {
             target_json: &str,
             role: &str,
         ) -> Result<String, String> {
-            can_change_role_json(actor_json, target_json, role)
+            js_str(can_change_role_json(actor_json, target_json, role))
         }
 
         #[wasm_bindgen(js_name = canManageVekn)]
@@ -352,7 +369,7 @@ mod wasm {
             actor_json: &str,
             target_json: &str,
         ) -> Result<String, String> {
-            can_manage_vekn_json(actor_json, target_json)
+            js_str(can_manage_vekn_json(actor_json, target_json))
         }
 
         #[wasm_bindgen(js_name = canEditUser)]
@@ -363,7 +380,12 @@ mod wasm {
             target_uid: &str,
             target_json: &str,
         ) -> Result<String, String> {
-            can_edit_user_json(actor_json, actor_uid, target_uid, target_json)
+            js_str(can_edit_user_json(
+                actor_json,
+                actor_uid,
+                target_uid,
+                target_json,
+            ))
         }
 
         #[wasm_bindgen(js_name = canManageCountry)]
@@ -372,17 +394,17 @@ mod wasm {
             actor_json: &str,
             target_country: &str,
         ) -> Result<String, String> {
-            can_manage_country_json(actor_json, target_country)
+            js_str(can_manage_country_json(actor_json, target_country))
         }
 
         #[wasm_bindgen(js_name = canManageTournaments)]
         pub fn can_manage_tournaments(&self, actor_json: &str) -> Result<String, String> {
-            can_manage_tournaments_json(actor_json)
+            js_str(can_manage_tournaments_json(actor_json))
         }
 
         #[wasm_bindgen(js_name = canManageLeagues)]
         pub fn can_manage_leagues(&self, actor_json: &str) -> Result<String, String> {
-            can_manage_leagues_json(actor_json)
+            js_str(can_manage_leagues_json(actor_json))
         }
 
         #[wasm_bindgen(js_name = isOrganizer)]
@@ -392,7 +414,7 @@ mod wasm {
             actor_uid: &str,
             tournament_json: &str,
         ) -> Result<String, String> {
-            is_organizer_json(actor_json, actor_uid, tournament_json)
+            js_str(is_organizer_json(actor_json, actor_uid, tournament_json))
         }
 
         #[wasm_bindgen(js_name = canEditLeague)]
@@ -402,7 +424,7 @@ mod wasm {
             actor_uid: &str,
             league_json: &str,
         ) -> Result<String, String> {
-            can_edit_league_json(actor_json, actor_uid, league_json)
+            js_str(can_edit_league_json(actor_json, actor_uid, league_json))
         }
 
         #[wasm_bindgen(js_name = canIssueSanction)]
@@ -413,7 +435,12 @@ mod wasm {
             level: &str,
             tournament_json: &str,
         ) -> Result<String, String> {
-            can_issue_sanction_json(actor_json, actor_uid, level, tournament_json)
+            js_str(can_issue_sanction_json(
+                actor_json,
+                actor_uid,
+                level,
+                tournament_json,
+            ))
         }
 
         #[wasm_bindgen(js_name = canLiftSanction)]
@@ -423,17 +450,17 @@ mod wasm {
             actor_uid: &str,
             ctx_json: &str,
         ) -> Result<String, String> {
-            can_lift_sanction_json(actor_json, actor_uid, ctx_json)
+            js_str(can_lift_sanction_json(actor_json, actor_uid, ctx_json))
         }
 
         #[wasm_bindgen(js_name = computeSeating)]
         pub fn compute_seating(&self, config_json: &str) -> Result<String, String> {
-            compute_seating_json(config_json)
+            js_str(compute_seating_json(config_json))
         }
 
         #[wasm_bindgen(js_name = scoreSeating)]
         pub fn score_seating(&self, config_json: &str) -> Result<String, String> {
-            score_seating_json(config_json)
+            js_str(score_seating_json(config_json))
         }
 
         #[wasm_bindgen(js_name = processTournamentEvent)]
@@ -445,13 +472,13 @@ mod wasm {
             sanctions_json: &str,
             decks_json: &str,
         ) -> Result<String, String> {
-            super::tournament::process_tournament_event(
+            js_str(super::tournament::process_tournament_event(
                 tournament_json,
                 event_json,
                 actor_json,
                 sanctions_json,
                 decks_json,
-            )
+            ))
         }
 
         #[wasm_bindgen(js_name = computeRatingPoints)]
@@ -473,7 +500,7 @@ mod wasm {
 
         #[wasm_bindgen(js_name = parseDeck)]
         pub fn parse_deck(&self, text: &str, cards_json: &str) -> Result<String, String> {
-            parse_deck_json(text, cards_json)
+            js_str(parse_deck_json(text, cards_json))
         }
 
         #[wasm_bindgen(js_name = validateDeck)]
@@ -483,12 +510,12 @@ mod wasm {
             cards_json: &str,
             format: &str,
         ) -> Result<String, String> {
-            validate_deck_json(deck_json, cards_json, format)
+            js_str(validate_deck_json(deck_json, cards_json, format))
         }
 
         #[wasm_bindgen(js_name = enrichDeck)]
         pub fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> Result<String, String> {
-            enrich_deck_json(deck_json, cards_json)
+            js_str(enrich_deck_json(deck_json, cards_json))
         }
 
         #[wasm_bindgen(js_name = createTournament)]
@@ -497,22 +524,22 @@ mod wasm {
             config_json: &str,
             actor_json: &str,
         ) -> Result<String, String> {
-            create_tournament_json(config_json, actor_json)
+            js_str(create_tournament_json(config_json, actor_json))
         }
 
         #[wasm_bindgen(js_name = computeLeagueStandings)]
         pub fn compute_league_standings(&self, config_json: &str) -> Result<String, String> {
-            compute_league_standings_json(config_json)
+            js_str(compute_league_standings_json(config_json))
         }
 
         #[wasm_bindgen(js_name = computeFinalStandings)]
         pub fn compute_final_standings(&self, config_json: &str) -> Result<String, String> {
-            compute_final_standings_json(config_json)
+            js_str(compute_final_standings_json(config_json))
         }
 
         #[wasm_bindgen(js_name = computePlayerIssues)]
         pub fn compute_player_issues(&self, config_json: &str) -> Result<String, String> {
-            compute_player_issues_json(config_json)
+            js_str(compute_player_issues_json(config_json))
         }
     }
 }
@@ -525,8 +552,10 @@ mod python {
     use super::shared::*;
     use pyo3::prelude::*;
 
-    fn py_str(r: Result<String, String>) -> PyResult<String> {
-        r.map_err(pyo3::exceptions::PyValueError::new_err)
+    /// Err arm crosses into Python as a ValueError whose message is the
+    /// EngineError wire JSON ({"code","params","message"}); the backend parses it.
+    fn py_str(r: Result<String, super::EngineError>) -> PyResult<String> {
+        r.map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
     }
 
     #[pyclass]
@@ -670,10 +699,10 @@ mod python {
             user_uid: &str,
         ) -> PyResult<(f64, f64)> {
             use pyo3::exceptions::PyValueError;
-            let tournament =
-                json::parse(tournament_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
-            let sanctions =
-                json::parse(sanctions_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
+            let tournament = json::parse(tournament_json)
+                .map_err(|e| PyValueError::new_err(super::EngineError::from(e).to_json()))?;
+            let sanctions = json::parse(sanctions_json)
+                .map_err(|e| PyValueError::new_err(super::EngineError::from(e).to_json()))?;
             Ok(super::tournament::compute_rating_vp_gw(
                 &tournament,
                 &sanctions,

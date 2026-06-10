@@ -31,7 +31,7 @@ class CommunityLinkInput(BaseModel):
     type: str
     url: str
     label: str = ""
-    language: str = ""
+    languages: list[str] = []
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -178,6 +178,17 @@ async def update_current_user(
                 ) from None
             if not link.url.startswith(("http://", "https://")):
                 raise HTTPException(status_code=422, detail=f"Invalid URL: {link.url}")
+            # Shape-only language validation — the selectable list is owned by
+            # the frontend (lib/data/languages.ts), the single point of truth.
+            if len(link.languages) > 5:
+                raise HTTPException(
+                    status_code=422, detail="Maximum 5 languages per link"
+                )
+            for lang in link.languages:
+                if not (len(lang) == 2 and lang.isascii() and lang.islower()):
+                    raise HTTPException(
+                        status_code=422, detail=f"Invalid language code: {lang}"
+                    )
             # Preserve moderation state from existing link with same URL
             mod = existing_mod.get(link.url)
             links.append(
@@ -185,7 +196,7 @@ async def update_current_user(
                     type=link_type,
                     url=link.url,
                     label=link.label,
-                    language=link.language,
+                    languages=link.languages,
                     moderation=mod,
                 )
             )

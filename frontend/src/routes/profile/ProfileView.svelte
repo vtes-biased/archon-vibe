@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { User, Camera, Unlink, Share2, Check, Plus, Trash2, CloudOff } from "lucide-svelte";
+  import { User, Camera, Unlink, Share2, Check, Plus, Trash2, CloudOff, X } from "lucide-svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
   import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
   import { updateProfile } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
+  import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
   import type { CommunityLinkType } from "$lib/types";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -44,27 +45,15 @@
   let editContactPhone = $state(initial.contact_phone || "");
   let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
 
-  interface EditLink { type: CommunityLinkType; url: string; label: string; language: string }
+  interface EditLink { type: CommunityLinkType; url: string; label: string; languages: string[] }
   let editLinks = $state<EditLink[]>(
-    (initial.community_links || []).map((l: any) => ({ type: l.type, url: l.url, label: l.label, language: l.language || "" }))
+    (initial.community_links || []).map((l: any) => ({ type: l.type, url: l.url, label: l.label, languages: l.languages || [] }))
   );
 
   const defaultLanguage = $derived(COUNTRY_LANGUAGE[editCountry] || "en");
+  const MAX_LANGUAGES = 5;
 
   const CONTENT_TYPES = new Set(["youtube", "twitch", "blog", "website", "instagram", "other"]);
-  const LANGUAGES = [
-    { value: "en", label: "English" }, { value: "es", label: "Español" },
-    { value: "fr", label: "Français" }, { value: "pt", label: "Português" },
-    { value: "it", label: "Italiano" }, { value: "de", label: "Deutsch" },
-    { value: "pl", label: "Polski" }, { value: "fi", label: "Suomi" },
-    { value: "sv", label: "Svenska" }, { value: "nl", label: "Nederlands" },
-    { value: "ja", label: "日本語" }, { value: "zh", label: "中文" },
-    { value: "ko", label: "한국어" }, { value: "ru", label: "Русский" },
-    { value: "cs", label: "Čeština" }, { value: "hu", label: "Magyar" },
-    { value: "ro", label: "Română" }, { value: "hr", label: "Hrvatski" },
-    { value: "el", label: "Ελληνικά" }, { value: "tr", label: "Türkçe" },
-    { value: "th", label: "ไทย" },
-  ];
 
   const maxLinks = $derived(isOfficial ? 10 : 5);
 
@@ -146,7 +135,7 @@
 
   function addLink() {
     if (editLinks.length >= maxLinks) return;
-    editLinks = [...editLinks, { type: "discord", url: "", label: "", language: defaultLanguage }];
+    editLinks = [...editLinks, { type: "discord", url: "", label: "", languages: [defaultLanguage] }];
   }
 
   function removeLink(index: number) {
@@ -346,14 +335,6 @@
                 <option value={lt.value}>{lt.label}</option>
               {/each}
             </select>
-            {#if CONTENT_TYPES.has(link.type)}
-              <select bind:value={link.language} onchange={saveLinks}
-                class="px-2 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 text-sm w-32">
-                {#each LANGUAGES as lang}
-                  <option value={lang.value}>{lang.label}</option>
-                {/each}
-              </select>
-            {/if}
             <button type="button" onclick={() => removeLink(i)}
               class="p-2 text-ash-500 hover:text-crimson-400 transition-colors shrink-0">
               <Trash2 class="w-4 h-4" />
@@ -365,6 +346,36 @@
           <input type="text" bind:value={link.label} placeholder={m.profile_link_label_placeholder()}
             onblur={saveLinks}
             class="{inputClass} text-sm" />
+          {#if CONTENT_TYPES.has(link.type)}
+            <div class="flex flex-wrap items-center gap-1.5">
+              {#each link.languages as code (code)}
+                <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-ash-800 text-ash-200 text-xs">
+                  {LANGUAGE_NAMES[code] ?? code}
+                  <button type="button" aria-label={m.profile_remove_language({ lang: LANGUAGE_NAMES[code] ?? code })}
+                    onclick={() => { link.languages = link.languages.filter(c => c !== code); saveLinks(); }}
+                    class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ash-500 hover:text-crimson-400 cursor-pointer">
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              {/each}
+              {#if link.languages.length === 0}
+                <span class="text-xs text-ash-500">{m.profile_link_all_languages()}</span>
+              {/if}
+              {#if link.languages.length < MAX_LANGUAGES}
+                <select value="" aria-label={m.profile_add_language()}
+                  onchange={(e) => {
+                    const c = e.currentTarget.value; e.currentTarget.value = "";
+                    if (c && !link.languages.includes(c)) { link.languages = [...link.languages, c]; saveLinks(); }
+                  }}
+                  class="px-2 py-1.5 border border-ash-600 rounded bg-dusk-950 text-ash-400 text-xs">
+                  <option value="" disabled selected>+ {m.profile_add_language()}</option>
+                  {#each LANGUAGES.filter(l => !link.languages.includes(l.value)) as lang}
+                    <option value={lang.value}>{lang.label}</option>
+                  {/each}
+                </select>
+              {/if}
+            </div>
+          {/if}
         </div>
       {/each}
     </div>

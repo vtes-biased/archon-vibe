@@ -10,8 +10,9 @@ Two modes against the same mapping code:
   decommission. Single writer per field: the VEKN sync owns identity
   (name/country/city/state), this sync owns archon-local fields (contact /
   nickname / discord / coopted_by, sanctions, leagues, rich play data), and
-  ROLES are written by neither — seeded once by the ETL (or on first merge
-  insert of a member), app-managed thereafter. Fields recorded in
+  ROLES are never UPDATED by either — seeded on a member's first import (by
+  this ETL/merge, or VEKN-derived in the member sync's create path when it
+  gets there first), app-managed thereafter. Fields recorded in
   `User.local_modifications` are never overwritten (same contract as the VEKN
   member sync). Merge mode takes a pre-run `pg_dump` of the NEW DB so a buggy
   merge is restore-fix-rerun.

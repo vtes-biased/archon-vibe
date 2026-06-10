@@ -1,5 +1,6 @@
 //! Raffle pool computation and deck public flag logic.
 
+use crate::error::EngineError;
 use json::JsonValue;
 
 /// Get the set of player UIDs who appeared in any round seating (sorted for determinism).
@@ -27,10 +28,10 @@ pub(super) fn get_raffle_pool(
     tournament: &JsonValue,
     pool: &str,
     exclude_drawn: bool,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, EngineError> {
     let played = get_played_uids(tournament);
     if played.is_empty() {
-        return Err("No players have played yet".to_string());
+        return Err(EngineError::RaffleNonePlayed);
     }
 
     // Build standings map: uid -> (gw, vp)
@@ -76,7 +77,7 @@ pub(super) fn get_raffle_pool(
             .filter(|uid| standings_map.get(*uid).is_none_or(|(_, vp)| *vp == 0.0))
             .cloned()
             .collect(),
-        _ => return Err(format!("Unknown pool: {}", pool)),
+        _ => return Err(EngineError::internal(format!("Unknown pool: {}", pool))),
     };
 
     if exclude_drawn {

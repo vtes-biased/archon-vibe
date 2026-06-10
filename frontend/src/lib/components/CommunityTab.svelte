@@ -7,7 +7,6 @@
   import { deobfuscateContact } from "$lib/contact";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunitySocialSection from "./CommunitySocialSection.svelte";
@@ -34,8 +33,13 @@
     auth.user?.roles?.some((r: string) => r === "IC" || r === "NC" || r === "Prince") ?? false
   );
   const isModerator = $derived(isOfficial);
+  const isIC = $derived(auth.user?.roles?.includes("IC") ?? false);
+  const isNC = $derived(auth.user?.roles?.includes("NC") ?? false);
 
-  // IC links (global resources)
+  const pinScope = (l: CommunityLink) =>
+    l.moderation?.status === "promoted" ? l.moderation.scope : null;
+
+  // Global resources: IC links, plus internationally-promoted links from any owner
   const icLinks = $derived.by(() => {
     const links: CommunityLink[] = [];
     for (const u of icUsers) {
@@ -45,7 +49,14 @@
         }
       }
     }
-    return links;
+    for (const u of allUsersWithLinks) {
+      if (u.roles?.includes("IC")) continue;
+      for (const l of u.community_links || []) {
+        if (pinScope(l) === "international") links.push(l);
+      }
+    }
+    const rank = (l: CommunityLink) => (pinScope(l) === "international" ? 0 : 1);
+    return links.sort((a, b) => rank(a) - rank(b));
   });
 
   // Social links grouped by country
@@ -59,19 +70,17 @@
       );
       if (socialLinks.length === 0) continue;
       if (!grouped.has(country)) grouped.set(country, []);
-      // Sort: promoted first, then officials first
-      const isOfficialUser = u.roles?.some(r => r === "NC" || r === "Prince") ?? false;
       grouped.get(country)!.push({ user: u, links: socialLinks });
     }
-    // Sort users within each country: officials first, promoted first
+    // Sort users within each country: pinned (scoped promotion) first, then officials
     for (const users of grouped.values()) {
       users.sort((a, b) => {
+        const aPin = a.links.some(l => pinScope(l)) ? 0 : 1;
+        const bPin = b.links.some(l => pinScope(l)) ? 0 : 1;
+        if (aPin !== bPin) return aPin - bPin;
         const aOff = a.user.roles?.some(r => r === "NC" || r === "Prince") ? 0 : 1;
         const bOff = b.user.roles?.some(r => r === "NC" || r === "Prince") ? 0 : 1;
-        if (aOff !== bOff) return aOff - bOff;
-        const aProm = a.links.some(l => l.moderation?.status === "promoted") ? 0 : 1;
-        const bProm = b.links.some(l => l.moderation?.status === "promoted") ? 0 : 1;
-        return aProm - bProm;
+        return aOff - bOff;
       });
     }
     const userCountry = auth.user?.country;
@@ -99,15 +108,21 @@
       for (const l of u.community_links || []) {
         if (!CONTENT_TYPES.has(l.type)) continue;
         if (l.moderation?.status === "hidden" && !isModerator) continue;
-        if (selectedLanguage && l.language && l.language !== selectedLanguage) continue;
+        if (selectedLanguage && l.languages?.length && !l.languages.includes(selectedLanguage)) continue;
         items.push({ user: u, link: l });
       }
     }
-    // Sort: promoted first, officials first, then by user name
+    // Sort: international pin, national pin, promoted, officials, then by user name
+    const rank = (l: CommunityLink) => {
+      if (l.moderation?.status !== "promoted") return 3;
+      if (l.moderation.scope === "international") return 0;
+      if (l.moderation.scope === "national") return 1;
+      return 2;
+    };
     items.sort((a, b) => {
-      const aProm = a.link.moderation?.status === "promoted" ? 0 : 1;
-      const bProm = b.link.moderation?.status === "promoted" ? 0 : 1;
-      if (aProm !== bProm) return aProm - bProm;
+      const aRank = rank(a.link);
+      const bRank = rank(b.link);
+      if (aRank !== bRank) return aRank - bRank;
       const aOff = a.user.roles?.some(r => r === "IC" || r === "NC" || r === "Prince") ? 0 : 1;
       const bOff = b.user.roles?.some(r => r === "IC" || r === "NC" || r === "Prince") ? 0 : 1;
       if (aOff !== bOff) return aOff - bOff;
@@ -121,7 +136,8 @@
     const langs = new Set<string>();
     for (const u of allUsersWithLinks) {
       for (const l of u.community_links || []) {
-        if (CONTENT_TYPES.has(l.type) && l.language) langs.add(l.language);
+        if (!CONTENT_TYPES.has(l.type)) continue;
+        for (const lang of l.languages || []) langs.add(lang);
       }
     }
     return [...langs].sort();
@@ -179,14 +195,10 @@
       u.roles?.some(r => r === "NC" || r === "Prince") &&
       (u.contact_email || u.discord_id || u.contact_phone)
     );
-    // Auto-expand user's country
+    // Auto-expand user's country (the language filter defaults to "All")
     if (auth.user?.country) {
       expandedCountries = new Set([auth.user.country]);
       expandedOfficialCountries = new Set([auth.user.country]);
-      // Default language filter from user's country
-      if (!selectedLanguage) {
-        selectedLanguage = COUNTRY_LANGUAGE[auth.user.country] || "";
-      }
     }
     loaded = true;
   }
@@ -290,6 +302,8 @@
         {expandedCountries}
         userCountry={auth.user?.country ?? null}
         {isModerator}
+        {isIC}
+        {isNC}
         onToggleCountry={toggleCountry}
         onModerate={handleModerate}
       />
@@ -309,6 +323,9 @@
         languages={contentLanguages}
         {selectedLanguage}
         {isModerator}
+        {isIC}
+        {isNC}
+        viewerCountry={auth.user?.country ?? null}
         onSelectLanguage={(lang) => { selectedLanguage = lang; }}
         onModerate={handleModerate}
       />

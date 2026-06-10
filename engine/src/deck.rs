@@ -3,6 +3,7 @@
 //! Handles Lackey, JOL, TWDA, and freeform deck list formats.
 
 use crate::cards::{Card, CardKind, CardMap};
+use crate::error::EngineError;
 use json::JsonValue;
 use std::collections::HashMap;
 
@@ -322,7 +323,7 @@ pub struct ParseResult {
 
 /// Parse a deck list text into a Deck. Auto-detects format.
 /// Returns the parsed deck and any lines that looked like card entries but couldn't be matched.
-pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, String> {
+pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, EngineError> {
     let mut deck = Deck::new();
     let mut header_lines: Vec<String> = Vec::new();
     let mut unrecognized_lines: Vec<String> = Vec::new();
@@ -373,7 +374,7 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, String>
     }
 
     if deck.cards.is_empty() {
-        return Err("No cards found in deck list".to_string());
+        return Err(EngineError::DeckNoCards);
     }
 
     // If no name was explicitly set, use first header line

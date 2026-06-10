@@ -39,6 +39,7 @@ from ..db import (
     soft_delete_tournament,
     tournament_transaction,
 )
+from ..engine_errors import EngineRejection
 from ..middleware.auth import OptionalUser
 from ..models import (
     DeckListsMode,
@@ -297,9 +298,9 @@ async def _check_player_barred(
             continue
         if s.level == SanctionLevel.SUSPENSION:
             if s.expires_at is None or s.expires_at > now:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Player is suspended and cannot participate",
+                raise EngineRejection(
+                    "Player is suspended and cannot participate",
+                    code="tournament.player_suspended",
                 )
 
     # Check league-wide DQ (only if tournament is in a league)
@@ -311,9 +312,9 @@ async def _check_player_barred(
                 # Check if the DQ sanction's tournament is in the same league
                 dq_tournament = await get_tournament_by_uid(s.tournament_uid, conn=conn)
                 if dq_tournament and dq_tournament.league_uid == tournament.league_uid:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Player is disqualified from a league tournament and cannot participate",
+                    raise EngineRejection(
+                        "Player is disqualified from a league tournament and cannot participate",
+                        code="tournament.player_disqualified",
                     )
 
 
@@ -901,8 +902,8 @@ async def tournament_action(
                 tournament_json, event_json, actor_json, sanctions_json, decks_json
             )
         except ValueError as e:
-            # Rust engine returns validation errors as ValueError
-            raise HTTPException(status_code=400, detail=str(e)) from e
+            # Engine rejections arrive as ValueError carrying the #107 wire JSON
+            raise EngineRejection.from_engine(e) from e
 
         # Parse new result format: {"tournament": {...}, "deck_ops": [...]}
         result = json.loads(result_json)

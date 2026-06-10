@@ -9,6 +9,7 @@ from typing import Any
 
 from uuid6 import uuid7
 
+from .data.vekn_roster import ADMINS, JUDGES
 from .db import (
     decode_json,
     get_connection,
@@ -59,6 +60,27 @@ def _load_officials_emails() -> dict[str, str]:
 
 
 OFFICIALS_EMAILS: dict[str, str] = _load_officials_emails()
+
+
+def _derive_role_seeds(vekn_player: dict[str, Any]) -> list[Role]:
+    """Initial roles for a member this sync is about to CREATE.
+
+    Seed-only: roles are written on first import and app-managed thereafter
+    (_update_user never touches them) — the same contract as the legacy-archon
+    ETL/merge seed, for environments where this sync is the first importer.
+    """
+    roles: list[Role] = []
+    if vekn_player.get("princeid"):
+        roles.append(Role.PRINCE)
+    if vekn_player.get("coordinatorid"):
+        roles.append(Role.NC)
+    vekn_id = str(vekn_player.get("veknid", ""))
+    if vekn_id in ADMINS:
+        roles.append(Role.IC)
+    if vekn_id in JUDGES:
+        roles.append(JUDGES[vekn_id])
+    return roles
+
 
 # City name corrections by country (VEKN database has typos/inconsistencies)
 FIX_CITIES: dict[str, dict[str, str]] = {
@@ -553,10 +575,11 @@ class VEKNSyncService:
             else:
                 city = None
 
-        # NO role derivation: roles are seeded once from old archon by the
-        # ETL/legacy-archon sync and app-managed thereafter — no sync ever
-        # writes them. princeid/coordinatorid still feed vekn_prefix below
-        # (used by the coopted_by inference), just not roles.
+        # No roles here: they are seeded on first import only — by the
+        # legacy-archon ETL/merge, or by _derive_role_seeds when this sync
+        # creates the user (see sync_player) — and app-managed thereafter; no
+        # sync ever updates them. princeid/coordinatorid still feed
+        # vekn_prefix below (used by the coopted_by inference), just not roles.
 
         # Extract vekn_prefix for Prince/NC users
         vekn_prefix = None
@@ -684,7 +707,8 @@ class VEKNSyncService:
             return existing_user, False
 
         # Apply changes to existing user, preserving all non-sync fields.
-        # Roles are deliberately absent: app-managed, never sync-written.
+        # Roles are deliberately absent: seeded on create only (sync_player),
+        # app-managed thereafter — never sync-updated.
         now = datetime.now(UTC)
         existing_user.name = new_name
         existing_user.country = new_country
@@ -724,6 +748,13 @@ class VEKNSyncService:
             user, changed = await self._update_user(existing_user, vekn_data)
             return user, "updated" if changed else "unchanged"
         else:
+            # First import of this member: seed roles (Prince/NC inference +
+            # static roster). Create path only — _update_user never touches
+            # roles (app-managed after the seed, same contract as the
+            # legacy-archon ETL/merge seed). This is what gives officials
+            # their roles in environments populated by this sync alone
+            # (dev resets, rebuilds without the legacy DB).
+            vekn_data["roles"] = _derive_role_seeds(vekn_player)
             return await self._create_user(vekn_data), "created"
 
     async def sync_all_members(self) -> dict[str, int]:

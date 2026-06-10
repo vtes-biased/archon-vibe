@@ -10,11 +10,10 @@ Invariants guarded (one test each):
 * member merge writes only archon-owned fields, respecting local_modifications
   (identity and roles untouched);
 * a vekn-created duplicate member is tombstoned when the old-archon member
-  arrives (one live user per vekn id);
-* the VEKN member sync never writes the `roles` field (the mirror of the rule
-  above on the daily vekn.net side: roles are seeded once from old archon and
-  app-managed thereafter — a sync re-deriving them would flip-flop access
-  control daily).
+  arrives (one live user per vekn id).
+
+The VEKN member sync's own role contract (CREATE seeds derived roles, UPDATE
+never writes them) is covered in test_vekn_member_sync.py.
 """
 
 from contextlib import asynccontextmanager
@@ -39,7 +38,6 @@ from src.models import (
     TournamentState,
     User,
 )
-from src.vekn_sync import VEKNSyncService
 
 
 @asynccontextmanager
@@ -268,22 +266,3 @@ async def test_member_insert_tombstones_vekn_created_duplicate(test_db):
     duplicate = await db.get_user_by_uid("v-9")
     assert duplicate.deleted_at is not None, "vekn-created duplicate tombstoned"
     assert stats["members.vekn_copy_tombstoned"] == 1
-
-
-def test_member_sync_never_maps_roles():
-    """A Prince/NC/admin-flagged vekn.net player maps to a field set with no
-    `roles` key, so _create_user/_update_user can never grant or revoke an
-    access-control role. Re-introducing the old derivation (princeid -> PRINCE,
-    coordinatorid -> NC, static admin/judge lists) would flip-flop roles daily."""
-    fields = VEKNSyncService()._map_vekn_to_user(
-        {
-            "veknid": 1000123,
-            "firstname": "A",
-            "lastname": "B",
-            "princeid": "PR1",
-            "coordinatorid": "CO1",
-        }
-    )
-    assert "roles" not in fields
-    # princeid still feeds vekn_prefix (the coopted_by inference relies on it).
-    assert fields["vekn_prefix"] == "PR1"

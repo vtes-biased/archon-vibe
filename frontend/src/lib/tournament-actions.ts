@@ -32,6 +32,7 @@ import { showToast } from '$lib/stores/toast.svelte';
 import { getAuthState } from '$lib/stores/auth.svelte';
 import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
 import { apiRequest, ApiError, requireOnline, isOnline } from './api';
+import { EngineError } from './error-codes';
 
 /**
  * Per-tournament action queue to serialize server POSTs.
@@ -60,7 +61,12 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
   for (const s of sanctions) {
     if (s.deleted_at || s.lifted_at) continue;
     if (s.level === 'suspension' && (!s.expires_at || new Date(s.expires_at) > now)) {
-      throw new Error('Player is suspended and cannot participate');
+      // Coded like the engine/backend twins so the offline path localizes too (#107)
+      throw new EngineError(
+        'tournament.player_suspended',
+        {},
+        'Player is suspended and cannot participate'
+      );
     }
   }
   if (tournament.league_uid) {
@@ -69,7 +75,11 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
       if (s.level === 'disqualification' && s.tournament_uid) {
         const dqTournament = await getTournament(s.tournament_uid);
         if (dqTournament && dqTournament.league_uid === tournament.league_uid) {
-          throw new Error('Player is disqualified from a league tournament and cannot participate');
+          throw new EngineError(
+            'tournament.player_disqualified',
+            {},
+            'Player is disqualified from a league tournament and cannot participate'
+          );
         }
       }
     }
@@ -167,8 +177,8 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
       return result.tournament;
     } catch (e) {
       // WASM rejected. When this tournament is offline (or the device is), there's
-      // no server to defer to — surface the engine's actual reason (thrown as a
-      // string) instead of falling through to a misleading "requires online".
+      // no server to defer to — surface the engine's actual reason (a typed
+      // EngineError since #107) instead of a misleading "requires online".
       // Otherwise fall through to server-only (covers genuine unknown-action drift).
       if (isOffline(uid) || !isOnline()) throw e;
     }

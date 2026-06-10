@@ -1,0 +1,48 @@
+// Languages selectable for community links — the single point of truth for the
+// list (profile editor and community filter chips both import it; the backend
+// only validates the two-letter ISO 639-1 shape, so adding a language here is
+// the whole job). Covers every country with a VEKN presence; extend freely.
+export const LANGUAGES: { value: string; label: string }[] = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Español" },
+  { value: "ca", label: "Català" },
+  { value: "fr", label: "Français" },
+  { value: "pt", label: "Português" },
+  { value: "it", label: "Italiano" },
+  { value: "de", label: "Deutsch" },
+  { value: "nl", label: "Nederlands" },
+  { value: "pl", label: "Polski" },
+  { value: "cs", label: "Čeština" },
+  { value: "sk", label: "Slovenčina" },
+  { value: "hu", label: "Magyar" },
+  { value: "ro", label: "Română" },
+  { value: "bg", label: "Български" },
+  { value: "hr", label: "Hrvatski" },
+  { value: "sr", label: "Srpski" },
+  { value: "sl", label: "Slovenščina" },
+  { value: "el", label: "Ελληνικά" },
+  { value: "fi", label: "Suomi" },
+  { value: "sv", label: "Svenska" },
+  { value: "no", label: "Norsk" },
+  { value: "da", label: "Dansk" },
+  { value: "is", label: "Íslenska" },
+  { value: "et", label: "Eesti" },
+  { value: "lv", label: "Latviešu" },
+  { value: "lt", label: "Lietuvių" },
+  { value: "ru", label: "Русский" },
+  { value: "uk", label: "Українська" },
+  { value: "tr", label: "Türkçe" },
+  { value: "he", label: "עברית" },
+  { value: "ar", label: "العربية" },
+  { value: "ja", label: "日本語" },
+  { value: "zh", label: "中文" },
+  { value: "ko", label: "한국어" },
+  { value: "th", label: "ไทย" },
+  { value: "vi", label: "Tiếng Việt" },
+  { value: "id", label: "Bahasa Indonesia" },
+  { value: "tl", label: "Filipino" },
+];
+
+export const LANGUAGE_NAMES: Record<string, string> = Object.fromEntries(
+  LANGUAGES.map((l) => [l.value, l.label]),
+);

@@ -3,9 +3,10 @@
 use json::JsonValue;
 
 use super::types::{SeatScore, TournamentEvent};
+use crate::error::EngineError;
 
 impl TournamentEvent {
-    pub fn from_json(value: &JsonValue) -> Result<Self, String> {
+    pub fn from_json(value: &JsonValue) -> Result<Self, EngineError> {
         let event_type = value["type"].as_str().ok_or("event type required")?;
 
         match event_type {
@@ -152,7 +153,7 @@ impl TournamentEvent {
                             vp: s["vp"].as_f64().unwrap_or(0.0),
                         })
                     })
-                    .collect::<Result<Vec<_>, String>>()?;
+                    .collect::<Result<Vec<_>, EngineError>>()?;
                 Ok(Self::SetScore {
                     round,
                     table,
@@ -207,7 +208,7 @@ impl TournamentEvent {
                     .to_string();
                 let deck = value["deck"].clone();
                 if deck.is_null() {
-                    return Err("deck required".to_string());
+                    return Err(EngineError::internal("deck required"));
                 }
                 let multideck = value["multideck"].as_bool().unwrap_or(false);
                 Ok(Self::UpsertDeck {
@@ -248,18 +249,21 @@ impl TournamentEvent {
             "UpdateConfig" => {
                 let config = value["config"].clone();
                 if config.is_null() || !config.is_object() {
-                    return Err("config object required".to_string());
+                    return Err(EngineError::internal("config object required"));
                 }
                 Ok(Self::UpdateConfig { config })
             }
             "CreateTournament" => {
                 let config = value["config"].clone();
                 if config.is_null() || !config.is_object() {
-                    return Err("config object required".to_string());
+                    return Err(EngineError::internal("config object required"));
                 }
                 Ok(Self::CreateTournament { config })
             }
-            _ => Err(format!("Unknown event type: {}", event_type)),
+            _ => Err(EngineError::internal(format!(
+                "Unknown event type: {}",
+                event_type
+            ))),
         }
     }
 }

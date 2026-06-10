@@ -12,7 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
 from fastapi import FastAPI, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from .broadcast import (
     SSEConnection,
@@ -31,6 +31,7 @@ from .db import (
     save_sanction,
 )
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
+from .engine_errors import EngineRejection
 from .models import (
     DataLevel,
     ObjectType,
@@ -370,6 +371,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Archon", version="0.1.0", lifespan=lifespan)
+
+
+@app.exception_handler(EngineRejection)
+async def engine_rejection_handler(request, exc: EngineRejection) -> JSONResponse:
+    """Engine domain rejection: detail stays a human string (bot/legacy clients),
+    code+params are additive for frontend i18n (#107)."""
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.message, "code": exc.code, "params": exc.params},
+    )
+
 
 # CORS: only needed in development (nginx handles it in production)
 if os.getenv("ENVIRONMENT", "development") == "development":

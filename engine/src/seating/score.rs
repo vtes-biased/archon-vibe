@@ -13,6 +13,7 @@
 //! - R9: same position group
 
 use super::measure::{build_mapping, measure_round, Measure};
+use crate::error::EngineError;
 
 /// Lexicographic score - array of 9 rule violation counts
 /// Compare using `cmp_lex` for strict priority ordering
@@ -495,9 +496,9 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
 }
 
 /// Score an existing seating arrangement without optimization.
-pub fn score_rounds(rounds: &[Vec<Vec<String>>]) -> Result<SeatingScore, String> {
+pub fn score_rounds(rounds: &[Vec<Vec<String>>]) -> Result<SeatingScore, EngineError> {
     if rounds.is_empty() {
-        return Err("No rounds to score".to_string());
+        return Err(EngineError::internal("No rounds to score"));
     }
     Ok(score_total(rounds))
 }

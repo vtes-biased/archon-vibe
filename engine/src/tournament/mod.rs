@@ -28,6 +28,7 @@ pub use types::{
 use types::VpError;
 
 // Import everything needed for apply_event from submodules
+use crate::error::EngineError;
 use helpers::{
     all_rounds_finished, count_completed_rounds, find_player_index, is_deck_locked, player_exists,
     players_in_other_active_rounds, require_organizer, require_state, require_state_or_finished,
@@ -43,7 +44,7 @@ use standings::{compute_preliminary_standings, top5_has_ties, update_standings};
 // ============================================================================
 
 /// Validate config fields shared between UpdateConfig and CreateTournament.
-fn validate_config_fields(config: &JsonValue) -> Result<(), String> {
+fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     if let Some(f) = config["format"].as_str() {
         validate_enum(f, &["Standard", "V5", "Limited"], "format")?;
     }
@@ -67,7 +68,7 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), String> {
     if config.has_key("name") {
         if let Some(n) = config["name"].as_str() {
             if n.trim().is_empty() {
-                return Err("name cannot be empty".to_string());
+                return Err(EngineError::NameRequired);
             }
         }
     }
@@ -76,12 +77,12 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), String> {
 
 /// Create a new tournament from config and actor context.
 /// Returns the tournament JSON string.
-pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, String> {
-    let config = json::parse(config_json).map_err(|e| e.to_string())?;
-    let actor = ActorContext::from_json(&json::parse(actor_json).map_err(|e| e.to_string())?)?;
+pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, EngineError> {
+    let config = json::parse(config_json)?;
+    let actor = ActorContext::from_json(&json::parse(actor_json)?)?;
 
     if !actor.can_manage_tournaments() {
-        return Err("Only IC, NC, or Prince can create tournaments".to_string());
+        return Err(EngineError::CreateForbidden);
     }
 
     validate_config_fields(&config)?;
@@ -89,7 +90,7 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
     // Name is required for creation
     let name = config["name"].as_str().ok_or("name is required")?;
     if name.trim().is_empty() {
-        return Err("name cannot be empty".to_string());
+        return Err(EngineError::NameRequired);
     }
 
     let uid = config["uid"].as_str().unwrap_or("").to_string();
@@ -150,12 +151,12 @@ pub fn process_tournament_event(
     actor_json: &str,
     sanctions_json: &str,
     decks_json: &str,
-) -> Result<String, String> {
-    let mut tournament = json::parse(tournament_json).map_err(|e| e.to_string())?;
-    let event_value = json::parse(event_json).map_err(|e| e.to_string())?;
-    let actor_value = json::parse(actor_json).map_err(|e| e.to_string())?;
-    let sanctions = json::parse(sanctions_json).map_err(|e| e.to_string())?;
-    let decks = json::parse(decks_json).map_err(|e| e.to_string())?;
+) -> Result<String, EngineError> {
+    let mut tournament = json::parse(tournament_json)?;
+    let event_value = json::parse(event_json)?;
+    let actor_value = json::parse(actor_json)?;
+    let sanctions = json::parse(sanctions_json)?;
+    let decks = json::parse(decks_json)?;
 
     let event = TournamentEvent::from_json(&event_value)?;
     let actor = ActorContext::from_json(&actor_value)?;
@@ -185,7 +186,7 @@ fn apply_event(
     sanctions: &JsonValue,
     decks: &JsonValue,
     deck_ops: &mut JsonValue,
-) -> Result<(), String> {
+) -> Result<(), EngineError> {
     let state = TournamentState::from_str(tournament["state"].as_str().unwrap_or("Planned"))
         .ok_or("Invalid tournament state")?;
 
@@ -267,22 +268,20 @@ fn apply_event(
 
             // Require VEKN ID
             if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
-                return Err("Player must have a VEKN ID to register".to_string());
+                return Err(EngineError::VeknIdRequired);
             }
 
             // Check not already registered
             if player_exists(&tournament["players"], user_uid) {
-                return Err("Already registered".to_string());
+                return Err(EngineError::AlreadyRegistered);
             }
 
             // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, user_uid) {
-                return Err(
-                    "Player has a disqualification sanction and cannot register".to_string()
-                );
+                return Err(EngineError::PlayerDisqualified);
             }
             if has_active_suspension(sanctions, user_uid) {
-                return Err("Player is suspended and cannot register".to_string());
+                return Err(EngineError::PlayerSuspended);
             }
 
             // Add player
@@ -299,9 +298,7 @@ fn apply_event(
                     player["display_name"] = dn.as_str().into();
                 }
             }
-            tournament["players"]
-                .push(player)
-                .map_err(|e| e.to_string())?;
+            tournament["players"].push(player)?;
             Ok(())
         }
 
@@ -310,11 +307,11 @@ fn apply_event(
 
             // Self-only: player can only unregister themselves
             if actor.uid != *user_uid {
-                return Err("You can only unregister yourself".to_string());
+                return Err(EngineError::UnregisterOnlySelf);
             }
 
             let players = &mut tournament["players"];
-            let idx = find_player_index(players, user_uid).ok_or("Player not found")?;
+            let idx = find_player_index(players, user_uid).ok_or(EngineError::PlayerNotFound)?;
             players.array_remove(idx);
             Ok(())
         }
@@ -331,26 +328,24 @@ fn apply_event(
                 && state != TournamentState::Playing
                 && state != TournamentState::Finished
             {
-                return Err("Cannot add players in this state".to_string());
+                return Err(EngineError::CannotAddPlayers);
             }
 
             // Require VEKN ID
             if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
-                return Err("Player must have a VEKN ID to register".to_string());
+                return Err(EngineError::VeknIdRequired);
             }
 
             if player_exists(&tournament["players"], user_uid) {
-                return Err("Player already registered".to_string());
+                return Err(EngineError::AlreadyRegistered);
             }
 
             // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, user_uid) {
-                return Err(
-                    "Player has a disqualification sanction and cannot register".to_string()
-                );
+                return Err(EngineError::PlayerDisqualified);
             }
             if has_active_suspension(sanctions, user_uid) {
-                return Err("Player is suspended and cannot register".to_string());
+                return Err(EngineError::PlayerSuspended);
             }
 
             // Auto check-in when adding during Waiting state
@@ -381,9 +376,7 @@ fn apply_event(
             {
                 player["missing_decklist"] = true.into();
             }
-            tournament["players"]
-                .push(player)
-                .map_err(|e| e.to_string())?;
+            tournament["players"].push(player)?;
             Ok(())
         }
 
@@ -394,35 +387,35 @@ fn apply_event(
                 && state != TournamentState::Waiting
                 && state != TournamentState::Finished
             {
-                return Err("Cannot remove players in this state".to_string());
+                return Err(EngineError::CannotRemovePlayers);
             }
             if !tournament["rounds"].is_empty() {
-                return Err("Use DropOut for players who have played".to_string());
+                return Err(EngineError::UseDropOut);
             }
 
             let players = &mut tournament["players"];
-            let idx = find_player_index(players, user_uid).ok_or("Player not found")?;
+            let idx = find_player_index(players, user_uid).ok_or(EngineError::PlayerNotFound)?;
             players.array_remove(idx);
             Ok(())
         }
 
         TournamentEvent::DropOut { player_uid } => {
             if state != TournamentState::Waiting && state != TournamentState::Playing {
-                return Err("Cannot drop out in this state".to_string());
+                return Err(EngineError::CannotDropOut);
             }
 
             let players = &mut tournament["players"];
-            let idx = find_player_index(players, player_uid).ok_or("Player not found")?;
+            let idx = find_player_index(players, player_uid).ok_or(EngineError::PlayerNotFound)?;
             let player_state = PlayerState::from_str(players[idx]["state"].as_str().unwrap_or(""))
                 .ok_or("Invalid player state")?;
 
             if player_state == PlayerState::Finished {
-                return Err("Player already finished".to_string());
+                return Err(EngineError::PlayerAlreadyFinished);
             }
 
             // Permission: self or organizer
             if !actor.is_organizer && actor.uid != *player_uid {
-                return Err("Only organizers or the player themselves can drop out".to_string());
+                return Err(EngineError::DropOutForbidden);
             }
 
             players[idx]["state"] = "Finished".into();
@@ -438,25 +431,24 @@ fn apply_event(
 
             // Permission: organizer or self (player checking themselves in)
             if !actor.is_organizer && actor.uid != *player_uid {
-                return Err("Only organizers or the player themselves can check in".to_string());
+                return Err(EngineError::CheckInForbidden);
             }
 
             let idx = match find_player_index(&tournament["players"], player_uid) {
                 Some(idx) => idx,
                 None => {
                     if state != TournamentState::Waiting {
-                        return Err("Player not found".to_string());
+                        return Err(EngineError::PlayerNotFound);
                     }
                     // Require VEKN ID for auto-registration (same as Register)
                     if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
-                        return Err("Player must have a VEKN ID to check in".to_string());
+                        return Err(EngineError::VeknIdRequired);
                     }
                     if has_dq_sanction(sanctions, player_uid) {
-                        return Err("Player has a disqualification sanction and cannot check in"
-                            .to_string());
+                        return Err(EngineError::PlayerDisqualified);
                     }
                     if has_active_suspension(sanctions, player_uid) {
-                        return Err("Player is suspended and cannot check in".to_string());
+                        return Err(EngineError::PlayerSuspended);
                     }
                     let mut player = json::object! {
                         user_uid: player_uid.as_str(),
@@ -471,26 +463,22 @@ fn apply_event(
                             player["display_name"] = dn.as_str().into();
                         }
                     }
-                    tournament["players"]
-                        .push(player)
-                        .map_err(|e| e.to_string())?;
+                    tournament["players"].push(player)?;
                     tournament["players"].len() - 1
                 }
             };
 
             // Block disqualified players from checking in
             if tournament["players"][idx]["state"].as_str() == Some("Disqualified") {
-                return Err("Disqualified players cannot check in".to_string());
+                return Err(EngineError::PlayerDisqualified);
             }
 
             // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, player_uid) {
-                return Err(
-                    "Player has a disqualification sanction and cannot check in".to_string()
-                );
+                return Err(EngineError::PlayerDisqualified);
             }
             if has_active_suspension(sanctions, player_uid) {
-                return Err("Player is suspended and cannot check in".to_string());
+                return Err(EngineError::PlayerSuspended);
             }
 
             // Check for missing decklist when required (uses decks parameter)
@@ -511,11 +499,11 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
 
-            let idx =
-                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
+            let idx = find_player_index(&tournament["players"], player_uid)
+                .ok_or(EngineError::PlayerNotFound)?;
 
             if tournament["players"][idx]["state"].as_str() != Some("Checked-in") {
-                return Err("Player is not checked in".to_string());
+                return Err(EngineError::PlayerNotCheckedIn);
             }
 
             tournament["players"][idx]["state"] = if state == TournamentState::Finished {
@@ -570,10 +558,15 @@ fn apply_event(
             require_organizer(actor)?;
             match status.as_str() {
                 "Pending" | "Paid" | "Refunded" | "Cancelled" => {}
-                _ => return Err(format!("Invalid payment status: {}", status)),
+                _ => {
+                    return Err(EngineError::internal(format!(
+                        "Invalid payment status: {}",
+                        status
+                    )))
+                }
             }
-            let idx =
-                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
+            let idx = find_player_index(&tournament["players"], player_uid)
+                .ok_or(EngineError::PlayerNotFound)?;
             tournament["players"][idx]["payment_status"] = status.as_str().into();
             Ok(())
         }
@@ -600,10 +593,10 @@ fn apply_event(
                     && state != TournamentState::Playing
                     && state != TournamentState::Finished
                 {
-                    return Err(format!(
-                        "Tournament must be in Waiting state (currently {})",
-                        state.as_str()
-                    ));
+                    return Err(EngineError::WrongState {
+                        expected: "Waiting".to_string(),
+                        current: state.as_str().to_string(),
+                    });
                 }
             } else {
                 require_state_or_finished(state, TournamentState::Waiting)?;
@@ -611,14 +604,14 @@ fn apply_event(
 
             // Cannot start prelim round after finals
             if !tournament["finals"].is_null() {
-                return Err("Cannot start a preliminary round after finals".to_string());
+                return Err(EngineError::PrelimAfterFinals);
             }
 
             // Check max rounds
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
             let current_rounds = tournament["rounds"].len();
             if max_rounds > 0 && current_rounds >= max_rounds {
-                return Err("Maximum rounds reached".to_string());
+                return Err(EngineError::MaxRoundsReached);
             }
 
             // Get available players: Checked-in, plus Playing for online parallel rounds
@@ -633,7 +626,7 @@ fn apply_event(
 
             let n = checked_in.len();
             if n < 4 {
-                return Err("Need at least 4 checked-in players".to_string());
+                return Err(EngineError::NotEnoughPlayers);
             }
 
             // Get previous rounds for seating optimization
@@ -665,21 +658,21 @@ fn apply_event(
                 let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
                 for table in submitted.iter() {
                     if table.len() < 4 || table.len() > 5 {
-                        return Err(format!("Invalid table size: {}", table.len()));
+                        return Err(EngineError::InvalidTableSize { size: table.len() });
                     }
                     for uid in table {
                         if !seat_set.contains(uid.as_str()) {
-                            return Err(format!("Player {} not in selected subset", uid));
+                            return Err(EngineError::PlayerNotInSubset {
+                                player: uid.to_string(),
+                            });
                         }
                         if !seen.insert(uid.as_str()) {
-                            return Err(format!("Duplicate player {}", uid));
+                            return Err(EngineError::DuplicatePlayer);
                         }
                     }
                 }
                 if seen.len() != players_to_seat.len() {
-                    return Err(
-                        "Submitted seating does not include all selected players".to_string()
-                    );
+                    return Err(EngineError::SeatingIncomplete);
                 }
                 submitted.clone()
             } else {
@@ -714,9 +707,7 @@ fn apply_event(
                 })
                 .collect();
 
-            tournament["rounds"]
-                .push(JsonValue::Array(tables))
-                .map_err(|e| e.to_string())?;
+            tournament["rounds"].push(JsonValue::Array(tables))?;
             if state != TournamentState::Finished {
                 tournament["state"] = "Playing".into();
             }
@@ -754,12 +745,12 @@ fn apply_event(
 
             let rounds = &tournament["rounds"];
             if rounds.is_empty() {
-                return Err("No rounds to finish".to_string());
+                return Err(EngineError::NoRoundToFinish);
             }
 
             let target_round_idx = round.unwrap_or(rounds.len() - 1);
             if target_round_idx >= rounds.len() {
-                return Err(format!("Invalid round number: {}", target_round_idx));
+                return Err(EngineError::InvalidRound);
             }
 
             let target_round = &rounds[target_round_idx];
@@ -773,7 +764,13 @@ fn apply_event(
                 .collect();
 
             if !unfinished.is_empty() {
-                return Err(format!("Tables {:?} not finished yet", unfinished));
+                return Err(EngineError::TablesNotFinished {
+                    tables: unfinished
+                        .iter()
+                        .map(|i| (i + 1).to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                });
             }
 
             // Move players back — only if not in another active round
@@ -808,14 +805,14 @@ fn apply_event(
 
             let rounds = &mut tournament["rounds"];
             if rounds.is_empty() {
-                return Err("No rounds to cancel".to_string());
+                return Err(EngineError::NoRoundToCancel);
             }
 
             let len = rounds.len();
             // Can only cancel the last round (removing mid-array would shift indices)
             if let Some(idx) = round {
                 if *idx != len - 1 {
-                    return Err("Can only cancel the last round".to_string());
+                    return Err(EngineError::OnlyLastRoundCancellable);
                 }
             }
 
@@ -871,39 +868,39 @@ fn apply_event(
             if is_finals {
                 let seating = &mut tournament["finals"]["seating"];
                 if *seat1 >= seating.len() || *seat2 >= seating.len() {
-                    return Err("Invalid seat number".to_string());
+                    return Err(EngineError::InvalidSeat);
                 }
                 let uid1 = seating[*seat1]["player_uid"]
                     .as_str()
-                    .ok_or("Invalid seat")?
+                    .ok_or(EngineError::InvalidSeat)?
                     .to_string();
                 let uid2 = seating[*seat2]["player_uid"]
                     .as_str()
-                    .ok_or("Invalid seat")?
+                    .ok_or(EngineError::InvalidSeat)?
                     .to_string();
                 seating[*seat1]["player_uid"] = uid2.as_str().into();
                 seating[*seat2]["player_uid"] = uid1.as_str().into();
             } else {
                 let rounds = &mut tournament["rounds"];
                 if *round >= rounds.len() {
-                    return Err("Invalid round number".to_string());
+                    return Err(EngineError::InvalidRound);
                 }
                 let round_tables = &mut rounds[*round];
                 if *table1 >= round_tables.len() || *table2 >= round_tables.len() {
-                    return Err("Invalid table number".to_string());
+                    return Err(EngineError::InvalidTable);
                 }
                 if *seat1 >= round_tables[*table1]["seating"].len()
                     || *seat2 >= round_tables[*table2]["seating"].len()
                 {
-                    return Err("Invalid seat number".to_string());
+                    return Err(EngineError::InvalidSeat);
                 }
                 let uid1 = round_tables[*table1]["seating"][*seat1]["player_uid"]
                     .as_str()
-                    .ok_or("Invalid seat")?
+                    .ok_or(EngineError::InvalidSeat)?
                     .to_string();
                 let uid2 = round_tables[*table2]["seating"][*seat2]["player_uid"]
                     .as_str()
-                    .ok_or("Invalid seat")?
+                    .ok_or(EngineError::InvalidSeat)?
                     .to_string();
                 round_tables[*table1]["seating"][*seat1]["player_uid"] = uid2.as_str().into();
                 round_tables[*table2]["seating"][*seat2]["player_uid"] = uid1.as_str().into();
@@ -918,7 +915,7 @@ fn apply_event(
                 && state != TournamentState::Finished
                 && state != TournamentState::Waiting
             {
-                return Err("Cannot alter seating in this state".to_string());
+                return Err(EngineError::CannotAlterSeating);
             }
 
             let rounds_len = tournament["rounds"].len();
@@ -929,7 +926,7 @@ fn apply_event(
                 let all_uids: Vec<&String> = seating.iter().flat_map(|t| t.iter()).collect();
                 let unique: std::collections::HashSet<&String> = all_uids.iter().copied().collect();
                 if all_uids.len() != unique.len() {
-                    return Err("Duplicate player in seating".to_string());
+                    return Err(EngineError::DuplicatePlayer);
                 }
             }
 
@@ -937,11 +934,11 @@ fn apply_event(
                 // Replace finals seating player UIDs
                 let finals = &mut tournament["finals"]["seating"];
                 if seating.len() != 1 {
-                    return Err("Finals expects exactly one table".to_string());
+                    return Err(EngineError::FinalsOneTable);
                 }
                 let new_players = &seating[0];
                 if new_players.len() != finals.len() {
-                    return Err("Finals player count mismatch".to_string());
+                    return Err(EngineError::FinalsPlayerCount);
                 }
                 // Verify same set of players
                 let old_set: std::collections::HashSet<String> = (0..finals.len())
@@ -951,7 +948,7 @@ fn apply_event(
                 if old_set.len() != new_set.len()
                     || !new_players.iter().all(|uid| old_set.contains(uid))
                 {
-                    return Err("Finals player set mismatch".to_string());
+                    return Err(EngineError::FinalsPlayerSet);
                 }
                 for (i, uid) in new_players.iter().enumerate() {
                     finals[i]["player_uid"] = uid.as_str().into();
@@ -959,13 +956,13 @@ fn apply_event(
             } else {
                 // Round seating
                 if *round >= rounds_len {
-                    return Err("Invalid round number".to_string());
+                    return Err(EngineError::InvalidRound);
                 }
 
                 // Validation phase (immutable borrows)
                 let table_count = tournament["rounds"][*round].len();
                 if seating.len() != table_count {
-                    return Err("Table count mismatch".to_string());
+                    return Err(EngineError::TableCountMismatch);
                 }
 
                 // Build map: player_uid -> (old_table, old_result, judge_uid) from current state
@@ -990,7 +987,7 @@ fn apply_event(
                 // Validate new seating has exact same player set
                 let new_total: usize = seating.iter().map(|t| t.len()).sum();
                 if new_total != old_results.len() {
-                    return Err("Player count mismatch".to_string());
+                    return Err(EngineError::PlayerCountMismatch);
                 }
 
                 // R1 check: reject predator-prey repeats
@@ -1019,7 +1016,7 @@ fn apply_event(
                     }
                     let issues = seating::compute_player_issues(&check_rounds);
                     if issues.iter().any(|i| i.rule == 0) {
-                        return Err("Seating violates R1 (predator-prey repeat)".to_string());
+                        return Err(EngineError::SeatingViolatesR1);
                     }
                 }
 
@@ -1032,9 +1029,11 @@ fn apply_event(
                     let mut new_seating = Vec::new();
                     for uid in new_players {
                         let (old_table, old_result, old_judge) =
-                            old_results.get(uid).ok_or_else(|| {
-                                format!("Player {} not found in current round seating", uid)
-                            })?;
+                            old_results
+                                .get(uid)
+                                .ok_or_else(|| EngineError::PlayerNotInRound {
+                                    player: uid.to_string(),
+                                })?;
                         // Preserve result and judge_uid if player stays in same table, reset otherwise
                         let (result, judge) = if *old_table == t {
                             (old_result.clone(), old_judge.as_str())
@@ -1079,35 +1078,34 @@ fn apply_event(
             require_state_or_finished(state, TournamentState::Playing)?;
 
             // Verify player exists and is Registered
-            let player_idx =
-                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
+            let player_idx = find_player_index(&tournament["players"], player_uid)
+                .ok_or(EngineError::PlayerNotFound)?;
             let player_state = tournament["players"][player_idx]["state"]
                 .as_str()
                 .unwrap_or("");
             if player_state != "Registered"
                 && !(state == TournamentState::Finished && player_state == "Finished")
             {
-                return Err(format!(
-                    "Player must be Registered (currently {})",
-                    player_state
-                ));
+                return Err(EngineError::PlayerWrongState {
+                    current: player_state.to_string(),
+                });
             }
 
             // Verify table exists in current round
             let rounds = &mut tournament["rounds"];
             if rounds.is_empty() {
-                return Err("No rounds in progress".to_string());
+                return Err(EngineError::NoRoundInProgress);
             }
             let last = rounds.len() - 1;
             if *table >= rounds[last].len() {
-                return Err("Invalid table number".to_string());
+                return Err(EngineError::InvalidTable);
             }
 
             // Verify table is not already full (max 5 players)
             let seating = &mut rounds[last][*table]["seating"];
             let seating_len = seating.len();
             if seating_len >= 5 {
-                return Err("Table already has 5 players".to_string());
+                return Err(EngineError::TableFull);
             }
             let insert_pos = if *seat > seating_len {
                 seating_len
@@ -1145,7 +1143,7 @@ fn apply_event(
 
             let rounds = &mut tournament["rounds"];
             if rounds.is_empty() {
-                return Err("No rounds in progress".to_string());
+                return Err(EngineError::NoRoundInProgress);
             }
             let last = rounds.len() - 1;
 
@@ -1168,7 +1166,9 @@ fn apply_event(
             }
 
             if !found {
-                return Err("Player not found in current round seating".to_string());
+                return Err(EngineError::PlayerNotInRound {
+                    player: player_uid.to_string(),
+                });
             }
 
             // Set player state back to Registered
@@ -1184,7 +1184,7 @@ fn apply_event(
 
             let rounds = &mut tournament["rounds"];
             if rounds.is_empty() {
-                return Err("No rounds in progress".to_string());
+                return Err(EngineError::NoRoundInProgress);
             }
             let last = rounds.len() - 1;
 
@@ -1193,7 +1193,7 @@ fn apply_event(
                 state: "In Progress",
                 override: json::Null,
             };
-            rounds[last].push(empty_table).map_err(|e| e.to_string())?;
+            rounds[last].push(empty_table)?;
             Ok(())
         }
 
@@ -1203,14 +1203,14 @@ fn apply_event(
 
             let rounds = &mut tournament["rounds"];
             if rounds.is_empty() {
-                return Err("No rounds in progress".to_string());
+                return Err(EngineError::NoRoundInProgress);
             }
             let last = rounds.len() - 1;
             if *table >= rounds[last].len() {
-                return Err("Invalid table number".to_string());
+                return Err(EngineError::InvalidTable);
             }
             if !rounds[last][*table]["seating"].is_empty() {
-                return Err("Cannot remove a table with players seated".to_string());
+                return Err(EngineError::TableNotEmpty);
             }
             rounds[last].array_remove(*table);
             Ok(())
@@ -1237,10 +1237,10 @@ fn apply_event(
             } else {
                 let rounds = &tournament["rounds"];
                 if *round >= rounds.len() {
-                    return Err("Invalid round number".to_string());
+                    return Err(EngineError::InvalidRound);
                 }
                 if *table >= rounds[*round].len() {
-                    return Err("Invalid table number".to_string());
+                    return Err(EngineError::InvalidTable);
                 }
                 &mut tournament["rounds"][*round][*table]
             };
@@ -1251,12 +1251,12 @@ fn apply_event(
                 .any(|s| s["player_uid"].as_str() == Some(&actor.uid));
 
             if !actor.is_organizer && !is_at_table {
-                return Err("Not authorized to score this table".to_string());
+                return Err(EngineError::ScoreForbidden);
             }
 
             // If table has override and actor is not organizer, deny
             if !t["override"].is_null() && !actor.is_organizer {
-                return Err("Table score is locked by judge".to_string());
+                return Err(EngineError::ScoreLocked);
             }
 
             // If any seat was scored by an organizer, non-organizers cannot change scores
@@ -1265,7 +1265,7 @@ fn apply_event(
                     .members()
                     .any(|s| !s["judge_uid"].as_str().unwrap_or("").is_empty());
                 if has_judge_score {
-                    return Err("Score has been set by organiser".to_string());
+                    return Err(EngineError::ScoreSetByOrganizer);
                 }
             }
 
@@ -1278,11 +1278,14 @@ fn apply_event(
                 if (vp < 0.0 || vp > table_size as f64 || (vp * 2.0).fract() != 0.0)
                     && !actor.is_organizer
                 {
-                    return Err(format!("Invalid VP value: {}", vp));
+                    return Err(EngineError::internal(format!("Invalid VP value: {}", vp)));
                 }
                 // table_size - 0.5 is impossible (non-organizer blocked)
                 if !actor.is_organizer && vp == table_size as f64 - 0.5 {
-                    return Err(format!("VP value {} is impossible", vp));
+                    return Err(EngineError::internal(format!(
+                        "VP value {} is impossible",
+                        vp
+                    )));
                 }
             }
 
@@ -1350,8 +1353,7 @@ fn apply_event(
                         // Invalid oust order or other error
                         if !actor.is_organizer {
                             // Non-organizer: reject impossible oust sequences
-                            return Err("Invalid score: impossible VP combination for this table"
-                                .to_string());
+                            return Err(EngineError::InvalidScore);
                         }
                         t["state"] = "Invalid".into();
                     }
@@ -1380,10 +1382,10 @@ fn apply_event(
             } else {
                 let rounds = &tournament["rounds"];
                 if *round >= rounds.len() {
-                    return Err("Invalid round number".to_string());
+                    return Err(EngineError::InvalidRound);
                 }
                 if *table >= rounds[*round].len() {
-                    return Err("Invalid table number".to_string());
+                    return Err(EngineError::InvalidTable);
                 }
                 &mut tournament["rounds"][*round][*table]
             };
@@ -1409,10 +1411,10 @@ fn apply_event(
             } else {
                 let rounds = &tournament["rounds"];
                 if *round >= rounds.len() {
-                    return Err("Invalid round number".to_string());
+                    return Err(EngineError::InvalidRound);
                 }
                 if *table >= rounds[*round].len() {
-                    return Err("Invalid table number".to_string());
+                    return Err(EngineError::InvalidTable);
                 }
                 &mut tournament["rounds"][*round][*table]
             };
@@ -1443,10 +1445,10 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
             if tournament["rounds"].len() < 2 {
-                return Err("Need at least 2 rounds before setting toss".to_string());
+                return Err(EngineError::TossMinRounds);
             }
-            let idx =
-                find_player_index(&tournament["players"], player_uid).ok_or("Player not found")?;
+            let idx = find_player_index(&tournament["players"], player_uid)
+                .ok_or(EngineError::PlayerNotFound)?;
             tournament["players"][idx]["toss"] = (*toss).into();
             Ok(())
         }
@@ -1455,7 +1457,7 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
             if tournament["rounds"].len() < 2 {
-                return Err("Need at least 2 rounds before random toss".to_string());
+                return Err(EngineError::TossMinRounds);
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
@@ -1531,10 +1533,10 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
             if tournament["rounds"].len() < 2 {
-                return Err("Need at least 2 rounds before finals".to_string());
+                return Err(EngineError::FinalsMinRounds);
             }
             if !tournament["finals"].is_null() {
-                return Err("Finals already started".to_string());
+                return Err(EngineError::FinalsAlreadyStarted);
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
@@ -1552,10 +1554,10 @@ fn apply_event(
                 .collect();
 
             if eligible.len() < 5 {
-                return Err("Need at least 5 eligible players with results for finals".to_string());
+                return Err(EngineError::FinalsNotEnoughPlayers);
             }
             if top5_has_ties(&standings) {
-                return Err("Resolve all ties in top 5 before starting finals".to_string());
+                return Err(EngineError::FinalsUnresolvedTies);
             }
 
             // Top 5 eligible players form the finals table
@@ -1598,12 +1600,12 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
             if tournament["finals"].is_null() {
-                return Err("No finals in progress".to_string());
+                return Err(EngineError::NoFinalsInProgress);
             }
 
             let finals_state = tournament["finals"]["state"].as_str().unwrap_or("");
             if finals_state != "Finished" {
-                return Err("Finals table must be Finished first".to_string());
+                return Err(EngineError::FinalsTableUnfinished);
             }
 
             // Determine winner: highest VP in finals, tiebreak by seed order
@@ -1655,7 +1657,7 @@ fn apply_event(
                 && state != TournamentState::Playing
                 && state != TournamentState::Finished
             {
-                return Err("Cannot finish from this state".to_string());
+                return Err(EngineError::CannotFinish);
             }
 
             tournament["state"] = "Finished".into();
@@ -1696,14 +1698,14 @@ fn apply_event(
         } => {
             // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
-                return Err("Only organizers or the player can upload a deck".to_string());
+                return Err(EngineError::DeckUploadForbidden);
             }
             // Verify player is registered
             let is_registered = tournament["players"]
                 .members()
                 .any(|p| p["user_uid"].as_str() == Some(player_uid.as_str()));
             if !is_registered {
-                return Err("Player is not registered in this tournament".to_string());
+                return Err(EngineError::NotRegistered);
             }
             // Lifecycle: non-organizers restricted by tournament state
             if !actor.is_organizer {
@@ -1717,19 +1719,14 @@ fn apply_event(
                             // Multideck: new deck goes at index == existing_count
                             // Block if that round has already been played
                             if is_deck_locked(tournament, existing_count) {
-                                return Err(
-                                    "Cannot upload deck for a round that has already started"
-                                        .to_string(),
-                                );
+                                return Err(EngineError::DeckLockedRound);
                             }
                         } else if existing_count > 0 {
-                            return Err(
-                                "Cannot modify deck while tournament is in progress".to_string()
-                            );
+                            return Err(EngineError::DeckLockedPlaying);
                         }
                     }
                     TournamentState::Finished if existing_count > 0 => {
-                        return Err("Cannot modify deck after tournament is finished".to_string());
+                        return Err(EngineError::DeckLockedFinished);
                     }
                     _ => {} // Planned, Registration, Waiting: always allowed
                 }
@@ -1757,7 +1754,7 @@ fn apply_event(
         } => {
             // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
-                return Err("Only organizers or the player can delete a deck".to_string());
+                return Err(EngineError::DeckDeleteForbidden);
             }
             // Lifecycle: non-organizers restricted
             if !actor.is_organizer {
@@ -1766,22 +1763,19 @@ fn apply_event(
                         if *multideck {
                             if let Some(idx) = deck_index {
                                 if is_deck_locked(tournament, *idx) {
-                                    return Err(
-                                        "Cannot delete a deck whose round has already started"
-                                            .to_string(),
-                                    );
+                                    return Err(EngineError::DeckLockedRound);
                                 }
                             } else {
-                                return Err("deck_index required for multideck delete".to_string());
+                                return Err(EngineError::internal(
+                                    "deck_index required for multideck delete",
+                                ));
                             }
                         } else {
-                            return Err(
-                                "Cannot delete deck while tournament is in progress".to_string()
-                            );
+                            return Err(EngineError::DeckLockedPlaying);
                         }
                     }
                     TournamentState::Finished => {
-                        return Err("Cannot delete deck after tournament is finished".to_string());
+                        return Err(EngineError::DeckLockedFinished);
                     }
                     _ => {} // Planned, Registration, Waiting: always allowed
                 }
@@ -1809,16 +1803,14 @@ fn apply_event(
                 && state != TournamentState::Playing
                 && state != TournamentState::Finished
             {
-                return Err(
-                    "Raffle requires tournament in Waiting, Playing, or Finished state".to_string(),
-                );
+                return Err(EngineError::RaffleWrongState);
             }
             if *count == 0 {
-                return Err("count must be at least 1".to_string());
+                return Err(EngineError::RaffleCountMin);
             }
             let mut eligible = get_raffle_pool(tournament, pool, *exclude_drawn)?;
             if eligible.is_empty() {
-                return Err("No eligible players in pool".to_string());
+                return Err(EngineError::RaffleNoPlayers);
             }
             // Fisher-Yates shuffle with caller-provided seed (same LCG as RandomToss)
             let mut rng = *seed;
@@ -1842,16 +1834,14 @@ fn apply_event(
             if tournament["raffles"].is_null() {
                 tournament["raffles"] = JsonValue::new_array();
             }
-            tournament["raffles"]
-                .push(draw)
-                .map_err(|e| e.to_string())?;
+            tournament["raffles"].push(draw)?;
             Ok(())
         }
 
         TournamentEvent::RaffleUndo => {
             require_organizer(actor)?;
             if tournament["raffles"].is_null() || tournament["raffles"].is_empty() {
-                return Err("No raffle draws to undo".to_string());
+                return Err(EngineError::RaffleNoDraws);
             }
             let last = tournament["raffles"].len() - 1;
             tournament["raffles"].array_remove(last);
@@ -1874,10 +1864,7 @@ fn apply_event(
                 if mr != 0 {
                     let completed = count_completed_rounds(tournament);
                     if mr < completed {
-                        return Err(format!(
-                            "max_rounds ({}) cannot be less than completed rounds ({})",
-                            mr, completed
-                        ));
+                        return Err(EngineError::MaxRoundsBelowCompleted { max: mr, completed });
                     }
                 }
             }
@@ -1890,9 +1877,7 @@ fn apply_event(
                         .can_organize_league_uids
                         .contains(&league_uid.to_string())
                 {
-                    return Err(
-                        "Only league organizers can link tournaments to this league".to_string()
-                    );
+                    return Err(EngineError::LeagueLinkForbidden);
                 }
             }
 
@@ -1953,9 +1938,8 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::CreateTournament { .. } => Err(
-            "CreateTournament is not a tournament event — use create_tournament() instead"
-                .to_string(),
-        ),
+        TournamentEvent::CreateTournament { .. } => Err(EngineError::internal(
+            "CreateTournament is not a tournament event — use create_tournament() instead",
+        )),
     }
 }

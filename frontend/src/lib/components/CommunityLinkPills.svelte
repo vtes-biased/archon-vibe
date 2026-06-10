@@ -1,8 +1,15 @@
 <script lang="ts">
   import type { CommunityLink, CommunityLinkType } from "$lib/types";
-  import { ExternalLink, Globe, MessageSquare, BookOpen, Link } from "lucide-svelte";
+  import { ExternalLink, Globe, MessageSquare, BookOpen, Link, Pin } from "lucide-svelte";
+  import * as m from '$lib/paraglide/messages.js';
 
   let { links }: { links: CommunityLink[] } = $props();
+
+  const pinTitle = (link: CommunityLink) =>
+    link.moderation?.status !== "promoted" ? null
+    : link.moderation.scope === "international" ? m.community_scope_international()
+    : link.moderation.scope === "national" ? m.community_scope_national()
+    : null;
 
   const LABELS: Record<CommunityLinkType, string> = {
     discord: "Discord",
@@ -76,6 +83,9 @@
       rel="noopener noreferrer"
       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-80 min-h-[48px] {COLORS[link.type] || COLORS.other}"
     >
+      {#if pinTitle(link)}
+        <Pin class="w-3 h-3 shrink-0" aria-label={pinTitle(link)} />
+      {/if}
       {#if link.type === "discord"}
         {@render discordIcon()}
       {:else if link.type === "telegram"}

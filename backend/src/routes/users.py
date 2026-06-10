@@ -22,7 +22,7 @@ from ..db import get_avatar as db_get_avatar
 from ..db import save_user as db_save_user
 from ..db import upsert_avatar as db_upsert_avatar
 from ..middleware.auth import CurrentUser, OptionalUser
-from ..models import CommunityLink, LinkModeration, Role, User
+from ..models import LinkModeration, Role, User
 from ..utils import user_to_context
 from .auth import send_invite_email
 
@@ -403,7 +403,7 @@ async def delete_avatar(
 
 class LinkModerationRequest(BaseModel):
     url: str  # link URL to moderate
-    action: str  # "hide" | "promote" | "clear"
+    action: str  # "hide" | "promote_national" | "promote_international" | "clear"
 
 
 @router.patch("/{user_uid}/community-link-moderation")
@@ -414,16 +414,16 @@ async def moderate_community_link(
 ) -> Response:
     """Moderate a community link on a target user.
 
-    Only IC, or NC/Prince in the same country as the target user, can moderate.
+    Hide/clear: IC anywhere, NC/Prince in the same country as the target.
+    promote_national: IC anywhere, NC in the same country (not Prince —
+    "top level for country" is the NC's call).
+    promote_international: IC only.
+    Self-moderation is allowed: officials pin their own links this way.
     """
-    # Cannot moderate your own links
-    if current_user.uid == user_uid:
-        raise HTTPException(status_code=403, detail="Cannot moderate your own links")
-
-    # Check moderator role
     is_ic = Role.IC in current_user.roles
-    is_nc_prince = Role.NC in current_user.roles or Role.PRINCE in current_user.roles
-    if not is_ic and not is_nc_prince:
+    is_nc = Role.NC in current_user.roles
+    is_prince = Role.PRINCE in current_user.roles
+    if not (is_ic or is_nc or is_prince):
         raise HTTPException(
             status_code=403, detail="Only IC/NC/Prince can moderate links"
         )
@@ -433,16 +433,51 @@ async def moderate_community_link(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # NC/Prince can only moderate in their own country
-    if is_nc_prince and not is_ic and current_user.country != target.country:
-        raise HTTPException(
-            status_code=403, detail="Can only moderate links in your country"
-        )
-
-    if request.action not in ("hide", "promote", "clear"):
-        raise HTTPException(
-            status_code=422, detail="Action must be 'hide', 'promote', or 'clear'"
-        )
+    same_country = current_user.country == target.country
+    mod: LinkModeration | None
+    match request.action:
+        case "hide" | "clear":
+            if not is_ic and not same_country:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Can only moderate links in your country",
+                )
+            mod = (
+                LinkModeration(
+                    status="hidden", by=current_user.uid, at=datetime.now(UTC)
+                )
+                if request.action == "hide"
+                else None
+            )
+        case "promote_national":
+            if not (is_ic or (is_nc and same_country)):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only IC, or the country's NC, can promote nationally",
+                )
+            mod = LinkModeration(
+                status="promoted",
+                by=current_user.uid,
+                at=datetime.now(UTC),
+                scope="national",
+            )
+        case "promote_international":
+            if not is_ic:
+                raise HTTPException(
+                    status_code=403, detail="Only IC can promote internationally"
+                )
+            mod = LinkModeration(
+                status="promoted",
+                by=current_user.uid,
+                at=datetime.now(UTC),
+                scope="international",
+            )
+        case _:
+            raise HTTPException(
+                status_code=422,
+                detail="Action must be 'hide', 'promote_national',"
+                " 'promote_international', or 'clear'",
+            )
 
     # Find and update the link
     updated_links = []
@@ -450,31 +485,7 @@ async def moderate_community_link(
     for link in target.community_links:
         if link.url == request.url:
             found = True
-            if request.action == "clear":
-                updated_links.append(
-                    CommunityLink(
-                        type=link.type,
-                        url=link.url,
-                        label=link.label,
-                        language=link.language,
-                        moderation=None,
-                    )
-                )
-            else:
-                mod = LinkModeration(
-                    status="hidden" if request.action == "hide" else "promoted",
-                    by=current_user.uid,
-                    at=datetime.now(UTC),
-                )
-                updated_links.append(
-                    CommunityLink(
-                        type=link.type,
-                        url=link.url,
-                        label=link.label,
-                        language=link.language,
-                        moderation=mod,
-                    )
-                )
+            updated_links.append(msgspec.structs.replace(link, moderation=mod))
         else:
             updated_links.append(link)
 

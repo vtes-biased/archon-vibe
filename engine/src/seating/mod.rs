@@ -27,6 +27,7 @@ pub use score::{
 pub use stagger::select_players_for_round;
 
 // Internal plumbing for this module's own entry points (not public API).
+use crate::error::EngineError;
 use anneal::{get_sa_params, optimize_sa_multi};
 use measure::build_round;
 use precomputed::{apply_precomputed, get_precomputed_seating};
@@ -50,7 +51,7 @@ pub fn seed_for_round(tournament_uid: &str, round_index: usize) -> u64 {
 }
 
 /// `compute_seating` result: (rounds → tables → seats) plus the seating's score.
-type SeatingResult = Result<(Vec<Vec<Vec<String>>>, SeatingScore), String>;
+type SeatingResult = Result<(Vec<Vec<Vec<String>>>, SeatingScore), EngineError>;
 
 /// Compute seating for a tournament.
 ///
@@ -83,11 +84,11 @@ pub fn compute_seating(
     seed: u64,
 ) -> SeatingResult {
     if players.len() < 4 {
-        return Err("At least 4 players required".to_string());
+        return Err(EngineError::SeatingMinPlayers);
     }
 
     if rounds_count == 0 {
-        return Err("At least 1 round required".to_string());
+        return Err(EngineError::SeatingMinRounds);
     }
 
     let n = players.len();
@@ -127,7 +128,7 @@ pub fn compute_seating(
     };
 
     if rounds.is_empty() {
-        return Err("Could not build rounds".to_string());
+        return Err(EngineError::internal("Could not build rounds"));
     }
 
     // Determine fixed rounds (previous rounds are fixed)
@@ -159,7 +160,7 @@ pub fn compute_next_round(
     current_players: &[String],
     previous_rounds: &[Vec<Vec<String>>],
     seed: u64,
-) -> Result<(Vec<Vec<String>>, SeatingScore), String> {
+) -> Result<(Vec<Vec<String>>, SeatingScore), EngineError> {
     let total_rounds = previous_rounds.len() + 1;
     let (all_rounds, score) =
         compute_seating(current_players, total_rounds, Some(previous_rounds), seed)?;

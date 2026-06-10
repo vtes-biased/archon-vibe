@@ -3,6 +3,7 @@
 use json::JsonValue;
 
 use super::types::{ActorContext, TournamentState};
+use crate::error::EngineError;
 
 /// Returns true if a deck at the given index is locked (its round has already started).
 pub(super) fn is_deck_locked(tournament: &JsonValue, deck_index: usize) -> bool {
@@ -10,9 +11,9 @@ pub(super) fn is_deck_locked(tournament: &JsonValue, deck_index: usize) -> bool 
     deck_index < rounds_played
 }
 
-pub(super) fn require_organizer(actor: &ActorContext) -> Result<(), String> {
+pub(super) fn require_organizer(actor: &ActorContext) -> Result<(), EngineError> {
     if !actor.is_organizer {
-        return Err("Only organizers can perform this action".to_string());
+        return Err(EngineError::NotOrganizer);
     }
     Ok(())
 }
@@ -20,13 +21,12 @@ pub(super) fn require_organizer(actor: &ActorContext) -> Result<(), String> {
 pub(super) fn require_state(
     current: TournamentState,
     expected: TournamentState,
-) -> Result<(), String> {
+) -> Result<(), EngineError> {
     if current != expected {
-        return Err(format!(
-            "Tournament must be in {} state (currently {})",
-            expected.as_str(),
-            current.as_str()
-        ));
+        return Err(EngineError::WrongState {
+            expected: expected.as_str().to_string(),
+            current: current.as_str().to_string(),
+        });
     }
     Ok(())
 }
@@ -34,13 +34,12 @@ pub(super) fn require_state(
 pub(super) fn require_state_or_finished(
     current: TournamentState,
     expected: TournamentState,
-) -> Result<(), String> {
+) -> Result<(), EngineError> {
     if current != expected && current != TournamentState::Finished {
-        return Err(format!(
-            "Tournament must be in {} state (currently {})",
-            expected.as_str(),
-            current.as_str()
-        ));
+        return Err(EngineError::WrongState {
+            expected: expected.as_str().to_string(),
+            current: current.as_str().to_string(),
+        });
     }
     Ok(())
 }
@@ -57,9 +56,12 @@ pub(super) fn find_player_index(players: &JsonValue, user_uid: &str) -> Option<u
         .position(|p| p["user_uid"].as_str() == Some(user_uid))
 }
 
-pub(super) fn validate_enum(value: &str, valid: &[&str], field: &str) -> Result<(), String> {
+pub(super) fn validate_enum(value: &str, valid: &[&str], field: &str) -> Result<(), EngineError> {
     if !valid.contains(&value) {
-        return Err(format!("Invalid {}: {}", field, value));
+        return Err(EngineError::internal(format!(
+            "Invalid {}: {}",
+            field, value
+        )));
     }
     Ok(())
 }

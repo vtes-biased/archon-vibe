@@ -18,10 +18,12 @@
     expandedCountries: Set<string>;
     userCountry: string | null;
     isModerator: boolean;
+    isIC: boolean;
+    isNC: boolean;
     onToggleCountry: (code: string) => void;
     onModerate: (userUid: string, url: string, action: string) => void;
   }
-  let { groups, expandedCountries, userCountry, isModerator, onToggleCountry, onModerate }: Props = $props();
+  let { groups, expandedCountries, userCountry, isModerator, isIC, isNC, onToggleCountry, onModerate }: Props = $props();
 </script>
 
 {#if groups.length > 0}
@@ -66,7 +68,13 @@
                 {/if}
                 <CommunityLinkPills {links} />
                 {#if isModerator}
-                  <CommunityModerationActions userUid={user.uid} {links} {onModerate} />
+                  <CommunityModerationActions
+                    userUid={user.uid}
+                    {links}
+                    {onModerate}
+                    canPromoteNational={isIC || (isNC && userCountry === user.country)}
+                    canPromoteInternational={isIC}
+                  />
                 {/if}
               </div>
             {/each}

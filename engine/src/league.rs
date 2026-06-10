@@ -6,6 +6,7 @@
 /// - **GP**: Position-based points per tournament; GW/VP include finals
 use json::JsonValue;
 
+use crate::error::EngineError;
 use crate::ratings::compute_rating_points;
 
 /// A player's aggregated league standing entry.
@@ -39,8 +40,8 @@ struct PlayerEntry {
 ///
 /// Output JSON: array of standing entries sorted by ranking, each with:
 /// `{ "user_uid", "gw", "vp", "tp", "points", "rank", "tournaments_count" }`
-pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
-    let config = json::parse(config_json).map_err(|e| e.to_string())?;
+pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError> {
+    let config = json::parse(config_json)?;
     let mode = config["standings_mode"].as_str().unwrap_or("RTP");
 
     let mut players: std::collections::HashMap<String, PlayerEntry> =
@@ -119,7 +120,10 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
                     entry.tp += tp;
                 }
                 _ => {
-                    return Err(format!("Unknown standings mode: {}", mode));
+                    return Err(EngineError::internal(format!(
+                        "Unknown standings mode: {}",
+                        mode
+                    )));
                 }
             }
         }
@@ -193,7 +197,7 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, String> {
         if mode == "Score" {
             obj.remove("points");
         }
-        result.push(obj).map_err(|e| e.to_string())?;
+        result.push(obj)?;
     }
 
     Ok(result.dump())

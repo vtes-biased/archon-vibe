@@ -1,5 +1,6 @@
 //! Type definitions for tournament engine.
 
+use crate::error::EngineError;
 use json::JsonValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -261,7 +262,7 @@ pub struct ActorContext {
 }
 
 impl ActorContext {
-    pub fn from_json(value: &JsonValue) -> Result<Self, String> {
+    pub fn from_json(value: &JsonValue) -> Result<Self, EngineError> {
         let uid = value["uid"]
             .as_str()
             .ok_or("actor uid required")?
