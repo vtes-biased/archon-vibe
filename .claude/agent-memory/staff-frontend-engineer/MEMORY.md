@@ -35,3 +35,6 @@
 - Modals: `fixed inset-0 z-50` + backdrop-blur, `role="dialog"` + `aria-modal` + `aria-labelledby`, Escape handling, `focusOnMount` action, stopPropagation, captured state.
 - Shared utils live in `tournament-utils.ts` (e.g. `getStateBadgeClass`, score helpers) — don't re-duplicate `computeGwLocal`/`computeTpLocal`/`vpOptions` per file.
 - English copy must pluralize (`{count} round(s)`) — the flat-string i18n setup has no built-in plural rules, so handle count-dependent strings deliberately.
+
+### Gotchas
+- [No line-clamp on markdown](feedback_no_lineclamp_on_markdown.md) — never `line-clamp-N` over `{@html renderMarkdown(...)}`; derive a plain-text excerpt from source for folded previews.
