@@ -306,12 +306,14 @@ pub fn can_edit_league(
     }
 }
 
-/// Context for a sanction-lift decision: the sanction level plus the relevant
-/// fields of the (caller-fetched) tournament and league.
+/// Context for a sanction lift/delete decision: the sanction level plus the
+/// relevant fields of the (caller-fetched) tournament and league.
 #[derive(Debug, Clone, Default)]
 pub struct SanctionContext {
     pub level: String,
     pub tournament_country: Option<String>,
+    pub tournament_state: String,
+    pub tournament_organizers_uids: Vec<String>,
     pub league_organizers_uids: Vec<String>,
 }
 
@@ -320,6 +322,11 @@ impl SanctionContext {
         SanctionContext {
             level: value["level"].as_str().unwrap_or("").to_string(),
             tournament_country: value["tournament_country"].as_str().map(|s| s.to_string()),
+            tournament_state: value["tournament_state"].as_str().unwrap_or("").to_string(),
+            tournament_organizers_uids: value["tournament_organizers_uids"]
+                .members()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect(),
             league_organizers_uids: value["league_organizers_uids"]
                 .members()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
@@ -386,6 +393,33 @@ pub fn can_lift_sanction(
         return PermissionResult::allow();
     }
     PermissionResult::deny("You don't have permission to lift this sanction")
+}
+
+/// Check if actor can delete a sanction.
+///
+/// - IC or Ethics: any sanction.
+/// - A tournament organizer: organizer-issuable levels (CAUTION/WARNING/SA/DQ)
+///   attached to their tournament, while it is not Finished — so a sanction
+///   issued by mistake can be removed at the event without escalating.
+pub fn can_delete_sanction(
+    user: &UserContext,
+    user_uid: &str,
+    ctx: &SanctionContext,
+) -> PermissionResult {
+    if user.has_role(Role::IC) || user.has_role(Role::Ethics) {
+        return PermissionResult::allow();
+    }
+    let organizer_issuable = matches!(
+        ctx.level.as_str(),
+        "caution" | "warning" | "standings_adjustment" | "disqualification"
+    );
+    if organizer_issuable
+        && ctx.tournament_state != "Finished"
+        && ctx.tournament_organizers_uids.iter().any(|u| u == user_uid)
+    {
+        return PermissionResult::allow();
+    }
+    PermissionResult::deny("You don't have permission to delete this sanction")
 }
 
 #[cfg(test)]
@@ -664,6 +698,7 @@ mod tests {
                     level: level.to_string(),
                     tournament_country: t_country,
                     league_organizers_uids: league_orgs.iter().map(|s| s.to_string()).collect(),
+                    ..Default::default()
                 },
             )
             .allowed
@@ -725,5 +760,52 @@ mod tests {
         assert!(!lift(vec![], None, "org-1", "warning", None, vec!["org-1"]));
         // Nobody
         assert!(!lift(vec![], None, "nobody", "caution", None, vec![]));
+    }
+
+    #[test]
+    fn test_can_delete_sanction() {
+        let del = |roles, uid: &str, level: &str, t_state: &str, t_orgs: Vec<&str>| {
+            can_delete_sanction(
+                &ctx(roles, None),
+                uid,
+                &SanctionContext {
+                    level: level.to_string(),
+                    tournament_state: t_state.to_string(),
+                    tournament_organizers_uids: t_orgs.iter().map(|s| s.to_string()).collect(),
+                    ..Default::default()
+                },
+            )
+            .allowed
+        };
+        // IC/Ethics: any sanction
+        assert!(del(vec![Role::IC], "x", "suspension", "", vec![]));
+        assert!(del(vec![Role::Ethics], "x", "warning", "Finished", vec![]));
+        // Organizer: issuable levels on their own open tournament
+        assert!(del(vec![], "org-1", "caution", "Playing", vec!["org-1"]));
+        assert!(del(
+            vec![],
+            "org-1",
+            "disqualification",
+            "Waiting",
+            vec!["org-1"]
+        ));
+        // ...but not once the tournament is finished
+        assert!(!del(vec![], "org-1", "warning", "Finished", vec!["org-1"]));
+        // ...and never suspension/probation
+        assert!(!del(
+            vec![],
+            "org-1",
+            "suspension",
+            "Playing",
+            vec!["org-1"]
+        ));
+        // Non-organizer without privileged role
+        assert!(!del(
+            vec![Role::NC],
+            "x",
+            "caution",
+            "Playing",
+            vec!["org-1"]
+        ));
     }
 }

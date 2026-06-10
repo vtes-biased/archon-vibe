@@ -6,6 +6,7 @@
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
+  import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock } from "lucide-svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
@@ -31,6 +32,8 @@
 
   // Sanction modal state
   let sanctionTarget = $state<{ uid: string; name: string; round: number } | null>(null);
+  // Sanction list modal state (view + cancel issued sanctions)
+  let sanctionListTarget = $state<{ uid: string; name: string } | null>(null);
 
   // Build a map of player uid → their sanctions
   const playerSanctionsMap = $derived.by(() => {
@@ -623,7 +626,10 @@
                       <span class="text-ash-300 inline-flex items-center gap-1">
                         {seatDisplay(seat.player_uid)}
                         {#if playerSanctionsMap[seat.player_uid]?.length}
-                          <SanctionIndicator sanctions={playerSanctionsMap[seat.player_uid]!} />
+                          <SanctionIndicator
+                            sanctions={playerSanctionsMap[seat.player_uid]!}
+                            onclick={() => sanctionListTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid) }}
+                          />
                         {/if}
                       </span>
                       <div class="flex items-center gap-2">
@@ -756,5 +762,16 @@
     playerName={sanctionTarget.name}
     currentRound={sanctionTarget.round}
     onClose={() => sanctionTarget = null}
+  />
+{/if}
+
+<!-- Sanction List Modal -->
+{#if sanctionListTarget}
+  <SanctionListModal
+    playerName={sanctionListTarget.name}
+    sanctions={playerSanctionsMap[sanctionListTarget.uid] ?? []}
+    tournamentUid={tournament.uid}
+    canManage={isOrganizer && tournament.state !== "Finished"}
+    onClose={() => sanctionListTarget = null}
   />
 {/if}

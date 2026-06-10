@@ -14,9 +14,10 @@ pub use error::EngineError;
 
 // Re-export permissions module items
 pub use permissions::{
-    can_change_role, can_edit_league, can_edit_user, can_issue_sanction, can_lift_sanction,
-    can_manage_country, can_manage_leagues, can_manage_tournaments, can_manage_vekn, is_organizer,
-    OwnedResource, PermissionResult, Role, SanctionContext, UserContext,
+    can_change_role, can_delete_sanction, can_edit_league, can_edit_user, can_issue_sanction,
+    can_lift_sanction, can_manage_country, can_manage_leagues, can_manage_tournaments,
+    can_manage_vekn, is_organizer, OwnedResource, PermissionResult, Role, SanctionContext,
+    UserContext,
 };
 
 // ============================================================================
@@ -131,6 +132,18 @@ mod shared {
         let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         let ctx = SanctionContext::from_json(&json::parse(ctx_json)?);
         Ok(can_lift_sanction(&actor, actor_uid, &ctx).to_json().dump())
+    }
+
+    pub fn can_delete_sanction_json(
+        actor_json: &str,
+        actor_uid: &str,
+        ctx_json: &str,
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let ctx = SanctionContext::from_json(&json::parse(ctx_json)?);
+        Ok(can_delete_sanction(&actor, actor_uid, &ctx)
+            .to_json()
+            .dump())
     }
 
     pub fn compute_seating_json(config_json: &str) -> Result<String, EngineError> {
@@ -453,6 +466,16 @@ mod wasm {
             js_str(can_lift_sanction_json(actor_json, actor_uid, ctx_json))
         }
 
+        #[wasm_bindgen(js_name = canDeleteSanction)]
+        pub fn can_delete_sanction(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            ctx_json: &str,
+        ) -> Result<String, String> {
+            js_str(can_delete_sanction_json(actor_json, actor_uid, ctx_json))
+        }
+
         #[wasm_bindgen(js_name = computeSeating)]
         pub fn compute_seating(&self, config_json: &str) -> Result<String, String> {
             js_str(compute_seating_json(config_json))
@@ -648,6 +671,15 @@ mod python {
             ctx_json: &str,
         ) -> PyResult<String> {
             py_str(can_lift_sanction_json(actor_json, actor_uid, ctx_json))
+        }
+
+        fn can_delete_sanction(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            ctx_json: &str,
+        ) -> PyResult<String> {
+            py_str(can_delete_sanction_json(actor_json, actor_uid, ctx_json))
         }
 
         fn compute_seating(&self, config_json: &str) -> PyResult<String> {

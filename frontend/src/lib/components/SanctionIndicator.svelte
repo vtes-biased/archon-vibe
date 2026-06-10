@@ -2,7 +2,7 @@
   import type { Sanction, SanctionLevel } from "$lib/types";
   import * as m from '$lib/paraglide/messages.js';
 
-  let { sanctions }: { sanctions: Sanction[] } = $props();
+  let { sanctions, onclick }: { sanctions: Sanction[]; onclick?: () => void } = $props();
 
   // Only show active (non-lifted, non-deleted) sanctions
   const activeSanctions = $derived(
@@ -56,14 +56,31 @@
   );
 </script>
 
+{#snippet dot()}
+  <span class="w-2 h-2 rounded-full {dotColor}"></span>
+  {#if activeSanctions.length > 1}
+    <span class="text-[10px] text-ash-400">{activeSanctions.length}</span>
+  {/if}
+{/snippet}
+
 {#if activeSanctions.length > 0}
-  <span
-    class="inline-flex items-center gap-0.5 cursor-help"
-    title={tooltipText}
-  >
-    <span class="w-2 h-2 rounded-full {dotColor}"></span>
-    {#if activeSanctions.length > 1}
-      <span class="text-[10px] text-ash-400">{activeSanctions.length}</span>
-    {/if}
-  </span>
+  {#if onclick}
+    <!-- Tap target padded to ~44px on mobile; negative margin keeps inline layout tight. Tooltip is desktop-only. -->
+    <button
+      type="button"
+      {onclick}
+      class="inline-flex items-center justify-center gap-0.5 -m-3 p-3 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:-m-2 sm:p-2"
+      title={tooltipText}
+      aria-label={tooltipText}
+    >
+      {@render dot()}
+    </button>
+  {:else}
+    <span
+      class="inline-flex items-center gap-0.5 cursor-help"
+      title={tooltipText}
+    >
+      {@render dot()}
+    </span>
+  {/if}
 {/if}

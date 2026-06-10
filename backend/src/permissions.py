@@ -94,3 +94,22 @@ def can_lift_sanction(
     return _allowed(
         _engine.can_lift_sanction(json.dumps(user_to_context(user)), user.uid, ctx)
     )
+
+
+def can_delete_sanction(
+    user: User, sanction: Sanction, tournament: Tournament | None
+) -> bool:
+    """IC/Ethics for any sanction; else an organizer of the sanction's
+    tournament, for organizer-issuable levels, while it is not Finished."""
+    ctx = json.dumps(
+        {
+            "level": str(sanction.level),
+            "tournament_state": str(tournament.state) if tournament else "",
+            "tournament_organizers_uids": (
+                tournament.organizers_uids if tournament else []
+            ),
+        }
+    )
+    return _allowed(
+        _engine.can_delete_sanction(json.dumps(user_to_context(user)), user.uid, ctx)
+    )

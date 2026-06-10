@@ -8,6 +8,7 @@
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
+  import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff } from "lucide-svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
@@ -41,6 +42,8 @@
 
   // Sanction modal state
   let sanctionTarget = $state<{ uid: string; name: string } | null>(null);
+  // Sanction list modal state (view + cancel issued sanctions)
+  let sanctionListTarget = $state<{ uid: string; name: string } | null>(null);
 
   // Build a map of player uid → their sanctions for this tournament
   const playerSanctionsMap = $derived.by(() => {
@@ -485,7 +488,10 @@
                   {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
                 </span>
                 {#if playerSanctionsMap[puid]?.length}
-                  <SanctionIndicator sanctions={playerSanctionsMap[puid]} />
+                  <SanctionIndicator
+                    sanctions={playerSanctionsMap[puid]}
+                    onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
+                  />
                 {/if}
               </div>
               {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
@@ -681,7 +687,10 @@
                 <span class="truncate flex items-center gap-1">
                   {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
                   {#if playerSanctionsMap[puid]?.length}
-                    <SanctionIndicator sanctions={playerSanctionsMap[puid]} />
+                    <SanctionIndicator
+                      sanctions={playerSanctionsMap[puid]}
+                      onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
+                    />
                   {/if}
                 </span>
                 {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
@@ -864,6 +873,17 @@
     playerName={sanctionTarget.name}
     {currentRound}
     onClose={() => sanctionTarget = null}
+  />
+{/if}
+
+<!-- Sanction List Modal -->
+{#if sanctionListTarget}
+  <SanctionListModal
+    playerName={sanctionListTarget.name}
+    sanctions={playerSanctionsMap[sanctionListTarget.uid] ?? []}
+    tournamentUid={tournament.uid}
+    canManage={isOrganizer && tournament.state !== "Finished"}
+    onClose={() => sanctionListTarget = null}
   />
 {/if}
 

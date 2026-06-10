@@ -64,6 +64,17 @@ async def _can_lift_sanction(user, sanction: Sanction) -> bool:
     return permissions.can_lift_sanction(user, sanction, tournament, league)
 
 
+async def _can_delete_sanction(user, sanction: Sanction) -> bool:
+    """Fetch the tournament context and delegate the decision to the engine —
+    see permissions.can_delete_sanction."""
+    tournament = (
+        await get_tournament_by_uid(sanction.tournament_uid)
+        if sanction.tournament_uid
+        else None
+    )
+    return permissions.can_delete_sanction(user, sanction, tournament)
+
+
 def _validate_expiry(
     level: SanctionLevel, expires_at: datetime | None, issued_at: datetime
 ) -> None:
@@ -443,17 +454,14 @@ async def delete_sanction_endpoint(
     """Soft delete a sanction.
 
     Sets deleted_at timestamp. Hard delete happens via cleanup job after 30 days.
-    Only IC and Ethics can delete sanctions.
+
+    Permissions: IC/Ethics any sanction; a tournament organizer can delete
+    organizer-issuable sanctions of their own tournament while it is not
+    Finished (mistake correction at the event) — see engine can_delete_sanction.
     """
     # Authenticate
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
-
-    # Check permission
-    if Role.IC not in current_user.roles and Role.ETHICS not in current_user.roles:
-        raise HTTPException(
-            status_code=403, detail="Only IC or Ethics can delete sanctions"
-        )
 
     # Get existing sanction
     sanction = await get_sanction_by_uid(uid)
@@ -463,12 +471,30 @@ async def delete_sanction_endpoint(
     if sanction.deleted_at is not None:
         raise HTTPException(status_code=400, detail="Sanction already deleted")
 
+    # Check permission
+    if not await _can_delete_sanction(current_user, sanction):
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have permission to delete this sanction",
+        )
+
     # Soft delete
     now = datetime.now(UTC)
     updated = msgspec.structs.replace(sanction, modified=now, deleted_at=now)
 
     bd = await save_sanction(updated)
     logger.info(f"Sanction {uid} soft-deleted by {current_user.uid}")
+
+    # Deleting an active DQ sanction restores the player on the tournament,
+    # mirroring the lift path
+    if (
+        sanction.level == SanctionLevel.DISQUALIFICATION
+        and sanction.lifted_at is None
+        and sanction.tournament_uid
+    ):
+        await _set_player_dq_state(
+            sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
+        )
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
