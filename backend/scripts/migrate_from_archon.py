@@ -283,6 +283,12 @@ async def migrate_members(
                 phone_is_whatsapp=bool(whatsapp),
                 coopted_by=nz(d.get("sponsor")),
                 vekn_prefix=nz(d.get("prefix")),
+                # Imported members owe no VEKN push: they either already exist in
+                # the vekn.net registry or predate it. Without this, batch_push
+                # would re-register ~19k members on its first run (model default
+                # False), and the residue unmatched by the first member sync
+                # would stay push-eligible forever.
+                vekn_synced=True,
                 # Protect existing role assignments from the later VEKN sync, which
                 # only derives Prince/NC/IC/static-judges and would otherwise strip
                 # archon-assigned Judge/Judgekin/Ethics/Rulemonger/PTC/PT. Role-less
@@ -665,6 +671,14 @@ async def migrate_tournaments(
                 finals=finals,
                 winner=winner_uid,
                 standings=standings,
+                # Imported finished tournaments owe no push: old archon already
+                # pushed them (or they predate pushing). Rich imports have rounds,
+                # so batch_push's rounds guard does NOT keep them out of the
+                # results push — and their standings fold finals in, while
+                # archondata assumes prelim-only (a re-push would send wrong
+                # numbers). Stamped whether or not they carry a vekn id, so the
+                # calendar-event query skips them too.
+                vekn_pushed_at=datetime.now(UTC) if finished else None,
             )
             await db.save_tournament(t)
             stats.bump("tournaments")

@@ -309,6 +309,22 @@ async def push_member_background(user: User) -> None:
         logger.exception(f"Failed to push member {user.vekn_id} to VEKN")
 
 
+# batch_push step 2 selection: tournaments needing a vekn.net calendar event.
+# The vekn_pushed_at guard keeps imported history out — ETL-migrated finished
+# tournaments without a vekn id are stamped at import (no push owed) and must
+# not get calendar events created for them years after the fact.
+# Guard covered by test_vekn_push_batch.py.
+UNCREATED_EVENTS_QUERY = """
+    SELECT "full" FROM objects
+    WHERE type = %s
+      AND "full"->>'state' != 'Planned'
+      AND deleted_at IS NULL
+      AND ("full"->'external_ids'->>'vekn') IS NULL
+      AND "full"->>'vekn_pushed_at' IS NULL
+      AND "full"->>'name' IS NOT NULL
+      AND "full"->>'start' IS NOT NULL
+"""
+
 # batch_push step 3 selection. The rounds guard keeps tournaments whose results
 # did not originate here (VEKN imports, ETL-migrated history — standings but no
 # play data) out of the push set even if their vekn_pushed_at was never stamped:
@@ -359,15 +375,7 @@ async def batch_push(client: VEKNAPIClient) -> dict:
     # 2. Push calendar events for tournaments without external_ids.vekn
     async with get_connection() as conn:
         result = await conn.execute(
-            """
-            SELECT "full" FROM objects
-            WHERE type = %s
-              AND "full"->>'state' != 'Planned'
-              AND deleted_at IS NULL
-              AND ("full"->'external_ids'->>'vekn') IS NULL
-              AND "full"->>'name' IS NOT NULL
-              AND "full"->>'start' IS NOT NULL
-            """,
+            UNCREATED_EVENTS_QUERY,
             (ObjectType.TOURNAMENT,),
         )
         rows = await result.fetchall()
