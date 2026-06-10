@@ -1,85 +1,61 @@
 import { test, expect, type Page } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { loginAsOrganizer, getE2EState } from './helpers/auth';
 import { waitForSync } from './helpers/wait';
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';
-
 /**
- * Score all tables via API, then end the round via API.
- * Reads seating from IDB (WASM optimistic update — deterministic since
- * StartRound now forwards computed seating to the server).
+ * Full nominal tournament arc, all through the real UI (no API shortcuts):
+ * create → register 8 players → check-in → 2 rounds scored via the VP
+ * dropdowns → random toss (sweep scoring guarantees ties at the finals
+ * cutoff) → finals → winner banner → rating points visible on /rankings.
+ *
+ * Mutations are optimistic (WASM) but server POSTs are serialized per
+ * tournament, so chaining UI steps is ordering-safe; we only await the
+ * server response where the next step depends on a server-side effect.
  */
-async function scoreAndEndRound(page: Page, tournamentUid: string, roundIndex: number) {
-  await page.evaluate(
-    async ({ uid, round, apiUrl }) => {
-      const token = localStorage.getItem('archon_access_token');
 
-      // Read round tables from IDB (written by WASM optimistic update)
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open('archon-db');
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-      let tables: any;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        const tournament = await new Promise<any>((resolve, reject) => {
-          const tx = db.transaction('tournaments', 'readonly');
-          const req = tx.objectStore('tournaments').get(uid);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
-        });
-        if (tournament?.rounds?.[round]) {
-          tables = tournament.rounds[round];
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 500));
-      }
-      db.close();
-      if (!tables) throw new Error(`Round ${round} not found in IDB after 10s polling`);
-
-      // Score all tables — first player gets all VPs (valid oust-order)
-      for (let t = 0; t < tables.length; t++) {
-        const table = tables[t];
-        const scores = table.seating.map((s: any, i: number) => ({
-          player_uid: s.player_uid,
-          vp: i === 0 ? table.seating.length : 0,
-        }));
-        const res = await fetch(`${apiUrl}/api/tournaments/${uid}/action`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ type: 'SetScore', round, table: t, scores }),
-        });
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`SetScore table ${t} failed: ${res.status} ${body}`);
-        }
-      }
-
-      // Finish the round via API
-      const endRes = await fetch(`${apiUrl}/api/tournaments/${uid}/action`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ type: 'FinishRound' }),
-      });
-      if (!endRes.ok) {
-        const body = await endRes.text();
-        throw new Error(`FinishRound failed: ${endRes.status} ${body}`);
-      }
-    },
-    { uid: tournamentUid, round: roundIndex, apiUrl: API_URL },
+/** Resolve when the server acknowledges a specific tournament action. */
+function actionResponse(page: Page, action: string) {
+  return page.waitForResponse(
+    (r) => r.url().includes('/action') && r.request().method() === 'POST'
+      && (r.request().postData() ?? '').includes(action),
   );
 }
 
-test.describe('Tournament lifecycle', () => {
-  test.setTimeout(30_000);
+/**
+ * Score a table through the UI: give the first seat all VPs (a sweep is a
+ * valid oust order) and wait for the table badge to flip to Finished.
+ */
+async function sweepTable(page: Page, heading: string, vp: number) {
+  const card = page
+    .locator('div.bg-ash-900\\/50')
+    .filter({ has: page.getByRole('heading', { name: heading, exact: true }) });
+  await card.locator('select').first().selectOption(String(vp));
+  await expect(card.getByText('Finished', { exact: true })).toBeVisible({ timeout: 5_000 });
+}
 
-  test('create, run rounds, and finish tournament', async ({ page }) => {
+// A real tournament-legal deck (Fifth Edition Tremere preconstructed) in the
+// classic text export format — crypt tails, section headers, accented names.
+const DECK_TEXT = fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tremere-precon.txt'),
+  'utf-8',
+);
+
+/** Paste a decklist in the (visible, desktop) upload form and submit. */
+async function uploadDeck(scope: ReturnType<Page['locator']>, name: string) {
+  await scope.getByPlaceholder('Deck name (optional)').fill(name);
+  await scope.getByPlaceholder('Paste your deck list here...').fill(DECK_TEXT);
+  await scope.getByRole('button', { name: 'Upload Deck' }).click();
+  // Upload registered: contents stay hidden pre-round-1, replace is offered
+  await expect(scope.getByRole('button', { name: 'Replace deck' })).toBeVisible({ timeout: 5_000 });
+}
+
+test.describe('Tournament lifecycle', () => {
+  test.setTimeout(45_000);
+
+  test('create, run rounds, toss, finals, and rank the winner', async ({ page }) => {
     const state = getE2EState();
 
     // ── Setup: navigate, wait for sync, then set auth tokens ──
@@ -99,7 +75,6 @@ test.describe('Tournament lifecycle', () => {
     await page.locator('#country').selectOption('US');
     await page.getByRole('button', { name: 'Create Tournament' }).click();
     await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]+/, { timeout: 2_000 });
-    const tournamentUid = page.url().split('/tournaments/')[1]!;
 
     await expect(page.locator('h1')).toContainText('E2E Test Tournament');
     await expect(page.getByText('Planned').first()).toBeVisible();
@@ -133,46 +108,103 @@ test.describe('Tournament lifecycle', () => {
       page.getByRole('button', { name: 'Start Round 1' }),
     ).toBeVisible({ timeout: 2_000 });
 
-    // ── Step 6: Round 1 (optimistic: tables appear instantly) ──
-    // Wait for the server POST so seating is committed before we score via API
-    const sr1Promise = page.waitForResponse(
-      (r) => r.url().includes('/action') && r.request().method() === 'POST'
-        && (r.request().postData() ?? '').includes('StartRound'),
-    );
-    await page.getByRole('button', { name: 'Start Round 1' }).click();
-    await sr1Promise;
-    await expect(page.getByText('Playing').first()).toBeVisible({ timeout: 2_000 });
+    // ── Step 5b: Organizer enters a player's decklist, then replaces it ──
+    // The Players tab renders mobile + desktop variants; scope to the
+    // visible desktop table for the upload form.
+    const playersDesktop = page
+      .locator('div.hidden.sm\\:block')
+      .filter({ has: page.locator('table') });
+    await page
+      .locator('tr')
+      .filter({ hasText: state.player_names[0]! })
+      .getByTitle('View deck')
+      .click();
+    await uploadDeck(playersDesktop, 'E2E Deck v1');
+    await playersDesktop.getByRole('button', { name: 'Replace deck' }).click();
+    await uploadDeck(playersDesktop, 'E2E Deck v2');
 
-    await page.getByRole('button', { name: 'Rounds' }).click();
-    await expect(page.getByText('Table 1')).toBeVisible({ timeout: 2_000 });
-    await expect(page.getByText('Table 2')).toBeVisible();
+    // ── Steps 6-7: Rounds 1 and 2, scored through the Rounds tab UI ──
+    for (const round of [1, 2]) {
+      // Wait for the server POST so seating is committed before scoring
+      const started = actionResponse(page, 'StartRound');
+      await page.getByRole('button', { name: `Start Round ${round}` }).click();
+      await started;
+      await expect(page.getByText('Playing').first()).toBeVisible({ timeout: 2_000 });
 
-    // Score round 1 via API and end it
-    await scoreAndEndRound(page, tournamentUid, 0);
+      if (round === 1) {
+        // Deck contents are hidden from the organizer until round 1 starts —
+        // now the replaced deck's name is revealed on the Players tab
+        await page.getByRole('button', { name: 'Players' }).click();
+        await page
+          .locator('tr')
+          .filter({ hasText: state.player_names[0]! })
+          .getByTitle('View deck')
+          .click();
+        await expect(playersDesktop.getByText('E2E Deck v2')).toBeVisible({ timeout: 5_000 });
+      }
 
-    await expect(
-      page.getByRole('button', { name: 'Start Round 2' }),
-    ).toBeVisible({ timeout: 5_000 });
+      await page.getByRole('button', { name: 'Rounds' }).click();
 
-    // ── Step 7: Round 2 ──
-    const sr2Promise = page.waitForResponse(
-      (r) => r.url().includes('/action') && r.request().method() === 'POST'
-        && (r.request().postData() ?? '').includes('StartRound'),
-    );
-    await page.getByRole('button', { name: 'Start Round 2' }).click();
-    await sr2Promise;
-    await expect(page.getByText('Playing').first()).toBeVisible({ timeout: 2_000 });
+      if (round === 1) {
+        const table1 = page
+          .locator('div.bg-ash-900\\/50')
+          .filter({ has: page.getByRole('heading', { name: 'Table 1', exact: true }) });
+        const seatRows = table1.locator('.divide-y > div');
 
-    // Score round 2 via API and end it
-    await scoreAndEndRound(page, tournamentUid, 1);
+        // ── Seating modification: unseat the first seat, re-seat them last ──
+        const movedPlayer = (await seatRows.first().locator('span').first().innerText()).trim();
+        await seatRows.first().getByTitle('Unseat player').click();
+        await expect(seatRows).toHaveCount(3, { timeout: 2_000 });
+        await table1.getByRole('button', { name: 'Seat a player' }).click();
+        await table1.getByRole('button', { name: movedPlayer }).click();
+        await expect(seatRows).toHaveCount(4, { timeout: 2_000 });
+        await expect(seatRows.last()).toContainText(movedPlayer);
 
-    await expect(
-      page.getByRole('button', { name: 'Start Round 3' }),
-    ).toBeVisible({ timeout: 5_000 });
+        // ── In-event sanction: caution the (new) first seat ──
+        // The indicator dot renders from IDB, so its appearance proves the
+        // sanction came back over SSE (POST /sanctions is not optimistic).
+        await seatRows.first().getByTitle('Issue Tournament Sanction').click();
+        await page.locator('#ts-description').fill('E2E caution: slow play');
+        await page.getByRole('button', { name: 'Issue Sanction' }).click();
+        await expect(seatRows.first().getByTitle('Caution (R1)')).toBeVisible({ timeout: 5_000 });
+      }
 
-    // ── Step 8: Finish Tournament (optimistic) ──
-    await page.getByRole('button', { name: 'Finish Tournament' }).click();
+      await sweepTable(page, 'Table 1', 4);
+      await sweepTable(page, 'Table 2', 4);
+
+      await page.getByRole('button', { name: 'End Round' }).click();
+      await expect(page.getByText(`Round ${round} complete`)).toBeVisible({ timeout: 5_000 });
+    }
+
+    // ── Step 8: Random toss resolves the guaranteed cutoff ties ──
+    await expect(page.getByText(/Resolve top 5 ties/)).toBeVisible({ timeout: 2_000 });
+    await page.getByRole('button', { name: 'Players' }).click();
+    await page.getByRole('button', { name: 'Random Toss' }).click();
+    await expect(page.getByText(/start finals/)).toBeVisible({ timeout: 2_000 });
+
+    // ── Step 9: Finals (StartFinals auto-switches to the Finals tab) ──
+    await page.getByRole('button', { name: 'Start Finals' }).click();
+    await sweepTable(page, 'Finals Table', 5);
+
+    const finished = actionResponse(page, 'FinishFinals');
+    await page.getByRole('button', { name: 'Finish Finals' }).click();
+    await finished; // server-side finish triggers the ratings recompute + SSE
     await expect(page.getByText('Finished').first()).toBeVisible({ timeout: 2_000 });
     await expect(page.getByText('Tournament complete.')).toBeVisible({ timeout: 2_000 });
+
+    // ── Step 10: Winner banner on Overview ──
+    await page.getByRole('button', { name: 'Overview' }).click();
+    const winnerBanner = page.locator('.banner-emerald').filter({ hasText: 'Winner' });
+    await expect(winnerBanner).toBeVisible({ timeout: 2_000 });
+    // Banner shows "Name (vekn_id)" — strip the id to match plain names
+    const winnerName = (await winnerBanner.locator('div').nth(1).innerText())
+      .replace(/\s*\(\d+\)\s*$/, '')
+      .trim();
+    expect(state.player_names).toContain(winnerName);
+
+    // ── Step 11: Rating points landed — winner appears on /rankings ──
+    await page.goto('/rankings');
+    await waitForSync(page);
+    await expect(page.locator('tbody').getByText(winnerName)).toBeVisible({ timeout: 10_000 });
   });
 });

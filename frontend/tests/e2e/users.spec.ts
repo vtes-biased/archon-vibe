@@ -263,6 +263,18 @@ test.describe('Edit user (authenticated)', () => {
   });
 });
 
+test.describe('Profile (authenticated)', () => {
+  test('shows own profile with VEKN id', async ({ page }) => {
+    await setupAuthBeforeNavigation(page);
+    await page.goto('/profile');
+    await waitForSync(page);
+
+    await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByPlaceholder('Name', { exact: true })).toHaveValue('E2E Organizer');
+    await expect(page.getByText('9999901')).toBeVisible();
+  });
+});
+
 test.describe('Sanctions (authenticated as IC)', () => {
   test('shows sanction controls for IC user', async ({ page }) => {
     await page.goto('/login');

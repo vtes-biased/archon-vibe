@@ -104,7 +104,7 @@ Seeds a minimal isolated DB:
 - Regenerates snapshots for fresh SSE sync
 - `--output <path>` writes the JSON the Playwright global setup reads
 - `--cleanup` removes test objects by VEKN ID prefix (`9999%` / `9990%`) and
-  tournament name prefix `E2E `
+  tournament/league name prefix `E2E `
 
 ### Auth Helpers (`helpers/auth.ts`)
 
@@ -124,12 +124,27 @@ Two strategies for injecting tokens:
 
 | Spec | Coverage |
 |------|----------|
-| `users.spec.ts` | App loads, SSE streaming, user list display (real auth tokens) |
-| `tournament.spec.ts` | Full tournament lifecycle: create → register 8 players → check-in → round 1 → round 2 → finish |
+| `users.spec.ts` | App loads, SSE streaming, user list display, profile page, sanction modal UI (real auth tokens) |
+| `tournament.spec.ts` | Full nominal tournament arc: create → register 8 players → check-in → decklist upload + replacement (organizer-entered, real precon list from `fixtures/tremere-precon.txt`) → 2 rounds scored via the UI, with a seating modification (unseat/re-seat) and an in-event caution (sanction delivered over SSE) during round 1 → random toss → finals → winner banner → rating points on `/rankings` |
+| `leagues.spec.ts` | League creation (IC) via the form, detail page, list page |
 
 ### Tournament Lifecycle Test Notes
 
-- Uses WASM optimistic updates — table UI appears before server response
-- Waits for `StartRound` server POST to complete before scoring via API (ensures server has committed seating)
-- Reads seating from IDB (WASM result) to score via API — reliable because `StartRound` now forwards computed seating so WASM and server are identical
-- `scoreAndEndRound()` helper: reads round tables from IDB with polling (up to 10s), posts `SetScore` per table, then `FinishRound`
+- Everything goes through the real UI — no direct API calls. Mutations are
+  optimistic (WASM), but server POSTs are serialized per tournament, so
+  chaining UI steps is ordering-safe.
+- Tables are scored with the VP dropdowns: the first seat gets all VPs (a
+  sweep is a valid oust order), which flips the table badge to Finished.
+- Sweep scoring guarantees score ties at the finals cutoff, so the
+  Random Toss step is always exercised. The toss shuffle is seeded from the
+  tournament uid, so the WASM optimistic result and the server agree.
+- The test awaits the `StartRound` server response before scoring (seating
+  committed) and the `FinishFinals` response before checking `/rankings`
+  (the server-side ratings recompute + SSE push happen in that request).
+- Decklist: the organizer uploads on a player's behalf (engine allows it —
+  the paper-decklist flow), replaces it pre-round-1 while contents are
+  hidden, and the replaced name is asserted after round 1 starts (the
+  reveal). Seating changes use the click-based Unseat/Seat-a-player flow —
+  `AlterSeating`'s drag-and-drop is not reliably scriptable. The caution's
+  indicator dot renders from IDB, so its appearance proves SSE delivery
+  (`POST /sanctions` is not optimistic).

@@ -220,7 +220,7 @@ async def cleanup() -> None:
             await delete_object(row[0])
     async with get_connection() as conn:
         result = await conn.execute(
-            """SELECT uid FROM objects WHERE type = 'tournament'
+            """SELECT uid FROM objects WHERE type IN ('tournament', 'league')
                AND "full"->>'name' LIKE 'E2E %'"""
         )
         rows = await result.fetchall()
