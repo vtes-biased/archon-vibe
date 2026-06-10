@@ -455,6 +455,7 @@ export interface VtesCard {
   id: number;
   name: string;
   printed_name: string;
+  img: string;
   kind: 'crypt' | 'library';
   types: string[];
   disciplines: string[];

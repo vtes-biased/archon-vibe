@@ -47,6 +47,7 @@ def transform_card(card: dict) -> dict:
         "printed_name": card.get("printed_name", ""),
         "types": types,
         "kind": kind,
+        "img": card.get("url", ""),
     }
     if kind == "crypt":
         result["disciplines"] = card.get("disciplines", [])

@@ -216,6 +216,11 @@
 
   function showCard(card: VtesCard | undefined) {
     if (!card) return;
+    if (card.img) {
+      cardImageUrl = card.img;
+      return;
+    }
+    // Fallback for stale IndexedDB card data predating the img field
     const normalized = card.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
     cardImageUrl = `https://static.krcg.org/card/${normalized}`;
   }
