@@ -31,3 +31,11 @@ git add ansible/roles/fastapi_backend/files/officials_contacts.json.vault   # ci
 
 `files/.gitignore` blocks committing a plaintext `officials_contacts.json` by
 accident; only the `.vault` file is allowed.
+
+### Dev
+
+The committed ciphertext is also the dev source — `just officials-dev` decrypts
+it (with your vault password) into the gitignored runtime path
+`backend/src/data/officials_contacts.json`, which the backend reads when
+`OFFICIALS_CONTACTS_FILE` is unset. The repo never holds the plaintext; the vault
+password is the only gate, for both dev and prod.

@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # `{env_dir}/officials_contacts.json`). In dev, with the env var unset, it falls
 # back to an untracked file next to this package. A missing/unreadable file means
 # no injection (and never wipes already-stored emails — see _update_user).
-# See scripts/backfill_officials_contacts.py and the ansible fastapi_backend role.
+# See the ansible fastapi_backend role for how the file is delivered.
 def _officials_contacts_path() -> Path:
     env = os.environ.get("OFFICIALS_CONTACTS_FILE")
     if env:

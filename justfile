@@ -120,6 +120,22 @@ cards:
 build-geonames:
     uv run python backend/scripts/build_geonames.py
 
+# Provision the officials-contacts file for dev (decrypt the committed vault copy)
+officials-dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # The repo only ever holds the .vault ciphertext; decrypt it into the
+    # gitignored runtime path the backend reads. Needs your ansible vault password
+    # (ANSIBLE_VAULT_PASSWORD_FILE in your shell, or it prompts). The VEKN sync
+    # then injects these contacts on its next run. mktemp+mv so a wrong password
+    # doesn't clobber an existing copy.
+    src=ansible/roles/fastapi_backend/files/officials_contacts.json.vault
+    out=backend/src/data/officials_contacts.json
+    tmp=$(mktemp)
+    ansible-vault view "$src" > "$tmp"
+    mv "$tmp" "$out"
+    echo "Wrote $out (gitignored, dev only)"
+
 # Reset dev database (clears all data)
 dev-reset:
     #!/usr/bin/env bash
