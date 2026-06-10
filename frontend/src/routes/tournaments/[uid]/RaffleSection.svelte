@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Tournament, Standing, RafflePool } from "$lib/types";
+  import type { Tournament, RafflePool } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
   import { Dices, Undo2, Trash2 } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -7,14 +7,12 @@
   let {
     tournament,
     playerInfo,
-    standings,
     isOrganizer,
     doAction,
     actionLoading,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
-    standings: Standing[];
     isOrganizer: boolean;
     doAction?: (action: string, body?: any) => Promise<void>;
     actionLoading?: boolean;
@@ -53,11 +51,21 @@
     return set;
   });
 
-  // Standings map: uid -> { gw, vp }
+  // Live GW/VP map: uid -> { gw, vp }, summed from per-seat round results.
+  // Do NOT use tournament.standings here: it only refreshes on FinishRound,
+  // so it misses GW/VP earned in the round in progress.
   const standingsMap = $derived.by(() => {
     const map = new Map<string, { gw: number; vp: number }>();
-    for (const s of standings) {
-      map.set(s.user_uid, { gw: s.gw, vp: s.vp });
+    for (const round of tournament.rounds ?? []) {
+      for (const table of round) {
+        for (const seat of table.seating) {
+          if (!seat.player_uid) continue;
+          const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0 };
+          e.gw += seat.result.gw ?? 0;
+          e.vp += seat.result.vp ?? 0;
+          map.set(seat.player_uid, e);
+        }
+      }
     }
     return map;
   });

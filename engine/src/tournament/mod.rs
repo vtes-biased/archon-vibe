@@ -1831,7 +1831,7 @@ fn apply_event(
             if *count == 0 {
                 return Err(EngineError::RaffleCountMin);
             }
-            let mut eligible = get_raffle_pool(tournament, pool, *exclude_drawn)?;
+            let mut eligible = get_raffle_pool(tournament, sanctions, pool, *exclude_drawn)?;
             if eligible.is_empty() {
                 return Err(EngineError::RaffleNoPlayers);
             }

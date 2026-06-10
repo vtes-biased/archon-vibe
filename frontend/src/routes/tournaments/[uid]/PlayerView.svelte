@@ -460,7 +460,6 @@
     <RaffleSection
       {tournament}
       {playerInfo}
-      standings={tournament.standings ?? []}
       isOrganizer={false}
     />
   </div>

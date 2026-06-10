@@ -1,5 +1,6 @@
 //! Raffle pool computation and deck public flag logic.
 
+use super::standings::compute_preliminary_standings;
 use crate::error::EngineError;
 use json::JsonValue;
 
@@ -26,6 +27,7 @@ fn get_played_uids(tournament: &JsonValue) -> Vec<String> {
 /// NOTE: Pool filtering logic duplicated in frontend RaffleSection.svelte eligibleForPool()
 pub(super) fn get_raffle_pool(
     tournament: &JsonValue,
+    sanctions: &JsonValue,
     pool: &str,
     exclude_drawn: bool,
 ) -> Result<Vec<String>, EngineError> {
@@ -34,16 +36,14 @@ pub(super) fn get_raffle_pool(
         return Err(EngineError::RaffleNonePlayed);
     }
 
-    // Build standings map: uid -> (gw, vp)
-    let mut standings_map: std::collections::HashMap<String, (f64, f64)> =
-        std::collections::HashMap::new();
-    for s in tournament["standings"].members() {
-        if let Some(uid) = s["user_uid"].as_str() {
-            let gw = s["gw"].as_f64().unwrap_or(0.0);
-            let vp = s["vp"].as_f64().unwrap_or(0.0);
-            standings_map.insert(uid.to_string(), (gw, vp));
-        }
-    }
+    // Build standings map: uid -> (gw, vp). Computed live from round results —
+    // the stored tournament["standings"] only refreshes on FinishRound and would
+    // miss GW/VP earned in the round in progress (scored via SetScore).
+    let standings_map: std::collections::HashMap<String, (f64, f64)> =
+        compute_preliminary_standings(tournament, sanctions)
+            .into_iter()
+            .map(|s| (s.user_uid, (s.gw, s.vp)))
+            .collect();
 
     // Finalists set
     let finalists: std::collections::HashSet<String> = if !tournament["finals"].is_null() {

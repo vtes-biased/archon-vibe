@@ -1806,3 +1806,46 @@ fn test_organizer_can_rescore_judge_locked_table() {
     let result = run_event(&t, &event, &organizer);
     assert!(result.is_ok());
 }
+
+// --- Raffle pool tests ---
+
+#[test]
+fn test_raffle_pools_count_scores_from_round_in_progress() {
+    // Mid-round: table 0 scored (p1 has the GW, p1-p4 have VPs), table 1 unscored,
+    // and no stored standings (FinishRound never ran). Pools must be computed from
+    // the live round results, not the stale stored standings.
+    let t = tournament_with_round();
+    let org = make_organizer();
+
+    let event = json::object! {
+        type: "RaffleDraw",
+        label: "no vp",
+        pool: "NoVictoryPoint",
+        exclude_drawn: false,
+        count: 8,
+        seed: 42,
+    };
+    let updated = json::parse(&run_event(&t, &event, &org).unwrap()).unwrap();
+    let mut winners: Vec<&str> = updated["raffles"][0]["winners"]
+        .members()
+        .filter_map(|w| w.as_str())
+        .collect();
+    winners.sort();
+    assert_eq!(winners, vec!["p5", "p6", "p7", "p8"]);
+
+    let event = json::object! {
+        type: "RaffleDraw",
+        label: "no gw",
+        pool: "NoGameWin",
+        exclude_drawn: false,
+        count: 8,
+        seed: 42,
+    };
+    let updated = json::parse(&run_event(&updated, &event, &org).unwrap()).unwrap();
+    let winners: Vec<&str> = updated["raffles"][1]["winners"]
+        .members()
+        .filter_map(|w| w.as_str())
+        .collect();
+    assert_eq!(winners.len(), 7);
+    assert!(!winners.contains(&"p1"));
+}

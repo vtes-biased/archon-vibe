@@ -346,7 +346,6 @@
           <RaffleSection
             {tournament}
             {playerInfo}
-            standings={tournament.standings ?? []}
             {isOrganizer}
             {doAction}
             {actionLoading}
