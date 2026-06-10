@@ -489,15 +489,22 @@ Outbound integration: pushes tournament data and members TO vekn.net. Controlled
 
 **Feature flags**:
 - `VEKN_PUSH=true` — backend env, enables all push operations
-- `VITE_VEKN_PUSH=true` — frontend env, restricts `max_rounds` UI to 2–4, shows VEKN link badge
+- `VITE_VEKN_PUSH=true` — frontend env, restricts `max_rounds` UI to 2–4, shows VEKN link badge and pending-sync badges
 
-**Two-phase push** (both are fire-and-forget — never block user actions):
+**Two-phase push** (both are fire-and-forget `asyncio.create_task` — never block user requests):
 - **Phase 1** (on create): `push_tournament_event()` — creates VEKN calendar entry, stores returned event ID in `tournament.external_ids["vekn"]`
 - **Phase 2** (on finish): `push_tournament_results()` — uploads archondata; sets `tournament.vekn_pushed_at`
 
-**Member push**: `push_member()` — called on sponsor action (`POST /vekn/sponsor`). Pushes locally-coopted members to VEKN registry.
+Each phase SSE-broadcasts the updated object after saving, so clients reflect changes immediately without reconnecting.
 
-**Batch push** (`batch_push()` in `vekn_push.py`): Hourly scheduled job catches missed real-time pushes. Queries DB for tournaments without `external_ids.vekn` or with `vekn_pushed_at IS NULL`.
+Failures are log-only. The object is saved with the flag unset (`external_ids.vekn` absent or `vekn_pushed_at IS NULL`) before the background task runs, so the hourly batch retries automatically.
+
+**Member push**: `push_member_background()` — `asyncio.create_task` on sponsor (`POST /vekn/sponsor`) and member create. Failures are log-only; `vekn_synced=false` flag queues the member for hourly batch retry.
+
+**Batch push** (`batch_push()` in `vekn_push.py`): Hourly scheduled job catches all missed real-time pushes:
+- Members: `vekn_synced=false`
+- Tournament events: `external_ids.vekn` absent
+- Tournament results: `vekn_pushed_at IS NULL` AND `rounds` array non-empty (guards imported/ETL-migrated tournaments whose results did not originate in-app)
 
 **archondata format** (VEKN API for result upload):
 ```
@@ -791,13 +798,17 @@ Pulls data FROM vekn.net into Archon. Runs periodically (default every 6h).
 - Creates new User objects for unknown VEKN IDs
 - Updates names, countries, roles for existing members
 - Infers `coopted_by` relationships
+- Non-destructive: locally-modified fields (tracked in `local_modifications`) are never overwritten
 
 ### Tournament Sync (`vekn_tournament_sync.py`)
 
 `sync_all_tournaments()` imports historical tournaments from VEKN API:
 - Creates Tournament objects for past events
 - Seeds venue autocomplete data from imported venue information
+- Stamps `vekn_pushed_at=now` on finished imported tournaments — results came FROM vekn.net and must never be re-uploaded (importer folds finals into standings; archondata assumes prelim-only, so a re-push would send wrong numbers)
 - Part of the periodic `run_vekn_sync` job
+
+**Error handling**: each sync phase (member, tournament, TWDA) is wrapped independently; an exception or timeout in one phase logs an error and skips that phase for the current cycle without aborting the others.
 
 **Triggered by**: Scheduled background task + manual `POST /admin/sync-vekn` and `POST /admin/sync-vekn-tournaments`
 

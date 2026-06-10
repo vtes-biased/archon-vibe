@@ -243,6 +243,10 @@ def _map_vekn_to_tournament(
             players=players,
             winner=winner_uid,
             standings=standings,
+            # Results came FROM vekn.net — stamp so batch_push never re-uploads
+            # them (the importer's standings fold finals in; archondata assumes
+            # prelim-only, so a re-push would send wrong numbers).
+            vekn_pushed_at=now,
         )
     else:
         # Future planned tournament (no players yet)
@@ -415,6 +419,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             players=tournament.players,
                             winner=tournament.winner,
                             standings=tournament.standings,
+                            vekn_pushed_at=tournament.vekn_pushed_at,
                         )
                         bd = await save_tournament(tournament)
                         broadcast_precomputed(bd)

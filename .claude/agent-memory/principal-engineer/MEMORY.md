@@ -57,6 +57,7 @@
 - [Final standings helper](project_final_standings_helper.md) — `compute_final_standings` is the shared VEKN placement fn (winner=1, finalists tie 2nd).
 - [SA penalty single-sourced in Rust](sa-penalty-duplicated-in-python.md) — SA scoring lives only in `engine.compute_rating_vp_gw`; never re-derive in Python.
 - [Standings are prelim-only](standings-prelim-only-contract.md) — `tournament.standings` = SA-adjusted prelim, finals excluded; the Python archon importer violates this (stores finals-inclusive) → league double-counts finals.
+- [Rounds⇔standings coupling](rounds-standings-coupling-engine.md) — engine invariant: standings non-empty iff rounds non-empty; makes the VEKN `batch_push` `rounds>0` guard safe (excludes imports, keeps in-app tournaments).
 
 ## Authorization (cross-stack)
 - [Authz single source = Rust](project_authz_single_source_rust.md) — predicates live in `engine/src/permissions.rs` (PyO3 + WASM), the agreed cross-stack-DRY exception.

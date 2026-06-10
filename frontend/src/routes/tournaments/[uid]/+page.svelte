@@ -13,7 +13,7 @@
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin, QrCode } from "lucide-svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin, QrCode, CloudOff } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -46,6 +46,14 @@ import TournamentModals from "./TournamentModals.svelte";
   const uid = $derived($page.params.uid as string);
   const isOrganizer = $derived(
     tournament ? engineIsOrganizer(auth.user, tournament) : false
+  );
+  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
+  // Strict null: undefined means the viewer's projection omits the field.
+  // rounds>0 mirrors batch_push's guard — results without in-app play data
+  // (VEKN imports, migrated history) are never pushed, so never "pending".
+  const veknResultsPending = $derived(
+    veknPush && tournament?.state === "Finished" && tournament?.vekn_pushed_at === null
+      && (tournament?.rounds?.length ?? 0) > 0
   );
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
@@ -546,7 +554,7 @@ import TournamentModals from "./TournamentModals.svelte";
       <div class="flex items-start justify-between mb-6">
         <div>
           <h1 class="text-3xl font-light text-bone-100">{tournament.name}</h1>
-          <div class="flex items-center gap-3 mt-2">
+          <div class="flex flex-wrap items-center gap-3 mt-2">
             <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
               {translateTournamentState(tournament.state)}
             </span>
@@ -561,6 +569,13 @@ import TournamentModals from "./TournamentModals.svelte";
                  title="View on vekn.net">
                 VEKN <ExternalLink class="w-3 h-3" />
               </a>
+            {/if}
+            {#if isOrganizer && veknResultsPending}
+              <span class="px-2 py-0.5 rounded text-xs font-medium banner-amber border inline-flex items-center gap-1"
+                    title={m.vekn_sync_pending_hint()}>
+                <CloudOff class="w-3 h-3" aria-hidden="true" />
+                {m.vekn_sync_pending_results()}
+              </span>
             {/if}
             {#if tournament.league_uid && leagueName}
               <a href="/leagues/{tournament.league_uid}"

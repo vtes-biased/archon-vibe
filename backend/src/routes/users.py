@@ -147,14 +147,11 @@ async def create_user(
             # Don't fail the request, user is already created
 
     # Push new member to VEKN (fire-and-forget, batch_push catches failures)
-    try:
-        from ..vekn_push import push_member, vekn_push_client
+    import asyncio
 
-        async with vekn_push_client() as client:
-            if client is not None:
-                await push_member(client, user)
-    except Exception:
-        logger.exception("Failed to push new member to VEKN")
+    from ..vekn_push import push_member_background
+
+    asyncio.create_task(push_member_background(user))
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)

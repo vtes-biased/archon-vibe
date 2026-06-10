@@ -1,5 +1,6 @@
 """Tournament API endpoints."""
 
+import asyncio
 import json
 import logging
 import os
@@ -517,8 +518,9 @@ async def create_tournament(
 
     broadcast_precomputed(bd)
 
-    # VEKN push: create calendar event
-    await _maybe_push_vekn_event(tournament)
+    # VEKN push: create calendar event. Background task — the response must not
+    # wait on vekn.net (30-120s timeouts when it is down); batch_push retries.
+    asyncio.create_task(_maybe_push_vekn_event(tournament))
 
     return Response(
         content=encoder.encode(tournament),
@@ -987,10 +989,12 @@ async def tournament_action(
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
-    # TWDA auto-PR + VEKN push: trigger when tournament finishes
+    # TWDA auto-PR + VEKN push: trigger when tournament finishes. VEKN push runs
+    # in the background — the response must not wait on vekn.net (30-120s
+    # timeouts when it is down); batch_push retries.
     if is_finished and not was_finished:
         await _maybe_submit_twda(updated)
-        await _maybe_push_vekn(updated)
+        asyncio.create_task(_maybe_push_vekn(updated))
 
     return Response(
         content=encoder.encode(updated),

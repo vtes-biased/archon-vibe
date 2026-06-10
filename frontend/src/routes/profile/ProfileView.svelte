@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { User, Camera, Unlink, Share2, Check, Plus, Trash2 } from "lucide-svelte";
+  import { User, Camera, Unlink, Share2, Check, Plus, Trash2, CloudOff } from "lucide-svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
   import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
@@ -17,6 +17,12 @@
     onClaimVekn: () => void;
   }
   let { user, avatarCacheBust, onAvatarClick, onAbandonVekn, onClaimVekn }: Props = $props();
+
+  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
+  // Strict false: undefined means the viewer's projection omits the field
+  const veknSyncPending = $derived(
+    veknPush && !!user.vekn_id && user.vekn_synced === false
+  );
 
   const countries = getCountries();
   const sortedCountries = Object.values(countries).sort((a, b) => a.name.localeCompare(b.name));
@@ -223,6 +229,13 @@
     <div class="flex justify-between items-center">
       <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
       <div class="flex items-center gap-2">
+        {#if veknSyncPending}
+          <span class="px-2 py-0.5 rounded text-xs font-medium banner-amber border inline-flex items-center gap-1"
+                title={m.vekn_sync_pending_hint()}>
+            <CloudOff class="w-3 h-3" aria-hidden="true" />
+            {m.vekn_sync_pending_member()}
+          </span>
+        {/if}
         <span class="text-bone-100 font-mono">{user.vekn_id}</span>
         <button
           onclick={onAbandonVekn}

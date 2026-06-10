@@ -244,15 +244,11 @@ async def sponsor_new_member(
     # Update Discord Linked Roles (gained vekn_id)
     asyncio.create_task(sync_user_discord_roles(updated.uid))
 
-    # Push new member to VEKN registry
-    try:
-        from ..vekn_push import push_member, vekn_push_client
+    # Push new member to VEKN registry. Background task — the response must not
+    # wait on vekn.net (30-120s timeouts when it is down); batch_push retries.
+    from ..vekn_push import push_member_background
 
-        async with vekn_push_client() as client:
-            if client is not None:
-                await push_member(client, updated)
-    except Exception:
-        logger.exception("Failed to push new member to VEKN")
+    asyncio.create_task(push_member_background(updated))
 
     return Response(
         content=encoder.encode(

@@ -2,7 +2,7 @@
   import type { User } from "$lib/types";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge } from "lucide-svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -12,6 +12,12 @@
     user: User;
     onaction: (user: User) => void;
   } = $props();
+
+  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
+  // Strict false: undefined means the viewer's projection omits the field
+  const veknSyncPending = $derived(
+    veknPush && !!user.vekn_id && user.vekn_synced === false
+  );
 
   let showLinkModal = $state(false);
   let showSponsorConfirm = $state(false);
@@ -93,10 +99,19 @@
     <p class="text-sm text-ash-300 mb-3">
       {#if user.vekn_id}
         {m.vekn_id_display({ id: user.vekn_id })}
+        {#if veknSyncPending}
+          <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium banner-amber border inline-flex items-center gap-1">
+            <CloudOff class="w-3 h-3" aria-hidden="true" />
+            {m.vekn_sync_pending_member()}
+          </span>
+        {/if}
       {:else}
         {m.vekn_no_id()}
       {/if}
     </p>
+    {#if veknSyncPending}
+      <p class="text-xs text-ash-500 -mt-2 mb-3">{m.vekn_sync_pending_hint()}</p>
+    {/if}
     <div class="flex flex-wrap gap-2">
       {#if !user.vekn_id}
         <button

@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
+from .broadcast import broadcast_precomputed
 from .db import (
     get_connection,
     get_sanctions_for_tournament,
@@ -191,7 +192,8 @@ async def push_tournament_event(
     # Store the VEKN event ID
     tournament.external_ids["vekn"] = event_id
     tournament.modified = datetime.now(UTC)
-    await save_tournament(tournament)
+    bd = await save_tournament(tournament)
+    broadcast_precomputed(bd)
     logger.info(f"Tournament {tournament.uid} → VEKN event {event_id}")
     return event_id
 
@@ -243,7 +245,8 @@ async def push_tournament_results(
     # Mark as pushed
     tournament.vekn_pushed_at = datetime.now(UTC)
     tournament.modified = datetime.now(UTC)
-    await save_tournament(tournament)
+    bd = await save_tournament(tournament)
+    broadcast_precomputed(bd)
     logger.info(
         f"Tournament {tournament.uid} results pushed to VEKN event {vekn_event_id}"
     )
@@ -286,9 +289,40 @@ async def push_member(
     user.vekn_synced = True
     user.vekn_synced_at = datetime.now(UTC)
     user.modified = datetime.now(UTC)
-    await save_user(user)
+    bd = await save_user(user)
+    broadcast_precomputed(bd)
     logger.info(f"Member {user.vekn_id} pushed to VEKN")
     return True
+
+
+async def push_member_background(user: User) -> None:
+    """push_member with its own client and swallowed errors, for asyncio.create_task.
+
+    Failures are log-only by design: the user is saved with vekn_synced=false
+    before this runs, so the hourly batch_push retries until VEKN accepts.
+    """
+    try:
+        async with vekn_push_client() as client:
+            if client is not None:
+                await push_member(client, user)
+    except Exception:
+        logger.exception(f"Failed to push member {user.vekn_id} to VEKN")
+
+
+# batch_push step 3 selection. The rounds guard keeps tournaments whose results
+# did not originate here (VEKN imports, ETL-migrated history — standings but no
+# play data) out of the push set even if their vekn_pushed_at was never stamped:
+# re-pushing them would send wrong numbers (their standings fold finals in;
+# archondata assumes prelim-only). Guard covered by test_vekn_push_batch.py.
+UNPUSHED_RESULTS_QUERY = """
+    SELECT "full" FROM objects
+    WHERE type = %s
+      AND "full"->>'state' = 'Finished'
+      AND deleted_at IS NULL
+      AND "full"->>'vekn_pushed_at' IS NULL
+      AND ("full"->'external_ids'->>'vekn') IS NOT NULL
+      AND jsonb_array_length(COALESCE("full"->'rounds', '[]'::jsonb)) > 0
+"""
 
 
 async def batch_push(client: VEKNAPIClient) -> dict:
@@ -348,17 +382,10 @@ async def batch_push(client: VEKNAPIClient) -> dict:
             logger.exception(f"Error pushing event for {t.uid}")
             stats["errors"] += 1
 
-    # 3. Push results for finished tournaments without vekn_pushed_at
+    # 3. Push results for finished tournaments without vekn_pushed_at.
     async with get_connection() as conn:
         result = await conn.execute(
-            """
-            SELECT "full" FROM objects
-            WHERE type = %s
-              AND "full"->>'state' = 'Finished'
-              AND deleted_at IS NULL
-              AND "full"->>'vekn_pushed_at' IS NULL
-              AND ("full"->'external_ids'->>'vekn') IS NOT NULL
-            """,
+            UNPUSHED_RESULTS_QUERY,
             (ObjectType.TOURNAMENT,),
         )
         rows = await result.fetchall()
