@@ -1,223 +1,225 @@
 # Production migration: archon → archon-vibe (epic #35)
 
-Migrated from `MIGRATION.md` (2026-06-06). **Status: shelved / draft for future execution.**
-The production deployment path is ready: the standalone systemd ansible stack (prod inventory + roles + `just *-prod` recipes) was delivered by epics #81/#85 — #37 (its prereq ticket) is closed. Residual execution-time config is folded into Phase 1 (#39).
+**Status: active.** Strategy revised 2026-06-10 (owner discussion): **no wipe, no
+big-bang migration window**. The new stack runs **two daily syncs** during a
+parallel-run period — the existing VEKN sync plus a new idempotent legacy-archon
+sync (#115) — and cutover collapses to: freeze old → final sync → nginx vhost
+swap. Old archon is decommissioned once the new stack is battle-tested.
 
-## Children (phases + gating work)
-- **#36** Resolve open questions before Phase 0 (decisions below)
-- **#37** ✅ done — ansible systemd-deploy playbook (delivered by #81/#85; residual config → #39)
-- **#38** Phase 0 — build the ETL + validation harness, dry-run on a prod dump
-- **#39** Phase 1 — parallel domain (`new.archon.vekn.net`), VEKN-sync only, IC/NC validation
-- **#40** Phase 2 — authoritative migration window + DNS cutover
-- **#41** Phase 3 — activate companion features + monitor
+Deployment path is ready: the systemd ansible stack (prod + beta inventories,
+CI-built Release artifacts, tag-then-release ceremony) was delivered by epics
+#81/#85 (#37 closed).
+
+## Children (gating work + phases)
+- **#36** ✅ pre-Phase-0 decisions (several revised 2026-06-10, see Decisions)
+- **#37** ✅ ansible deploy stack (via #81/#85)
+- **#38** ✅ ETL + validation harness, rehearsed end-to-end on a prod dump
+  (results: `.pst/details/38-etl-phase0.md`)
+- **#114** push stamping/guards — migrated/synced data must be push-inert (gates #39)
+- **#115** legacy-archon daily sync — idempotent merge mode (gates #39; design:
+  `.pst/details/115-legacy-archon-sync.md`)
+- **#116** prod PG sequencing + `migrate_postgres.yml` must stop `archon_web`
+- **#91** beta shakedown on owner infra at `new.archon.krcg.org` (gates #39)
+- **#39** Phase 1 — parallel run at `new.archon.vekn.net` (weeks)
+- **#40** Phase 2 — flip (vhost swap, minutes)
+- **#41** Phase 3 — post-flip (bot guild install, TWDA, passkeys, monitoring)
 - **#42** Phase 4 — decommission old archon
+- related: **#113** officials-contacts re-projection on deploy (not a migration
+  concern per owner; rides its own ticket)
 
 ---
 
 ## Context
 
-`archon.vekn.net` currently runs the legacy **archon** app (`/Users/lpanhaleux/Developer/archon`): Python FastAPI + PostgreSQL 16, JSONB-everywhere schema (`members`, `tournaments`, `leagues`, `tournament_events`, `clients`, `member_deletions`), Jinja+vanilla-TS frontend, Ansible-deployed to a single Ubuntu VPS.
+`archon.vekn.net` runs legacy **archon** (`/Users/lpanhaleux/Developer/archon`):
+Python FastAPI + PostgreSQL 16 (`archondb`, service `archon_web`, port 8001,
+`ubuntu@46.226.104.123`), JSONB schema (`members`, `tournaments`, `leagues`,
+`tournament_events`, `clients`, `member_deletions`), Jinja+vanilla-TS frontend,
+ansible-deployed. It syncs from vekn.net **and pushes to it** (`VEKN_PUSH=1`),
+and can mint VEKN ids. Its VEKN sync is an in-app asyncio task (stopping the
+service stops the sync). It has **no** read-only/maintenance mode — freeze =
+stop `archon_web` + a static nginx maintenance page.
 
-The rewrite **archon-vibe** (this repo) is ready: Svelte PWA + FastAPI + PostgreSQL 17, Rust/WASM engine, unified `objects` table with pre-computed access-level projections (public/member/full), separate `auth_methods` and OAuth tables, a companion Discord bot process.
+The rewrite **archon-vibe** (this repo) deploys to the **same VPS** (~2GB RAM,
+decision: no second box): Svelte PWA + FastAPI + PG17, Rust/WASM engine, unified
+`objects` table with pre-computed access projections, companion Discord bot.
+Note: archon-vibe has its **own Discord application** (`1495034668469194864`),
+distinct from old archon's (`1381856472161456139`) — Discord identity carries
+over via `discord_id` (app-independent); redirect URIs are configured on the
+*new* app only.
 
-Goal: cut over `archon.vekn.net` from old to new, **preserving all member identities, tournament history, leagues, sanctions, and OAuth registrations**, with minimal user-visible downtime. The existing `backend/src/archon_import.py` does **not** help — it imports from legacy Excel files, not from the old database. A purpose-built ETL is required.
+Goal: move `archon.vekn.net` to the new stack preserving all member identities,
+tournament history, leagues, sanctions — with near-zero user-visible downtime.
 
----
-
-## Key data-shape diffs (what the ETL must handle)
+## Key data-shape diffs (what the ETL/merge handles)
 
 | Concept | Old | New |
 |---|---|---|
-| Storage | `members` / `tournaments` / `leagues` / `clients` tables, JSONB `data` | Unified `objects` table, type-discriminated, three access-level JSONB projections |
-| Member identity | `Member` row (password, discord, email, sanctions, ratings embedded) | `User` row (contact fields) + one `AuthMethod` row per method + embedded `CategoryRating`s; sanctions become separate `Sanction` rows |
-| Tournament | `players: dict[uid→Player]`, `rounds: [Round{tables:[Table{seating:[TableSeat{deck,result,judge}]}]}]`, `sanctions: dict[uid→[Sanction]]`, `finals_seeds: list[uid]` | `players: list[Player]`, `rounds: list[list[Table]]`, `finals: FinalsTable?`, `standings: list[Standing]` precomputed; decks extracted to `DeckObject` rows; sanctions extracted to `Sanction` rows |
-| Roles | Admin, Playtester, (rest identical) | `Admin`→`IC`, `Playtester`→`PT`, + new `DEV` |
-| Formats | Standard, V5, Limited, **Draft** | Standard, V5, Limited (no Draft — ETL maps old `Draft`→`Limited`, see #36) |
-| IDs | UUID v4 | UUID v7 (strings). Old v4 UUIDs are valid strings — **keep them** |
-| Tournament events log | `tournament_events` table, 366d retention | No equivalent. Dump to cold storage, drop from live DB |
-| Access control | Filtered at read time | Pre-computed at write time via `backend/src/access_levels.py` |
+| Storage | per-type tables, flat JSONB `data` | unified `objects` table, 3 access projections |
+| Member | one row, everything embedded | `User` + `AuthMethod` rows + separate `Sanction` rows |
+| Tournament | `players: dict`, `rounds:[Round{tables}]`, embedded decks/sanctions | `players: list`, `rounds: list[list[Table]]`, `finals`, precomputed `standings`; decks → `DeckObject`, sanctions → `Sanction` |
+| Roles | Admin, Playtester, … | `Admin`→`IC`, `Playtester`→`PT`, + `DEV` |
+| Formats | …, Draft | Draft→`Limited` (provenance note in description) |
+| IDs | UUID v4 | UUID v7 — old v4s are valid strings, **preserved** (what makes the merge an upsert) |
+| `tournament_events` log | 366d retention | no equivalent — dump to cold storage (#42) |
+
+Full mapping (ranks, states, sanction categories, decks, league fields) and the
+rehearsed validation results: `.pst/details/38-etl-phase0.md`.
 
 ---
 
-## Recommended approach: 4-phase rollout, side-by-side domains, single cutover
+## Architecture: two upstreams, single writer per field
 
-Run new archon-vibe at a **parallel domain** (`new.archon.vekn.net` or `beta.archon.vekn.net`) during validation phases. Do the authoritative data migration during a short maintenance window, then swap DNS so `archon.vekn.net` points to the new stack. Old stack stays up read-only on `old.archon.vekn.net` for ~30 days as a safety net.
+During the parallel run the new stack ingests from **vekn.net** (identity,
+round-less ratified results, calendar — unchanged) and from **old archon**
+(everything vekn doesn't carry: contact/discord/nickname/coopted_by, roles,
+sanctions, leagues, rich play data for events held there). Three rules make the
+combination graceful and idempotent — see `.pst/details/115-legacy-archon-sync.md`
+for the full design:
 
-**Why not same-domain blue/green?** Harder with nginx/ansible on a single VPS and two different deployment topologies. Side-by-side domains let users test the new URL pre-cutover and give a trivial rollback (DNS flip back).
+1. **Single writer per field** — each field has exactly one sync source, so the
+   two dailies can never flip-flop a value. Old-archon identity edits flow in
+   *via* vekn.net (old pushes members there).
+2. **`local_modifications` trumps both syncs** — already enforced field-by-field
+   by the VEKN sync (`vekn_sync.py:662`); set by in-app edits
+   (`routes/users.py:188-262`). **Roles are special-cased harder: seeded once by
+   the ETL (old-archon mapping), then app-managed only — no sync ever writes
+   roles again** (the vekn-sync role derivation is removed outright, no flags;
+   beta and prod identical by construction). Old-archon role changes during the
+   parallel run don't propagate — role management moves to the new app at
+   Phase-1 start.
+3. **Rich-wins + single-holder invariant** for tournaments — vekn-first then
+   archon-rich merges INTO the vekn-created copy (the existing rich-guard at
+   `vekn_tournament_sync.py:332` protects it afterwards); at most one live
+   tournament per vekn event id; both-rich = one-app-per-event violation, logged.
 
-**Why not incremental (keep old + new writing to same DB)?** Schemas are incompatible at the write path — old writes flat JSONB, new writes three pre-computed projections and splits decks/sanctions into separate rows. Dual-writing would mean porting half the engine into old archon. Not worth it.
+**Dual push.** Both stacks run `VEKN_PUSH` during the parallel run; officials
+handle each event wholly in ONE app, vekn.net mediates. Safe only once #114
+lands: ETL/sync-ingested data must be stamped push-inert
+(`vekn_pushed_at`/`vekn_synced=True`), else the first `batch_push` re-submits
+thousands of ratified results and ~19k member updates (`vekn_push.py` selects on
+those markers).
 
-### Data flow: ETL FIRST, then VEKN sync (settled, rehearsed 2026-06-09)
+**Initial population stays ETL-first** (rehearsed 2026-06-09: clean insert into
+an empty DB, VEKN sync reconciles on top — 0 errors, 0 dupes, rich rounds and
+protected roles intact). The recurring merge then keeps the DB converged daily.
 
-Old archon is a **superset** of vekn.net (it synced from vekn.net and added local data: discord logins, profile edits, and rich tournament rounds/finals/decks for events run in-app). So:
-
-1. **ETL into an empty DB** — produces the complete baseline. Clean insert, no merge logic.
-2. **Enable VEKN sync** — reconciles on top using its existing idempotent merge (match by `vekn_id` / `external_ids["vekn"]`, respect `local_modifications`). Running it the other way round would force re-implementing merge semantics inside the ETL.
-
-**Conflict matrix (who wins what):**
-
-| data | winner | mechanism |
-|---|---|---|
-| member identity (name/country/city/state) | **vekn.net** | sync overwrites (authoritative registry); came from there originally |
-| roles | **archon** | ETL marks `local_modifications={"roles"}` so sync can't strip Judge/Ethics/etc |
-| contact / nickname / discord_id / community links / coopted_by | **archon** | VEKN sync doesn't manage these fields |
-| tournament metadata (name/venue/dates/…) | **vekn.net** | sync refreshes |
-| in-app tournament play-data (rounds/finals/standings/players/winner) | **archon** | `vekn_tournament_sync` refreshes metadata only when `rounds`/`finals` present |
-| vekn-origin (round-less) tournament results | **vekn.net** | sync is authoritative for those |
-
-**Auth migration:** Discord login carries over (migrate `discord_id` + a discord `AuthMethod`; no token to migrate — OAuth re-auths each session). Legacy passwords do NOT migrate (88-char legacy hash ≠ argon2); email users re-establish via magic-link (keyed on migrated `contact_email`) or Discord.
-
-**Rehearsal result (local, real vekn.net API):** member sync 0 created / 18,669 updated / 0 errors; tournament sync 6 created / 7,546 updated / 0 errors; 0 duplicate vekn_id/event-id, rich rounds preserved (267→267), protected roles intact (109→109), 0 orphans, 30,957 objects decode clean. See `.pst/details/38-etl-phase0.md`.
-
----
-
-### Phase 0 (#38) — Build the ETL, dry-run against prod dump (no deploy)
-
-**Deliverable**: `backend/scripts/migrate_from_archon.py` in archon-vibe.
-
-**What it does** (reads from old archon DB, writes to new archon-vibe DB):
-1. **Members → Users + AuthMethods**: stream `SELECT uid, vekn, data FROM members` in batches of 500 (VPS RAM budget). For each row:
-   - Build `User` with preserved `uid`, map roles (`Admin`→`IC`, `Playtester`→`PT`), copy `name/country/city/nickname/vekn_id/contact_email/contact_phone`, move `discord.id` to `discord_id`, keep `coopted_by=None` initially.
-   - Create `AuthMethod` rows per available method: email/password (if `password_hash`), discord (if `discord.id`), ignore passkeys (new only).
-   - Skip embedded ratings — new archon recomputes them from tournaments post-import (see Phase 2 step 6).
-2. **member_deletions → soft-deleted User shells** (optional; preserves referential integrity for old tournament records that reference deleted members).
-3. **Leagues → League objects**: straightforward field copy, map `ranking`→`standings_mode`, attach `organizers_uids` from old `organizers` list.
-4. **Tournaments → Tournament + DeckObject + Sanction**:
-   - Reshape `players` dict → list; preserve `user_uid` link.
-   - Reshape `rounds`: `[Round{tables:[Table]}]` → `list[list[Table]]`, move `TableSeat.judge` → `Seat.judge_uid`, extract `TableSeat.deck` → separate `DeckObject` row (keyed by tournament+user+round).
-   - Extract last round if it's a finals round into `finals: FinalsTable` (build `seed_order` from old `finals_seeds`).
-   - Extract `sanctions: dict[uid→[Sanction]]` → individual `Sanction` rows with `user_uid`, `issued_by_uid` (look up judge by vekn/name), `tournament_uid`.
-   - **Draft tournaments**: map old `Draft` format → new `Limited` (Draft is a limited format; #36 decided). Optionally prepend an "originally Draft format" note to `description` for provenance. No skip flag needed.
-   - Populate `standings: list[Standing]` by running the Rust engine's standings computation, or by flattening old embedded standings if available.
-   - Compute access-level projections via `access_levels.py` before insert.
-5. **clients → OAuthClient**: copy rows, but OAuth 2.0 semantics differ — old `clients` used a different flow. Re-register rather than migrate unless there are active integrations (list them in Phase 0 exploration). See decision #36.
-6. **Skip**: `tournament_events` (dump separately as `pg_dump -t tournament_events` to S3/local backup, drop from live).
-
-**Validation harness** (`migrate_validate.py`):
-- Run against a `pg_dump` of prod into a local container.
-- Assert counts match (members, tournaments, leagues).
-- Spot-check 10 random tournaments: player counts, VP totals, winner, finals seats.
-- Assert zero orphan references (every `user_uid` in Tournament.players resolves to a User).
-- Run new archon-vibe's rating recompute; compare to old archon's stored ratings (expect small deltas from formula refinements — log, don't fail).
-
-**Rollback**: N/A, nothing deployed.
-
-**Exit criteria**: ETL runs end-to-end on a recent prod dump with zero errors, spot-checks pass, rating deltas reviewed.
+**Auth:** Discord carries over (`discord_id` + discord `AuthMethod`); legacy
+password hashes don't migrate — email users re-establish via magic link on
+migrated `contact_email`. Passkeys are new-stack-only, opt-in post-flip.
 
 ---
 
-### Phase 1 (#39) — Deploy archon-vibe at parallel domain, validate the full ETL→sync path
+### Phase 1 (#39) — parallel run at `new.archon.vekn.net` (a couple of weeks)
 
-Stand up the new stack at `new.archon.vekn.net`:
-- Deployed via archon-vibe's ansible playbook (systemd-based, no Docker — the standalone prod path: `inventories/prod` + `playbooks/{site,database,deploy}.yml`, `just bootstrap-prod`/`database-prod`/`deploy-prod`). The playbook itself was delivered by epics #81/#85 (#37 closed); only execution-time config remains for this phase:
-  - fill the real VEKN-VPS host in `ansible/inventories/prod/hosts.ini` (currently the placeholder `archon-prod.example`)
-  - populate `ansible/inventories/prod/group_vars/vault.yml` (db/jwt/mail/discord/vekn secrets)
-  - for the parallel domain, override `domain_main` → `new.archon.vekn.net` (group_vars/`--extra-vars`) so nginx_tls + static_site + redirect URIs target the beta host, not prod `archon.vekn.net`
-- Fresh PostgreSQL 17 instance (do not share the old DB).
-- **Run the ETL from a recent prod dump** (`migrate_from_archon.py`), then **enable VEKN sync** so it reconciles on top — exercise the real Phase-2 ordering and dataset on the VPS. (See the data-flow note below: ETL first, then sync, no wipe.)
-- Enable Discord OAuth against a **new** redirect URI (`new.archon.vekn.net/auth/discord`) to avoid colliding with the prod one. Same Discord client ID is fine if you add the second redirect URI.
-- Bot process stays **disabled** (or points at a test guild) until Phase 3 to avoid sending real DMs/role updates from two processes.
+Both apps live on the same VPS, both pushing to vekn.net, the new stack syncing
+daily from both upstreams. **Open access** — officials are the live testers (no
+invite gate; the one comms rule is one-app-per-event). **Bot enabled** (new
+Discord app; side effects scoped by guild installation — test guild first).
+Nothing created on the new stack is ever wiped.
 
-**Who gets access**: IC + NC only, via an invite/testing flag. Use it to validate UI, performance, and the merged dataset on the real VPS.
+Prereqs/config (see ticket): #91 beta passed, #114 + #115 landed, PG sequencing
+per #116 (recommended: `just migrate-postgres-prod` first — with #116's
+`archon_web` fix — so one PG17 cluster on 5432 hosts both `archondb` and the new
+`archon` db; avoids the 5433 two-cluster trap and halves PG RAM), real host in
+`inventories/prod/hosts.ini`, vault populated, committed phase-1 override
+(`domain_main=new.archon.vekn.net` — redirect URI/RP_ID derive), DNS A records.
 
-**Rollback**: Take `new.archon.vekn.net` offline. Zero impact on prod.
+**Rollback:** stop the new services. Zero impact on old archon.
 
-**Exit criteria**: New stack serves real traffic for ≥1 week; no P1 regressions; IC/NC sign-off.
+**Exit:** a couple of weeks of real events run end-to-end on the new stack, both
+syncs and push behaving, officials satisfied. (No automated drift reporting —
+owner decision; sync logs must be loud on conflicts.)
 
----
+### Phase 2 (#40) — flip (minutes)
 
-### Phase 2 (#40) — Authoritative data migration (maintenance window, ~1–2 hours)
+Announce → freeze old archon (stop `archon_web` + nginx maintenance page; that
+also stops its in-app sync/push) → insurance `pg_dump` of `archondb` → final
+#115 run + checks + ratings recompute → **nginx vhost swap** (both stacks share
+the IP, so this is NOT a DNS cutover): redeploy new stack with
+`domain_main=archon.vekn.net`; re-host legacy read-only at `old.archon.vekn.net`
+(domain is a var in `archon/ansible/archon.yml`; Discord login breaks there —
+acceptable for a 30-day safety net). The `archon.vekn.net` cert already exists
+on the box; watch the two certbot renewal setups until #42 consolidates them.
 
-Scheduled downtime window announced ≥1 week in advance (banner on old archon, Discord notice).
+**Rollback:** vhost flip back (instant; old data untouched — the sync only reads
+it). After the flip, writes land on the new stack; rolling back later loses
+them — same trade-off as any cutover, but the window shrinks to whenever the
+flip is judged failed.
 
-**Sequence** (run from a laptop or jump host with access to both DBs):
+### Phase 3 (#41) — post-flip
 
-1. **Freeze old archon**: put old archon in read-only mode (a quick patch that returns 503 on non-GET requests; or stop `archon_web.service` entirely and serve a maintenance page from nginx). Stop its scheduled VEKN sync.
-2. **pg_dump old archon**: full logical dump as rollback insurance (`archon_prod_YYYYMMDD.sql.gz`).
-3. **Start from an empty new archon-vibe DB** (apply `schema.sql`). No VEKN seeding first — old archon is a superset of vekn.net, so the ETL produces the complete baseline and VEKN sync reconciles afterward.
-4. **Run ETL** (`migrate_from_archon.py`): streams all members→users(+auth), leagues, tournaments(+decks, +sanctions). ~45s locally on the full ~19k members / 8.4k tournaments; budget more on the VPS.
-5. **ETL integrity checks** (`migrate_validate.py`): counts, orphan scan, prelim-standings invariant, decode round-trip. Exits non-zero on failure.
-6. **Enable VEKN sync** (`run_vekn_sync.py` / scheduled): member sync then tournament sync. It MERGES onto the ETL data — matches members by `vekn_id` and tournaments by `external_ids["vekn"]`, refreshes vekn-owned identity/metadata, and **preserves** archon-owned data (roles via `local_modifications`, in-app tournament rounds/finals/standings, discord/contact auth). Then `check_merge.py` to assert no dupes / no wiped play-data / roles intact.
-7. **Reconciliation jobs**: rating recompute (rebuilds `CategoryRating` — also the place to verify ratings vs old) + snapshot/projection regen.
-8. **Smoke-test new stack**: magic-link login (legacy passwords don't migrate — argon2 vs legacy), Discord login, view a historical + a rich tournament, create+finish a test tournament, sanction lookup.
-9. **DNS swap**: `archon.vekn.net` → new stack. Old stack → `old.archon.vekn.net` (read-only).
-10. **Watch**: tail logs for 2 hours. Confirm the VEKN sync schedule runs cleanly on the new stack.
+Install the bot on prod guild(s) (installation, not deployment), Discord portal
+redirect URIs + ToS/privacy URLs (#24), TWDA import/push if desired, passkey
+opt-in, optional re-login notice, monitor error rates / SSE / IDB hydration for
+2–4 weeks. `VEKN_PUSH` has been live since Phase 1.
 
-**Rollback at step 8**: DNS flip back to old stack, remove new-stack from DNS. Old data is untouched (we only read from it). Users lose at most the downtime window.
+### Phase 4 (#42) — decommission
 
-**Rollback after step 8**: still possible for ~30 days by restoring the Phase 2 pg_dump to old archon and flipping DNS. Any writes to new stack during that period would be lost — communicate this risk if rollback is invoked.
-
-**Exit criteria**: DNS swap complete, 24h elapsed with no rollback.
-
----
-
-### Phase 3 (#41) — Activate companion features + monitor (2–4 weeks)
-
-Post-cutover work, shipped as incremental versions of archon-vibe:
-- **Enable Discord bot** pointed at prod Discord client, production guild(s). Subscribes to SSE, manages tournament voice channels, Linked Roles metadata push.
-- **Enable TWDA import + push** if desired.
-- **Enable `VEKN_PUSH=true`** scheduled job to publish newly-finished tournaments back to VEKN.
-- **Passkey registration**: users can add passkeys (new capability — no migration needed, opt-in).
-- **Session migration handling**: users logged in via old archon cookies won't carry over. Add a friendly "please log in again" banner for the first 7 days.
-- **Monitor**: error rates, SSE reconnect storms, IndexedDB hydration times (esp. for organizers with large tournament history).
-
-**Rollback**: per-feature feature flags (env vars) so each can be disabled without redeploy.
-
-**Exit criteria**: 30 days stable, <1 P2 bug/week, IC approval.
+Disable #115 (roles need nothing — they're app-managed since the seed, no
+re-enable question); final `pg_dump` archive; stop
+`archon_web`; remove `old.archon.vekn.net` vhost/DNS; consolidate certbot;
+archive the old repo; cold-store `tournament_events`.
 
 ---
 
-### Phase 4 (#42) — Decommission old archon
+## Critical files
 
-- Final `pg_dump` of old archon (archive indefinitely — this is the history of record).
-- Stop `archon_web.service`, remove from ansible inventory.
-- Remove `old.archon.vekn.net` DNS + nginx vhost.
-- Archive `/Users/lpanhaleux/Developer/archon` repo as read-only.
-- Move `tournament_events` dump to cold storage.
+- `backend/scripts/migrate_from_archon.py` — ETL (done, #38) → gains merge mode (#115)
+- `backend/scripts/migrate_validate.py`, `check_merge.py` — validation (done; extend for merge invariants)
+- `backend/src/vekn_push.py` — stamping/guards (#114)
+- `backend/src/vekn_sync.py`, `vekn_tournament_sync.py` — remove role writes, sync stamping (#114/#115)
+- `ansible/playbooks/migrate_postgres.yml` — must stop `archon_web` (#116)
+- old repo: nothing to modify — freeze is operational (stop service + maintenance page)
 
----
+## Decisions
 
-## Critical files to create / modify
+Settled 2026-06-09 (#36), still standing: parallel domain on the **same VPS**;
+Draft→Limited; OAuth `clients` re-register (enumerate active ones from a dump —
+expected few); `tournament_events` dump-only; rating drift tolerated (recompute
+post-import, log >5% deltas); ETL-first for initial population.
 
-- **NEW**: `backend/scripts/migrate_from_archon.py` — the ETL, connects to both DBs, streams in batches
-- **NEW**: `backend/scripts/migrate_validate.py` — post-ETL integrity checks
-- **DONE** (#37): ansible systemd deploy stack — `ansible/{inventories/prod,roles,playbooks}`, `just deploy-prod` (built by #81/#85)
-- **MODIFY (old repo)**: `/Users/lpanhaleux/Developer/archon/src/archon/app/main.py` — add a read-only middleware flag for Phase 2 freeze
-- **REUSE** (read-only, as references for the ETL transformation):
-  - `/Users/lpanhaleux/Developer/archon/src/archon/models.py` — source shapes
-  - `backend/src/models.py` — target shapes
-  - `backend/src/db.py` — `save_object_from_model`, `save_user`, etc.
-  - `backend/src/access_levels.py` — projection computation
-  - `backend/src/ratings.py` — `recompute_all_ratings`
+Revised 2026-06-10 (owner):
+1. **No wipe / no migration window** — recurring idempotent legacy sync (#115);
+   cutover = freeze + final sync + vhost swap.
+2. **Dual push during the parallel run** — both apps push to vekn.net;
+   one-app-per-event discipline; #114 makes ingested data push-inert first.
+3. **Bot enabled everywhere** (beta included) — it's a primary test subject;
+   guild installation scopes its side effects. No deploy toggle needed.
+4. **Open access in Phase 1** — no invite gate; officials get told, everyone can
+   try it on real events.
+5. **Roles**: seeded once by the ETL from old archon, then **app-managed only,
+   permanently** — no sync (vekn or legacy) ever writes roles again. Old-archon
+   role changes during the parallel run don't propagate (manage roles in the new
+   app from Phase-1 day one); post-seed vekn.net list appointments need an
+   in-app grant.
+6. **No drift-report automation** — officials are the live testers; rely on loud
+   sync logs.
+7. Officials-contacts delivery/cloaking is ordinary app deployment (#113), not a
+   migration workstream.
+8. ~~"DNS swap" cutover~~ → it was always a same-IP setup: cutover is an nginx
+   vhost swap; DNS only gains `new.`/`old.`/`bot.` records ahead of time.
 
----
+## Verification checklist (gates the flip, #40)
 
-## Resolved decisions (#36 — settled 2026-06-09)
-
-1. **Cutover strategy → parallel domain.** Stand up `new.archon.vekn.net` for IC/NC validation, then DNS-swap `archon.vekn.net` to the new stack; old moves to `old.archon.vekn.net` read-only for ~30d. Rollback = DNS flip.
-2. **VPS → same VPS** (no second box). ⚠️ Constraint: Phase 1 runs **both** stacks at once on ~2GB RAM. Mitigation: run the new stack lean during Phase 1 (minimal uvicorn workers, IC/NC-only traffic so load is low); Phase 2 stops/freezes old archon during the window to free RAM for the ETL + reconcile. Watch memory in Phase 1 — if it's too tight, revisit a temporary second box.
-3. **Draft tournaments → map `Draft`→`Limited`.** Draft is a limited format, so it imports as a real `Limited` tournament (preserves players/standings/sanctions). Optionally note "originally Draft" in `description`. No `--skip-draft` flag, no cold-backup-only path.
-4. **OAuth `clients` → re-register.** Notify each active integration owner to re-register on the new stack; don't port hashed secrets across the incompatible auth scheme. Enumerate active clients from a prod dump in Phase 0 (expected: very few).
-5. **`tournament_events` audit log → dump-only.** `pg_dump -t tournament_events` to cold storage, drop from live DB. No viewer in new archon.
-6. **Rating formula drift → tolerated.** New Rust engine needn't match old Python bit-for-bit; ratings recompute from tournaments post-ETL anyway. Validation logs per-user deltas and flags any >5% for manual review — does not fail the run. No compatibility mode.
-7. **Maintenance-window timing → policy now, date later.** Weekend EU/US off-hours overlap, avoid known VEKN tournament weekends, announce ≥1 week ahead (banner on old archon + Discord). Pin the exact date near execution (gated on #37 ansible + #38 ETL being ready).
-8. **Migration order → ETL FIRST, then VEKN sync** (not VEKN-first). Old archon is a superset; ETL gives the complete baseline and VEKN sync reconciles on top via its existing merge. See the "Data flow" section above for the full conflict matrix. Rehearsed end-to-end against the real vekn.net API on 2026-06-09 — passed.
-9. **Identity conflict → vekn.net wins** for name/country/city/state; archon wins roles (protected via `local_modifications`) and all fields VEKN doesn't manage (contact/discord/nickname).
-
----
-
-## Verification checklist (before Phase 2 — full prod dump)
-
-- [ ] `migrate_from_archon.py` runs clean on full prod dump
-- [ ] Member count matches (±deletions)
-- [ ] Tournament count matches exactly
-- [ ] Random 10 tournaments: players, rounds, VPs, winner, finals all verified manually
-- [ ] Every `Tournament.players[*].user_uid` resolves to a live User (no orphans)
-- [ ] Every `Sanction.user_uid` and `issued_by_uid` resolves
-- [ ] Ratings recomputed, deltas vs old ≤ 5% per user (document outliers)
-- [ ] Access-level projections generated for every object
-- [ ] Old-archon Discord-linked user can log in to new archon via Discord OAuth
-- [ ] Old-archon email-password user can log in via email
-- [ ] VEKN scheduled sync runs cleanly on new stack after ETL
-- [ ] Bot disabled during Phases 0–2, enabled cleanly in Phase 3
-- [ ] `old.archon.vekn.net` serves old data read-only for 30 days post-cutover
+- [ ] #114 audit: all three `batch_push` queries return zero candidates after
+      ETL + both syncs on a prod dump (run on #91, re-run on the Phase-1 stack
+      before enabling push)
+- [ ] #115 exercised in both orders (vekn-first / archon-first) incl. the
+      single-holder dedup; deck/sanction identity stable across re-runs
+- [ ] An event held on old archon during Phase 1 shows up rich on the new stack
+      after the next daily sync (rounds/seatings/decks/sanctions), and is not
+      re-pushed
+- [ ] An event held on the new stack is pushed once, appears round-less on old
+      archon, and is never overwritten by either sync
+- [ ] Roles untouched by both dailies (seeded set stable across runs); in-app
+      role edit sticks; officials informed role management lives in the new app
+      from Phase-1 start
+- [ ] Profile edit on the new stack survives both dailies (`local_modifications`)
+- [ ] Member counts converge (± deletions); orphan scan clean; ratings
+      recomputed with deltas reviewed (≤5% or documented)
+- [ ] Old-archon Discord user logs into the new stack; email user re-establishes
+      via magic link
+- [ ] Vhost swap rehearsed against the box's nginx state: no duplicate
+      `server_name`, certs valid for `archon.vekn.net`/`old.`/`bot.`
+- [ ] `old.archon.vekn.net` serves read-only legacy for ~30 days post-flip
