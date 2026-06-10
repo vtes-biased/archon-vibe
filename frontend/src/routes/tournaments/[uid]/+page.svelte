@@ -7,7 +7,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
-  import { getUser, getTournament, getSanctionsForTournament, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
+  import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
@@ -278,6 +278,10 @@ import TournamentModals from "./TournamentModals.svelte";
     return tournamentSanctions.filter(s => s.user_uid === userUid);
   }
 
+  function playerUidsOf(t: Tournament | null | undefined): string[] {
+    return (t?.players ?? []).map(p => p.user_uid).filter((u): u is string => !!u);
+  }
+
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo);
   }
@@ -328,7 +332,7 @@ import TournamentModals from "./TournamentModals.svelte";
       if (t) {
         tournament = t;
         await loadPlayerNames();
-        tournamentSanctions = await getSanctionsForTournament(uid);
+        tournamentSanctions = await getTournamentContextSanctions(uid, playerUidsOf(t));
       } else if (!tournament) {
         // No data in IndexedDB yet — will arrive via SSE
         error = m.tournament_error_not_synced();
@@ -461,7 +465,7 @@ import TournamentModals from "./TournamentModals.svelte";
         getDecksByTournamentGrouped(uid).then(grouped => { decksByUser = grouped; });
       }
       if (event.type === "sanction") {
-        getSanctionsForTournament(uid).then(s => { tournamentSanctions = s; });
+        getTournamentContextSanctions(uid, playerUidsOf(tournament)).then(s => { tournamentSanctions = s; });
       }
       if (event.type === "judge_call" && event.data) {
         judgeCallBanner?.addCall(event.data as JudgeCallData);

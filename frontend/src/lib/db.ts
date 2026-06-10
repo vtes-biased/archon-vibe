@@ -437,6 +437,31 @@ export async function getPlayerSanctionsInTournament(
 }
 
 /**
+ * Sanctions visible in a tournament's context: all of the tournament's own
+ * sanctions, plus the given players' sanctions from OTHER tournaments within
+ * the last 18 months (VEKN cross-event visibility). Only cautions stay
+ * private to the event where they were issued. Single scan of the store.
+ */
+export async function getTournamentContextSanctions(
+  tournamentUid: string,
+  playerUids: string[]
+): Promise<Sanction[]> {
+  const db = await getDB();
+  const all = await db.getAll('sanctions');
+  const players = new Set(playerUids);
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 18);
+
+  return all.filter(s => {
+    if (s.deleted_at) return false;
+    if (s.tournament_uid === tournamentUid) return true;
+    if (!players.has(s.user_uid)) return false;
+    if (s.level === 'caution') return false;
+    return new Date(s.issued_at) >= cutoff;
+  });
+}
+
+/**
  * Get active (non-deleted) sanctions for a user within the last 18 months.
  */
 export async function getActiveSanctionsForUser(userUid: string): Promise<Sanction[]> {

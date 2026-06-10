@@ -170,12 +170,12 @@ Organizers must drop unavailable finalists before launching finals.
 
 #### Event-Level Sanctions (issued by organizers/judges during a tournament)
 
-| Level | Scope | Effect |
-|-------|-------|--------|
-| Caution | Event only | Verbal warning, tracked during event for pattern detection |
-| Warning | Permanent record | Tracked in VEKN database, visible to future organizers |
-| Standings Adjustment | Event + permanent | -1 VP penalty applied to current/next/previous game depending on timing (v2 Judges Guide) |
-| Disqualification | Event + permanent | Dropped from tournament, prevents further check-in |
+| Level | Visibility | Effect |
+|-------|-----------|--------|
+| Caution | Private to its tournament | Verbal warning, tracked during the event for pattern detection. Never shown on member pages or in other events (IC/Ethics excepted) |
+| Warning | Member page + other events, 18 months | Tracked in VEKN database, visible to future organizers |
+| Standings Adjustment | Member page + other events, 18 months | -1 VP penalty applied to current/next/previous game depending on timing (v2 Judges Guide) |
+| Disqualification | Member page + other events, 18 months | Dropped from tournament (player state → Disqualified), prevents further check-in; bars sibling events of the same league |
 
 **Infraction categories** (from v2 Judges Guide — tracked per sanction):
 - Procedural Errors (2.x): Missed Mandatory Effect, Card Access Error, Game Rule Violation, Failure to Maintain Game State
@@ -192,7 +192,32 @@ Organizers must drop unavailable finalists before launching finals.
 
 **On-site sanction**: A head judge can issue an immediate 30-day national suspension for gross ethics violations. Must be escalated to Ethics Committee within 5 days or it's lifted. See `reference/code-of-ethics.md`.
 
-**App tracking**: Archon tracks all sanction types. Event-level sanctions are managed via a sanctions modal on the tournament page. VEKN-wide sanctions (suspension/probation) are managed via a modal on the members list. Suspended/banned players are blocked from check-in.
+#### Visibility Rules
+
+- **Caution**: belongs to the tournament where it was issued — shown only in that event's context (the sanction dot next to the player). Hidden on member pages and in other events, except to IC/Ethics.
+- **Warning / SA / DQ**: visible on the member detail page and members list, and in other tournaments' context (the dot shows them to organizers of later events), for **18 months** from issuance.
+- **Suspension / Probation**: membership-level, always visible; a permanent ban (suspension without expiry) stays visible past 18 months.
+- IC/Ethics see all levels on every surface. The filtering is a display rule — all sanction records sync to all members' clients (member access level).
+
+#### Permissions
+
+| Action | Caution / Warning / SA / DQ | Suspension / Probation |
+|--------|-----------------------------|------------------------|
+| Issue | IC, Ethics, or an organizer of the tournament | IC, Ethics |
+| Lift | IC, Rulemonger, NC of the tournament's country; a league organizer for a DQ in their league event | IC (Ethics for modify) |
+| Edit fields | IC, Ethics | IC, Ethics |
+| Delete (soft) | IC, Ethics — plus the tournament's own organizer **while the event is not Finished** (mistake correction: delete + reissue; organizers cannot edit) | IC, Ethics |
+
+Single source: `engine/src/permissions.rs` (`can_issue_sanction`, `can_lift_sanction`, `can_delete_sanction`), consumed by the backend (PyO3) and frontend (WASM).
+
+#### Lifecycle Effects
+
+- **DQ ↔ player state**: issuing a DQ sets the player to Disqualified on the tournament; lifting or deleting an active DQ restores them (Finished).
+- **Probation requires an expiry** (≤ 18 months); suspension expiry is optional — none means permanent ban.
+- **Cleanup job (daily)**: sanctions expired for over 18 months are soft-deleted; soft-deleted records are hard-deleted after 30 days (a mistaken organizer delete stays recoverable by IC in that window).
+- **Active suspension** blocks check-in/registration in any sanctioned event and blocks self-abandoning the VEKN ID; sanctions stay attached to the VEKN record through account merge/detach (see ARCHITECTURE.md).
+
+**App tracking**: Archon tracks all sanction types. Event-level sanctions are issued via the sanction modal on the tournament page (with JG v2 per-infraction escalation hints); the colored dot next to a sanctioned player opens a list where the organizer can review and cancel them. VEKN-wide sanctions (suspension/probation) are managed from the member detail page. Suspended/banned players are blocked from check-in.
 
 ### 3.9 Special Situations
 

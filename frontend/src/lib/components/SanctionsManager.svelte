@@ -2,6 +2,7 @@
   import type { User, Sanction, SanctionLevel, SanctionCategory } from "$lib/types";
   import { createSanction, updateSanction, deleteSanctionApi } from "$lib/api";
   import { getActiveSanctionsForUser } from "$lib/db";
+  import { visibleSanctions } from "$lib/utils";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
   import { Pencil, TriangleAlert, CircleCheck, Trash2 } from "lucide-svelte";
@@ -42,6 +43,10 @@
       userSanctions = sanctions;
     });
   });
+
+  // Cautions are private to their tournament; the member directory only
+  // surfaces them to managers (IC/Ethics).
+  const shownSanctions = $derived(visibleSanctions(userSanctions, canIssueSanctions));
 
   const expiryRequired = $derived(sanctionLevel === "probation");
   const expiryAllowed = $derived(sanctionLevel === "suspension" || sanctionLevel === "probation");
@@ -177,11 +182,11 @@
 
 {#if inline}
   <!-- Inline mode: just badges in a row (for User.svelte view mode) -->
-  {#if userSanctions.length > 0}
+  {#if shownSanctions.length > 0}
     <div class="flex items-start gap-2">
       <span class="font-medium">{m.sanction_mgr_title()}:</span>
       <div class="flex flex-wrap gap-1">
-        {#each userSanctions as sanction (sanction.uid)}
+        {#each shownSanctions as sanction (sanction.uid)}
           <SanctionBadge {sanction} />
         {/each}
       </div>
@@ -189,13 +194,13 @@
   {/if}
 {:else}
   <!-- Standalone section card -->
-  {#if canIssueSanctions || userSanctions.length > 0}
+  {#if canIssueSanctions || shownSanctions.length > 0}
     <div class="mt-6">
       <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.sanction_mgr_title()}</h2>
       <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4">
-        {#if userSanctions.length > 0}
+        {#if shownSanctions.length > 0}
           <div class="space-y-2 {canIssueSanctions ? 'mb-4' : ''}">
-            {#each userSanctions as sanction (sanction.uid)}
+            {#each shownSanctions as sanction (sanction.uid)}
               {#if canIssueSanctions}
                 <button
                   type="button"
