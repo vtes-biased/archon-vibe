@@ -17,7 +17,7 @@
   <Trophy class="w-3.5 h-3.5 inline align-middle text-amber-400" aria-label={m.tournament_winner()} />
 {:else if finalist}
   <span class="text-ash-600">{hash ? "#" : ""}{rank}</span>
-  <span class="ml-1 text-[10px] px-1 py-0.5 rounded bg-amber-900/30 text-amber-400 align-middle">{m.tournament_finalist()}</span>
+  <span class="ml-1 text-[10px] px-1 py-0.5 rounded badge-amber align-middle">{m.tournament_finalist()}</span>
 {:else}
   {hash ? "#" : ""}{rank}
 {/if}
