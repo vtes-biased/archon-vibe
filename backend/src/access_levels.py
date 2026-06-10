@@ -5,7 +5,32 @@ All functions take a dict (full object data) and return a dict or None.
 None means the object is not visible at that access level.
 """
 
+import base64
+
 from .models import ObjectType, Role
+
+# Contact fields cloaked in the PUBLIC projection only (anonymous viewers).
+# Reversible base64 keeps the plaintext — and any "@" — out of the public
+# snapshot, so naive bulk harvesters of /sync/snapshot?level=public come up
+# empty. The frontend decodes for display (deobfuscateContact in
+# lib/contact.ts); member/full projections (authenticated viewers) stay
+# plaintext. Mirror the prefix + scheme on both sides.
+_OBFUSCATED_PREFIX = "#b64#"
+_PUBLIC_OBFUSCATED_FIELDS = ("contact_email", "contact_phone")
+
+
+def _obfuscate(value: str) -> str:
+    return _OBFUSCATED_PREFIX + base64.b64encode(value.encode("utf-8")).decode("ascii")
+
+
+def _obfuscate_public_contacts(proj: dict) -> dict:
+    """In-place cloak the harvestable contact fields of a public projection."""
+    for field in _PUBLIC_OBFUSCATED_FIELDS:
+        value = proj.get(field)
+        if isinstance(value, str) and value:
+            proj[field] = _obfuscate(value)
+    return proj
+
 
 # ---------------------------------------------------------------------------
 # User projections
@@ -79,8 +104,8 @@ def compute_user_public(d: dict) -> dict | None:
     """
     roles = d.get("roles", [])
     if Role.NC in roles or Role.PRINCE in roles:
-        return _pick(
-            d, _USER_PUBLIC_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS
+        return _obfuscate_public_contacts(
+            _pick(d, _USER_PUBLIC_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
         )
     if Role.IC in roles:
         return _pick(d, _USER_PUBLIC_FIELDS | _USER_COMMUNITY_LINKS)

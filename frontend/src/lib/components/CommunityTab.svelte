@@ -4,6 +4,7 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses } from "$lib/roles";
+  import { deobfuscateContact } from "$lib/contact";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
@@ -361,9 +362,11 @@
                           <div class="text-sm text-ash-400 mt-0.5">{official.city}</div>
                         {/if}
                         {#if official.contact_email || official.discord_id || official.contact_phone}
+                          {@const email = deobfuscateContact(official.contact_email)}
+                          {@const phone = deobfuscateContact(official.contact_phone)}
                           <div class="flex flex-wrap gap-3 mt-2 text-xs text-ash-400">
-                            {#if official.contact_email}
-                              <a href="mailto:{official.contact_email}" class="text-crimson-500 hover:text-crimson-400">{official.contact_email}</a>
+                            {#if email}
+                              <a href="mailto:{email}" class="text-crimson-500 hover:text-crimson-400">{email}</a>
                             {/if}
                             {#if official.discord_id}
                               <a
@@ -376,11 +379,11 @@
                                 <span>{official.contact_discord || "Discord"}</span>
                               </a>
                             {/if}
-                            {#if official.contact_phone}
+                            {#if phone}
                               {#if official.phone_is_whatsapp}
-                                <a href="https://wa.me/{official.contact_phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-crimson-500 hover:text-crimson-400">WhatsApp: {official.contact_phone}</a>
+                                <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-crimson-500 hover:text-crimson-400">WhatsApp: {phone}</a>
                               {:else}
-                                <span>{official.contact_phone}</span>
+                                <span>{phone}</span>
                               {/if}
                             {/if}
                           </div>

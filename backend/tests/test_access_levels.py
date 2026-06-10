@@ -1,5 +1,7 @@
 """Tests for access level projection functions."""
 
+import base64
+
 import pytest
 from src.access_levels import compute_full, compute_member, compute_public
 from src.models import ObjectType
@@ -82,10 +84,18 @@ class TestUserPublic:
         assert result["country"] == "FR"
         assert result["roles"] == ["NC"]
         assert result["vekn_prefix"] == "100"
-        # Contact info included for NC/Prince
-        assert result["contact_email"] == "alice@example.com"
+        # Contact info included for NC/Prince, but email/phone are cloaked in the
+        # public projection (base64, decoded client-side) so the plaintext never
+        # appears in the public snapshot. Discord isn't a harvest target.
+        assert result["contact_email"].startswith("#b64#")
+        assert "alice@example.com" not in result["contact_email"]
+        assert (
+            base64.b64decode(result["contact_email"][len("#b64#") :]).decode()
+            == "alice@example.com"
+        )
+        assert result["contact_phone"].startswith("#b64#")
+        assert "@" not in str(result)
         assert result["contact_discord"] == "alice#1234"
-        assert result["contact_phone"] == "+33612345678"
 
     def test_prince_user_visible(self):
         """Prince users get a public representation."""

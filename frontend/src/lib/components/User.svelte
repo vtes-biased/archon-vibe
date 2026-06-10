@@ -4,6 +4,7 @@
   import { createUser, updateUser, uploadAvatar } from "$lib/api";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses } from "$lib/roles";
+  import { deobfuscateContact } from "$lib/contact";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canChangeRole as engineCanChangeRole, canEditUser } from "$lib/engine";
   import CityAutocomplete from "./CityAutocomplete.svelte";
@@ -556,11 +557,13 @@
           <SanctionsManager {user} canIssueSanctions={false} inline={true} />
 
           {#if user.contact_email || user.discord_id || user.contact_phone}
+            {@const email = deobfuscateContact(user.contact_email)}
+            {@const phone = deobfuscateContact(user.contact_phone)}
             <div class="mt-3 pt-3 border-t border-ash-700 space-y-1">
               <span class="font-medium text-ash-400">{m.profile_contact()}:</span>
-              {#if user.contact_email}
+              {#if email}
                 <div class="flex items-center gap-2">
-                  <a href="mailto:{user.contact_email}" class="text-crimson-500 hover:text-crimson-400 text-sm">{user.contact_email}</a>
+                  <a href="mailto:{email}" class="text-crimson-500 hover:text-crimson-400 text-sm">{email}</a>
                 </div>
               {/if}
               {#if user.discord_id}
@@ -568,11 +571,11 @@
                   <a href="https://discord.com/users/{user.discord_id}" target="_blank" rel="noopener noreferrer" class="text-crimson-500 hover:text-crimson-400">{m.profile_contact_discord()}: {user.contact_discord || "Discord"}</a>
                 </div>
               {/if}
-              {#if user.contact_phone}
+              {#if phone}
                 {#if user.phone_is_whatsapp}
-                  <a href="https://wa.me/{user.contact_phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-sm text-crimson-500 hover:text-crimson-400">WhatsApp: {user.contact_phone}</a>
+                  <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-sm text-crimson-500 hover:text-crimson-400">WhatsApp: {phone}</a>
                 {:else}
-                  <div class="text-sm">{user.contact_phone}</div>
+                  <div class="text-sm">{phone}</div>
                 {/if}
               {/if}
             </div>
