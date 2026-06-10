@@ -6,13 +6,10 @@ collections:
     version: ">=10.0.0,<12.0.0"
   - name: ansible.posix
     version: ">=1.6.2,<3.0.0"
-
-roles:
-  # Shared server foundation. Provides the reusable nginx_site (proxy/spa/static)
-  # and postgres_db roles consumed by the beta (frankfurt) deploy. `just galaxy`
-  # installs it into galaxy_roles/ (git-ignored); ansible.cfg's roles_path points
-  # at galaxy_roles/server-setup/roles so the roles resolve as nginx_site /
-  # postgres_db. Pin to a tag/SHA once server-setup cuts releases.
-  - src: https://github.com/lionel-panhaleux/server-setup.git
-    name: server-setup
+  # Shared server foundation: the lionel_panhaleux.server_setup collection
+  # (nginx_site / postgres_db roles) consumed by the beta (frankfurt) deploy.
+  # Installed from git into galaxy_collections/ (git-ignored) by `just galaxy`.
+  # Pin version to a tag/SHA once server-setup cuts releases.
+  - name: https://github.com/lionel-panhaleux/server-setup.git
+    type: git
     version: main

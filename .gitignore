@@ -94,7 +94,7 @@ ansible/.vault_pass
 ansible/.ansible_facts/
 ansible/.ansible/
 ansible/*.retry
-ansible/galaxy_roles/
+ansible/galaxy_collections/
 
 # Local prod DB dump for migration dry-runs (never commit)
 archondb.dump.gz

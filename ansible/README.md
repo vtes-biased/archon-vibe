@@ -53,7 +53,7 @@ On each server (first time only, before `just bootstrap-<env>`):
 
 ```bash
 cd ansible
-just galaxy                               # ansible collections + server-setup roles
+just galaxy                               # ansible collections (incl. server-setup foundation)
 
 # Create the vault password file (git-ignored) and encrypt the vault
 echo '<your vault password>' > .vault_pass
@@ -175,9 +175,9 @@ path.
 ```
 ansible/
 ├── ansible.cfg           # defaults (roles_path, vault, SSH multiplex)
-├── requirements.yml      # collection + server-setup role pins
+├── requirements.yml      # collection pins (incl. lionel_panhaleux.server_setup from git)
 ├── justfile              # deploy + local-build recipes (wraps ansible-playbook)
-├── galaxy_roles/         # server-setup roles installed by `just galaxy` (git-ignored)
+├── galaxy_collections/   # collections installed by `just galaxy` (git-ignored)
 ├── inventories/<env>/    # hosts.ini + group_vars/{all.yml, vault.yml}
 ├── playbooks/
 │   ├── bootstrap.yml     # common role only

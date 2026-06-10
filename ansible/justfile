@@ -17,10 +17,11 @@ manylinux := "quay.io/pypa/manylinux_2_28_x86_64"
 default:
     @just --list
 
-# Install Ansible collection + role dependencies
+# Install Ansible collection dependencies (incl. the server-setup foundation;
+# git-sourced collections always reinstall, so new server-setup commits are
+# picked up on every run while the pin stays on a branch)
 galaxy:
-    uv run --project {{repo_root}} ansible-galaxy collection install -r requirements.yml
-    uv run --project {{repo_root}} ansible-galaxy role install -r requirements.yml -p galaxy_roles
+    uv run --project {{repo_root}} ansible-galaxy collection install -r requirements.yml -p galaxy_collections
 
 # Remove local build artifacts
 clean:

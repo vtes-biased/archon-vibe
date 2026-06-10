@@ -4,11 +4,17 @@
 
 profile: production
 
+# Collections are pre-installed into galaxy_collections/ by `just galaxy` (a
+# lint dependency) and resolved via ansible.cfg's collections_path — no need
+# for ansible-lint to re-download requirements.yml into its own .ansible/.
+offline: true
+
 exclude_paths:
   - build/
+  - .ansible/
   - .ansible_facts/
   - .cache/
-  - galaxy_roles/           # third-party roles installed via `make galaxy` (server-setup)
+  - galaxy_collections/     # third-party collections installed via `just galaxy`
   - inventories/beta/group_vars/vault.yml
   - inventories/prod/group_vars/vault.yml
 

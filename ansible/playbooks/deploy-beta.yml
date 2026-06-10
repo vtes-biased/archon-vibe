@@ -24,7 +24,7 @@
     # 1. Database + owner role (server-setup). Runs as the postgres OS user for
     #    peer auth over the unix socket; the runtime user (== db_user) connects
     #    the same way, so the DATABASE_URL password is vestigial.
-    - role: postgres_db
+    - role: lionel_panhaleux.server_setup.postgres_db
       become: true
       become_user: postgres
       vars:
@@ -85,7 +85,7 @@
     # 6. Bot vhost via server-setup's shared nginx_site (proxy + cert + journald
     #    tag nginx_<name>). The bot is a plain reverse proxy, so spa-mode caveats
     #    don't apply here.
-    - role: nginx_site
+    - role: lionel_panhaleux.server_setup.nginx_site
       vars:
         nginx_site_name: "{{ service_name }}_bot"
         nginx_site_domain: "{{ domain_bot }}"
