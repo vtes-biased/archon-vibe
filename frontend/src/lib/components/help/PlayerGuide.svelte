@@ -2,7 +2,7 @@
   import { renderGuideSection } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
   import ExampleBox from "./ExampleBox.svelte";
-  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar } from "lucide-svelte";
+  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Languages, RefreshCw, Trophy } from "lucide-svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
 </script>
 
@@ -147,6 +147,85 @@
       <span class="p-1 text-ash-500">
         <Unlink class="w-4 h-4" />
       </span>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.pg_profile_settings())}
+
+<ExampleBox>
+  <div class="max-w-xs space-y-4">
+    <div>
+      <label for="ex-language" class="block text-sm text-ash-400 mb-1 flex items-center gap-1.5">
+        <Languages class="w-4 h-4" />
+        Language
+      </label>
+      <select id="ex-language" class="w-full px-3 py-2 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100" tabindex="-1">
+        <option>English</option>
+      </select>
+    </div>
+    <div>
+      <span class="block text-sm text-ash-400 mb-1">Theme</span>
+      <div class="flex bg-dusk-900 rounded-lg p-1">
+        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium bg-crimson-700 text-white">Dark</button>
+        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-ash-400">Light</button>
+        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-ash-400">System</button>
+      </div>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.pg_profile_accounts())}
+
+<ExampleBox>
+  <div class="max-w-sm space-y-2">
+    <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
+      <span class="flex items-center gap-2 text-sm text-ash-200"><KeyRound class="w-4 h-4" /> Passkey</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-emerald">Active</span>
+    </div>
+    <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
+      <span class="flex items-center gap-2 text-sm text-ash-200"><Mail class="w-4 h-4" /> Email &amp; password</span>
+      <button class="text-xs px-2 py-0.5 bg-ash-700 text-bone-100 rounded">Set up</button>
+    </div>
+    <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
+      <span class="flex items-center gap-2 text-sm text-ash-200"><DiscordIcon class="w-4 h-4" /> Discord</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-emerald">Linked</span>
+    </div>
+    <div class="pt-1 flex gap-2">
+      <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded-lg flex items-center gap-1.5">
+        <RefreshCw class="w-3.5 h-3.5" />
+        Resync
+      </button>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.pg_install())}
+
+{@html renderGuideSection(m.pg_community())}
+
+<ExampleBox>
+  <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4 max-w-sm">
+    <p class="text-xs text-ash-500 mb-2">Officials — France</p>
+    <div class="flex items-center justify-between">
+      <span class="text-sm text-ash-200">Jane Doe</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-crimson">National Coordinator</span>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.pg_leagues())}
+
+<ExampleBox>
+  <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4 max-w-sm">
+    <div class="flex items-center gap-2 mb-2">
+      <Trophy class="w-4 h-4 text-crimson-400" />
+      <span class="text-sm font-medium text-bone-100">Spring Circuit 2026</span>
+    </div>
+    <div class="divide-y divide-ash-800 text-sm">
+      <div class="py-1.5 flex justify-between"><span class="text-ash-300">1. Alice</span><span class="text-ash-400">75</span></div>
+      <div class="py-1.5 flex justify-between"><span class="text-ash-300">2. Bob</span><span class="text-ash-400">60</span></div>
+      <div class="py-1.5 flex justify-between"><span class="text-ash-300">3. Charlie</span><span class="text-ash-400">48</span></div>
     </div>
   </div>
 </ExampleBox>
