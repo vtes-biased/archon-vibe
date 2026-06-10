@@ -11,7 +11,7 @@
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
-  import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, stripLeadingTitle, descriptionExcerpt, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ChevronDown, ChevronRight, ExternalLink, MapPin, QrCode, CloudOff } from "lucide-svelte";
   import { renderMarkdown } from "$lib/markdown";
@@ -661,18 +661,20 @@ import TournamentModals from "./TournamentModals.svelte";
       <!-- Collapsible description -->
       {#if tournament.description}
         {@const cleaned = stripLeadingTitle(tournament.description, tournament.name)}
+        {@const excerpt = descriptionExcerpt(cleaned)}
         <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6">
           <button
             onclick={() => descriptionExpanded = !descriptionExpanded}
+            aria-expanded={descriptionExpanded}
             class="w-full flex items-center gap-2 px-4 py-3 text-left text-sm font-medium text-ash-300 hover:text-bone-100 transition-colors"
           >
-            {#if descriptionExpanded}<ChevronDown class="w-4 h-4 shrink-0" />{:else}<ChevronRight class="w-4 h-4 shrink-0" />{/if}
+            {#if descriptionExpanded}<ChevronDown class="w-4 h-4 shrink-0" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4 shrink-0" aria-hidden="true" />{/if}
             {m.common_description()}
           </button>
           {#if descriptionExpanded}
             <div class="px-4 pb-4 prose dark:prose-invert prose-sm max-w-none">{@html renderMarkdown(cleaned)}</div>
           {:else}
-            <div class="px-4 pb-3 text-sm text-ash-400 line-clamp-3">{@html renderMarkdown(cleaned)}</div>
+            <div class="px-4 pb-3 text-sm text-ash-400">{excerpt.text}{#if excerpt.truncated}<span aria-hidden="true">…</span>{/if}</div>
           {/if}
         </div>
       {/if}
