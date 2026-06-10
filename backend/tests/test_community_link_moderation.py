@@ -56,10 +56,10 @@ MATRIX = [
     ([Role.NC], "promote_national", "FR", 200),
     ([Role.NC], "promote_national", "US", 403),
     ([Role.PRINCE], "promote_national", "FR", 403),
-    # --- promote_international: IC only ---
-    ([Role.IC], "promote_international", "FR", 200),
-    ([Role.NC], "promote_international", "FR", 403),
-    ([Role.PRINCE], "promote_international", "FR", 403),
+    # --- promote_global: IC only ---
+    ([Role.IC], "promote_global", "FR", 200),
+    ([Role.NC], "promote_global", "FR", 403),
+    ([Role.PRINCE], "promote_global", "FR", 403),
 ]
 
 
@@ -82,7 +82,7 @@ async def test_moderation_permission_matrix(
 @pytest.mark.asyncio
 async def test_promote_persists_scope(test_client: AsyncClient, test_db):
     """A successful promote stamps the moderation status and the scope that the
-    frontend filter consumes — national for the country's NC, international for IC."""
+    frontend filter consumes — national for the country's NC, global for IC."""
     nc = await _insert_user(roles=[Role.NC], country="FR")
     ic = await _insert_user(roles=[Role.IC], country="FR")
     target_nat = await _insert_user(roles=[], country="FR")
@@ -100,12 +100,12 @@ async def test_promote_persists_scope(test_client: AsyncClient, test_db):
 
     r2 = await test_client.patch(
         f"/api/users/{target_intl.uid}/community-link-moderation",
-        json={"url": LINK_URL, "action": "promote_international"},
+        json={"url": LINK_URL, "action": "promote_global"},
         headers=make_auth_header(ic.uid),
     )
     assert r2.status_code == 200
     stored = await db.get_user_by_uid(target_intl.uid)
-    assert stored.community_links[0].moderation.scope == "international"
+    assert stored.community_links[0].moderation.scope == "global"
 
 
 @pytest.mark.asyncio
@@ -115,9 +115,9 @@ async def test_self_moderation_allowed(test_client: AsyncClient, test_db):
     ic = await _insert_user(roles=[Role.IC], country="FR")
     response = await test_client.patch(
         f"/api/users/{ic.uid}/community-link-moderation",
-        json={"url": LINK_URL, "action": "promote_international"},
+        json={"url": LINK_URL, "action": "promote_global"},
         headers=make_auth_header(ic.uid),
     )
     assert response.status_code == 200
     stored = await db.get_user_by_uid(ic.uid)
-    assert stored.community_links[0].moderation.scope == "international"
+    assert stored.community_links[0].moderation.scope == "global"
