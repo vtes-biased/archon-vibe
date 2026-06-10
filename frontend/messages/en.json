@@ -585,6 +585,7 @@
   "players_no_deck": "No deck uploaded",
   "players_view_deck": "View deck",
   "rounds_no_rounds": "No rounds played yet.",
+  "rounds_no_rounds_recorded": "No rounds recorded.",
   "rounds_round_in_progress": "Round {n} in progress",
   "rounds_seating_invalid": "Invalid Seating",
   "rounds_seating_perfect": "Perfect",

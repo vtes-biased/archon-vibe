@@ -585,6 +585,7 @@
   "players_no_deck": "Sin deck cargado",
   "players_view_deck": "Ver deck",
   "rounds_no_rounds": "No se han jugado rondas todavía.",
+  "rounds_no_rounds_recorded": "No hay rondas registradas.",
   "rounds_round_in_progress": "Ronda {n} en progreso",
   "rounds_seating_invalid": "Asientos inválidos",
   "rounds_seating_perfect": "Perfecto",

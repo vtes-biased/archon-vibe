@@ -585,6 +585,7 @@
   "players_no_deck": "Aucun deck téléchargé",
   "players_view_deck": "Voir le deck",
   "rounds_no_rounds": "Aucune ronde jouée pour le moment.",
+  "rounds_no_rounds_recorded": "Aucune ronde enregistrée.",
   "rounds_round_in_progress": "Ronde {n} en cours",
   "rounds_seating_invalid": "Placement invalide",
   "rounds_seating_perfect": "Parfait",

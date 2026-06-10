@@ -585,6 +585,7 @@
   "players_no_deck": "Nenhum deck enviado",
   "players_view_deck": "Ver deck",
   "rounds_no_rounds": "Nenhuma rodada jogada ainda.",
+  "rounds_no_rounds_recorded": "Nenhuma rodada registrada.",
   "rounds_round_in_progress": "Rodada {n} em andamento",
   "rounds_seating_invalid": "Alocação Inválida",
   "rounds_seating_perfect": "Perfeito",

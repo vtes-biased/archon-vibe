@@ -371,7 +371,12 @@
   {/if}
 
   {#if tournament.rounds!.length === 0}
-    <p class="text-ash-400">{m.rounds_no_rounds()}</p>
+    <!-- VEKN-synced tournaments carry standings but no round details (engine
+         preserves them: standings.rs update_standings guard). Distinguish those
+         from a not-yet-played event, which has neither. -->
+    <p class="text-ash-400">
+      {(tournament.standings?.length ?? 0) > 0 ? m.rounds_no_rounds_recorded() : m.rounds_no_rounds()}
+    </p>
   {:else}
     <!-- Current round controls -->
     {#if isOrganizer && currentRoundIdx >= 0 && !hasParallelRounds}
