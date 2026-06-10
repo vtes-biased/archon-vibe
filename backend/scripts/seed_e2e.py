@@ -74,7 +74,7 @@ PLAYER_LINKS: list[list[CommunityLink]] = [
             type=CommunityLinkType.BLOG,
             url="https://alice-vtes.blog",
             label="Alice's Blog",
-            language="en",
+            languages=["en"],
         )
     ],
     [],  # Bob
@@ -88,7 +88,7 @@ PLAYER_LINKS: list[list[CommunityLink]] = [
             type=CommunityLinkType.YOUTUBE,
             url="https://youtube.com/@vtes-fr",
             label="VTES FR",
-            language="fr",
+            languages=["fr"],
         ),
     ],
     [
@@ -151,7 +151,7 @@ async def seed() -> dict:
                 type=CommunityLinkType.YOUTUBE,
                 url="https://youtube.com/@vtes-channel",
                 label="VTES Channel",
-                language="en",
+                languages=["en"],
             ),
         ],
     )
