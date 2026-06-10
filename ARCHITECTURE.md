@@ -504,7 +504,7 @@ Failures are log-only. The object is saved with the flag unset (`external_ids.ve
 **Batch push** (`batch_push()` in `vekn_push.py`): Hourly scheduled job catches all missed real-time pushes:
 - Members: `vekn_synced=false`
 - Tournament events: `external_ids.vekn` absent
-- Tournament results: `vekn_pushed_at IS NULL` AND `rounds` array non-empty (guards imported/ETL-migrated tournaments whose results did not originate in-app)
+- Tournament results: `vekn_pushed_at IS NULL` AND `rounds` array non-empty (guards VEKN-imported and archon-merged tournaments — both stamp `vekn_pushed_at` so results are never re-uploaded)
 
 **archondata format** (VEKN API for result upload):
 ```
@@ -796,7 +796,8 @@ Pulls data FROM vekn.net into Archon. Runs periodically (default every 6h).
 
 `VEKNSyncService` pulls the full VEKN member roster and reconciles with local users:
 - Creates new User objects for unknown VEKN IDs
-- Updates names, countries, roles for existing members
+- Updates identity (name, country, city/state) for existing members
+- Never writes roles: seeded once by the ETL/legacy-archon sync, app-managed thereafter
 - Infers `coopted_by` relationships
 - Non-destructive: locally-modified fields (tracked in `local_modifications`) are never overwritten
 
@@ -840,6 +841,35 @@ Pulls winner decklists from [static.krcg.org/data/twda.json](https://static.krcg
 **ETag caching**: In-memory only (no persistent cache). `~12MB` JSON released via `del raw_entries` after parsing.
 
 **Key file**: `backend/src/twda_import.py`
+
+## Legacy-Archon Sync (`migrate_from_archon.py`)
+
+`backend/scripts/migrate_from_archon.py` — two modes, same mapping code:
+
+- **Insert-only ETL** (default): initial population of an empty new DB (`--truncate` wipes first). Used for beta rebuilds and as a disaster fallback.
+- **Idempotent merge** (`--merge`): daily run on the new stack during the parallel-run period, old archon being a read-only second upstream until decommission. Cutover is freeze + final merge + vhost swap (no Phase-2 wipe).
+
+**Single writer per field** (prevents daily flip-flop between syncs):
+
+| Data | Writer |
+|------|--------|
+| identity (name/country/city/state) | VEKN sync |
+| contact / nickname / discord / coopted_by / community links | archon sync |
+| roles | nobody — seeded once by ETL, app-managed thereafter |
+| sanctions, leagues | archon sync (upsert by source uid) |
+| rich play data (rounds/seatings/decks/finals) | archon sync |
+| `local_modifications` fields | nobody — local user edits trump both syncs |
+
+**Tournament matching** (merge mode, at most one live tournament per vekn event id):
+1. Match by uid (previously merged/ETL-imported) → idempotent update.
+2. Else match by `external_ids.archon` (set when a prior run merged into a vekn-created copy) or `external_ids.vekn` → merge rich data INTO the vekn-created copy (its uid survives). Echo guard: round-less incoming copy never overwrites a rich original.
+3. Else insert under old-archon uid.
+
+Both-rich conflict (one-app-per-event violation) → logged loudly, skipped.
+
+**Other invariants**: deterministic deck uids (uuid5 of tournament+user+round); pre-run `pg_dump` of the new DB (restore-fix-rerun recovery); merge writes are NOT live-broadcast over SSE (standalone process — clients catch up on next SSE reconnect); `vekn_pushed_at` stamped on merged finished tournaments so `batch_push` never re-uploads them.
+
+**Runner**: systemd timer invoking the script directly (not an in-app scheduled job). Env: `OLD_DATABASE_URL`, `NEW_DATABASE_URL`.
 
 ## Archon Import
 
@@ -885,6 +915,7 @@ Splits one account into two: the VEKN record keeps its uid and all keyed data (s
 | Job | Schedule | Module | Description |
 |-----|----------|--------|-------------|
 | VEKN sync | Every 6h (configurable) | `vekn_sync.py`, `vekn_tournament_sync.py`, `twda_import.py` | Pull members + historical tournaments from VEKN; import TWDA winner decks |
+| Legacy-archon merge | Daily (systemd timer) | `scripts/migrate_from_archon.py --merge` | Idempotent daily merge from old archon DB during the parallel-run period (parallel run only; decommissioned at cutover). See single-writer-per-field contract in [Legacy-Archon Sync](#legacy-archon-sync-migrate_from_archonpy) |
 | VEKN push | Every 1h (configurable) | `vekn_push.py` | Batch push missed tournament events/results/members |
 | Sanction cleanup | Daily | `db.py` | Soft-delete expired (>18mo), hard-delete soft-deleted (>30d) |
 | Rating recompute | Daily | `ratings.py` | Full recompute of all player ratings and wins |

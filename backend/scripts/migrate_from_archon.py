@@ -1,19 +1,44 @@
-"""ETL: legacy **archon** DB → **archon-vibe** unified `objects` table.
+"""ETL + daily merge: legacy **archon** DB → **archon-vibe** unified `objects` table.
 
-Phase 0 of the production migration. Reads the OLD archon Postgres
-(members / leagues / tournaments / clients / member_deletions) and writes the NEW
-archon-vibe schema, REUSING the backend's own `save_*` helpers so the
-public/member/full access projections are computed byte-identically to runtime.
+Two modes against the same mapping code:
 
-Mapping decisions are recorded in `.pst/details/35-archon-production-migration.md`.
-Highlights:
-  * roles    Admin→IC, Playtester→PT (others identical)
+* **Insert-only ETL** (default): Phase 0 of the production migration — initial
+  population of an empty new DB (`--truncate` wipes first). Kept for beta
+  rebuilds and as a disaster fallback.
+* **Idempotent merge** (`--merge`): run daily on the new stack during the
+  parallel run, old archon being a temporary second upstream (read-only) until
+  decommission. Single writer per field: the VEKN sync owns identity
+  (name/country/city/state), this sync owns archon-local fields (contact /
+  nickname / discord / coopted_by, sanctions, leagues, rich play data), and
+  ROLES are written by neither — seeded once by the ETL (or on first merge
+  insert of a member), app-managed thereafter. Fields recorded in
+  `User.local_modifications` are never overwritten (same contract as the VEKN
+  member sync). Merge mode takes a pre-run `pg_dump` of the NEW DB so a buggy
+  merge is restore-fix-rerun.
+
+Reads the OLD archon Postgres (members / leagues / tournaments / clients /
+member_deletions) and writes the NEW archon-vibe schema, REUSING the backend's
+own `save_*` helpers so the public/member/full access projections are computed
+byte-identically to runtime. Note: writes from this script are NOT broadcast
+live over SSE (broadcast is in-process in the backend); clients pick them up
+through the catch-up sync on their next SSE reconnect.
+
+Mapping decisions are recorded in `.pst/details/35-archon-production-migration.md`,
+merge semantics in `.pst/details/115-legacy-archon-sync.md`. Highlights:
+  * roles    Admin→IC, Playtester→PT (others identical) — seed only, see above
   * format   Draft→Limited (draft is a limited format)
   * rank     Grand Prix→BASIC (new model has no GP rank; GP lives in league mode)
   * state    Finals→Playing (new model has no FINALS tournament state)
   * sanctions old free-ish category/level → new JG-v2 category(+subcategory)
   * OAuth    clients table is empty in prod → nothing to migrate (re-register)
-  * ratings  skipped — recomputed from tournaments post-import (Phase 2)
+  * ratings  skipped — recomputed from tournaments post-import
+
+Tournament matching in merge mode (at most one LIVE tournament per vekn event
+id): match by uid, else by `external_ids.archon` (set when a previous run
+merged the rich payload into a vekn-created copy), else by `external_ids.vekn`
+— rich data merges INTO the vekn-created copy (its uid survives, deep links
+stay valid); a round-less incoming copy never overwrites a rich original (echo
+guard); both rich is a one-app-per-event violation: logged loudly, skipped.
 
 Dry-run against the sandbox:
     cd backend
@@ -22,13 +47,15 @@ Dry-run against the sandbox:
     uv run python scripts/migrate_from_archon.py --truncate
 
 `--limit N` caps each type for quick smoke runs; `--truncate` wipes the new
-objects/auth_methods first so reruns are idempotent.
+objects/auth_methods first so ETL reruns are idempotent.
 """
 
 import argparse
 import asyncio
 import os
+import subprocess
 import sys
+import uuid
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -39,6 +66,7 @@ backend_dir = Path(__file__).parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+import msgspec
 import psycopg
 from psycopg.rows import dict_row
 from src import db
@@ -69,6 +97,7 @@ from src.models import (
     TournamentRank,
     TournamentState,
 )
+from src.vekn_sync import OFFICIALS_EMAILS
 from uuid6 import uuid7
 
 # --------------------------------------------------------------------------- #
@@ -182,6 +211,29 @@ STANDINGS_MODE_MAP: dict[str, StandingsMode] = {
     "Public": StandingsMode.PUBLIC,
 }
 
+# Archon-local member fields this sync owns in merge mode. Identity
+# (name/country/city/state) is the VEKN sync's (old-archon identity edits reach
+# us through vekn.net), roles are app-managed post-seed, and anything listed in
+# the user's local_modifications is never overwritten.
+ARCHON_USER_FIELDS = (
+    "nickname",
+    "contact_email",
+    "contact_discord",
+    "discord_id",
+    "contact_phone",
+    "phone_is_whatsapp",
+    "coopted_by",
+)
+
+# Deterministic deck identity: one deck per (tournament, user, round) — reruns
+# replace-by-key instead of inserting duplicates.
+DECK_NS = uuid.uuid5(uuid.NAMESPACE_URL, "archon-vibe/legacy-deck")
+
+
+def deck_uid(tuid: str, puid: str, round_idx: int | None) -> str:
+    return str(uuid.uuid5(DECK_NS, f"{tuid}:{puid}:{round_idx}"))
+
+
 # --------------------------------------------------------------------------- #
 # Small helpers                                                                #
 # --------------------------------------------------------------------------- #
@@ -231,18 +283,213 @@ def flatten_deck(krcg: dict) -> dict[str, int]:
     return cards
 
 
+def same_but_modified(built: msgspec.Struct, existing: msgspec.Struct) -> bool:
+    """True when `built` equals `existing` apart from the `modified` timestamp —
+    the merge's skip-if-unchanged test (avoids daily rewrite + SSE churn for
+    every object)."""
+    return msgspec.structs.replace(built, modified=existing.modified) == existing
+
+
 class Stats(Counter):
     def bump(self, key: str, n: int = 1) -> None:
         self[key] += n
 
 
+def loud(msg: str) -> None:
+    """Conflicts and dedups must stand out in the (journald) logs."""
+    print(f"!! {msg}", flush=True)
+
+
 # --------------------------------------------------------------------------- #
-# Migrators                                                                    #
+# Live-object lookups (merge mode)                                             #
+#                                                                              #
+# Soft-deleted rows must not match: tombstones from previous dedups would      #
+# otherwise shadow the live holder.                                            #
 # --------------------------------------------------------------------------- #
+
+
+async def live_user_by_vekn_id(vekn_id: str) -> db.User | None:
+    async with db.get_connection() as conn:
+        res = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'user' AND "full"->>'vekn_id' = %s
+              AND deleted_at IS NULL LIMIT 1""",
+            (vekn_id,),
+        )
+        row = await res.fetchone()
+    return db.decode_json(row[0], db.User) if row else None
+
+
+async def live_tournament_by_ext(platform: str, ext_id: str) -> Tournament | None:
+    async with db.get_connection() as conn:
+        res = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'tournament' AND "full"->'external_ids'->>%s = %s
+              AND deleted_at IS NULL LIMIT 1""",
+            (platform, ext_id),
+        )
+        row = await res.fetchone()
+    return db.decode_json(row[0], Tournament) if row else None
+
+
+async def other_live_vekn_holders(ext_id: str, but_uid: str) -> list[Tournament]:
+    async with db.get_connection() as conn:
+        res = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' = %s
+              AND uid != %s AND deleted_at IS NULL""",
+            (ext_id, but_uid),
+        )
+        rows = await res.fetchall()
+    return [db.decode_json(row[0], Tournament) for row in rows]
+
+
+# --------------------------------------------------------------------------- #
+# Members                                                                      #
+# --------------------------------------------------------------------------- #
+
+
+def build_user(row: dict, stats: Stats) -> tuple[db.User, dict]:
+    """Old member row → (User, discord blob). Pure mapping, no I/O."""
+    d = row["data"] or {}
+    uid = str(row["uid"])
+    discord = d.get("discord") or {}
+    whatsapp = nz(d.get("whatsapp"))
+    roles: list[Role] = []
+    for r in d.get("roles", []):
+        mapped = ROLE_MAP.get(r)
+        if mapped:
+            roles.append(mapped)
+        else:
+            stats.bump(f"warn.unknown_role:{r}")
+
+    user = db.User(
+        uid=uid,
+        modified=parse_dt(row["last_updated"]) or datetime.now(UTC),
+        name=d.get("name") or "(unknown)",
+        country=nz(d.get("country")),
+        vekn_id=nz(row.get("vekn")) or nz(d.get("vekn")),
+        city=nz(d.get("city")),
+        city_geoname_id=d.get("city_geoname_id"),
+        nickname=nz(d.get("nickname")),
+        # Roles are SEEDED here (first appearance of the member) and app-managed
+        # from then on: no sync — VEKN or this one — ever writes roles again.
+        roles=roles,
+        contact_email=nz(d.get("email")),
+        contact_discord=nz(discord.get("username")) or nz(discord.get("global_name")),
+        discord_id=nz(discord.get("id")),
+        contact_phone=whatsapp,
+        phone_is_whatsapp=bool(whatsapp),
+        coopted_by=nz(d.get("sponsor")),
+        vekn_prefix=nz(d.get("prefix")),
+        # Imported members owe no VEKN push: they either already exist in the
+        # vekn.net registry or predate it. Without this, batch_push would
+        # re-register ~19k members on its first run (model default False), and
+        # the residue unmatched by the first member sync would stay
+        # push-eligible forever.
+        vekn_synced=True,
+    )
+    return user, discord
+
+
+async def ensure_discord_auth(user_uid: str, discord: dict, stats: Stats) -> None:
+    """Insert the Discord auth method if that Discord account isn't linked yet.
+
+    Legacy password hashes are NOT argon2 and can't be verified by the new
+    stack, so no (broken) email/password auth is created — email users
+    re-establish access via magic-link (keyed on the migrated contact_email) or
+    Discord.
+    """
+    discord_id = nz(discord.get("id"))
+    if not discord_id:
+        return
+    existing = await db.get_auth_method_by_identifier("discord", discord_id)
+    if existing:
+        if existing.user_uid != user_uid:
+            loud(
+                f"discord auth conflict: account {discord_id} linked to user "
+                f"{existing.user_uid}, old archon says {user_uid} — left alone"
+            )
+            stats.bump("warn.discord_auth_conflict")
+        return
+    await db.insert_auth_method(
+        AuthMethod(
+            uid=str(uuid7()),
+            modified=datetime.now(UTC),
+            user_uid=user_uid,
+            method_type=AuthMethodType.DISCORD,
+            identifier=discord_id,
+            verified=bool(discord.get("verified", True)),
+        )
+    )
+    stats.bump("auth.discord")
+
+
+async def merge_member(user: db.User, discord: dict, stats: Stats) -> None:
+    """Idempotent member upsert: insert new members wholesale (the seed), merge
+    only archon-owned fields into existing ones."""
+    existing = await db.get_user_by_uid(user.uid)
+
+    if existing is None:
+        if user.vekn_id:
+            # vekn-first echo: a member created on old archon reached us through
+            # the vekn.net member sync first, under a fresh uid. The old-archon
+            # copy carries the history (contacts, auth, references from its
+            # tournaments) — it wins; tombstone the identity-only vekn copy.
+            holder = await live_user_by_vekn_id(user.vekn_id)
+            if holder is not None:
+                now = datetime.now(UTC)
+                holder.deleted_at = now
+                holder.modified = now
+                # The unique index on vekn_id spans tombstones (one user per
+                # vekn id, ever): release the number to the surviving user.
+                holder.vekn_id = None
+                await db.save_user(holder)
+                loud(
+                    f"member dedup: soft-deleted vekn-created user {holder.uid} "
+                    f"(vekn {user.vekn_id}); old-archon user {user.uid} takes over"
+                )
+                stats.bump("members.vekn_copy_tombstoned")
+        await db.save_user(user)
+        await ensure_discord_auth(user.uid, discord, stats)
+        stats.bump("members.inserted")
+        return
+
+    if existing.deleted_at:
+        # Deleted on the new stack — never resurrect from upstream.
+        stats.bump("members.skipped_deleted")
+        return
+
+    changed = False
+    for field in ARCHON_USER_FIELDS:
+        if field in existing.local_modifications:
+            continue
+        value = getattr(user, field)
+        # coopted_by: the VEKN sync infers sponsors for members old archon has
+        # none recorded for — an old-archon None must not wipe that inference
+        # (it would flip-flop daily with the inference re-filling it).
+        if field == "coopted_by" and value is None:
+            continue
+        # Officials' contact_email is injected by the VEKN member sync from the
+        # scraped vekn.net lists — writing old archon's address here would
+        # flip-flop daily with that injection.
+        if field == "contact_email" and existing.vekn_id in OFFICIALS_EMAILS:
+            continue
+        if getattr(existing, field) != value:
+            setattr(existing, field, value)
+            changed = True
+    if changed:
+        existing.modified = datetime.now(UTC)
+        await db.save_user(existing)
+        stats.bump("members.updated")
+    else:
+        stats.bump("members.unchanged")
+    if "discord_id" not in existing.local_modifications:
+        await ensure_discord_auth(existing.uid, discord, stats)
 
 
 async def migrate_members(
-    old: psycopg.AsyncConnection, stats: Stats, limit: int | None
+    old: psycopg.AsyncConnection, stats: Stats, limit: int | None, merge: bool
 ) -> set[str]:
     """members → User (+ AuthMethod rows). Returns the set of live user uids."""
     live: set[str] = set()
@@ -253,82 +500,25 @@ async def migrate_members(
         cur.itersize = 500
         await cur.execute(q)
         async for row in cur:
-            d = row["data"] or {}
-            uid = str(row["uid"])
-            discord = d.get("discord") or {}
-            whatsapp = nz(d.get("whatsapp"))
-            roles: list[Role] = []
-            for r in d.get("roles", []):
-                mapped = ROLE_MAP.get(r)
-                if mapped:
-                    roles.append(mapped)
-                else:
-                    stats.bump(f"warn.unknown_role:{r}")
-
-            user = db.User(
-                uid=uid,
-                modified=parse_dt(row["last_updated"]) or datetime.now(UTC),
-                name=d.get("name") or "(unknown)",
-                country=nz(d.get("country")),
-                vekn_id=nz(row.get("vekn")) or nz(d.get("vekn")),
-                city=nz(d.get("city")),
-                city_geoname_id=d.get("city_geoname_id"),
-                nickname=nz(d.get("nickname")),
-                roles=roles,
-                contact_email=nz(d.get("email")),
-                contact_discord=nz(discord.get("username"))
-                or nz(discord.get("global_name")),
-                discord_id=nz(discord.get("id")),
-                contact_phone=whatsapp,
-                phone_is_whatsapp=bool(whatsapp),
-                coopted_by=nz(d.get("sponsor")),
-                vekn_prefix=nz(d.get("prefix")),
-                # Imported members owe no VEKN push: they either already exist in
-                # the vekn.net registry or predate it. Without this, batch_push
-                # would re-register ~19k members on its first run (model default
-                # False), and the residue unmatched by the first member sync
-                # would stay push-eligible forever.
-                vekn_synced=True,
-                # Protect existing role assignments from the later VEKN sync, which
-                # only derives Prince/NC/IC/static-judges and would otherwise strip
-                # archon-assigned Judge/Judgekin/Ethics/Rulemonger/PTC/PT. Role-less
-                # users stay unprotected so VEKN can still grant Prince/NC. Identity
-                # fields (name/country/city/state) are intentionally left for VEKN to
-                # own (authoritative registry).
-                local_modifications={"roles"} if roles else set(),
-            )
-            await db.save_user(user)
-            live.add(uid)
+            user, discord = build_user(row, stats)
+            if merge:
+                await merge_member(user, discord, stats)
+            else:
+                await db.save_user(user)
+                await ensure_discord_auth(user.uid, discord, stats)
+            live.add(user.uid)
             stats.bump("users")
-
-            # auth methods: Discord only. Legacy password hashes are NOT argon2 and
-            # can't be verified by the new stack, so no (broken) email/password auth is
-            # created — email users re-establish access via magic-link (keyed on the
-            # migrated contact_email) or Discord. Discord login keeps working via the
-            # migrated discord_id.
-            if nz(discord.get("id")):
-                await db.insert_auth_method(
-                    AuthMethod(
-                        uid=str(uuid7()),
-                        modified=datetime.now(UTC),
-                        user_uid=uid,
-                        method_type=AuthMethodType.DISCORD,
-                        identifier=str(discord["id"]),
-                        verified=bool(discord.get("verified", True)),
-                    )
-                )
-                stats.bump("auth.discord")
-
             if stats["users"] % 2000 == 0:
                 print(f"  …{stats['users']} users")
     return live
 
 
 async def migrate_member_deletions(
-    old: psycopg.AsyncConnection, live: set[str], stats: Stats
+    old: psycopg.AsyncConnection, live: set[str], stats: Stats, merge: bool
 ) -> None:
-    """member_deletions → soft-deleted User shells (preserve referential integrity
-    for any historical record pointing at a deleted member)."""
+    """member_deletions → soft-deleted User shells (ETL: preserve referential
+    integrity for historical records pointing at a deleted member; merge: also
+    propagate deletions of members that exist live on the new stack)."""
     async with old.cursor(row_factory=dict_row) as cur:
         await cur.execute("SELECT uid, deleted_at FROM member_deletions")
         rows = await cur.fetchall()
@@ -337,6 +527,17 @@ async def migrate_member_deletions(
         if uid in live:
             continue  # a live member with the same uid wins
         del_at = parse_dt(row["deleted_at"]) or datetime.now(UTC)
+        if merge:
+            existing = await db.get_user_by_uid(uid)
+            if existing is not None:
+                if existing.deleted_at:
+                    continue  # already propagated
+                existing.deleted_at = del_at
+                existing.modified = datetime.now(UTC)
+                await db.save_user(existing)
+                loud(f"member deletion propagated from old archon: {uid}")
+                stats.bump("members.deletion_propagated")
+                continue
         await db.save_user(
             db.User(
                 uid=uid, modified=del_at, deleted_at=del_at, name="(deleted member)"
@@ -345,7 +546,14 @@ async def migrate_member_deletions(
         stats.bump("deleted_user_shells")
 
 
-async def migrate_leagues(old: psycopg.AsyncConnection, stats: Stats) -> None:
+# --------------------------------------------------------------------------- #
+# Leagues                                                                      #
+# --------------------------------------------------------------------------- #
+
+
+async def migrate_leagues(
+    old: psycopg.AsyncConnection, stats: Stats, merge: bool
+) -> None:
     async with old.cursor(row_factory=dict_row) as cur:
         await cur.execute("SELECT uid, start, finish, data FROM leagues")
         rows = await cur.fetchall()
@@ -375,8 +583,23 @@ async def migrate_leagues(old: psycopg.AsyncConnection, stats: Stats) -> None:
             ],
             parent_uid=nz(parent.get("uid")),
         )
+        if merge:
+            prev = await db.get_league_by_uid(league.uid)
+            if prev is not None:
+                if prev.deleted_at:
+                    stats.bump("leagues.skipped_deleted")
+                    continue
+                if same_but_modified(league, prev):
+                    stats.bump("leagues.unchanged")
+                    continue
+                league.modified = datetime.now(UTC)
         await db.save_league(league)
         stats.bump("leagues")
+
+
+# --------------------------------------------------------------------------- #
+# Sanctions                                                                    #
+# --------------------------------------------------------------------------- #
 
 
 def build_sanction(
@@ -405,6 +628,11 @@ def build_sanction(
         description=s.get("comment") or "",
         issued_at=issued_at,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Tournaments                                                                  #
+# --------------------------------------------------------------------------- #
 
 
 class _DeckCtx(NamedTuple):
@@ -467,245 +695,11 @@ def _build_seats(
     return seats
 
 
-async def migrate_tournaments(
-    old: psycopg.AsyncConnection,
-    sanctions: dict[str, Sanction],
-    stats: Stats,
-    limit: int | None,
-) -> None:
-    q = "SELECT uid, data FROM tournaments"
-    if limit:
-        q += f" LIMIT {limit}"
-    async with old.cursor(name="tournaments_cur", row_factory=dict_row) as cur:
-        cur.itersize = 200
-        await cur.execute(q)
-        async for row in cur:
-            d = row["data"] or {}
-            tuid = str(row["uid"])
-            players_dict: dict = d.get("players") or {}
-            finals_seeds = [str(x) for x in (d.get("finals_seeds") or [])]
-            finals_set = set(finals_seeds)
-            multideck = bool(d.get("multideck"))
-            state = STATE_MAP.get(d.get("state"), TournamentState.PLANNED)
-            finished = state == TournamentState.FINISHED
-            winner_uid = nz(d.get("winner")) or ""
-            decklists_mode = DECKLISTS_MODE_MAP.get(
-                d.get("decklists_mode"), DeckListsMode.WINNER
-            )
-
-            # rounds reshape: [Round{tables}] → [[Table]]; last round becomes the
-            # FinalsTable when finals_seeds is set.
-            old_rounds = d.get("rounds") or []
-            has_rounds = len(old_rounds) > 0
-            has_finals = bool(finals_seeds) and has_rounds
-            prelim_src = old_rounds[:-1] if has_finals else old_rounds
-            finals_src = old_rounds[-1] if has_finals else None
-            decks: list[DeckObject] = []
-
-            # Seat scores are PRESERVED from old archon (verified correct: 0 GW-rule
-            # violations across prod prelim seats, finals GW matches the engine's
-            # finals rule). VP/GW/TP are summed per player into prelim-only (feeds
-            # `standings`) and prelim+finals (feeds Player.result). Keeping the two
-            # separated is the actual fix: league scoring (league.rs) adds finals on
-            # top of prelim standings, and the old vekn-push bug came from folding
-            # finals into prelim. The new standings model is "prelim-only".
-            prelim: dict[str, list[float]] = {
-                str(u): [0.0, 0.0, 0.0] for u in players_dict
-            }
-            total: dict[str, list[float]] = {
-                str(u): [0.0, 0.0, 0.0] for u in players_dict
-            }
-            deck_ctx = _DeckCtx(
-                finished=finished,
-                mode=decklists_mode,
-                finals_set=frozenset(finals_set),
-                winner_uid=winner_uid,
-            )
-            seat_kw = {
-                "tuid": tuid,
-                "multideck": multideck,
-                "deck_ctx": deck_ctx,
-                "prelim": prelim,
-                "total": total,
-                "decks": decks,
-            }
-
-            new_rounds: list[list[Table]] = []
-            for ri, rd in enumerate(prelim_src):
-                new_rounds.append(
-                    [
-                        Table(
-                            seating=_build_seats(
-                                tbl.get("seating", []), ri, False, **seat_kw
-                            ),
-                            state=TABLE_STATE_MAP.get(
-                                tbl.get("state"), TableState.FINISHED
-                            ),
-                        )
-                        for tbl in rd.get("tables", [])
-                    ]
-                )
-
-            finals: FinalsTable | None = None
-            if finals_src and finals_src.get("tables"):
-                ftbl = finals_src["tables"][0]
-                finals = FinalsTable(
-                    seating=_build_seats(
-                        ftbl.get("seating", []), len(prelim_src), True, **seat_kw
-                    ),
-                    seed_order=finals_seeds,
-                    state=TABLE_STATE_MAP.get(ftbl.get("state"), TableState.FINISHED),
-                )
-
-            # players (result = prelim+finals for rich; old aggregate for round-less
-            # imports) + standings (prelim-only)
-            players: list[Player] = []
-            standings: list[Standing] = []
-            for puid, p in players_dict.items():
-                puid = str(puid)
-                toss = int(p.get("toss", 0) or 0)
-                finalist = puid in finals_set
-                if has_rounds:
-                    tg, tv, tt = total[puid]
-                    pg, pv, pt = prelim[puid]
-                    result = Score(gw=int(tg), vp=tv, tp=int(tt))
-                    standings.append(
-                        Standing(
-                            user_uid=puid,
-                            gw=float(int(pg)),
-                            vp=pv,
-                            tp=int(pt),
-                            toss=toss,
-                            finalist=finalist,
-                        )
-                    )
-                else:
-                    result = score_of(p.get("result"))
-                    standings.append(
-                        Standing(
-                            user_uid=puid,
-                            gw=float(result.gw),
-                            vp=result.vp,
-                            tp=result.tp,
-                            toss=toss,
-                            finalist=finalist,
-                        )
-                    )
-                players.append(
-                    Player(
-                        user_uid=puid,
-                        state=PLAYER_STATE_MAP.get(
-                            p.get("state"), PlayerState.REGISTERED
-                        ),
-                        toss=toss,
-                        result=result,
-                        finalist=finalist,
-                    )
-                )
-
-            # match engine sort: gw/vp/tp/toss desc, then uid asc (deterministic)
-            standings.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss, s.user_uid))
-
-            # monodeck default decks (round=None) from player.deck
-            for puid, p in players_dict.items():
-                if p.get("deck"):
-                    decks.append(
-                        _deck_obj(
-                            tuid,
-                            str(puid),
-                            None,
-                            p["deck"],
-                            _deck_public(str(puid), deck_ctx),
-                        )
-                    )
-
-            # description note for migrated Draft-format tournaments
-            description = d.get("description") or ""
-            if d.get("format") == "Draft":
-                description = ("[Originally Draft format] " + description).strip()
-
-            league_ref = d.get("league") or {}
-            # old archon stored the vekn.net event id in extra.vekn_id; the new stack
-            # keys vekn tournaments by external_ids["vekn"], so map it there — that lets
-            # the later VEKN tournament sync MATCH these instead of creating duplicates.
-            extra = d.get("extra") or {}
-            external_ids: dict[str, str] = {}
-            if extra.get("vekn_id") not in (None, "", 0):
-                external_ids["vekn"] = str(extra["vekn_id"])
-
-            t = Tournament(
-                uid=tuid,
-                modified=parse_dt(d.get("finish"))
-                or parse_dt(d.get("start"))
-                or datetime.now(UTC),
-                name=d.get("name") or "(unnamed tournament)",
-                format=FORMAT_MAP.get(d.get("format"), TournamentFormat.Standard),
-                rank=RANK_MAP.get(d.get("rank"), TournamentRank.BASIC),
-                online=bool(d.get("online")),
-                start=parse_dt(d.get("start")),
-                finish=parse_dt(d.get("finish")),
-                timezone=d.get("timezone") or "UTC",
-                country=nz(d.get("country")),
-                league_uid=nz(league_ref.get("uid")),
-                state=state,
-                organizers_uids=[
-                    str(j["uid"]) for j in d.get("judges", []) if j.get("uid")
-                ],
-                venue=d.get("venue") or "",
-                venue_url=d.get("venue_url") or "",
-                address=d.get("address") or "",
-                map_url=d.get("map_url") or "",
-                proxies=bool(d.get("proxies")),
-                multideck=multideck,
-                decklist_required=bool(d.get("decklist_required")),
-                description=description,
-                standings_mode=STANDINGS_MODE_MAP.get(
-                    d.get("standings_mode"), StandingsMode.PRIVATE
-                ),
-                decklists_mode=decklists_mode,
-                max_rounds=int(d.get("max_rounds", 0) or 0),
-                external_ids=external_ids,
-                checkin_code=d.get("checkin_code") or "",
-                players=players,
-                rounds=new_rounds,
-                finals=finals,
-                winner=winner_uid,
-                standings=standings,
-                # Imported finished tournaments owe no push: old archon already
-                # pushed them (or they predate pushing). Rich imports have rounds,
-                # so batch_push's rounds guard does NOT keep them out of the
-                # results push — and their standings fold finals in, while
-                # archondata assumes prelim-only (a re-push would send wrong
-                # numbers). Stamped whether or not they carry a vekn id, so the
-                # calendar-event query skips them too.
-                vekn_pushed_at=datetime.now(UTC) if finished else None,
-            )
-            await db.save_tournament(t)
-            stats.bump("tournaments")
-            stats.bump(f"tournament_state:{t.state.value}")
-            for deck in decks:
-                await db.save_object_from_model(db.ObjectType.DECK, deck)
-                stats.bump("decks")
-                if deck.public:
-                    stats.bump("decks_public")
-
-            # accumulate tournament-embedded sanctions (dict[member_uid → [Sanction]])
-            for member_uid, slist in (d.get("sanctions") or {}).items():
-                for s in slist:
-                    if s.get("uid"):
-                        sanctions[str(s["uid"])] = build_sanction(
-                            s, str(member_uid), tuid, stats
-                        )
-
-            if stats["tournaments"] % 1000 == 0:
-                print(f"  …{stats['tournaments']} tournaments")
-
-
 def _deck_obj(
     tuid: str, puid: str, round_idx: int | None, krcg: dict, public: bool
 ) -> DeckObject:
     return DeckObject(
-        uid=str(uuid7()),
+        uid=deck_uid(tuid, puid, round_idx),
         modified=datetime.now(UTC),
         tournament_uid=tuid,
         user_uid=puid,
@@ -719,6 +713,394 @@ def _deck_obj(
         attribution=None,
         public=public,
     )
+
+
+def build_tournament(
+    d: dict,
+    target_uid: str,
+    existing: Tournament | None,
+    sanctions: dict[str, Sanction],
+    stats: Stats,
+) -> tuple[Tournament, list[DeckObject]]:
+    """Old tournament JSON → (Tournament under target_uid, extracted decks).
+
+    Accumulates tournament-embedded sanctions into `sanctions` (keyed to
+    target_uid; tref-sourced tournament refs are remapped by the caller)."""
+    players_dict: dict = d.get("players") or {}
+    finals_seeds = [str(x) for x in (d.get("finals_seeds") or [])]
+    finals_set = set(finals_seeds)
+    multideck = bool(d.get("multideck"))
+    state = STATE_MAP.get(d.get("state"), TournamentState.PLANNED)
+    finished = state == TournamentState.FINISHED
+    winner_uid = nz(d.get("winner")) or ""
+    decklists_mode = DECKLISTS_MODE_MAP.get(
+        d.get("decklists_mode"), DeckListsMode.WINNER
+    )
+
+    # rounds reshape: [Round{tables}] → [[Table]]; last round becomes the
+    # FinalsTable when finals_seeds is set.
+    old_rounds = d.get("rounds") or []
+    has_rounds = len(old_rounds) > 0
+    has_finals = bool(finals_seeds) and has_rounds
+    prelim_src = old_rounds[:-1] if has_finals else old_rounds
+    finals_src = old_rounds[-1] if has_finals else None
+    decks: list[DeckObject] = []
+
+    # Seat scores are PRESERVED from old archon (verified correct: 0 GW-rule
+    # violations across prod prelim seats, finals GW matches the engine's
+    # finals rule). VP/GW/TP are summed per player into prelim-only (feeds
+    # `standings`) and prelim+finals (feeds Player.result). Keeping the two
+    # separated is the actual fix: league scoring (league.rs) adds finals on
+    # top of prelim standings, and the old vekn-push bug came from folding
+    # finals into prelim. The new standings model is "prelim-only".
+    prelim: dict[str, list[float]] = {str(u): [0.0, 0.0, 0.0] for u in players_dict}
+    total: dict[str, list[float]] = {str(u): [0.0, 0.0, 0.0] for u in players_dict}
+    deck_ctx = _DeckCtx(
+        finished=finished,
+        mode=decklists_mode,
+        finals_set=frozenset(finals_set),
+        winner_uid=winner_uid,
+    )
+    seat_kw = {
+        "tuid": target_uid,
+        "multideck": multideck,
+        "deck_ctx": deck_ctx,
+        "prelim": prelim,
+        "total": total,
+        "decks": decks,
+    }
+
+    new_rounds: list[list[Table]] = []
+    for ri, rd in enumerate(prelim_src):
+        new_rounds.append(
+            [
+                Table(
+                    seating=_build_seats(tbl.get("seating", []), ri, False, **seat_kw),
+                    state=TABLE_STATE_MAP.get(tbl.get("state"), TableState.FINISHED),
+                )
+                for tbl in rd.get("tables", [])
+            ]
+        )
+
+    finals: FinalsTable | None = None
+    if finals_src and finals_src.get("tables"):
+        ftbl = finals_src["tables"][0]
+        finals = FinalsTable(
+            seating=_build_seats(
+                ftbl.get("seating", []), len(prelim_src), True, **seat_kw
+            ),
+            seed_order=finals_seeds,
+            state=TABLE_STATE_MAP.get(ftbl.get("state"), TableState.FINISHED),
+        )
+
+    # players (result = prelim+finals for rich; old aggregate for round-less
+    # imports) + standings (prelim-only)
+    players: list[Player] = []
+    standings: list[Standing] = []
+    for puid, p in players_dict.items():
+        puid = str(puid)
+        toss = int(p.get("toss", 0) or 0)
+        finalist = puid in finals_set
+        if has_rounds:
+            tg, tv, tt = total[puid]
+            pg, pv, pt = prelim[puid]
+            result = Score(gw=int(tg), vp=tv, tp=int(tt))
+            standings.append(
+                Standing(
+                    user_uid=puid,
+                    gw=float(int(pg)),
+                    vp=pv,
+                    tp=int(pt),
+                    toss=toss,
+                    finalist=finalist,
+                )
+            )
+        else:
+            result = score_of(p.get("result"))
+            standings.append(
+                Standing(
+                    user_uid=puid,
+                    gw=float(result.gw),
+                    vp=result.vp,
+                    tp=result.tp,
+                    toss=toss,
+                    finalist=finalist,
+                )
+            )
+        players.append(
+            Player(
+                user_uid=puid,
+                state=PLAYER_STATE_MAP.get(p.get("state"), PlayerState.REGISTERED),
+                toss=toss,
+                result=result,
+                finalist=finalist,
+            )
+        )
+
+    # match engine sort: gw/vp/tp/toss desc, then uid asc (deterministic)
+    standings.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss, s.user_uid))
+
+    # monodeck default decks (round=None) from player.deck
+    for puid, p in players_dict.items():
+        if p.get("deck"):
+            decks.append(
+                _deck_obj(
+                    target_uid,
+                    str(puid),
+                    None,
+                    p["deck"],
+                    _deck_public(str(puid), deck_ctx),
+                )
+            )
+
+    # description note for migrated Draft-format tournaments
+    description = d.get("description") or ""
+    if d.get("format") == "Draft":
+        description = ("[Originally Draft format] " + description).strip()
+
+    league_ref = d.get("league") or {}
+    # old archon stored the vekn.net event id in extra.vekn_id; the new stack
+    # keys vekn tournaments by external_ids["vekn"], so map it there — that lets
+    # the later VEKN tournament sync MATCH these instead of creating duplicates.
+    # In merge mode, entries the new stack already carries are preserved, and
+    # the old-archon uid is recorded under "archon" when the rich payload
+    # merged into a vekn-created copy (so later runs find it again by marker
+    # instead of mistaking their own merge for a both-rich conflict).
+    old_uid = str(d.get("uid") or target_uid)
+    extra = d.get("extra") or {}
+    external_ids: dict[str, str] = dict(existing.external_ids) if existing else {}
+    if extra.get("vekn_id") not in (None, "", 0):
+        vekn_eid = str(extra["vekn_id"])
+        if external_ids.get("vekn") not in (None, vekn_eid):
+            loud(
+                f"vekn event id conflict on {target_uid}: ours "
+                f"{external_ids['vekn']} vs old archon {vekn_eid} — old archon wins"
+            )
+            stats.bump("warn.vekn_event_id_conflict")
+        external_ids["vekn"] = vekn_eid
+    if target_uid != old_uid:
+        external_ids["archon"] = old_uid
+
+    t = Tournament(
+        uid=target_uid,
+        modified=parse_dt(d.get("finish"))
+        or parse_dt(d.get("start"))
+        or datetime.now(UTC),
+        name=d.get("name") or "(unnamed tournament)",
+        format=FORMAT_MAP.get(d.get("format"), TournamentFormat.Standard),
+        rank=RANK_MAP.get(d.get("rank"), TournamentRank.BASIC),
+        online=bool(d.get("online")),
+        start=parse_dt(d.get("start")),
+        finish=parse_dt(d.get("finish")),
+        timezone=d.get("timezone") or "UTC",
+        country=nz(d.get("country")),
+        league_uid=nz(league_ref.get("uid")),
+        state=state,
+        organizers_uids=[str(j["uid"]) for j in d.get("judges", []) if j.get("uid")],
+        venue=d.get("venue") or "",
+        venue_url=d.get("venue_url") or "",
+        address=d.get("address") or "",
+        map_url=d.get("map_url") or "",
+        proxies=bool(d.get("proxies")),
+        multideck=multideck,
+        decklist_required=bool(d.get("decklist_required")),
+        description=description,
+        standings_mode=STANDINGS_MODE_MAP.get(
+            d.get("standings_mode"), StandingsMode.PRIVATE
+        ),
+        decklists_mode=decklists_mode,
+        max_rounds=int(d.get("max_rounds", 0) or 0),
+        external_ids=external_ids,
+        checkin_code=d.get("checkin_code") or "",
+        players=players,
+        rounds=new_rounds,
+        finals=finals,
+        winner=winner_uid,
+        standings=standings,
+        # Imported finished tournaments owe no push: old archon already pushed
+        # them (or they predate pushing). Rich imports have rounds, so
+        # batch_push's rounds guard does NOT keep them out of the results push
+        # — an unstamped import would re-upload results old archon already
+        # ratified. Stamped whether or not they carry a vekn id, so the
+        # calendar-event query skips them too. An existing stamp is preserved.
+        vekn_pushed_at=(existing.vekn_pushed_at if existing else None)
+        or (datetime.now(UTC) if finished else None),
+    )
+
+    # accumulate tournament-embedded sanctions (dict[member_uid → [Sanction]])
+    for member_uid, slist in (d.get("sanctions") or {}).items():
+        for s in slist:
+            if s.get("uid"):
+                sanctions[str(s["uid"])] = build_sanction(
+                    s, str(member_uid), target_uid, stats
+                )
+
+    return t, decks
+
+
+async def process_tournament_row(
+    row: dict,
+    sanctions: dict[str, Sanction],
+    stats: Stats,
+    merge: bool,
+    uid_map: dict[str, str],
+) -> None:
+    """Migrate/merge one old tournament row. Records old_uid → surviving uid in
+    `uid_map` (used to remap sanction tournament refs)."""
+    d = dict(row["data"] or {})
+    old_uid = str(row["uid"])
+    d["uid"] = old_uid  # build_tournament reads it for the external_ids marker
+    extra = d.get("extra") or {}
+    vekn_eid = (
+        str(extra["vekn_id"]) if extra.get("vekn_id") not in (None, "", 0) else None
+    )
+
+    target_uid = old_uid
+    existing: Tournament | None = None
+    if merge:
+        existing = await db.get_tournament_by_uid(old_uid)
+        if existing is not None and existing.deleted_at:
+            # Deleted on the new stack — never resurrect from upstream.
+            uid_map[old_uid] = old_uid
+            stats.bump("tournaments.skipped_deleted")
+            return
+        if existing is None:
+            # A previous run merged this event's rich payload into a
+            # vekn-created copy: find it again by the marker.
+            existing = await live_tournament_by_ext("archon", old_uid)
+            if existing is not None:
+                target_uid = existing.uid
+        if existing is None and vekn_eid:
+            x = await live_tournament_by_ext("vekn", vekn_eid)
+            if x is not None:
+                incoming_rich = bool(d.get("rounds"))
+                if not incoming_rich:
+                    # Echo guard: old archon's round-less copy of an event whose
+                    # results live elsewhere (it synced them from vekn.net).
+                    # Never import the pale copy over the original.
+                    uid_map[old_uid] = x.uid
+                    stats.bump("tournaments.echo_skipped")
+                    return
+                if x.rounds:
+                    loud(
+                        f"BOTH-RICH conflict on vekn event {vekn_eid}: ours {x.uid} "
+                        f"and old archon {old_uid} both have rounds — one-app-per-"
+                        f"event violation, skipped; resolve manually"
+                    )
+                    uid_map[old_uid] = x.uid
+                    stats.bump("tournaments.both_rich_conflict")
+                    return
+                # Merge the rich payload INTO the vekn-created copy: its uid
+                # survives (deep links stay valid, no client tombstone); the
+                # next VEKN sync run hits the rich-guard and refreshes metadata
+                # only.
+                target_uid, existing = x.uid, x
+
+    t, decks = build_tournament(d, target_uid, existing, sanctions, stats)
+    uid_map[old_uid] = target_uid
+
+    # vekn-linked events: the VEKN tournament sync owns descriptive metadata —
+    # its rich-guard path refreshes name/format/rank/online/dates/timezone/
+    # country/venue fields from vekn.net and unions organizers. Writing old
+    # archon's values for those would flip-flop daily with that refresh. Keep
+    # the existing metadata, write play data + archon-only config, and union
+    # organizers the same way the VEKN sync does.
+    if merge and existing is not None and "vekn" in t.external_ids:
+        t = msgspec.structs.replace(
+            existing,
+            state=t.state,
+            league_uid=t.league_uid,
+            proxies=t.proxies,
+            multideck=t.multideck,
+            decklist_required=t.decklist_required,
+            description=t.description,
+            standings_mode=t.standings_mode,
+            decklists_mode=t.decklists_mode,
+            max_rounds=t.max_rounds,
+            external_ids=t.external_ids,
+            organizers_uids=list(
+                dict.fromkeys(existing.organizers_uids + t.organizers_uids)
+            ),
+            players=t.players,
+            rounds=t.rounds,
+            finals=t.finals,
+            winner=t.winner,
+            standings=t.standings,
+            vekn_pushed_at=t.vekn_pushed_at,
+            modified=t.modified,
+        )
+
+    stats.bump("tournaments")
+    if merge and existing is not None:
+        if same_but_modified(t, existing):
+            stats.bump("tournaments.unchanged")
+        else:
+            t.modified = datetime.now(UTC)
+            await db.save_tournament(t)
+            stats.bump("tournaments.updated")
+    else:
+        await db.save_tournament(t)
+        if merge:
+            stats.bump("tournaments.inserted")
+        stats.bump(f"tournament_state:{t.state.value}")
+
+    if merge and decks:
+        prev_decks = {
+            deck.uid: deck for deck in await db.get_decks_for_tournament(target_uid)
+        }
+        for deck in decks:
+            prev = prev_decks.get(deck.uid)
+            if prev is not None and same_but_modified(deck, prev):
+                continue
+            await db.save_object_from_model(db.ObjectType.DECK, deck)
+            stats.bump("decks.upserted")
+    else:
+        for deck in decks:
+            await db.save_object_from_model(db.ObjectType.DECK, deck)
+            stats.bump("decks")
+            if deck.public:
+                stats.bump("decks_public")
+
+    # Invariant: at most one live tournament per vekn event id. The archon-first
+    # interleave creates a second holder (this sync inserts rich pre-push, the
+    # VEKN sync creates a round-less copy before the rich one gains the id):
+    # the rich copy wins, the round-less one is tombstoned.
+    if merge and t.external_ids.get("vekn"):
+        for other in await other_live_vekn_holders(t.external_ids["vekn"], target_uid):
+            if other.rounds:
+                loud(
+                    f"BOTH-RICH conflict on vekn event {t.external_ids['vekn']}: "
+                    f"{target_uid} and {other.uid} both live with rounds — "
+                    f"resolve manually"
+                )
+                stats.bump("tournaments.both_rich_conflict")
+            else:
+                await db.soft_delete_tournament(other.uid)
+                loud(
+                    f"tournament dedup: soft-deleted round-less {other.uid} "
+                    f"(vekn event {t.external_ids['vekn']}); rich {target_uid} wins"
+                )
+                stats.bump("tournaments.roundless_copy_tombstoned")
+
+
+async def migrate_tournaments(
+    old: psycopg.AsyncConnection,
+    sanctions: dict[str, Sanction],
+    stats: Stats,
+    limit: int | None,
+    merge: bool,
+    uid_map: dict[str, str],
+) -> None:
+    q = "SELECT uid, data FROM tournaments"
+    if limit:
+        q += f" LIMIT {limit}"
+    async with old.cursor(name="tournaments_cur", row_factory=dict_row) as cur:
+        cur.itersize = 200
+        await cur.execute(q)
+        async for row in cur:
+            await process_tournament_row(row, sanctions, stats, merge, uid_map)
+            if stats["tournaments"] % 1000 == 0:
+                print(f"  …{stats['tournaments']} tournaments")
 
 
 async def migrate_member_sanctions(
@@ -739,6 +1121,28 @@ async def migrate_member_sanctions(
                     )
 
 
+async def save_sanctions(
+    sanctions: dict[str, Sanction],
+    stats: Stats,
+    merge: bool,
+    uid_map: dict[str, str],
+) -> None:
+    for s in sanctions.values():
+        # Remap tournament refs to the surviving uid for events whose rich
+        # payload merged into a vekn-created copy.
+        if s.tournament_uid:
+            s.tournament_uid = uid_map.get(s.tournament_uid, s.tournament_uid)
+        if merge:
+            prev = await db.get_sanction_by_uid(s.uid)
+            if prev is not None and same_but_modified(s, prev):
+                stats.bump("sanctions.unchanged")
+                continue
+            if prev is not None:
+                s.modified = datetime.now(UTC)
+        await db.save_sanction(s)
+        stats.bump("sanctions")
+
+
 # --------------------------------------------------------------------------- #
 # Entry point                                                                  #
 # --------------------------------------------------------------------------- #
@@ -750,9 +1154,24 @@ async def truncate_new() -> None:
         await conn.execute("TRUNCATE auth_methods")
 
 
+def backup_new_db(dsn: str, backup_dir: Path) -> Path:
+    """Pre-merge pg_dump of the NEW DB — a buggy merge is restore-fix-rerun.
+    Keeps the last 7 dumps."""
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    path = backup_dir / f"archon_vibe_premerge_{stamp}.dump"
+    subprocess.run(["pg_dump", "-Fc", "-f", str(path), dsn], check=True)
+    for stale in sorted(backup_dir.glob("archon_vibe_premerge_*.dump"))[:-7]:
+        stale.unlink()
+    return path
+
+
 async def run(args: argparse.Namespace) -> None:
     db.DB_URL = args.new_dsn
     os.environ["DATABASE_URL"] = args.new_dsn
+    if args.merge and not args.skip_backup:
+        path = backup_new_db(args.new_dsn, Path(args.backup_dir))
+        print(f"Pre-merge backup: {path}")
     await db.init_db()
     if args.truncate:
         print("Truncating new objects/auth_methods…")
@@ -763,32 +1182,35 @@ async def run(args: argparse.Namespace) -> None:
     old = await psycopg.AsyncConnection.connect(args.old_dsn, autocommit=False)
     stats = Stats()
     sanctions: dict[str, Sanction] = {}
+    uid_map: dict[str, str] = {}
     try:
         print("→ members")
-        live = await migrate_members(old, stats, args.limit)
+        live = await migrate_members(old, stats, args.limit, args.merge)
         print("→ member_deletions")
-        await migrate_member_deletions(old, live, stats)
+        await migrate_member_deletions(old, live, stats, args.merge)
         print("→ leagues")
-        await migrate_leagues(old, stats)
+        await migrate_leagues(old, stats, args.merge)
         print("→ tournaments (+ decks, + tournament sanctions)")
-        await migrate_tournaments(old, sanctions, stats, args.limit)
+        await migrate_tournaments(
+            old, sanctions, stats, args.limit, args.merge, uid_map
+        )
         print("→ member sanctions (union by uid)")
         await migrate_member_sanctions(old, sanctions, stats)
         print(f"→ sanctions ({len(sanctions)} distinct)")
-        for s in sanctions.values():
-            await db.save_sanction(s)
-            stats.bump("sanctions")
+        await save_sanctions(sanctions, stats, args.merge, uid_map)
     finally:
         await old.close()
         await db.close_db()
 
-    print("\n=== migration summary ===")
+    print(f"\n=== {'merge' if args.merge else 'migration'} summary ===")
     for k in sorted(stats):
         print(f"  {k:40s} {stats[k]}")
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="archon → archon-vibe ETL (Phase 0)")
+    p = argparse.ArgumentParser(
+        description="archon → archon-vibe ETL (initial population) / daily merge"
+    )
     p.add_argument(
         "--old-dsn", default=os.getenv("OLD_DATABASE_URL"), help="source archon DSN"
     )
@@ -804,11 +1226,28 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--truncate", action="store_true", help="wipe new objects/auth_methods first"
     )
+    p.add_argument(
+        "--merge",
+        action="store_true",
+        help="idempotent daily merge (parallel run) instead of insert-only ETL",
+    )
+    p.add_argument(
+        "--backup-dir",
+        default=os.getenv("MERGE_BACKUP_DIR", "."),
+        help="where --merge writes the pre-run pg_dump (keeps last 7)",
+    )
+    p.add_argument(
+        "--skip-backup",
+        action="store_true",
+        help="skip the pre-merge pg_dump (dev only)",
+    )
     args = p.parse_args()
     if not args.old_dsn or not args.new_dsn:
         p.error(
             "both --old-dsn and --new-dsn (or env OLD_DATABASE_URL / NEW_DATABASE_URL) are required"
         )
+    if args.merge and args.truncate:
+        p.error("--merge and --truncate are mutually exclusive")
     return args
 
 

@@ -872,11 +872,17 @@ async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] |
 async def get_tournament_by_external_id(
     platform: str, ext_id: str
 ) -> Tournament | None:
-    """Get a tournament by external ID (e.g., platform='vekn', ext_id='123')."""
+    """Get a LIVE tournament by external ID (e.g., platform='vekn', ext_id='123').
+
+    Soft-deleted holders are skipped: the legacy-archon merge tombstones
+    round-less duplicates of an event id — matching one here (VEKN tournament
+    sync) would refresh a dead copy instead of the surviving tournament.
+    """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'tournament' AND "full"->'external_ids'->>%s = %s LIMIT 1""",
+            WHERE type = 'tournament' AND "full"->'external_ids'->>%s = %s
+              AND deleted_at IS NULL LIMIT 1""",
             (platform, ext_id),
         )
         row = await result.fetchone()
@@ -915,13 +921,17 @@ async def get_finished_tournaments_for_category(
 ) -> list[Tournament]:
     """Get all FINISHED tournaments matching format/online within date window."""
     async with get_connection() as conn:
+        # finish is optional (the engine never stamps it on FinishTournament /
+        # FinishFinals) — fall back to start then modified, mirroring the date
+        # used for the rating entry itself (ratings.py).
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'tournament'
               AND "full"->>'state' = 'Finished'
               AND "full"->>'format' = %s
               AND ("full"->>'online')::boolean = %s
-              AND ("full"->>'finish')::timestamp >= %s::timestamp""",
+              AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')::timestamp
+                  >= %s::timestamp""",
             (format_value, online, since_date),
         )
         rows = await result.fetchall()

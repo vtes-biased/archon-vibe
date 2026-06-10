@@ -22,8 +22,9 @@ import psycopg
 SNAP = Path("/tmp/merge_baseline.json")
 FAIL, OK, WARN = "\033[31mFAIL\033[0m", "\033[32mok\033[0m", "\033[33mwarn\033[0m"
 
-# Roles VEKN sync cannot derive (it only knows Prince/NC/IC/static-judges); these
-# must survive the sync on migrated users.
+# Roles are seeded by the ETL and app-managed thereafter — no sync ever writes
+# them. These archon-seeded roles surviving the VEKN sync is the regression net
+# for that rule.
 PROTECTED_ROLES = ("Judge", "Judgekin", "Ethics", "Rulemonger", "PTC", "PT", "DEV")
 
 METRICS = {

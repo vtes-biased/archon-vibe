@@ -92,3 +92,33 @@ async def test_community_links_bad_url_rejected(test_client: AsyncClient, test_d
     )
     assert response.status_code == 422
     assert "invalid url" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_self_edited_contact_fields_flagged_local(
+    test_client: AsyncClient, test_db
+):
+    """A self-edit of contact fields and nickname records them in
+    local_modifications, so neither the VEKN sync (officials' email injection)
+    nor the legacy-archon merge silently reverts the user's own value. Without
+    this flag a daily sync would overwrite self-edited contact data."""
+    user = await _insert_user(roles=[], vekn_id="1000004")
+    response = await test_client.patch(
+        "/auth/me",
+        json={
+            "nickname": "MyNick",
+            "contact_email": "me@example.com",
+            "contact_phone": "+33123456789",
+            "phone_is_whatsapp": True,
+        },
+        headers=make_auth_header(user.uid),
+    )
+    assert response.status_code == 200
+
+    after = await db.get_user_by_uid(user.uid)
+    assert {
+        "nickname",
+        "contact_email",
+        "contact_phone",
+        "phone_is_whatsapp",
+    } <= after.local_modifications

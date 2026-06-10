@@ -9,7 +9,6 @@ from typing import Any
 
 from uuid6 import uuid7
 
-from .data.vekn_roster import ADMINS, JUDGES
 from .db import (
     decode_json,
     get_connection,
@@ -554,18 +553,10 @@ class VEKNSyncService:
             else:
                 city = None
 
-        # Infer Prince/NC roles from princeid/coordinatorid presence
-        roles: list[Role] = []
-        if vekn_player.get("princeid"):
-            roles.append(Role.PRINCE)
-        if vekn_player.get("coordinatorid"):
-            roles.append(Role.NC)
-
-        # Add static role assignments
-        if vekn_id in ADMINS:
-            roles.append(Role.IC)
-        if vekn_id in JUDGES:
-            roles.append(JUDGES[vekn_id])
+        # NO role derivation: roles are seeded once from old archon by the
+        # ETL/legacy-archon sync and app-managed thereafter — no sync ever
+        # writes them. princeid/coordinatorid still feed vekn_prefix below
+        # (used by the coopted_by inference), just not roles.
 
         # Extract vekn_prefix for Prince/NC users
         vekn_prefix = None
@@ -581,7 +572,6 @@ class VEKNSyncService:
             "city": city,
             "city_geoname_id": city_geoname_id,
             "state": vekn_player.get("statename") or None,
-            "roles": roles,
             "vekn_prefix": vekn_prefix,
         }
         # Officials' contact email comes from the scraped vekn.net lists, not the
@@ -603,11 +593,15 @@ class VEKNSyncService:
             User if found, None otherwise
         """
         async with get_connection() as conn:
+            # Live users only: the legacy-archon merge tombstones vekn-created
+            # duplicates; matching one here would update a dead copy instead of
+            # the surviving user.
             result = await conn.execute(
                 """
                 SELECT "full"
                 FROM objects
                 WHERE type = %s AND "full"->>'vekn_id' = %s
+                  AND deleted_at IS NULL
                 LIMIT 1
                 """,
                 (ObjectType.USER, vekn_id),
@@ -663,7 +657,6 @@ class VEKNSyncService:
                 update_fields[field] = value
 
         # Check if any data actually changed
-        old_roles = list(existing_user.roles)
         new_name = update_fields.get("name", existing_user.name)
         new_country = update_fields.get("country", existing_user.country)
         new_city = update_fields.get("city", existing_user.city)
@@ -671,7 +664,6 @@ class VEKNSyncService:
             "city_geoname_id", existing_user.city_geoname_id
         )
         new_state = update_fields.get("state", existing_user.state)
-        new_roles = update_fields.get("roles", existing_user.roles)
         new_vekn_prefix = update_fields.get("vekn_prefix", existing_user.vekn_prefix)
         new_contact_email = update_fields.get(
             "contact_email", existing_user.contact_email
@@ -683,7 +675,6 @@ class VEKNSyncService:
             or new_city != existing_user.city
             or new_city_geoname_id != existing_user.city_geoname_id
             or new_state != existing_user.state
-            or sorted(new_roles) != sorted(existing_user.roles)
             or new_vekn_prefix != existing_user.vekn_prefix
             or new_contact_email != existing_user.contact_email
         )
@@ -692,14 +683,14 @@ class VEKNSyncService:
         if not has_changes:
             return existing_user, False
 
-        # Apply changes to existing user, preserving all non-sync fields
+        # Apply changes to existing user, preserving all non-sync fields.
+        # Roles are deliberately absent: app-managed, never sync-written.
         now = datetime.now(UTC)
         existing_user.name = new_name
         existing_user.country = new_country
         existing_user.city = new_city
         existing_user.city_geoname_id = new_city_geoname_id
         existing_user.state = new_state
-        existing_user.roles = new_roles
         existing_user.vekn_prefix = new_vekn_prefix
         existing_user.contact_email = new_contact_email
         existing_user.vekn_synced = True
@@ -707,14 +698,6 @@ class VEKNSyncService:
         existing_user.modified = now
 
         await save_user(existing_user)
-
-        # If roles changed, update Discord Linked Roles metadata
-        if sorted(new_roles) != sorted(old_roles):
-            import asyncio
-
-            from .roles_hook import sync_user_discord_roles
-
-            asyncio.create_task(sync_user_discord_roles(existing_user.uid))
 
         return existing_user, True
 

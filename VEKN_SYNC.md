@@ -34,7 +34,7 @@ Each function SSE-broadcasts the updated object after saving so clients reflect 
 - Tournament events: `external_ids.vekn` absent
 - Tournament results: `vekn_pushed_at IS NULL` AND `rounds` array non-empty
 
-The `rounds` guard excludes imported/ETL-migrated tournaments: their results came FROM vekn.net and must never be re-uploaded (the importer folds finals into standings; archondata assumes prelim-only, so a re-push would send wrong numbers).
+Results that did not originate in-app must never be re-uploaded. The `rounds` guard excludes round-less VEKN imports (the importer folds finals into standings; archondata assumes prelim-only, so a re-push would send wrong numbers); rich ETL/archon-merged history has rounds, so both importers also stamp `vekn_pushed_at` on every finished tournament they write (old archon already pushed those results).
 
 ### archondata format
 
@@ -75,9 +75,13 @@ i18n keys: `vekn_sync_pending_results`, `vekn_sync_pending_member`, `vekn_sync_p
 
 `VEKNSyncService` pulls the full VEKN roster and reconciles with local users:
 - Creates User objects for unknown VEKN IDs
-- Updates names, countries, roles for existing members
+- Updates identity (name, country, city/state) for existing members
+- Never writes roles: they are seeded once from legacy archon (ETL / first
+  merge insert) and app-managed thereafter
 - Infers `coopted_by` relationships
 - Non-destructive: fields in `local_modifications` are never overwritten
+  (recorded by profile/user edit routes for identity, contact and nickname
+  fields)
 
 Tracking fields on User: `vekn_synced` (bool), `vekn_synced_at` (timestamp), `local_modifications` (set of field names).
 

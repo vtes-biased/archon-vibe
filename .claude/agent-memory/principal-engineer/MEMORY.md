@@ -61,3 +61,6 @@
 
 ## Authorization (cross-stack)
 - [Authz single source = Rust](project_authz_single_source_rust.md) — predicates live in `engine/src/permissions.rs` (PyO3 + WASM), the agreed cross-stack-DRY exception.
+
+## Legacy-archon merge (#115)
+- [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; tournament meta + officials' contact_email can oscillate daily unless single-writer enforced (member side is, tournament side isn't).

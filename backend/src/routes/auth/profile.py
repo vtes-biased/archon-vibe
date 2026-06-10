@@ -117,12 +117,16 @@ async def update_current_user(
     # Track locally modified fields so VEKN sync won't overwrite them
     local_mods = set(user.local_modifications)
 
-    # Update only provided fields
+    # Update only provided fields. Contact fields and nickname are recorded in
+    # local_modifications too: the VEKN sync (officials' contact_email
+    # injection) and the legacy-archon merge both skip locally-modified fields,
+    # so self-edits here must not be silently reverted by either.
     if request.name is not None:
         user.name = request.name
         local_mods.add("name")
     if request.nickname is not None:
         user.nickname = request.nickname if request.nickname else None
+        local_mods.add("nickname")
     if request.country is not None:
         user.country = request.country.upper() if request.country else None
         local_mods.add("country")
@@ -139,10 +143,13 @@ async def update_current_user(
         local_mods.add("city_geoname_id")
     if request.contact_email is not None:
         user.contact_email = request.contact_email if request.contact_email else None
+        local_mods.add("contact_email")
     if request.contact_phone is not None:
         user.contact_phone = request.contact_phone if request.contact_phone else None
+        local_mods.add("contact_phone")
     if request.phone_is_whatsapp is not None:
         user.phone_is_whatsapp = request.phone_is_whatsapp
+        local_mods.add("phone_is_whatsapp")
     if request.community_links is not None:
         if not user.vekn_id:
             raise HTTPException(
