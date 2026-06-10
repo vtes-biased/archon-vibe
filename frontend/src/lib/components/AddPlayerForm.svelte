@@ -66,7 +66,7 @@
   }
 </script>
 
-<div class="relative">
+<div class="relative flex-1 min-w-0 max-w-md">
   <input
     id="player-search-input"
     type="text"
