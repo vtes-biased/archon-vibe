@@ -13,7 +13,7 @@ import msgspec
 import pytest
 import pytest_asyncio
 import src.db as db
-from src.models import Player, Seat, Table, Tournament, User
+from src.models import Player, Seat, Table, Tournament, TournamentState, User
 from uuid6 import uuid7
 
 from tests.conftest import make_auth_header
@@ -297,3 +297,45 @@ async def test_duplicate_participant_rejected(test_client, test_db):
     assert await _count_users() == before
     saved = await db.get_tournament_by_uid(uid)
     assert saved.offline_mode is True
+
+
+@pytest.mark.asyncio
+async def test_finished_go_online_recomputes_ratings(test_client, test_db):
+    """An event run+finished offline gets its rating points immediately on
+    go-online — not only when the daily recompute job next fires (~24h late). pst #127
+    """
+    from src.ratings import rating_category_for_tournament
+
+    org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
+    player = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Player")
+    await db.save_user(org)
+    await db.save_user(player)
+    uid = await _seed(org.uid)
+
+    # The offline session finished the event with `player` participating.
+    t = Tournament(
+        uid=uid,
+        modified=datetime.now(UTC),
+        name="Offline T",
+        organizers_uids=[org.uid],
+        country="France",
+        offline_mode=True,
+        offline_device_id="devA",
+        state=TournamentState.FINISHED,
+        players=[Player(user_uid=player.uid)],
+    )
+    category = rating_category_for_tournament(t)
+
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/go-online",
+        json={"device_id": "devA", "tournament": json.loads(msgspec.json.encode(t))},
+        headers=make_auth_header(org.uid),
+    )
+    assert resp.status_code == 200
+
+    # The participant's rating was recomputed on go-online (None by default → set).
+    updated = await db.get_user_by_uid(player.uid)
+    assert getattr(updated, category.value) is not None
+    # The organizer is not a participant, so was not recomputed.
+    org_after = await db.get_user_by_uid(org.uid)
+    assert getattr(org_after, category.value) is None

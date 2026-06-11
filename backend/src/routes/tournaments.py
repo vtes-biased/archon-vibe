@@ -1633,6 +1633,24 @@ async def go_online(
     # 7. Broadcast updated tournament
     broadcast_precomputed(tournament_bd)
 
+    # An event run+finished offline would otherwise get its rating points only on
+    # the next daily recompute (~24h late). Mirror the action route and recompute
+    # immediately on go-online so players' ratings reflect the result right away. pst #127
+    if updated.state == TournamentState.FINISHED:
+        try:
+            from ..ratings import (
+                rating_category_for_tournament,
+                recompute_ratings_for_players,
+            )
+
+            player_uids = {p.user_uid for p in updated.players if p.user_uid}
+            category = rating_category_for_tournament(updated)
+            results = await recompute_ratings_for_players(player_uids, category)
+            for _user, bd in results:
+                broadcast_precomputed(bd)
+        except Exception as e:
+            logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
+
     return Response(content=encoder.encode(updated), media_type="application/json")
 
 
