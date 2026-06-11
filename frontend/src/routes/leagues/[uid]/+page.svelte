@@ -10,9 +10,10 @@
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { canEditLeague, computeLeagueStandings } from "$lib/engine";
+  import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
-  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X } from "lucide-svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);
@@ -511,22 +512,43 @@
 
       <!-- Standings -->
       <div>
-        <h2 class="text-xl font-medium text-bone-100 mb-3">Standings</h2>
+        <h2 class="text-xl font-medium text-bone-100 mb-3">{m.league_col_standings()}</h2>
         {#if standings.length > 0}
-          <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
+          <!-- Mobile card layout -->
+          <div class="sm:hidden bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800 divide-y divide-ash-800">
+            {#each standings as entry (entry.user_uid)}
+              <div class="flex items-center gap-3 px-4 py-3">
+                <span class="w-6 shrink-0 text-right text-sm font-medium text-ash-400">{entry.rank}</span>
+                <div class="min-w-0 flex-1">
+                  <a href="/users/{entry.user_uid}" class="block truncate text-sm text-bone-100 hover:text-crimson-400">{entry.name}</a>
+                  <div class="mt-0.5 flex items-center gap-3 text-xs text-ash-500">
+                    <span class="whitespace-nowrap">{formatScore(entry.gw, entry.vp, entry.tp)}</span>
+                    <span class="inline-flex items-center gap-1"><Trophy class="w-3 h-3" />{entry.tournaments_count}</span>
+                  </div>
+                </div>
+                {#if league?.standings_mode !== "Score"}
+                  <div class="shrink-0 text-right">
+                    <div class="text-sm font-semibold text-bone-100 leading-tight">{entry.points}</div>
+                    <div class="text-[10px] uppercase tracking-wide text-ash-500">{m.rankings_col_points()}</div>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+
+          <!-- Desktop table -->
+          <div class="hidden sm:block bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
                   <tr class="bg-ash-900 text-ash-300 border-b border-ash-700">
-                    <th class="px-4 py-2 text-left w-12">#</th>
-                    <th class="px-4 py-2 text-left">Player</th>
+                    <th class="px-4 py-2 text-left w-12">{m.tournament_col_rank()}</th>
+                    <th class="px-4 py-2 text-left">{m.tournament_col_player()}</th>
                     {#if league?.standings_mode !== "Score"}
-                      <th class="px-4 py-2 text-right">Points</th>
+                      <th class="px-4 py-2 text-right">{m.rankings_col_points()}</th>
                     {/if}
-                    <th class="px-4 py-2 text-right">GW</th>
-                    <th class="px-4 py-2 text-right">VP</th>
-                    <th class="px-4 py-2 text-right">TP</th>
-                    <th class="px-4 py-2 text-right">Events</th>
+                    <th class="px-4 py-2 text-right whitespace-nowrap">{m.league_standings_score()}</th>
+                    <th class="px-4 py-2 text-right">{m.league_standings_events()}</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-ash-800">
@@ -539,9 +561,7 @@
                       {#if league?.standings_mode !== "Score"}
                         <td class="px-4 py-2 text-right text-bone-100 font-medium">{entry.points}</td>
                       {/if}
-                      <td class="px-4 py-2 text-right text-ash-300">{entry.gw}</td>
-                      <td class="px-4 py-2 text-right text-ash-300">{entry.vp}</td>
-                      <td class="px-4 py-2 text-right text-ash-300">{entry.tp}</td>
+                      <td class="px-4 py-2 text-right text-ash-300 whitespace-nowrap">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
                       <td class="px-4 py-2 text-right text-ash-400">{entry.tournaments_count}</td>
                     </tr>
                   {/each}
@@ -556,7 +576,7 @@
           </div>
         {:else}
           <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-            <p class="text-ash-400">Standings will appear when tournaments finish.</p>
+            <p class="text-ash-400">{m.league_standings_empty()}</p>
           </div>
         {/if}
       </div>
