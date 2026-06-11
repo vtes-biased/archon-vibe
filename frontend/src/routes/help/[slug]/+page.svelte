@@ -82,7 +82,7 @@
 </script>
 
 <svelte:head>
-  <title>{doc?.title ?? "Help"} - Archon</title>
+  <title>{doc?.title ?? m.help_title_fallback()} - Archon</title>
 </svelte:head>
 
 {#if doc}

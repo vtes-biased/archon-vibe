@@ -34,7 +34,7 @@
       // Clear URL params for security
       replaceState("/auth/email/verify", {});
     } else {
-      error = auth.error || "Verification failed";
+      error = auth.error || m.auth_verify_error_failed();
     }
   });
 
@@ -57,7 +57,7 @@
     if (success) {
       goto("/");
     } else {
-      passwordError = auth.error || "Failed to set password";
+      passwordError = auth.error || m.auth_verify_error_set_password();
     }
   }
 

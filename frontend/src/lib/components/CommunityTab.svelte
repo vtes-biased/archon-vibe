@@ -210,7 +210,7 @@
       });
       await loadData(); // Refresh after moderation
     } catch (e: any) {
-      showToast({ type: "error", message: e.detail || "Moderation failed" });
+      showToast({ type: "error", message: e.detail || m.community_moderation_failed() });
     }
   }
 

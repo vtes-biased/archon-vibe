@@ -705,7 +705,7 @@
                       <button
                         onclick={() => { overrideTable_ = i; overrideComment = ""; }}
                         class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
-                        title="Override table result as judge"
+                        title={m.override_title()}
                       >
                         <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
                       </button>

@@ -241,6 +241,16 @@ export function translatePlayerState(state: string): string {
   }
 }
 
+export function translateStandingsMode(mode: string | undefined): string {
+  switch (mode) {
+    case "Private": return m.tournament_standings_private();
+    case "Cutoff": return m.tournament_standings_cutoff();
+    case "Top 10": return m.tournament_standings_top10();
+    case "Public": return m.tournament_standings_public();
+    default: return mode ?? "";
+  }
+}
+
 export function resolveTableLabel(
   tableRooms: { name: string; count: number }[] | undefined,
   tableIndex: number,

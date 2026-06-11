@@ -154,7 +154,7 @@
             if (!cardsDb.has(parseInt(id))) unknownIds.push(id);
           }
           if (unknownIds.length > 0) {
-            uploadWarnings.push(`${unknownIds.length} card(s) not found in card database (IDs: ${unknownIds.join(', ')})`);
+            uploadWarnings.push(m.deck_unknown_cards({ count: unknownIds.length, ids: unknownIds.join(', ') }));
           }
         }
       } catch { /* card DB unavailable — skip check */ }

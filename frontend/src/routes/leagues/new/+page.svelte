@@ -72,7 +72,7 @@
 </script>
 
 <svelte:head>
-  <title>New League - Archon</title>
+  <title>{m.league_new_title()} - Archon</title>
 </svelte:head>
 
 <div class="p-4 sm:p-8">
@@ -81,12 +81,12 @@
       <a href="/leagues" class="text-ash-400 hover:text-bone-100">
         <ArrowLeft class="w-5 h-5" />
       </a>
-      <h1 class="text-3xl font-light text-crimson-500">New League</h1>
+      <h1 class="text-3xl font-light text-crimson-500">{m.league_new_title()}</h1>
     </div>
 
     {#if !canCreate}
       <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4">
-        <p class="text-crimson-300">Only NCs and ICs can create leagues.</p>
+        <p class="text-crimson-300">{m.league_new_no_permission()}</p>
       </div>
     {:else}
       {#if error}
@@ -106,50 +106,50 @@
 
           <!-- Kind -->
           <div>
-            <label for="kind" class="block text-sm text-ash-400 mb-1">Kind</label>
+            <label for="kind" class="block text-sm text-ash-400 mb-1">{m.league_kind_label()}</label>
             <select id="kind" bind:value={kind}
               class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-              <option value="League">League</option>
-              <option value="Meta-League">Meta-League</option>
+              <option value="League">{m.league_kind_league()}</option>
+              <option value="Meta-League">{m.league_kind_meta()}</option>
             </select>
             {#if kind === "Meta-League"}
-              <p class="text-xs text-ash-500 mt-1">A meta-league groups child leagues. Add children after creation.</p>
+              <p class="text-xs text-ash-500 mt-1">{m.league_kind_meta_hint()}</p>
             {/if}
           </div>
 
           <!-- Parent league (only for regular leagues) -->
           {#if kind === "League" && metaLeagues.length > 0}
             <div>
-              <label for="parent" class="block text-sm text-ash-400 mb-1">Parent League</label>
+              <label for="parent" class="block text-sm text-ash-400 mb-1">{m.league_parent_label()}</label>
               <select id="parent" bind:value={parentUid}
                 class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-                <option value="">None</option>
+                <option value="">{m.common_none()}</option>
                 {#each metaLeagues as ml (ml.uid)}
                   <option value={ml.uid}>{ml.name}</option>
                 {/each}
               </select>
-              <p class="text-xs text-ash-500 mt-1">Optionally attach this league to a meta-league.</p>
+              <p class="text-xs text-ash-500 mt-1">{m.league_parent_hint()}</p>
             </div>
           {/if}
 
           <!-- Standings mode -->
           <div>
-            <label for="standings" class="block text-sm text-ash-400 mb-1">Standings Mode</label>
+            <label for="standings" class="block text-sm text-ash-400 mb-1">{m.league_standings_mode_label()}</label>
             <select id="standings" bind:value={standingsMode}
               class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-              <option value="RTP">Rating Points (RTP)</option>
-              <option value="Score">GW/VP/TP (prelims only)</option>
-              <option value="GP">Grand Prix (position-based)</option>
+              <option value="RTP">{m.league_standings_rtp_opt()}</option>
+              <option value="Score">{m.league_standings_score_opt()}</option>
+              <option value="GP">{m.league_standings_gp_opt()}</option>
             </select>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Format restriction -->
             <div>
-              <label for="format" class="block text-sm text-ash-400 mb-1">Format</label>
+              <label for="format" class="block text-sm text-ash-400 mb-1">{m.tfield_format()}</label>
               <select id="format" bind:value={format}
                 class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-                <option value="">Any format</option>
+                <option value="">{m.tfield_format_any()}</option>
                 <option value="Standard">Standard</option>
                 <option value="V5">V5</option>
                 <option value="Limited">Limited</option>
@@ -158,10 +158,10 @@
 
             <!-- Country -->
             <div>
-              <label for="country" class="block text-sm text-ash-400 mb-1">Country</label>
+              <label for="country" class="block text-sm text-ash-400 mb-1">{m.common_country()}</label>
               <select id="country" bind:value={country}
                 class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-                <option value="">Worldwide</option>
+                <option value="">{m.league_worldwide()}</option>
                 {#each Object.entries(countries) as [code, c]}
                   <option value={code}>{c.name} {getCountryFlag(code)}</option>
                 {/each}
@@ -179,16 +179,16 @@
 
             <!-- End date -->
             <div>
-              <label for="finish" class="block text-sm text-ash-400 mb-1">End Date</label>
+              <label for="finish" class="block text-sm text-ash-400 mb-1">{m.tfield_finish()}</label>
               <input id="finish" type="date" bind:value={finishDate}
                 class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200" />
-              <p class="text-xs text-ash-500 mt-1">Leave empty for ongoing league</p>
+              <p class="text-xs text-ash-500 mt-1">{m.league_finish_hint()}</p>
             </div>
           </div>
 
           <!-- Description -->
           <div>
-            <label for="desc" class="block text-sm text-ash-400 mb-1">Description</label>
+            <label for="desc" class="block text-sm text-ash-400 mb-1">{m.common_description()}</label>
             <span class="text-xs text-ash-500 mb-1 block">
               {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
             </span>
@@ -200,14 +200,14 @@
 
         <div class="flex justify-end gap-3">
           <a href="/leagues" class="px-4 py-2 text-sm font-medium text-ash-400 hover:text-bone-100 transition-colors">
-            Cancel
+            {m.common_cancel()}
           </a>
           <button
             type="submit"
             disabled={isSubmitting || !name.trim() || !startDate}
             class="px-6 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
           >
-            {isSubmitting ? "Creating..." : "Create League"}
+            {isSubmitting ? m.league_new_creating() : m.league_new_create_btn()}
           </button>
         </div>
       </form>

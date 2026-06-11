@@ -6,7 +6,7 @@
   import { getCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
   import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
   import type { Tournament, TournamentFormat } from "$lib/types";
-  import { getStateBadgeClass } from "$lib/tournament-utils";
+  import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
   import { Loader2, Trophy, Calendar, Copy, Check } from "lucide-svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -391,7 +391,7 @@
                     </div>
                   </div>
                   <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
-                    {tournament.state}
+                    {translateTournamentState(tournament.state)}
                   </span>
                 </div>
                 <div class="flex gap-2 text-xs text-ash-500 flex-wrap">
@@ -435,7 +435,7 @@
                 </div>
                 <div class="col-span-2">
                   <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
-                    {tournament.state}
+                    {translateTournamentState(tournament.state)}
                   </span>
                 </div>
               </div>

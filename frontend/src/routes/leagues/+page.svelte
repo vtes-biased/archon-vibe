@@ -201,7 +201,7 @@
                     <span>· {getCountryFlag(league.country)}</span>
                   {/if}
                   {#if league.kind === "Meta-League"}
-                    <span>· Meta</span>
+                    <span>· {m.league_meta_badge()}</span>
                   {/if}
                 </div>
               </div>
@@ -212,7 +212,7 @@
                   <div class="font-semibold text-bone-100">
                     {league.name}
                     {#if league.kind === "Meta-League"}
-                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">Meta</span>
+                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">{m.league_meta_badge()}</span>
                     {/if}
                   </div>
                   {#if league.format}

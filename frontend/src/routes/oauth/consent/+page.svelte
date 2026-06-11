@@ -63,7 +63,7 @@
 
       if (!response.ok) {
         const data = await response.json();
-        error = data.detail || "Authorization request failed";
+        error = data.detail || m.oauth_error_load_failed();
         loading = false;
         return;
       }
@@ -142,7 +142,7 @@
 
       if (!response.ok) {
         const data = await response.json();
-        error = data.detail || "Failed to deny";
+        error = data.detail || m.oauth_error_deny();
         submitting = false;
         return;
       }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, resolveTableLabel } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel } from "lucide-svelte";
@@ -180,7 +180,7 @@
         <span class="text-ash-500">{m.tournament_your_status()}</span>
         <span class="ml-2 text-ash-200">{currentPlayerEntry.state === "Finished"
           ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
-          : currentPlayerEntry.state}</span>
+          : translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
       {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && !playerHasValidDeck}
         <div class="flex items-center gap-2 text-amber-400 text-sm">
@@ -245,7 +245,7 @@
         <h3 class="text-sm font-medium text-bone-100 mb-2">
           {m.tournament_standings()}
           {#if tournament.standings_mode !== "Public"}
-            <span class="text-xs text-ash-500 font-normal ml-1">({tournament.standings_mode})</span>
+            <span class="text-xs text-ash-500 font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
           {/if}
         </h3>
         <table class="w-full text-sm">

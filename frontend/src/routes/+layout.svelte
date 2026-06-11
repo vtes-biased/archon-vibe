@@ -192,7 +192,7 @@
   <!-- Side navigation (desktop) -->
   <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-20 bg-dusk-950 border-r border-ash-800 flex-col items-center py-4 z-40">
     <!-- Logo -->
-    <a href="/tournaments" class="mb-6 text-crimson-500 hover:text-crimson-400" title="Home">
+    <a href="/tournaments" class="mb-6 text-crimson-500 hover:text-crimson-400" title={m.nav_home()}>
       <img src="/favicon.svg" alt="Archon" class="w-16 h-16" />
     </a>
 

@@ -518,11 +518,11 @@
               {#if isFinished && playerSort === 'standings'}<span class="text-ash-500">{getRatingPts(entry)} RP</span>{/if}
               {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
                 {#if editingToss && isOrganizer}
-                  <span class="text-ash-500">Toss:</span>
+                  <span class="text-ash-500">{m.tournament_toss_label()}</span>
                   <input type="number" min="1" class="w-12 min-h-[44px] bg-ash-800 text-bone-100 text-xs rounded px-1 py-1.5 border border-ash-700"
                     value={tossEdits[puid] ?? ""} oninput={(e) => tossEdits[puid] = (e.target as HTMLInputElement).value} />
                 {:else}
-                  <span class="text-ash-500">Toss: {entry.toss || "—"}</span>
+                  <span class="text-ash-500">{m.tournament_toss_label()} {entry.toss || "—"}</span>
                 {/if}
               {/if}
             </div>

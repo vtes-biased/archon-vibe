@@ -373,10 +373,10 @@
       onchange={(e) => handleInput("standings_mode", (e.target as HTMLSelectElement).value)}
       class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
     >
-      <option value="Private">Private</option>
-      <option value="Cutoff">Cutoff (Top 5)</option>
-      <option value="Top 10">Top 10</option>
-      <option value="Public">Public</option>
+      <option value="Private">{m.tournament_standings_private()}</option>
+      <option value="Cutoff">{m.tfield_standings_cutoff()}</option>
+      <option value="Top 10">{m.tournament_standings_top10()}</option>
+      <option value="Public">{m.tournament_standings_public()}</option>
     </select>
   </div>
   <div>
@@ -388,9 +388,9 @@
       onchange={(e) => handleInput("decklists_mode", (e.target as HTMLSelectElement).value)}
       class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
     >
-      <option value="Winner">Winner Only</option>
-      <option value="Finalists">Finalists</option>
-      <option value="All">All</option>
+      <option value="Winner">{m.tfield_decklists_winner()}</option>
+      <option value="Finalists">{m.tfield_decklists_finalists()}</option>
+      <option value="All">{m.tfield_decklists_all()}</option>
     </select>
   </div>
 </div>

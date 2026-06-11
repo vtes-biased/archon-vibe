@@ -10,6 +10,7 @@
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { canEditLeague, computeLeagueStandings } from "$lib/engine";
+  import { translateTournamentState } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
@@ -47,9 +48,9 @@
 
   function standingsModeLabel(mode: LeagueStandingsMode): string {
     switch (mode) {
-      case "RTP": return "Rating Points";
-      case "Score": return "GW/VP/TP";
-      case "GP": return "Grand Prix";
+      case "RTP": return m.league_standings_rtp();
+      case "Score": return m.league_standings_score();
+      case "GP": return m.league_standings_gp();
       default: return mode;
     }
   }
@@ -211,7 +212,7 @@
   }
 
   async function handleDelete() {
-    if (!league || !confirm("Delete this league? This cannot be undone.")) return;
+    if (!league || !confirm(m.league_delete_confirm())) return;
     try {
       await deleteLeagueApi(league.uid, { suppressErrorToast: true });
       goto("/leagues");
@@ -261,7 +262,7 @@
 </script>
 
 <svelte:head>
-  <title>{league?.name || "League"} - Archon</title>
+  <title>{league?.name || m.league_title_fallback()} - Archon</title>
 </svelte:head>
 
 <div class="p-4 sm:p-8">
@@ -273,8 +274,8 @@
     {:else if !league}
       <div class="text-center py-12">
         <CircleAlert class="mx-auto h-12 w-12 text-ash-600 mb-4" />
-        <h3 class="text-lg font-medium text-bone-100 mb-2">League not found</h3>
-        <a href="/leagues" class="text-crimson-400 hover:text-crimson-300">Back to leagues</a>
+        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.league_not_found()}</h3>
+        <a href="/leagues" class="text-crimson-400 hover:text-crimson-300">{m.league_back_to_list()}</a>
       </div>
     {:else}
       <!-- Header -->
@@ -287,7 +288,7 @@
             <h1 class="text-3xl font-light text-crimson-500">{league.name}</h1>
             <div class="flex gap-2 mt-1 text-sm text-ash-400">
               <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-emerald' : 'bg-ash-800 text-ash-400'}">
-                {isActive() ? "Active" : "Finished"}
+                {isActive() ? m.league_status_active() : m.league_status_finished()}
               </span>
               <span>{standingsModeLabel(league.standings_mode)}</span>
               {#if league.format}
@@ -296,10 +297,10 @@
               {#if league.country}
                 <span>· {getCountryFlag(league.country)} {countries[league.country]?.name || league.country}</span>
               {:else}
-                <span>· Worldwide</span>
+                <span>· {m.league_worldwide()}</span>
               {/if}
               {#if league.kind === "Meta-League"}
-                <span class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">Meta</span>
+                <span class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">{m.league_meta_badge()}</span>
               {/if}
             </div>
           </div>
@@ -307,10 +308,10 @@
         {#if isOrganizer}
           <div class="flex gap-2">
             <button onclick={startEdit} class="px-3 py-1.5 text-sm text-ash-300 hover:text-bone-100 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
-              <Pencil class="w-4 h-4 inline -mt-0.5" /> Edit
+              <Pencil class="w-4 h-4 inline -mt-0.5" /> {m.common_edit()}
             </button>
             <button onclick={handleDelete} class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
-              <Trash2 class="w-4 h-4 inline -mt-0.5" /> Delete
+              <Trash2 class="w-4 h-4 inline -mt-0.5" /> {m.common_delete()}
             </button>
           </div>
         {/if}
@@ -335,19 +336,19 @@
           <!-- Standings Mode & Format -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label for="edit-mode" class="block text-sm text-ash-400 mb-1">Standings Mode</label>
+              <label for="edit-mode" class="block text-sm text-ash-400 mb-1">{m.league_standings_mode_label()}</label>
               <select id="edit-mode" bind:value={editStandingsMode}
                 class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-                <option value="RTP">Rating Points (RTP)</option>
-                <option value="Score">GW/VP/TP (prelims only)</option>
-                <option value="GP">Grand Prix</option>
+                <option value="RTP">{m.league_standings_rtp_opt()}</option>
+                <option value="Score">{m.league_standings_score_opt()}</option>
+                <option value="GP">{m.league_standings_gp()}</option>
               </select>
             </div>
             <div>
               <label for="edit-format" class="block text-sm text-ash-400 mb-1">{m.tfield_format()}</label>
               <select id="edit-format" bind:value={editFormat}
                 class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-                <option value="">Any format</option>
+                <option value="">{m.tfield_format_any()}</option>
                 <option value="Standard">Standard</option>
                 <option value="V5">V5</option>
                 <option value="Limited">Limited</option>
@@ -366,7 +367,7 @@
               <label for="edit-finish" class="block text-sm text-ash-400 mb-1">{m.tfield_finish()}</label>
               <input id="edit-finish" type="date" bind:value={editFinish}
                 class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200 focus:border-ash-500 focus:outline-none" />
-              <p class="text-xs text-ash-500 mt-1">Leave empty for ongoing league</p>
+              <p class="text-xs text-ash-500 mt-1">{m.league_finish_hint()}</p>
             </div>
           </div>
 
@@ -375,7 +376,7 @@
             <label for="edit-country" class="block text-sm text-ash-400 mb-1">{m.common_country()}</label>
             <select id="edit-country" bind:value={editCountry}
               class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
-              <option value="">Worldwide</option>
+              <option value="">{m.league_worldwide()}</option>
               {#each Object.entries(countries) as [code, c]}
                 <option value={code}>{c.name} {getCountryFlag(code)}</option>
               {/each}
@@ -401,11 +402,11 @@
       <!-- Info cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
-          <div class="text-sm text-ash-400">Dates</div>
-          <div class="text-bone-100 mt-1">{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : "ongoing"}</div>
+          <div class="text-sm text-ash-400">{m.league_col_dates()}</div>
+          <div class="text-bone-100 mt-1">{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : m.league_ongoing()}</div>
         </div>
         <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
-          <div class="text-sm text-ash-400 mb-1">Organizers</div>
+          <div class="text-sm text-ash-400 mb-1">{m.league_organizers_label()}</div>
           {#if isOrganizer}
             <OrganizerManager
               organizerUids={league.organizers_uids}
@@ -429,19 +430,19 @@
       <!-- Child leagues (meta-league) -->
       {#if league.kind === "Meta-League"}
         <div class="mb-6">
-          <h2 class="text-xl font-medium text-bone-100 mb-3">Child Leagues</h2>
+          <h2 class="text-xl font-medium text-bone-100 mb-3">{m.league_child_leagues()}</h2>
           {#if isOrganizer && orphanLeagues.length > 0}
             <div class="flex gap-2 mb-3">
               <select bind:value={addChildUid}
                 class="flex-1 px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 text-sm">
-                <option value="">Select a league to add...</option>
+                <option value="">{m.league_add_child_placeholder()}</option>
                 {#each orphanLeagues as ol (ol.uid)}
                   <option value={ol.uid}>{ol.name}</option>
                 {/each}
               </select>
               <button onclick={addChildLeague} disabled={!addChildUid}
                 class="px-3 py-2 text-sm font-medium btn-emerald rounded-lg">
-                <Plus class="w-4 h-4 inline -mt-0.5" /> Add
+                <Plus class="w-4 h-4 inline -mt-0.5" /> {m.common_add()}
               </button>
             </div>
           {/if}
@@ -458,7 +459,7 @@
                     </a>
                     {#if isOrganizer}
                       <button onclick={() => removeChildLeague(child.uid)}
-                        class="ml-2 p-1 text-ash-500 hover:text-crimson-400 transition-colors" title="Remove from meta-league">
+                        class="ml-2 p-1 text-ash-500 hover:text-crimson-400 transition-colors" title={m.league_remove_child_title()}>
                         <X class="w-4 h-4" />
                       </button>
                     {/if}
@@ -468,7 +469,7 @@
             </div>
           {:else}
             <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-              <p class="text-ash-400">No child leagues yet.</p>
+              <p class="text-ash-400">{m.league_no_children()}</p>
             </div>
           {/if}
         </div>
@@ -477,7 +478,7 @@
       <!-- Tournaments -->
       <div class="mb-6">
         <h2 class="text-xl font-medium text-bone-100 mb-3">
-          Tournaments ({leagueTournaments.length})
+          {m.league_tournaments_heading({ count: leagueTournaments.length })}
         </h2>
         {#if leagueTournaments.length > 0}
           <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
@@ -496,7 +497,7 @@
                       </div>
                     </div>
                     <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-ash-800 text-ash-400' : 'badge-emerald'}">
-                      {t.state}
+                      {translateTournamentState(t.state)}
                     </span>
                   </div>
                 </a>
@@ -505,7 +506,7 @@
           </div>
         {:else}
           <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-            <p class="text-ash-400">No tournaments in this league yet.</p>
+            <p class="text-ash-400">{m.league_no_tournaments()}</p>
           </div>
         {/if}
       </div>

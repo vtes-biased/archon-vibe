@@ -569,7 +569,7 @@ import TournamentModals from "./TournamentModals.svelte";
               <a href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
                  target="_blank" rel="noopener noreferrer"
                  class="px-2 py-0.5 rounded text-xs font-medium bg-dusk-800 text-ash-300 hover:text-ash-100 inline-flex items-center gap-1"
-                 title="View on vekn.net">
+                 title={m.tournament_vekn_link_title()}>
                 VEKN <ExternalLink class="w-3 h-3" />
               </a>
             {/if}

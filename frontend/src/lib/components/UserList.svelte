@@ -268,7 +268,7 @@
         // Refresh display to show any final data
         scheduleDisplayRefresh();
       } else if (event.type === "error") {
-        error = event.error || "Sync error occurred";
+        error = event.error || m.sync_error_generic();
         isSyncing = false; // Stop showing syncing on error
       } else if (event.type === "disconnected") {
         // Connection lost - stop syncing state to avoid stuck spinner

@@ -269,7 +269,7 @@
             {#if archonResult.success}
               <div class="bg-emerald-900/30 border border-emerald-700 rounded p-3 text-sm text-emerald-200">
                 <p>{m.archon_import_success()}</p>
-                <p class="text-xs mt-1">{m.archon_players_matched({ count: archonResult.players_matched })} · {m.archon_rounds_imported({ count: archonResult.rounds_imported })}{archonResult.has_finals ? " · Finals" : ""}</p>
+                <p class="text-xs mt-1">{m.archon_players_matched({ count: archonResult.players_matched })} · {m.archon_rounds_imported({ count: archonResult.rounds_imported })}{archonResult.has_finals ? ` · ${m.archon_finals_label()}` : ""}</p>
               </div>
             {:else}
               <div class="bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-200">
