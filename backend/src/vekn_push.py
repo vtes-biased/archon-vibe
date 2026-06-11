@@ -10,6 +10,7 @@ from .broadcast import broadcast_precomputed
 from .db import (
     get_connection,
     get_sanctions_for_tournament,
+    get_tournament_by_uid,
     get_user_by_uid,
     save_tournament,
     save_user,
@@ -23,7 +24,7 @@ from .models import (
     User,
 )
 from .ratings import _compute_entry_sync
-from .vekn_api import VEKNAPIClient, VEKNAPIError
+from .vekn_api import VEKNAPIClient, VEKNAPIConnectionError, VEKNAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -185,14 +186,19 @@ async def push_tournament_event(
             proxies=tournament.proxies,
             description=tournament.description[:500] if tournament.description else "",
         )
+    except VEKNAPIConnectionError:
+        raise  # batch-fatal: let batch_push abort and retry next cycle
     except VEKNAPIError as e:
         logger.error(f"Failed to create VEKN event for {tournament.uid}: {e}")
         return None
 
-    # Store the VEKN event ID
-    tournament.external_ids["vekn"] = event_id
-    tournament.modified = datetime.now(UTC)
-    bd = await save_tournament(tournament)
+    # Store the VEKN event ID. Re-fetch first (#122): batch_push loads rows up
+    # front but saves here minutes later — only the vekn fields are ours, so we
+    # write them onto a fresh snapshot instead of clobbering interim edits.
+    fresh = await get_tournament_by_uid(tournament.uid) or tournament
+    fresh.external_ids["vekn"] = event_id
+    fresh.modified = datetime.now(UTC)
+    bd = await save_tournament(fresh)
     broadcast_precomputed(bd)
     logger.info(f"Tournament {tournament.uid} → VEKN event {event_id}")
     return event_id
@@ -238,14 +244,20 @@ async def push_tournament_results(
 
     try:
         await client.upload_results(vekn_event_id, archondata)
+    except VEKNAPIConnectionError:
+        raise  # batch-fatal: let batch_push abort and retry next cycle
     except VEKNAPIError as e:
         logger.error(f"Failed to upload results for {tournament.uid}: {e}")
         return False
 
-    # Mark as pushed
-    tournament.vekn_pushed_at = datetime.now(UTC)
-    tournament.modified = datetime.now(UTC)
-    bd = await save_tournament(tournament)
+    # Mark as pushed. Re-fetch first (#122): the snapshot we computed archondata
+    # from may be minutes stale by now — write only the vekn fields onto a fresh
+    # one so concurrent edits aren't clobbered. push_tournament_event above may
+    # have already bumped external_ids.vekn; re-reading picks that up too.
+    fresh = await get_tournament_by_uid(tournament.uid) or tournament
+    fresh.vekn_pushed_at = datetime.now(UTC)
+    fresh.modified = datetime.now(UTC)
+    bd = await save_tournament(fresh)
     broadcast_precomputed(bd)
     logger.info(
         f"Tournament {tournament.uid} results pushed to VEKN event {vekn_event_id}"
@@ -282,14 +294,20 @@ async def push_member(
             state=user.state or "",
             city=user.city or "",
         )
+    except VEKNAPIConnectionError:
+        raise  # batch-fatal: let batch_push abort and retry next cycle
     except VEKNAPIError as e:
         logger.error(f"Failed to push member {user.vekn_id}: {e}")
         return False
 
-    user.vekn_synced = True
-    user.vekn_synced_at = datetime.now(UTC)
-    user.modified = datetime.now(UTC)
-    bd = await save_user(user)
+    # Re-fetch before save (#122): batch_push may have loaded this user minutes
+    # ago — write only the vekn-sync flags onto a fresh snapshot so interim
+    # profile edits (name, city, roles) aren't clobbered.
+    fresh = await get_user_by_uid(user.uid) or user
+    fresh.vekn_synced = True
+    fresh.vekn_synced_at = datetime.now(UTC)
+    fresh.modified = datetime.now(UTC)
+    bd = await save_user(fresh)
     broadcast_precomputed(bd)
     logger.info(f"Member {user.vekn_id} pushed to VEKN")
     return True
@@ -342,70 +360,95 @@ UNPUSHED_RESULTS_QUERY = """
 
 
 async def batch_push(client: VEKNAPIClient) -> dict:
-    """Push all unpushed tournaments and members. Returns stats dict."""
+    """Push all unpushed tournaments and members. Returns stats dict.
+
+    Fail-fast (#121): the first VEKNAPIConnectionError (transport down, timeout,
+    auth failure) aborts the whole batch rather than letting every remaining
+    item re-time-out serially (30-120s each) during an outage — it reruns next
+    cycle anyway. Per-item data errors (bad VEKN id, parse error) still skip just
+    that item and continue.
+    """
     from .db import decode_json
 
-    stats = {"events_created": 0, "results_pushed": 0, "members_pushed": 0, "errors": 0}
+    stats = {
+        "events_created": 0,
+        "results_pushed": 0,
+        "members_pushed": 0,
+        "errors": 0,
+        "aborted": False,
+    }
 
     if not os.getenv("VEKN_PUSH", "").lower() == "true":
         return stats
 
-    # 1. Push unsynced members (must come before results so VEKN knows the IDs)
-    async with get_connection() as conn:
-        result = await conn.execute(
-            """
-            SELECT "full" FROM objects
-            WHERE type = %s
-              AND "full"->>'vekn_id' IS NOT NULL
-              AND ("full"->>'vekn_synced')::boolean = false
-            """,
-            (ObjectType.USER,),
+    try:
+        # 1. Push unsynced members (must come before results so VEKN knows the IDs)
+        async with get_connection() as conn:
+            result = await conn.execute(
+                """
+                SELECT "full" FROM objects
+                WHERE type = %s
+                  AND "full"->>'vekn_id' IS NOT NULL
+                  AND ("full"->>'vekn_synced')::boolean = false
+                """,
+                (ObjectType.USER,),
+            )
+            rows = await result.fetchall()
+
+        for row in rows:
+            u = decode_json(row[0], User)
+            try:
+                if await push_member(client, u):
+                    stats["members_pushed"] += 1
+            except VEKNAPIConnectionError:
+                raise
+            except Exception:
+                logger.exception(f"Error pushing member {u.vekn_id}")
+                stats["errors"] += 1
+
+        # 2. Push calendar events for tournaments without external_ids.vekn
+        async with get_connection() as conn:
+            result = await conn.execute(
+                UNCREATED_EVENTS_QUERY,
+                (ObjectType.TOURNAMENT,),
+            )
+            rows = await result.fetchall()
+
+        for row in rows:
+            t = decode_json(row[0], Tournament)
+            try:
+                event_id = await push_tournament_event(client, t)
+                if event_id:
+                    stats["events_created"] += 1
+            except VEKNAPIConnectionError:
+                raise
+            except Exception:
+                logger.exception(f"Error pushing event for {t.uid}")
+                stats["errors"] += 1
+
+        # 3. Push results for finished tournaments without vekn_pushed_at.
+        async with get_connection() as conn:
+            result = await conn.execute(
+                UNPUSHED_RESULTS_QUERY,
+                (ObjectType.TOURNAMENT,),
+            )
+            rows = await result.fetchall()
+
+        for row in rows:
+            t = decode_json(row[0], Tournament)
+            try:
+                if await push_tournament_results(client, t):
+                    stats["results_pushed"] += 1
+            except VEKNAPIConnectionError:
+                raise
+            except Exception:
+                logger.exception(f"Error pushing results for {t.uid}")
+                stats["errors"] += 1
+    except VEKNAPIConnectionError as e:
+        logger.warning(
+            f"Batch push aborted — VEKN unreachable: {e}; retries next cycle"
         )
-        rows = await result.fetchall()
-
-    for row in rows:
-        u = decode_json(row[0], User)
-        try:
-            if await push_member(client, u):
-                stats["members_pushed"] += 1
-        except Exception:
-            logger.exception(f"Error pushing member {u.vekn_id}")
-            stats["errors"] += 1
-
-    # 2. Push calendar events for tournaments without external_ids.vekn
-    async with get_connection() as conn:
-        result = await conn.execute(
-            UNCREATED_EVENTS_QUERY,
-            (ObjectType.TOURNAMENT,),
-        )
-        rows = await result.fetchall()
-
-    for row in rows:
-        t = decode_json(row[0], Tournament)
-        try:
-            event_id = await push_tournament_event(client, t)
-            if event_id:
-                stats["events_created"] += 1
-        except Exception:
-            logger.exception(f"Error pushing event for {t.uid}")
-            stats["errors"] += 1
-
-    # 3. Push results for finished tournaments without vekn_pushed_at.
-    async with get_connection() as conn:
-        result = await conn.execute(
-            UNPUSHED_RESULTS_QUERY,
-            (ObjectType.TOURNAMENT,),
-        )
-        rows = await result.fetchall()
-
-    for row in rows:
-        t = decode_json(row[0], Tournament)
-        try:
-            if await push_tournament_results(client, t):
-                stats["results_pushed"] += 1
-        except Exception:
-            logger.exception(f"Error pushing results for {t.uid}")
-            stats["errors"] += 1
+        stats["aborted"] = True
 
     logger.info(f"Batch push complete: {stats}")
     return stats

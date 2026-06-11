@@ -51,7 +51,17 @@ VEKN_MESSAGES = {
 
 
 class VEKNAPIError(Exception):
-    """VEKN API error."""
+    """VEKN API error (default: a per-item/data error — bad VEKN id, parse error)."""
+
+
+class VEKNAPIConnectionError(VEKNAPIError):
+    """VEKN is unreachable or won't authenticate (transport error, timeout, auth).
+
+    Distinguished from plain VEKNAPIError so batch_push can fail-fast: a data
+    error skips one item, but a connection/auth failure means the whole batch is
+    doomed and should abort (it reruns next cycle). Subclasses VEKNAPIError so
+    existing callers that catch VEKNAPIError still see it.
+    """
 
 
 class VEKNAPIClient:
@@ -80,13 +90,15 @@ class VEKNAPIClient:
 
     async def _authenticate(self) -> None:
         """Authenticate with VEKN API and get auth token."""
+        # All failures here are batch-fatal (no creds, bad creds, transport down),
+        # so they raise the connection-class error → batch_push aborts.
         if (
             not self.username
             or not self.password
             or not self.username.strip()
             or not self.password.strip()
         ):
-            raise VEKNAPIError(
+            raise VEKNAPIConnectionError(
                 "VEKN_API_USERNAME and VEKN_API_PASSWORD must be set in environment"
             )
 
@@ -102,18 +114,30 @@ class VEKNAPIClient:
 
                 # VEKN API nests the actual data inside a 'data' field
                 inner_data = data.get("data", {})
-                self._check_vekn_error(inner_data, "Authentication failed")
+                self._check_vekn_error(
+                    inner_data, "Authentication failed", exc=VEKNAPIConnectionError
+                )
                 self._auth_token = inner_data.get("auth")
                 if not self._auth_token:
-                    raise VEKNAPIError(f"No auth token in response: {data}")
+                    raise VEKNAPIConnectionError(f"No auth token in response: {data}")
 
                 logger.info("Successfully authenticated with VEKN API")
 
-        except aiohttp.ClientError as e:
-            raise VEKNAPIError(f"HTTP error during authentication: {e}") from e
+        except (aiohttp.ClientError, TimeoutError) as e:
+            raise VEKNAPIConnectionError(
+                f"HTTP error during authentication: {e}"
+            ) from e
 
-    def _check_vekn_error(self, data: dict[str, Any], context: str = "") -> None:
-        """Check VEKN response for error codes and raise appropriate exception."""
+    def _check_vekn_error(
+        self,
+        data: dict[str, Any],
+        context: str = "",
+        exc: type[VEKNAPIError] = VEKNAPIError,
+    ) -> None:
+        """Check VEKN response for error codes and raise appropriate exception.
+
+        Pass exc=VEKNAPIConnectionError for batch-fatal contexts (e.g. auth).
+        """
         code = data.get("code", 200)
         # Normalize code to int (API returns string "200" or int 200)
         if isinstance(code, str):
@@ -122,7 +146,7 @@ class VEKNAPIClient:
             message = data.get("message", "Unknown error")
             message = VEKN_MESSAGES.get(message, message)
             prefix = f"{context}: " if context else ""
-            raise VEKNAPIError(f"{prefix}{message} (code: {code})")
+            raise exc(f"{prefix}{message} (code: {code})")
 
     async def _ensure_authenticated(self) -> None:
         """Ensure we have a valid auth token."""
@@ -258,8 +282,8 @@ class VEKNAPIClient:
                     raise VEKNAPIError(f"No event ID in response: {data}")
                 logger.info(f"Created VEKN event {event_id}: {name}")
                 return str(event_id)
-        except aiohttp.ClientError as e:
-            raise VEKNAPIError(f"HTTP error creating event: {e}") from e
+        except (aiohttp.ClientError, TimeoutError) as e:
+            raise VEKNAPIConnectionError(f"HTTP error creating event: {e}") from e
 
     async def upload_results(self, vekn_event_id: str, archondata: str) -> None:
         """Upload archon data (results) for a VEKN event."""
@@ -287,8 +311,8 @@ class VEKNAPIClient:
                 inner = data.get("data", {})
                 self._check_vekn_error(inner, "Upload results failed")
                 logger.info(f"Uploaded archon data for VEKN event {vekn_event_id}")
-        except aiohttp.ClientError as e:
-            raise VEKNAPIError(f"HTTP error uploading results: {e}") from e
+        except (aiohttp.ClientError, TimeoutError) as e:
+            raise VEKNAPIConnectionError(f"HTTP error uploading results: {e}") from e
 
     async def create_member(
         self,
@@ -331,8 +355,8 @@ class VEKNAPIClient:
                 inner = data.get("data", {})
                 self._check_vekn_error(inner, "Create member failed")
                 logger.info(f"Created VEKN member {veknid}: {firstname} {lastname}")
-        except aiohttp.ClientError as e:
-            raise VEKNAPIError(f"HTTP error creating member: {e}") from e
+        except (aiohttp.ClientError, TimeoutError) as e:
+            raise VEKNAPIConnectionError(f"HTTP error creating member: {e}") from e
 
     async def fetch_venue(self, venue_id: str) -> dict[str, str]:
         """Fetch venue details by ID. Returns venue dict or empty dict.

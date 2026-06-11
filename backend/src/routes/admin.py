@@ -82,6 +82,23 @@ async def trigger_vekn_tournament_sync(
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}") from e
 
 
+@router.get("/vekn-status")
+async def vekn_status(
+    manager: CurrentUser,
+) -> dict:
+    """Last success/error of VEKN sync & push jobs (#123). Requires IC role.
+
+    Lets admins spot a days-long vekn.net outage without grepping logs. State is
+    in-process (resets on restart); keys: member_sync, tournament_sync, batch_push.
+    """
+    if Role.IC not in manager.roles:
+        raise HTTPException(status_code=403, detail="Only IC can view VEKN status")
+
+    from ..vekn_status import get_status
+
+    return {"jobs": get_status()}
+
+
 @router.post("/sync-twda-decks")
 async def trigger_twda_deck_import(
     manager: CurrentUser,

@@ -76,24 +76,32 @@ async def run_vekn_sync() -> None:
     if not _sync_service:
         return
 
+    from .vekn_status import record_error, record_success
+
     try:
         logger.info("Starting VEKN member sync")
-        await _sync_service.sync_all_members()
+        stats = await _sync_service.sync_all_members()
+        record_success("member_sync", stats if isinstance(stats, dict) else None)
     except TimeoutError:
         logger.error("VEKN member sync timed out - the API may be slow or unreachable")
+        record_error("member_sync", "timed out — API slow or unreachable")
     except Exception as e:
         logger.error(f"Error during VEKN member sync: {e}", exc_info=True)
+        record_error("member_sync", str(e))
 
     # Tournament sync runs after member sync (needs user UIDs)
     try:
         from .vekn_tournament_sync import sync_all_tournaments
 
         logger.info("Starting VEKN tournament sync")
-        await sync_all_tournaments(_sync_service.client)
+        stats = await sync_all_tournaments(_sync_service.client)
+        record_success("tournament_sync", stats if isinstance(stats, dict) else None)
     except TimeoutError:
         logger.error("VEKN tournament sync timed out")
+        record_error("tournament_sync", "timed out")
     except Exception as e:
         logger.error(f"Error during VEKN tournament sync: {e}", exc_info=True)
+        record_error("tournament_sync", str(e))
 
     # Import TWDA winner decklists for matched tournaments
     try:
@@ -169,6 +177,8 @@ async def run_rating_recompute() -> None:
 
 async def run_vekn_push() -> None:
     """Run VEKN push batch (scheduled task)."""
+    from .vekn_status import record_error, record_success
+
     try:
         from .vekn_push import batch_push, vekn_push_client
 
@@ -178,8 +188,13 @@ async def run_vekn_push() -> None:
             logger.info("Starting VEKN batch push")
             stats = await batch_push(client)
             logger.info(f"VEKN batch push complete: {stats}")
+            if stats.get("aborted"):
+                record_error("batch_push", "aborted — VEKN unreachable")
+            else:
+                record_success("batch_push", stats)
     except Exception as e:
         logger.error(f"Error during VEKN batch push: {e}", exc_info=True)
+        record_error("batch_push", str(e))
 
 
 async def run_snapshot_generation() -> None:

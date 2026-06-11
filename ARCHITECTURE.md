@@ -525,6 +525,8 @@ Failures are log-only. The object is saved with the flag unset (`external_ids.ve
 - Tournament events: `external_ids.vekn` absent
 - Tournament results: `vekn_pushed_at IS NULL` AND `rounds` array non-empty (guards VEKN-imported and archon-merged tournaments — both stamp `vekn_pushed_at` so results are never re-uploaded)
 
+Outage-resilient: `batch_push` fails fast on the first connection/auth error (aborts, reruns next cycle) instead of re-timing-out every item; push functions re-fetch before writing the vekn flags so backlog drains don't clobber interim edits; job health is exposed at `GET /admin/vekn-status`. Detail in VEKN_SYNC.md.
+
 **archondata format** (VEKN API for result upload):
 ```
 {nrounds}¤{rank}§{first}§{last}§{city}§{vekn}§{gw}§{vp}§{vpf}§{tp}§{toss}§{rtp}§...

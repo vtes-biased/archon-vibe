@@ -49,3 +49,34 @@ where it matters (unpushed member/event), and resync gracefully on recovery.
 - Scheduling: `backend/src/main.py:261-340` (lifespan jobs)
 - Existing tests: `backend/tests/test_vekn_push.py` (archondata format only — no
   network-failure coverage; add some with 118/121)
+
+## Resolution (2026-06-11)
+
+All six children landed. Closing the epic.
+
+- **118** fire-and-forget real-time pushes (asyncio.create_task) — done earlier
+- **119** broadcast vekn_push.py saves so badges clear live — done earlier
+- **120** frontend pending-sync badges (VITE_VEKN_PUSH gated) — done earlier
+- **121** fail-fast circuit + timeout wrapping:
+  - `VEKNAPIConnectionError(VEKNAPIError)` in `vekn_api.py` marks batch-fatal
+    failures (transport/timeout/auth). `_authenticate` raises it for missing/bad
+    creds + HTTP errors; `create_event`/`upload_results`/`create_member` now
+    catch `(aiohttp.ClientError, TimeoutError)` (aiohttp total-timeout is
+    `TimeoutError`, NOT a `ClientError`) → wrap into it.
+  - push functions re-raise `VEKNAPIConnectionError` (swallow only data-class
+    `VEKNAPIError`); `batch_push` aborts the whole run on the first one and sets
+    `stats["aborted"]=True`. Per-item data errors still skip+continue.
+- **122** lost-update: push functions re-fetch the User/Tournament immediately
+  before writing the vekn flags, so a minutes-late backlog drain writes onto a
+  fresh snapshot instead of the stale one. Narrows clobber window to µs.
+- **123** observability: `vekn_status.py` (in-process last success/error per job)
+  + `GET /admin/vekn-status` (IC-gated). `run_vekn_sync`/`run_vekn_push` record
+  outcomes. UI widget added to the existing IC AdminSection (profile page):
+  per-job status dot + last success / last error, loads on expand and after a
+  manual run. `getVeknStatus()` in api.ts (justified GET — in-process state, not
+  a synced object type). 10 i18n keys across all 5 locales.
+
+Tests: 2 fail-fast regression tests in `test_vekn_push_batch.py` (connection
+error aborts; data error skips+continues). Full backend suite green (207);
+frontend svelte-check clean.
+Docs: VEKN_SYNC.md "Outage resilience" subsection + one-line ARCHITECTURE.md note.

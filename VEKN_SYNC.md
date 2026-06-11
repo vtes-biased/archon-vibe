@@ -36,6 +36,14 @@ Each function SSE-broadcasts the updated object after saving so clients reflect 
 
 Results that did not originate in-app must never be re-uploaded. The `rounds` guard excludes round-less VEKN imports (the importer folds finals into standings; archondata assumes prelim-only, so a re-push would send wrong numbers); rich ETL/archon-merged history has rounds, so both importers also stamp `vekn_pushed_at` on every finished tournament they write (old archon already pushed those results).
 
+### Outage resilience
+
+The app keeps working through hours/days of vekn.net downtime and self-heals on recovery (local saves + SSE broadcast always precede the push; the next hourly `batch_push` drains the backlog). Hardening on top of that:
+
+- **Fail-fast** — `batch_push` aborts the whole run on the first `VEKNAPIConnectionError` (transport down, timeout, or auth failure) rather than re-timing-out every pending item serially (30–120 s each); it reruns next cycle. Per-item *data* errors (bad VEKN id, parse error) still skip just that item and continue. `VEKNAPIConnectionError` is a `VEKNAPIError` subclass; `vekn_api.py` wraps aiohttp total-timeouts (`TimeoutError`, *not* a `ClientError`) into it so callers actually see timeouts.
+- **No lost updates** — push functions re-fetch the User/Tournament immediately before writing back the vekn flags (`vekn_synced`, `external_ids.vekn`, `vekn_pushed_at`). `batch_push` loads rows up front but may save minutes later during outage-recovery backlog; re-fetching narrows the clobber window to microseconds so interim profile/tournament edits survive.
+- **Observability** — scheduled jobs record last success/error in-process (`vekn_status.py`); `GET /admin/vekn-status` (IC-gated) exposes `member_sync` / `tournament_sync` / `batch_push` so a days-long outage is visible without grepping logs. Resets on restart.
+
 ### archondata format
 
 ```

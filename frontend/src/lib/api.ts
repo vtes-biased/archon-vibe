@@ -314,6 +314,27 @@ export async function syncTwdaDecks(): Promise<AdminSyncResult> {
   return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });
 }
 
+export interface VeknJobStatus {
+  last_success_at?: string;
+  last_error_at?: string;
+  last_error?: string;
+  last_status?: 'ok' | 'error';
+  last_detail?: Record<string, unknown>;
+}
+export interface VeknStatusResponse {
+  jobs: Record<string, VeknJobStatus>;
+}
+
+/**
+ * IC-only: last success/error of the scheduled VEKN jobs (member/tournament
+ * sync, hourly push). In-process server state, not a synced object type — a
+ * justified GET (like the sync triggers above, it can't come from IndexedDB).
+ */
+export async function getVeknStatus(): Promise<VeknStatusResponse> {
+  requireOnline({ suppressErrorToast: true });
+  return apiRequest<VeknStatusResponse>('/admin/vekn-status', { method: 'GET' }, { suppressErrorToast: true });
+}
+
 // Sanctions API
 
 export interface CreateSanctionData {
