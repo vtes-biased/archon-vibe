@@ -849,11 +849,11 @@ Pulls data FROM vekn.net into Archon. Runs periodically (default every 6h).
 
 Auto-submits winner's decklists to the [Tournament Winning Deck Archive](https://github.com/GiottoVerducci/TWD).
 
-**Trigger**: On `FinishTournament`, if winner has a deck, `twda.py` creates a GitHub PR against the TWDA repository.
+**Trigger**: On the transition into `Finished` (if the winner has a deck), `twda.py` creates a GitHub PR against the TWDA repository. It also re-fires when the **winner's deck is upserted on an already-finished tournament** (organizer-only — players are deck-locked post-finish, `DeckLockedFinished`), so post-event edits and late uploads reach the archive.
 
 **Features**:
-- Updates PR if decklist is modified after finish
-- Late uploads (winner adds deck post-tournament) trigger PR at that point
+- Idempotent PR (branch `archon/{vekn_event_id}` + file `decks/{id}.txt`, create-or-update): a re-fire updates the open PR rather than duplicating
+- Post-finish organizer edits to the winning deck (e.g. an added strategy writeup) propagate to the PR
 
 **Key files**: `backend/src/twda.py`, `engine/src/deck.rs` (`export_twda`)
 

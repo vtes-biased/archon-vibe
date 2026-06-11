@@ -1005,6 +1005,20 @@ async def tournament_action(
     if is_finished and not was_finished:
         await _maybe_submit_twda(updated)
         asyncio.create_task(_maybe_push_vekn(updated))
+    elif (
+        is_finished
+        and updated.winner
+        and any(
+            op.get("op") == "upsert" and op.get("player_uid") == updated.winner
+            for op in deck_ops
+        )
+    ):
+        # Winner's deck was edited on an already-finished tournament (organizers
+        # only — players are deck-locked post-finish). Re-submit so the
+        # idempotent TWDA PR (branch/file keyed on the vekn event id) picks up
+        # the change, e.g. an added strategy writeup. Background: the deck save
+        # already committed and _maybe_submit_twda self-contains its errors.
+        asyncio.create_task(_maybe_submit_twda(updated))
 
     return Response(
         content=encoder.encode(updated),
