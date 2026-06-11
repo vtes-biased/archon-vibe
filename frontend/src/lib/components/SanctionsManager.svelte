@@ -48,6 +48,9 @@
   // surfaces them to managers (IC/Ethics).
   const shownSanctions = $derived(visibleSanctions(userSanctions, canIssueSanctions));
 
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
   const expiryRequired = $derived(sanctionLevel === "probation");
   const expiryAllowed = $derived(sanctionLevel === "suspension" || sanctionLevel === "probation");
 
@@ -213,9 +216,9 @@
                       <span class="text-sm text-ash-300 truncate">{sanction.description}</span>
                     </div>
                     <div class="text-xs text-ash-500 mt-1">
-                      {new Date(sanction.issued_at).toLocaleDateString()}
+                      {formatDate(sanction.issued_at)}
                       {#if sanction.expires_at}
-                        → {new Date(sanction.expires_at).toLocaleDateString()}
+                        → {formatDate(sanction.expires_at)}
                       {/if}
                     </div>
                   </div>
@@ -228,9 +231,9 @@
                     <span class="text-sm text-ash-300">{sanction.description}</span>
                   </div>
                   <div class="text-xs text-ash-500 mt-1">
-                    {new Date(sanction.issued_at).toLocaleDateString()}
+                    {formatDate(sanction.issued_at)}
                     {#if sanction.expires_at}
-                      → {new Date(sanction.expires_at).toLocaleDateString()}
+                      → {formatDate(sanction.expires_at)}
                     {/if}
                   </div>
                 </div>

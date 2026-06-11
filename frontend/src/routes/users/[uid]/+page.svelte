@@ -32,6 +32,7 @@
   }
 
   let user = $state<User | undefined>();
+  let sponsorName = $state<string | undefined>();
   let isOnline = $state(navigator.onLine);
 
   const uid = $derived($page.params.uid);
@@ -78,6 +79,9 @@
   async function loadData() {
     if (!uid) return;
     user = await getUser(uid);
+    // coopted_by is full-projection only, so its presence is the permission gate.
+    // Resolve the sponsor's name from local IndexedDB; absence falls back gracefully.
+    sponsorName = user?.coopted_by ? (await getUser(user.coopted_by))?.name : undefined;
   }
 
   function scheduleRefresh() {
@@ -152,6 +156,17 @@
       editable={canEdit() && isOnline}
       onupdated={handleUserUpdated}
     />
+
+    {#if user.coopted_by}
+      {@const date = user.coopted_at ? new Date(user.coopted_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
+      <p class="mt-2 px-4 text-xs text-mist-dark">
+        {#if sponsorName}
+          {m.user_sponsored_by({ name: sponsorName, date })}
+        {:else}
+          {m.user_sponsored_unknown({ date })}
+        {/if}
+      </p>
+    {/if}
 
     {#if canManage()}
       <div class="mt-6">

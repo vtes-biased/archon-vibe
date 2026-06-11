@@ -40,7 +40,7 @@
 
   // Format date for tooltip
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString();
+    return new Date(dateStr).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   };
 
   const tooltipText = $derived(() => {
