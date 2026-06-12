@@ -44,10 +44,10 @@ backend_service: new-archon-backend
 bot_service: new-archon-bot
 
 # --- versions -------------------------------------------------------------
-# PostgreSQL pinned via PGDG repo. Python is managed by uv (downloaded from
-# python-build-standalone) — same exact version on both envs, independent of
-# the distro. Change python_version to roll forward.
-postgresql_version: 17
+# Python is managed by uv (downloaded from python-build-standalone) — same
+# exact version on both envs, independent of the distro. Change python_version
+# to roll forward. PostgreSQL comes from the server-setup foundation here
+# (distro major); archon's own postgresql role never runs on beta.
 python_version: "3.13"
 uv_python_install_dir: /opt/uv/python
 

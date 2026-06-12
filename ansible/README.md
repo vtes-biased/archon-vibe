@@ -42,12 +42,14 @@ On your workstation:
 - Only for `SOURCE=local` builds: Docker Desktop (manylinux PyO3 wheel),
   Node 22 (matches CI), and `wasm-pack` (frontend WASM engine).
 
-On each server (first time only, before `just bootstrap-<env>`):
-- A non-root admin user with passwordless sudo (see `inventories/<env>/hosts.ini`
-  — `ansible_user` must be that account).
-- SSH key auth already set up.
+On each server (first time only):
+- **prod** (before `just bootstrap-prod`): a non-root admin user with
+  passwordless sudo (see `inventories/prod/hosts.ini` — `ansible_user` must be
+  that account) and SSH key auth.
+- **beta**: nothing to prepare — the foundation, `deploy` user included, comes
+  from server-setup.
 - DNS A/AAAA records pointing at the server for both the main domain and the
-  `bot.<main-domain>` subdomain.
+  `bot.<main-domain>` subdomain (certbot HTTP-01 needs them before deploy).
 
 ## First-time setup
 
@@ -63,7 +65,12 @@ chmod 600 .vault_pass
 ansible-vault edit inventories/beta/group_vars/vault.yml
 ansible-vault edit inventories/prod/group_vars/vault.yml
 
-just bootstrap-beta                        # provision beta end-to-end
+# beta (frankfurt) is server-setup-provisioned — there is no beta bootstrap.
+# `just deploy-beta` is the only beta entrypoint (it creates the app user and
+# the DB/role itself, via server-setup's postgres_db role).
+just deploy-beta
+
+just bootstrap-prod                        # prod: full provision (archon's own roles)
 ```
 
 ## Cutting a release
@@ -106,7 +113,8 @@ ships.
 ## Deploy from CI (GitHub Actions)
 
 `.github/workflows/deploy.yml` runs the deploy from a runner — `beta` →
-`deploy-beta.yml` (server-setup host), `prod` → `deploy.yml` (standalone). It is
+`deploy-beta.yml` (server-setup host), `production` → `deploy.yml` (standalone,
+inventory dir `prod`). It is
 **manual-only** (`workflow_dispatch`, pick `beta`/`prod` + an optional
 `release_tag`) and **approval-gated**: the job binds to a GitHub Environment whose
 required-reviewer rule pauses the run until someone approves. Nothing
@@ -116,8 +124,8 @@ For **beta**, server-setup owns the config — `just sync` (from the server-setu
 repo) pushes `DEPLOY_HOST` + `DEPLOY_HOST_KEY` and `just sync-key ~/.ssh/deploy`
 pushes `DEPLOY_SSH_KEY` to this repo's `beta` environment. One-time setup:
 
-1. **Environments** (Settings → Environments): create `beta` and `prod`, each with
-   **Required reviewers** enabled.
+1. **Environments** (Settings → Environments): create `beta` and `production`,
+   each with **Required reviewers** enabled.
 2. **Per-environment variables** (Variables — not sensitive; `just sync` sets these
    for beta):
    - `DEPLOY_HOST` — the real server host/IP (the committed inventory ships a
@@ -132,20 +140,21 @@ pushes `DEPLOY_SSH_KEY` to this repo's `beta` environment. One-time setup:
    - `ANSIBLE_VAULT_PASSWORD` — the vault password for that env's `vault.yml`.
 4. The VPS must accept SSH from GitHub-hosted runner IPs (port 22 open).
 
-`prod` deploys require an explicit `release_tag` (a pre-check fails a blank prod
-dispatch before the approval gate), so the reviewer sees the exact tag being
-shipped; `beta` allows blank (= latest).
+`production` deploys require an explicit `release_tag` (a pre-check fails a
+blank production dispatch before the approval gate), so the reviewer sees the
+exact tag being shipped; `beta` allows blank (= latest).
 
 ## System updates / kernel upgrades
 
 ```bash
-just upgrade-beta                          # apt upgrade; warns if reboot needed
-REBOOT=1 just upgrade-beta                 # also reboot if /var/run/reboot-required
-FULL=1 REBOOT=1 just upgrade-beta          # dist-upgrade + reboot (major kernel bumps)
+just upgrade-prod                          # apt upgrade; warns if reboot needed
+REBOOT=1 just upgrade-prod                 # also reboot if /var/run/reboot-required
+FULL=1 REBOOT=1 just upgrade-prod          # dist-upgrade + reboot (major kernel bumps)
 ```
 
-The `system_upgrade` role stops `archon-backend` + `archon-bot` before rebooting
-and restarts + health-checks them afterwards.
+The `system_upgrade` role stops the backend + bot services before rebooting and
+restarts + health-checks them afterwards. Prod only: beta (frankfurt) system
+updates, reboots included, are owned by server-setup's own upgrade pipeline.
 
 ## One-shot PG16 → PG17 migration (prod only)
 

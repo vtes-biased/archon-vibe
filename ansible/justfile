@@ -77,18 +77,13 @@ build-frontend:
 # Build every deployable artifact
 build-all: build-engine-wheel build-backend build-bot build-frontend
 
-# First-time provision: beta (packages, users, firewall, db, services)
-bootstrap-beta: galaxy
-    uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/site.yml
-
-# First-time provision: prod
+# Beta has no bootstrap: server-setup owns the frankfurt foundation, and
+# `just deploy-beta` is the only beta entrypoint.
+# First-time provision: prod (packages, users, firewall, db, services)
 bootstrap-prod: galaxy
     uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml
 
-# Install/configure PostgreSQL + archon DB/user on beta
-database-beta:
-    uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/database.yml
-
+# Beta's DB/role is created by deploy-beta.yml via server-setup's postgres_db role.
 # Install/configure PostgreSQL + archon DB/user on prod
 database-prod:
     uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/database.yml
@@ -111,15 +106,7 @@ deploy-prod:
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
     uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/deploy.yml $extra
 
-# apt upgrade + (optional) reboot on beta (FULL=1 REBOOT=1)
-upgrade-beta:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    extra=""
-    if [ -n "${FULL:-}" ]; then extra="-e upgrade_full=true"; fi
-    if [ -n "${REBOOT:-}" ]; then extra="$extra -e upgrade_reboot=true"; fi
-    uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/upgrade.yml $extra
-
+# No beta variant: frankfurt system updates (apt + reboots) belong to server-setup.
 # apt upgrade + (optional) reboot on prod (FULL=1 REBOOT=1)
 upgrade-prod:
     #!/usr/bin/env bash
@@ -138,9 +125,14 @@ lint: galaxy
     uv run --project {{repo_root}} yamllint -s .
     uv run --project {{repo_root}} ansible-lint
 
-# Dry-run (check mode) of site.yml against beta
-dry-beta: galaxy
-    uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/site.yml --check --diff
+# Dry-run (check mode) of the beta deploy; the release fetch runs for real, localhost-only (RELEASE_TAG=… / SOURCE=local)
+dry-deploy-beta: galaxy
+    #!/usr/bin/env bash
+    set -euo pipefail
+    extra=""
+    if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
+    if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
+    uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/deploy-beta.yml --check --diff $extra
 
 # Dry-run (check mode) of site.yml against prod
 dry-prod: galaxy

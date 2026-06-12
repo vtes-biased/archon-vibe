@@ -9,6 +9,10 @@
   delegate_to: localhost
   become: false
   run_once: true
+  # Run for real even under --check: everything here is localhost-only (fills
+  # build/), and skipping it would starve the wheel-glob assert below — making
+  # dry runs impossible without pre-populated artifacts.
+  check_mode: false
   block:
     - name: Reset local artifact dir
       ansible.builtin.file:
