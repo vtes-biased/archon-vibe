@@ -1,8 +1,8 @@
 name: Deploy
 
-# Manual, approval-gated deploy to beta or prod. The job binds to a GitHub
-# Environment (beta | prod) whose protection rules require a reviewer — the run
-# pauses for approval before anything touches a server. Both environments are
+# Manual, approval-gated deploy to beta or production. The job binds to a GitHub
+# Environment (beta | production) whose protection rules require a reviewer — the
+# run pauses for approval before anything touches a server. Both environments are
 # dispatch-only; nothing auto-deploys.
 #
 # beta deploys to the server-setup-managed host (frankfurt) as the `deploy` user;
@@ -23,7 +23,7 @@ on:
       environment:
         description: Target environment
         type: choice
-        options: [beta, prod]
+        options: [beta, production]
         required: true
       release_tag:
         description: Release tag to deploy (blank = latest)
@@ -40,15 +40,16 @@ concurrency:
 
 jobs:
   # Runs before the approval gate (no environment) so a bad request never even
-  # asks a reviewer. prod must pin a tag — blank=latest would ship an unreviewed
-  # release, and pinning means the reviewer sees the exact tag in the run inputs.
+  # asks a reviewer. production must pin a tag — blank=latest would ship an
+  # unreviewed release, and pinning means the reviewer sees the exact tag in the
+  # run inputs.
   precheck:
     runs-on: ubuntu-latest
     steps:
-      - name: Require an explicit release_tag for prod
-        if: ${{ inputs.environment == 'prod' && inputs.release_tag == '' }}
+      - name: Require an explicit release_tag for production
+        if: ${{ inputs.environment == 'production' && inputs.release_tag == '' }}
         run: |
-          echo "::error::prod deploys must pin an explicit release_tag (blank = latest is not allowed for prod)."
+          echo "::error::production deploys must pin an explicit release_tag (blank = latest is not allowed for production)."
           exit 1
 
   deploy:
@@ -91,13 +92,15 @@ jobs:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          # beta rides the server-setup foundation (deploy-beta.yml); prod is the
-          # standalone target (deploy.yml).
-          playbook=playbooks/deploy.yml
-          [ "${{ inputs.environment }}" = beta ] && playbook=playbooks/deploy-beta.yml
+          # beta rides the server-setup foundation (deploy-beta.yml); production
+          # is the standalone target (deploy.yml, inventory dir `prod`).
+          playbook=playbooks/deploy.yml; inventory=prod
+          if [ "${{ inputs.environment }}" = beta ]; then
+            playbook=playbooks/deploy-beta.yml; inventory=beta
+          fi
           uv run --project .. --frozen --group dev ansible-playbook \
             --private-key ~/.ssh/deploy_key \
-            -i "inventories/${{ inputs.environment }}" "$playbook" \
+            -i "inventories/$inventory" "$playbook" \
             -e ansible_host="$DEPLOY_HOST" \
             ${RELEASE_TAG:+-e release_tag="$RELEASE_TAG"}
 

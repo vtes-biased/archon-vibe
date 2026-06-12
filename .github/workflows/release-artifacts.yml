@@ -1,9 +1,10 @@
 name: Release Artifacts
 
 # Builds every deployable artifact in CI and attaches it to the published
-# GitHub Release. The ansible deploy (`make fetch-release`) downloads these
-# assets instead of building locally — CI is the single source of deployed
-# builds. Card data freshness is owned by update-cards.yml (daily).
+# GitHub Release. The deploy playbooks fetch these assets themselves
+# (ansible/tasks/fetch_release.yml) instead of building locally — CI is the
+# single source of deployed builds. Card data freshness is owned by
+# update-cards.yml (daily).
 on:
   release:
     types: [published]   # attach artifacts to the published release
