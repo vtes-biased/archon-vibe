@@ -19,7 +19,7 @@
 ## #86 — galaxy wiring (done)
 server-setup's roles live under `server-setup/roles/`, so the README's
 `role: server-setup/nginx_site` does **not** resolve. Verified working form:
-- `make galaxy` installs server-setup into git-ignored `ansible/galaxy_roles/`
+- `just galaxy` installs server-setup into git-ignored `ansible/galaxy_roles/`
   (`ansible-galaxy role install -r requirements.yml -p galaxy_roles`).
 - `ansible.cfg` `roles_path = roles:galaxy_roles/server-setup/roles` → reference the
   roles plainly as `nginx_site` / `postgres_db`.
@@ -53,11 +53,11 @@ the `new_archon` runtime user/dirs — server-setup doesn't) → `postgres_db`
 - Shared self-fetch extracted to `vars/release_artifacts.yml` + `tasks/fetch_release.yml`
   (prod deploy.yml now imports the same — no duplication).
 - Beta inventory: host `frankfurt` 57.129.110.107, `ansible_user=deploy`.
-- `make deploy-beta` → deploy-beta.yml; `galaxy_roles/` excluded from ansible-lint.
+- `just deploy-beta` → deploy-beta.yml; `galaxy_roles/` excluded from ansible-lint.
 
 ### Deploy prerequisites (before first run)
 - DNS: `new.archon.krcg.org` + `bot.archon.krcg.org` → 57.129.110.107 (certbot HTTP-01).
-- `deploy` user key authorized on frankfurt; `make galaxy` to install server-setup.
+- `deploy` user key authorized on frankfurt; `just galaxy` to install server-setup.
 - Vault password available; `just sync` / `sync-key` to populate the GitHub env (#89).
 
 ## #89 — CI workflow rework (done)
