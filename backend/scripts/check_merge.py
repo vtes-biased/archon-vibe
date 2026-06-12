@@ -5,7 +5,7 @@ Run with --snapshot BEFORE the VEKN sync (records ETL-only baseline), then with
 
     DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_new \\
     uv run python scripts/check_merge.py --snapshot
-    # … run scripts/run_vekn_sync.py …
+    # … trigger the VEKN sync (backend startup sync, or the in-app admin Run-now button) …
     DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_new \\
     uv run python scripts/check_merge.py --check
 """

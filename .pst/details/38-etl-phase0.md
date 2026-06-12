@@ -8,8 +8,8 @@ Deliverables (built 2026-06-09, dry-run validated against a full prod dump):
   identically to runtime.
 - `backend/scripts/migrate_validate.py` — ETL integrity harness (count parity,
   orphan-ref scan, projection sanity, semantic invariants, random spot-checks).
-- `backend/scripts/run_vekn_sync.py` — standalone VEKN member+tournament sync
-  runner (mirrors `main.run_vekn_sync`) for the post-ETL merge / rehearsal.
+- VEKN sync for the post-ETL merge / rehearsal is driven by the backend startup
+  sync (`main.run_vekn_sync`) or the in-app admin Run-now — no standalone script.
 - `backend/scripts/check_merge.py` — `--snapshot` the ETL baseline, then `--check`
   after VEKN sync to assert the merge added no dupes and wiped no archon data.
 
@@ -38,7 +38,7 @@ Two production-code fixes were required for a clean merge / wheel deploy:
 
 ## Rehearsal — full path on the real vekn.net API (PASSED, 2026-06-09)
 
-Empty DB → ETL → `run_vekn_sync.py` (live API) → `check_merge.py`:
+Empty DB → ETL → VEKN sync (live API) → `check_merge.py`:
 - member sync: 0 created / 18,669 updated / 162 unchanged / **0 errors** (18,831 total)
 - tournament sync: 6 created / 7,546 updated / 537 unchanged / **0 errors** (8,089 total)
 - merge invariants: no dup `vekn_id` (18861/18861), no new dup vekn-event-id (gap
