@@ -4,7 +4,7 @@
 # r.site_root             required (install dir, e.g. /opt/archon/backend)
 # r.port                  required (localhost port)
 # r.asgi_entrypoint       required (e.g. backend.src.main:app)
-# r.python_version        required (uv-managed Python, e.g. "3.13")
+# r.python_version        required (uv-managed Python, e.g. "3.14")
 # r.uv_python_install_dir required (where uv stores managed Pythons)
 # r.user                  required (runtime unix user)
 # r.group                 required (runtime unix group)

@@ -3,7 +3,7 @@ name = "archon"
 version = "0.1.0"
 description = "VEKN community and tournament management system"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
@@ -41,6 +41,10 @@ only-include = ["backend/src"]
 
 [tool.ruff]
 line-length = 88
+# Source-syntax floor, deliberately kept one below requires-python (3.14). Bumping
+# to py314 makes the formatter rewrite `except (A, B):` -> `except A, B:` (PEP 758,
+# 3.14-only and visually identical to a Py2 syntax error) across the codebase. We
+# run on 3.14 but keep the source conventional/portable — don't raise this to py314.
 target-version = "py313"
 
 [tool.ruff.lint]

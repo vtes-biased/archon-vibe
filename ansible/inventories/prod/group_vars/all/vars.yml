@@ -46,7 +46,7 @@ legacy_web_service: archon_web
 # PostgreSQL pinned via PGDG repo. Python is managed by uv (downloaded from
 # python-build-standalone) — identical on prod and beta.
 postgresql_version: 17
-python_version: "3.13"
+python_version: "3.14"
 uv_python_install_dir: /opt/uv/python
 
 # --- database -------------------------------------------------------------

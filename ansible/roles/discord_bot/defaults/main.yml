@@ -3,7 +3,7 @@
 # r.site_root              required (e.g. /opt/archon/bot)
 # r.bot_wheel_src          required (local path to the built archon_discord_bot-*.whl)
 # r.requirements_src       required (local path to pinned requirements.txt)
-# r.python_version         required (uv-managed Python, e.g. "3.13")
+# r.python_version         required (uv-managed Python, e.g. "3.14")
 # r.uv_python_install_dir  required (where uv stores managed Pythons)
 # r.user                   required
 # r.group                  required
