@@ -66,6 +66,55 @@
     mode: "0644"
   notify: Restart bot service
 
+# Beta has no bootstrap step (server-setup owns the foundation) and neither deploy
+# playbook re-runs the common role on a python_version bump — so the uv-managed
+# interpreter must be ensured here, as root, before any venv work. Without it,
+# `uv venv --python X.Y` (run as the unprivileged service user) tries to download
+# the interpreter into the root-owned install dir and dies with EACCES. Idempotent:
+# `uv python install` is a no-op when the version is already present.
+- name: Ensure uv managed-python dir exists
+  ansible.builtin.file:
+    path: "{{ r.uv_python_install_dir }}"
+    state: directory
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Install uv-managed Python {{ r.python_version }}
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/uv
+      - python
+      - install
+      - "{{ r.python_version }}"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
+  register: _uv_python_install
+  changed_when: "'Installed' in _uv_python_install.stderr"
+
+- name: Detect existing venv Python version
+  ansible.builtin.command:
+    argv:
+      - "{{ _venv_dir }}/bin/python"
+      - -c
+      - "import sys; print('{}.{}'.format(*sys.version_info[:2]))"
+  register: _venv_pyver
+  changed_when: false
+  failed_when: false
+
+# The 'creates:' guard below makes venv creation a one-time artifact, so a
+# python_version bump never rebuilds an existing venv. uv pip install then targets
+# the stale interpreter and a requires-python>=N wheel fails to resolve. Drop the
+# mismatched venv here so the next task recreates it; deps + wheels reinstall
+# unconditionally afterwards, so a fresh venv is repopulated in full.
+- name: Remove venv when its Python differs from {{ r.python_version }}
+  ansible.builtin.file:
+    path: "{{ _venv_dir }}"
+    state: absent
+  when:
+    - _venv_pyver.rc == 0
+    - _venv_pyver.stdout | trim != r.python_version
+
 - name: Create venv with uv-managed Python {{ r.python_version }}
   ansible.builtin.command:
     argv:
