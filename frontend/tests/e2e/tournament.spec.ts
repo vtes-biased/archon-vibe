@@ -74,7 +74,9 @@ test.describe('Tournament lifecycle', () => {
     await page.locator('#start').fill('2099-01-01T10:00');
     await page.locator('#country').selectOption('US');
     await page.getByRole('button', { name: 'Create Tournament' }).click();
-    await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]+/, { timeout: 2_000 });
+    // First optimistic mutation of the run: WASM/IndexedDB cold-start can push
+    // the redirect past the 2s warm-path budget under CI load, so allow more.
+    await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]+/, { timeout: 10_000 });
 
     await expect(page.locator('h1')).toContainText('E2E Test Tournament');
     await expect(page.getByText('Planned').first()).toBeVisible();
@@ -98,7 +100,9 @@ test.describe('Tournament lifecycle', () => {
       await expect(searchInput).toHaveValue('');
     }
 
-    await expect(page.getByText('8 registered')).toBeVisible({ timeout: 2_000 });
+    // exact: true — a substring match also hits a player row whose uuid7 ends in
+    // "8" ("…a48 Registered" contains "8 registered" case-insensitively).
+    await expect(page.getByText('8 registered', { exact: true })).toBeVisible({ timeout: 2_000 });
 
     // ── Step 5: Close Registration & Check In All (optimistic) ──
     await page.getByRole('button', { name: 'Start Check-in' }).click();
