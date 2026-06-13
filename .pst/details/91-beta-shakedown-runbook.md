@@ -45,78 +45,80 @@ exercise — that's part of the shakedown, not a precondition of it.
   stacks are otherwise fully isolated (own DB, ports, server_names, `new-archon-*`
   units). The whole 8xxx/9xxx band is otherwise empty.
 
-## Progress checkpoint — 2026-06-13 (background; RESUME HERE is the dry-run block below)
+## Progress checkpoint — 2026-06-14 (RESUME HERE is below)
 
-Live execution state (the board carries the new tickets #149–#152):
+§0 (Release v0.1.1), §1 (dry run) and §2 (first real deploy + boot) are DONE.
+The first `just deploy-beta` brought archon-vibe up on frankfurt from CI-built
+v0.1.1 wheels, and the backend ran the full startup VEKN sync into the empty
+`new_archon` DB — **members + 8096 tournaments, 0 errors** (this is leg A's
+vekn-first SEED; the §4 merge itself is still to run). The DB persists across
+redeploys, so that seed survives the v0.1.2 bring-up below.
 
-- **Prereqs P0–P3, P5 ✓.** P0 PG17 + the 8008/9008 port fix. P1 DNS resolves.
-  P5 galaxy. P3 beta Discord app (discord/vekn/mail vault values filled).
-- **Vault/secrets ✓ — committed `ff38859` + `7eb7aee`.** New scheme: each env's
-  ansible-vault password is age-encrypted in `ansible/secrets/<env>.vault-pass.age`
-  (recipients = admins' SSH/age pubkeys in `secrets/age-recipients.txt`). Decrypt to
-  `ansible/.<env>.vault_pass`; the `just` deploy/provision recipes default
-  `ANSIBLE_VAULT_PASSWORD_FILE` to it when unset (owner moved their global default to
-  `~/.ansible.cfg`). CI uses the GitHub Environment secret `ANSIBLE_VAULT_PASSWORD`
-  (set on `beta` + `production`). Per-env role secret files
-  `officials_contacts.json.<env>.vault` + `twda_github_app.pem.<env>.vault` (selected
-  via `r.officials_contacts_vault` / `r.twda_key_vault`); all four decrypt-verified.
-  Full docs: `ansible/README.md` "Vault passwords" + the fastapi_backend role README.
-  TWDA `vault_twda_github_installation_id` still empty → TWDA no-ops (fine, out of scope).
-- **P4 dump ✓.** Fresh **custom-format** dump on frankfurt at `/tmp/archondb.dump`
-  (`pg_dump -Fc archondb`, streamed prod→frankfurt) — so §3's `pg_restore -O -x` is exact.
-- **Step 0 ✓ — Release `v0.1.1` published with all six assets.** GOTCHA (#152):
-  `release.yml` creates the Release with `github.token`, so `release:published` never
-  fires and `release-artifacts.yml` doesn't auto-run. Workaround used to attach assets:
-  `gh release delete v0.1.1 --yes && gh release create v0.1.1 --verify-tag --generate-notes`
-  (user token re-fires the event). Until #152's PAT fix lands, **every** release needs
-  that manual delete+recreate.
-- New tickets: **#150** CI svelte-check codegen gap (CLOSED by sibling agent) · **#151**
-  e2e Community-tab "global pins" regression (FIXED → unblocked v0.1.1) · **#152**
-  release-artifacts `GITHUB_TOKEN` trigger bug (p1, open) · **#149** TWDA App-ID→Client-ID (p3).
+**§2 surfaced 8 install bugs (exactly #91's purpose) — all fixed.**
 
-**◀ RESUME HERE — Dry-run §1 DONE, green to the `--check` limit (2026-06-13).** `just
-dry-deploy-beta` now reaches `fastapi_backend` (30 ok); the only remaining stop
-is the inherent check-mode wall — you can't `become` the `new_archon` runtime
-user before a real run creates it. Four root-cause fixes got it there:
+Deploy/ansible (committed to archon-vibe `main`):
+- `b03f32f` static_site rsync: macOS ships openrsync as `/usr/bin/rsync`, which
+  rejects `--chmod/--chown`; dropped them (archive mode preserves Vite 644/755) +
+  a follow-up `file` ownership task.
+- `8d994a8` fastapi_backend `data_dir`: `service.j2` hardcoded `/var/lib/archon`
+  in `ReadWritePaths`; with `ProtectSystem=strict` that path must exist, so beta
+  (`/var/lib/new_archon`) crash-looped `226/NAMESPACE`. Added `r.data_dir`
+  (default `/var/lib/archon`, prod unchanged); deploy-beta.yml passes `app_lib_dir`.
 
-- **server-setup `postgres_db` become-leak** (→ collection 1.0.1, pushed). Its
-  `vars/main.yml` set `ansible_become`/`ansible_become_user: postgres`; role vars
-  leak play-wide and (as `ansible_become*`) override the consumer's `become`, so
-  fact-gathering, the `delegate_to: localhost` release-fetch (the macOS
-  `chmod A+user:…` "Invalid file mode" error), `app_user` and the app roles all
-  ran as postgres. Now scoped to per-file `block`s.
-- **server-setup `postgres_db` `--check` autocommit** (→ 1.0.2): the per-DB
-  timeouts task is guarded `when: not ansible_check_mode` (autocommit is mutually
-  exclusive with check mode). Both collection commits are on `main`.
-- **vault never loaded**: `group_vars/vault.yml` mapped to a nonexistent group
-  `vault`, so every `vault_*` var was undefined. Restructured **beta and prod**
-  to `group_vars/all/{vars,vault}.yml` (loads for the `all` group).
-- **macOS unarchive**: `fetch_release.yml` now unpacks the frontend with
-  `tar -xzf` (the `unarchive` module needs GNU tar; laptop control nodes ship
-  bsdtar and it fell through to `unzip`).
+server-setup repo (pushed to its `main`; `just galaxy` reconciles the installed
+`galaxy_collections/` copies — do NOT run galaxy before that push or it reverts):
+- `nginx_site` HTTPS template: was `include options-ssl-nginx.conf` + `ssl_dhparam
+  ssl-dhparams.pem` — files only the certbot *nginx* plugin creates, absent under
+  `certbot certonly --webroot` → `nginx -t` emerg. Inlined SSL hardening; also
+  `listen 443 ssl; http2 on;` (de-deprecate) and a per-site
+  `ssl_session_cache shared:ssl_<name>:10m` (the shared `SSL` zone collided with
+  static_site's `shared:SSL:50m`). Molecule prepare.yml stubs removed.
+- `postgres_db`: `db:` → `login_db:` (community.postgresql deprecation).
 
-**NEXT: §2 `just deploy-beta`** (real apply — creates `new_archon`, so the
-check-mode wall is moot), then **§3** ETL against `/tmp/archondb.dump`, then §4–8.
-SSH to `deploy@frankfurt` works. Decrypted `.beta/.prod.vault_pass` live on the
-owner's local disk (gitignored). Vault now lives at
-`inventories/<env>/group_vars/all/vault.yml`.
+v0.1.2 code fixes (need the re-release to reach beta):
+- **#157** `597a65c` frontend `.env.production` `VITE_API_URL=` → same-origin.
+  Login built Discord OAuth with `redirect_uri=localhost:8000` because `API_BASE`
+  falls back to localhost when VITE_API_URL is unbaked (it only matters for a
+  production build; e2e uses `vite dev` so it was never caught). Same artifact
+  ships to all domains, so "" (nginx same-origin) is the only correct value.
+- **#155** `6f9ae48` twda.py + twda_import.py httpx→aiohttp. httpx was dev-only
+  (`[dependency-groups] dev`), so `--no-dev` installs crashed the startup TWDA
+  import with ModuleNotFoundError. aiohttp is core and already the app's client.
+- **#154** `f98ea04` (sibling) bot lightbulb v2 `.d` → v3 DI (was crash-looping).
+- **#152** `0b670d6` (sibling) release pipeline: release.yml now calls
+  release-artifacts via `workflow_call` → **no more manual delete/recreate dance.**
+- **#156** (sibling, p3) bot startup CI-smoke-test gap (filed, not fixed).
 
-**Commit/push state (2026-06-13):**
-- **server-setup → pushed to `main`:** `f940621` (1.0.1 become-leak) + `a049ddc`
-  (1.0.2 `--check` autocommit guard). `just galaxy` pulls these into the
-  gitignored `galaxy_collections/`; 1.0.2 is already installed locally.
-- **archon-vibe → committed on local `main`, NOT pushed:** `3f7e377` (vault →
-  `group_vars/all/`, beta+prod, + README/deploy.yml/runbook path fixes) +
-  `d7479b6` (frontend `tar -xzf`). **Push these before any CI-driven deploy.**
+CI/build (committed):
+- `4d5e13c` e2e flaky-test hardening — verified locally **26 passed**: 10s
+  create-redirect timeout + `getByText('8 registered', {exact:true})` (a player
+  uuid7 ending in "8" matched the substring ~40% of seeds).
+- `7fae103` Dockerfile + Dockerfile.test install wasm-pack via `cargo binstall`
+  (prebuilt aarch64/x86_64 musl, ~12s vs minutes) — verified **26 passed**.
+- `0517fa3` (sibling) frontend dep-stack upgrade + Node 24.
 
-Re-verify the dry run from a clean session (or just go to §2):
-```sh
-cd ansible
-ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass uv run --project .. \
-  ansible-playbook -i inventories/beta playbooks/deploy-beta.yml --check --diff
-```
-Expect `ok≈30`, one failure at `fastapi_backend : Create venv` (`sudo: unknown
-user new_archon`) — the inherent check-mode wall, not a bug.
+**◀ RESUME HERE — cutting v0.1.2, then deploy + resume at §3 (2026-06-14).**
+Owner is pushing `main` and re-tagging **v0.1.2** (at HEAD `7fae103` — all the
+above, verified green together by the last e2e run). Then:
+
+1. `just deploy-beta RELEASE_TAG=v0.1.2` — every §2 deploy bug is fixed, so expect
+   a clean run. Redeploy restarts the backend → startup sync re-runs on the
+   already-seeded DB (rich-guard applies); the DB is NOT wiped.
+2. Verify on v0.1.2: Discord login works (#157, same-origin), `new-archon-bot`
+   no longer crash-loops (#154), startup VEKN sync logs **no httpx error** (#155).
+3. **Resume at §3** below: ETL workbench → §4 leg A merge → §5 leg B (state beta
+   keeps) → §6 login/bot OAuth client → §7 #114 push audit = the **#39 GATE** →
+   §8 #80 check.
+
+Host/access unchanged: `deploy@57.129.110.107` (frankfurt), PG17, beta on
+8008/9008, `/tmp/archondb.dump` present (P4). **Export
+`ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass`** in `ansible/` — the owner's
+global `~/.ansible/.vault_pass` is the WRONG pass for the beta vault and silently
+fails decryption.
+
+Not part of #91 (review/discard if unintended): uncommitted `uv.lock` +
+`bot/uv.lock` (stray `uv lock` re-serialization) and `.pst/tickets` (sibling's
+ongoing board edits).
 
 ## Read before running anything
 
