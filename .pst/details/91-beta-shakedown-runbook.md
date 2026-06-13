@@ -31,6 +31,20 @@ exercise — that's part of the shakedown, not a precondition of it.
   the CI deploy path is optional wiring (§CI); the shakedown path is local
   `just deploy-beta`.
 
+## On-host findings 2026-06-13 (P0, verified on the box)
+- **PG is 17.10** on Debian 13 (trixie) — matches the assumption, **no 16 fork**.
+  Services all active, passwordless sudo OK.
+- **A legacy-archon BETA already runs on this box** (its own FastAPI/uvicorn) with
+  database **`archondb`** on the shared PG17 cluster. It is a **do-not-touch
+  neighbor**: nothing of ours references it, and our `§Cleanup dropdb
+  archon_legacy` is a *different* database — never drop `archondb`. `archon_legacy`
+  and `new_archon` are both free (confirmed).
+- **Port collision**: the legacy beta's uvicorn owns `127.0.0.1:8007`, which was
+  beta's original `backend_port`. Moved beta to the **+8 pair `8008`/`9008`** in
+  `inventories/beta/group_vars/all.yml` (backend/bot kept consistent). The two
+  stacks are otherwise fully isolated (own DB, ports, server_names, `new-archon-*`
+  units). The whole 8xxx/9xxx band is otherwise empty.
+
 ## Read before running anything
 
 1. **Beta is `just deploy-beta` ONLY** (plus `just dry-deploy-beta` for check

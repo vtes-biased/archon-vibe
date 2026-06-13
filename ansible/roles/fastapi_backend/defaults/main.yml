@@ -13,5 +13,9 @@
 # r.requirements_src      required (local path to pinned requirements.txt)
 # r.env                   required (dict of KEY: value pairs)
 # r.env_dir               optional (default: /etc/archon)
+# r.officials_contacts_vault optional (per-env vault filename in files/; default
+#                            officials_contacts.json.vault; e.g. ...json.beta.vault)
+# r.twda_key_vault        optional (per-env vault filename in files/; default
+#                            twda_github_app.pem.vault; e.g. ...pem.beta.vault)
 r: {}
 fastapi_env_dir_default: /etc/archon

@@ -14,6 +14,14 @@ repo_root := parent_directory(justfile_directory())
 build_dir := justfile_directory() / "build"
 manylinux := "quay.io/pypa/manylinux_2_28_x86_64"
 
+# Deploy/provision recipes default ANSIBLE_VAULT_PASSWORD_FILE to the env's
+# ansible/.<env>.vault_pass when you haven't set it yourself (an already-set value —
+# your global, or CI's — is respected). Locally: decrypt secrets/<env>.vault-pass.age
+# into it first (see README "Vault passwords"); CI writes its own file from the GitHub
+# Environment secret. lint/build recipes are left out so they run with no password.
+vault_pass_beta := justfile_directory() / ".beta.vault_pass"
+vault_pass_prod := justfile_directory() / ".prod.vault_pass"
+
 default:
     @just --list
 
@@ -81,17 +89,18 @@ build-all: build-engine-wheel build-backend build-bot build-frontend
 # `just deploy-beta` is the only beta entrypoint.
 # First-time provision: prod (packages, users, firewall, db, services)
 bootstrap-prod: galaxy
-    uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml
 
 # Beta's DB/role is created by deploy-beta.yml via server-setup's postgres_db role.
 # Install/configure PostgreSQL + archon DB/user on prod
 database-prod:
-    uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/database.yml
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/database.yml
 
 # Deploy archon-vibe to beta/frankfurt (RELEASE_TAG=… / SOURCE=local)
 deploy-beta:
     #!/usr/bin/env bash
     set -euo pipefail
+    export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}"
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
@@ -101,6 +110,7 @@ deploy-beta:
 deploy-prod:
     #!/usr/bin/env bash
     set -euo pipefail
+    export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}"
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
@@ -111,6 +121,7 @@ deploy-prod:
 upgrade-prod:
     #!/usr/bin/env bash
     set -euo pipefail
+    export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}"
     extra=""
     if [ -n "${FULL:-}" ]; then extra="-e upgrade_full=true"; fi
     if [ -n "${REBOOT:-}" ]; then extra="$extra -e upgrade_reboot=true"; fi
@@ -118,7 +129,7 @@ upgrade-prod:
 
 # One-shot PG16 -> PG17 migration on prod (requires confirmation)
 migrate-postgres-prod:
-    uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/migrate_postgres.yml
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/migrate_postgres.yml
 
 # yamllint + ansible-lint on the ansible tree
 lint: galaxy
@@ -129,6 +140,7 @@ lint: galaxy
 dry-deploy-beta: galaxy
     #!/usr/bin/env bash
     set -euo pipefail
+    export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}"
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
@@ -136,4 +148,4 @@ dry-deploy-beta: galaxy
 
 # Dry-run (check mode) of site.yml against prod
 dry-prod: galaxy
-    uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml --check --diff
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml --check --diff

@@ -57,13 +57,9 @@ On each server (first time only):
 cd ansible
 just galaxy                               # ansible collections (incl. server-setup foundation)
 
-# Create the vault password file (git-ignored) and encrypt the vault
-echo '<your vault password>' > .vault_pass
-chmod 600 .vault_pass
-
-# Edit and encrypt the placeholder secrets
-ansible-vault edit inventories/beta/group_vars/vault.yml
-ansible-vault edit inventories/prod/group_vars/vault.yml
+# Vault password: each env's lives age-encrypted in secrets/<env>.vault-pass.age and
+# the deploy recipes decrypt it for you — see "Vault passwords" below for adding your
+# key, creating/rotating a password, and editing vault.yml.
 
 # beta (frankfurt) is server-setup-provisioned — there is no beta bootstrap.
 # `just deploy-beta` is the only beta entrypoint (it creates the app user and
@@ -72,6 +68,108 @@ just deploy-beta
 
 just bootstrap-prod                        # prod: full provision (archon's own roles)
 ```
+
+## Vault passwords
+
+Each env (`beta`, `prod`) has its **own** ansible-vault password. We don't pass
+them around by hand — each is stored **in the repo, age-encrypted**, decryptable
+only by the admins whose public keys are listed in `secrets/age-recipients.txt`:
+
+```
+ansible/secrets/
+├── age-recipients.txt   # admins' PUBLIC keys — decrypt BOTH env passwords
+├── beta.vault-pass.age  # beta vault password, age-encrypted to that list
+└── prod.vault-pass.age  # prod vault password, age-encrypted to that list
+```
+
+Both the recipients list (public keys) and the `*.age` files (ciphertext) are
+**safe to commit**; `secrets/.gitignore` whitelists only those, so a plaintext
+password can't slip in. Install [`age`](https://github.com/FiloSottile/age) first:
+`brew install age` / `apt install age` / `winget install FiloSottile.age`.
+
+### Use it (local deploy)
+
+Decrypt the env's password into its git-ignored `.<env>.vault_pass` with **your**
+age/SSH key, then run the deploy — the `just` deploy/provision recipes default
+`ANSIBLE_VAULT_PASSWORD_FILE` to that per-env file for you:
+
+```bash
+cd ansible
+age -d -i ~/.ssh/id_ed25519 -o .beta.vault_pass secrets/beta.vault-pass.age   # fill .beta.vault_pass
+just deploy-beta            # recipe points ansible-vault at ./.beta.vault_pass
+rm -f .beta.vault_pass      # plaintext on disk; git-ignored, but remove when done
+```
+
+Choose your identity with `-i` (`~/.ssh/id_ed25519`, `~/.ssh/id_rsa`, or an age key
+like `~/.config/age/keys.txt`). Same for prod (`prod.vault-pass.age` →
+`.prod.vault_pass` → `just deploy-prod`). For a one-off `ansible-vault` command (not
+a recipe), point it at the same file: `ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass
+ansible-vault edit inventories/beta/group_vars/vault.yml`.
+
+> **A set `ANSIBLE_VAULT_PASSWORD_FILE` overrides this.** The recipe default only
+> kicks in when the variable is *unset* — an exported value (yours or CI's) is
+> respected as-is, and the env var also beats any `ansible.cfg` `vault_password_file`.
+> So keep your *global* default in `~/.ansible.cfg` (`[defaults]` → `vault_password_file`),
+> not a shell `export`, or it'll shadow the recipe's per-env `.<env>.vault_pass` here.
+
+### Become a recipient
+
+You decrypt with a private key whose public half is in `age-recipients.txt`. Pick
+one (the file can mix types):
+
+- **GitHub SSH key** (no new key if you already have one): `https://github.com/<you>.keys`
+  serves your `ssh-ed25519` / `ssh-rsa` keys — append the line. (age does **not**
+  support `ecdsa-sha2-*` or FIDO `sk-ssh-*` keys.)
+- **Local SSH pubkey**: paste a line from `~/.ssh/id_ed25519.pub`.
+- **Dedicated age key**: `age-keygen -o ~/.config/age/keys.txt` prints your `age1…`
+  public line — add that.
+
+### Create / rotate a password
+
+Make sure your key is in `age-recipients.txt` (above), then generate the password
+**straight into the age file** — it's never shown or written in plaintext. From
+`ansible/`:
+
+```bash
+# fresh random password, age-encrypted to the recipients (-a = armored, diff-friendly):
+openssl rand -base64 32 | tr -d '\n' | age -R secrets/age-recipients.txt -a -o secrets/beta.vault-pass.age
+openssl rand -base64 32 | tr -d '\n' | age -R secrets/age-recipients.txt -a -o secrets/prod.vault-pass.age
+```
+
+After **first** creating a password, encrypt that env's `vault.yml` with it (decrypt
+to the per-env file, then encrypt):
+
+```bash
+age -d -i ~/.ssh/id_ed25519 -o .beta.vault_pass secrets/beta.vault-pass.age
+ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass ansible-vault encrypt inventories/beta/group_vars/vault.yml
+```
+
+To **rotate recipients** (add/remove an admin) without changing the password,
+re-encrypt the existing password to the updated list — age can't re-wrap in place:
+
+```bash
+$EDITOR secrets/age-recipients.txt    # add/remove keys, then per env:
+age -d -i ~/.ssh/id_ed25519 secrets/beta.vault-pass.age | age -R secrets/age-recipients.txt -a -o secrets/beta.vault-pass.age.new
+mv secrets/beta.vault-pass.age.new secrets/beta.vault-pass.age
+```
+
+Commit the updated `*.age` / `age-recipients.txt`.
+
+### CI mirror (GitHub Environment secret)
+
+CI can't read a `*.age` (no admin key in the runner), and GitHub secrets are
+**write-only** anyway (`gh`/the API set but never read a value back). So each env's
+GitHub **Environment secret** `ANSIBLE_VAULT_PASSWORD` holds the same password and
+`deploy.yml` writes it to `.vault_pass` for the run. Mirror it from the age file
+(decrypt → `gh`, never on disk) whenever you create or rotate a password:
+
+```bash
+age -d -i ~/.ssh/id_ed25519 secrets/beta.vault-pass.age | gh secret set ANSIBLE_VAULT_PASSWORD --env beta       --repo vtes-biased/archon-vibe
+age -d -i ~/.ssh/id_ed25519 secrets/prod.vault-pass.age | gh secret set ANSIBLE_VAULT_PASSWORD --env production --repo vtes-biased/archon-vibe
+```
+
+Same password, two delivery paths: humans decrypt the `.age` locally; CI reads the
+Environment secret.
 
 ## Cutting a release
 
@@ -137,7 +235,8 @@ pushes `DEPLOY_SSH_KEY` to this repo's `beta` environment. One-time setup:
 3. **Per-environment secrets** (Secrets):
    - `DEPLOY_SSH_KEY` — the deploy keypair's private half (LF newlines); its public
      half is in the deploy user's `authorized_keys` (`just sync-key` for beta).
-   - `ANSIBLE_VAULT_PASSWORD` — the vault password for that env's `vault.yml`.
+   - `ANSIBLE_VAULT_PASSWORD` — the vault password for that env's `vault.yml`
+     (set it with `gh secret set` — see [Vault passwords](#vault-passwords)).
 4. The VPS must accept SSH from GitHub-hosted runner IPs (port 22 open).
 
 `production` deploys require an explicit `release_tag` (a pre-check fails a

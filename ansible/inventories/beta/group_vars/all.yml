@@ -27,8 +27,10 @@ legal_terms_url: "{{ site_url_base }}/legal/terms"
 legal_privacy_url: "{{ site_url_base }}/legal/privacy"
 
 # --- ports (localhost only, nginx proxies to them) ------------------------
-backend_port: 8007
-bot_port: 9007                    # matches bot default 9000 but differentiated per env
+# 8007 is taken by the co-located legacy-archon beta's uvicorn on this box, so
+# beta uses the +8 pair (8008/9008); the whole 8xxx/9xxx band is otherwise free.
+backend_port: 8008
+bot_port: 9008                    # paired with backend_port at +8 for this env
 
 # --- filesystem paths -----------------------------------------------------
 opt_root: /opt/new_archon

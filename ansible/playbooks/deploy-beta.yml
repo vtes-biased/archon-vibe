@@ -54,6 +54,8 @@
         requirements_src: "{{ backend_requirements }}"
         env: "{{ backend_env }}"
         env_dir: "{{ env_dir }}"
+        officials_contacts_vault: officials_contacts.json.beta.vault
+        twda_key_vault: twda_github_app.pem.beta.vault
 
     # 4. Frontend dist + PWA-correct vhost (archon's own role manages this nginx).
     - role: static_site

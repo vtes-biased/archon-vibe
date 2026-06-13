@@ -90,9 +90,24 @@ INCOMING/
 
 # Ansible
 ansible/build/
-ansible/.vault_pass
 ansible/.ansible_facts/
 ansible/.ansible/
+
+# Ansible vault — decrypted vault passwords, never commit (CI writes .vault_pass in
+# the runner; admins decrypt secrets/<env>.vault-pass.age into the per-env files).
+ansible/.vault_pass
+ansible/.beta.vault_pass
+ansible/.prod.vault_pass
+
+# ansible/secrets/ — commit ONLY the public recipients list + age-encrypted password
+# files; everything else (e.g. a decrypted plaintext password) stays ignored.
+ansible/secrets/*
+!ansible/secrets/age-recipients.txt
+!ansible/secrets/*.vault-pass.age
+
+# Role secret files — commit only the ansible-vault (.vault) variants, never plaintext.
+ansible/roles/fastapi_backend/files/officials_contacts.json
+ansible/roles/fastapi_backend/files/twda_github_app.pem
 ansible/*.retry
 ansible/galaxy_collections/
 
