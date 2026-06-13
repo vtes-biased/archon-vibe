@@ -46,7 +46,7 @@ jobs:
 
       - name: Upload wheel as a workflow artifact
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: archon-engine-wheel
           path: engine/dist/*.whl
@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload as a workflow artifact
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: archon-backend
           path: |
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload as a workflow artifact
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: archon-bot
           path: |
@@ -141,13 +141,15 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack   # crates.io build → guaranteed on ~/.cargo/bin (PATH); matches justfile
+        uses: taiki-e/install-action@v2   # prebuilt binary (~3s) vs ~80s source compile
+        with:
+          tool: wasm-pack
 
       - name: Build WASM engine
         working-directory: engine
         run: wasm-pack build --target web --release -- --features wasm
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -168,7 +170,7 @@ jobs:
 
       - name: Upload as a workflow artifact
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: archon-frontend-dist
           path: frontend-dist.tar.gz

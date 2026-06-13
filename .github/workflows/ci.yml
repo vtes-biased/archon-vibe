@@ -114,11 +114,13 @@ jobs:
         with:
           workspaces: engine
       - name: Install wasm-pack
-        run: cargo install wasm-pack   # crates.io build; matches release-artifacts.yml + justfile
+        uses: taiki-e/install-action@v2   # prebuilt binary (~3s) vs ~80s source compile
+        with:
+          tool: wasm-pack
       - name: Build WASM engine (generates engine/pkg/*.d.ts)
         working-directory: engine
         run: wasm-pack build --target web --release -- --features wasm
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
