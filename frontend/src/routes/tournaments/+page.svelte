@@ -7,7 +7,7 @@
   import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
   import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
-  import { Loader2, Trophy, Calendar, Copy, Check } from "lucide-svelte";
+  import { Loader2, Trophy, Calendar, Copy, Check } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";

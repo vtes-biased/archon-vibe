@@ -7,7 +7,7 @@
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock } from "lucide-svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';

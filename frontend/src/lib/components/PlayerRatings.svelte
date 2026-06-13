@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
-  import { ChevronDown, Crown, Medal } from "lucide-svelte";
+  import { ChevronDown, Crown, Medal } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { user }: { user: User | undefined } = $props();

@@ -4,7 +4,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { getAuthState, getAccessToken } from "$lib/stores/auth.svelte";
-  import { Loader2, CircleAlert, ShieldCheck, CircleCheck } from 'lucide-svelte';
+  import { Loader2, CircleAlert, ShieldCheck, CircleCheck } from '@lucide/svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";

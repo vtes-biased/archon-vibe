@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CommunityLink, CommunityLinkType } from "$lib/types";
-  import { ExternalLink, Globe, MessageSquare, BookOpen, Link, Pin } from "lucide-svelte";
+  import { ExternalLink, Globe, MessageSquare, BookOpen, Link, Pin } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { links }: { links: CommunityLink[] } = $props();

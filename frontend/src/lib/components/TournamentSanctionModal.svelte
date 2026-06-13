@@ -4,7 +4,7 @@
   import { createSanction } from "$lib/api";
   import { getPlayerSanctionsInTournament } from "$lib/db";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { TriangleAlert, CircleArrowDown } from "lucide-svelte";
+  import { TriangleAlert, CircleArrowDown } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

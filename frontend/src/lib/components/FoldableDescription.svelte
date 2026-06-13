@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight } from "lucide-svelte";
+  import { ChevronDown, ChevronRight } from "@lucide/svelte";
   import { renderMarkdown, stripLeadingTitle, descriptionExcerpt } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
 

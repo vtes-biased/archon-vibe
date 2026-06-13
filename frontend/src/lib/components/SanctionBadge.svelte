@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Sanction, SanctionLevel } from "$lib/types";
-  import { Ban, Check, Clock } from "lucide-svelte";
+  import { Ban, Check, Clock } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { sanction }: { sanction: Sanction } = $props();

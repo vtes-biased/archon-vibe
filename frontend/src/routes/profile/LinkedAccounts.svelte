@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { KeyRound, Mail } from "lucide-svelte";
+  import { KeyRound, Mail } from "@lucide/svelte";
   import { isPasskeySupported } from "$lib/stores/passkeys.svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import * as m from '$lib/paraglide/messages.js';

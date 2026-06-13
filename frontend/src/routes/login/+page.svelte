@@ -12,7 +12,7 @@
     createAccountWithPasskey,
     loginWithPasskey,
   } from "$lib/stores/passkeys.svelte";
-  import { Mail, Loader2, KeyRound } from 'lucide-svelte';
+  import { Mail, Loader2, KeyRound } from '@lucide/svelte';
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import * as m from '$lib/paraglide/messages.js';
 

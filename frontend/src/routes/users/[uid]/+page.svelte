@@ -10,7 +10,7 @@
   import VeknManagement from "$lib/components/VeknManagement.svelte";
   import SanctionsManager from "$lib/components/SanctionsManager.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
-  import { Loader2, Share2, Check } from "lucide-svelte";
+  import { Loader2, Share2, Check } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let copied = $state(false);

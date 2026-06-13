@@ -4,7 +4,7 @@
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunityModerationActions from "./CommunityModerationActions.svelte";
-  import { ChevronDown, ChevronRight } from "lucide-svelte";
+  import { ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface CountryGroup {

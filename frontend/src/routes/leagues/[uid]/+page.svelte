@@ -14,7 +14,7 @@
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
-  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy } from "lucide-svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);

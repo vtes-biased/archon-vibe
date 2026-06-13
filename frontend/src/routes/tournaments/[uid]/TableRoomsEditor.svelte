@@ -2,7 +2,7 @@
   import type { Tournament } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { Plus, X, ChevronUp, ChevronDown } from "lucide-svelte";
+  import { Plus, X, ChevronUp, ChevronDown } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

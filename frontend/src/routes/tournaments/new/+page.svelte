@@ -5,7 +5,7 @@
   import { saveTournament } from "$lib/db";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
-  import { ArrowLeft } from "lucide-svelte";
+  import { ArrowLeft } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));

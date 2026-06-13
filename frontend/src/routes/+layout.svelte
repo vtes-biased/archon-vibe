@@ -9,7 +9,7 @@
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState } from '$lib/stores/offline.svelte';
   import { onMount } from 'svelte';
-  import { WifiOff, Download, Trophy, BarChart3, Medal, Users, User, BookOpen } from 'lucide-svelte';
+  import { WifiOff, Download, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
   import Toast from '$lib/components/Toast.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';

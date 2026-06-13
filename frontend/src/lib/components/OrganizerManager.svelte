@@ -3,7 +3,7 @@
   import { getFilteredUsers, getUser } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { X } from "lucide-svelte";
+  import { X } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

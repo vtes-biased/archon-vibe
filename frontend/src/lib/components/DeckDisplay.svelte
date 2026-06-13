@@ -6,7 +6,7 @@
   import AttributionPicker from "./AttributionPicker.svelte";
   import { validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
-  import { CircleX, TriangleAlert } from "lucide-svelte";
+  import { CircleX, TriangleAlert } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

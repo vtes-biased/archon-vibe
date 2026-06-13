@@ -4,7 +4,7 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel } from "lucide-svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";

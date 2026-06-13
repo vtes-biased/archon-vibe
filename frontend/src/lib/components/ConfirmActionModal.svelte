@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import * as m from '$lib/paraglide/messages.js';
-  import { Loader2, CircleCheck, TriangleAlert } from 'lucide-svelte';
+  import { Loader2, CircleCheck, TriangleAlert } from '@lucide/svelte';
 
   let {
     title,

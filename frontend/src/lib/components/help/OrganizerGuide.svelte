@@ -6,7 +6,7 @@
     QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Undo2, Trash2,
     Play, Pause, RotateCcw, Clock, ChevronDown, ChevronRight,
     ShieldCheck, PauseCircle, PlayCircle, Gavel, X,
-  } from "lucide-svelte";
+  } from "@lucide/svelte";
 
   let openFaq = $state<number | null>(null);
   const faqs = [

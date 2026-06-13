@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GripVertical, CircleAlert } from "lucide-svelte";
+  import { GripVertical, CircleAlert } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, resolveTableLabel } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { onMount } from 'svelte';

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { helpDocs, referenceDocs, userGuides } from "$lib/help-docs";
-  import { BookOpen, Trophy, Scale, Shield, UserRound, ClipboardList, ShieldCheck, FileText } from "lucide-svelte";
-  import { ArrowLeft } from "lucide-svelte";
+  import { BookOpen, Trophy, Scale, Shield, UserRound, ClipboardList, ShieldCheck, FileText } from "@lucide/svelte";
+  import { ArrowLeft } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const iconMap: Record<string, typeof BookOpen> = {

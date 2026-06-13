@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
   import { timerStart, timerPause, timerReset, timerAddTime } from "$lib/api";
-  import { Play, Pause, RotateCcw, Clock } from "lucide-svelte";
+  import { Play, Pause, RotateCcw, Clock } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

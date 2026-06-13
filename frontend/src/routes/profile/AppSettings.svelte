@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Monitor, Sun, Moon } from "lucide-svelte";
+  import { Monitor, Sun, Moon } from "@lucide/svelte";
   import { getTheme, setTheme, type ThemePref } from "$lib/stores/theme.svelte";
   import { getLocale, setLocale, locales } from '$lib/paraglide/runtime.js';
   import * as m from '$lib/paraglide/messages.js';

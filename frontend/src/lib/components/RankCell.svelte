@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Trophy } from "lucide-svelte";
+  import { Trophy } from "@lucide/svelte";
   import * as m from "$lib/paraglide/messages.js";
 
   // Renders a final-placement rank: a trophy for the winner (rank 1), a dimmed

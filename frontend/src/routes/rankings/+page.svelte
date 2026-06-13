@@ -4,7 +4,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import type { User, RatingCategory } from "$lib/types";
-  import { Trophy, Loader2, ChevronLeft, ChevronRight } from "lucide-svelte";
+  import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let users = $state<User[]>([]);

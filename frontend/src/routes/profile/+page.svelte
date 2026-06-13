@@ -12,7 +12,7 @@
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
-  import { User } from "lucide-svelte";
+  import { User } from "@lucide/svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import * as m from '$lib/paraglide/messages.js';
 

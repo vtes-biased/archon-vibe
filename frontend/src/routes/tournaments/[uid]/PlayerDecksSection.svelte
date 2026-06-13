@@ -9,7 +9,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import { toUserMessage } from "$lib/errors";
   import { getCards } from "$lib/cards";
-  import { ChevronDown, ChevronRight, CircleCheck, Lock } from "lucide-svelte";
+  import { ChevronDown, ChevronRight, CircleCheck, Lock } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import * as m from '$lib/paraglide/messages.js';

@@ -12,7 +12,7 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
   import RaffleSection from "./RaffleSection.svelte";
-  import { Share2, ClipboardCopy, Upload, Download, ChevronDown, ChevronRight } from "lucide-svelte";
+  import { Share2, ClipboardCopy, Upload, Download, ChevronDown, ChevronRight } from "@lucide/svelte";
 
   import * as m from '$lib/paraglide/messages.js';
 

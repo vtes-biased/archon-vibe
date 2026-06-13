@@ -7,7 +7,7 @@ COPY engine/ .
 RUN wasm-pack build --no-opt --target web --release --features wasm
 
 # Stage 2: Build frontend
-FROM node:22-slim AS builder
+FROM node:24-slim AS builder
 WORKDIR /app
 
 # Build arg: empty string for Docker (nginx proxy), undefined for local dev

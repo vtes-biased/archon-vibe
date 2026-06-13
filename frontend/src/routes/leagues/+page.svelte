@@ -6,7 +6,7 @@
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
-  import { Loader2, BarChart3 } from "lucide-svelte";
+  import { Loader2, BarChart3 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);

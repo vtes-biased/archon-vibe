@@ -2,7 +2,7 @@
   import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "$lib/stores/auth.svelte";
-  import { Loader2, X } from 'lucide-svelte';
+  import { Loader2, X } from '@lucide/svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());

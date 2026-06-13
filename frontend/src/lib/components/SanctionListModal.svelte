@@ -3,7 +3,7 @@
   import { deleteSanctionApi } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
-  import { Trash2 } from "lucide-svelte";
+  import { Trash2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

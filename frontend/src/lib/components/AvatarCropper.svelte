@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ImagePlus, ZoomOut, ZoomIn } from "lucide-svelte";
+  import { ImagePlus, ZoomOut, ZoomIn } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   // Props

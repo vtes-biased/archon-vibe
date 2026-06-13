@@ -1,7 +1,7 @@
 <script lang="ts">
     import { searchCities } from "$lib/geonames";
     import type { City } from "$lib/types";
-    import { Loader2 } from "lucide-svelte";
+    import { Loader2 } from "@lucide/svelte";
     import * as m from '$lib/paraglide/messages.js';
 
     let {

@@ -5,7 +5,7 @@
   import { visibleSanctions } from "$lib/utils";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
-  import { Pencil, TriangleAlert, CircleCheck, Trash2 } from "lucide-svelte";
+  import { Pencil, TriangleAlert, CircleCheck, Trash2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

@@ -9,7 +9,7 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff } from "lucide-svelte";
+  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";

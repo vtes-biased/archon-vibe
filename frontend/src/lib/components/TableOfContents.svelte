@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { List, X } from "lucide-svelte";
+  import { List, X } from "@lucide/svelte";
   import { replaceState } from "$app/navigation";
   import type { TocEntry } from "$lib/help-docs";
   import * as m from '$lib/paraglide/messages.js';

@@ -6,7 +6,7 @@
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { League, LeagueKind, LeagueStandingsMode } from "$lib/types";
-  import { ArrowLeft } from "lucide-svelte";
+  import { ArrowLeft } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const canCreate = $derived(hasAnyRole("IC", "NC"));

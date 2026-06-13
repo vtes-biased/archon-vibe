@@ -2,7 +2,7 @@
   import { renderGuideSection } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
   import ExampleBox from "./ExampleBox.svelte";
-  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Languages, RefreshCw, Trophy } from "lucide-svelte";
+  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Languages, RefreshCw, Trophy } from "@lucide/svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
 </script>
 

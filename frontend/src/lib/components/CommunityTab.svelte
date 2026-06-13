@@ -12,7 +12,7 @@
   import CommunitySocialSection from "./CommunitySocialSection.svelte";
   import CommunityContentSection from "./CommunityContentSection.svelte";
   import DiscordIcon from "./DiscordIcon.svelte";
-  import { ChevronDown, ChevronRight, Globe, Hash, Pencil, Search, Users, Video } from "lucide-svelte";
+  import { ChevronDown, ChevronRight, Globe, Hash, Pencil, Search, Users, Video } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());

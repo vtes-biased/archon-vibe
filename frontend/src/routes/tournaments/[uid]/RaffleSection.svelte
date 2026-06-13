@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament, RafflePool } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { Dices, Undo2, Trash2 } from "lucide-svelte";
+  import { Dices, Undo2, Trash2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

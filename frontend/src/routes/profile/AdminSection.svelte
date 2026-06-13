@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, RefreshCw } from 'lucide-svelte';
+  import { ChevronDown, RefreshCw } from '@lucide/svelte';
   import * as m from '$lib/paraglide/messages.js';
   import {
     syncVeknMembers,

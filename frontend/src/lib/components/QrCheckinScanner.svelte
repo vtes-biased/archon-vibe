@@ -3,7 +3,7 @@
   import { onDestroy } from 'svelte';
   import { qrCheckin } from '$lib/api';
   import { saveTournament } from '$lib/db';
-  import { X } from 'lucide-svelte';
+  import { X } from '@lucide/svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {

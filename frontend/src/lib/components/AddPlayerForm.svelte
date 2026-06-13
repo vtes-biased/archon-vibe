@@ -2,7 +2,7 @@
   import type { User, Tournament } from "$lib/types";
   import { getFilteredUsers, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
-  import { Ban, TriangleAlert, Flower2 } from "lucide-svelte";
+  import { Ban, TriangleAlert, Flower2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

@@ -11,7 +11,7 @@
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
-  import { Loader2, X, User as UserIcon, Camera, SquarePen } from "lucide-svelte";
+  import { Loader2, X, User as UserIcon, Camera, SquarePen } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

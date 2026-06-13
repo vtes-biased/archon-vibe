@@ -7,7 +7,7 @@ COPY engine/ .
 RUN wasm-pack build --no-opt --target web --release --features wasm
 
 # Stage 2: Test runner with Playwright
-FROM node:22-slim
+FROM node:24-slim
 WORKDIR /app
 
 # Install Playwright system dependencies and curl

@@ -2,7 +2,7 @@
   import { getAuthState, hasRole } from "$lib/stores/auth.svelte";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { ChevronDown, Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff } from "lucide-svelte";
+  import { ChevronDown, Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());

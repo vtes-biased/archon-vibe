@@ -13,7 +13,7 @@
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff } from "lucide-svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';

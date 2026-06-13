@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CommunityLink } from "$lib/types";
-  import { EyeOff, Star, Globe } from "lucide-svelte";
+  import { EyeOff, Star, Globe } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface Props {

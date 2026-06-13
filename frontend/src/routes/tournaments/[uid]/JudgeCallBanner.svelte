@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { JudgeCallData } from "$lib/sync";
-  import { X, Gavel } from "lucide-svelte";
+  import { X, Gavel } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

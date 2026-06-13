@@ -2,7 +2,7 @@
   import type { User } from "$lib/types";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2 } from "lucide-svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {

@@ -10,7 +10,7 @@
   import { syncManager } from "$lib/sync";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
-  import { RefreshCw, Users } from "lucide-svelte";
+  import { RefreshCw, Users } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let filteredUsers = $state<UserType[]>([]);

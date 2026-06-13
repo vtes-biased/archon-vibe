@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight } from "lucide-svelte";
+  import { ChevronDown, ChevronRight } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import type { Snippet } from "svelte";
 
