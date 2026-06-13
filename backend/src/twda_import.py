@@ -3,7 +3,7 @@
 import logging
 from datetime import UTC, datetime
 
-import httpx
+import aiohttp
 import msgspec
 from uuid6 import uuid7
 
@@ -117,18 +117,17 @@ async def import_twda_decks() -> dict[str, int]:
     if _last_etag:
         headers["If-None-Match"] = _last_etag
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.get(TWDA_URL, headers=headers)
-
-    if resp.status_code == 304:
-        logger.info("TWDA data unchanged (304)")
-        return {"status": "unchanged"}
-
-    resp.raise_for_status()
-    _last_etag = resp.headers.get("ETag")
-
-    # 2. Parse & build compact lookup
-    raw_entries: list[dict] = resp.json()
+    timeout = aiohttp.ClientTimeout(total=60.0)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(TWDA_URL, headers=headers) as resp:
+            if resp.status == 304:
+                logger.info("TWDA data unchanged (304)")
+                return {"status": "unchanged"}
+            resp.raise_for_status()
+            _last_etag = resp.headers.get("ETag")
+            # 2. Parse & build compact lookup (read body before the response closes;
+            # content_type=None: static.krcg.org may not serve application/json)
+            raw_entries: list[dict] = await resp.json(content_type=None)
     twda_lookup: dict[str, dict] = {}
     for entry in raw_entries:
         event_id = _extract_vekn_event_id(entry)
