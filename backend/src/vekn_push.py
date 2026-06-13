@@ -182,6 +182,9 @@ async def push_tournament_event(
             final=has_finals,
             organizer_vekn_id=organizer.vekn_id,
             online=tournament.online,
+            # VEKN requires a venue for in-person events; 9999 is the generic
+            # placeholder venue the VEKN admins provisioned for app-created events.
+            venueid=0 if tournament.online else 9999,
             multideck=tournament.multideck,
             proxies=tournament.proxies,
             description=tournament.description[:500] if tournament.description else "",
