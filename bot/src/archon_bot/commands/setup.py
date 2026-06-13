@@ -37,10 +37,13 @@ class SetupCommand(
     url = lightbulb.string("url", "Archon tournament URL")
 
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-        api: ArchonAPI = ctx.client.d["api"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+    ) -> None:
         if not ctx.guild_id:
             await ctx.respond(
                 "This command must be used in a server.",
@@ -130,7 +133,7 @@ class SetupCommand(
         # Start SSE listener
         await start_sse(
             ctx.client.app,
-            ctx.client.d["api"],
+            api,
             store,
             str(ctx.guild_id),
             tournament_uid,
@@ -181,10 +184,13 @@ class TeardownCommand(
     description="Remove all bot-created channels for a tournament",
 ):
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-        api: ArchonAPI = ctx.client.d["api"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+    ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
@@ -242,10 +248,13 @@ class AnnounceCommand(
     message = lightbulb.string("message", "Message to announce")
 
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-        api: ArchonAPI = ctx.client.d["api"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+    ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return

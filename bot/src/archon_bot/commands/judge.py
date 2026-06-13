@@ -365,10 +365,14 @@ class SanctionCommand(
     player = lightbulb.user("player", "The player to sanction")
 
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-        api: ArchonAPI = ctx.client.d["api"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+        miru_client: miru.Client,
+    ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
@@ -413,5 +417,4 @@ class SanctionCommand(
             components=view,
             flags=hikari.MessageFlag.EPHEMERAL,
         )
-        miru_client: miru.Client = ctx.client.d["miru"]
         miru_client.start_view(view)

@@ -46,10 +46,11 @@ def main() -> None:
     store = TokenStore()
     api = ArchonAPI(store)
 
-    # Attach to client.d for command access
-    client.d["store"] = store
-    client.d["api"] = api
-    client.d["miru"] = miru_client
+    # Register shared deps for command access via lightbulb v3 dependency injection
+    registry = client.di.registry_for(lightbulb.di.Contexts.DEFAULT)
+    registry.register_value(TokenStore, store)
+    registry.register_value(ArchonAPI, api)
+    registry.register_value(miru.Client, miru_client)
 
     # Register commands
     client.register(SetupCommand)
@@ -61,15 +62,20 @@ def main() -> None:
     client.register(JudgeCommand)
     client.register(SanctionCommand)
 
+    # hikari's GatewayBot has no data store in v2.5; share via this closure
+    callback_runner = None
+
     @bot.listen(hikari.StartedEvent)
     async def on_started(event: hikari.StartedEvent) -> None:
+        nonlocal callback_runner
         await store.init()
         await api.init()
         set_context(bot, store, api)
 
         # Start OAuth callback HTTP server
-        runner = await start_callback_server(config.CALLBACK_HOST, config.CALLBACK_PORT)
-        bot.d["callback_runner"] = runner
+        callback_runner = await start_callback_server(
+            config.CALLBACK_HOST, config.CALLBACK_PORT
+        )
 
         # Resume SSE listeners for all linked tournaments (reconnect after restart)
         all_tournaments = await store.get_all_guild_tournaments()
@@ -89,9 +95,8 @@ def main() -> None:
 
     @bot.listen(hikari.StoppingEvent)
     async def on_stopping(event: hikari.StoppingEvent) -> None:
-        runner = bot.d.get("callback_runner")
-        if runner:
-            await runner.cleanup()
+        if callback_runner:
+            await callback_runner.cleanup()
         await api.close()
         await store.close()
 

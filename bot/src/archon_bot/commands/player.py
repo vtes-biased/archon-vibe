@@ -304,6 +304,7 @@ async def _handle_registration_pipeline(
     ctx: lightbulb.Context,
     store: TokenStore,
     api: ArchonAPI,
+    miru_client: miru.Client,
     tournament_uid: str,
     action: str,
 ) -> None:
@@ -378,7 +379,6 @@ async def _handle_registration_pipeline(
             components=view,
             flags=hikari.MessageFlag.EPHEMERAL,
         )
-        miru_client: miru.Client = ctx.client.d["miru"]
         miru_client.start_view(view)
 
 
@@ -386,30 +386,42 @@ class RegisterCommand(
     lightbulb.SlashCommand, name="register", description="Register for the tournament"
 ):
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-        api: ArchonAPI = ctx.client.d["api"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+        miru_client: miru.Client,
+    ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
 
-        await _handle_registration_pipeline(ctx, store, api, tournament_uid, "register")
+        await _handle_registration_pipeline(
+            ctx, store, api, miru_client, tournament_uid, "register"
+        )
 
 
 class CheckinCommand(
     lightbulb.SlashCommand, name="checkin", description="Check in for the tournament"
 ):
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-        api: ArchonAPI = ctx.client.d["api"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+        miru_client: miru.Client,
+    ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
 
-        await _handle_registration_pipeline(ctx, store, api, tournament_uid, "checkin")
+        await _handle_registration_pipeline(
+            ctx, store, api, miru_client, tournament_uid, "checkin"
+        )
 
 
 _VP_CHOICES = [
@@ -425,10 +437,13 @@ class ReportCommand(
     vp = lightbulb.number("vp", "Your victory points", choices=_VP_CHOICES)
 
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-        api: ArchonAPI = ctx.client.d["api"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+    ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
@@ -485,9 +500,12 @@ class JudgeCommand(
     lightbulb.SlashCommand, name="judge", description="Call a judge to your table"
 ):
     @lightbulb.invoke
-    async def invoke(self, ctx: lightbulb.Context) -> None:
-        store: TokenStore = ctx.client.d["store"]
-
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+    ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
