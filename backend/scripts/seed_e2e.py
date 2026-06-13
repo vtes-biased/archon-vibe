@@ -29,6 +29,7 @@ from src.models import (  # noqa: E402
     AuthMethodType,
     CommunityLink,
     CommunityLinkType,
+    LinkModeration,
     Role,
     User,
 )
@@ -146,6 +147,11 @@ async def seed() -> dict:
                 type=CommunityLinkType.DISCORD,
                 url="https://discord.gg/vtes-global",
                 label="VTES Global",
+                # Globally-pinned by the IC so it surfaces under Global Resources
+                # (the section only lists scope="global" promotions post-97dee76).
+                moderation=LinkModeration(
+                    status="promoted", by=org_uid, at=now, scope="global"
+                ),
             ),
             CommunityLink(
                 type=CommunityLinkType.YOUTUBE,
