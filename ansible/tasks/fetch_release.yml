@@ -67,10 +67,12 @@
         mode: "0755"
 
     - name: Unpack frontend dist
-      ansible.builtin.unarchive:
-        src: "{{ build_dir }}/frontend-dist.tar.gz"
-        dest: "{{ frontend_dist_dir }}"
-        remote_src: true
+      # Use tar directly rather than ansible.builtin.unarchive: the control node
+      # may be macOS (laptop deploys), where unarchive can't find GNU tar and
+      # falls through to unzip on a .tar.gz. bsdtar and GNU tar both take -xzf.
+      ansible.builtin.command:  # noqa: command-instead-of-module
+        cmd: tar -xzf {{ build_dir }}/frontend-dist.tar.gz -C {{ frontend_dist_dir }}
+      changed_when: true
 
 - name: Assert build artifacts are present
   ansible.builtin.assert:
