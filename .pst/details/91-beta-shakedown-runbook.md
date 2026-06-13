@@ -45,7 +45,7 @@ exercise — that's part of the shakedown, not a precondition of it.
   stacks are otherwise fully isolated (own DB, ports, server_names, `new-archon-*`
   units). The whole 8xxx/9xxx band is otherwise empty.
 
-## Progress checkpoint — 2026-06-13 (RESUME HERE)
+## Progress checkpoint — 2026-06-13 (background; RESUME HERE is the dry-run block below)
 
 Live execution state (the board carries the new tickets #149–#152):
 
@@ -74,7 +74,7 @@ Live execution state (the board carries the new tickets #149–#152):
   e2e Community-tab "global pins" regression (FIXED → unblocked v0.1.1) · **#152**
   release-artifacts `GITHUB_TOKEN` trigger bug (p1, open) · **#149** TWDA App-ID→Client-ID (p3).
 
-**Dry-run §1 DONE — green to the `--check` limit (2026-06-13).** `just
+**◀ RESUME HERE — Dry-run §1 DONE, green to the `--check` limit (2026-06-13).** `just
 dry-deploy-beta` now reaches `fastapi_backend` (30 ok); the only remaining stop
 is the inherent check-mode wall — you can't `become` the `new_archon` runtime
 user before a real run creates it. Four root-cause fixes got it there:
@@ -100,6 +100,23 @@ check-mode wall is moot), then **§3** ETL against `/tmp/archondb.dump`, then §
 SSH to `deploy@frankfurt` works. Decrypted `.beta/.prod.vault_pass` live on the
 owner's local disk (gitignored). Vault now lives at
 `inventories/<env>/group_vars/all/vault.yml`.
+
+**Commit/push state (2026-06-13):**
+- **server-setup → pushed to `main`:** `f940621` (1.0.1 become-leak) + `a049ddc`
+  (1.0.2 `--check` autocommit guard). `just galaxy` pulls these into the
+  gitignored `galaxy_collections/`; 1.0.2 is already installed locally.
+- **archon-vibe → committed on local `main`, NOT pushed:** `3f7e377` (vault →
+  `group_vars/all/`, beta+prod, + README/deploy.yml/runbook path fixes) +
+  `d7479b6` (frontend `tar -xzf`). **Push these before any CI-driven deploy.**
+
+Re-verify the dry run from a clean session (or just go to §2):
+```sh
+cd ansible
+ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass uv run --project .. \
+  ansible-playbook -i inventories/beta playbooks/deploy-beta.yml --check --diff
+```
+Expect `ok≈30`, one failure at `fastapi_backend : Create venv` (`sudo: unknown
+user new_archon`) — the inherent check-mode wall, not a bug.
 
 ## Read before running anything
 
