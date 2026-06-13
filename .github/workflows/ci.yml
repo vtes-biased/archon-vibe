@@ -1,10 +1,9 @@
 name: CI
 
-# Fast pre-merge gate — the high-signal, deterministic checks, complementing the
-# slow full-stack E2E suite (release.yml, on `v*` tags). Mirrors `just test` /
+# Fast pre-merge gate — the high-signal, deterministic checks that run in minutes,
+# complementing the slow full-stack E2E suite (e2e.yml). Mirrors `just test` /
 # `just lint-check`, split into independent parallel jobs so each layer fails and
-# reports on its own: python lint, rust fmt+clippy, engine tests, backend pytest,
-# frontend types. Jobs run concurrently, so total wall-clock = the slowest job.
+# reports on its own: python lint, the Rust engine, backend pytest, frontend types.
 on:
   pull_request:
   push:
@@ -30,20 +29,17 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - uses: astral-sh/setup-uv@v8.2.0   # no floating major tag published; pin full version
-        with:
-          enable-cache: true
+      - name: Install uv
+        run: pip install uv
       - name: ruff check + format
         run: |
           uv run ruff check .
           uv run ruff format --check .
 
-  # `just lint-check` (rust half): fmt + clippy. Split out from the test job so the
-  # compile-bound `cargo test` doesn't sit behind ~11s of fmt+clippy on one runner —
-  # the two now run on separate runners in parallel. Deps are shared via rust-cache
-  # (same Cargo.lock), so the duplicate dep compile is a cache hit, not a rebuild.
-  engine-lint:
-    name: Rust engine (fmt + clippy)
+  # `just lint-check` (rust half) + engine unit tests. fmt/clippy/test share one
+  # toolchain + cache, so they live together rather than fanning out further.
+  engine:
+    name: Rust engine (fmt + clippy + test)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -59,24 +55,6 @@ jobs:
           workspaces: engine
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --all-features -- -D warnings
-
-  # Engine unit + doctests. The CI critical path: compile-bound (one test binary,
-  # ~160 unit tests + doctests). `[profile.test] debug = line-tables-only` (Cargo.toml)
-  # trims debuginfo codegen/link, the bulk of the cost. NOT nextest — it skips the
-  # doctests in league.rs.
-  engine-test:
-    name: Rust engine (test)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: engine
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: engine
       - run: cargo test
 
   # `just test-backend`: build the PyO3 engine into the venv, then pytest against a
@@ -97,9 +75,9 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U archon"
-          --health-interval 2s
-          --health-timeout 3s
-          --health-retries 15
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -109,9 +87,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: engine
-      - uses: astral-sh/setup-uv@v8.2.0   # no floating major tag published; pin full version
-        with:
-          enable-cache: true
+      - name: Install uv
+        run: pip install uv
       - name: Build PyO3 engine into the venv
         run: uv run maturin develop --manifest-path engine/Cargo.toml
       - name: pytest
@@ -142,25 +119,14 @@ jobs:
           tool: wasm-pack
       - name: Build WASM engine (generates engine/pkg/*.d.ts)
         working-directory: engine
-        # --dev: svelte-check only needs the generated .d.ts + JS bindings, not a
-        # size-optimized wasm binary, so skip the release optimization passes.
-        run: wasm-pack build --target web --dev -- --features wasm
+        run: wasm-pack build --target web --release -- --features wasm
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      # Cache the resolved node_modules tree (not just the npm download cache) so a
-      # clean install is skipped entirely on a lockfile hit.
-      - uses: actions/cache@v5
-        id: node-modules
-        with:
-          path: frontend/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-      - name: Install deps
-        if: steps.node-modules.outputs.cache-hit != 'true'
+      - name: Install deps + type-check
         working-directory: frontend
-        run: npm ci
-      - name: Type-check
-        working-directory: frontend
-        run: npm run check -- --threshold error
+        run: |
+          npm ci
+          npm run check -- --threshold error

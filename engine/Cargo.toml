@@ -20,16 +20,6 @@ rand = "0.8"
 rand_chacha = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
 
-# Dev/test builds (engine `cargo test`, backend `maturin develop`) don't need
-# full debuginfo — line tables keep panic/backtrace line numbers while cutting
-# debuginfo codegen + link time, the dominant cost of the compile-bound CI test
-# job. Release is unaffected (still size-optimized + stripped).
-[profile.dev]
-debug = "line-tables-only"
-
-[profile.test]
-debug = "line-tables-only"
-
 [profile.release]
 opt-level = "z"     # Optimize for size
 lto = true          # Link-time optimization
