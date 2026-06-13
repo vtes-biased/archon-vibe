@@ -16,7 +16,7 @@ name: Deploy
 #   Secrets:
 #     DEPLOY_SSH_KEY         deploy key (private half, LF newlines); public half in
 #                            the deploy user's authorized_keys (server-setup sync-key)
-#     ANSIBLE_VAULT_PASSWORD vault password for inventories/<env>/group_vars/vault.yml
+#     ANSIBLE_VAULT_PASSWORD vault password for inventories/<env>/group_vars/all/vault.yml
 on:
   workflow_dispatch:
     inputs:

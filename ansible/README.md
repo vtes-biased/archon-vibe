@@ -23,7 +23,7 @@ The `just build-*` recipes still build everything locally for development, and
 (handy for testing an un-released change on beta).
 
 Runtime Python is managed by **uv** (same version on both hosts, pinned via
-`python_version` in `group_vars/all.yml` — currently `3.13`). uv downloads
+`python_version` in `group_vars/all/vars.yml` — currently `3.13`). uv downloads
 python-build-standalone binaries into `/opt/uv/python`, independent of the
 distro. No third-party PPAs; no abi3 tricks in the Rust engine build.
 
@@ -104,7 +104,7 @@ Choose your identity with `-i` (`~/.ssh/id_ed25519`, `~/.ssh/id_rsa`, or an age 
 like `~/.config/age/keys.txt`). Same for prod (`prod.vault-pass.age` →
 `.prod.vault_pass` → `just deploy-prod`). For a one-off `ansible-vault` command (not
 a recipe), point it at the same file: `ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass
-ansible-vault edit inventories/beta/group_vars/vault.yml`.
+ansible-vault edit inventories/beta/group_vars/all/vault.yml`.
 
 > **A set `ANSIBLE_VAULT_PASSWORD_FILE` overrides this.** The recipe default only
 > kicks in when the variable is *unset* — an exported value (yours or CI's) is
@@ -141,7 +141,7 @@ to the per-env file, then encrypt):
 
 ```bash
 age -d -i ~/.ssh/id_ed25519 -o .beta.vault_pass secrets/beta.vault-pass.age
-ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass ansible-vault encrypt inventories/beta/group_vars/vault.yml
+ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass ansible-vault encrypt inventories/beta/group_vars/all/vault.yml
 ```
 
 To **rotate recipients** (add/remove an admin) without changing the password,
