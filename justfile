@@ -64,7 +64,7 @@ test:
     (cd engine && cargo test)
     just lint-check
     just test-backend
-    (cd frontend && npx svelte-check --threshold error)
+    (cd frontend && npm run check -- --threshold error)
 
 # Run backend tests (starts DB if needed, stops it after)
 test-backend *ARGS='-v':

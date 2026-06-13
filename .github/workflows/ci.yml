@@ -98,7 +98,9 @@ jobs:
 
   # `just test` (frontend half): svelte-check. It resolves engine types from
   # engine/pkg (the gitignored WASM build output), so the WASM engine must be built
-  # first; then svelte-kit sync generates $types before the type-check.
+  # first; then `npm run check` runs the frontend codegen (geonames copy + paraglide
+  # compile + svelte-kit sync) before the type-check — all three emit gitignored
+  # sources svelte-check needs ($lib/paraglide, $lib/data/geonames, $types).
   frontend:
     name: Frontend type-check (svelte-check)
     runs-on: ubuntu-latest
@@ -125,5 +127,4 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npx svelte-kit sync
-          npx svelte-check --tsconfig ./tsconfig.json --threshold error
+          npm run check -- --threshold error
