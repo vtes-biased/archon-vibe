@@ -2,8 +2,10 @@ name: Release
 
 # Tag-gated release pipeline. Pushing a `v*` tag runs the full Playwright E2E
 # suite against an isolated, ephemeral stack; only if it passes does the next job
-# create the GitHub Release. Publishing that release then fires release-artifacts.yml
-# (the wheel/dist build). So the chain is:
+# create the GitHub Release. The artifacts job then calls release-artifacts.yml
+# directly (workflow_call) to build + attach the wheel/dist assets — we don't
+# rely on a `release: published` event, which a github.token-created Release
+# never fires (#152). So the chain is one run:
 #
 #   git push origin v1.2.3  ->  e2e  ->  (green) create release  ->  artifacts  ->  manual deploy
 #
@@ -71,7 +73,6 @@ jobs:
 
   # Gate: create the GitHub Release from the tag only after E2E is green. Skipped
   # on workflow_dispatch (no tag ref) so ad-hoc suite runs never cut a release.
-  # Publishing the release triggers release-artifacts.yml to build + attach assets.
   create-release:
     name: Create release (gated on e2e)
     needs: e2e
@@ -85,5 +86,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         # --verify-tag aborts if the tag somehow isn't on the remote; --generate-notes
-        # auto-builds release notes. Non-prerelease so release-artifacts attaches assets.
+        # auto-builds release notes. Non-prerelease so the artifacts job attaches assets.
         run: gh release create "${{ github.ref_name }}" --verify-tag --generate-notes
+
+  # Build + attach the deployable assets to the Release we just created. Called
+  # directly (workflow_call) rather than via `release: published` — see header.
+  artifacts:
+    name: Build & attach artifacts
+    needs: create-release
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    permissions:
+      contents: write   # release-artifacts uploads assets with github.token
+    uses: ./.github/workflows/release-artifacts.yml
+    with:
+      tag: ${{ github.ref_name }}

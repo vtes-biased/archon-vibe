@@ -1,23 +1,30 @@
 name: Release Artifacts
 
-# Builds every deployable artifact in CI and attaches it to the published
-# GitHub Release. The deploy playbooks fetch these assets themselves
-# (ansible/tasks/fetch_release.yml) instead of building locally — CI is the
-# single source of deployed builds. Card data freshness is owned by
-# update-cards.yml (daily).
+# Builds every deployable artifact in CI and attaches it to a GitHub Release.
+# Called directly by release.yml (workflow_call) right after the e2e-gated
+# Release is created — no `release: published` event handoff, which a
+# github.token-created Release never fires (#152). The deploy playbooks fetch
+# these assets themselves (ansible/tasks/fetch_release.yml) instead of building
+# locally — CI is the single source of deployed builds. Card data freshness is
+# owned by update-cards.yml (daily).
 on:
-  release:
-    types: [published]   # attach artifacts to the published release
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to attach the built assets to.
+        required: true
+        type: string
   workflow_dispatch: {}  # manual build → downloadable workflow artifacts
 
 # Least privilege by default; each job re-grants contents:write only because it
-# attaches assets to the Release on the `release` event.
+# attaches assets to the Release when called with a tag.
 permissions:
   contents: read
 
-# Serialize per release tag so two close-together publishes don't race to upload.
+# Serialize per release tag so two close-together releases don't race to upload;
+# a workflow_dispatch build has no tag → unique group → never serialized.
 concurrency:
-  group: release-${{ github.event.release.tag_name || github.run_id }}
+  group: release-${{ inputs.tag || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -39,13 +46,13 @@ jobs:
           args: --release -i python3.13 --out dist
 
       - name: Attach wheel to the GitHub Release
-        if: github.event_name == 'release' && github.event.release.prerelease == false
+        if: inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" engine/dist/*.whl --clobber
+        run: gh release upload "${{ inputs.tag }}" engine/dist/*.whl --clobber
 
       - name: Upload wheel as a workflow artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.tag == ''
         uses: actions/upload-artifact@v7
         with:
           name: archon-engine-wheel
@@ -73,15 +80,15 @@ jobs:
             -o dist/backend-requirements.txt
 
       - name: Attach to the GitHub Release
-        if: github.event_name == 'release' && github.event.release.prerelease == false
+        if: inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          gh release upload "${{ inputs.tag }}" \
             dist/archon-*.whl dist/backend-requirements.txt --clobber
 
       - name: Upload as a workflow artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.tag == ''
         uses: actions/upload-artifact@v7
         with:
           name: archon-backend
@@ -112,15 +119,15 @@ jobs:
             -o ../dist/bot-requirements.txt
 
       - name: Attach to the GitHub Release
-        if: github.event_name == 'release' && github.event.release.prerelease == false
+        if: inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          gh release upload "${{ inputs.tag }}" \
             dist/archon_discord_bot-*.whl dist/bot-requirements.txt --clobber
 
       - name: Upload as a workflow artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.tag == ''
         uses: actions/upload-artifact@v7
         with:
           name: archon-bot
@@ -163,13 +170,13 @@ jobs:
         run: tar czf frontend-dist.tar.gz -C frontend/build .
 
       - name: Attach to the GitHub Release
-        if: github.event_name == 'release' && github.event.release.prerelease == false
+        if: inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" frontend-dist.tar.gz --clobber
+        run: gh release upload "${{ inputs.tag }}" frontend-dist.tar.gz --clobber
 
       - name: Upload as a workflow artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.tag == ''
         uses: actions/upload-artifact@v7
         with:
           name: archon-frontend-dist

@@ -140,7 +140,7 @@ test-e2e:
         --abort-on-container-exit --exit-code-from frontend-test frontend-test
 
 # release.yml runs e2e on the pushed tag and, only if green, creates the GitHub
-# Release (which then triggers the artifact build).
+# Release, then builds + attaches the artifacts in the same run.
 #
 # Cut a release: push a vX.Y.Z tag (e2e-gated; see release.yml)
 release tag:

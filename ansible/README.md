@@ -185,8 +185,10 @@ From there:
    stack). A failing suite aborts — no Release is created.
 2. On success, the workflow runs `gh release create <tag> --verify-tag
    --generate-notes` to publish the GitHub Release.
-3. Publishing the Release triggers `release-artifacts.yml` to build and attach
-   the wheel / frontend dist assets.
+3. The same run then calls `release-artifacts.yml` directly (`workflow_call`)
+   to build and attach the wheel / frontend dist assets — no `release:
+   published` event handoff (a `github.token`-created Release never fires it),
+   so no PAT/token is needed.
 4. Deploy is manual + approval-gated (`deploy.yml`) — nothing auto-deploys.
 
 To run the E2E suite without cutting a release (e.g. on `main`), use
