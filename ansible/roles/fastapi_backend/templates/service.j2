@@ -25,7 +25,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths={{ r.site_root }} /var/lib/archon
+ReadWritePaths={{ r.site_root }} {{ _data_dir }}
 
 [Install]
 WantedBy=multi-user.target

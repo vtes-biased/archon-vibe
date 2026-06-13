@@ -54,6 +54,7 @@
         requirements_src: "{{ backend_requirements }}"
         env: "{{ backend_env }}"
         env_dir: "{{ env_dir }}"
+        data_dir: "{{ app_lib_dir }}"
         officials_contacts_vault: officials_contacts.json.beta.vault
         twda_key_vault: twda_github_app.pem.beta.vault
 

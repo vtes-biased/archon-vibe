@@ -21,6 +21,7 @@
     _env_dir: "{{ r.env_dir | default(fastapi_env_dir_default) }}"
     _wheels_dir: "{{ r.site_root }}/wheels"
     _venv_dir: "{{ r.site_root }}/.venv"
+    _data_dir: "{{ r.data_dir | default(fastapi_data_dir_default) }}"
 
 - name: Ensure site_root exists
   ansible.builtin.file:

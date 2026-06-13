@@ -13,9 +13,14 @@
 # r.requirements_src      required (local path to pinned requirements.txt)
 # r.env                   required (dict of KEY: value pairs)
 # r.env_dir               optional (default: /etc/archon)
+# r.data_dir              optional (writable state dir for snapshots etc.;
+#                          default: /var/lib/archon. Must exist — systemd
+#                          ProtectSystem=strict + ReadWritePaths needs it.
+#                          Beta passes /var/lib/new_archon per its namespace.)
 # r.officials_contacts_vault optional (per-env vault filename in files/; default
 #                            officials_contacts.json.vault; e.g. ...json.beta.vault)
 # r.twda_key_vault        optional (per-env vault filename in files/; default
 #                            twda_github_app.pem.vault; e.g. ...pem.beta.vault)
 r: {}
 fastapi_env_dir_default: /etc/archon
+fastapi_data_dir_default: /var/lib/archon
