@@ -17,7 +17,10 @@ const config = {
 			handleUnseenRoutes: 'warn'
 		},
 		paths: {
-			relative: false
+			// Keep default true: false makes Vite 8 emit "./_app/immutable/..."
+			// preload deps resolved against the entry chunk, doubling the path → 404.
+			// The 200.html fallback uses absolute asset paths regardless of this.
+			relative: true
 		},
 		alias: {
 			$lib: 'src/lib',
