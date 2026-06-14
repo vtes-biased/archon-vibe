@@ -4,6 +4,8 @@ This repo tracks work in **pst** (`.pst/tickets`), not plan-mode plans or a `TOD
 
 **Committing pst changes.** Commit the board change *together with* the fix/feature it tracks (same commit closing the ticket), not as a separate `chore(pst)` commit — and stage **only the ticket lines you touched**, never the whole `.pst/tickets` file. The board is line-stable (the write rules never delete or reorder lines), so `wip`/`close` is an in-place one-line flip that forms its own isolated diff hunk. When the working tree holds other sessions' board edits, cherry-pick just your hunk: `git diff .pst/tickets`, filter to the hunk(s) mentioning your ticket, `git apply --cached`, then commit. This keeps unrelated ticket transitions out of your commit.
 
+**Close on commit, not on deploy.** `close` a ticket in the same commit as the change that resolves it — do **not** hold it open waiting for the fix to be deployed or verified in production/beta. The board tracks what's *done in the tree*, not what's *live*. If a later deploy doesn't confirm the fix, `reopen` it. (So a deploy-bug fix lands closed even though a redeploy is still pending; the redeploy is itself tracked by the deploy/runbook ticket.)
+
 **Tags — priority only.** The sole tag axis is priority, one per ticket: `p1` (do it ASAP), `p2` (important), `p3` (nice-to-have, not urgent). Everything else — stack, kind, subsystem — goes in the ticket **body**, not as a tag (a label only earns a tag when you filter the board by it *and* it isn't already in the prose; only priority qualifies). There is no `deferred`/parked tag: anything on the board must be looked into, so `p3` is the floor, not a graveyard.
 
 # Agent Workflow (PROACTIVE — do not wait for user to ask)
