@@ -30,13 +30,46 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+@lightbulb.hook(lightbulb.ExecutionSteps.PRE_INVOKE)
+async def _auto_defer(
+    _pipeline: lightbulb.ExecutionPipeline, ctx: lightbulb.Context
+) -> None:
+    """Defer every command response ephemerally before invoke runs.
+
+    Commands do backend-API / Discord-REST I/O before their first response;
+    without a deferral that can blow Discord's 3s interaction window ("the
+    application did not respond"). Every command response is already ephemeral,
+    and none opens a modal as its first response (modals come from miru button
+    callbacks, separate interactions), so a blanket ephemeral defer is safe.
+    """
+    await ctx.defer(ephemeral=True)
+
+
+async def _on_unhandled_command_error(
+    exc: lightbulb.exceptions.ExecutionPipelineFailedException,
+) -> bool:
+    """Last-resort handler: log the traceback and replace the deferred
+    "thinking…" with a visible error instead of a silent hang."""
+    logger.error("Unhandled command error", exc_info=exc)
+    try:
+        await exc.context.respond(
+            "Something went wrong handling that command. Please try again.",
+            flags=hikari.MessageFlag.EPHEMERAL,
+        )
+    except Exception:
+        logger.exception("Failed to send command error response")
+    return True
+
+
 def main() -> None:
     bot = hikari.GatewayBot(
         config.DISCORD_BOT_TOKEN,
         intents=hikari.Intents.GUILDS | hikari.Intents.GUILD_VOICE_STATES,
     )
 
-    client = lightbulb.client_from_app(bot)
+    client = lightbulb.client_from_app(bot, hooks=[_auto_defer])
+    # Surface command crashes as a message instead of a silent/perpetual defer.
+    client.error_handler(_on_unhandled_command_error, priority=-10)
     # Subscribe lightbulb client start to bot starting event
     bot.subscribe(hikari.StartingEvent, client.start)
 
