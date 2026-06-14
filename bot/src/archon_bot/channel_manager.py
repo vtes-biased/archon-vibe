@@ -1,12 +1,25 @@
 """Discord channel creation and permission management."""
 
 import logging
+import re
 
 import hikari
 
 logger = logging.getLogger(__name__)
 
 PLAYER_ALLOW = hikari.Permissions.CONNECT | hikari.Permissions.SPEAK
+
+# Table voice-channel name: round-prefixed "R{n} - Table {m}". The optional
+# legacy "Table {m}" form (no prefix) is still matched so tournaments mid-flight
+# when this shipped are discovered/cleaned correctly.
+_TABLE_NAME_RE = re.compile(r"^(?:R\d+ - )?Table (\d+)$")
+
+
+def _table_channel_name(table_num: int, round_number: int | None) -> str:
+    """Voice-channel name for a prelim table — round-prefixed when known."""
+    if round_number is not None:
+        return f"R{round_number} - Table {table_num}"
+    return f"Table {table_num}"
 
 
 async def create_tournament_channels(
@@ -152,6 +165,7 @@ async def create_table_channels(
     organizer_uids: set[str] | None = None,
     is_finals: bool = False,
     start_index: int = 0,
+    round_number: int | None = None,
 ) -> list[int]:
     """Create voice channels for tournament tables, then sync permissions.
 
@@ -161,6 +175,7 @@ async def create_table_channels(
         organizer_uids: Set of organizer archon UIDs (get access to all tables)
         is_finals: If True, create a single "Finals" channel
         start_index: Table numbering offset (for adding new tables mid-round)
+        round_number: 1-based round, prefixes table names as "R{n} - Table {m}"
 
     Returns list of created channel IDs.
     """
@@ -199,12 +214,11 @@ async def create_table_channels(
     else:
         for i, table in enumerate(tables):
             table_num = start_index + i + 1
-            logger.info(
-                "→ create_guild_voice_channel 'Table %d' guild=%s", table_num, guild_id
-            )
+            ch_name = _table_channel_name(table_num, round_number)
+            logger.info("→ create_guild_voice_channel '%s' guild=%s", ch_name, guild_id)
             ch = await bot.rest.create_guild_voice_channel(
                 guild_id,
-                name=f"Table {table_num}",
+                name=ch_name,
                 category=category_id,
                 permission_overwrites=[
                     hikari.PermissionOverwrite(
@@ -215,7 +229,7 @@ async def create_table_channels(
                 ],
             )
             channel_ids.append(ch.id)
-            logger.info("✓ created 'Table %d' id=%s", table_num, ch.id)
+            logger.info("✓ created '%s' id=%s", ch_name, ch.id)
             # Freshly created: only @everyone role override, no member overrides
             await sync_table_permissions(
                 bot,
@@ -238,8 +252,9 @@ async def fetch_round_channel_ids(
     """Discover the round's voice channels currently under the category.
 
     Returns ``(table_channel_ids_ordered, finals_channel_id)`` by matching the
-    deterministic names this module creates — ``Table N`` (ordered by N) and
-    ``Finals``. The per-tournament ``judges`` voice channel is ignored.
+    deterministic names this module creates — ``R{n} - Table {m}`` (and the
+    legacy ``Table {m}``), ordered by table number, plus ``Finals``. The
+    per-tournament ``judges`` voice channel is ignored.
 
     This makes round setup idempotent: after a bot restart (which loses the
     in-memory channel map) or a half-finished creation, the caller can tell which
@@ -256,11 +271,10 @@ async def fetch_round_channel_ids(
         name = ch.name or ""
         if name == "Finals":
             finals_id = ch.id
-        elif name.startswith("Table "):
-            try:
-                tables[int(name[len("Table ") :])] = ch.id
-            except ValueError:
-                continue
+            continue
+        m = _TABLE_NAME_RE.match(name)
+        if m:
+            tables[int(m.group(1))] = ch.id
     ordered = [tables[n] for n in sorted(tables)]
     logger.info(
         "Discovered round channels under category=%s: %d table(s), finals=%s",

@@ -87,6 +87,26 @@ async def test_orders_tables_numerically_finds_finals_ignores_noise() -> None:
 
 
 @pytest.mark.asyncio
+async def test_round_prefixed_table_names_parsed_by_table_number() -> None:
+    """New "R{n} - Table {m}" names parse by table number (round prefix ignored),
+    so reconcile adopts and round-close cleanup deletes them just like the legacy
+    "Table {m}" form. A stray legacy name is matched too (transition coexistence).
+    """
+    channels = [
+        FakeChannel(2, "R3 - Table 2", hikari.ChannelType.GUILD_VOICE, CATEGORY_ID),
+        FakeChannel(10, "R3 - Table 10", hikari.ChannelType.GUILD_VOICE, CATEGORY_ID),
+        FakeChannel(1, "R3 - Table 1", hikari.ChannelType.GUILD_VOICE, CATEGORY_ID),
+        FakeChannel(50, "Finals", hikari.ChannelType.GUILD_VOICE, CATEGORY_ID),
+        FakeChannel(60, "judges", hikari.ChannelType.GUILD_VOICE, CATEGORY_ID),
+    ]
+    tables, finals_id = await fetch_round_channel_ids(
+        FakeBot(channels), guild_id=1, category_id=CATEGORY_ID
+    )
+    assert tables == [1, 2, 10]  # numeric by table number, not lexical
+    assert finals_id == 50
+
+
+@pytest.mark.asyncio
 async def test_empty_when_no_round_channels_yet() -> None:
     """Before any round: only judges/text exist → caller treats round as fresh."""
     channels = [

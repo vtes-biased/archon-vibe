@@ -469,6 +469,38 @@ async def _warn_unlinked_players(
     )
 
 
+async def _cleanup_round_channels(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+) -> None:
+    """Tear down the round's table/finals voice channels — robust to a stale map.
+
+    Deletes the in-memory tracked channels AND any ``R{n} - Table {m}`` / ``Finals``
+    channel still under the category (discovered via ``fetch_round_channel_ids``).
+    The discovery pass is what makes round-close cleanup survive a bot restart:
+    afterwards the in-memory ``_table_channels`` map is empty, so a map-only delete
+    would leave the closed round's channels lingering forever — exactly the
+    "channels never close" symptom. The category and #announcement/#lobby/#judges
+    channels are left intact (those go on ``/teardown``).
+    """
+    key = _task_key(guild_id, tournament_uid)
+    tracked = _table_channels.pop(key, [])
+    discovered: list[int] = []
+    link = await store.get_tournament_link(guild_id, tournament_uid)
+    if link:
+        tables, finals_id = await fetch_round_channel_ids(
+            bot, int(guild_id), int(link["category_id"])
+        )
+        discovered = [*tables, *([finals_id] if finals_id is not None else [])]
+    # Dedupe while preserving order (tracked first); both lists usually agree.
+    to_delete = list(dict.fromkeys([*tracked, *discovered]))
+    if to_delete:
+        await delete_channels(bot, to_delete)
+    _last_seating.pop(key, None)
+
+
 async def _handle_update(
     bot,
     store: TokenStore,
@@ -587,10 +619,9 @@ async def _handle_update(
         )
         await _post(bot, announcement_id, "\n".join(lines))
 
-        # Clean up table channels
-        if key in _table_channels:
-            await delete_channels(bot, _table_channels.pop(key))
-        _last_seating.pop(key, None)
+        # Tear down the finished round's table channels (robust to a stale
+        # in-memory map after a restart — see _cleanup_round_channels).
+        await _cleanup_round_channels(bot, store, guild_id, tournament_uid)
 
         checked_in = sum(1 for p in players if p.get("state") == "Checked-in")
         await _post(
@@ -651,6 +682,7 @@ async def _handle_update(
                         discord_id_map=discord_id_map,
                         organizer_uids=organizer_uids,
                         start_index=prev_count,
+                        round_number=round_count,
                     )
                     table_chs.extend(new_ch_ids)
                 except Exception as e:
@@ -716,10 +748,9 @@ async def _handle_update(
         lines.append("Thank you all for playing!")
         await _post(bot, announcement_id, "\n".join(lines))
 
-        # Clean up table channels
-        if key in _table_channels:
-            await delete_channels(bot, _table_channels.pop(key))
-        _last_seating.pop(key, None)
+        # Tear down table/finals voice channels (category & text channels stay
+        # until /teardown).
+        await _cleanup_round_channels(bot, store, guild_id, tournament_uid)
 
         await _post(
             bot,
@@ -827,6 +858,7 @@ async def _setup_round(
                 discord_id_map=discord_id_map,
                 organizer_uids=organizer_uids,
                 start_index=len(existing),
+                round_number=round_count,
             )
             _table_channels[key] = existing + new_ids
         except Exception as e:
@@ -962,12 +994,22 @@ async def _reconcile(
     would otherwise have no voice channels and no seating announcement. This
     recreates them. ``_setup_round``/``_setup_finals`` reuse existing channels,
     so a normal reconnect (channels already present) is silent.
+
+    The mirror case: a round that *closed* while we were disconnected. The live
+    Playing→Waiting cleanup is missed across the reconnect (snapshot seeds the
+    post-close state, so there's no transition to detect), leaving the old
+    round's table channels orphaned. So when we reconnect into a non-active state
+    we tear down any leftover round channels. (Reconnecting into Waiting after a
+    tournament reopen likewise clears the now-stale Finals channel — desired,
+    since the organizer is about to redo finals.)
     """
     key = _task_key(guild_id, tournament_uid)
     obj = _last_tournament.get(key)
     state = obj.get("state", "") if obj else "(none)"
     logger.info("Reconciling %s after (re)connect (state=%s)", key, state)
     if not obj or state != "Playing":
+        if obj and state in ("Waiting", "Finished"):
+            await _cleanup_round_channels(bot, store, guild_id, tournament_uid)
         return
     finals = obj.get("finals") or {}
     if finals.get("seating") and not finals.get("result"):
