@@ -132,6 +132,16 @@ async def start_sse(
     _sse_tasks[key] = task
 
 
+def tracked_table_channels(guild_id: str, tournament_uid: str) -> list[int]:
+    """Snapshot the table/finals voice channels currently tracked for a tournament.
+
+    ``/teardown`` passes these to ``teardown_tournament`` so it also deletes
+    channels that have drifted out of the category (which the category scan would
+    miss). Returns a copy; call it BEFORE ``stop_sse``, which clears the map.
+    """
+    return list(_table_channels.get(_task_key(guild_id, tournament_uid), []))
+
+
 async def stop_sse(guild_id: str, tournament_uid: str) -> None:
     """Stop SSE listener for a tournament and clean up all cached state."""
     key = _task_key(guild_id, tournament_uid)

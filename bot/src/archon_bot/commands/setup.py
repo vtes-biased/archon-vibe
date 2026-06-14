@@ -10,7 +10,7 @@ from .. import config
 from ..archon_api import ArchonAPI
 from ..channel_manager import create_tournament_channels, teardown_tournament
 from ..oauth_utils import generate_pkce, make_oauth_url
-from ..sse_listener import start_sse, stop_sse
+from ..sse_listener import start_sse, stop_sse, tracked_table_channels
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
 from ._common import fetch_userinfo
@@ -223,21 +223,45 @@ class TeardownCommand(
             "Removing tournament channels...", flags=hikari.MessageFlag.EPHEMERAL
         )
 
+        # Every channel we know belongs to this tournament, so teardown is a
+        # reliable catch-all even if some drifted out of the category. Snapshot
+        # tracked table/finals channels BEFORE stop_sse, which clears the map.
+        extra_ids = [
+            int(link[k])
+            for k in (
+                "announcement_channel_id",
+                "lobby_channel_id",
+                "judges_channel_id",
+            )
+            if link.get(k)
+        ]
+        extra_ids += tracked_table_channels(guild_id, tournament_uid)
+
         await stop_sse(guild_id, tournament_uid)
 
+        failed: list[int] = []
         try:
-            await teardown_tournament(
+            failed = await teardown_tournament(
                 ctx.client.app,
                 ctx.guild_id,
                 int(link["category_id"]),
+                extra_ids,
             )
         except Exception as e:
             logger.warning("Teardown error: %s", e)
 
         await store.unlink_tournament(guild_id, tournament_uid)
-        await ctx.respond(
-            "Tournament channels removed.", flags=hikari.MessageFlag.EPHEMERAL
-        )
+        if failed:
+            await ctx.respond(
+                f"Removed tournament channels, but {len(failed)} could not be deleted "
+                "— check my **Manage Channels** permission and remove any leftovers "
+                "manually.",
+                flags=hikari.MessageFlag.EPHEMERAL,
+            )
+        else:
+            await ctx.respond(
+                "Tournament channels removed.", flags=hikari.MessageFlag.EPHEMERAL
+            )
 
 
 class AnnounceCommand(

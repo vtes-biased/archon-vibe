@@ -2,6 +2,7 @@
 
 import logging
 import re
+from collections.abc import Iterable
 
 import hikari
 
@@ -305,18 +306,56 @@ async def teardown_tournament(
     bot: hikari.GatewayBot,
     guild_id: int,
     category_id: int,
-) -> None:
-    """Delete all channels in a tournament category, then the category itself."""
+    extra_channel_ids: Iterable[int] = (),
+) -> list[int]:
+    """Delete a tournament's channels reliably, then the category itself.
+
+    Deletes (by explicit id, deduped) the union of:
+      - every channel currently under ``category_id`` — the restart-safe catch-all
+        that finds table/finals channels we may have lost track of in memory; and
+      - ``extra_channel_ids`` — channels we know belong to this tournament but that
+        may have drifted *out* of the category and so are invisible to the scan.
+        A child whose delete failed during an earlier teardown is left top-level
+        when the category is then removed (Discord un-parents children rather than
+        deleting them); the scan, keyed on the now-gone category, can never see it
+        again. The caller passes the link's announcement/lobby/judges plus any
+        tracked table/finals ids so a re-run still cleans those orphans up.
+
+    The category is deleted LAST so an early category delete never orphans a child
+    we were about to remove. Returns the channel ids that could not be deleted
+    (excluding ones already gone) so the caller can flag a partial teardown for
+    manual cleanup instead of falsely reporting success.
+    """
+    under_category: list[int] = []
     try:
         channels = await bot.rest.fetch_guild_channels(guild_id)
-        for ch in channels:
-            if getattr(ch, "parent_id", None) == category_id:
-                try:
-                    await bot.rest.delete_channel(ch.id)
-                except Exception as e:
-                    logger.warning("Failed to delete channel %s: %s", ch.id, e)
-        await bot.rest.delete_channel(category_id)
-    except hikari.NotFoundError:
-        pass
+        under_category = [
+            int(ch.id)
+            for ch in channels
+            if getattr(ch, "parent_id", None) == category_id
+        ]
     except Exception as e:
-        logger.warning("Failed to teardown category %s: %s", category_id, e)
+        # Listing failed — still delete the explicitly-known ids below.
+        logger.warning("Teardown: failed to list channels in guild=%s: %s", guild_id, e)
+
+    failed: list[int] = []
+    # Children + known orphans first; the category itself is handled last.
+    targets = dict.fromkeys(
+        cid
+        for cid in (*under_category, *map(int, extra_channel_ids))
+        if cid != int(category_id)
+    )
+    for cid in (*targets, int(category_id)):
+        try:
+            await bot.rest.delete_channel(cid)
+        except hikari.NotFoundError:
+            pass
+        except Exception as e:
+            logger.warning("Teardown: failed to delete channel %s: %s", cid, e)
+            failed.append(cid)
+
+    if failed:
+        logger.warning("Teardown left %d channel(s) undeleted: %s", len(failed), failed)
+    else:
+        logger.info("Teardown removed all channels for category=%s", category_id)
+    return failed
