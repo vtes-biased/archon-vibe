@@ -5,7 +5,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
-from pathlib import Path
+from importlib.resources import files
 
 import msgspec
 from archon_engine import PyEngine
@@ -536,8 +536,9 @@ async def create_tournament(
 @router.get("/archon-template")
 async def download_archon_template() -> FileResponse:
     """Serve blank Archon v1.5l spreadsheet template. Public access."""
-    path = Path(__file__).parent.parent.parent / "data" / "thearchon1.5l.xlsx"
-    if not path.exists():
+    # must live under backend/src/data to ship inside the installed wheel
+    path = files("backend.src").joinpath("data", "thearchon1.5l.xlsx")
+    if not path.is_file():
         raise HTTPException(status_code=404, detail="Template file not found")
     return FileResponse(
         path,
