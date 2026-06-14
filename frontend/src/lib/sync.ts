@@ -39,7 +39,7 @@ import {
   getOfflineSanctionUids,
   getOfflineDeckUids,
 } from './db';
-import { getAccessToken } from '$lib/stores/auth.svelte';
+import { getAccessToken, ensureSyncToken, refreshTokens } from '$lib/stores/auth.svelte';
 import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLockLost } from '$lib/stores/offline.svelte';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
@@ -124,16 +124,27 @@ class SyncManager {
    * `epoch` is the connect generation that requested this snapshot; if a newer
    * connect() starts while we're in flight we bail before touching IndexedDB.
    */
-  private async fetchSnapshot(epoch: number): Promise<string | null> {
-    const token = getAccessToken();
-    const params = new URLSearchParams();
-    if (token) params.set('token', token);
-    const qs = params.toString();
-    const url = qs ? `${API_URL}/snapshot?${qs}` : `${API_URL}/snapshot`;
+  private async fetchSnapshot(epoch: number, token: string | null): Promise<string | null> {
+    const buildUrl = (t: string | null) => {
+      const params = new URLSearchParams();
+      if (t) params.set('token', t);
+      const qs = params.toString();
+      return qs ? `${API_URL}/snapshot?${qs}` : `${API_URL}/snapshot`;
+    };
 
     try {
-      const response = await fetch(url);
+      let response = await fetch(buildUrl(token));
       if (this.superseded(epoch)) return null;
+      // Stale token → 401: refresh+retry once instead of falling through to a
+      // stream connect with the same bad token.
+      if (response.status === 401 && token) {
+        const refreshed = await refreshTokens();
+        if (this.superseded(epoch)) return null;
+        if (refreshed) {
+          response = await fetch(buildUrl(getAccessToken()));
+          if (this.superseded(epoch)) return null;
+        }
+      }
       if (!response.ok) {
         console.error(`Snapshot fetch failed: ${response.status}`);
         return null;
@@ -225,12 +236,28 @@ class SyncManager {
     this.isSynced = false;
     this.emit({ type: 'syncing' });
 
+    // Refresh on demand so neither the snapshot nor the stream opens with a
+    // stale token. One token feeds both requests below.
+    const auth = await ensureSyncToken();
+    if (this.superseded(epoch)) return;
+    if (auth.kind === 'retry') {
+      void this.handleError();  // transient: back off, don't connect stale
+      return;
+    }
+    if (auth.kind === 'downgrade') {
+      // Drop to anonymous via clear-then-refill, not a since-overlay that would
+      // mix member + public rows.
+      void this.refresh();
+      return;
+    }
+    const token = auth.kind === 'token' ? auth.token : null;
+
     let lastSync: string | null = await getLastSyncTimestamp();
     if (this.superseded(epoch)) return;
 
     // If no sync timestamp, fetch snapshot first
     if (!lastSync) {
-      lastSync = await this.fetchSnapshot(epoch);
+      lastSync = await this.fetchSnapshot(epoch, token);
       if (this.superseded(epoch)) return;
       // If snapshot failed, fall back to full SSE sync (no since param)
     }
@@ -240,7 +267,6 @@ class SyncManager {
 
     const params = new URLSearchParams();
     if (lastSync) params.set('since', lastSync);
-    const token = getAccessToken();
     if (token) params.set('token', token);
     const qs = params.toString();
     const url = qs ? `${API_URL}/stream?${qs}` : `${API_URL}/stream`;

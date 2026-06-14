@@ -5,13 +5,14 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import jwt
 import msgspec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from .broadcast import (
@@ -32,6 +33,7 @@ from .db import (
 )
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .engine_errors import EngineRejection
+from .middleware.auth import get_current_user
 from .models import (
     DataLevel,
     ObjectType,
@@ -495,8 +497,34 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
         return None
 
 
+async def _resolve_viewer(
+    request: Request, token: str | None, authorization: str | None
+) -> User | None:
+    """Resolve the SSE/snapshot viewer. The bot sends an `Authorization` header
+    (revocation-aware, oauth-aware via get_current_user); the browser EventSource
+    can't set headers and passes a `token` query param. A supplied-but-invalid
+    credential raises 401; only a wholly absent one yields None (anonymous public).
+    """
+    if authorization and authorization.startswith("Bearer "):
+        return await get_current_user(request, authorization)
+    if token:
+        viewer = await _resolve_user_from_token(token)
+        if viewer is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired token",
+                headers={"Cache-Control": "no-cache"},
+            )
+        return viewer
+    return None
+
+
 @app.get("/snapshot")
-async def get_snapshot(token: str | None = None) -> Response:
+async def get_snapshot(
+    request: Request,
+    token: str | None = None,
+    authorization: Annotated[str | None, Header()] = None,
+) -> Response:
     """Serve pre-computed gzip snapshot for the viewer's access level.
 
     In dev: reads file from disk and streams directly.
@@ -504,7 +532,7 @@ async def get_snapshot(token: str | None = None) -> Response:
     """
     from .snapshots import get_snapshot_path
 
-    viewer = await _resolve_user_from_token(token)
+    viewer = await _resolve_viewer(request, token, authorization)
     level = _viewer_level(viewer)
 
     snapshot_path = get_snapshot_path(level.value)
@@ -733,9 +761,11 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
 
 @app.get("/stream")
 async def stream_updates(
+    request: Request,
     since: str | None = None,
     token: str | None = None,
     tournament: str | None = None,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
     """Stream object updates via SSE (new sync architecture).
 
@@ -751,7 +781,7 @@ async def stream_updates(
     """
     from .db import _pool, stream_objects_new
 
-    stream_user = await _resolve_user_from_token(token)
+    stream_user = await _resolve_viewer(request, token, authorization)
     # One label identifies this connection in every log line below: who + scope
     # (a tournament-scoped bot stream vs a full-corpus browser stream). Makes
     # open/close/overflow/sync-complete attributable — the gap that made the bot

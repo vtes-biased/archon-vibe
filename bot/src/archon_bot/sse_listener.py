@@ -1,8 +1,11 @@
 """SSE subscription per organizer for real-time tournament state changes."""
 
 import asyncio
+import base64
+import binascii
 import json
 import logging
+import time
 from collections import defaultdict
 
 import aiohttp
@@ -33,6 +36,20 @@ logger = logging.getLogger(__name__)
 # Bounding each dispatch turns a permanent wedge into a logged, recoverable skip;
 # any side-effect missed on a skip is repaired by reconcile on the next sync.
 _DISPATCH_TIMEOUT = 90
+
+def _access_token_expired(token: str, *, skew_seconds: int = 60) -> bool:
+    """Decode the UNVERIFIED JWT payload (the bot holds no signing secret) to read
+    ``exp``. True if it expires within ``skew_seconds`` or can't be parsed, so the
+    caller refreshes before connecting rather than after a 401.
+    """
+    try:
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)  # restore base64 padding
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return float(payload["exp"]) - time.time() <= skew_seconds
+    except (IndexError, KeyError, ValueError, binascii.Error, json.JSONDecodeError):
+        return True
+
 
 # Track active SSE tasks: guild_id+tournament_uid → asyncio.Task
 _sse_tasks: dict[str, asyncio.Task] = {}
@@ -150,6 +167,17 @@ async def _sse_loop(
                     "No tokens for organizer %s, stopping SSE", organizer_discord_id
                 )
                 return
+
+            # Refresh up front if the stored token expired while we were down, so
+            # the first connect doesn't 401.
+            if _access_token_expired(tokens["access_token"]):
+                refreshed = await api.refresh_tokens(
+                    organizer_discord_id,
+                    stale_access_token=tokens["access_token"],
+                )
+                if refreshed:
+                    tokens = refreshed
+                # else fall through: the 401 handler below refreshes.
 
             try:
                 headers = {"Authorization": f"Bearer {tokens['access_token']}"}

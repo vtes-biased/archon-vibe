@@ -228,10 +228,26 @@ export async function storeTokensFromCallback(
   }
 }
 
+// Single-flight: concurrent refreshers must share one POST, else a replayed
+// rotated-out refresh token trips the backend's reuse-detection.
+let refreshInFlight: Promise<boolean> | null = null;
+
 /**
- * Refresh the access token using the refresh token.
+ * Refresh the access token. On failure the side effect distinguishes the cases:
+ * a rejected refresh token clears tokens + resets auth state; a transient error
+ * keeps them. Callers tell them apart via getAccessToken() afterwards.
  */
-async function refreshTokens(): Promise<boolean> {
+export async function refreshTokens(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = doRefreshTokens();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+async function doRefreshTokens(): Promise<boolean> {
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
   if (!refreshToken) {
     return false;
@@ -259,6 +275,42 @@ async function refreshTokens(): Promise<boolean> {
     // Don't clear auth state; the server may just be restarting.
     return false;
   }
+}
+
+/**
+ * Outcome of resolving a token before opening an SSE/snapshot connection:
+ *  - token      authed; refreshed on demand if it was near expiry
+ *  - anonymous  no session — connect at public level
+ *  - downgrade  refresh token dead → caller must resync (clear-then-refill),
+ *               never a since-overlay that mixes member + public rows
+ *  - retry      transient refresh failure → back off, don't connect stale
+ */
+export type SyncToken =
+  | { kind: "token"; token: string }
+  | { kind: "anonymous" }
+  | { kind: "downgrade" }
+  | { kind: "retry" };
+
+/**
+ * Refresh on demand so we never open a connection with a stale access token (the
+ * proactive timer dies under tab-suspend/device-sleep).
+ */
+export async function ensureSyncToken(): Promise<SyncToken> {
+  const token = getAccessToken();
+  if (!token) return { kind: "anonymous" };
+
+  const payload = parseJwt(token);
+  if (payload && payload.exp * 1000 - Date.now() > REFRESH_THRESHOLD_MS) {
+    return { kind: "token", token };
+  }
+
+  const refreshed = await refreshTokens();
+  if (refreshed) {
+    const fresh = getAccessToken();
+    return fresh ? { kind: "token", token: fresh } : { kind: "downgrade" };
+  }
+  // Cleared tokens ⇒ refresh token rejected (downgrade); kept ⇒ transient.
+  return getAccessToken() ? { kind: "retry" } : { kind: "downgrade" };
 }
 
 /**

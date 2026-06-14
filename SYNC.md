@@ -45,6 +45,17 @@ async def stream_objects_new(
 
 `None` means column is NULL in DB — object invisible at that level.
 
+### Credential Transport
+
+`/stream` and `/snapshot` accept credentials via two transports, resolved by `_resolve_viewer()`:
+
+| Caller | Transport | Mechanism |
+|--------|-----------|-----------|
+| Browser (`EventSource`) | `token=` query param | Native `EventSource` cannot set headers; resolved via `_resolve_user_from_token` (JWT decode + DB lookup) |
+| Discord bot | `Authorization: Bearer <token>` header | Resolved via `get_current_user` (revocation-aware, handles `oauth_access` tokens + `user:impersonate` scope) |
+
+**Invalid credential → 401** (not silent downgrade): a supplied-but-invalid/expired/revoked credential raises HTTP 401 regardless of transport. Only a wholly absent credential yields anonymous → `public`. Clients react: the bot proactively checks expiry (`_access_token_expired`) before connecting and refreshes on 401; the webapp calls `ensureSyncToken()` before each (re)connect and on a 401 refreshes once then retries; a dead refresh drops to anonymous via a full clear-then-refill resync.
+
 ### SSE Endpoint
 
 ```python
@@ -124,7 +135,7 @@ Each connection has a bounded `asyncio.Queue` (maxsize 100). On `QueueFull` (a s
 
 ### Snapshot-Based Initial Sync
 
-On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects.
+On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects. The same `_resolve_viewer()` credential logic applies (see **Credential Transport** above).
 
 After the snapshot loads, the SSE stream picks up from the snapshot's timestamp, delivering any changes that occurred since generation.
 
@@ -236,7 +247,7 @@ Apply to IndexedDB optimistically → send to server → SSE corrects if needed.
 | players | ✓ (full) | ✓ (no per-player results) | ✓ (no per-player results) |
 | standings | ✓ | Per `standings_mode` | Per `standings_mode` |
 | finals | ✓ | ✗ | ✗ |
-| rounds | ✗ | ✗ | ✗ |
+| rounds | ✓ | ✓ | ✓ |
 
 `decklists_mode`: Winner → winner's deck only, Finalists → finalist decks, All → all decks.
 
