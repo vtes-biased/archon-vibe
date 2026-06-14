@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import signal
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -70,6 +71,52 @@ _sync_service: VEKNSyncService | None = None
 
 # Shutdown event for graceful SSE termination
 _shutdown_event: asyncio.Event | None = None
+
+
+def _install_fast_shutdown_signals() -> None:
+    """Flip _shutdown_event the instant SIGTERM/SIGINT arrives so the long-lived
+    /stream generators self-close within ~1s instead of stalling the restart.
+
+    uvicorn shuts down gracefully on these signals, but its lifespan-shutdown —
+    where _shutdown_event would otherwise be set — runs only AFTER it has drained
+    open connections. The SSE generators never end on their own, so that signal
+    arrives too late and the drain blocks until --timeout-graceful-shutdown (or,
+    absent that, systemd's SIGKILL at TimeoutStopSec) cuts it off. Setting the
+    event from the signal handler itself — before uvicorn's handler flips
+    should_exit and the loop begins the drain — lets the generators (which poll
+    it every <=1s) return promptly, so the drain finishes in ~1s instead of
+    waiting out the graceful timeout.
+
+    Mechanism (version-coupled): uvicorn installs handle_exit via plain
+    signal.signal (its capture_signals()), so signal.getsignal() returns that
+    real handler for us to chain. We run inside the same synchronous signal
+    invocation — set the event first, then call uvicorn's handler (which only
+    sets should_exit) — so the event is provably set before the loop drains. If
+    uvicorn ever switched to loop.add_signal_handler, getsignal() would return
+    asyncio's no-op instead and this chain would silently stop driving uvicorn's
+    shutdown; revisit then.
+
+    Only Event.set() is touched here, and no coroutine ever waits on
+    _shutdown_event (the generators only read .is_set()), so set() is a plain
+    attribute write with no loop interaction — safe from a signal handler.
+    """
+
+    def _make_handler(prev):
+        def _handler(signum, frame):
+            if _shutdown_event is not None:
+                _shutdown_event.set()
+            if callable(prev):
+                prev(signum, frame)
+
+        return _handler
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            signal.signal(sig, _make_handler(signal.getsignal(sig)))
+        except ValueError:
+            # Not in the main thread (e.g. Starlette TestClient) — uvicorn didn't
+            # install its handlers here either, so there is nothing to accelerate.
+            pass
 
 
 async def run_member_sync() -> None:
@@ -282,6 +329,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
 
     _shutdown_event = asyncio.Event()
+    _install_fast_shutdown_signals()
     await init_db()
 
     # Register Discord Linked Roles metadata (idempotent)

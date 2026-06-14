@@ -9,11 +9,18 @@ User={{ r.user }}
 Group={{ r.group }}
 WorkingDirectory={{ r.site_root }}
 EnvironmentFile={{ _env_dir }}/{{ r.service_name }}.env
-ExecStart={{ _venv_dir }}/bin/uvicorn --host 127.0.0.1 --port {{ r.port }} --log-level info {{ r.asgi_entrypoint }}
+ExecStart={{ _venv_dir }}/bin/uvicorn --host 127.0.0.1 --port {{ r.port }} --log-level info --timeout-graceful-shutdown 5 {{ r.asgi_entrypoint }}
 Restart=always
 RestartSec=3
 TimeoutStartSec=30
 RuntimeMaxSec=1d
+# Restart/stop speed: the app sets _shutdown_event on SIGTERM so the SSE streams
+# self-close in ~1s; --timeout-graceful-shutdown caps the drain at 5s, and these
+# bound the worst case if a connection ignores both (was a ~90s hang via the
+# default 90s TimeoutStopSec). KillMode=mixed: SIGTERM the main proc, SIGKILL the
+# cgroup if it overruns.
+TimeoutStopSec=15
+KillMode=mixed
 
 # hardening
 NoNewPrivileges=true
