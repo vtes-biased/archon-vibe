@@ -16,5 +16,6 @@ static_site_backend_paths_default:
   - /vekn
   - /sanctions
   - /admin
+  - /snapshot
 static_site_sse_path_default: /stream
 static_site_client_max_body_default: "10M"

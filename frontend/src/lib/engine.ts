@@ -13,6 +13,14 @@ import { engineErrorFromThrown } from './error-codes';
 // Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
 
+// Content-hashed .wasm asset URL, resolved by Vite. We hand it to the
+// wasm-bindgen init explicitly (see initEngine) rather than relying on the glue's
+// default — `new URL('archon_engine_bg.wasm', import.meta.url)` resolves relative
+// to the *chunk* it's bundled into (/_app/immutable/chunks/), doubling the path
+// to /_app/immutable/chunks/_app/immutable/assets/…wasm → 404 (engine never loads).
+// Vite emits this as a base-relative string ("./_app/immutable/assets/…wasm").
+import wasmUrl from '../../../engine/pkg/archon_engine_bg.wasm?url';
+
 /**
  * Run a raw WASM engine call. wasm-bindgen throws the `Err` arm as a JS string
  * primitive — since #107 that string is the engine's `{code,params,message}`
@@ -44,7 +52,11 @@ export async function initEngine(): Promise<WasmEngine> {
     initPromise = (async () => {
       try {
         const wasm = await import('../../../engine/pkg/archon_engine');
-        await wasm.default();
+        // Root the base-relative `wasmUrl` against the origin. The glue feeds it
+        // to fetch(), which would otherwise resolve "./_app/…" against the current
+        // page — fine on "/", but 404 on deep routes (e.g. /tournaments/<uid>).
+        // paths.base is empty, so origin-rooted "/_app/…" matches every other asset.
+        await wasm.default({ module_or_path: new URL(wasmUrl, location.origin).href });
         wasmEngine = new wasm.WasmEngine();
         markEngineReady();
       } catch (e) {

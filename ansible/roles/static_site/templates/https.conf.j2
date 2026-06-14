@@ -96,9 +96,13 @@ server {
     add_header Cache-Control "public, must-revalidate, max-age=0";
   }
 
-  # SPA fallback
+  # SPA fallback. adapter-static emits prerendered routes as `<route>.html` (and
+  # nested dirs like tournaments/ for /tournaments/new), so try `$uri.html` for a
+  # clean URL, then fall back to the SPA shell `200.html`. Deliberately NO `$uri/`
+  # term: it would match the bare tournaments/ dir (no index.html inside) and
+  # nginx would 403 instead of booting the client router.
   location / {
-    try_files $uri $uri/ /index.html;
+    try_files $uri $uri.html /200.html;
     add_header Cache-Control "public, must-revalidate, max-age=0";
   }
 }
