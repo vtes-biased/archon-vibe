@@ -635,6 +635,102 @@ async def _scoped_catchup_frames(
     return frames, last_ts
 
 
+async def _overlay_frames(viewer) -> tuple[list[str], int]:
+    """Personal-overlay frames for a member connection: own profile/decks at full
+    level, plus NC/Prince same-country and organizer full data.
+
+    Buffers every frame while holding ONE pooled connection, then returns them so
+    the caller can release the connection BEFORE draining to the client. Yielding
+    inside `async with _pool.connection()` would pin the slot for the whole client
+    read and, on a mid-drain disconnect, return an ACTIVE connection to the pool
+    (which then fails its reset-rollback and is discarded). Mirrors
+    _scoped_catchup_frames.
+    """
+    from .db import _pool
+
+    frames: list[str] = []
+    count = 0
+    if not _pool:
+        return frames, count
+
+    async with _pool.connection() as db_conn:
+        # Own user profile at full level
+        row = await (
+            await db_conn.execute(
+                'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s',
+                (viewer.uid, ObjectType.USER),
+            )
+        ).fetchone()
+        if row and row[0]:
+            frames.append(f'data: {{"type":"user","data":{row[0]}}}\n\n')
+            count += 1
+
+        # Own decks at full level (even if member=null)
+        rows = await (
+            await db_conn.execute(
+                'SELECT "full"::text FROM objects WHERE type = %s '
+                "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
+                (ObjectType.DECK, viewer.uid),
+            )
+        ).fetchall()
+        if rows:
+            frames.extend(_sse_object_lines("decks", [r[0] for r in rows]))
+            count += len(rows)
+
+        # NC/Prince: full for same-country users + tournaments
+        if viewer.country and (Role.NC in viewer.roles or Role.PRINCE in viewer.roles):
+            rows = await (
+                await db_conn.execute(
+                    'SELECT "full"::text FROM objects WHERE type = %s '
+                    "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
+                    (ObjectType.USER, viewer.country),
+                )
+            ).fetchall()
+            if rows:
+                frames.extend(_sse_object_lines("users", [r[0] for r in rows]))
+                count += len(rows)
+
+            rows = await (
+                await db_conn.execute(
+                    'SELECT "full"::text FROM objects WHERE type = %s '
+                    "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
+                    (ObjectType.TOURNAMENT, viewer.country),
+                )
+            ).fetchall()
+            if rows:
+                frames.extend(_sse_object_lines("tournaments", [r[0] for r in rows]))
+                count += len(rows)
+
+        # Organizer: full for organized tournaments + their decks
+        rows = await (
+            await db_conn.execute(
+                'SELECT uid, "full"::text FROM objects WHERE type = %s '
+                "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
+                (ObjectType.TOURNAMENT, viewer.uid),
+            )
+        ).fetchall()
+        if rows:
+            t_uids = [r[0] for r in rows]
+            frames.extend(_sse_object_lines("tournaments", [r[1] for r in rows]))
+            count += len(rows)
+
+            # Decks for organized tournaments (single IN query)
+            placeholders = ", ".join(["%s"] * len(t_uids))
+            deck_rows = await (
+                await db_conn.execute(
+                    f'SELECT "full"::text FROM objects WHERE type = %s '  # ty: ignore[invalid-argument-type]
+                    f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
+                    f"AND deleted_at IS NULL",
+                    (ObjectType.DECK, *t_uids),
+                )
+            ).fetchall()
+            if deck_rows:
+                frames.extend(_sse_object_lines("decks", [r[0] for r in deck_rows]))
+                count += len(deck_rows)
+
+    return frames, count
+
+
 @app.get("/stream")
 async def stream_updates(
     since: str | None = None,
@@ -744,111 +840,23 @@ async def stream_updates(
 
                 totals[obj_type] = count
 
-            # Personal overlay phase: send full-level data for own objects
+            # Personal overlay phase: full-level data for own objects. Built off
+            # the pooled connection (see _overlay_frames), then drained — so the
+            # connection is never pinned across a client read.
             if not scoped and stream_user and level == DataLevel.MEMBER and _pool:
-                overlay_count = 0
                 try:
-                    async with _pool.connection() as db_conn:
-                        # Own user profile at full level
-                        row = await (
-                            await db_conn.execute(
-                                'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s',
-                                (stream_user.uid, ObjectType.USER),
-                            )
-                        ).fetchone()
-                        if row and row[0]:
-                            yield f'data: {{"type":"user","data":{row[0]}}}\n\n'
-                            overlay_count += 1
-
-                        # Own decks at full level (even if member=null)
-                        rows = await (
-                            await db_conn.execute(
-                                'SELECT "full"::text FROM objects WHERE type = %s '
-                                "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
-                                (ObjectType.DECK, stream_user.uid),
-                            )
-                        ).fetchall()
-                        if rows:
-                            for line in _sse_object_lines(
-                                "decks", [r[0] for r in rows]
-                            ):
-                                yield line
-                            overlay_count += len(rows)
-
-                        # NC/Prince: full for same-country users + tournaments
-                        if stream_user.country and (
-                            Role.NC in stream_user.roles
-                            or Role.PRINCE in stream_user.roles
-                        ):
-                            # Same-country users
-                            rows = await (
-                                await db_conn.execute(
-                                    'SELECT "full"::text FROM objects WHERE type = %s '
-                                    "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                                    (ObjectType.USER, stream_user.country),
-                                )
-                            ).fetchall()
-                            if rows:
-                                for line in _sse_object_lines(
-                                    "users", [r[0] for r in rows]
-                                ):
-                                    yield line
-                                overlay_count += len(rows)
-
-                            # Same-country tournaments
-                            rows = await (
-                                await db_conn.execute(
-                                    'SELECT "full"::text FROM objects WHERE type = %s '
-                                    "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                                    (ObjectType.TOURNAMENT, stream_user.country),
-                                )
-                            ).fetchall()
-                            if rows:
-                                for line in _sse_object_lines(
-                                    "tournaments", [r[0] for r in rows]
-                                ):
-                                    yield line
-                                overlay_count += len(rows)
-
-                        # Organizer: full for organized tournaments + their decks
-                        rows = await (
-                            await db_conn.execute(
-                                'SELECT uid, "full"::text FROM objects WHERE type = %s '
-                                "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
-                                (ObjectType.TOURNAMENT, stream_user.uid),
-                            )
-                        ).fetchall()
-                        if rows:
-                            t_uids = [r[0] for r in rows]
-                            for line in _sse_object_lines(
-                                "tournaments", [r[1] for r in rows]
-                            ):
-                                yield line
-                            overlay_count += len(rows)
-
-                            # Decks for organized tournaments (single IN query)
-                            placeholders = ", ".join(["%s"] * len(t_uids))
-                            deck_rows = await (
-                                await db_conn.execute(
-                                    f'SELECT "full"::text FROM objects WHERE type = %s '  # ty: ignore[invalid-argument-type]
-                                    f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
-                                    f"AND deleted_at IS NULL",
-                                    (ObjectType.DECK, *t_uids),
-                                )
-                            ).fetchall()
-                            if deck_rows:
-                                for line in _sse_object_lines(
-                                    "decks", [r[0] for r in deck_rows]
-                                ):
-                                    yield line
-                                overlay_count += len(deck_rows)
-
-                    if overlay_count:
-                        logger.info(
-                            f"Personal overlay: {overlay_count} objects for {stream_user.uid}"
-                        )
+                    overlay, overlay_count = await _overlay_frames(stream_user)
                 except Exception as e:
                     logger.error(f"Error in personal overlay: {e}", exc_info=True)
+                    overlay, overlay_count = [], 0
+                for line in overlay:
+                    if _shutdown_event and _shutdown_event.is_set():
+                        return
+                    yield line
+                if overlay_count:
+                    logger.info(
+                        f"Personal overlay: {overlay_count} objects for {stream_user.uid}"
+                    )
 
             total_time = time.time() - start_time
             parts = ", ".join(f"{v} {k}" for k, v in totals.items())
