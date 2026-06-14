@@ -11,20 +11,25 @@ Covers two sync-correctness invariants:
 
 import asyncio
 
-from src.broadcast import SSEConnection, _sse_connections, broadcast_precomputed
+from src.broadcast import (
+    SSEConnection,
+    _scope_matches,
+    _sse_connections,
+    broadcast_precomputed,
+)
 from src.db import BroadcastData
 from src.models import ObjectType
 
 MODIFIED_AT = "2026-06-03T12:00:00.123456"
 
 
-def _bd(modified_at: str | None = MODIFIED_AT) -> BroadcastData:
+def _bd(modified_at: str | None = MODIFIED_AT, uid: str = "t1") -> BroadcastData:
     return BroadcastData(
         obj_type=ObjectType.TOURNAMENT,
-        uid="t1",
-        pub_json='{"uid":"t1"}',
+        uid=uid,
+        pub_json=f'{{"uid":"{uid}"}}',
         mem_json=None,
-        full_json='{"uid":"t1"}',
+        full_json=f'{{"uid":"{uid}"}}',
         modified_at=modified_at,
     )
 
@@ -55,6 +60,50 @@ def test_broadcast_precomputed_omits_ts_when_missing():
         assert '"ts"' not in msg
     finally:
         _sse_connections.clear()
+
+
+def test_scoped_connection_only_receives_its_tournament():
+    """A tournament-scoped connection (the bot) gets its tournament's events and
+    drops everything else; an unscoped connection still gets both."""
+    scoped = SSEConnection(user=None, tournament_uid="t1")
+    unscoped = SSEConnection(user=None)
+    _sse_connections.clear()
+    _sse_connections.update({scoped, unscoped})
+    try:
+        broadcast_precomputed(_bd(uid="t2"))  # a different tournament
+        assert scoped.queue.empty()  # scoped drops it
+        assert not unscoped.queue.empty()  # unscoped still gets it
+
+        broadcast_precomputed(_bd(uid="t1"))  # the scoped tournament
+        assert '"data":{"uid":"t1"}' in scoped.queue.get_nowait()
+    finally:
+        _sse_connections.clear()
+
+
+def test_scope_matches_sanction_by_tournament_uid():
+    """A scoped connection wants only the sanctions of its tournament; unscoped
+    wants everything."""
+    scoped = SSEConnection(user=None, tournament_uid="t1")
+    unscoped = SSEConnection(user=None)
+    mine = BroadcastData(
+        obj_type=ObjectType.SANCTION,
+        uid="s1",
+        pub_json=None,
+        mem_json='{"uid":"s1"}',
+        full_json='{"uid":"s1"}',
+        tournament_uid="t1",
+    )
+    other = BroadcastData(
+        obj_type=ObjectType.SANCTION,
+        uid="s2",
+        pub_json=None,
+        mem_json='{"uid":"s2"}',
+        full_json='{"uid":"s2"}',
+        tournament_uid="t2",
+    )
+    assert _scope_matches(scoped, mine) is True
+    assert _scope_matches(scoped, other) is False
+    assert _scope_matches(unscoped, other) is True
 
 
 def test_broadcast_precomputed_closes_connection_on_overflow():

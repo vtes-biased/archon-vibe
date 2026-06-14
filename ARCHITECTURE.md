@@ -773,7 +773,7 @@ Standalone process (`bot/`) — manages online VTES tournaments inside Discord s
 
 ### SSE Listener
 
-Subscribes to the Archon SSE stream using the organizer's `user:impersonate` token. Reacts to tournament lifecycle events:
+Subscribes to a **tournament-scoped** SSE stream (`/stream?tournament=<uid>`) using the organizer's `user:impersonate` token — one connection per active (guild, tournament) pair. The scoped stream delivers only that tournament + its sanctions + judge calls; the bot never streams the whole corpus. Reacts to tournament lifecycle events:
 
 - **Open/CheckIn state**: posts registration/check-in announcements to #announcement
 - **RoundStart**: posts seating; creates per-table voice channels; syncs per-player CONNECT+SPEAK permissions; warns unlinked players
@@ -781,7 +781,7 @@ Subscribes to the Archon SSE stream using the organizer's `user:impersonate` tok
 - **Finish**: posts final standings; prompts `/teardown`
 - **Mid-round seating changes** (SwapSeats, AlterSeating, etc.): detected via `_last_seating` diff → re-syncs voice channel permissions
 - **`judge_call` ephemeral event**: posts to #judges channel
-- **Catch-up on (re)connect**: the bot sends no `since` cursor, so the backend replays full current state. Events seed state silently until a `sync_complete` message flips `synced`; only after that do events post announcements — so a restart/reconnect doesn't re-post past announcements. A `resync` message triggers a fresh reconnect.
+- **Catch-up on (re)connect**: the bot sends no `since` cursor, so the backend replays full current tournament state. Events seed state silently until a `sync_complete` message flips `synced`; only after that do events post announcements — so a restart/reconnect doesn't re-post past announcements. A `resync` message triggers a fresh reconnect.
 
 Uses a shared `aiohttp` session across SSE reconnects. State tracked in module-level dicts (`_sse_tasks`, `_last_state`, `_last_round_count`, `_last_tournament`, `_last_seating`, `_table_channels`). All state cleaned up on `stop_sse` and teardown.
 

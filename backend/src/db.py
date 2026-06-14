@@ -37,6 +37,9 @@ class BroadcastData:
     country: str | None = None
     org_uids: list[str] | None = None
     obj_user_uid: str | None = None
+    # The tournament a sanction/deck belongs to (None for tournaments/users/
+    # leagues). Lets a tournament-scoped SSE connection match related objects.
+    tournament_uid: str | None = None
     # Authoritative modified_at (DB clock) of the written row. Emitted in the
     # live SSE envelope as `ts` so clients advance their sync cursor in the same
     # value space the `since` catch-up filter uses (not the payload's `modified`,
@@ -304,6 +307,7 @@ async def save_object(
         country=full_data.get("country"),
         org_uids=full_data.get("organizers_uids"),
         obj_user_uid=full_data.get("user_uid"),
+        tournament_uid=full_data.get("tournament_uid"),
         modified_at=modified_at,
     )
 

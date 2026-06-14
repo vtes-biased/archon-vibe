@@ -26,9 +26,70 @@ class SSEConnection:
     # stream so the browser EventSource reconnects and runs a catch-up sync,
     # rather than staying OPEN on a queue that no longer receives events.
     closed: bool = False
+    # Tournament-scoped connections (the Discord bot) receive ONLY events for
+    # this tournament — its own object, its sanctions, and its judge calls —
+    # instead of the whole corpus. None = unscoped (the browser's full sync).
+    tournament_uid: str | None = None
 
 
 _sse_connections: set[SSEConnection] = set()
+
+
+def entitled_level(
+    viewer: User | None,
+    *,
+    obj_type: str,
+    uid: str,
+    country: str | None,
+    org_uids: list[str] | None,
+    obj_user_uid: str | None,
+) -> str:
+    """The projection level a viewer is entitled to for one object.
+
+    Single source of truth for SSE access, shared by the live broadcast and the
+    tournament-scoped catch-up (main.stream_updates). Returns "public",
+    "member", or "full"; the caller maps that to its precomputed message or DB
+    column. IC sees full; NC/Prince see full in their own country; explicit
+    organizers see full for their tournaments; members see member (plus full for
+    their own profile/decks); everyone else sees public.
+    """
+    if not viewer:
+        return "public"
+    if Role.IC in viewer.roles:
+        return "full"
+    if (
+        (Role.NC in viewer.roles or Role.PRINCE in viewer.roles)
+        and viewer.country
+        and country
+        and viewer.country == country
+    ):
+        return "full"
+    if org_uids and viewer.uid in org_uids:
+        return "full"
+    if viewer.vekn_id:
+        if obj_type == ObjectType.USER and uid == viewer.uid:
+            return "full"  # Own profile
+        if obj_type == ObjectType.DECK and obj_user_uid == viewer.uid:
+            return "full"  # Own deck
+        return "member"
+    return "public"
+
+
+def _scope_matches(conn: SSEConnection, bd: BroadcastData) -> bool:
+    """Whether a (possibly tournament-scoped) connection wants this object.
+
+    Unscoped connections want everything. A scoped connection wants only its own
+    tournament object and that tournament's sanctions — symmetric with the
+    scoped catch-up (main._scoped_catchup_frames); other types (users, decks,
+    leagues) are dropped.
+    """
+    if conn.tournament_uid is None:
+        return True
+    if bd.obj_type == ObjectType.TOURNAMENT:
+        return bd.uid == conn.tournament_uid
+    if bd.obj_type == ObjectType.SANCTION:
+        return bd.tournament_uid == conn.tournament_uid
+    return False
 
 
 def _wake_sse_connections() -> None:
@@ -49,41 +110,26 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
         ts = f',"ts":"{bd.modified_at}"' if bd.modified_at else ""
         return f'data: {{"type":"{bd.obj_type}","data":{json_str}{ts}}}\n\n'
 
-    pub_msg = _make_msg(bd.pub_json) if bd.pub_json else None
-    mem_msg = _make_msg(bd.mem_json) if bd.mem_json else None
-    full_msg = _make_msg(bd.full_json) if bd.full_json else None
+    msg_by_level = {
+        "public": _make_msg(bd.pub_json) if bd.pub_json else None,
+        "member": _make_msg(bd.mem_json) if bd.mem_json else None,
+        "full": _make_msg(bd.full_json) if bd.full_json else None,
+    }
 
-    org_uids = bd.org_uids or []
     disconnected: set[SSEConnection] = set()
     for sse_conn in _sse_connections:
         try:
-            viewer = sse_conn.user
-            msg = None
-
-            if not viewer:
-                msg = pub_msg
-            elif Role.IC in viewer.roles:
-                msg = full_msg
-            elif (
-                (Role.NC in viewer.roles or Role.PRINCE in viewer.roles)
-                and viewer.country
-                and bd.country
-                and viewer.country == bd.country
-            ):
-                msg = full_msg
-            elif isinstance(org_uids, list) and viewer.uid in org_uids:
-                msg = full_msg
-            elif viewer.vekn_id:
-                # Member level — but check personal overlay
-                if bd.obj_type == ObjectType.USER and bd.uid == viewer.uid:
-                    msg = full_msg  # Own profile
-                elif bd.obj_type == ObjectType.DECK and bd.obj_user_uid == viewer.uid:
-                    msg = full_msg  # Own deck
-                else:
-                    msg = mem_msg
-            else:
-                msg = pub_msg
-
+            if not _scope_matches(sse_conn, bd):
+                continue
+            level = entitled_level(
+                sse_conn.user,
+                obj_type=bd.obj_type,
+                uid=bd.uid,
+                country=bd.country,
+                org_uids=bd.org_uids,
+                obj_user_uid=bd.obj_user_uid,
+            )
+            msg = msg_by_level.get(level)
             if msg:
                 sse_conn.queue.put_nowait(msg)
         except asyncio.QueueFull:
@@ -118,6 +164,8 @@ async def broadcast_judge_call(
     disconnected: set[SSEConnection] = set()
     for conn in _sse_connections:
         if not conn.user:
+            continue
+        if conn.tournament_uid is not None and conn.tournament_uid != tournament_uid:
             continue
         if conn.user.uid in org_set:
             try:

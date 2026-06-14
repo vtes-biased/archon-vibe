@@ -145,6 +145,10 @@ async def _sse_loop(
                 headers = {"Authorization": f"Bearer {tokens['access_token']}"}
                 async with session.get(
                     f"{config.ARCHON_URL}/stream",
+                    # Tournament-scoped: the backend streams only this
+                    # tournament + its sanctions + judge calls, not the whole
+                    # corpus (which overflowed aiohttp's 512KB line limit).
+                    params={"tournament": tournament_uid},
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=None, sock_read=300),
                 ) as resp:
@@ -156,67 +160,78 @@ async def _sse_loop(
                         if not refreshed:
                             logger.error("Token refresh failed for SSE, stopping")
                             return
+                        # Fresh token: retry at once (token renewal is one-shot,
+                        # not a failure to back off from).
                         continue
 
                     if resp.status != 200:
                         logger.error("SSE connection failed: %s", resp.status)
-                        await asyncio.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 2, 60)
-                        continue
+                    else:
+                        logger.info(
+                            "SSE connected for guild=%s tournament=%s",
+                            guild_id,
+                            tournament_uid,
+                        )
 
-                    retry_delay = 1
-                    logger.info(
-                        "SSE connected for guild=%s tournament=%s",
-                        guild_id,
-                        tournament_uid,
-                    )
+                        # The backend sends no `event:` field — every message is a
+                        # single `data: {"type":...}` line, so we dispatch on the
+                        # payload `type`, never on an SSE event name. `synced` flips
+                        # at `sync_complete`; before that we only seed state (no
+                        # announcements) so the catch-up replay doesn't spam.
+                        synced = False
+                        data_lines: list[str] = []
 
-                    # The backend sends no `event:` field — every message is a
-                    # single `data: {"type":...}` line, so we dispatch on the
-                    # payload `type`, never on an SSE event name. `synced` flips
-                    # at `sync_complete`; before that we only seed state (no
-                    # announcements) so the catch-up replay doesn't spam.
-                    synced = False
-                    data_lines: list[str] = []
+                        async for line_bytes in resp.content:
+                            line = line_bytes.decode("utf-8").rstrip("\n\r")
 
-                    async for line_bytes in resp.content:
-                        line = line_bytes.decode("utf-8").rstrip("\n\r")
+                            if line.startswith("data:"):
+                                data_lines.append(line[5:].strip())
+                            elif line == "":
+                                if not data_lines:
+                                    continue
+                                data_str = "\n".join(data_lines)
+                                data_lines = []
+                                try:
+                                    data = json.loads(data_str)
+                                except json.JSONDecodeError:
+                                    logger.warning(
+                                        "Unparseable SSE data: %s", data_str[:200]
+                                    )
+                                    continue
 
-                        if line.startswith("data:"):
-                            data_lines.append(line[5:].strip())
-                        elif line == "":
-                            if not data_lines:
-                                continue
-                            data_str = "\n".join(data_lines)
-                            data_lines = []
-                            try:
-                                data = json.loads(data_str)
-                            except json.JSONDecodeError:
-                                logger.warning(
-                                    "Unparseable SSE data: %s", data_str[:200]
+                                if data.get("type") == "resync":
+                                    # Server wants a clean re-sync. Reconnect for
+                                    # a fresh scoped catch-up (the bot sends no
+                                    # `since`, so a reconnect always replays the
+                                    # tournament's full current state).
+                                    logger.info(
+                                        "Resync requested, reconnecting SSE for %s",
+                                        key,
+                                    )
+                                    break
+
+                                synced = await _dispatch_event(
+                                    bot, store, guild_id, tournament_uid, data, synced
                                 )
-                                continue
-
-                            if data.get("type") == "resync":
-                                # Server wants a clean re-sync. Reconnect for a
-                                # fresh catch-up (the bot sends no `since`, so a
-                                # reconnect always replays full current state).
-                                logger.info(
-                                    "Resync requested, reconnecting SSE for %s", key
-                                )
-                                break
-
-                            synced = await _dispatch_event(
-                                bot, store, guild_id, tournament_uid, data, synced
-                            )
-                        # `:`-comment lines (": connected", ": keepalive") ignored
+                                # A completed catch-up proves the connection
+                                # works, so reset backoff for a prompt reconnect.
+                                # Reset only on a *healthy* sync — NOT right after
+                                # the 200 — so a connection that fails mid-read
+                                # (e.g. an oversized catch-up frame) keeps backing
+                                # off instead of hammering /stream once per second.
+                                if synced:
+                                    retry_delay = 1
+                            # `:`-comment lines (": connected"/": keepalive") ignored
 
             except asyncio.CancelledError:
                 return
             except Exception as e:
                 logger.error("SSE error: %s", e)
-                await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 60)
+
+            # Back off before every reconnect (clean EOF, non-200, resync, or
+            # error). Reset to 1 above only after a healthy sync.
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 60)
 
 
 def _normalize_events(data: dict) -> list[dict]:

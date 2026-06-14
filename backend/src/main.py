@@ -505,16 +505,125 @@ async def get_snapshot(token: str | None = None) -> Response:
 # ---------------------------------------------------------------------------
 _STREAM_TYPES = list(ObjectType)
 
+# Max bytes of joined object JSON packed into a single SSE `data:` line. The
+# browser EventSource has no per-line cap, but the Discord bot's aiohttp
+# StreamReader rejects any line over 512KB ("Got more than 524288 bytes when
+# reading"), so an unbounded catch-up frame (all objects of a type in one line)
+# crash-loops the bot. Keep frames well under that limit. A single object larger
+# than the budget is emitted alone (never split).
+_SSE_LINE_BUDGET = 200_000
+
+
+def _sse_object_lines(batch_type: str, json_strings: list[str]):
+    """Yield SSE `data:` frames for `json_strings`, each payload under the byte
+    budget so no single line exceeds the bot client's StreamReader limit.
+
+    Sizes by UTF-8 byte length (not str length) — the 512KB limit is in bytes,
+    so multibyte names (CJK/accents) must count for what they weigh on the wire.
+    """
+    batch: list[str] = []
+    size = 0
+    for s in json_strings:
+        s_bytes = len(s.encode()) + 1  # +1 for the joining comma
+        if batch and size + s_bytes > _SSE_LINE_BUDGET:
+            yield f'data: {{"type":"{batch_type}","data":[{",".join(batch)}]}}\n\n'
+            batch, size = [], 0
+        batch.append(s)
+        size += s_bytes
+    if batch:
+        yield f'data: {{"type":"{batch_type}","data":[{",".join(batch)}]}}\n\n'
+
+
+async def _scoped_catchup_frames(
+    viewer, tournament_uid: str
+) -> tuple[list[str], str | None]:
+    """Catch-up frames for a tournament-scoped SSE connection.
+
+    Returns (frames, last_modified_at) for the one tournament + its sanctions,
+    each at the viewer's entitled projection (the same access rule the live
+    broadcast uses). Far smaller than the full-corpus catch-up — this is what
+    lets the bot watch a tournament without streaming the whole database.
+    """
+    from .broadcast import entitled_level
+    from .db import _pool
+
+    frames: list[str] = []
+    last_ts: str | None = None
+    if not _pool:
+        return frames, last_ts
+
+    async with _pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                'SELECT public::text, member::text, "full"::text, modified_at '
+                "FROM objects WHERE uid = %s AND type = %s AND deleted_at IS NULL",
+                (tournament_uid, ObjectType.TOURNAMENT),
+            )
+        ).fetchone()
+        if row and row[2]:
+            full_dict = msgspec.json.decode(row[2].encode())
+            level = entitled_level(
+                viewer,
+                obj_type=ObjectType.TOURNAMENT,
+                uid=tournament_uid,
+                country=full_dict.get("country"),
+                org_uids=full_dict.get("organizers_uids"),
+                obj_user_uid=None,
+            )
+            col = {"public": row[0], "member": row[1], "full": row[2]}.get(level)
+            if col:
+                frames.append(f'data: {{"type":"tournament","data":{col}}}\n\n')
+                if row[3]:
+                    last_ts = row[3].isoformat()
+
+        # Sanctions are an identity projection (full content at member/full,
+        # nothing at public), so the level is viewer-only — compute it once.
+        sanction_level = entitled_level(
+            viewer,
+            obj_type=ObjectType.SANCTION,
+            uid="",
+            country=None,
+            org_uids=None,
+            obj_user_uid=None,
+        )
+        srows = await (
+            await conn.execute(
+                'SELECT public::text, member::text, "full"::text, modified_at '
+                "FROM objects WHERE type = %s "
+                "AND \"full\"->>'tournament_uid' = %s AND deleted_at IS NULL "
+                "ORDER BY modified_at ASC",
+                (ObjectType.SANCTION, tournament_uid),
+            )
+        ).fetchall()
+        sjson: list[str] = []
+        for sr in srows:
+            col = {"public": sr[0], "member": sr[1], "full": sr[2]}.get(sanction_level)
+            if col:
+                sjson.append(col)
+            if sr[3] and (last_ts is None or sr[3].isoformat() > last_ts):
+                last_ts = sr[3].isoformat()
+        frames.extend(_sse_object_lines("sanctions", sjson))
+
+    return frames, last_ts
+
 
 @app.get("/stream")
 async def stream_updates(
-    since: str | None = None, token: str | None = None
+    since: str | None = None,
+    token: str | None = None,
+    tournament: str | None = None,
 ) -> StreamingResponse:
     """Stream object updates via SSE (new sync architecture).
 
     Reads pre-computed access level columns — no per-item filtering.
     Personal overlay sends full-level data for own objects and
     role-based full access (NC/Prince same country, organizer).
+
+    `tournament=<uid>` opens a tournament-scoped stream (the Discord bot): the
+    catch-up carries only that tournament + its sanctions, and live events are
+    filtered to that tournament (its object, sanctions, judge calls). Access is
+    unchanged — the same per-object projection rule applies, just restricted to
+    one tournament's objects — so it adds no new visibility.
     """
     from .db import _pool, stream_objects_new
 
@@ -552,7 +661,7 @@ async def stream_updates(
 
     async def event_generator():
         """Generate SSE events from pre-computed columns."""
-        conn = SSEConnection(user=stream_user)
+        conn = SSEConnection(user=stream_user, tournament_uid=tournament)
         _sse_connections.add(conn)
 
         try:
@@ -567,8 +676,22 @@ async def stream_updates(
             last_timestamp: str | None = None
             totals: dict[str, int] = {}
 
+            # Tournament-scoped catch-up (the Discord bot): only that tournament
+            # + its sanctions, instead of the whole corpus. Skips the per-type
+            # catch-up and personal overlay below. `since` is ignored here — the
+            # scoped state is small, so every (re)connect replays it in full.
+            scoped = tournament is not None
+            if scoped:
+                frames, last_timestamp = await _scoped_catchup_frames(
+                    stream_user, tournament
+                )
+                for line in frames:
+                    if _shutdown_event and _shutdown_event.is_set():
+                        return
+                    yield line
+
             # Catch-up phase: stream from objects table
-            for obj_type in _STREAM_TYPES:
+            for obj_type in [] if scoped else _STREAM_TYPES:
                 count = 0
                 batch_type = obj_type + "s"  # "users", "tournaments", etc.
                 try:
@@ -586,16 +709,15 @@ async def stream_updates(
                         ):
                             last_timestamp = batch_max
 
-                        if json_strings:
-                            joined = ",".join(json_strings)
-                            yield f'data: {{"type":"{batch_type}","data":[{joined}]}}\n\n'
+                        for line in _sse_object_lines(batch_type, json_strings):
+                            yield line
                 except Exception as e:
                     logger.error(f"Error streaming {obj_type} (non-fatal): {e}")
 
                 totals[obj_type] = count
 
             # Personal overlay phase: send full-level data for own objects
-            if stream_user and level == DataLevel.MEMBER and _pool:
+            if not scoped and stream_user and level == DataLevel.MEMBER and _pool:
                 overlay_count = 0
                 try:
                     async with _pool.connection() as db_conn:
@@ -619,8 +741,10 @@ async def stream_updates(
                             )
                         ).fetchall()
                         if rows:
-                            decks_json = ",".join(r[0] for r in rows)
-                            yield f'data: {{"type":"decks","data":[{decks_json}]}}\n\n'
+                            for line in _sse_object_lines(
+                                "decks", [r[0] for r in rows]
+                            ):
+                                yield line
                             overlay_count += len(rows)
 
                         # NC/Prince: full for same-country users + tournaments
@@ -637,10 +761,10 @@ async def stream_updates(
                                 )
                             ).fetchall()
                             if rows:
-                                for i in range(0, len(rows), 500):
-                                    batch = rows[i : i + 500]
-                                    joined = ",".join(r[0] for r in batch)
-                                    yield f'data: {{"type":"users","data":[{joined}]}}\n\n'
+                                for line in _sse_object_lines(
+                                    "users", [r[0] for r in rows]
+                                ):
+                                    yield line
                                 overlay_count += len(rows)
 
                             # Same-country tournaments
@@ -652,10 +776,10 @@ async def stream_updates(
                                 )
                             ).fetchall()
                             if rows:
-                                for i in range(0, len(rows), 100):
-                                    batch = rows[i : i + 100]
-                                    joined = ",".join(r[0] for r in batch)
-                                    yield f'data: {{"type":"tournaments","data":[{joined}]}}\n\n'
+                                for line in _sse_object_lines(
+                                    "tournaments", [r[0] for r in rows]
+                                ):
+                                    yield line
                                 overlay_count += len(rows)
 
                         # Organizer: full for organized tournaments + their decks
@@ -668,10 +792,10 @@ async def stream_updates(
                         ).fetchall()
                         if rows:
                             t_uids = [r[0] for r in rows]
-                            for i in range(0, len(rows), 100):
-                                batch = rows[i : i + 100]
-                                joined = ",".join(r[1] for r in batch)
-                                yield f'data: {{"type":"tournaments","data":[{joined}]}}\n\n'
+                            for line in _sse_object_lines(
+                                "tournaments", [r[1] for r in rows]
+                            ):
+                                yield line
                             overlay_count += len(rows)
 
                             # Decks for organized tournaments (single IN query)
@@ -685,8 +809,10 @@ async def stream_updates(
                                 )
                             ).fetchall()
                             if deck_rows:
-                                joined = ",".join(r[0] for r in deck_rows)
-                                yield f'data: {{"type":"decks","data":[{joined}]}}\n\n'
+                                for line in _sse_object_lines(
+                                    "decks", [r[0] for r in deck_rows]
+                                ):
+                                    yield line
                                 overlay_count += len(deck_rows)
 
                     if overlay_count:

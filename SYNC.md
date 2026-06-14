@@ -48,17 +48,15 @@ async def stream_objects_new(
 ### SSE Endpoint
 
 ```python
-_STREAM_TYPES = ["user", "tournament", "sanction", "deck", "league"]
-
-for obj_type in _STREAM_TYPES:
-    async for json_strings, batch_max in stream_objects_new(
-        obj_type=obj_type, level=level.value, since=effective_since
-    ):
-        joined = ",".join(json_strings)
-        yield f'data: {{"type":"{obj_type}s","data":[{joined}]}}\n\n'
+_STREAM_TYPES = list(ObjectType)      # catch-up object order
+_SSE_LINE_BUDGET = 200_000            # bytes per `data:` line
 ```
 
+Catch-up emits batch frames via `_sse_object_lines()`, which chunks each object-type batch so no single `data:` line exceeds `_SSE_LINE_BUDGET` (200 KB). Reason: the browser EventSource has no per-line cap, but the Discord bot's aiohttp StreamReader rejects lines over 512 KB. A single object larger than the budget is emitted alone (never split across lines).
+
 No per-viewer filtering at read time — projections are pre-computed. After the catch-up phase, a **personal overlay** sends `full`-level data for the viewer's own objects and role-based full-access objects (NC/Prince same country, organizers).
+
+**Tournament-scoped stream** — `/stream?tournament=<uid>` opens a scoped connection (used by the Discord bot). The catch-up delivers only that tournament + its sanctions (`_scoped_catchup_frames`); the live phase filters to that tournament's object, its sanctions, and its judge calls via `SSEConnection.tournament_uid` + `_scope_matches`. Access rules are unchanged — `entitled_level()` (see below) applies per object, just restricted to one tournament's scope. The bot opens one scoped stream per watched tournament instead of streaming the whole corpus.
 
 The stream then enters the **live phase**, relaying single-object events from `broadcast_precomputed()`:
 
@@ -114,9 +112,13 @@ Triggered when a viewer's data level changes (role or vekn_id change).
 - User update: roles or vekn_id changed
 - Release bump: `MINIMUM_SYNC_EPOCH` in main.py
 
+### Access Entitlement
+
+`entitled_level(viewer, *, obj_type, uid, country, org_uids, obj_user_uid) → "public"|"member"|"full"` in `broadcast.py` is the **single source of truth** for per-object access. It is called by both the live broadcast (`broadcast_precomputed`) and the tournament-scoped catch-up (`_scoped_catchup_frames`). Logic: IC → full; NC/Prince same country → full; explicit organizer → full; member with own profile/deck → full; any member → member; otherwise public.
+
 ### Generic Broadcast
 
-Single `broadcast_precomputed()` function (in `broadcast.py`) with per-viewer filtering handles all object types.
+Single `broadcast_precomputed()` function (in `broadcast.py`) with per-viewer filtering handles all object types. `BroadcastData` carries `tournament_uid` (the tournament a sanction/deck belongs to) so `_scope_matches` can route events to tournament-scoped connections without re-reading the DB.
 
 Each connection has a bounded `asyncio.Queue` (maxsize 100). On `QueueFull` (a slow/stalled consumer), the connection is marked `closed` and evicted from the broadcast set; the SSE generator sees the flag, **ends the stream**, and the browser's `EventSource` auto-reconnects with `?since=<cursor>` and catches up. This is deliberate: a dropped event must not leave the client OPEN on a queue that no longer receives broadcasts (silently "deaf"). Lossless catch-up depends on the cursor being accurate — see **Sync Cursor** above.
 
@@ -244,10 +246,11 @@ Apply to IndexedDB optimistically → send to server → SSE corrects if needed.
 
 1. **Backend model** in `models.py` (extend `BaseObject`)
 2. **Projection functions** in `access_levels.py`: `compute_<type>_public/member/full()` + add to dispatch dicts
-3. **CRUD wrappers** in `db.py`: thin wrappers calling `save_object_from_model("<type>", obj)` and `get_object_full(uid, Type)`
-4. **Add to `_STREAM_TYPES`** in `main.py` (SSE catch-up loop)
-5. **Add to `OBJECT_TYPES`** in `snapshots.py`
-6. **Broadcast** via `broadcast_precomputed()` (from `broadcast.py`) after mutations
-7. **Frontend type** in `types.ts`
-8. **IndexedDB store** in `db.ts` (bump version → full clear)
-9. **Add to `SPECS`** in `sync.ts`
+3. **CRUD wrappers** in `db.py`: thin wrappers calling `save_object_from_model("<type>", obj)` and `get_object_full(uid, Type)`; populate `BroadcastData.tournament_uid` if the type belongs to a tournament (needed for tournament-scoped SSE connections)
+4. **Access entitlement** in `broadcast.entitled_level()`: add a branch if the type has non-standard visibility rules (own object, country-scoped, etc.)
+5. **Add to `_STREAM_TYPES`** in `main.py` (SSE catch-up loop)
+6. **Add to `OBJECT_TYPES`** in `snapshots.py`
+7. **Broadcast** via `broadcast_precomputed()` (from `broadcast.py`) after mutations
+8. **Frontend type** in `types.ts`
+9. **IndexedDB store** in `db.ts` (bump version → full clear)
+10. **Add to `SPECS`** in `sync.ts`
