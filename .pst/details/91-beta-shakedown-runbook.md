@@ -45,7 +45,7 @@ exercise — that's part of the shakedown, not a precondition of it.
   stacks are otherwise fully isolated (own DB, ports, server_names, `new-archon-*`
   units). The whole 8xxx/9xxx band is otherwise empty.
 
-## Progress checkpoint — 2026-06-14 (RESUME at §3)
+## Progress checkpoint — 2026-06-14 (RESUME at §6 — §7 gate GREEN)
 
 §0–§2 DONE. The first `just deploy-beta` brought archon-vibe up on frankfurt from
 CI-built **v0.1.1** wheels; the backend's startup VEKN sync filled the empty
@@ -61,10 +61,29 @@ deployed from CI wheels, §2 re-verify green: Discord login works, bot stable (n
 crash-loop), startup VEKN sync clean, engine loads (no toaster), `/tournaments/`
 200 on refresh, `/snapshot` serves backend JSON.
 
-**◀ RESUME HERE — §3 ETL workbench (2026-06-14).** v0.1.3 verified, so proceed:
-§3 ETL workbench → §4 leg A merge (onto the surviving seed) → §5 leg B (the state
-beta keeps) → §6 login/bot OAuth client → §7 #114 push audit = the **#39 GATE** →
-§8 #80 check.
+§3–§5 + §7 DONE (2026-06-14). ETL workbench up; leg A (vekn-first merge) and
+leg B (`--truncate` archon-first re-seed = the state beta keeps) both ran clean
+(0 ETL errors, migrate_validate + check_merge green). Two ETL fixes landed and
+ran in leg B: **#168** (`d007f2d`, stamp `vekn_pushed_at` on every non-Planned
+import — closed the calendar-push gap) and **#169** (`a048ee4`, sibling — match
+members by vekn id, never detach claimed accounts).
+
+**§7 #114 push audit = the #39 GATE is GREEN.** All three batch_push selection
+queries return 0 on the leg-B state — query 2 went **5→0** (the #168 fix
+confirmed on real prod data), queries 1 and 3 stayed 0. Beta pushes nothing and
+the ETL stamping protects prod from re-registering history → **#39 unblocked.**
+
+Known finding deferred to #39 (see #170): a few old-archon events carry 2+ rich
+tournaments for one vekn id (data-quality dups; e.g. event 12642 → 2 live). They
+don't affect the §7 gate (they carry vekn ids + are stamped) but violate
+one-live-per-vekn-id; manual cleanup is a #39-prep item, intentionally skipped on
+beta.
+
+**◀ RESUME HERE — §6 login + bot OAuth client + admin (2026-06-14).** Then §8
+(#80 clean-install check). Those two are all that remain before #91 closes. §6
+note: claiming a vekn id is what #169 fixed — confirm your migrated account
+survived leg B intact (auth methods + community links, not detached) before
+leaning on it.
 
 Host/access: `deploy@57.129.110.107` (frankfurt), PG17, beta on 8008/9008,
 `/tmp/archondb.dump` present (P4). **Vault pass:** `just deploy-beta` defaults
