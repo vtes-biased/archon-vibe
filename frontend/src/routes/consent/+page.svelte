@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { getAuthState, getAccessToken } from "$lib/stores/auth.svelte";
+  import { getAuthState, getAccessToken, initAuth } from "$lib/stores/auth.svelte";
   import { Loader2, CircleAlert, ShieldCheck, CircleCheck } from '@lucide/svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -26,6 +26,12 @@
   // If the user was auto-redirected (existing consent), this won't render
 
   onMount(async () => {
+    // The root layout hydrates auth in its own onMount, which fires AFTER this
+    // page's — so auth.isAuthenticated is still its initial `false` here on a
+    // fresh load. Settle auth first, or a logged-in user gets bounced to login
+    // and a fresh /consent load loops instead of ever showing the prompt.
+    if (auth.isLoading) await initAuth();
+
     if (!auth.isAuthenticated) {
       // Redirect to login, then back here
       const currentUrl = window.location.href;
