@@ -45,7 +45,7 @@ exercise — that's part of the shakedown, not a precondition of it.
   stacks are otherwise fully isolated (own DB, ports, server_names, `new-archon-*`
   units). The whole 8xxx/9xxx band is otherwise empty.
 
-## Progress checkpoint — 2026-06-14 (RESUME at §6 — §7 gate GREEN)
+## Progress checkpoint — 2026-06-14 (§7 gate GREEN; §6 bot flow done — see §6 update below)
 
 §0–§2 DONE. The first `just deploy-beta` brought archon-vibe up on frankfurt from
 CI-built **v0.1.1** wheels; the backend's startup VEKN sync filled the empty
@@ -79,11 +79,40 @@ don't affect the §7 gate (they carry vekn ids + are stamped) but violate
 one-live-per-vekn-id; manual cleanup is a #39-prep item, intentionally skipped on
 beta.
 
-**◀ RESUME HERE — §6 login + bot OAuth client + admin (2026-06-14).** Then §8
-(#80 clean-install check). Those two are all that remain before #91 closes. §6
-note: claiming a vekn id is what #169 fixed — confirm your migrated account
-survived leg B intact (auth methods + community links, not detached) before
-leaning on it.
+### §6 update — 2026-06-14 (bot OAuth flow working end-to-end)
+
+§6 steps 1–4 DONE. Discord login works; the bot's OAuth client is registered
+in-app (Profile → Developer; scopes profile:read + user:impersonate; redirect
+`https://bot.archon.krcg.org/oauth/callback`) with its id/secret in the beta
+vault; the beta Discord app is installed on a test guild and **`/setup` works
+end-to-end** (authorize link → consent → approve → bot callback → channels
+created). The #169 fix held — the migrated account survived leg B intact.
+
+It took a chain of CI-built releases, each surfacing the next bug now that the
+bot consent flow is finally reachable (all closed in pst):
+- **v0.1.4** — bot crashed at command INVOCATION: lightbulb v2 `ctx.author` →
+  v3 `ctx.user`; the v2→v3 migration was then completed + audited (#171).
+- **v0.1.5** — relocate the OAuth-consent + magic-link pages OFF the `/oauth` +
+  `/auth` backend nginx prefixes (they 404'd as SPA pages under a proxied
+  prefix) → `/consent` + `/verify-email`; URL builders (bot + magic-link mailer)
+  updated; a CI guardrail (`backend/tests/test_route_collisions.py`) now blocks
+  frontend↔backend route collisions (#176, resolved #175). Plus bot auto-defer +
+  v3 error handler (#172, #173-B).
+- **v0.1.6** — consent page looped a logged-in user through Discord (gated on
+  auth in onMount before the root layout hydrated it); now awaits initAuth (#177).
+
+**v0.1.6 is the current beta build.**
+
+**◀ RESUME HERE — §6 step 5 (admin panel) + §8 (#80 clean-install)** — all that
+remains before #91 closes. §6.5: Profile → Admin → the #123 status panel +
+"Run now" on the VEKN syncs exercises the Bearer-authed `/admin/*` endpoints
+(paths are `/admin/*` — no `/api` prefix, no cookie auth). §8: confirm entrypoint
+`backend.src.main:app`, `/api/cards` from the wheel (green in §2), no
+path/resource errors in journalctl, snapshots under `/var/lib/new_archon/snapshots`.
+
+Open follow-ups (none block #91): #173 (p3, optional bot guild-scoping for
+instant command propagation), #178 (p2, slow backend stop/restart ~90s —
+uvicorn SSE graceful-shutdown), #170 (#39-prep dup cleanup).
 
 Host/access: `deploy@57.129.110.107` (frankfurt), PG17, beta on 8008/9008,
 `/tmp/archondb.dump` present (P4). **Vault pass:** `just deploy-beta` defaults
