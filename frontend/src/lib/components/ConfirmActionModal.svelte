@@ -20,6 +20,7 @@
 
   let status = $state<'idle' | 'loading' | 'success' | 'error'>('idle');
   let stats = $state<[string, unknown][]>([]);
+  let started = $state(false);
   let errorMsg = $state('');
 
   function flatten(value: unknown): string {
@@ -30,8 +31,18 @@
   async function run() {
     status = 'loading';
     errorMsg = '';
+    started = false;
     try {
       const result = await action();
+      // Background-dispatched jobs (the admin syncs) return
+      // {status:'started'|'already_running'} with no stats — the outcome shows
+      // up in the status panel, not here.
+      const s = result && typeof result === 'object' ? (result as { status?: unknown }).status : undefined;
+      if (s === 'started' || s === 'already_running') {
+        started = true;
+        status = 'success';
+        return;
+      }
       const data =
         result && typeof result === 'object' && 'stats' in result
           ? (result as { stats: unknown }).stats
@@ -79,9 +90,11 @@
       {#if status === 'success'}
         <div class="flex items-center gap-2 text-emerald-400 mb-4">
           <CircleCheck class="w-5 h-5 shrink-0" />
-          <span class="font-medium">{m.admin_op_success()}</span>
+          <span class="font-medium">{started ? m.admin_op_started() : m.admin_op_success()}</span>
         </div>
-        {#if stats.length > 0}
+        {#if started}
+          <p class="text-ash-400 text-sm mb-6">{m.admin_op_started_hint()}</p>
+        {:else if stats.length > 0}
           <dl class="text-sm bg-dusk-900 border border-ash-700 rounded-lg p-3 space-y-1 mb-6 max-h-60 overflow-auto">
             {#each stats as [key, value]}
               <div class="flex justify-between gap-4">

@@ -1,6 +1,8 @@
 """Admin API routes."""
 
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 
 import msgspec
 from fastapi import APIRouter, HTTPException
@@ -21,12 +23,37 @@ encoder = msgspec.json.Encoder()
 
 # Will be set by main.py
 _sync_service = None
+# Recorded background runners injected by main.py (member_sync / tournament_sync).
+_runners: dict[str, Callable[[], Awaitable[None]]] = {}
+# In-flight admin-dispatched jobs, keyed by job name — keeps the task referenced
+# (so it isn't GC'd) and lets a re-trigger see a run is already going.
+_running_tasks: dict[str, asyncio.Task] = {}
 
 
 def set_sync_service(sync_service) -> None:
     """Set the sync service instance."""
     global _sync_service
     _sync_service = sync_service
+
+
+def set_sync_runners(**runners: Callable[[], Awaitable[None]]) -> None:
+    """Register the recorded sync runners the admin endpoints dispatch."""
+    _runners.update(runners)
+
+
+def _dispatch(job: str, make_coro: Callable[[], Awaitable[None]]) -> dict:
+    """Fire a job in the background and return immediately.
+
+    The job is long-running (a full VEKN pull is minutes); awaiting it inline
+    would block the HTTP response until the reverse proxy times the request out
+    and cancels it mid-query. Instead we launch it as a task and let the caller
+    poll /admin/vekn-status for the outcome.
+    """
+    existing = _running_tasks.get(job)
+    if existing and not existing.done():
+        return {"status": "already_running"}
+    _running_tasks[job] = asyncio.create_task(make_coro())
+    return {"status": "started"}
 
 
 class MergeRequest(BaseModel):
@@ -40,46 +67,44 @@ class MergeRequest(BaseModel):
 async def trigger_vekn_sync(
     manager: CurrentUser,
 ) -> dict:
-    """Manually trigger VEKN member synchronization. Requires IC role."""
+    """Dispatch a VEKN member sync in the background. Requires IC role.
+
+    Returns immediately ({"status": "started"} or "already_running"); the
+    outcome lands in /admin/vekn-status under member_sync.
+    """
     if Role.IC not in manager.roles:
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
-    if not _sync_service:
+    runner = _runners.get("member_sync")
+    if not runner:
         raise HTTPException(
             status_code=503, detail="VEKN sync service is not available"
         )
 
-    try:
-        logger.info("Manual VEKN sync triggered via admin endpoint")
-        stats = await _sync_service.sync_all_members()
-        return {"status": "success", "stats": stats}
-    except Exception as e:
-        logger.error(f"Error during manual VEKN sync: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}") from e
+    logger.info("Manual VEKN member sync dispatched via admin endpoint")
+    return _dispatch("member_sync", runner)
 
 
 @router.post("/sync-vekn-tournaments")
 async def trigger_vekn_tournament_sync(
     manager: CurrentUser,
 ) -> dict:
-    """Manually trigger VEKN tournament synchronization. Requires IC role."""
+    """Dispatch a VEKN tournament sync in the background. Requires IC role.
+
+    Returns immediately; the outcome lands in /admin/vekn-status under
+    tournament_sync.
+    """
     if Role.IC not in manager.roles:
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
-    if not _sync_service:
+    runner = _runners.get("tournament_sync")
+    if not runner:
         raise HTTPException(
             status_code=503, detail="VEKN sync service is not available"
         )
 
-    try:
-        from ..vekn_tournament_sync import sync_all_tournaments
-
-        logger.info("Manual VEKN tournament sync triggered via admin endpoint")
-        stats = await sync_all_tournaments(_sync_service.client)
-        return {"status": "success", "stats": stats}
-    except Exception as e:
-        logger.error(f"Error during manual VEKN tournament sync: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}") from e
+    logger.info("Manual VEKN tournament sync dispatched via admin endpoint")
+    return _dispatch("tournament_sync", runner)
 
 
 @router.get("/vekn-status")
@@ -99,25 +124,32 @@ async def vekn_status(
     return {"jobs": get_status()}
 
 
+async def _run_twda_import() -> None:
+    """TWDA import wrapped for background dispatch (logs its own outcome)."""
+    from ..twda_import import import_twda_decks
+
+    try:
+        logger.info("Starting TWDA deck import")
+        stats = await import_twda_decks()
+        logger.info(f"TWDA deck import: {stats}")
+    except Exception as e:
+        logger.error(f"Error during TWDA deck import: {e}", exc_info=True)
+
+
 @router.post("/sync-twda-decks")
 async def trigger_twda_deck_import(
     manager: CurrentUser,
 ) -> dict:
-    """Manually trigger TWDA winner decklist import. Requires IC role."""
+    """Dispatch a TWDA winner-decklist import in the background. Requires IC role.
+
+    Returns immediately; the outcome is logged (TWDA has no vekn-status panel
+    entry).
+    """
     if Role.IC not in manager.roles:
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
-    try:
-        from ..twda_import import import_twda_decks
-
-        logger.info("Manual TWDA deck import triggered via admin endpoint")
-        stats = await import_twda_decks()
-        return {"status": "success", "stats": stats}
-    except Exception as e:
-        logger.error(f"Error during manual TWDA deck import: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"TWDA import failed: {str(e)}"
-        ) from e
+    logger.info("Manual TWDA deck import dispatched via admin endpoint")
+    return _dispatch("twda", _run_twda_import)
 
 
 @router.post("/users/merge")

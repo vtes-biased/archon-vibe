@@ -762,6 +762,8 @@
   "admin_run_now": "Esegui ora",
   "admin_op_running": "In esecuzione…",
   "admin_op_success": "Completato",
+  "admin_op_started": "Sincronizzazione avviata",
+  "admin_op_started_hint": "Viene eseguita in background — controlla il pannello di stato sopra per vedere il risultato.",
   "admin_op_error": "Errore",
   "admin_sync_vekn_label": "Sincronizza i membri VEKN",
   "admin_sync_vekn_desc": "Scarica il registro dei membri da VEKN. Viene eseguita automaticamente ogni 6 ore.",

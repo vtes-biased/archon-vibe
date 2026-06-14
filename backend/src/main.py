@@ -70,9 +70,12 @@ _sync_service: VEKNSyncService | None = None
 _shutdown_event: asyncio.Event | None = None
 
 
-async def run_vekn_sync() -> None:
-    """Run VEKN member sync, then tournament sync (scheduled task)."""
-    global _sync_service
+async def run_member_sync() -> None:
+    """VEKN member sync with status recording (vekn_status).
+
+    Shared by the scheduled run and the admin 'Run now' endpoint, so both record
+    the same member_sync health and the manual trigger stays a quick dispatch.
+    """
     if not _sync_service:
         return
 
@@ -89,7 +92,17 @@ async def run_vekn_sync() -> None:
         logger.error(f"Error during VEKN member sync: {e}", exc_info=True)
         record_error("member_sync", str(e))
 
-    # Tournament sync runs after member sync (needs user UIDs)
+
+async def run_tournament_sync() -> None:
+    """VEKN tournament sync with status recording (vekn_status).
+
+    Shared by the scheduled run and the admin 'Run now' endpoint.
+    """
+    if not _sync_service:
+        return
+
+    from .vekn_status import record_error, record_success
+
     try:
         from .vekn_tournament_sync import sync_all_tournaments
 
@@ -102,6 +115,16 @@ async def run_vekn_sync() -> None:
     except Exception as e:
         logger.error(f"Error during VEKN tournament sync: {e}", exc_info=True)
         record_error("tournament_sync", str(e))
+
+
+async def run_vekn_sync() -> None:
+    """Full scheduled chain: members → tournaments → TWDA → ratings → snapshot."""
+    if not _sync_service:
+        return
+
+    await run_member_sync()
+    # Tournament sync runs after member sync (needs user UIDs).
+    await run_tournament_sync()
 
     # Import TWDA winner decklists for matched tournaments
     try:
@@ -279,6 +302,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("VEKN sync is enabled")
         _sync_service = VEKNSyncService()
         admin.set_sync_service(_sync_service)
+        # Recorded runners the admin 'Run now' dispatches in the background
+        # (instead of awaiting the multi-minute sync inline in the request).
+        admin.set_sync_runners(
+            member_sync=run_member_sync, tournament_sync=run_tournament_sync
+        )
 
         # Set up periodic sync
         sync_interval_hours = int(os.getenv("VEKN_SYNC_INTERVAL_HOURS", "6"))

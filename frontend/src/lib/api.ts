@@ -291,24 +291,26 @@ export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<
 
 /** Result of an IC manual-sync trigger: a status plus a free-form stats map. */
 export interface AdminSyncResult {
+  /** "started" / "already_running" for background-dispatched syncs. */
   status: string;
-  stats: Record<string, unknown>;
+  /** Only present for synchronous ops; the VEKN/TWDA syncs run in the background. */
+  stats?: Record<string, unknown>;
 }
 
-/** IC-only: trigger a VEKN member sync now (also runs on a 6h schedule). */
+/** IC-only: dispatch a VEKN member sync in the background (also runs on a 6h schedule). */
 export async function syncVeknMembers(): Promise<AdminSyncResult> {
   requireOnline({ suppressErrorToast: true });
   // Errors surface inline in ConfirmActionModal — suppress the duplicate toast.
   return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' }, { suppressErrorToast: true });
 }
 
-/** IC-only: trigger a VEKN tournament sync now (also runs on a 6h schedule). */
+/** IC-only: dispatch a VEKN tournament sync in the background (also runs on a 6h schedule). */
 export async function syncVeknTournaments(): Promise<AdminSyncResult> {
   requireOnline({ suppressErrorToast: true });
   return apiRequest<AdminSyncResult>('/admin/sync-vekn-tournaments', { method: 'POST' }, { suppressErrorToast: true });
 }
 
-/** IC-only: trigger a TWDA decklist import now (also runs on a 24h schedule). */
+/** IC-only: dispatch a TWDA decklist import in the background (also runs on a 24h schedule). */
 export async function syncTwdaDecks(): Promise<AdminSyncResult> {
   requireOnline({ suppressErrorToast: true });
   return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });

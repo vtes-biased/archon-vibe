@@ -62,8 +62,8 @@ async def test_admin_sync_requires_ic(test_client: AsyncClient, non_ic_user, pat
 
 @pytest.mark.asyncio
 async def test_admin_sync_vekn_allows_ic(test_client: AsyncClient, ic_user):
-    """IC clears the role gate; the sync service is unset in tests, so the
-    handler reports 503 rather than 403 — proving IC passed the guard."""
+    """IC clears the role gate; no runner is registered in tests, so the handler
+    reports 503 rather than 403 — proving IC passed the guard."""
     resp = await test_client.post(
         "/admin/sync-vekn", headers=make_auth_header(ic_user.uid)
     )
