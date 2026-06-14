@@ -84,7 +84,6 @@ async def run_member_sync() -> None:
     from .vekn_status import record_error, record_success
 
     try:
-        logger.info("Starting VEKN member sync")
         stats = await _sync_service.sync_all_members()
         record_success("member_sync", stats if isinstance(stats, dict) else None)
     except TimeoutError:
@@ -108,7 +107,6 @@ async def run_tournament_sync() -> None:
     try:
         from .vekn_tournament_sync import sync_all_tournaments
 
-        logger.info("Starting VEKN tournament sync")
         stats = await sync_all_tournaments(_sync_service.client)
         record_success("tournament_sync", stats if isinstance(stats, dict) else None)
     except TimeoutError:
