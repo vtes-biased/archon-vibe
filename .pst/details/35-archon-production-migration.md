@@ -100,9 +100,28 @@ lands: ETL/sync-ingested data must be stamped push-inert
 thousands of ratified results and ~19k member updates (`vekn_push.py` selects on
 those markers).
 
-**Initial population stays ETL-first** (rehearsed 2026-06-09: clean insert into
-an empty DB, VEKN sync reconciles on top — 0 errors, 0 dupes, rich rounds and
-protected roles intact). The recurring merge then keeps the DB converged daily.
+**Initial population is SYNC-FIRST** (revised 2026-06-14 — supersedes the
+original ETL-first call; principal-engineer review + #169). Empty DB → VEKN
+member+tournament sync creates accounts (fresh uuid7) → legacy `--merge` layers
+archon-owned fields and rich play data on top, **matching members by `vekn_id`**
+and remapping every old-archon uid reference through a `member_uid_map` (#169).
+This is the exact path the #91 beta exercises, so prod ships the ordering we
+battle-tested instead of a second one. ETL `--truncate` (uid-preserving,
+rehearsed 2026-06-09: 0 errors / 0 dupes) demotes to **disaster-recovery +
+dev-seed**, not the prod seed.
+
+What made the flip safe: #169's reference remap removes ETL-first's only real
+advantage (uid preservation → native ref integrity), so which uid an account
+carries no longer matters — nothing external depends on old-archon uids
+(calendar tokens keyed by their own column, bot state by `discord_id`,
+tournament deep-links preserved because rich data merges INTO the vekn-created
+copy and keeps its uid). The two decisions are **coupled**: sync-first makes the
+remap load-bearing — the VEKN tournament sync writes uuid7 player uids
+(`vekn_tournament_sync.py:180`), so an un-remapped rich merge would split one
+tournament across uuid7 `players` and old-archon `rounds`/`seating`. **Cutover
+gate:** refuse the final `--merge` if the live vekn-account count is below
+threshold (~18k; beta synced 18,831 clean), so a half-failed sync can't seed
+thousands under old uids. The recurring merge then keeps the DB converged daily.
 
 **Auth:** Discord carries over (`discord_id` + discord `AuthMethod`); legacy
 password hashes don't migrate — email users re-establish via magic link on
@@ -177,7 +196,11 @@ archive the old repo; cold-store `tournament_events`.
 Settled 2026-06-09 (#36), still standing: parallel domain on the **same VPS**;
 Draft→Limited; OAuth `clients` re-register (enumerate active ones from a dump —
 expected few); `tournament_events` dump-only; rating drift tolerated (recompute
-post-import, log >5% deltas); ETL-first for initial population.
+post-import, log >5% deltas).
+
+**Revised 2026-06-14** (supersedes "ETL-first for initial population" above):
+initial population is **sync-first**, matching the beta — see the SYNC-FIRST
+paragraph in Data flow and #169. ETL `--truncate` is now DR/dev-seed only.
 
 Revised 2026-06-10 (owner):
 1. **No wipe / no migration window** — recurring idempotent legacy sync (#115);

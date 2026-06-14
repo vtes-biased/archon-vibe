@@ -8,7 +8,29 @@ final sync + vhost swap. Keep the clean-insert mode for beta rebuilds (#91) and
 as a disaster fallback.
 
 Decided with owner 2026-06-10. Supersedes the wipe+re-ETL design in `#35`
-(decision 8 there covers the *initial* population only, which stays ETL-first).
+(decision 8 there covers the *initial* population only).
+
+> **Amendment 2026-06-14 (#169, principal-engineer-reviewed) — member matching
+> by VEKN ID + sync-first prod.** Two coupled changes supersede parts of the
+> design below:
+> 1. **Match members by `vekn_id`, not by uid.** The uid-match (`get_user_by_uid`,
+>    `merge_member`) + its "vekn-first echo" tombstone branch caused **silent
+>    data loss**: a user who CLAIMED a VEKN-sync identity copy holds a uuid7 ≠ the
+>    old-archon uid, so the lookup missed and the branch tombstoned the live
+>    claimed account + nulled its `vekn_id` (losing auth, community_links, local
+>    edits). Replaced by: match on `vekn_id`; merge archon-owned fields into the
+>    live account; **never tombstone**; build `member_uid_map[old_uid]→live_uid`
+>    and remap *every* member-uid reference through it. Vekn-less legacy members
+>    are **seeded as soft-deleted shells** (NOT dropped — the dump has 9 tournament
+>    refs to vekn-less members in 3 rich events; bare-drop orphans them). Full
+>    spec + the complete reference-field enumeration: `.pst/details/169-*.md`.
+> 2. **Prod is sync-first** (was ETL-first). The remap makes uid-preservation
+>    moot, so prod runs the same path as the #91 beta. ETL `--truncate` → DR/
+>    dev-seed. See the SYNC-FIRST paragraph in `.pst/details/35-*.md`. The two are
+>    coupled: sync-first makes the remap load-bearing.
+>
+> The "single writer per field" and tournament-matching design below still holds;
+> only the *member*-matching key (uid → vekn_id) and the vekn-less handling change.
 
 ## Why this is cheap here
 

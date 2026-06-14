@@ -9,8 +9,10 @@ Invariants guarded (one test each):
 * both-rich conflicts are skipped, not merged;
 * member merge writes only archon-owned fields, respecting local_modifications
   (identity and roles untouched);
-* a vekn-created duplicate member is tombstoned when the old-archon member
-  arrives (one live user per vekn id).
+* members are matched by VEKN id: the old-archon member merges INTO the live
+  (possibly claimed) account and is NEVER tombstoned/detached (#169);
+* every old-archon member-uid reference is remapped to the live uid, and a
+  vekn-less member is seeded as a shell so its references still resolve.
 
 The VEKN member sync's own role contract (CREATE seeds derived roles, UPDATE
 never writes them) is covered in test_vekn_member_sync.py.
@@ -244,25 +246,87 @@ async def test_member_merge_respects_field_ownership(test_db):
 
 
 @pytest.mark.asyncio
-async def test_member_insert_tombstones_vekn_created_duplicate(test_db):
+async def test_claimed_account_not_detached_by_merge(test_db):
+    """#169 regression: a user claimed a VEKN-sync copy (uuid7 ≠ old-archon uid),
+    so the old-archon member arrives under a different uid. The merge must match
+    on the vekn id and merge INTO the claimed account — never tombstone it or
+    null its vekn_id (the old bug wiped the claimed identity + its community
+    links)."""
+    from src.models import CommunityLink, CommunityLinkType
+
     await db.save_user(
         User(
-            uid="v-9",
+            uid="v-9",  # VEKN-sync uuid7, then claimed (≠ old-archon "o-9")
             modified=datetime(2025, 6, 1, tzinfo=UTC),
-            name="Vekn Copy",
+            name="Claimed Account",
             vekn_id="1000009",
             vekn_synced=True,
+            community_links=[
+                CommunityLink(type=CommunityLinkType.WEBSITE, url="https://me.example")
+            ],
         )
     )
 
     stats = Stats()
     user, discord = build_user(
-        _old_member_row("o-9", vekn="1000009", name="Old Member"), stats
+        _old_member_row("o-9", vekn="1000009", name="Old Member", nickname="Nick"), stats
     )
-    await merge_member(user, discord, stats)
+    live_uid = await merge_member(user, discord, stats)
 
-    survivor = await db.get_user_by_uid("o-9")
-    assert survivor is not None and survivor.deleted_at is None
-    duplicate = await db.get_user_by_uid("v-9")
-    assert duplicate.deleted_at is not None, "vekn-created duplicate tombstoned"
-    assert stats["members.vekn_copy_tombstoned"] == 1
+    assert live_uid == "v-9", "old member maps to the live claimed account"
+    survivor = await db.get_user_by_uid("v-9")
+    assert survivor.deleted_at is None, "claimed account NOT tombstoned"
+    assert survivor.vekn_id == "1000009", "vekn id NOT detached"
+    assert survivor.community_links, "community links survive the merge"
+    assert survivor.nickname == "Nick", "archon-owned field merged in"
+    assert await db.get_user_by_uid("o-9") is None, "no duplicate under the old uid"
+    assert stats["members.vekn_copy_tombstoned"] == 0
+
+
+@pytest.mark.asyncio
+async def test_member_refs_remapped_and_vekn_less_seeded(test_db):
+    """The load-bearing remap: a tournament's old-archon player uids are rewritten
+    to the live (vekn-matched) uids, and a vekn-less player is seeded as a shell
+    so its reference still resolves (no orphan)."""
+    async with _cleanup():
+        # p1 is the live account a user claimed (uuid7 'live-1', vekn 2000001);
+        # p5 has no vekn id (stays under its old uid as a shell).
+        await db.save_user(
+            User(
+                uid="live-1",
+                modified=datetime(2025, 6, 1, tzinfo=UTC),
+                name="Live One",
+                vekn_id="2000001",
+            )
+        )
+        # member_uid_map built from the members pass: p1→live-1 (vekn match),
+        # p5→p5 (vekn-less shell), p2..p4 seeded under their own uids.
+        member_uid_map: dict[str, str] = {}
+        for old_uid, vekn in (
+            ("p1", "2000001"),
+            ("p2", "2000002"),
+            ("p3", "2000003"),
+            ("p4", "2000004"),
+            ("p5", ""),  # vekn-less
+        ):
+            user, discord = build_user(
+                _old_member_row(old_uid, vekn=vekn, name=old_uid), Stats()
+            )
+            member_uid_map[old_uid] = await merge_member(user, discord, Stats())
+
+        assert member_uid_map["p1"] == "live-1"
+        shell = await db.get_user_by_uid("p5")
+        assert shell is not None and shell.deleted_at is not None, "vekn-less shell"
+
+        row = _old_tournament_row("o-r", with_deck=True)
+        row["data"]["winner"] = "p1"
+        await process_tournament_row(row, {}, Stats(), True, {}, member_uid_map)
+
+        t = await db.get_tournament_by_uid("o-r")
+        seat_uids = {s.player_uid for tbl in t.rounds[0] for s in tbl.seating}
+        assert "live-1" in seat_uids and "p1" not in seat_uids, "player_uid remapped"
+        assert "p5" in seat_uids, "vekn-less ref preserved (resolves to the shell)"
+        assert t.winner == "live-1", "winner remapped"
+        assert {s.user_uid for s in t.standings} >= {"live-1", "p5"}
+        decks = await db.get_decks_for_tournament("o-r")
+        assert decks[0].user_uid == "live-1", "deck.user_uid remapped"

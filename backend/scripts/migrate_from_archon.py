@@ -17,6 +17,17 @@ Two modes against the same mapping code:
   member sync). Merge mode takes a pre-run `pg_dump` of the NEW DB so a buggy
   merge is restore-fix-rerun.
 
+  Members are matched on **VEKN id** (the stable cross-system key), NOT on the
+  old-archon uid — which diverges whenever the live account was VEKN-sync-created
+  (fresh uuid7) and then claimed. The merge merges archon-owned fields into that
+  live account and NEVER tombstones it (matching on uid used to detach claimed
+  accounts, #169); every play-data reference to an old-archon member uid is
+  remapped to the live uid via `member_uid_map`. Members with no VEKN id are
+  seeded as soft-deleted shells (historical tournaments reference them; they
+  aren't live identities). This is what makes the prod migration **sync-first**
+  (VEKN sync creates the accounts, the merge layers history on) instead of
+  ETL-first — see `.pst/details/35` / `169`.
+
 Reads the OLD archon Postgres (members / leagues / tournaments / clients /
 member_deletions) and writes the NEW archon-vibe schema, REUSING the backend's
 own `save_*` helpers so the public/member/full access projections are computed
@@ -426,74 +437,104 @@ async def ensure_discord_auth(user_uid: str, discord: dict, stats: Stats) -> Non
     stats.bump("auth.discord")
 
 
-async def merge_member(user: db.User, discord: dict, stats: Stats) -> None:
-    """Idempotent member upsert: insert new members wholesale (the seed), merge
-    only archon-owned fields into existing ones."""
-    existing = await db.get_user_by_uid(user.uid)
-
-    if existing is None:
-        if user.vekn_id:
-            # vekn-first echo: a member created on old archon reached us through
-            # the vekn.net member sync first, under a fresh uid. The old-archon
-            # copy carries the history (contacts, auth, references from its
-            # tournaments) — it wins; tombstone the identity-only vekn copy.
-            holder = await live_user_by_vekn_id(user.vekn_id)
-            if holder is not None:
-                now = datetime.now(UTC)
-                holder.deleted_at = now
-                holder.modified = now
-                # The unique index on vekn_id spans tombstones (one user per
-                # vekn id, ever): release the number to the surviving user.
-                holder.vekn_id = None
-                await db.save_user(holder)
-                loud(
-                    f"member dedup: soft-deleted vekn-created user {holder.uid} "
-                    f"(vekn {user.vekn_id}); old-archon user {user.uid} takes over"
-                )
-                stats.bump("members.vekn_copy_tombstoned")
-        await db.save_user(user)
-        await ensure_discord_auth(user.uid, discord, stats)
-        stats.bump("members.inserted")
+async def seed_vekn_less_shell(user: db.User, stats: Stats) -> None:
+    """A legacy member with no VEKN id: seed a soft-deleted shell under its old
+    uid so historical tournament/sanction references to it resolve, WITHOUT
+    creating a live identity (it isn't on vekn.net and can't be claimed). Mirrors
+    the member_deletions shells. Never resurrects or modifies an existing row."""
+    if await db.get_user_by_uid(user.uid) is not None:
         return
+    now = datetime.now(UTC)
+    await db.save_user(msgspec.structs.replace(user, deleted_at=now, modified=now))
+    stats.bump("members.vekn_less_shell")
 
-    if existing.deleted_at:
+
+async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
+    """Idempotent member upsert keyed on VEKN id. Returns the LIVE uid this
+    old-archon member maps to (the caller records old_uid → live_uid in
+    `member_uid_map` and remaps every play-data reference through it).
+
+    The VEKN id is the stable cross-system identity key, so we match on it rather
+    than on the old-archon uid — which diverges whenever the live account was
+    created by the VEKN sync (fresh uuid7) and then claimed. Matching on uid here
+    used to tombstone such a claimed account and null its vekn_id (silent data
+    loss, #169); this never tombstones a live account.
+
+    - no vekn_id        → soft-deleted shell (refs resolve; not a live identity)
+    - vekn_id matches a live account → merge archon-owned fields into it
+      (respecting local_modifications); identity / vekn_id / roles untouched
+    - vekn_id unknown here → seed-insert under the old-archon uid
+    """
+    if not user.vekn_id:
+        await seed_vekn_less_shell(user, stats)
+        return user.uid
+
+    live = await live_user_by_vekn_id(user.vekn_id)
+    if live is None:
+        # vekn.net hasn't produced this account yet (VEKN sync didn't create it,
+        # or this is a vekn-sync-less env): seed under the old-archon uid. A
+        # previous run's seed already holds the vekn_id, so it is found above on
+        # the next run — idempotent.
+        existing = await db.get_user_by_uid(user.uid)
+        if existing is not None:
+            if existing.deleted_at:
+                stats.bump("members.skipped_deleted")
+                return user.uid
+            live = existing  # pre-existing under this uid — merge into it
+        else:
+            await db.save_user(user)
+            await ensure_discord_auth(user.uid, discord, stats)
+            stats.bump("members.inserted")
+            return user.uid
+
+    if live.deleted_at:
         # Deleted on the new stack — never resurrect from upstream.
         stats.bump("members.skipped_deleted")
-        return
+        return live.uid
 
     changed = False
     for field in ARCHON_USER_FIELDS:
-        if field in existing.local_modifications:
+        if field in live.local_modifications:
+            continue
+        # coopted_by is a member→member reference written EXCLUSIVELY by
+        # remap_coopted_by, once the full member_uid_map is known: writing the
+        # un-remapped old-archon sponsor uid here would flip-flop daily against
+        # that remap (the live account already holds the remapped uid).
+        if field == "coopted_by":
             continue
         value = getattr(user, field)
-        # coopted_by: the VEKN sync infers sponsors for members old archon has
-        # none recorded for — an old-archon None must not wipe that inference
-        # (it would flip-flop daily with the inference re-filling it).
-        if field == "coopted_by" and value is None:
-            continue
         # Officials' contact_email is injected by the VEKN member sync from the
         # scraped vekn.net lists — writing old archon's address here would
         # flip-flop daily with that injection.
-        if field == "contact_email" and existing.vekn_id in OFFICIALS_EMAILS:
+        if field == "contact_email" and live.vekn_id in OFFICIALS_EMAILS:
             continue
-        if getattr(existing, field) != value:
-            setattr(existing, field, value)
+        if getattr(live, field) != value:
+            setattr(live, field, value)
             changed = True
     if changed:
-        existing.modified = datetime.now(UTC)
-        await db.save_user(existing)
+        live.modified = datetime.now(UTC)
+        await db.save_user(live)
         stats.bump("members.updated")
     else:
         stats.bump("members.unchanged")
-    if "discord_id" not in existing.local_modifications:
-        await ensure_discord_auth(existing.uid, discord, stats)
+    if "discord_id" not in live.local_modifications:
+        await ensure_discord_auth(live.uid, discord, stats)
+    return live.uid
 
 
 async def migrate_members(
-    old: psycopg.AsyncConnection, stats: Stats, limit: int | None, merge: bool
-) -> set[str]:
-    """members → User (+ AuthMethod rows). Returns the set of live user uids."""
-    live: set[str] = set()
+    old: psycopg.AsyncConnection,
+    stats: Stats,
+    limit: int | None,
+    merge: bool,
+    coopted_pending: list[tuple[str, str]],
+) -> dict[str, str]:
+    """members → User (+ AuthMethod rows). Returns `member_uid_map`: old-archon
+    member uid → the LIVE uid it maps to (identity in ETL mode where uids are
+    preserved; the vekn-matched live account in merge mode). Every downstream
+    member-uid reference is remapped through this map. Also collects
+    (live_uid, old_sponsor_uid) pairs for the deferred coopted_by remap."""
+    member_uid_map: dict[str, str] = {}
     q = "SELECT uid, vekn, data, last_updated FROM members"
     if limit:
         q += f" LIMIT {limit}"
@@ -503,15 +544,43 @@ async def migrate_members(
         async for row in cur:
             user, discord = build_user(row, stats)
             if merge:
-                await merge_member(user, discord, stats)
+                live_uid = await merge_member(user, discord, stats)
             else:
                 await db.save_user(user)
                 await ensure_discord_auth(user.uid, discord, stats)
-            live.add(user.uid)
+                live_uid = user.uid
+            member_uid_map[user.uid] = live_uid
+            if user.coopted_by:
+                coopted_pending.append((live_uid, user.coopted_by))
             stats.bump("users")
             if stats["users"] % 2000 == 0:
                 print(f"  …{stats['users']} users")
-    return live
+    return member_uid_map
+
+
+async def remap_coopted_by(
+    coopted_pending: list[tuple[str, str]],
+    member_uid_map: dict[str, str],
+    stats: Stats,
+) -> None:
+    """Set coopted_by to the sponsor's LIVE uid, once the full member_uid_map is
+    known (coopted_by is a member→member reference, so the sponsor may be unseen
+    when the member is written, and the merge loop deliberately skips the field).
+    This is the SOLE writer of coopted_by in this sync: it writes the remapped
+    value directly and idempotently, so daily re-runs are a no-op (writing the
+    un-remapped old uid in the merge loop instead would flip-flop against this).
+    A local edit wins; the ETL identity map writes the unchanged uid (no-op)."""
+    for live_uid, old_sponsor in coopted_pending:
+        desired = member_uid_map.get(old_sponsor, old_sponsor)
+        u = await db.get_user_by_uid(live_uid)
+        if u is None or u.deleted_at or "coopted_by" in u.local_modifications:
+            continue
+        if u.coopted_by == desired:
+            continue
+        u.coopted_by = desired
+        u.modified = datetime.now(UTC)
+        await db.save_user(u)
+        stats.bump("members.coopted_remapped")
 
 
 async def migrate_member_deletions(
@@ -553,7 +622,10 @@ async def migrate_member_deletions(
 
 
 async def migrate_leagues(
-    old: psycopg.AsyncConnection, stats: Stats, merge: bool
+    old: psycopg.AsyncConnection,
+    stats: Stats,
+    merge: bool,
+    member_uid_map: dict[str, str],
 ) -> None:
     async with old.cursor(row_factory=dict_row) as cur:
         await cur.execute("SELECT uid, start, finish, data FROM leagues")
@@ -580,7 +652,9 @@ async def migrate_leagues(
             finish=parse_dt(row["finish"]),
             description=d.get("description") or "",
             organizers_uids=[
-                str(o["uid"]) for o in d.get("organizers", []) if o.get("uid")
+                member_uid_map.get(str(o["uid"]), str(o["uid"]))
+                for o in d.get("organizers", [])
+                if o.get("uid")
             ],
             parent_uid=nz(parent.get("uid")),
         )
@@ -944,15 +1018,69 @@ def build_tournament(
     return t, decks
 
 
+def _remap_member_refs(
+    t: Tournament, decks: list[DeckObject], member_uid_map: dict[str, str]
+) -> tuple[Tournament, list[DeckObject]]:
+    """Rewrite every member-uid reference the importer BUILDS — players, winner,
+    rounds+finals seating (player_uid + judge_uid), finals.seed_order, standings,
+    organizers_uids, offline_user_uid, deck.user_uid — through `member_uid_map`
+    (old-archon uid → live uid). Centralised so no ref field is missed: a missed
+    one silently splits a tournament across the old and live uid spaces (the live
+    account's players came from the VEKN sync as uuid7, the rich rounds carry old
+    uids) — and the cross-object orphan scan can't catch it. (ScoreOverride.judge_uid
+    and RaffleDraw.winners are also member refs but the importer never builds them,
+    so they stay empty and need no remap.) Empty map (ETL identity) → no-op. The
+    deck *uid* (uuid5 of the old player uid) is intentionally left stable across
+    modes; only deck.user_uid is remapped."""
+    if not member_uid_map:
+        return t, decks
+
+    def g(u: str | None) -> str | None:
+        return member_uid_map.get(u, u) if u else u
+
+    def remap_seats(seats: list[Seat]) -> list[Seat]:
+        return [
+            msgspec.structs.replace(s, player_uid=g(s.player_uid), judge_uid=g(s.judge_uid))
+            for s in seats
+        ]
+
+    rounds = [
+        [msgspec.structs.replace(tbl, seating=remap_seats(tbl.seating)) for tbl in rd]
+        for rd in t.rounds
+    ]
+    finals = t.finals
+    if finals is not None:
+        finals = msgspec.structs.replace(
+            finals,
+            seating=remap_seats(finals.seating),
+            seed_order=[g(u) for u in finals.seed_order],
+        )
+    t = msgspec.structs.replace(
+        t,
+        winner=g(t.winner),
+        organizers_uids=[g(u) for u in t.organizers_uids],
+        offline_user_uid=g(t.offline_user_uid),
+        players=[msgspec.structs.replace(p, user_uid=g(p.user_uid)) for p in t.players],
+        standings=[msgspec.structs.replace(s, user_uid=g(s.user_uid)) for s in t.standings],
+        rounds=rounds,
+        finals=finals,
+    )
+    decks = [msgspec.structs.replace(d, user_uid=g(d.user_uid)) for d in decks]
+    return t, decks
+
+
 async def process_tournament_row(
     row: dict,
     sanctions: dict[str, Sanction],
     stats: Stats,
     merge: bool,
     uid_map: dict[str, str],
+    member_uid_map: dict[str, str] | None = None,
 ) -> None:
     """Migrate/merge one old tournament row. Records old_uid → surviving uid in
-    `uid_map` (used to remap sanction tournament refs)."""
+    `uid_map` (used to remap sanction tournament refs); remaps every member-uid
+    in the rich payload through `member_uid_map` (old member uid → live uid)."""
+    member_uid_map = member_uid_map or {}
     d = dict(row["data"] or {})
     old_uid = str(row["uid"])
     d["uid"] = old_uid  # build_tournament reads it for the external_ids marker
@@ -1003,6 +1131,9 @@ async def process_tournament_row(
                 target_uid, existing = x.uid, x
 
     t, decks = build_tournament(d, target_uid, existing, sanctions, stats)
+    # Remap member refs to live uids BEFORE the merge-into-vekn-copy below, so the
+    # rich payload and the vekn copy's existing players share one uid space.
+    t, decks = _remap_member_refs(t, decks, member_uid_map)
     uid_map[old_uid] = target_uid
 
     # vekn-linked events: the VEKN tournament sync owns descriptive metadata —
@@ -1096,6 +1227,7 @@ async def migrate_tournaments(
     limit: int | None,
     merge: bool,
     uid_map: dict[str, str],
+    member_uid_map: dict[str, str],
 ) -> None:
     q = "SELECT uid, data FROM tournaments"
     if limit:
@@ -1104,7 +1236,9 @@ async def migrate_tournaments(
         cur.itersize = 200
         await cur.execute(q)
         async for row in cur:
-            await process_tournament_row(row, sanctions, stats, merge, uid_map)
+            await process_tournament_row(
+                row, sanctions, stats, merge, uid_map, member_uid_map
+            )
             if stats["tournaments"] % 1000 == 0:
                 print(f"  …{stats['tournaments']} tournaments")
 
@@ -1132,12 +1266,17 @@ async def save_sanctions(
     stats: Stats,
     merge: bool,
     uid_map: dict[str, str],
+    member_uid_map: dict[str, str],
 ) -> None:
     for s in sanctions.values():
         # Remap tournament refs to the surviving uid for events whose rich
-        # payload merged into a vekn-created copy.
+        # payload merged into a vekn-created copy, and the sanctioned member +
+        # issuing judge to their live uids (old-archon uid → live, #169).
         if s.tournament_uid:
             s.tournament_uid = uid_map.get(s.tournament_uid, s.tournament_uid)
+        s.user_uid = member_uid_map.get(s.user_uid, s.user_uid)
+        if s.issued_by_uid:
+            s.issued_by_uid = member_uid_map.get(s.issued_by_uid, s.issued_by_uid)
         if merge:
             prev = await db.get_sanction_by_uid(s.uid)
             if prev is not None and same_but_modified(s, prev):
@@ -1189,21 +1328,25 @@ async def run(args: argparse.Namespace) -> None:
     stats = Stats()
     sanctions: dict[str, Sanction] = {}
     uid_map: dict[str, str] = {}
+    coopted_pending: list[tuple[str, str]] = []
     try:
         print("→ members")
-        live = await migrate_members(old, stats, args.limit, args.merge)
+        member_uid_map = await migrate_members(
+            old, stats, args.limit, args.merge, coopted_pending
+        )
+        await remap_coopted_by(coopted_pending, member_uid_map, stats)
         print("→ member_deletions")
-        await migrate_member_deletions(old, live, stats, args.merge)
+        await migrate_member_deletions(old, set(member_uid_map), stats, args.merge)
         print("→ leagues")
-        await migrate_leagues(old, stats, args.merge)
+        await migrate_leagues(old, stats, args.merge, member_uid_map)
         print("→ tournaments (+ decks, + tournament sanctions)")
         await migrate_tournaments(
-            old, sanctions, stats, args.limit, args.merge, uid_map
+            old, sanctions, stats, args.limit, args.merge, uid_map, member_uid_map
         )
         print("→ member sanctions (union by uid)")
         await migrate_member_sanctions(old, sanctions, stats)
         print(f"→ sanctions ({len(sanctions)} distinct)")
-        await save_sanctions(sanctions, stats, args.merge, uid_map)
+        await save_sanctions(sanctions, stats, args.merge, uid_map, member_uid_map)
     finally:
         await old.close()
         await db.close_db()

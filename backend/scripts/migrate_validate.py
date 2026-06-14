@@ -6,6 +6,12 @@ inside the new DB, and spot-checks random tournaments field-by-field. Exits
 non-zero if any hard check fails (counts / orphans); spot-check mismatches and
 rating drift are reported as warnings.
 
+Scope: the ROW-COUNT parity + uid-keyed spot-checks assume the **ETL/--truncate**
+population (uids preserved, every member live). The merge / sync-first path is
+validated by `check_merge.py` (vekn-keyed, snapshot deltas) instead — but the
+**orphan + internal-consistency scans below are mode-agnostic** and are the key
+guard for the #169 member-uid remap (a missed ref field orphans here).
+
     cd backend
     OLD_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_old \\
     NEW_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_new \\
@@ -130,6 +136,72 @@ async def main(args) -> int:
             SELECT count(*) FROM objects t, jsonb_array_elements(t."full"->'players') p
             WHERE t.type='tournament'
               AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = p->>'user_uid')""",
+        # rounds[][].seating[] player/judge refs (the most-likely-missed remap sites,
+        # #169) — judge_uid is optional so empty strings are skipped.
+        "tournament.rounds[].seating[].player_uid → user": """
+            SELECT count(*) FROM objects t,
+                 jsonb_array_elements(t."full"->'rounds') rd,
+                 jsonb_array_elements(rd) tb, jsonb_array_elements(tb->'seating') s
+            WHERE t.type='tournament'
+              AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = s->>'player_uid')""",
+        "tournament.rounds[].seating[].judge_uid → user": """
+            SELECT count(*) FROM objects t,
+                 jsonb_array_elements(t."full"->'rounds') rd,
+                 jsonb_array_elements(rd) tb, jsonb_array_elements(tb->'seating') s
+            WHERE t.type='tournament' AND COALESCE(s->>'judge_uid','') <> ''
+              AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = s->>'judge_uid')""",
+        "tournament.finals.seating[].player_uid → user": """
+            SELECT count(*) FROM objects t,
+                 jsonb_array_elements(t."full"->'finals'->'seating') s
+            WHERE t.type='tournament' AND t."full"->'finals' IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = s->>'player_uid')""",
+        "tournament.finals.seating[].judge_uid → user": """
+            SELECT count(*) FROM objects t,
+                 jsonb_array_elements(t."full"->'finals'->'seating') s
+            WHERE t.type='tournament' AND t."full"->'finals' IS NOT NULL
+              AND COALESCE(s->>'judge_uid','') <> ''
+              AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = s->>'judge_uid')""",
+        "tournament.finals.seed_order[] → user": """
+            SELECT count(*) FROM objects t,
+                 jsonb_array_elements_text(t."full"->'finals'->'seed_order') so
+            WHERE t.type='tournament' AND t."full"->'finals' IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = so)""",
+        "tournament.standings[].user_uid → user": """
+            SELECT count(*) FROM objects t, jsonb_array_elements(t."full"->'standings') st
+            WHERE t.type='tournament'
+              AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = st->>'user_uid')""",
+        "tournament.organizers_uids[] → user": """
+            SELECT count(*) FROM objects t,
+                 jsonb_array_elements_text(t."full"->'organizers_uids') o
+            WHERE t.type='tournament'
+              AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = o)""",
+        # internal consistency (#169): every member-uid across ALL play data
+        # (rounds + finals seating, finals seed_order, standings) must also be a
+        # player — catches a partial remap that splits one tournament across the
+        # old and live uid spaces (which the cross-object scans above miss).
+        "play-data uids ⊆ players[].user_uid (no uid split)": """
+            WITH pdata AS (
+                SELECT t.uid AS tuid, s->>'player_uid' AS u FROM objects t,
+                     jsonb_array_elements(t."full"->'rounds') rd,
+                     jsonb_array_elements(rd) tb, jsonb_array_elements(tb->'seating') s
+                  WHERE t.type='tournament'
+                UNION ALL
+                SELECT t.uid, s->>'player_uid' FROM objects t,
+                     jsonb_array_elements(t."full"->'finals'->'seating') s
+                  WHERE t.type='tournament' AND t."full"->'finals' IS NOT NULL
+                UNION ALL
+                SELECT t.uid, so FROM objects t,
+                     jsonb_array_elements_text(t."full"->'finals'->'seed_order') so
+                  WHERE t.type='tournament' AND t."full"->'finals' IS NOT NULL
+                UNION ALL
+                SELECT t.uid, st->>'user_uid' FROM objects t,
+                     jsonb_array_elements(t."full"->'standings') st
+                  WHERE t.type='tournament'
+            )
+            SELECT count(*) FROM pdata
+            WHERE NOT EXISTS (SELECT 1 FROM objects t2,
+                     jsonb_array_elements(t2."full"->'players') p
+                  WHERE t2.uid = pdata.tuid AND p->>'user_uid' = pdata.u)""",
         "tournament.winner → user": """
             SELECT count(*) FROM objects t
             WHERE t.type='tournament' AND COALESCE(t."full"->>'winner','') <> ''
