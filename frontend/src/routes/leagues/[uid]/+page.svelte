@@ -22,6 +22,7 @@
   const auth = $derived(getAuthState());
 
   let league = $state<League | null>(null);
+  let parentLeague = $state<{ uid: string; name: string } | null>(null);
   let leagueTournaments = $state<Tournament[]>([]);
   let childLeagues = $state<League[]>([]);
   let orphanLeagues = $state<League[]>([]);
@@ -77,6 +78,10 @@
       return;
     }
     league = l;
+
+    // Resolve parent meta-league (for the appartenance badge)
+    const p = l.parent_uid ? await getLeague(l.parent_uid) : undefined;
+    parentLeague = p && !p.deleted_at ? { uid: p.uid, name: p.name } : null;
 
     // Load associated tournaments
     const allTournaments = await getAllTournaments();
@@ -301,6 +306,10 @@
               {/if}
               {#if league.kind === "Meta-League"}
                 <span class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">{m.league_meta_badge()}</span>
+              {/if}
+              {#if parentLeague}
+                <a href="/leagues/{parentLeague.uid}" title={m.league_kind_meta()}
+                   class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300 hover:opacity-80 transition-opacity">{parentLeague.name}</a>
               {/if}
             </div>
           </div>

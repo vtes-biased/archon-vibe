@@ -79,12 +79,17 @@ import TournamentModals from "./TournamentModals.svelte";
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
 
-  // League name for display
+  // League name + parent meta-league for display
   let leagueName = $state<string | null>(null);
+  let metaLeague = $state<{ uid: string; name: string } | null>(null);
   $effect(() => {
     const luid = tournament?.league_uid;
-    if (!luid) { leagueName = null; return; }
-    getLeague(luid).then(l => { leagueName = l?.name ?? null; });
+    if (!luid) { leagueName = null; metaLeague = null; return; }
+    getLeague(luid).then(async l => {
+      leagueName = l?.name ?? null;
+      const p = l?.parent_uid ? await getLeague(l.parent_uid) : undefined;
+      metaLeague = p && !p.deleted_at ? { uid: p.uid, name: p.name } : null;
+    });
   });
 
   // Decks loaded from IDB (separate store)
@@ -584,6 +589,12 @@ import TournamentModals from "./TournamentModals.svelte";
               <a href="/leagues/{tournament.league_uid}"
                  class="px-2 py-0.5 rounded text-xs font-medium badge-blue inline-flex items-center gap-1 hover:opacity-80 transition-opacity max-w-48 truncate">
                 {leagueName}
+              </a>
+            {/if}
+            {#if metaLeague}
+              <a href="/leagues/{metaLeague.uid}" title={m.league_kind_meta()}
+                 class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300 inline-flex items-center gap-1 hover:opacity-80 transition-opacity max-w-48 truncate">
+                {metaLeague.name}
               </a>
             {/if}
           </div>

@@ -65,15 +65,24 @@
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
 
-  // League names for display
+  // League names for display, plus parent meta-league (keyed by league_uid)
   let leagueNames = $state<Record<string, string>>({});
+  let metaLeagues = $state<Record<string, { uid: string; name: string }>>({});
   $effect(() => {
     const uids = [...new Set(tournaments.map(t => t.league_uid).filter((u): u is string => !!u))];
-    if (!uids.length) { leagueNames = {}; return; }
-    Promise.all(uids.map(u => getLeague(u))).then(leagues => {
+    if (!uids.length) { leagueNames = {}; metaLeagues = {}; return; }
+    Promise.all(uids.map(u => getLeague(u))).then(async leagues => {
       const map: Record<string, string> = {};
-      for (const l of leagues) { if (l) map[l.uid] = l.name; }
+      const parentUids = new Set<string>();
+      for (const l of leagues) { if (l) { map[l.uid] = l.name; if (l.parent_uid) parentUids.add(l.parent_uid); } }
       leagueNames = map;
+      const parents = await Promise.all([...parentUids].map(p => getLeague(p)));
+      const byUid = new Map(parents.filter(p => p && !p.deleted_at).map(p => [p!.uid, p!.name]));
+      const mmap: Record<string, { uid: string; name: string }> = {};
+      for (const l of leagues) {
+        if (l?.parent_uid && byUid.has(l.parent_uid)) mmap[l.uid] = { uid: l.parent_uid, name: byUid.get(l.parent_uid)! };
+      }
+      metaLeagues = mmap;
     });
   });
 
@@ -405,6 +414,9 @@
                   {#if tournament.league_uid && leagueNames[tournament.league_uid]}
                     <span class="text-blue-400/70">· {leagueNames[tournament.league_uid]}</span>
                   {/if}
+                  {#if tournament.league_uid && metaLeagues[tournament.league_uid]}
+                    <span class="text-violet-300/80" title={m.league_kind_meta()}>· {metaLeagues[tournament.league_uid]?.name}</span>
+                  {/if}
                 </div>
               </div>
 
@@ -414,7 +426,7 @@
                   <div class="font-semibold text-bone-100">{tournament.name}</div>
                   {#if tournament.rank || (tournament.league_uid && leagueNames[tournament.league_uid])}
                     <div class="text-xs text-ash-500 truncate">
-                      {#if tournament.rank}{tournament.rank}{/if}{#if tournament.rank && tournament.league_uid && leagueNames[tournament.league_uid]} · {/if}{#if tournament.league_uid && leagueNames[tournament.league_uid]}<span class="text-blue-400/70">{leagueNames[tournament.league_uid]}</span>{/if}
+                      {#if tournament.rank}{tournament.rank}{/if}{#if tournament.rank && tournament.league_uid && leagueNames[tournament.league_uid]} · {/if}{#if tournament.league_uid && leagueNames[tournament.league_uid]}<span class="text-blue-400/70">{leagueNames[tournament.league_uid]}</span>{/if}{#if tournament.league_uid && metaLeagues[tournament.league_uid]} · <span class="text-violet-300/80" title={m.league_kind_meta()}>{metaLeagues[tournament.league_uid]?.name}</span>{/if}
                     </div>
                   {/if}
                 </div>

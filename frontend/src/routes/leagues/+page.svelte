@@ -10,6 +10,8 @@
   import * as m from '$lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);
+  // Parent meta-league name, keyed by child league uid
+  let metaLeagueNames = $state<Record<string, string>>({});
   let loaded = $state(false);
 
   // Filters
@@ -52,6 +54,13 @@
   async function loadLeagues() {
     try {
       let all = await getAllLeagues();
+      // Resolve parent meta-league names from the full (unfiltered) set
+      const byUid = new Map(all.filter(l => !l.deleted_at).map(l => [l.uid, l.name]));
+      const metaMap: Record<string, string> = {};
+      for (const l of all) {
+        if (!l.deleted_at && l.parent_uid && byUid.has(l.parent_uid)) metaMap[l.uid] = byUid.get(l.parent_uid)!;
+      }
+      metaLeagueNames = metaMap;
       // Exclude soft-deleted
       all = all.filter(l => !l.deleted_at);
       // Filter past
@@ -203,6 +212,9 @@
                   {#if league.kind === "Meta-League"}
                     <span>· {m.league_meta_badge()}</span>
                   {/if}
+                  {#if metaLeagueNames[league.uid]}
+                    <span class="text-violet-300/80" title={m.league_kind_meta()}>· {metaLeagueNames[league.uid]}</span>
+                  {/if}
                 </div>
               </div>
 
@@ -213,6 +225,9 @@
                     {league.name}
                     {#if league.kind === "Meta-League"}
                       <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">{m.league_meta_badge()}</span>
+                    {/if}
+                    {#if metaLeagueNames[league.uid]}
+                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300" title={m.league_kind_meta()}>{metaLeagueNames[league.uid]}</span>
                     {/if}
                   </div>
                   {#if league.format}
