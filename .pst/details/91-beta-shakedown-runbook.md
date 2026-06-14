@@ -103,16 +103,26 @@ bot consent flow is finally reachable (all closed in pst):
 
 **v0.1.6 is the current beta build.**
 
-**◀ RESUME HERE — §6 step 5 (admin panel) + §8 (#80 clean-install)** — all that
-remains before #91 closes. §6.5: Profile → Admin → the #123 status panel +
-"Run now" on the VEKN syncs exercises the Bearer-authed `/admin/*` endpoints
-(paths are `/admin/*` — no `/api` prefix, no cookie auth). §8: confirm entrypoint
-`backend.src.main:app`, `/api/cards` from the wheel (green in §2), no
-path/resource errors in journalctl, snapshots under `/var/lib/new_archon/snapshots`.
+**§8 #80 clean-install DONE (2026-06-14).** Entrypoint `backend.src.main:app`,
+`/api/cards` served from the installed wheel, no path/resource errors in
+journalctl, snapshots under `/var/lib/new_archon/snapshots` — all confirmed clean.
+
+**§6 step 5 (admin panel) DONE (2026-06-14).** Profile → Admin → the #123 status
+panel + "Run now" on the VEKN syncs exercised the Bearer-authed `/admin/*`
+endpoints end-to-end; the sync ran and the status panel reflected the outcome
+(the "didn't refresh" report was the background-dispatched job not yet finished
+when first checked — it updated once complete). **#91 COMPLETE — all "Done when"
+criteria met.**
+
+Bugs surfaced by the shakedown are tracked + fixed under their own tickets (not
+blockers for closing the shakedown itself): #185 (SSE bot-header auth + 401),
+the frontend prod-build 404 fix (commit 501fbe1), #186 (CI smoke-test the built
+artifact). These need the pending release/redeploy to reach beta.
 
 Open follow-ups (none block #91): #173 (p3, optional bot guild-scoping for
 instant command propagation), #178 (p2, slow backend stop/restart ~90s —
-uvicorn SSE graceful-shutdown), #170 (#39-prep dup cleanup).
+uvicorn SSE graceful-shutdown), #170 (#39-prep dup cleanup), #185/#186 (await
+redeploy).
 
 Host/access: `deploy@57.129.110.107` (frankfurt), PG17, beta on 8008/9008,
 `/tmp/archondb.dump` present (P4). **Vault pass:** `just deploy-beta` defaults
