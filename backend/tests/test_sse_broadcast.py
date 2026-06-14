@@ -80,6 +80,35 @@ def test_scoped_connection_only_receives_its_tournament():
         _sse_connections.clear()
 
 
+def test_tournament_delivery_flags_scoped_conn_for_participant_refresh():
+    """A tournament delivery to the bot flags the live loop to push participant
+    identities (so newly-seated players resolve to names). Sanction deliveries
+    and unscoped (browser) connections must not set the flag."""
+    scoped = SSEConnection(user=None, tournament_uid="t1")
+    unscoped = SSEConnection(user=None)
+    _sse_connections.clear()
+    _sse_connections.update({scoped, unscoped})
+    try:
+        broadcast_precomputed(_bd(uid="t1"))
+        assert scoped.needs_participant_refresh is True
+        assert unscoped.needs_participant_refresh is False
+
+        scoped.needs_participant_refresh = False
+        broadcast_precomputed(
+            BroadcastData(
+                obj_type=ObjectType.SANCTION,
+                uid="s1",
+                pub_json=None,
+                mem_json='{"uid":"s1"}',
+                full_json='{"uid":"s1"}',
+                tournament_uid="t1",
+            )
+        )
+        assert scoped.needs_participant_refresh is False  # sanction doesn't flag
+    finally:
+        _sse_connections.clear()
+
+
 def test_scope_matches_sanction_by_tournament_uid():
     """A scoped connection wants only the sanctions of its tournament; unscoped
     wants everything."""

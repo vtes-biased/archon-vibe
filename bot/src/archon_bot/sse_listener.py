@@ -71,6 +71,22 @@ _last_tournament: dict[str, dict] = {}
 # Track last known seating per round for mid-round change detection
 _last_seating: dict[str, list[set[str]]] = {}
 
+# Cache participant identities (uid → {"name", "nickname"}) per tournament,
+# seeded from `user` SSE events (the scoped stream now pushes the tournament's
+# participants alongside the tournament object). Lets seating/standings resolve a
+# name for players not linked to Discord. Popped in stop_sse.
+_user_names: dict[str, dict[str, dict]] = defaultdict(dict)
+
+
+def _cache_user_identity(key: str, user_obj: dict) -> None:
+    """Record a participant's display identity from a `user` SSE event."""
+    uid = user_obj.get("uid")
+    if uid:
+        _user_names[key][uid] = {
+            "name": user_obj.get("name"),
+            "nickname": user_obj.get("nickname"),
+        }
+
 
 def _task_key(guild_id: str, tournament_uid: str) -> str:
     return f"{guild_id}:{tournament_uid}"
@@ -153,6 +169,7 @@ async def stop_sse(guild_id: str, tournament_uid: str) -> None:
     _last_seating.pop(key, None)
     _table_channels.pop(key, None)
     _last_tournament.pop(key, None)
+    _user_names.pop(key, None)
 
 
 async def _sse_loop(
@@ -398,6 +415,9 @@ def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
     items = data if isinstance(data, list) else [data]
     for item in items:
         obj = item.get("data", item)
+        if item.get("type") == "user":
+            _cache_user_identity(key, obj)
+            continue
         if item.get("type") != "tournament" or obj.get("uid") != tournament_uid:
             continue
         _last_state[key] = obj.get("state", "")
@@ -476,7 +496,11 @@ def _active_tables(obj: dict) -> tuple[str, list[dict]]:
 
 
 def compute_result_announcements(
-    prev_obj: dict, cur_obj: dict, table_chs: list[int], players: list
+    prev_obj: dict,
+    cur_obj: dict,
+    table_chs: list[int],
+    players: list,
+    user_names: dict | None = None,
 ) -> list[tuple[int, str]]:
     """Pure: which table channels to notify of a reported score, and with what.
 
@@ -507,7 +531,12 @@ def compute_result_announcements(
         if set(cur_res) != set(prev_res) or cur_res == prev_res:
             continue
         out.append(
-            (table_chs[i], format_table_result(i, table, players, is_finals=is_finals))
+            (
+                table_chs[i],
+                format_table_result(
+                    i, table, players, is_finals=is_finals, user_names=user_names
+                ),
+            )
         )
     return out
 
@@ -526,12 +555,14 @@ async def _warn_unlinked_players(
     player_uids: set[str],
     discord_id_map: dict[str, int],
     players: list,
+    user_names: dict | None = None,
 ) -> None:
     """Post a warning to #judges about seated players without a Discord link."""
     unlinked = player_uids - set(discord_id_map.keys())
     if not unlinked:
         return
-    names = [player_display(uid, players) for uid in unlinked]
+    # Unlinked by definition → no mention possible; show the best known name.
+    names = [player_display(uid, players, user_names=user_names) for uid in unlinked]
     await _post(
         bot,
         judges_id,
@@ -580,11 +611,19 @@ async def _handle_update(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    """Handle an SSE update event (tournament or sanction)."""
+    """Handle an SSE update event (tournament, sanction, or participant user)."""
     obj_type = data.get("type")
 
     if obj_type == "sanction":
         await _handle_sanction_update(bot, store, guild_id, tournament_uid, data)
+        return
+
+    if obj_type == "user":
+        # Participant identity pushed alongside the tournament — cache it for name
+        # resolution; never announced directly.
+        _cache_user_identity(
+            _task_key(guild_id, tournament_uid), data.get("data") or {}
+        )
         return
 
     if obj_type != "tournament":
@@ -685,7 +724,11 @@ async def _handle_update(
         standings_mode = obj.get("standings_mode", "Private")
 
         lines = [f"**Round {round_count} complete!**"]
-        lines.append(format_standings(standings, standings_mode, players))
+        lines.append(
+            format_standings(
+                standings, standings_mode, players, user_names=_user_names[key]
+            )
+        )
         lines.append(
             f"\nCheck-in for the next round is open — use `/checkin` in <#{lobby_id}>."
         )
@@ -793,7 +836,13 @@ async def _handle_update(
             lines = [f"**Seating updated — Round {round_count}**\n"]
             for ti, table in enumerate(current_round):
                 seat_names = [
-                    player_display(s.get("player_uid", ""), players)
+                    player_display(
+                        s.get("player_uid", ""),
+                        players,
+                        discord_id_map=discord_id_map,
+                        user_names=_user_names[key],
+                        mention=True,
+                    )
                     for s in table.get("seating", [])
                 ]
                 lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
@@ -801,7 +850,12 @@ async def _handle_update(
 
             # Warn about newly unlinked players
             await _warn_unlinked_players(
-                bot, judges_id, all_player_uids, discord_id_map, players
+                bot,
+                judges_id,
+                all_player_uids,
+                discord_id_map,
+                players,
+                _user_names[key],
             )
 
     # ── Score reported at a table (open reporting = anti-cheat visibility) ──
@@ -816,7 +870,7 @@ async def _handle_update(
     prev_obj = _last_tournament.get(key)
     if state == "Playing" and prev_obj is not None:
         for ch_id, msg in compute_result_announcements(
-            prev_obj, obj, _table_channels.get(key, []), players
+            prev_obj, obj, _table_channels.get(key, []), players, _user_names[key]
         ):
             await _post(bot, ch_id, msg)
 
@@ -828,10 +882,14 @@ async def _handle_update(
 
         lines = [f"**{name} is finished!**"]
         if winner:
-            winner_name = player_display(winner, players)
+            winner_name = player_display(winner, players, user_names=_user_names[key])
             lines.append(f"Congratulations to the winner: **{winner_name}**!")
 
-        lines.append(format_standings(standings, standings_mode, players))
+        lines.append(
+            format_standings(
+                standings, standings_mode, players, user_names=_user_names[key]
+            )
+        )
         lines.append(f"\nFull results: {webapp_url}")
         lines.append("Thank you all for playing!")
         await _post(bot, announcement_id, "\n".join(lines))
@@ -932,7 +990,13 @@ async def _setup_round(
         await _post(
             bot,
             announcement_id,
-            format_round_seating(round_count, tables_data, players),
+            format_round_seating(
+                round_count,
+                tables_data,
+                players,
+                discord_id_map=discord_id_map,
+                user_names=_user_names[key],
+            ),
         )
 
     if do_create:
@@ -973,7 +1037,7 @@ async def _setup_round(
 
     if do_announce:
         await _warn_unlinked_players(
-            bot, judges_id, all_player_uids, discord_id_map, players
+            bot, judges_id, all_player_uids, discord_id_map, players, _user_names[key]
         )
         await _post(
             bot,
@@ -1037,7 +1101,16 @@ async def _setup_finals(
 
     if announce and fresh:
         await _post(
-            bot, announcement_id, format_finals(name, seating, seed_order, players)
+            bot,
+            announcement_id,
+            format_finals(
+                name,
+                seating,
+                seed_order,
+                players,
+                discord_id_map=discord_id_map,
+                user_names=_user_names[key],
+            ),
         )
 
     if fresh:
@@ -1060,7 +1133,7 @@ async def _setup_finals(
 
     if announce and fresh:
         await _warn_unlinked_players(
-            bot, judges_id, finalist_uids, discord_id_map, players
+            bot, judges_id, finalist_uids, discord_id_map, players, _user_names[key]
         )
         await _post(
             bot,

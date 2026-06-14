@@ -636,15 +636,64 @@ def _sse_object_lines(batch_type: str, json_strings: list[str]):
         yield f'data: {{"type":"{batch_type}","data":[{",".join(batch)}]}}\n\n'
 
 
+async def _participant_user_frames(
+    db_conn, tournament_uid: str, sent: set[str]
+) -> list[str]:
+    """Member-level identity frames for a tournament's participants not in `sent`.
+
+    The bot's tournament-scoped stream otherwise carries no user objects (see
+    broadcast._scope_matches), so it can't resolve seated players' names. This
+    pushes each participant's User object (player user_uids + organizers) so the
+    bot renders names/nicknames; `sent` dedups across calls and is mutated here.
+
+    Sends the MEMBER column for ALL participants regardless of viewer
+    entitlement — deliberately NOT entitled_level. The bot needs only
+    name/nickname (both in member); routing through entitled_level would upgrade
+    an organizer viewer to `full` and stream participant CONTACT INFO to the
+    Discord process. Member is the minimal projection that carries identity.
+
+    Caller passes an open pooled connection (catch-up reuses its own; the live
+    refresh opens+releases one) — never yield while holding the pool.
+    """
+    row = await (
+        await db_conn.execute(
+            'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s '
+            "AND deleted_at IS NULL",
+            (tournament_uid, ObjectType.TOURNAMENT),
+        )
+    ).fetchone()
+    if not row or not row[0]:
+        return []
+    t = msgspec.json.decode(row[0].encode())
+    uids = {p["user_uid"] for p in t.get("players", []) if p.get("user_uid")}
+    uids |= set(t.get("organizers_uids") or [])
+    new_uids = [u for u in uids if u not in sent]
+    if not new_uids:
+        return []
+    urows = await (
+        await db_conn.execute(
+            "SELECT member::text FROM objects WHERE type = %s "
+            "AND uid = ANY(%s) AND deleted_at IS NULL",
+            (ObjectType.USER, new_uids),
+        )
+    ).fetchall()
+    # Mark all attempted uids sent (incl. any without a member row) so a steady
+    # stream of roster-unchanged tournament events does no further DB work.
+    sent.update(new_uids)
+    return list(_sse_object_lines("users", [r[0] for r in urows if r[0]]))
+
+
 async def _scoped_catchup_frames(
-    viewer, tournament_uid: str
+    viewer, tournament_uid: str, sent: set[str]
 ) -> tuple[list[str], str | None]:
     """Catch-up frames for a tournament-scoped SSE connection.
 
-    Returns (frames, last_modified_at) for the one tournament + its sanctions,
-    each at the viewer's entitled projection (the same access rule the live
-    broadcast uses). Far smaller than the full-corpus catch-up — this is what
-    lets the bot watch a tournament without streaming the whole database.
+    Returns (frames, last_modified_at) for the one tournament + its sanctions +
+    its participants' identities, each at the viewer's entitled projection (the
+    same access rule the live broadcast uses). Far smaller than the full-corpus
+    catch-up — this is what lets the bot watch a tournament without streaming the
+    whole database. Seeds `sent` with the participant uids it emits so the first
+    live tournament event doesn't re-send everyone.
     """
     from .broadcast import entitled_level
     from .db import _pool
@@ -705,6 +754,10 @@ async def _scoped_catchup_frames(
             if sr[3] and (last_ts is None or sr[3].isoformat() > last_ts):
                 last_ts = sr[3].isoformat()
         frames.extend(_sse_object_lines("sanctions", sjson))
+
+        # Reuse this same pooled connection (no second acquisition) to seed the
+        # bot with participant identities; mutates `sent` for the live diff.
+        frames.extend(await _participant_user_frames(conn, tournament_uid, sent))
 
     return frames, last_ts
 
@@ -889,7 +942,7 @@ async def stream_updates(
             scoped = tournament is not None
             if scoped:
                 frames, last_timestamp = await _scoped_catchup_frames(
-                    stream_user, tournament
+                    stream_user, tournament, conn.sent_participant_uids
                 )
                 for line in frames:
                     if _shutdown_event and _shutdown_event.is_set():
@@ -971,6 +1024,27 @@ async def stream_updates(
                     if message:
                         yield message
                     keepalive_counter = 0
+                    # A tournament delivery may have added participants; push their
+                    # identities so the bot can name newly-seated players. Clear the
+                    # flag BEFORE fetching so a concurrent set isn't lost, and fetch
+                    # into a list with the pool released before yielding (the
+                    # _overlay_frames/_scoped_catchup contract).
+                    if scoped and conn.needs_participant_refresh and _pool:
+                        conn.needs_participant_refresh = False
+                        try:
+                            async with _pool.connection() as db_conn:
+                                pframes = await _participant_user_frames(
+                                    db_conn, tournament, conn.sent_participant_uids
+                                )
+                        except Exception as e:
+                            logger.error(
+                                f"Participant refresh failed ({conn_label}): {e}"
+                            )
+                            pframes = []
+                        for line in pframes:
+                            if _shutdown_event and _shutdown_event.is_set():
+                                return
+                            yield line
                 except TimeoutError:
                     keepalive_counter += 1
                     if keepalive_counter >= 30:

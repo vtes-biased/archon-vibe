@@ -30,6 +30,16 @@ class SSEConnection:
     # this tournament — its own object, its sanctions, and its judge calls —
     # instead of the whole corpus. None = unscoped (the browser's full sync).
     tournament_uid: str | None = None
+    # Scoped-only: the bot needs each seated participant's User identity
+    # (name/nickname) to render seating, but _scope_matches drops generic user
+    # broadcasts. So identities are pushed alongside the tournament: a tournament
+    # delivery sets `needs_participant_refresh`, and the async live loop then
+    # fetches+sends member-level user frames for participants not in
+    # `sent_participant_uids` (broadcast_precomputed is sync + no-DB and can't
+    # fetch here). The set is seeded by the scoped catch-up so steady-state
+    # tournament events that add no players do zero DB work.
+    sent_participant_uids: set[str] = field(default_factory=set)
+    needs_participant_refresh: bool = False
 
 
 _sse_connections: set[SSEConnection] = set()
@@ -146,6 +156,13 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
             msg = msg_by_level.get(level)
             if msg:
                 sse_conn.queue.put_nowait(msg)
+                # A tournament delivery to the bot may carry new participants;
+                # flag the live loop to push their identities (see SSEConnection).
+                if (
+                    sse_conn.tournament_uid is not None
+                    and bd.obj_type == ObjectType.TOURNAMENT
+                ):
+                    sse_conn.needs_participant_refresh = True
                 # Trace delivery to scoped (bot) connections only — low volume
                 # (one tournament) and answers "did this event reach the bot?".
                 # Full-corpus (browser) connections would be far too noisy.
