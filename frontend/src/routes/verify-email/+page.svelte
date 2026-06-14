@@ -32,7 +32,7 @@
     if (result) {
       verifyResult = result;
       // Clear URL params for security
-      replaceState("/auth/email/verify", {});
+      replaceState("/verify-email", {});
     } else {
       error = auth.error || m.auth_verify_error_failed();
     }

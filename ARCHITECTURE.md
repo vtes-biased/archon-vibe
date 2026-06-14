@@ -674,7 +674,7 @@ Multiple authentication methods, all producing JWT access/refresh token pairs.
 | WebAuthn / Passkeys | FIDO2 registration + login (both new and existing users) | `routes/auth.py`, `passkeys.svelte.ts` |
 | Discord OAuth | Login or link Discord account | `routes/auth.py` (discord authorize/callback) |
 
-**Magic Link**: Used for signup, password reset, and invite flows. Link remains valid until the password is actually set (not just until verified). Frontend: `/auth/email/verify` route handles the landing page.
+**Magic Link**: Used for signup, password reset, and invite flows. Link remains valid until the password is actually set (not just until verified). Frontend: `/verify-email` route handles the landing page.
 
 **Passkeys**: Four endpoints — `register/options` + `register/verify` (authenticated, add passkey to existing account), `create/options` + `create/verify` (unauthenticated, create new user with passkey).
 
@@ -731,7 +731,7 @@ Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.
 
 **Security**: PKCE S256 required, Argon2-hashed client secrets, refresh token rotation with revocation chain, single-use auth codes, consent persistence.
 
-**Frontend**: `/oauth/consent` page, `DeveloperSection.svelte` in profile for client management.
+**Frontend**: `/consent` page, `DeveloperSection.svelte` in profile for client management.
 
 **Key files**: `routes/oauth.py`, `db_oauth.py`, `models.py` (OAuth models), `middleware/auth.py` (token validation)
 

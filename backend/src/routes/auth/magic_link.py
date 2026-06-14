@@ -92,7 +92,7 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
 
     # Build magic link URL
     frontend_url = _get_frontend_url()
-    magic_link = f"{frontend_url}/auth/email/verify?token={token}"
+    magic_link = f"{frontend_url}/verify-email?token={token}"
 
     # Send email
     sent = await send_magic_link_email(email, magic_link, purpose="invite")
@@ -167,7 +167,7 @@ async def request_magic_link(
 
     # Build magic link URL
     frontend_url = _get_frontend_url()
-    magic_link = f"{frontend_url}/auth/email/verify?token={token}"
+    magic_link = f"{frontend_url}/verify-email?token={token}"
 
     # Send email with appropriate subject
     sent = await send_magic_link_email(email, magic_link, purpose=purpose)

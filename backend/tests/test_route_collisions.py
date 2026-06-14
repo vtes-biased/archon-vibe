@@ -5,13 +5,13 @@ Frontend and backend share one origin behind nginx, split by path prefix: a
 fixed set of prefixes proxies to the backend, everything else falls through to
 the SPA shell. A frontend *page* placed under a backend prefix is therefore
 sent to the API and 404s instead of booting the client router — this bit us
-twice (/oauth/consent, /auth/email/verify).
+twice (/oauth/consent, /auth/email/verify, since relocated to /consent and
+/verify-email).
 
 This test reads the proxied-prefix list straight from the `static_site` role
 default (the same source nginx renders from), so the guardrail and the deployed
 config can't drift, and scans the real SvelteKit route tree. One invariant:
-every page route lives outside every backend prefix, except the explicit,
-documented exceptions below.
+every page route lives outside every backend prefix.
 """
 
 from pathlib import Path
@@ -23,13 +23,6 @@ _ROUTES = _REPO / "frontend" / "src" / "routes"
 _STATIC_SITE_DEFAULTS = (
     _REPO / "ansible" / "roles" / "static_site" / "defaults" / "main.yml"
 )
-
-# Frontend pages that intentionally sit under a backend prefix and are kept
-# reachable by an explicit nginx exception (location = ...). EMPTY THIS once the
-# pages are relocated to the frontend namespace (/consent, /verify-email) and
-# the nginx exceptions are dropped — then the guardrail enforces zero. See the
-# route-collision cleanup ticket.
-ALLOWED_SHADOWED = {"/oauth/consent", "/auth/email/verify"}
 
 
 def _backend_prefixes() -> list[str]:
@@ -62,11 +55,10 @@ def test_no_frontend_route_shadowed_by_backend_prefix() -> None:
         route: prefix
         for route in _page_routes()
         for prefix in prefixes
-        if _shadowed_by(route, prefix) and route not in ALLOWED_SHADOWED
+        if _shadowed_by(route, prefix)
     }
     assert not offenders, (
         "Frontend page routes shadowed by a backend nginx prefix — these would "
         f"404 against the API instead of booting the SPA: {offenders}. Move the "
-        "page out of the backend namespace, or (if it must live there) add an "
-        "nginx `location =` exception and list it in ALLOWED_SHADOWED."
+        "page out of the backend namespace (give it a frontend-only path)."
     )

@@ -28,4 +28,4 @@ def make_oauth_url(state: str, code_challenge: str) -> str:
         "code_challenge_method": "S256",
         "login_hint": "discord",
     }
-    return f"{config.ARCHON_FRONTEND_URL}/oauth/consent?{urlencode(params)}"
+    return f"{config.ARCHON_FRONTEND_URL}/consent?{urlencode(params)}"
