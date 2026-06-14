@@ -68,3 +68,11 @@
 
 ## Legacy-archon merge (#115)
 - [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; tournament meta + officials' contact_email can oscillate daily unless single-writer enforced (member side is, tournament side isn't).
+
+## Migration redesign (#169 vekn-matching + sync-first, 2026-06)
+The redesign shipped (vekn-id member matching, no tombstone, vekn-less shells,
+`member_uid_map` remap of all member-uid refs). Implementation + the full ref
+surface + the now-fixed coopted_by/idempotence detail all live in
+`.pst/details/169-vekn-id-matching-merge.md`. Two residual hazards worth keeping:
+- [Vekn-less drop is NOT ref-free (measured)](migration-veknless-orphan-measured.md) — dropping the 142 vekn-less members orphans 9 refs (4 players + 5 seats) in 3 Finished RICH tournaments; old archon never enforced vekn at registration. Probe recipe in file (reusable for the #39/#40 prod runs).
+- [vekn_id unique index spans tombstones](vekn-unique-index-spans-tombstones.md) — index has no deleted_at exclusion; soft-deleted user reserves its vekn_id; lookups that filter deleted_at disagree → seed-insert can crash on a reserved number. UNFIXED, reachable on steady-state nightly merges (admin user-delete keeps vekn_id).
