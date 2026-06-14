@@ -18,6 +18,7 @@ async def create_tournament_channels(
 
     Returns dict with channel IDs.
     """
+    logger.info("Creating tournament channels in guild=%s", guild_id)
     guild = await bot.rest.fetch_guild(guild_id)
     me = guild.get_my_member() or await bot.rest.fetch_my_member(guild_id)
 
@@ -26,6 +27,7 @@ async def create_tournament_channels(
         guild_id,
         name=f"Tournament: {tournament_name[:50]}",
     )
+    logger.info("✓ created tournament category id=%s", category.id)
 
     # #announcement — read-only for @everyone
     announcement = await bot.rest.create_guild_text_channel(
@@ -106,6 +108,13 @@ async def sync_table_permissions(
 
     # Remove stale overrides
     stale = current_member_ids - desired_discord_ids
+    missing_preview = desired_discord_ids - current_member_ids
+    logger.info(
+        "Syncing perms channel=%s: +%d -%d members",
+        channel_id,
+        len(missing_preview),
+        len(stale),
+    )
     for did in stale:
         try:
             await bot.rest.delete_permission_overwrite(
@@ -160,6 +169,7 @@ async def create_table_channels(
 
     if is_finals:
         # Single finals channel with @everyone DENY
+        logger.info("→ create_guild_voice_channel 'Finals' guild=%s", guild_id)
         ch = await bot.rest.create_guild_voice_channel(
             guild_id,
             name="Finals",
@@ -173,6 +183,7 @@ async def create_table_channels(
             ],
         )
         channel_ids.append(ch.id)
+        logger.info("✓ created 'Finals' id=%s", ch.id)
         # All finalists across all tables
         all_players = {uid for table in tables for uid in table}
         # Freshly created: only @everyone role override, no member overrides
@@ -188,6 +199,9 @@ async def create_table_channels(
     else:
         for i, table in enumerate(tables):
             table_num = start_index + i + 1
+            logger.info(
+                "→ create_guild_voice_channel 'Table %d' guild=%s", table_num, guild_id
+            )
             ch = await bot.rest.create_guild_voice_channel(
                 guild_id,
                 name=f"Table {table_num}",
@@ -201,6 +215,7 @@ async def create_table_channels(
                 ],
             )
             channel_ids.append(ch.id)
+            logger.info("✓ created 'Table %d' id=%s", table_num, ch.id)
             # Freshly created: only @everyone role override, no member overrides
             await sync_table_permissions(
                 bot,
@@ -215,11 +230,54 @@ async def create_table_channels(
     return channel_ids
 
 
+async def fetch_round_channel_ids(
+    bot: hikari.GatewayBot,
+    guild_id: int,
+    category_id: int,
+) -> tuple[list[int], int | None]:
+    """Discover the round's voice channels currently under the category.
+
+    Returns ``(table_channel_ids_ordered, finals_channel_id)`` by matching the
+    deterministic names this module creates — ``Table N`` (ordered by N) and
+    ``Finals``. The per-tournament ``judges`` voice channel is ignored.
+
+    This makes round setup idempotent: after a bot restart (which loses the
+    in-memory channel map) or a half-finished creation, the caller can tell which
+    table channels already exist instead of blindly re-creating duplicates.
+    """
+    channels = await bot.rest.fetch_guild_channels(guild_id)
+    tables: dict[int, int] = {}
+    finals_id: int | None = None
+    for ch in channels:
+        if getattr(ch, "parent_id", None) != category_id:
+            continue
+        if ch.type != hikari.ChannelType.GUILD_VOICE:
+            continue
+        name = ch.name or ""
+        if name == "Finals":
+            finals_id = ch.id
+        elif name.startswith("Table "):
+            try:
+                tables[int(name[len("Table ") :])] = ch.id
+            except ValueError:
+                continue
+    ordered = [tables[n] for n in sorted(tables)]
+    logger.info(
+        "Discovered round channels under category=%s: %d table(s), finals=%s",
+        category_id,
+        len(ordered),
+        finals_id,
+    )
+    return ordered, finals_id
+
+
 async def delete_channels(
     bot: hikari.GatewayBot,
     channel_ids: list[int],
 ) -> None:
     """Delete a list of channels, ignoring already-deleted ones."""
+    if channel_ids:
+        logger.info("→ deleting %d channel(s): %s", len(channel_ids), channel_ids)
     for cid in channel_ids:
         try:
             await bot.rest.delete_channel(cid)

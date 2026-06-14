@@ -752,8 +752,14 @@ async def stream_updates(
     from .db import _pool, stream_objects_new
 
     stream_user = await _resolve_user_from_token(token)
-    if stream_user:
-        logger.info(f"SSE connection authenticated as user {stream_user.uid}")
+    # One label identifies this connection in every log line below: who + scope
+    # (a tournament-scoped bot stream vs a full-corpus browser stream). Makes
+    # open/close/overflow/sync-complete attributable — the gap that made the bot
+    # SSE-listener wedge hard to trace from backend logs.
+    _who = stream_user.uid if stream_user else "anon"
+    _scope = f"tournament={tournament}" if tournament else "full-corpus"
+    conn_label = f"user={_who} {_scope}"
+    logger.info(f"SSE connection opening: {conn_label}")
 
     # Determine base level
     level = _viewer_level(stream_user)
@@ -860,7 +866,10 @@ async def stream_updates(
 
             total_time = time.time() - start_time
             parts = ", ".join(f"{v} {k}" for k, v in totals.items())
-            logger.info(f"Sync complete: {parts} in {total_time:.3f}s")
+            # Scoped (bot) catch-up has empty per-type totals — label it explicitly
+            # so an empty "Sync complete" isn't mistaken for a broken full sync.
+            summary = parts if parts else ("scoped" if scoped else "0 objects")
+            logger.info(f"Sync complete ({conn_label}): {summary} in {total_time:.3f}s")
 
             sync_complete = {"type": "sync_complete", "timestamp": last_timestamp}
             yield f"data: {encoder.encode(sync_complete).decode('utf-8')}\n\n"
@@ -876,7 +885,8 @@ async def stream_updates(
                 # on a connection that no longer receives broadcasts.
                 if conn.closed:
                     logger.warning(
-                        "SSE connection closed after queue overflow; ending stream for reconnect"
+                        f"SSE connection closed after queue overflow ({conn_label}); "
+                        "ending stream for reconnect"
                     )
                     return
 
@@ -892,10 +902,11 @@ async def stream_updates(
                         keepalive_counter = 0
 
         except Exception as e:
-            logger.error(f"Error in SSE generator: {e}", exc_info=True)
+            logger.error(f"Error in SSE generator ({conn_label}): {e}", exc_info=True)
             raise
         finally:
             _sse_connections.discard(conn)
+            logger.info(f"SSE connection closed ({conn_label})")
 
     return StreamingResponse(
         event_generator(),

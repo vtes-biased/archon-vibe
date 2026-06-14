@@ -35,6 +35,20 @@ class SSEConnection:
 _sse_connections: set[SSEConnection] = set()
 
 
+def _conn_label(conn: SSEConnection) -> str:
+    """Identify a connection in logs: user + scope (tournament uid or full corpus).
+
+    Without this, overflow/close warnings can't be attributed to the bot vs a
+    browser tab — exactly the ambiguity that made the bot SSE-listener wedge hard
+    to diagnose from the backend logs.
+    """
+    user = conn.user.uid if conn.user else "anon"
+    scope = (
+        f"tournament={conn.tournament_uid}" if conn.tournament_uid else "full-corpus"
+    )
+    return f"user={user} {scope}"
+
+
 def entitled_level(
     viewer: User | None,
     *,
@@ -132,9 +146,24 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
             msg = msg_by_level.get(level)
             if msg:
                 sse_conn.queue.put_nowait(msg)
+                # Trace delivery to scoped (bot) connections only — low volume
+                # (one tournament) and answers "did this event reach the bot?".
+                # Full-corpus (browser) connections would be far too noisy.
+                if sse_conn.tournament_uid is not None:
+                    logger.info(
+                        "SSE → %s: queued %s %s (%s)",
+                        _conn_label(sse_conn),
+                        bd.obj_type,
+                        bd.uid,
+                        level,
+                    )
         except asyncio.QueueFull:
             logger.warning(
-                "SSE queue full, closing connection so client reconnects and catches up"
+                "SSE queue full (%s), closing connection so client reconnects and "
+                "catches up; dropped %s %s",
+                _conn_label(sse_conn),
+                bd.obj_type,
+                bd.uid,
             )
             sse_conn.closed = True
             disconnected.add(sse_conn)
@@ -171,7 +200,10 @@ async def broadcast_judge_call(
             try:
                 conn.queue.put_nowait(message)
             except asyncio.QueueFull:
-                logger.warning("SSE queue full for judge_call, closing connection")
+                logger.warning(
+                    "SSE queue full for judge_call (%s), closing connection",
+                    _conn_label(conn),
+                )
                 conn.closed = True
                 disconnected.add(conn)
     _sse_connections.difference_update(disconnected)

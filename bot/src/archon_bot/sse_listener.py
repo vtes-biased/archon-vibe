@@ -18,11 +18,21 @@ from .announcements import (
 from .channel_manager import (
     create_table_channels,
     delete_channels,
+    fetch_round_channel_ids,
     sync_table_permissions,
 )
 from .token_store import TokenStore
 
 logger = logging.getLogger(__name__)
+
+# Hard cap on how long a single SSE event may take to handle. Handlers do
+# blocking Discord REST work (posting messages, creating voice channels); if one
+# stalls on an un-timed-out await, processing events INLINE in the read loop
+# would freeze stream consumption indefinitely (the listener goes silent — no
+# error, no reconnect, since sock_read never fires while stuck in a handler).
+# Bounding each dispatch turns a permanent wedge into a logged, recoverable skip;
+# any side-effect missed on a skip is repaired by reconcile on the next sync.
+_DISPATCH_TIMEOUT = 90
 
 # Track active SSE tasks: guild_id+tournament_uid → asyncio.Task
 _sse_tasks: dict[str, asyncio.Task] = {}
@@ -210,9 +220,56 @@ async def _sse_loop(
                                     )
                                     break
 
-                                synced = await _dispatch_event(
-                                    bot, store, guild_id, tournament_uid, data, synced
-                                )
+                                was_synced = synced
+                                try:
+                                    synced = await asyncio.wait_for(
+                                        _dispatch_event(
+                                            bot,
+                                            store,
+                                            guild_id,
+                                            tournament_uid,
+                                            data,
+                                            synced,
+                                        ),
+                                        timeout=_DISPATCH_TIMEOUT,
+                                    )
+                                except TimeoutError:
+                                    # The connection is fine — only the handler
+                                    # stalled. Log and keep reading so one slow
+                                    # Discord call can't wedge the whole stream;
+                                    # reconcile repairs any missed side-effect.
+                                    logger.error(
+                                        "Timed out (%ds) handling SSE %s for %s; "
+                                        "skipping to keep the stream flowing",
+                                        _DISPATCH_TIMEOUT,
+                                        data.get("type"),
+                                        key,
+                                    )
+                                # Catch-up just completed: reconcile Discord to the
+                                # current tournament state (create round channels
+                                # missed while we were disconnected). Bounded
+                                # separately so a slow reconcile can't unset
+                                # `synced` and silence live announcements.
+                                if synced and not was_synced:
+                                    logger.info(
+                                        "SSE catch-up complete for %s; now live, "
+                                        "reconciling Discord state",
+                                        key,
+                                    )
+                                    try:
+                                        await asyncio.wait_for(
+                                            _reconcile(
+                                                bot,
+                                                store,
+                                                guild_id,
+                                                tournament_uid,
+                                            ),
+                                            timeout=_DISPATCH_TIMEOUT,
+                                        )
+                                    except TimeoutError:
+                                        logger.error("Reconcile timed out for %s", key)
+                                    except Exception as e:
+                                        logger.error("Reconcile failed: %s", e)
                                 # A completed catch-up proves the connection
                                 # works, so reset backoff for a prompt reconnect.
                                 # Reset only on a *healthy* sync — NOT right after
@@ -224,12 +281,18 @@ async def _sse_loop(
                             # `:`-comment lines (": connected"/": keepalive") ignored
 
             except asyncio.CancelledError:
+                logger.info("SSE listener cancelled for %s; stopping", key)
                 return
             except Exception as e:
-                logger.error("SSE error: %s", e)
+                logger.error("SSE error for %s: %s", key, e)
 
             # Back off before every reconnect (clean EOF, non-200, resync, or
-            # error). Reset to 1 above only after a healthy sync.
+            # error). Reset to 1 above only after a healthy sync. This line is
+            # the single observable proof the listener is still alive and will
+            # reconnect — if it stops appearing, the loop is wedged.
+            logger.info(
+                "SSE disconnected for %s; reconnecting in %ds", key, retry_delay
+            )
             await asyncio.sleep(retry_delay)
             retry_delay = min(retry_delay * 2, 60)
 
@@ -265,10 +328,12 @@ async def _dispatch_event(
     channels. After it, tournament/sanction objects drive live announcements.
     """
     msg_type = data.get("type", "")
+    key = _task_key(guild_id, tournament_uid)
 
     if msg_type == "sync_complete":
         return True
     if msg_type == "judge_call":
+        logger.info("SSE recv judge_call for %s", key)
         await _handle_judge_call(
             bot, store, guild_id, tournament_uid, data.get("data") or {}
         )
@@ -278,10 +343,12 @@ async def _dispatch_event(
 
     if not synced:
         # Catch-up / overlay: seed tournament state, post nothing.
-        _handle_snapshot(_task_key(guild_id, tournament_uid), tournament_uid, events)
+        logger.info("SSE catch-up: seeding %d object(s) for %s", len(events), key)
+        _handle_snapshot(key, tournament_uid, events)
         return synced
 
     for ev in events:
+        logger.info("SSE recv live %s for %s", ev.get("type"), key)
         await _handle_update(bot, store, guild_id, tournament_uid, ev)
     return synced
 
@@ -306,9 +373,16 @@ def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
 
 
 async def _post(bot, channel_id: int, content: str) -> None:
-    """Post a message to a channel, logging failures."""
+    """Post a message to a channel, logging failures.
+
+    Logs before AND after the Discord call: a "→ create_message" with no
+    matching "✓" pins a hung/slow REST call (the listener-wedge failure mode) to the exact
+    channel, since the bot has no CI and we debug from logs.
+    """
+    logger.info("→ create_message channel=%s (%d chars)", channel_id, len(content))
     try:
         await bot.rest.create_message(channel_id, content)
+        logger.info("✓ create_message channel=%s", channel_id)
     except Exception as e:
         logger.warning("Failed to post to channel %s: %s", channel_id, e)
 
@@ -412,6 +486,18 @@ async def _handle_update(
     players = obj.get("players", [])
     round_count = len(rounds)
 
+    # The key debug line for transition bugs: every tournament update logs the
+    # state machine delta the handlers below branch on.
+    logger.info(
+        "Tournament update %s: state %s→%s, rounds %d→%d, %d players",
+        key,
+        prev_state,
+        state,
+        prev_round_count,
+        round_count,
+        len(players),
+    )
+
     organizer_uids = set(obj.get("organizers_uids", []))
 
     # ── Registration opened (Planned → Registration) ──
@@ -488,95 +574,14 @@ async def _handle_update(
 
     # ── New round started ──
     if state == "Playing" and round_count > prev_round_count and rounds:
-        current_round = rounds[-1]
-        tables_data: list[list[str]] = [
-            [s.get("player_uid", "") for s in table.get("seating", [])]
-            for table in current_round
-        ]
-        await _post(
-            bot,
-            announcement_id,
-            format_round_seating(round_count, tables_data, players),
-        )
-
-        # Build discord_id_map for all players + organizers
-        all_player_uids = {uid for table in tables_data for uid in table}
-        discord_id_map = await _build_discord_id_map(
-            store, all_player_uids | organizer_uids
-        )
-
-        # Create table voice channels with permissions
-        try:
-            channel_ids = await create_table_channels(
-                bot,
-                int(guild_id),
-                category_id,
-                tables_data,
-                discord_id_map=discord_id_map,
-                organizer_uids=organizer_uids,
-            )
-            _table_channels[key] = channel_ids
-        except Exception as e:
-            logger.warning("Failed to create table channels: %s", e)
-
-        # Track seating for mid-round change detection
-        _last_seating[key] = [set(t) for t in tables_data]
-
-        # Warn about unlinked players
-        await _warn_unlinked_players(
-            bot, judges_id, all_player_uids, discord_id_map, players
-        )
-
-        await _post(
-            bot,
-            judges_id,
-            f"**{name}** — Round {round_count} started ({len(tables_data)} tables, "
-            f"{sum(len(t) for t in tables_data)} players).\n"
-            f"Use `/sanction @player` to issue sanctions.\n{webapp_url}",
+        await _setup_round(
+            bot, store, guild_id, tournament_uid, obj, announce=True, new_round=True
         )
 
     # ── Finals started ──
     finals = obj.get("finals")
     if finals and state == "Playing" and prev_state != "Playing":
-        seating = finals.get("seating", [])
-        seed_order = finals.get("seed_order", [])
-
-        await _post(
-            bot, announcement_id, format_finals(name, seating, seed_order, players)
-        )
-
-        finalists = [[s.get("player_uid", "") for s in seating]]
-        finalist_uids = {s.get("player_uid", "") for s in seating}
-
-        # Build discord_id_map for finalists + organizers
-        discord_id_map = await _build_discord_id_map(
-            store, finalist_uids | organizer_uids
-        )
-
-        try:
-            ch_ids = await create_table_channels(
-                bot,
-                int(guild_id),
-                category_id,
-                finalists,
-                discord_id_map=discord_id_map,
-                organizer_uids=organizer_uids,
-                is_finals=True,
-            )
-            _table_channels[key].extend(ch_ids)
-        except Exception as e:
-            logger.warning("Failed to create finals channel: %s", e)
-
-        # Warn about unlinked finalists
-        await _warn_unlinked_players(
-            bot, judges_id, finalist_uids, discord_id_map, players
-        )
-
-        await _post(
-            bot,
-            judges_id,
-            f"**{name}** — Finals started ({len(seating)} finalists).\n{webapp_url}",
-        )
+        await _setup_finals(bot, store, guild_id, tournament_uid, obj, announce=True)
 
     # ── Mid-round seating changes (SwapSeats, AlterSeating, etc.) ──
     if (
@@ -702,6 +707,246 @@ async def _handle_update(
     _last_tournament[key] = obj
 
 
+async def _setup_round(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+    obj: dict,
+    *,
+    announce: bool,
+    new_round: bool = False,
+) -> None:
+    """Set up the current round's table voice channels + (optionally) announce.
+
+    Two modes, both safe to call repeatedly:
+
+    - ``new_round=True`` (a genuine transition: ``round_count`` increased): any
+      ``Table N`` channels under the category are STALE — leftovers from a prior
+      round whose cleanup we missed, or a partial set from a timed-out attempt —
+      so delete them all, then create this round's tables fresh and announce.
+      Delete-then-create is what makes a timed-out retry idempotent (no duplicate
+      channels) without adopting the wrong round's channels by count.
+    - ``new_round=False`` (reconnect/reconcile): reuse channels that already
+      cover the round (silent — re-adopt the map and re-sync permissions to the
+      current seating); otherwise treat it as a missed round and set it up.
+    """
+    key = _task_key(guild_id, tournament_uid)
+    link = await store.get_tournament_link(guild_id, tournament_uid)
+    if not link:
+        return
+    rounds = obj.get("rounds", [])
+    if not rounds:
+        return
+
+    category_id = int(link["category_id"])
+    announcement_id = int(link["announcement_channel_id"])
+    judges_id = int(link["judges_channel_id"])
+    name = obj.get("name", "Tournament")
+    webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+    players = obj.get("players", [])
+    organizer_uids = set(obj.get("organizers_uids", []))
+    round_count = len(rounds)
+    tables_data: list[list[str]] = [
+        [s.get("player_uid", "") for s in table.get("seating", [])]
+        for table in rounds[-1]
+    ]
+
+    existing, _finals_id = await fetch_round_channel_ids(
+        bot, int(guild_id), category_id
+    )
+
+    if new_round and existing:
+        # Stale channels (missed prior cleanup, or a timed-out partial create).
+        await delete_channels(bot, existing)
+        existing = []
+
+    # A true new round always (re)creates; reconcile adopts channels that already
+    # cover the round and only creates when they're missing.
+    do_create = new_round or len(existing) < len(tables_data)
+    do_announce = announce and do_create
+    logger.info(
+        "Setup round %d for %s: %d tables, new_round=%s, existing=%d → %s",
+        round_count,
+        key,
+        len(tables_data),
+        new_round,
+        len(existing),
+        "create+announce" if do_announce else ("create" if do_create else "adopt"),
+    )
+
+    all_player_uids = {uid for table in tables_data for uid in table}
+    discord_id_map = await _build_discord_id_map(
+        store, all_player_uids | organizer_uids
+    )
+
+    if do_announce:
+        await _post(
+            bot,
+            announcement_id,
+            format_round_seating(round_count, tables_data, players),
+        )
+
+    if do_create:
+        # Create only the not-yet-existing tables, numbered after the existing.
+        try:
+            new_ids = await create_table_channels(
+                bot,
+                int(guild_id),
+                category_id,
+                tables_data[len(existing) :],
+                discord_id_map=discord_id_map,
+                organizer_uids=organizer_uids,
+                start_index=len(existing),
+            )
+            _table_channels[key] = existing + new_ids
+        except Exception as e:
+            logger.warning("Failed to create table channels: %s", e)
+            _table_channels[key] = existing
+    else:
+        # Channels already present (reconnect): adopt them, reconcile perms.
+        _table_channels[key] = existing[: len(tables_data)]
+        for i, table in enumerate(tables_data):
+            if i < len(_table_channels[key]):
+                try:
+                    await sync_table_permissions(
+                        bot,
+                        int(guild_id),
+                        _table_channels[key][i],
+                        set(table),
+                        organizer_uids,
+                        discord_id_map,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to sync table %d permissions: %s", i + 1, e)
+
+    _last_seating[key] = [set(t) for t in tables_data]
+
+    if do_announce:
+        await _warn_unlinked_players(
+            bot, judges_id, all_player_uids, discord_id_map, players
+        )
+        await _post(
+            bot,
+            judges_id,
+            f"**{name}** — Round {round_count} started ({len(tables_data)} tables, "
+            f"{sum(len(t) for t in tables_data)} players).\n"
+            f"Use `/sanction @player` to issue sanctions.\n{webapp_url}",
+        )
+
+
+async def _setup_finals(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+    obj: dict,
+    *,
+    announce: bool,
+) -> None:
+    """Idempotently set up the finals voice channel + announce the finalists.
+
+    Reuses an existing ``Finals`` channel under the category (reconnect/restart
+    safe); only announces + creates when none exists yet.
+    """
+    key = _task_key(guild_id, tournament_uid)
+    link = await store.get_tournament_link(guild_id, tournament_uid)
+    if not link:
+        return
+    finals = obj.get("finals") or {}
+    seating = finals.get("seating", [])
+    if not seating:
+        return
+
+    category_id = int(link["category_id"])
+    announcement_id = int(link["announcement_channel_id"])
+    judges_id = int(link["judges_channel_id"])
+    name = obj.get("name", "Tournament")
+    webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+    players = obj.get("players", [])
+    organizer_uids = set(obj.get("organizers_uids", []))
+    seed_order = finals.get("seed_order", [])
+    finalists = [s.get("player_uid", "") for s in seating]
+    finalist_uids = set(finalists)
+
+    # Ignore any prelim `Table N` channels: during finals sanctions route to the
+    # single finals table, and teardown deletes whatever is in _table_channels —
+    # so the map must hold ONLY the finals channel, never stale prelim tables.
+    _existing_tables, finals_id = await fetch_round_channel_ids(
+        bot, int(guild_id), category_id
+    )
+    fresh = finals_id is None
+    logger.info(
+        "Setup finals for %s: %d finalists, existing_finals=%s → %s",
+        key,
+        len(seating),
+        finals_id,
+        "create+announce" if (announce and fresh) else "adopt",
+    )
+
+    discord_id_map = await _build_discord_id_map(store, finalist_uids | organizer_uids)
+
+    if announce and fresh:
+        await _post(
+            bot, announcement_id, format_finals(name, seating, seed_order, players)
+        )
+
+    if fresh:
+        try:
+            ch_ids = await create_table_channels(
+                bot,
+                int(guild_id),
+                category_id,
+                [finalists],
+                discord_id_map=discord_id_map,
+                organizer_uids=organizer_uids,
+                is_finals=True,
+            )
+            finals_id = ch_ids[0] if ch_ids else None
+        except Exception as e:
+            logger.warning("Failed to create finals channel: %s", e)
+
+    if finals_id is not None:
+        _table_channels[key] = [finals_id]
+
+    if announce and fresh:
+        await _warn_unlinked_players(
+            bot, judges_id, finalist_uids, discord_id_map, players
+        )
+        await _post(
+            bot,
+            judges_id,
+            f"**{name}** — Finals started ({len(seating)} finalists).\n{webapp_url}",
+        )
+
+
+async def _reconcile(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+) -> None:
+    """Repair Discord to match current state after a (re)connect's catch-up.
+
+    Catch-up only SEEDS state silently (``_handle_snapshot``), so a round or
+    finals that started while the bot was disconnected — or before a restart —
+    would otherwise have no voice channels and no seating announcement. This
+    recreates them. ``_setup_round``/``_setup_finals`` reuse existing channels,
+    so a normal reconnect (channels already present) is silent.
+    """
+    key = _task_key(guild_id, tournament_uid)
+    obj = _last_tournament.get(key)
+    state = obj.get("state", "") if obj else "(none)"
+    logger.info("Reconciling %s after (re)connect (state=%s)", key, state)
+    if not obj or state != "Playing":
+        return
+    finals = obj.get("finals") or {}
+    if finals.get("seating") and not finals.get("result"):
+        await _setup_finals(bot, store, guild_id, tournament_uid, obj, announce=True)
+    elif obj.get("rounds"):
+        await _setup_round(bot, store, guild_id, tournament_uid, obj, announce=True)
+
+
 async def _handle_sanction_update(
     bot,
     store: TokenStore,
@@ -747,8 +992,16 @@ async def _handle_sanction_update(
         level, category, subcategory, description, round_number, player_mention
     )
 
+    logger.info(
+        "SSE recv sanction (level=%s round=%s) for %s",
+        level,
+        round_number,
+        _task_key(guild_id, tournament_uid),
+    )
+
     # Post to judges channel
     try:
+        logger.info("→ create_message sanction→judges channel=%s", judges_id)
         await bot.rest.create_message(judges_id, judges_msg)
     except Exception as e:
         logger.warning("Failed to post sanction to judges: %s", e)
@@ -773,6 +1026,11 @@ async def _handle_sanction_update(
                     if any(s.get("player_uid") == user_uid for s in seating):
                         if ti < len(table_chs):
                             try:
+                                logger.info(
+                                    "→ create_message sanction→table %d channel=%s",
+                                    ti + 1,
+                                    table_chs[ti],
+                                )
                                 await bot.rest.create_message(table_chs[ti], player_msg)
                                 posted_to_table = True
                             except Exception as e:
@@ -784,6 +1042,7 @@ async def _handle_sanction_update(
     if not posted_to_table:
         # No active round, no table channels, or player not found at a table — post to lobby
         try:
+            logger.info("→ create_message sanction→lobby channel=%s", lobby_id)
             await bot.rest.create_message(lobby_id, player_msg)
         except Exception as e:
             logger.warning("Failed to post sanction to lobby: %s", e)
@@ -815,6 +1074,7 @@ async def _handle_judge_call(
     player_name = data.get("player_name", "Unknown")
 
     try:
+        logger.info("→ create_message judge_call→judges channel=%s", judges_id)
         await bot.rest.create_message(
             judges_id,
             f"**Judge call!** {table_label} — {player_name} needs a judge",
