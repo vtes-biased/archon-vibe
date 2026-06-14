@@ -269,7 +269,8 @@ async def test_claimed_account_not_detached_by_merge(test_db):
 
     stats = Stats()
     user, discord = build_user(
-        _old_member_row("o-9", vekn="1000009", name="Old Member", nickname="Nick"), stats
+        _old_member_row("o-9", vekn="1000009", name="Old Member", nickname="Nick"),
+        stats,
     )
     live_uid = await merge_member(user, discord, stats)
 

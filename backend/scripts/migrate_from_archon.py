@@ -1040,7 +1040,9 @@ def _remap_member_refs(
 
     def remap_seats(seats: list[Seat]) -> list[Seat]:
         return [
-            msgspec.structs.replace(s, player_uid=g(s.player_uid), judge_uid=g(s.judge_uid))
+            msgspec.structs.replace(
+                s, player_uid=g(s.player_uid), judge_uid=g(s.judge_uid)
+            )
             for s in seats
         ]
 
@@ -1061,7 +1063,9 @@ def _remap_member_refs(
         organizers_uids=[g(u) for u in t.organizers_uids],
         offline_user_uid=g(t.offline_user_uid),
         players=[msgspec.structs.replace(p, user_uid=g(p.user_uid)) for p in t.players],
-        standings=[msgspec.structs.replace(s, user_uid=g(s.user_uid)) for s in t.standings],
+        standings=[
+            msgspec.structs.replace(s, user_uid=g(s.user_uid)) for s in t.standings
+        ],
         rounds=rounds,
         finals=finals,
     )
