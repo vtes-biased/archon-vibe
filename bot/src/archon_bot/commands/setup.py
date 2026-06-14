@@ -59,7 +59,7 @@ class SetupCommand(
             )
             return
 
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
 
         # Check if user has tokens
         tokens = await store.get_tokens(discord_id)
@@ -196,7 +196,7 @@ class TeardownCommand(
             return
 
         guild_id = str(ctx.guild_id)
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
 
         link = await store.get_tournament_link(guild_id, tournament_uid)
         if not link:
@@ -260,7 +260,7 @@ class AnnounceCommand(
             return
 
         guild_id = str(ctx.guild_id)
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
 
         link = await store.get_tournament_link(guild_id, tournament_uid)
         if not link:

@@ -21,7 +21,7 @@ async def _ensure_auth(
     ctx: lightbulb.Context, store: TokenStore, action: str, extra: str = ""
 ) -> dict | None:
     """Ensure the user is authenticated. Returns tokens or sends OAuth link."""
-    discord_id = str(ctx.author.id)
+    discord_id = str(ctx.user.id)
     tokens = await store.get_tokens(discord_id)
     if tokens:
         return tokens
@@ -66,7 +66,7 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
         self._tournament_uid = tournament_uid
 
     async def callback(self, ctx: miru.ModalContext) -> None:
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
         claim = await self._api.claim_vekn_id(discord_id, self.vekn_id.value.strip())
         if not claim.ok:
             await ctx.respond(
@@ -125,7 +125,7 @@ class SponsorshipModal(miru.Modal, title="New Player Registration"):
         self._guild_id = guild_id
 
     async def callback(self, ctx: miru.ModalContext) -> None:
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
         info = await fetch_userinfo(self._api, ctx, discord_id)
         if info is None:
             return
@@ -199,7 +199,7 @@ class SponsorshipView(miru.View):
 
     @miru.button(label="Approve", style=hikari.ButtonStyle.SUCCESS)
     async def approve(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        organizer_discord_id = str(ctx.author.id)
+        organizer_discord_id = str(ctx.user.id)
 
         info = await fetch_userinfo(self._api, ctx, organizer_discord_id)
         if info is None:
@@ -244,7 +244,7 @@ class SponsorshipView(miru.View):
     @miru.button(label="Deny", style=hikari.ButtonStyle.DANGER)
     async def deny(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         await ctx.edit_response(
-            f"**Denied** by <@{ctx.author.id}>.",
+            f"**Denied** by <@{ctx.user.id}>.",
             components=[],
         )
         self.stop()
@@ -295,9 +295,9 @@ def _get_display_name(ctx) -> str | None:
         return (
             member.nickname
             or getattr(member, "display_name", None)
-            or ctx.author.username
+            or ctx.user.username
         )
-    return ctx.author.username
+    return ctx.user.username
 
 
 async def _handle_registration_pipeline(
@@ -309,7 +309,7 @@ async def _handle_registration_pipeline(
     action: str,
 ) -> None:
     """Shared pipeline for /register and /checkin."""
-    discord_id = str(ctx.author.id)
+    discord_id = str(ctx.user.id)
 
     # Step 1: Check authentication
     tokens = await _ensure_auth(ctx, store, action, tournament_uid)
@@ -448,7 +448,7 @@ class ReportCommand(
         if not tournament_uid:
             return
 
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
 
         # Check authentication
         tokens = await _ensure_auth(ctx, store, "report", tournament_uid)
@@ -520,7 +520,7 @@ class JudgeCommand(
             return
 
         judges_id = int(link["judges_channel_id"])
-        display_name = _get_display_name(ctx) or ctx.author.username
+        display_name = _get_display_name(ctx) or ctx.user.username
 
         # Use the channel name as table context
         table_info = "unknown location"

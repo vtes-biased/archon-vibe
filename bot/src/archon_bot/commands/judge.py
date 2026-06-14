@@ -313,7 +313,7 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
         self.add_item(self._description_input)
 
     async def callback(self, ctx: miru.ModalContext) -> None:
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
 
         round_num = None
         if self._round_input is not None:
@@ -377,7 +377,7 @@ class SanctionCommand(
         if not tournament_uid:
             return
 
-        discord_id = str(ctx.author.id)
+        discord_id = str(ctx.user.id)
 
         # Verify issuer is authenticated
         tokens = await store.get_tokens(discord_id)
