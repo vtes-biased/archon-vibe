@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # any side-effect missed on a skip is repaired by reconcile on the next sync.
 _DISPATCH_TIMEOUT = 90
 
+
 def _access_token_expired(token: str, *, skew_seconds: int = 60) -> bool:
     """Decode the UNVERIFIED JWT payload (the bot holds no signing secret) to read
     ``exp``. True if it expires within ``skew_seconds`` or can't be parsed, so the
