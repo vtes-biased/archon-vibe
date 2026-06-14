@@ -89,6 +89,43 @@ def format_finals(name: str, seating: list, seed_order: list, players: list) -> 
     return "\n".join(lines)
 
 
+def _fmt_vp(vp) -> str:
+    """VPs are whole in normal play but the model allows halves (split finals);
+    render '3' not '3.0', and '2.5' as-is."""
+    f = float(vp)
+    return str(int(f)) if f == int(f) else str(f)
+
+
+def format_table_result(
+    table_index: int, table: dict, players: list, *, is_finals: bool = False
+) -> str:
+    """Render a table's current reported VPs for its voice channel.
+
+    Posted on every score change so everyone seated sees what was entered —
+    open reporting deters mis-reporting. No pings (players are already here).
+    The footer reflects the engine-computed table ``state``.
+    """
+    label = "Finals" if is_finals else f"Table {table_index + 1}"
+    lines = [f"**Results reported — {label}**"]
+    for s in table.get("seating", []):
+        name = player_display(s.get("player_uid", ""), players)
+        vp = (s.get("result") or {}).get("vp", 0)
+        judged = " _(entered by judge)_" if s.get("judge_uid") else ""
+        lines.append(f"{name}: {_fmt_vp(vp)} VP{judged}")
+
+    if table.get("override"):
+        lines.append("\n_Result finalized by a judge._")
+    else:
+        state = table.get("state", "")
+        if state == "Finished":
+            lines.append("\n_Table complete — VP total checks out._")
+        elif state == "Invalid":
+            lines.append("\n⚠️ _Reported VPs don't add up — check with a judge._")
+        else:
+            lines.append("\n_Awaiting the rest of the table's results._")
+    return "\n".join(lines)
+
+
 def format_sanction(
     level: str,
     category: str,

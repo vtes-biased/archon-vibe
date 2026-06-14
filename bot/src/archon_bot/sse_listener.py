@@ -16,6 +16,7 @@ from .announcements import (
     format_round_seating,
     format_sanction,
     format_standings,
+    format_table_result,
     player_display,
 )
 from .channel_manager import (
@@ -440,6 +441,67 @@ def _collect_all_player_uids(seating: list[set[str]]) -> set[str]:
     return result
 
 
+def _seat_results(table: dict) -> dict[str, tuple]:
+    """Map each seated player UID → its (gw, vp, tp) score tuple for diffing."""
+    out: dict[str, tuple] = {}
+    for s in table.get("seating", []):
+        r = s.get("result") or {}
+        out[s.get("player_uid", "")] = (r.get("gw", 0), r.get("vp", 0), r.get("tp", 0))
+    return out
+
+
+def _active_tables(obj: dict) -> tuple[str, list[dict]]:
+    """The tables whose voice channels are currently live in ``_table_channels``:
+    finals if seated, otherwise the latest round. The returned tag identifies the
+    context (``finals`` / ``round<N>``) so a round-change or prelim→finals
+    transition is never mistaken for a score being reported.
+    """
+    finals = obj.get("finals") or {}
+    if finals.get("seating"):
+        return "finals", [finals]
+    rounds = obj.get("rounds", [])
+    if rounds:
+        return f"round{len(rounds)}", rounds[-1]
+    return "", []
+
+
+def compute_result_announcements(
+    prev_obj: dict, cur_obj: dict, table_chs: list[int], players: list
+) -> list[tuple[int, str]]:
+    """Pure: which table channels to notify of a reported score, and with what.
+
+    A table is announced when its seating is unchanged (same players) but a
+    reported score differs from the previous tournament snapshot — i.e. someone
+    entered or edited VPs. Skips:
+      - context changes (new round / finals start): tag mismatch — those have
+        their own seating announcement;
+      - seating swaps (different players at a position): handled elsewhere;
+      - no-op pushes (sanctions, check-ins, …) that left scores untouched.
+    Returns ``[(channel_id, message), …]`` index-aligned to ``table_chs``.
+    """
+    cur_tag, cur_tables = _active_tables(cur_obj)
+    prev_tag, prev_tables = _active_tables(prev_obj)
+    if not cur_tag or cur_tag != prev_tag:
+        return []
+    is_finals = cur_tag == "finals"
+    out: list[tuple[int, str]] = []
+    # Positional alignment: cur_tables[i] ↔ table_chs[i]. Safe because the engine
+    # never reorders existing tables within a round; a mid-round table ADD only
+    # appends (i ≥ len(prev_tables) is clamped out — a fresh table has no prior
+    # score to diff), and a remove shrinks both lists from the tail.
+    for i, table in enumerate(cur_tables):
+        if i >= len(table_chs) or i >= len(prev_tables):
+            continue
+        cur_res = _seat_results(table)
+        prev_res = _seat_results(prev_tables[i])
+        if set(cur_res) != set(prev_res) or cur_res == prev_res:
+            continue
+        out.append(
+            (table_chs[i], format_table_result(i, table, players, is_finals=is_finals))
+        )
+    return out
+
+
 async def _build_discord_id_map(
     store: TokenStore, archon_uids: set[str]
 ) -> dict[str, int]:
@@ -731,6 +793,22 @@ async def _handle_update(
             await _warn_unlinked_players(
                 bot, judges_id, all_player_uids, discord_id_map, players
             )
+
+    # ── Score reported at a table (open reporting = anti-cheat visibility) ──
+    # A SetScore re-broadcasts the whole tournament; post the table's current
+    # VPs to that table's voice channel so everyone seated sees what was entered.
+    # `_last_tournament[key]` is still the PREVIOUS object here (refreshed at the
+    # end of this handler), so we diff against it. On reconnect it was reseeded to
+    # the full current state at catch-up, so a score entered while disconnected is
+    # already in the baseline and never re-announced.
+    # Gate on Playing: once Finished the table channels are deleted (below), so a
+    # late organizer score edit (engine allows it) has nowhere to post anyway.
+    prev_obj = _last_tournament.get(key)
+    if state == "Playing" and prev_obj is not None:
+        for ch_id, msg in compute_result_announcements(
+            prev_obj, obj, _table_channels.get(key, []), players
+        ):
+            await _post(bot, ch_id, msg)
 
     # ── Tournament finished ──
     if state == "Finished" and prev_state != "Finished":
