@@ -45,80 +45,34 @@ exercise — that's part of the shakedown, not a precondition of it.
   stacks are otherwise fully isolated (own DB, ports, server_names, `new-archon-*`
   units). The whole 8xxx/9xxx band is otherwise empty.
 
-## Progress checkpoint — 2026-06-14 (RESUME HERE is below)
+## Progress checkpoint — 2026-06-14 (RESUME at §3)
 
-§0 (Release v0.1.1), §1 (dry run) and §2 (first real deploy + boot) are DONE.
-The first `just deploy-beta` brought archon-vibe up on frankfurt from CI-built
-v0.1.1 wheels, and the backend ran the full startup VEKN sync into the empty
-`new_archon` DB — **members + 8096 tournaments, 0 errors** (this is leg A's
-vekn-first SEED; the §4 merge itself is still to run). The DB persists across
-redeploys, so that seed survives the v0.1.2 bring-up below.
+§0–§2 DONE. The first `just deploy-beta` brought archon-vibe up on frankfurt from
+CI-built **v0.1.1** wheels; the backend's startup VEKN sync filled the empty
+`new_archon` DB — **members + 8096 tournaments, 0 errors** (leg A's vekn-first
+SEED; the §4 merge itself is still to run). The DB persists across redeploys, so
+that seed survives every re-release.
 
-**§2 surfaced 8 install bugs (exactly #91's purpose) — all fixed.**
+§2 did its job: a batch of install/deploy bugs surfaced and were fixed across
+**v0.1.2** and **v0.1.3** (all tracked in pst — backend packaging, the release
+pipeline, ansible/nginx templates, and the frontend: WASM engine load, SPA
+deep-link fallback, `/snapshot` proxy). **v0.1.3 is the current beta build**,
+deployed from CI wheels, §2 re-verify green: Discord login works, bot stable (no
+crash-loop), startup VEKN sync clean, engine loads (no toaster), `/tournaments/`
+200 on refresh, `/snapshot` serves backend JSON.
 
-Deploy/ansible (committed to archon-vibe `main`):
-- `b03f32f` static_site rsync: macOS ships openrsync as `/usr/bin/rsync`, which
-  rejects `--chmod/--chown`; dropped them (archive mode preserves Vite 644/755) +
-  a follow-up `file` ownership task.
-- `8d994a8` fastapi_backend `data_dir`: `service.j2` hardcoded `/var/lib/archon`
-  in `ReadWritePaths`; with `ProtectSystem=strict` that path must exist, so beta
-  (`/var/lib/new_archon`) crash-looped `226/NAMESPACE`. Added `r.data_dir`
-  (default `/var/lib/archon`, prod unchanged); deploy-beta.yml passes `app_lib_dir`.
+**◀ RESUME HERE — §3 ETL workbench (2026-06-14).** v0.1.3 verified, so proceed:
+§3 ETL workbench → §4 leg A merge (onto the surviving seed) → §5 leg B (the state
+beta keeps) → §6 login/bot OAuth client → §7 #114 push audit = the **#39 GATE** →
+§8 #80 check.
 
-server-setup repo (pushed to its `main`; `just galaxy` reconciles the installed
-`galaxy_collections/` copies — do NOT run galaxy before that push or it reverts):
-- `nginx_site` HTTPS template: was `include options-ssl-nginx.conf` + `ssl_dhparam
-  ssl-dhparams.pem` — files only the certbot *nginx* plugin creates, absent under
-  `certbot certonly --webroot` → `nginx -t` emerg. Inlined SSL hardening; also
-  `listen 443 ssl; http2 on;` (de-deprecate) and a per-site
-  `ssl_session_cache shared:ssl_<name>:10m` (the shared `SSL` zone collided with
-  static_site's `shared:SSL:50m`). Molecule prepare.yml stubs removed.
-- `postgres_db`: `db:` → `login_db:` (community.postgresql deprecation).
-
-v0.1.2 code fixes (need the re-release to reach beta):
-- **#157** `597a65c` frontend `.env.production` `VITE_API_URL=` → same-origin.
-  Login built Discord OAuth with `redirect_uri=localhost:8000` because `API_BASE`
-  falls back to localhost when VITE_API_URL is unbaked (it only matters for a
-  production build; e2e uses `vite dev` so it was never caught). Same artifact
-  ships to all domains, so "" (nginx same-origin) is the only correct value.
-- **#155** `6f9ae48` twda.py + twda_import.py httpx→aiohttp. httpx was dev-only
-  (`[dependency-groups] dev`), so `--no-dev` installs crashed the startup TWDA
-  import with ModuleNotFoundError. aiohttp is core and already the app's client.
-- **#154** `f98ea04` (sibling) bot lightbulb v2 `.d` → v3 DI (was crash-looping).
-- **#152** `0b670d6` (sibling) release pipeline: release.yml now calls
-  release-artifacts via `workflow_call` → **no more manual delete/recreate dance.**
-- **#156** (sibling, p3) bot startup CI-smoke-test gap (filed, not fixed).
-
-CI/build (committed):
-- `4d5e13c` e2e flaky-test hardening — verified locally **26 passed**: 10s
-  create-redirect timeout + `getByText('8 registered', {exact:true})` (a player
-  uuid7 ending in "8" matched the substring ~40% of seeds).
-- `7fae103` Dockerfile + Dockerfile.test install wasm-pack via `cargo binstall`
-  (prebuilt aarch64/x86_64 musl, ~12s vs minutes) — verified **26 passed**.
-- `0517fa3` (sibling) frontend dep-stack upgrade + Node 24.
-
-**◀ RESUME HERE — cutting v0.1.2, then deploy + resume at §3 (2026-06-14).**
-Owner is pushing `main` and re-tagging **v0.1.2** (at HEAD `7fae103` — all the
-above, verified green together by the last e2e run). Then:
-
-1. `just deploy-beta RELEASE_TAG=v0.1.2` — every §2 deploy bug is fixed, so expect
-   a clean run. Redeploy restarts the backend → startup sync re-runs on the
-   already-seeded DB (rich-guard applies); the DB is NOT wiped.
-2. Verify on v0.1.2: Discord login works (#157, same-origin), `new-archon-bot`
-   no longer crash-loops (#154), startup VEKN sync logs **no httpx error** (#155).
-3. **Resume at §3** below: ETL workbench → §4 leg A merge → §5 leg B (state beta
-   keeps) → §6 login/bot OAuth client → §7 #114 push audit = the **#39 GATE** →
-   §8 #80 check.
-
-Host/access unchanged: `deploy@57.129.110.107` (frankfurt), PG17, beta on
-8008/9008, `/tmp/archondb.dump` present (P4). **Export
-`ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass`** in `ansible/` — the owner's
-global `~/.ansible/.vault_pass` is the WRONG pass for the beta vault and silently
-fails decryption.
-
-Not part of #91 (review/discard if unintended): uncommitted `uv.lock` +
-`bot/uv.lock` (stray `uv lock` re-serialization) and `.pst/tickets` (sibling's
-ongoing board edits).
+Host/access: `deploy@57.129.110.107` (frankfurt), PG17, beta on 8008/9008,
+`/tmp/archondb.dump` present (P4). **Vault pass:** `just deploy-beta` defaults
+`ANSIBLE_VAULT_PASSWORD_FILE` to `ansible/.beta.vault_pass` (justfile:103), but
+only as a `:-` fallback — a global `ANSIBLE_VAULT_PASSWORD_FILE` already exported
+in your shell (the owner's `~/.ansible/.vault_pass`, WRONG pass for beta) wins and
+silently fails decryption. `unset` it first, or prefix
+`ANSIBLE_VAULT_PASSWORD_FILE="$PWD/.beta.vault_pass"`.
 
 ## Read before running anything
 
@@ -141,8 +95,12 @@ ongoing board edits).
    `--check --diff` works against the Release with no prep; everything
    host-side stays check-mode. `RELEASE_TAG=…` / `SOURCE=local` work as for
    `deploy-beta`.
-4. **Export `ANSIBLE_VAULT_PASSWORD_FILE=.vault_pass`** — neither `ansible.cfg`
-   nor the justfile sets it; without it every playbook run fails to decrypt vault.yml.
+4. **Vault pass:** `deploy-beta`/`dry-deploy-beta` default
+   `ANSIBLE_VAULT_PASSWORD_FILE` to `ansible/.beta.vault_pass` (justfile:103), so
+   normally you set nothing — but it's a `:-` fallback, so a pre-existing global
+   `ANSIBLE_VAULT_PASSWORD_FILE` (the owner's `~/.ansible/.vault_pass` = WRONG pass
+   for beta) overrides it and silently fails decryption. `unset` it first, or
+   prefix `ANSIBLE_VAULT_PASSWORD_FILE="$PWD/.beta.vault_pass"`.
 5. Keep `?host=/var/run/postgresql` in all DSNs — psycopg's bundled libpq
    defaults to the wrong socket dir.
 6. Writes from on-box scripts are **not broadcast over SSE** (broadcast is
@@ -222,7 +180,7 @@ names/paths/templates before first contact.
 ### 2 · Deploy + first boot  *(this is also leg A's vekn-first seed)*
 ```sh
 cd ansible
-just deploy-beta                       # latest Release; RELEASE_TAG=vX.Y.Z to pin
+just deploy-beta                       # latest Release (to pin: `RELEASE_TAG=vX.Y.Z just deploy-beta` — env-var PREFIX, not an arg)
 ```
 On the box:
 ```sh
@@ -326,7 +284,7 @@ SELECT count(*) FROM objects
  WHERE type='user' AND "full"->>'vekn_id' IS NOT NULL
    AND ("full"->>'vekn_synced')::boolean = false;
 
--- 2. tournaments owed a calendar event  (ETL stamps vekn_pushed_at → expect 0)
+-- 2. tournaments owed a calendar event  (ETL stamps every non-Planned import → expect 0)
 SELECT count(*) FROM objects
  WHERE type='tournament' AND "full"->>'state' <> 'Planned' AND deleted_at IS NULL
    AND ("full"->'external_ids'->>'vekn') IS NULL
@@ -355,6 +313,21 @@ results vekn.net already ratified — thousands of rows). A query-1 user with
 sync just created and hasn't stamped yet — re-run the audit once the sync chain
 settles before calling it. Do not proceed to #39 until all three read 0 on the
 state beta keeps (post-§5 leg B).
+
+**Stamping model (hardened in #91, leg A — see #168).** The ETL stamps
+`vekn_pushed_at` on *every non-Planned* migrated event — finished AND in-flight —
+not just finished (`migrate_from_archon.py` build_tournament; the exact inverse of
+query 2's state gate). Under one-app-per-event (#39) legacy owns each migrated
+event until it finishes it there; legacy pushes, then the daily #115 `--merge`
+carries the vekn id + results + stamp back, so new archon never re-registers it.
+Before this, leg-A query 2 returned **5** live/upcoming dump events (no vekn id,
+not finished → unstamped) that prod would have double-registered against legacy.
+So query 2 = 0 means "no *migrated* row owes a push"; a genuinely-new event created
+**in the app** post-migration correctly matches query 2 and *should* push — hence
+run the audit before any in-app test events. Handover escape hatch (accepted, not
+built): if an event is genuinely handed legacy→new during the parallel run,
+manually clear its `vekn_pushed_at` and set its vekn id so the new stack resumes
+pushing.
 
 ### 8 · #80 clean-install check
 Already half-done in §2 (`/api/cards` served from the installed wheel). Confirm

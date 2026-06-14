@@ -918,14 +918,19 @@ def build_tournament(
         finals=finals,
         winner=winner_uid,
         standings=standings,
-        # Imported finished tournaments owe no push: old archon already pushed
-        # them (or they predate pushing). Rich imports have rounds, so
-        # batch_push's rounds guard does NOT keep them out of the results push
-        # — an unstamped import would re-upload results old archon already
-        # ratified. Stamped whether or not they carry a vekn id, so the
-        # calendar-event query skips them too. An existing stamp is preserved.
+        # Migrated events owe new archon no VEKN push. Under one-app-per-event
+        # (#39) legacy owns each event until it's finished there; legacy pushes it
+        # and the daily #115 --merge then carries the vekn id + results + this
+        # stamp back, so new archon must never (re)create a calendar event or
+        # (re)upload results for a migrated event. Stamp every NON-PLANNED import
+        # — finished AND in-flight — the exact inverse of batch_push's
+        # `state != 'Planned'` calendar-event gate (and a superset of the
+        # finished+rounds results guard), so queries 2 and 3 both skip them.
+        # Planned drafts aren't push-eligible anyway. Genuinely-new events created
+        # in-app aren't ETL-stamped, so they still push normally. An existing
+        # stamp is preserved (idempotent across daily merges).
         vekn_pushed_at=(existing.vekn_pushed_at if existing else None)
-        or (datetime.now(UTC) if finished else None),
+        or (datetime.now(UTC) if state != TournamentState.PLANNED else None),
     )
 
     # accumulate tournament-embedded sanctions (dict[member_uid → [Sanction]])
