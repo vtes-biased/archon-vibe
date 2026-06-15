@@ -12,7 +12,7 @@ from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from uuid6 import uuid7
+from uuid import uuid7
 
 from .. import permissions
 from ..broadcast import (

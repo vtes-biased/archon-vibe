@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 import aiohttp
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
-from uuid6 import uuid7
+from uuid import uuid7
 
 from ...accounts import merge_users
 from ...broadcast import broadcast_precomputed

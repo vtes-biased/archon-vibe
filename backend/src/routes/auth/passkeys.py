@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import msgspec
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel
-from uuid6 import uuid7
+from uuid import uuid7
 from webauthn import (
     generate_authentication_options,
     generate_registration_options,

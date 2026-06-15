@@ -8,7 +8,7 @@ import msgspec
 from argon2 import PasswordHasher
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel, EmailStr
-from uuid6 import uuid7
+from uuid import uuid7
 
 from ...db import (
     delete_transient_token,

@@ -35,7 +35,7 @@ from src.models import (
     SanctionLevel,
     User,
 )
-from uuid6 import uuid7
+from uuid import uuid7
 
 from tests.conftest import make_auth_header
 

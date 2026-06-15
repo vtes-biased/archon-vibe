@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import aiohttp
 import msgspec
-from uuid6 import uuid7
+from uuid import uuid7
 
 from .broadcast import broadcast_precomputed
 from .db import get_connection, save_object_from_model

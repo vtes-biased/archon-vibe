@@ -7,7 +7,7 @@ from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import msgspec
-from uuid6 import uuid7
+from uuid import uuid7
 
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE

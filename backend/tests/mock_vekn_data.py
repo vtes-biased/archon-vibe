@@ -307,7 +307,7 @@ def generate_mock_users(count: int = 400) -> list[User]:
         vekn_synced_at = modified if vekn_synced else None
 
         # Generate proper UUID v7 format
-        from uuid6 import uuid7
+        from uuid import uuid7
 
         user = User(
             uid=str(uuid7()),

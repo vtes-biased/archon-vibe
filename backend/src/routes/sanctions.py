@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 import msgspec
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
-from uuid6 import uuid7
+from uuid import uuid7
 
 from .. import permissions
 from ..broadcast import broadcast_precomputed

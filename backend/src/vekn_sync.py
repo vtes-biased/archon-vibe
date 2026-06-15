@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from uuid6 import uuid7
+from uuid import uuid7
 
 from .data.vekn_roster import ADMINS, JUDGES
 from .db import (

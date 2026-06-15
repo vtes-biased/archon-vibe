@@ -34,7 +34,7 @@ from src.models import (  # noqa: E402
     User,
 )
 from src.snapshots import generate_snapshots  # noqa: E402
-from uuid6 import uuid7  # noqa: E402
+from uuid import uuid7  # noqa: E402
 
 ph = PasswordHasher()
 

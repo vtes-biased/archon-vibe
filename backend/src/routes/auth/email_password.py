@@ -6,7 +6,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, EmailStr
-from uuid6 import uuid7
+from uuid import uuid7
 
 from ...db import (
     get_auth_method_by_identifier,

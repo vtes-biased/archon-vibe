@@ -18,7 +18,7 @@ from src import db
 from src.models import Role, User
 
 # Import uuid7 for generating IDs
-from uuid6 import uuid7
+from uuid import uuid7
 
 
 def generate_mock_users(count: int = 300) -> list[User]:

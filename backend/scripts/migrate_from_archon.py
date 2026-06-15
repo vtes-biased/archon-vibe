@@ -110,7 +110,7 @@ from src.models import (
     TournamentState,
 )
 from src.vekn_sync import OFFICIALS_EMAILS
-from uuid6 import uuid7
+from uuid import uuid7
 
 # --------------------------------------------------------------------------- #
 # Mapping tables                                                               #

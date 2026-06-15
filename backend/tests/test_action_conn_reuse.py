@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 import pytest
 import src.db as db
 from src.models import Sanction, SanctionCategory, SanctionLevel
-from uuid6 import uuid7
+from uuid import uuid7
 
 
 def _sanction(user_uid: str, level: SanctionLevel) -> Sanction:

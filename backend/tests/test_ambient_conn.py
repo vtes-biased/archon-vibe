@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 import pytest
 import src.db as db
 from src.models import User
-from uuid6 import uuid7
+from uuid import uuid7
 
 
 @asynccontextmanager
