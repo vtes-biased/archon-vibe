@@ -71,11 +71,14 @@ encoder = msgspec.json.Encoder()
 # an already-finished tournament. Conservative denylist — everything else still
 # recomputes, because a stale rating is worse than a redundant pass. These are the
 # edits that realistically happen after a tournament finishes: the winner's TWDA
-# writeup (UpdateDeck), closing-ceremony raffles, payment reconciliation, late
-# check-in fixes. (Wire types per engine/tournament/parsing.rs — note UpdateDeck,
-# not UpsertDeck.)
+# writeup, closing-ceremony raffles, payment reconciliation, late check-in fixes.
+# Wire types are the RAW request.type, unnormalized — so list every deck-upsert
+# alias the engine accepts (parsing.rs: UpsertDeck|UploadDeck|UpdateDeck); the
+# frontend actually sends UpsertDeck, so omitting it defeated the headline case.
 _RATING_IRRELEVANT_ACTIONS = frozenset(
     {
+        "UpsertDeck",
+        "UploadDeck",
         "UpdateDeck",
         "DeleteDeck",
         "SetPaymentStatus",
