@@ -25,11 +25,12 @@ async def stream_objects_new(
     level: str = "full",          # "public" | "member" | "full"
     since: str | None = None,
     batch_size: int = 1000,
+    exclude_deleted: bool = False, # snapshot path drops tombstones; SSE keeps them
 ) -> AsyncIterator[tuple[list[str], str]]:
     # Yields (batch_of_raw_json_strings, max_modified_at)
 ```
 
-**Keyset pagination**: Uses `WHERE (modified_at, uid) > (%s, %s)`. DB connections acquired/released per batch. Yields raw JSONB text strings — no Python deserialization.
+**Keyset pagination**: Uses `WHERE (modified_at, uid) > (%s, %s)` (tie-safe across batch seams), `ORDER BY modified_at, uid LIMIT batch_size`. A pooled connection is acquired then **released before each yield**, so a slow SSE client never pins a pool slot across its catch-up and app heap holds at most one batch — not the whole resultset. Yields raw JSONB text strings — no Python deserialization. Snapshot generation reuses it with `exclude_deleted=True`.
 
 ### Access-Level Projections (computed at write time)
 

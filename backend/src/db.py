@@ -482,35 +482,65 @@ async def stream_objects_new(
     obj_type: str | None = None,
     level: str = "full",
     since: str | None = None,
+    batch_size: int = 1000,
+    exclude_deleted: bool = False,
 ) -> AsyncIterator[tuple[list[str], str]]:
-    """Stream pre-serialized JSON strings. Single query, single yield."""
+    """Stream pre-serialized JSON in keyset-paginated batches.
+
+    Each batch acquires a pooled connection, fetches up to `batch_size` rows
+    ordered by (modified_at, uid), then RELEASES the connection BEFORE yielding —
+    so a slow SSE client never pins a pool slot across its catch-up, and app heap
+    holds at most one batch (not the whole resultset). This bounds the full-corpus
+    reads a single fetchall would otherwise materialize per connection: a no-`since`
+    rating recompute, or a large catch-up delta. Keyset continuation on
+    (modified_at, uid) is tie-safe across batch boundaries (a same-timestamp run
+    split by the LIMIT is neither skipped nor duplicated) and rides the
+    idx_objects_type_modified (type, modified_at, uid) index.
+
+    `exclude_deleted` filters soft-deleted rows (the snapshot path — a fresh client
+    needs no tombstones); the SSE catch-up leaves it False so deletions propagate.
+    Yields (batch_of_raw_json_strings, max_modified_at_in_batch) per non-empty batch.
+    """
     if not _pool:
         raise RuntimeError("Database not initialized")
 
     col = _level_col(level)
-    conditions = [f"{col} IS NOT NULL"]
-    params: list = []
+    last_modified: str | None = None
+    last_uid: str | None = None
 
-    if obj_type:
-        conditions.append("type = %s")
-        params.append(obj_type)
-    if since:
-        conditions.append("modified_at > %s")
-        params.append(since)
+    while True:
+        conditions = [f"{col} IS NOT NULL"]
+        params: list = []
+        if obj_type:
+            conditions.append("type = %s")
+            params.append(obj_type)
+        if exclude_deleted:
+            conditions.append("deleted_at IS NULL")
+        if last_modified is not None:
+            # Keyset continuation: tie-safe past the previous batch's last row.
+            conditions.append("(modified_at, uid) > (%s::timestamp, %s)")
+            params += [last_modified, last_uid]
+        elif since:
+            conditions.append("modified_at > %s::timestamp")
+            params.append(since)
+        where = " AND ".join(conditions)
 
-    where = " AND ".join(conditions)
+        async with _pool.connection() as conn:
+            rows = await (
+                await conn.execute(
+                    f"SELECT {col}::text, modified_at, uid FROM objects "  # ty: ignore[invalid-argument-type]
+                    f"WHERE {where} ORDER BY modified_at ASC, uid ASC LIMIT %s",
+                    (*params, batch_size),
+                )
+            ).fetchall()
 
-    async with _pool.connection() as conn:
-        rows = await (
-            await conn.execute(
-                f"SELECT {col}::text, modified_at FROM objects "  # ty: ignore[invalid-argument-type]
-                f"WHERE {where} ORDER BY modified_at ASC",
-                tuple(params),
-            )
-        ).fetchall()
-
-    if rows:
+        if not rows:
+            break
         yield [r[0] for r in rows], rows[-1][1].isoformat()
+        if len(rows) < batch_size:
+            break
+        last_modified = rows[-1][1].isoformat()
+        last_uid = rows[-1][2]
 
 
 async def purge_deleted_objects(days: int = 30) -> int:

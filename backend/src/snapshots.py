@@ -33,7 +33,7 @@ async def generate_snapshots() -> dict[str, int]:
     Returns dict of {level: object_count}.
     Reads {level}::text column directly — no Python deserialization.
     """
-    from .db import _pool
+    from .db import _pool, stream_objects_new
 
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -70,27 +70,20 @@ async def generate_snapshots() -> dict[str, int]:
 
                     gz.write(f'{{"type":"{obj_type}","data":[')
 
-                    # Stream objects of this type, reading pre-computed column
-                    col = f'"{level}"'
-                    async with _pool.connection() as conn:
-                        result = await conn.execute(
-                            f"SELECT {col}::text, modified_at FROM objects "  # ty: ignore[invalid-argument-type]
-                            f"WHERE type = %s AND deleted_at IS NULL AND {col} IS NOT NULL "
-                            f"ORDER BY modified_at ASC",
-                            (obj_type,),
-                        )
-                        first_obj = True
-                        async for row in result:
-                            json_str, mod_at = row[0], row[1]
+                    # Stream the pre-computed column in keyset batches (bounded heap),
+                    # excluding soft-deleted rows — a fresh client needs no tombstones.
+                    first_obj = True
+                    async for json_strings, batch_max in stream_objects_new(
+                        obj_type=obj_type, level=level, exclude_deleted=True
+                    ):
+                        for json_str in json_strings:
                             if not first_obj:
                                 gz.write(",")
                             first_obj = False
                             gz.write(json_str)
                             count += 1
-
-                            mod_str = mod_at.isoformat()
-                            if timestamp is None or mod_str > timestamp:
-                                timestamp = mod_str
+                        if timestamp is None or batch_max > timestamp:
+                            timestamp = batch_max
 
                     gz.write("]}")
 
