@@ -3,7 +3,8 @@ name: CI
 # Fast pre-merge gate — the high-signal, deterministic checks that run in minutes,
 # complementing the slow full-stack E2E suite (e2e.yml). Mirrors `just test` /
 # `just lint-check`, split into independent parallel jobs so each layer fails and
-# reports on its own: python lint, the Rust engine, backend pytest, frontend types.
+# reports on its own: python lint, the Rust engine, backend pytest, frontend types,
+# bot pytest.
 on:
   pull_request:
   push:
@@ -130,3 +131,28 @@ jobs:
         run: |
           npm ci
           npm run check -- --threshold error
+
+  # Bot has no live-Discord test, but its unit + startup-wiring suite runs here so a
+  # DI/command-wiring regression (the lightbulb v2→v3 class that crash-looped beta
+  # while E2E stayed green) fails the build. Pure Python — no engine/DB needed; the
+  # dummy secrets just satisfy config.py's import-time env reads.
+  bot:
+    name: Bot pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: bot
+    env:
+      DISCORD_BOT_TOKEN: ci-test-token
+      OAUTH_CLIENT_ID: ci-test-client
+      OAUTH_CLIENT_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install uv
+        run: pip install uv
+      - name: pytest
+        run: uv run --with pytest --with pytest-asyncio pytest -q
