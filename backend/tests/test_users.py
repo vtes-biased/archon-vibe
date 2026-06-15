@@ -84,7 +84,9 @@ async def test_role_change_resyncs_only_for_access_roles(
     target = next(
         u
         for u in populated_db
-        if u.uid != admin.uid and u.vekn_id and not (set(u.roles) & {Role.NC, Role.PRINCE, Role.IC})
+        if u.uid != admin.uid
+        and u.vekn_id
+        and not (set(u.roles) & {Role.NC, Role.PRINCE, Role.IC})
     )
     headers = make_auth_header(admin.uid)
 
