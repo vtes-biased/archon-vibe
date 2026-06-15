@@ -65,7 +65,30 @@ from .auth import send_invite_email
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
-decoder = msgspec.json.Decoder(Tournament)
+
+# Post-finish actions that CANNOT change ranking points, so they must not trigger
+# the (expensive: full window recompute + a broadcast per player) rating pass on
+# an already-finished tournament. Conservative denylist — everything else still
+# recomputes, because a stale rating is worse than a redundant pass. These are the
+# edits that realistically happen after a tournament finishes: the winner's TWDA
+# writeup (UpdateDeck), closing-ceremony raffles, payment reconciliation, late
+# check-in fixes. (Wire types per engine/tournament/parsing.rs — note UpdateDeck,
+# not UpsertDeck.)
+_RATING_IRRELEVANT_ACTIONS = frozenset(
+    {
+        "UpdateDeck",
+        "DeleteDeck",
+        "SetPaymentStatus",
+        "MarkAllPaid",
+        "RaffleDraw",
+        "RaffleUndo",
+        "RaffleClear",
+        "CheckIn",
+        "CheckOut",
+        "CheckInAll",
+        "ResetCheckIn",
+    }
+)
 
 _engine = PyEngine()
 
@@ -965,7 +988,11 @@ async def tournament_action(
             v = t_data.get(dt_field)
             if isinstance(v, str) and len(v) == 16:  # "YYYY-MM-DDTHH:MM"
                 t_data[dt_field] = v + ":00"
-        updated = decoder.decode(msgspec.json.encode(t_data))
+        # Build the model straight from the engine's dict: msgspec.convert applies
+        # the same coercion (incl. RFC3339 str→datetime) as a JSON decode but skips
+        # the redundant whole-object encode→decode round-trip — meaningful event-loop
+        # CPU on a 400-player object during a large scoring burst.
+        updated = msgspec.convert(t_data, Tournament)
         updated.modified = datetime.now(UTC)
         # Stamp the actual end time when entering Finished without an explicit
         # finish date — the engine never sets finish, and ratings/VEKN push
@@ -1023,11 +1050,17 @@ async def tournament_action(
 
     broadcast_precomputed(tournament_bd)
 
-    # Recompute ratings when tournament enters/leaves Finished state,
-    # or when data changes on a finished tournament (e.g. SetScore, UpdateConfig)
+    # Recompute ratings when the tournament enters/leaves Finished (state change),
+    # or when a result-affecting action lands on an already-finished tournament
+    # (e.g. SetScore/Override correction). Skip the recompute for finished-state
+    # edits that can't move ranking points (deck/payment/raffle/check-in) — they
+    # otherwise trigger a full window recompute + a broadcast per player on EVERY
+    # such post-finish action.
     was_finished = pre_state == TournamentState.FINISHED
     is_finished = updated.state == TournamentState.FINISHED
-    if was_finished != is_finished or is_finished:
+    state_changed = was_finished != is_finished
+    results_may_change = is_finished and request.type not in _RATING_IRRELEVANT_ACTIONS
+    if state_changed or results_may_change:
         try:
             from ..ratings import (
                 rating_category_for_tournament,
@@ -1642,7 +1675,7 @@ async def go_online(
         tournament_data["modified"] = datetime.now(UTC).isoformat()
 
         # Save tournament within the locked transaction (upsert handles insert)
-        updated = decoder.decode(msgspec.json.encode(tournament_data))
+        updated = msgspec.convert(tournament_data, Tournament)
         updated.modified = datetime.now(UTC)
         # A tournament finished offline arrives without a finish date (the
         # engine never stamps it) — use the sync time as the actual end time
@@ -1800,7 +1833,7 @@ async def sync_offline(
             tournament_data["offline_since"] = tournament.offline_since.isoformat()
         tournament_data["modified"] = datetime.now(UTC).isoformat()
 
-        updated = decoder.decode(msgspec.json.encode(tournament_data))
+        updated = msgspec.convert(tournament_data, Tournament)
         updated.modified = datetime.now(UTC)
         await save_object(
             ObjectType.TOURNAMENT,

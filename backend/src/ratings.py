@@ -19,7 +19,7 @@ from .db import (
     get_finished_tournaments_for_category,
     get_sanctions_for_tournament,
     get_tournament_wins_for_users,
-    get_user_by_uid,
+    get_users_by_uids,
     save_user,
     stream_objects_new,
 )
@@ -158,14 +158,15 @@ async def recompute_ratings_for_players(
             await get_finished_tournaments_for_category(fmt, online, cutoff_str)
         )
 
-    # Fetch wins for all players in batch
+    # Fetch wins + the player User objects in batch (one query each, not N).
     wins_map = await get_tournament_wins_for_users(player_uids)
+    users_by_uid = await get_users_by_uids(player_uids)
 
     updated_users: list[tuple[User, BroadcastData]] = []
     sanctions_cache: dict[str, list] = {}
 
     for user_uid in player_uids:
-        user = await get_user_by_uid(user_uid)
+        user = users_by_uid.get(user_uid)
         if not user:
             continue
 

@@ -578,6 +578,24 @@ async def get_user_by_uid(
     return await get_object_full(uid, User, conn=conn)
 
 
+async def get_users_by_uids(uids: set[str]) -> dict[str, User]:
+    """Batch-fetch users by uid, keyed by uid (full projection, same as
+    get_user_by_uid). One query instead of N round-trips — the post-finish rating
+    recompute would otherwise do one get_user_by_uid per player (400 sequential
+    round-trips at a big-event finish). Missing/null-full uids are absent from the
+    map, so the caller skips them exactly as the per-uid loop did."""
+    if not uids:
+        return {}
+    async with get_connection() as conn:
+        result = await conn.execute(
+            'SELECT "full" FROM objects '
+            "WHERE type = 'user' AND uid = ANY(%s) AND \"full\" IS NOT NULL",
+            (list(uids),),
+        )
+        rows = await result.fetchall()
+    return {u.uid: u for u in (decode_json(row[0], User) for row in rows)}
+
+
 async def delete_user(uid: str) -> None:
     """Delete a user from the database (hard delete)."""
     await delete_object(uid)

@@ -232,3 +232,17 @@ async def test_country_change_authority_for_officials(
         "/auth/me", json={"country": "DE"}, headers=make_auth_header(member_fr.uid)
     )
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_get_users_by_uids_batch_matches_per_uid(populated_db):
+    """Batch fetch returns exactly the per-uid users keyed by uid, and silently
+    omits unknown uids — the rating recompute relies on this to skip missing
+    players in one query instead of a round-trip each."""
+    uids = {u.uid for u in populated_db[:50]}
+    batch = await db.get_users_by_uids(uids | {"no-such-uid"})
+    assert set(batch) == uids  # unknown uid omitted; every real uid present
+    for uid in uids:
+        one = await db.get_user_by_uid(uid)
+        assert batch[uid].uid == one.uid and batch[uid].name == one.name
+    assert await db.get_users_by_uids(set()) == {}  # empty in → empty out
