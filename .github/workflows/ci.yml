@@ -132,6 +132,48 @@ jobs:
           npm ci
           npm run check -- --threshold error
 
+  # The fast gate's only check against the BUILT artifact: the e2e suite serves
+  # the frontend via `vite dev`, so prod-build-only breakage (asset paths, the
+  # 200.html SPA fallback, modulepreload, the API base) ships green. Needs the
+  # WASM engine — the frontend build imports $engine — same as the type-check job.
+  frontend-build:
+    name: Frontend build smoke (playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: Build WASM engine
+        working-directory: engine
+        run: wasm-pack build --target web --release -- --features wasm
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps + build (prod-like, relative API base)
+        working-directory: frontend
+        env:
+          VITE_API_URL: ""
+        run: |
+          npm ci
+          npm run build
+      - name: Install Playwright chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build smoke
+        working-directory: frontend
+        run: npm run test:smoke
+
   # Bot has no live-Discord test, but its unit + startup-wiring suite runs here so a
   # DI/command-wiring regression (the lightbulb v2→v3 class that crash-looped beta
   # while E2E stayed green) fails the build. Pure Python — no engine/DB needed; the

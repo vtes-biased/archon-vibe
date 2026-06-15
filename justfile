@@ -139,6 +139,17 @@ test-e2e:
     docker compose -p archon-vibe-e2e --profile test up --build \
         --abort-on-container-exit --exit-code-from frontend-test frontend-test
 
+# Smoke-test the PRODUCTION frontend build — catches prod-build-only breakage the
+# dev-server e2e misses (asset paths, SPA fallback, WASM, API base). No backend
+# needed; mirrors CI's frontend-build job.
+test-smoke:
+    #!/usr/bin/env bash
+    set -e
+    (cd engine && wasm-pack build --target web --release -- --features wasm)
+    cd frontend
+    VITE_API_URL="" npm run build
+    npm run test:smoke
+
 # release.yml runs e2e on the pushed tag and, only if green, creates the GitHub
 # Release, then builds + attaches the artifacts in the same run. Examples:
 #   just release patch   # v0.1.10 -> v0.1.11
