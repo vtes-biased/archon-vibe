@@ -752,6 +752,7 @@ Standalone process (`bot/`) — manages online VTES tournaments inside Discord s
 | `/setup <url>` | Link an Archon tournament URL to the Discord guild; creates category + announcement/lobby/judges channels | NC/Prince/IC only |
 | `/teardown` | Remove all bot-created channels and unlink tournament | Organizer |
 | `/announce <message>` | Post to the announcement channel | Setup organizer, NC/Prince/IC |
+| `/sync` | Manually reconcile voice channels with current tournament state (repair tool) | Organizer |
 | `/register` | Self-register for the tournament (VEKN ID claim or sponsorship request flow) | Any guild member |
 | `/checkin` | Check in for current round | Any guild member |
 | `/report <vp>` | Submit VP score via `SetScore` action | Seated player |
@@ -773,17 +774,25 @@ Standalone process (`bot/`) — manages online VTES tournaments inside Discord s
 
 ### SSE Listener
 
-Subscribes to a **tournament-scoped** SSE stream (`/stream?tournament=<uid>`) using the organizer's `user:impersonate` token — one connection per active (guild, tournament) pair. The scoped stream delivers only that tournament + its sanctions + judge calls; the bot never streams the whole corpus. Reacts to tournament lifecycle events:
+Subscribes to a **tournament-scoped** SSE stream (`/stream?tournament=<uid>`) using the organizer's `user:impersonate` token — one connection per active (guild, tournament) pair. The scoped stream delivers only that tournament + its sanctions + judge calls; the bot never streams the whole corpus.
 
-- **Open/CheckIn state**: posts registration/check-in announcements to #announcement
-- **RoundStart**: posts seating; creates per-table voice channels; syncs per-player CONNECT+SPEAK permissions; warns unlinked players
-- **RoundFinish/Finals**: posts standings; deletes table voice channels; opens check-in for next round
-- **Finish**: posts final standings; prompts `/teardown`
-- **Mid-round seating changes** (SwapSeats, AlterSeating, etc.): detected via `_last_seating` diff → re-syncs voice channel permissions
+**Channel structure** — driven by a single idempotent authority in `sse_listener.py`:
+- `reconcile_channels(bot, store, guild_id, tournament_uid, obj)` is the sole function that creates/deletes voice channels and sets per-member CONNECT+SPEAK permissions. It is called on every relevant state change (round start/end, finals, reconnect, `/sync`).
+- `channel_manager.desired_channels(obj)` (pure) computes the target channel set from tournament state; `structure_signature(obj)` produces a change-guard hash so reconcile is skipped when structure is unchanged.
+- A per-tournament `asyncio.Lock` (`_structural_locks`) serializes all structural mutations so concurrent SSE events, reconnects, and `/sync` invocations never interleave.
+
+**Announcements** — separate edge-triggered layer (`_emit_announcements`) that posts seating/standings/score text to #announcement. Runs after structural reconcile; suppressed during the silent catch-up phase.
+
+**Lifecycle reactions**:
+- **Open/CheckIn state**: posts registration/check-in announcements
+- **RoundStart / Finals**: reconcile channels + post seating; warns unlinked players
+- **RoundFinish**: reconcile channels (removes round channels) + post standings
+- **Finish**: post final standings; prompt `/teardown`
 - **`judge_call` ephemeral event**: posts to #judges channel
-- **Catch-up on (re)connect**: the bot sends no `since` cursor, so the backend replays full current tournament state. Events seed state silently until a `sync_complete` message flips `synced`; only after that do events post announcements — so a restart/reconnect doesn't re-post past announcements. A `resync` message triggers a fresh reconnect.
 
-Uses a shared `aiohttp` session across SSE reconnects. State tracked in module-level dicts (`_sse_tasks`, `_last_state`, `_last_round_count`, `_last_tournament`, `_last_seating`, `_table_channels`). All state cleaned up on `stop_sse` and teardown.
+**Catch-up on (re)connect**: the bot sends no `since` cursor, so the backend replays full current tournament state. Events seed state silently until `sync_complete` flips `synced`; announcements are suppressed until then — so a restart/reconnect doesn't re-post past announcements. A `resync` message triggers a fresh reconnect.
+
+Uses a shared `aiohttp` session across SSE reconnects. State tracked in module-level dicts (`_sse_tasks`, `_last_state`, `_last_round_count`, `_last_tournament`, `_table_channels`). All state cleaned up on `stop_sse` and teardown.
 
 ### Channel Permissions
 

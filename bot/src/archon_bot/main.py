@@ -18,7 +18,12 @@ from .commands.player import (
     RegisterCommand,
     ReportCommand,
 )
-from .commands.setup import AnnounceCommand, SetupCommand, TeardownCommand
+from .commands.setup import (
+    AnnounceCommand,
+    SetupCommand,
+    SyncCommand,
+    TeardownCommand,
+)
 from .oauth_callback import set_context, start_callback_server
 from .sse_listener import start_sse
 from .token_store import TokenStore
@@ -61,39 +66,56 @@ async def _on_unhandled_command_error(
     return True
 
 
-def main() -> None:
-    bot = hikari.GatewayBot(
-        config.DISCORD_BOT_TOKEN,
-        intents=hikari.Intents.GUILDS | hikari.Intents.GUILD_VOICE_STATES,
-    )
+# Every slash command, in registration order. A tuple so the startup smoke test
+# (test_startup.py) can register the same set and assert each command's injected
+# dependencies resolve — the wiring regression #154 would have caught.
+COMMANDS = (
+    SetupCommand,
+    TeardownCommand,
+    AnnounceCommand,
+    SyncCommand,
+    RegisterCommand,
+    CheckinCommand,
+    ReportCommand,
+    JudgeCommand,
+    SanctionCommand,
+)
 
+
+def build_client(
+    bot: hikari.GatewayBot,
+    store: TokenStore,
+    api: ArchonAPI,
+    miru_client: miru.Client,
+) -> lightbulb.Client:
+    """Wire the lightbulb client the way the running bot does: DI registry, the
+    auto-defer hook + error handler, and every command registered. Extracted from
+    ``main`` so a startup smoke test can exercise this wiring — and that each
+    command's injected deps resolve — without a live Discord connection.
+    """
     client = lightbulb.client_from_app(bot, hooks=[_auto_defer])
-    # Surface command crashes as a message instead of a silent/perpetual defer.
     client.error_handler(_on_unhandled_command_error, priority=-10)
-    # Subscribe lightbulb client start to bot starting event
     bot.subscribe(hikari.StartingEvent, client.start)
 
-    miru_client = miru.Client(bot)
-
-    # Shared state
-    store = TokenStore()
-    api = ArchonAPI(store)
-
-    # Register shared deps for command access via lightbulb v3 dependency injection
     registry = client.di.registry_for(lightbulb.di.Contexts.DEFAULT)
     registry.register_value(TokenStore, store)
     registry.register_value(ArchonAPI, api)
     registry.register_value(miru.Client, miru_client)
 
-    # Register commands
-    client.register(SetupCommand)
-    client.register(TeardownCommand)
-    client.register(AnnounceCommand)
-    client.register(RegisterCommand)
-    client.register(CheckinCommand)
-    client.register(ReportCommand)
-    client.register(JudgeCommand)
-    client.register(SanctionCommand)
+    for command in COMMANDS:
+        client.register(command)
+    return client
+
+
+def main() -> None:
+    bot = hikari.GatewayBot(
+        config.DISCORD_BOT_TOKEN,
+        intents=hikari.Intents.GUILDS | hikari.Intents.GUILD_VOICE_STATES,
+    )
+    miru_client = miru.Client(bot)
+    store = TokenStore()
+    api = ArchonAPI(store)
+    build_client(bot, store, api, miru_client)
 
     # hikari's GatewayBot has no data store in v2.5; share via this closure
     callback_runner = None

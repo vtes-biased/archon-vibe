@@ -26,11 +26,10 @@ def _table_channel_name(table_num: int, round_number: int | None) -> str:
 
 @dataclass(frozen=True)
 class DesiredChannel:
-    """One voice channel the current tournament state requires to exist.
+    """A voice channel the tournament state requires, matched/diffed by ``name``.
 
-    ``member_uids`` is the CONNECT+SPEAK allow-set (seated players ∪ organizers)
-    layered over the constant ``@everyone DENY CONNECT`` baseline every table /
-    finals channel carries. Channels are matched and diffed by ``name``.
+    ``member_uids`` (seated players ∪ organizers) is the CONNECT+SPEAK allow-set
+    over the constant ``@everyone DENY CONNECT`` baseline.
     """
 
     name: str
@@ -38,23 +37,16 @@ class DesiredChannel:
 
 
 def _seat_uids(seating: Iterable[dict]) -> frozenset[str]:
-    """The non-empty ``player_uid`` set of a list of seat dicts."""
     return frozenset(s.get("player_uid", "") for s in seating) - {""}
 
 
 def desired_channels(obj: dict) -> list[DesiredChannel]:
-    """Pure: the deterministic target voice-channel set for a tournament's state.
+    """The target round/finals voice-channel set for a state — reconcile's goal.
 
-    The single source of truth for *which* round/finals channels must exist and
-    who may connect — ``reconcile_channels`` diffs this against Discord.
-
-    - Empty unless the tournament is ``Playing``.
-    - Finals (``finals.seating`` present, no result yet): a single ``Finals``
-      channel for all finalists ∪ organizers. A finished finals (result in) — like
-      any non-Playing state — yields nothing, so its channel gets torn down.
-    - Otherwise the current (latest) round: one ``R{n} - Table {m}`` channel per
-      table, ordered by table number, each scoped to that table's seated players ∪
-      organizers.
+    Empty unless ``Playing``. With finals seated and no result yet: a single
+    ``Finals`` for all finalists ∪ organizers (a finished finals → nothing, so the
+    channel is torn down). Otherwise the current round: one ``R{n} - Table {m}`` per
+    table, scoped to that table's seated players ∪ organizers.
     """
     if obj.get("state") != "Playing":
         return []
@@ -79,14 +71,11 @@ def desired_channels(obj: dict) -> list[DesiredChannel]:
 
 
 def structure_signature(obj: dict) -> tuple:
-    """Pure, hashable digest of the STRUCTURE-affecting fields only.
+    """Hashable digest of the structure-affecting fields — the cheap reconcile guard.
 
-    A cheap guard: when it is unchanged between two tournament snapshots, no
-    channel/permission reconcile is needed (skips the per-score-report churn). It
-    keys on each desired channel's name and full member set — i.e. per-table
-    membership, the organizer set, and finals-vs-prelim mode — but deliberately
-    NOT on table *count* alone: a same-size seat swap (same number of tables,
-    different players) changes a member set and so must still trigger a reconcile.
+    Keyed on each desired channel's name and full member set (per-table membership,
+    organizers, finals/prelim mode), NOT on table count: a same-size seat swap must
+    still flip it. Equal between two snapshots ⇒ no reconcile needed.
     """
     return tuple((dc.name, dc.member_uids) for dc in desired_channels(obj))
 
@@ -152,6 +141,21 @@ async def create_tournament_channels(
     }
 
 
+def member_override_ids(channel: object) -> set[int]:
+    """Member ids holding an override on an already-fetched channel payload.
+
+    Lets reconcile pass current members to ``sync_table_permissions`` off the
+    ``fetch_guild_channels`` payload instead of re-fetching per channel. Role
+    overrides (@everyone) are skipped.
+    """
+    overrides = getattr(channel, "permission_overwrites", None) or {}
+    return {
+        int(ov.id)
+        for ov in overrides.values()
+        if ov.type == hikari.PermissionOverwriteType.MEMBER
+    }
+
+
 async def sync_table_permissions(
     bot: hikari.GatewayBot,
     guild_id: int,
@@ -169,7 +173,8 @@ async def sync_table_permissions(
 
     Args:
         current_member_ids: If provided, skip the fetch_channel call (e.g., when
-            called right after channel creation with known-empty overrides).
+            called right after channel creation with known-empty overrides, or with
+            the overwrites already on a ``fetch_guild_channels`` payload).
     """
     allowed_uids = player_uids | organizer_uids
     desired_discord_ids: set[int] = set()
@@ -179,14 +184,8 @@ async def sync_table_permissions(
             desired_discord_ids.add(did)
 
     if current_member_ids is None:
-        # Fetch current overrides
         channel = await bot.rest.fetch_channel(channel_id)
-        current_overrides = getattr(channel, "permission_overwrites", {})
-        # Find current member overrides (skip role overrides like @everyone)
-        current_member_ids = set()
-        for ov in current_overrides.values():
-            if ov.type == hikari.PermissionOverwriteType.MEMBER:
-                current_member_ids.add(int(ov.id))
+        current_member_ids = member_override_ids(channel)
 
     # Remove stale overrides
     stale = current_member_ids - desired_discord_ids
@@ -225,133 +224,63 @@ async def sync_table_permissions(
             )
 
 
-async def create_table_channels(
+async def create_round_voice_channel(
     bot: hikari.GatewayBot,
     guild_id: int,
     category_id: int,
-    tables: list[list[str]],
+    name: str,
+    member_uids: frozenset[str] | set[str],
     discord_id_map: dict[str, int],
-    organizer_uids: set[str] | None = None,
-    is_finals: bool = False,
-    start_index: int = 0,
-    round_number: int | None = None,
-) -> list[int]:
-    """Create voice channels for tournament tables, then sync permissions.
+) -> int:
+    """Create one table/finals voice channel (``@everyone DENY CONNECT`` baseline)
+    and grant CONNECT+SPEAK to its members. Returns the new channel id."""
+    logger.info("→ create_guild_voice_channel '%s' guild=%s", name, guild_id)
+    ch = await bot.rest.create_guild_voice_channel(
+        guild_id,
+        name=name,
+        category=category_id,
+        permission_overwrites=[
+            hikari.PermissionOverwrite(
+                id=guild_id,
+                type=hikari.PermissionOverwriteType.ROLE,
+                deny=hikari.Permissions.CONNECT,
+            ),
+        ],
+    )
+    logger.info("✓ created '%s' id=%s", name, ch.id)
+    # Freshly created → only the @everyone override exists, so no fetch needed.
+    await sync_table_permissions(
+        bot,
+        guild_id,
+        ch.id,
+        set(member_uids),
+        set(),
+        discord_id_map,
+        current_member_ids=set(),
+    )
+    return ch.id
 
-    Args:
-        tables: List of tables, each containing player archon UIDs
-        discord_id_map: Mapping from archon_uid to Discord user ID (int)
-        organizer_uids: Set of organizer archon UIDs (get access to all tables)
-        is_finals: If True, create a single "Finals" channel
-        start_index: Table numbering offset (for adding new tables mid-round)
-        round_number: 1-based round, prefixes table names as "R{n} - Table {m}"
 
-    Returns list of created channel IDs.
+def round_channels_by_name(
+    channels: Iterable[object], category_id: int
+) -> dict[str, object]:
+    """The volatile round/finals VOICE channels under ``category_id``, keyed by name
+    — exactly what reconcile owns (``R{n} - Table {m}``, legacy ``Table {m}``,
+    ``Finals``); #judges, text, and foreign-category channels are excluded.
+
+    Takes an already-fetched list so reconcile reads each survivor's
+    ``permission_overwrites`` off the same payload it diffs.
     """
-    org_uids = organizer_uids or set()
-    channel_ids = []
-
-    if is_finals:
-        # Single finals channel with @everyone DENY
-        logger.info("→ create_guild_voice_channel 'Finals' guild=%s", guild_id)
-        ch = await bot.rest.create_guild_voice_channel(
-            guild_id,
-            name="Finals",
-            category=category_id,
-            permission_overwrites=[
-                hikari.PermissionOverwrite(
-                    id=guild_id,
-                    type=hikari.PermissionOverwriteType.ROLE,
-                    deny=hikari.Permissions.CONNECT,
-                ),
-            ],
-        )
-        channel_ids.append(ch.id)
-        logger.info("✓ created 'Finals' id=%s", ch.id)
-        # All finalists across all tables
-        all_players = {uid for table in tables for uid in table}
-        # Freshly created: only @everyone role override, no member overrides
-        await sync_table_permissions(
-            bot,
-            guild_id,
-            ch.id,
-            all_players,
-            org_uids,
-            discord_id_map,
-            current_member_ids=set(),
-        )
-    else:
-        for i, table in enumerate(tables):
-            table_num = start_index + i + 1
-            ch_name = _table_channel_name(table_num, round_number)
-            logger.info("→ create_guild_voice_channel '%s' guild=%s", ch_name, guild_id)
-            ch = await bot.rest.create_guild_voice_channel(
-                guild_id,
-                name=ch_name,
-                category=category_id,
-                permission_overwrites=[
-                    hikari.PermissionOverwrite(
-                        id=guild_id,
-                        type=hikari.PermissionOverwriteType.ROLE,
-                        deny=hikari.Permissions.CONNECT,
-                    ),
-                ],
-            )
-            channel_ids.append(ch.id)
-            logger.info("✓ created '%s' id=%s", ch_name, ch.id)
-            # Freshly created: only @everyone role override, no member overrides
-            await sync_table_permissions(
-                bot,
-                guild_id,
-                ch.id,
-                set(table),
-                org_uids,
-                discord_id_map,
-                current_member_ids=set(),
-            )
-
-    return channel_ids
-
-
-async def fetch_round_channel_ids(
-    bot: hikari.GatewayBot,
-    guild_id: int,
-    category_id: int,
-) -> tuple[list[int], int | None]:
-    """Discover the round's voice channels currently under the category.
-
-    Returns ``(table_channel_ids_ordered, finals_channel_id)`` by matching the
-    deterministic names this module creates — ``R{n} - Table {m}`` (and the
-    legacy ``Table {m}``), ordered by table number, plus ``Finals``. The
-    per-tournament ``judges`` voice channel is ignored.
-
-    This makes round setup idempotent: after a bot restart (which loses the
-    in-memory channel map) or a half-finished creation, the caller can tell which
-    table channels already exist instead of blindly re-creating duplicates.
-    """
-    channels = await bot.rest.fetch_guild_channels(guild_id)
-    tables: dict[int, int] = {}
-    finals_id: int | None = None
+    out: dict[str, object] = {}
     for ch in channels:
         if getattr(ch, "parent_id", None) != category_id:
             continue
         if ch.type != hikari.ChannelType.GUILD_VOICE:
             continue
         name = ch.name or ""
-        if name == "Finals":
-            finals_id = ch.id
-            continue
-        m = _TABLE_NAME_RE.match(name)
-        if m:
-            tables[int(m.group(1))] = ch.id
-    ordered = [tables[n] for n in sorted(tables)]
-    logger.info(
-        "Discovered round channels under category=%s: %d table(s), finals=%s",
-        category_id,
-        len(ordered),
-        finals_id,
-    )
-    return ordered, finals_id
+        if name == "Finals" or _TABLE_NAME_RE.match(name):
+            out[name] = ch
+    return out
 
 
 async def delete_channels(

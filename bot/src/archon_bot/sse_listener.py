@@ -7,6 +7,7 @@ import json
 import logging
 import time
 from collections import defaultdict
+from dataclasses import dataclass, field
 
 import aiohttp
 
@@ -20,9 +21,12 @@ from .announcements import (
     player_display,
 )
 from .channel_manager import (
-    create_table_channels,
+    create_round_voice_channel,
     delete_channels,
-    fetch_round_channel_ids,
+    desired_channels,
+    member_override_ids,
+    round_channels_by_name,
+    structure_signature,
     sync_table_permissions,
 )
 from .token_store import TokenStore
@@ -56,20 +60,18 @@ def _access_token_expired(token: str, *, skew_seconds: int = 60) -> bool:
 # Track active SSE tasks: guild_id+tournament_uid → asyncio.Task
 _sse_tasks: dict[str, asyncio.Task] = {}
 
-# Track table voice channel IDs per round: key → list of channel IDs
+# key → table/finals voice channel ids in desired order. Written by
+# reconcile_channels; read by the announcement layer to route sanctions/scores.
 _table_channels: dict[str, list[int]] = defaultdict(list)
 
-# Track last known state per tournament to detect transitions (prevents spam)
-_last_state: dict[str, str] = {}
-
-# Track last known round count to detect new rounds
-_last_round_count: dict[str, int] = {}
-
-# Cache last tournament data for table lookups (needed for sanction → table mapping)
+# key → the previous tournament snapshot: announcements diff against it and the
+# reconcile guard hashes it. Seeded silently at catch-up, popped in stop_sse.
 _last_tournament: dict[str, dict] = {}
 
-# Track last known seating per round for mid-round change detection
-_last_seating: dict[str, list[set[str]]] = {}
+# key → lock serializing all structural mutation (live/reconnect reconcile, /sync,
+# /teardown). NOT popped in stop_sse: popping mid-hold would hand a waiter a fresh
+# lock, and a torn-down link makes every holder no-op after its re-read anyway.
+_structural_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 # Cache participant identities (uid → {"name", "nickname"}) per tournament,
 # seeded from `user` SSE events (the scoped stream now pushes the tournament's
@@ -90,6 +92,12 @@ def _cache_user_identity(key: str, user_obj: dict) -> None:
 
 def _task_key(guild_id: str, tournament_uid: str) -> str:
     return f"{guild_id}:{tournament_uid}"
+
+
+def structural_lock(guild_id: str, tournament_uid: str) -> asyncio.Lock:
+    """Per-tournament lock every structural-mutation path holds (reconcile from a
+    live event or reconnect, /sync, /teardown) so they never interleave."""
+    return _structural_locks[_task_key(guild_id, tournament_uid)]
 
 
 def find_player_table(
@@ -155,7 +163,9 @@ def tracked_table_channels(guild_id: str, tournament_uid: str) -> list[int]:
     channels that have drifted out of the category (which the category scan would
     miss). Returns a copy; call it BEFORE ``stop_sse``, which clears the map.
     """
-    return list(_table_channels.get(_task_key(guild_id, tournament_uid), []))
+    return [
+        c for c in _table_channels.get(_task_key(guild_id, tournament_uid), []) if c
+    ]
 
 
 async def stop_sse(guild_id: str, tournament_uid: str) -> None:
@@ -164,12 +174,10 @@ async def stop_sse(guild_id: str, tournament_uid: str) -> None:
     task = _sse_tasks.pop(key, None)
     if task and not task.done():
         task.cancel()
-    _last_state.pop(key, None)
-    _last_round_count.pop(key, None)
-    _last_seating.pop(key, None)
     _table_channels.pop(key, None)
     _last_tournament.pop(key, None)
     _user_names.pop(key, None)
+    # _structural_locks intentionally NOT popped — see structural_lock.
 
 
 async def _sse_loop(
@@ -411,7 +419,12 @@ async def _dispatch_event(
 
 
 def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
-    """Initialize state tracking from snapshot without posting announcements."""
+    """Seed the previous-state snapshot from catch-up without posting anything.
+
+    Catch-up replays the tournament's full current state; recording it silently
+    means the next live event diffs against where we actually are (no spam), and a
+    reconnect's reconcile reads it to repair channels.
+    """
     items = data if isinstance(data, list) else [data]
     for item in items:
         obj = item.get("data", item)
@@ -420,14 +433,11 @@ def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
             continue
         if item.get("type") != "tournament" or obj.get("uid") != tournament_uid:
             continue
-        _last_state[key] = obj.get("state", "")
-        _last_round_count[key] = len(obj.get("rounds", []))
-        _last_seating[key] = _extract_round_seating(obj) or []
         _last_tournament[key] = obj
         logger.info(
             "Snapshot: state=%s rounds=%d for %s",
-            _last_state[key],
-            _last_round_count[key],
+            obj.get("state", ""),
+            len(obj.get("rounds", [])),
             key,
         )
 
@@ -460,14 +470,6 @@ def _extract_round_seating(tournament: dict) -> list[set[str]] | None:
     for table in current_round:
         seating = table.get("seating", [])
         result.append({s.get("player_uid", "") for s in seating})
-    return result
-
-
-def _collect_all_player_uids(seating: list[set[str]]) -> set[str]:
-    """Collect all player UIDs from seating."""
-    result: set[str] = set()
-    for table in seating:
-        result |= table
     return result
 
 
@@ -524,7 +526,8 @@ def compute_result_announcements(
     # appends (i ≥ len(prev_tables) is clamped out — a fresh table has no prior
     # score to diff), and a remove shrinks both lists from the tail.
     for i, table in enumerate(cur_tables):
-        if i >= len(table_chs) or i >= len(prev_tables):
+        # `not table_chs[i]` skips a 0 sentinel left by a failed reconcile create.
+        if i >= len(table_chs) or i >= len(prev_tables) or not table_chs[i]:
             continue
         cur_res = _seat_results(table)
         prev_res = _seat_results(prev_tables[i])
@@ -572,36 +575,147 @@ async def _warn_unlinked_players(
     )
 
 
-async def _cleanup_round_channels(
+@dataclass
+class ReconcileSummary:
+    """What a ``reconcile_channels`` run changed — surfaced by ``/sync``."""
+
+    created: list[str] = field(default_factory=list)
+    deleted: list[str] = field(default_factory=list)
+    synced: list[str] = field(default_factory=list)
+    aborted: bool = False
+
+
+async def reconcile_channels(
     bot,
     store: TokenStore,
     guild_id: str,
     tournament_uid: str,
-) -> None:
-    """Tear down the round's table/finals voice channels — robust to a stale map.
+    obj: dict,
+) -> ReconcileSummary:
+    """The single idempotent authority for a tournament's round/finals voice channels.
 
-    Deletes the in-memory tracked channels AND any ``R{n} - Table {m}`` / ``Finals``
-    channel still under the category (discovered via ``fetch_round_channel_ids``).
-    The discovery pass is what makes round-close cleanup survive a bot restart:
-    afterwards the in-memory ``_table_channels`` map is empty, so a map-only delete
-    would leave the closed round's channels lingering forever — exactly the
-    "channels never close" symptom. The category and #announcement/#lobby/#judges
-    channels are left intact (those go on ``/teardown``).
+    Drives Discord to ``desired_channels(obj)`` from ONE ``fetch_guild_channels``
+    call, diffing by channel NAME (so a timed-out partial create converges without
+    duplicates): create the missing, delete the no-longer-desired, perm-sync the
+    survivors — threading each survivor's overrides off the payload so
+    ``sync_table_permissions`` never re-fetches per channel. Writes
+    ``_table_channels`` in desired order for the announcement layer.
+
+    An empty desired set (non-Playing, or a finished finals) deletes everything —
+    that IS round-close cleanup.
+
+    Callers MUST hold ``structural_lock``; the link is re-read here (teardown may
+    have removed it while we waited) and a missing link no-ops. v1 reconciles only
+    the volatile round/finals channels — never the category/text channels — but
+    aborts and warns #judges if the category itself is gone, rather than recreate
+    an unparented mess.
     """
     key = _task_key(guild_id, tournament_uid)
-    tracked = _table_channels.pop(key, [])
-    discovered: list[int] = []
     link = await store.get_tournament_link(guild_id, tournament_uid)
-    if link:
-        tables, finals_id = await fetch_round_channel_ids(
-            bot, int(guild_id), int(link["category_id"])
+    if not link:
+        return ReconcileSummary()
+
+    category_id = int(link["category_id"])
+    judges_id = int(link["judges_channel_id"])
+
+    desired = desired_channels(obj)
+    channels = await bot.rest.fetch_guild_channels(int(guild_id))
+
+    if not any(int(ch.id) == category_id for ch in channels):
+        logger.error(
+            "Reconcile %s: category %s is gone — aborting (won't recreate)",
+            key,
+            category_id,
         )
-        discovered = [*tables, *([finals_id] if finals_id is not None else [])]
-    # Dedupe while preserving order (tracked first); both lists usually agree.
-    to_delete = list(dict.fromkeys([*tracked, *discovered]))
-    if to_delete:
-        await delete_channels(bot, to_delete)
-    _last_seating.pop(key, None)
+        await _post(
+            bot,
+            judges_id,
+            "**Channel sync aborted:** the tournament category was deleted, so I "
+            "can't place voice channels. Recreate it, or run `/teardown` then "
+            "`/setup` again.",
+        )
+        return ReconcileSummary(aborted=True)
+
+    current = round_channels_by_name(channels, category_id)
+    desired_by_name = {dc.name: dc for dc in desired}
+
+    all_member_uids: set[str] = set()
+    for dc in desired:
+        all_member_uids |= dc.member_uids
+    discord_id_map = await _build_discord_id_map(store, all_member_uids)
+
+    summary = ReconcileSummary()
+
+    # No longer desired: closed round, prelim tables under finals, stale round prefix.
+    extra = [ch for name, ch in current.items() if name not in desired_by_name]
+    if extra:
+        await delete_channels(bot, [int(ch.id) for ch in extra])
+        summary.deleted = [ch.name for ch in extra]
+
+    name_to_id: dict[str, int] = {}
+    for dc in desired:
+        ch = current.get(dc.name)
+        if ch is None:
+            try:
+                name_to_id[dc.name] = await create_round_voice_channel(
+                    bot,
+                    int(guild_id),
+                    category_id,
+                    dc.name,
+                    dc.member_uids,
+                    discord_id_map,
+                )
+                summary.created.append(dc.name)
+            except Exception as e:
+                logger.warning("Reconcile %s: create '%s' failed: %s", key, dc.name, e)
+        else:
+            try:
+                await sync_table_permissions(
+                    bot,
+                    int(guild_id),
+                    int(ch.id),
+                    set(dc.member_uids),
+                    set(),
+                    discord_id_map,
+                    current_member_ids=member_override_ids(ch),
+                )
+                summary.synced.append(dc.name)
+            except Exception as e:
+                logger.warning("Reconcile %s: sync '%s' failed: %s", key, dc.name, e)
+            name_to_id[dc.name] = int(ch.id)
+
+    # Positional: index i ↔ desired table i, the contract the announcement layer
+    # (score + sanction routing) indexes into. A failed create leaves a 0 sentinel
+    # so later tables keep their index instead of shifting; consumers skip 0.
+    _table_channels[key] = [name_to_id.get(dc.name, 0) for dc in desired]
+    logger.info(
+        "Reconcile %s: +%d -%d ~%d (state=%s, %d channels)",
+        key,
+        len(summary.created),
+        len(summary.deleted),
+        len(summary.synced),
+        obj.get("state", ""),
+        len(_table_channels[key]),
+    )
+    return summary
+
+
+async def sync_now(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+) -> ReconcileSummary | None:
+    """Reconcile against the cached tournament object, under the structural lock.
+
+    Backs the ``/sync`` command. Returns ``None`` if no tournament state is cached
+    yet (the listener is still connecting), else the reconcile summary.
+    """
+    async with structural_lock(guild_id, tournament_uid):
+        obj = _last_tournament.get(_task_key(guild_id, tournament_uid))
+        if obj is None:
+            return None
+        return await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
 
 
 async def _handle_update(
@@ -611,7 +725,12 @@ async def _handle_update(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    """Handle an SSE update event (tournament, sanction, or participant user)."""
+    """Handle one live SSE update (tournament, sanction, or participant user).
+
+    A tournament event splits in two: the STRUCTURAL half (channels+perms) is
+    reconciled only when ``structure_signature`` changes (skipping score-report
+    churn); the ANNOUNCEMENT half is edge-triggered off the prev→cur diff.
+    """
     obj_type = data.get("type")
 
     if obj_type == "sanction":
@@ -636,41 +755,73 @@ async def _handle_update(
         return
 
     key = _task_key(guild_id, tournament_uid)
-
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
         _last_tournament[key] = obj
         return
 
+    prev_obj = _last_tournament.get(key)
+    state = obj.get("state", "")
+    round_count = len(obj.get("rounds", []))
+    logger.info(
+        "Tournament update %s: state %s→%s, rounds %d→%d, %d players",
+        key,
+        (prev_obj or {}).get("state", "(none)"),
+        state,
+        len((prev_obj or {}).get("rounds", [])),
+        round_count,
+        len(obj.get("players", [])),
+    )
+
+    # Structural half — only when the structure changed (skips score-report churn).
+    if structure_signature(prev_obj or {}) != structure_signature(obj):
+        async with structural_lock(guild_id, tournament_uid):
+            try:
+                await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
+            except Exception as e:
+                logger.error("Reconcile failed for %s: %s", key, e)
+
+    # Announcement half — edge-triggered.
+    try:
+        await _emit_announcements(
+            bot, store, guild_id, tournament_uid, prev_obj, obj, link
+        )
+    except Exception as e:
+        logger.error("Announcement emit failed for %s: %s", key, e)
+
+    # Snapshot LAST: the diffs above need the previous object; a crash retries next event.
+    _last_tournament[key] = obj
+
+
+async def _emit_announcements(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+    prev_obj: dict | None,
+    obj: dict,
+    link: dict,
+) -> None:
+    """The ANNOUNCEMENT half: edge-triggered posts on the prev→cur diff.
+
+    Deliberately NOT idempotent — each fires once on its transition (re-posting
+    seating would be spam). Channel structure/perms are ``reconcile_channels``'s job.
+    """
+    key = _task_key(guild_id, tournament_uid)
     announcement_id = int(link["announcement_channel_id"])
     lobby_id = int(link["lobby_channel_id"])
-    category_id = int(link["category_id"])
     judges_id = int(link["judges_channel_id"])
+
+    prev = prev_obj or {}
+    prev_state = prev.get("state", "")
+    prev_round_count = len(prev.get("rounds", []))
 
     state = obj.get("state", "")
     name = obj.get("name", "Tournament")
     webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
-
-    prev_state = _last_state.get(key)
-    prev_round_count = _last_round_count.get(key, 0)
-
     rounds = obj.get("rounds", [])
     players = obj.get("players", [])
     round_count = len(rounds)
-
-    # The key debug line for transition bugs: every tournament update logs the
-    # state machine delta the handlers below branch on.
-    logger.info(
-        "Tournament update %s: state %s→%s, rounds %d→%d, %d players",
-        key,
-        prev_state,
-        state,
-        prev_round_count,
-        round_count,
-        len(players),
-    )
-
-    organizer_uids = set(obj.get("organizers_uids", []))
 
     # ── Registration opened (Planned → Registration) ──
     if state == "Registration" and prev_state != "Registration":
@@ -693,11 +844,13 @@ async def _handle_update(
 
     # ── Check-in opened (Registration → Waiting) ──
     if state == "Waiting" and prev_state == "Registration":
-        checked_in = sum(1 for p in players if p.get("state") == "Checked-in")
         registered = len(players)
         decklist_note = ""
         if obj.get("decklist_required"):
-            decklist_note = f"\nThis tournament requires a decklist — upload yours on the webapp: {webapp_url}"
+            decklist_note = (
+                f"\nThis tournament requires a decklist — upload yours on the "
+                f"webapp: {webapp_url}"
+            )
 
         await _post(
             bot,
@@ -709,7 +862,8 @@ async def _handle_update(
         await _post(
             bot,
             lobby_id,
-            f"Check-in is now open! Use `/checkin` to check in for **{name}**.{decklist_note}",
+            f"Check-in is now open! Use `/checkin` to check in for "
+            f"**{name}**.{decklist_note}",
         )
         await _post(
             bot,
@@ -718,7 +872,7 @@ async def _handle_update(
             f"Close check-in and start Round 1 from the webapp when ready.\n{webapp_url}",
         )
 
-    # ── Round finished → back to Waiting ──
+    # ── Round finished → back to Waiting (channel cleanup is reconcile's job) ──
     if state == "Waiting" and prev_state == "Playing":
         standings = obj.get("standings", [])
         standings_mode = obj.get("standings_mode", "Private")
@@ -734,10 +888,6 @@ async def _handle_update(
         )
         await _post(bot, announcement_id, "\n".join(lines))
 
-        # Tear down the finished round's table channels (robust to a stale
-        # in-memory map after a restart — see _cleanup_round_channels).
-        await _cleanup_round_channels(bot, store, guild_id, tournament_uid)
-
         checked_in = sum(1 for p in players if p.get("state") == "Checked-in")
         await _post(
             bot,
@@ -749,132 +899,40 @@ async def _handle_update(
 
     # ── New round started ──
     if state == "Playing" and round_count > prev_round_count and rounds:
-        await _setup_round(
-            bot, store, guild_id, tournament_uid, obj, announce=True, new_round=True
-        )
+        await _announce_round_seating(bot, store, guild_id, tournament_uid, obj, link)
 
     # ── Finals started ──
-    finals = obj.get("finals")
-    if finals and state == "Playing" and prev_state != "Playing":
-        await _setup_finals(bot, store, guild_id, tournament_uid, obj, announce=True)
+    if obj.get("finals") and state == "Playing" and prev_state != "Playing":
+        await _announce_finals(bot, store, guild_id, tournament_uid, obj, link)
 
-    # ── Mid-round seating changes (SwapSeats, AlterSeating, etc.) ──
+    # ── Mid-round seating change (SwapSeats, AlterSeating, AddTable, …) ──
     if (
         state == "Playing"
         and round_count == prev_round_count
         and round_count > 0
-        and key in _last_seating
+        and prev_obj is not None
     ):
-        current_seating = _extract_round_seating(obj)
-        prev_seating = _last_seating.get(key)
-
+        cur_seating = _extract_round_seating(obj)
+        prev_seating = _extract_round_seating(prev_obj)
         if (
-            current_seating is not None
+            cur_seating is not None
             and prev_seating is not None
-            and current_seating != prev_seating
+            and cur_seating != prev_seating
         ):
-            all_player_uids = _collect_all_player_uids(current_seating)
-            discord_id_map = await _build_discord_id_map(
-                store, all_player_uids | organizer_uids
-            )
-
-            table_chs = _table_channels.get(key, [])
-            prev_count = len(prev_seating)
-            new_count = len(current_seating)
-
-            # Handle table count changes
-            if new_count > prev_count:
-                # New tables added — create channels with correct numbering
-                new_tables = [
-                    list(current_seating[i]) for i in range(prev_count, new_count)
-                ]
-                try:
-                    new_ch_ids = await create_table_channels(
-                        bot,
-                        int(guild_id),
-                        category_id,
-                        new_tables,
-                        discord_id_map=discord_id_map,
-                        organizer_uids=organizer_uids,
-                        start_index=prev_count,
-                        round_number=round_count,
-                    )
-                    table_chs.extend(new_ch_ids)
-                except Exception as e:
-                    logger.warning("Failed to create new table channels: %s", e)
-
-            if new_count < prev_count:
-                # Tables removed — delete orphaned channels, update dict immediately
-                orphaned = table_chs[new_count:]
-                await delete_channels(bot, orphaned)
-                table_chs = table_chs[:new_count]
-                _table_channels[key] = table_chs
-
-            # Sync permissions on existing tables that changed
-            for i in range(min(new_count, len(table_chs))):
-                if i < len(prev_seating) and i < len(current_seating):
-                    if current_seating[i] != prev_seating[i]:
-                        try:
-                            await sync_table_permissions(
-                                bot,
-                                int(guild_id),
-                                table_chs[i],
-                                current_seating[i],
-                                organizer_uids,
-                                discord_id_map,
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                "Failed to sync table %d permissions: %s", i + 1, e
-                            )
-
-            _table_channels[key] = table_chs
-            _last_seating[key] = current_seating
-
-            # Post updated seating
-            current_round = rounds[-1]
-            lines = [f"**Seating updated — Round {round_count}**\n"]
-            for ti, table in enumerate(current_round):
-                seat_names = [
-                    player_display(
-                        s.get("player_uid", ""),
-                        players,
-                        discord_id_map=discord_id_map,
-                        user_names=_user_names[key],
-                        mention=True,
-                    )
-                    for s in table.get("seating", [])
-                ]
-                lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
-            await _post(bot, announcement_id, "\n".join(lines))
-
-            # Warn about newly unlinked players
-            await _warn_unlinked_players(
-                bot,
-                judges_id,
-                all_player_uids,
-                discord_id_map,
-                players,
-                _user_names[key],
+            await _announce_seating_update(
+                bot, store, guild_id, tournament_uid, obj, link
             )
 
     # ── Score reported at a table (open reporting = anti-cheat visibility) ──
-    # A SetScore re-broadcasts the whole tournament; post the table's current
-    # VPs to that table's voice channel so everyone seated sees what was entered.
-    # `_last_tournament[key]` is still the PREVIOUS object here (refreshed at the
-    # end of this handler), so we diff against it. On reconnect it was reseeded to
-    # the full current state at catch-up, so a score entered while disconnected is
-    # already in the baseline and never re-announced.
-    # Gate on Playing: once Finished the table channels are deleted (below), so a
-    # late organizer score edit (engine allows it) has nowhere to post anyway.
-    prev_obj = _last_tournament.get(key)
+    # A pure score report makes no structural change, so reconcile was skipped and
+    # _table_channels still maps the live tables. Gated on Playing — Finished has none.
     if state == "Playing" and prev_obj is not None:
         for ch_id, msg in compute_result_announcements(
             prev_obj, obj, _table_channels.get(key, []), players, _user_names[key]
         ):
             await _post(bot, ch_id, msg)
 
-    # ── Tournament finished ──
+    # ── Tournament finished (channel cleanup is reconcile's job) ──
     if state == "Finished" and prev_state != "Finished":
         standings = obj.get("standings", [])
         winner = obj.get("winner", "")
@@ -894,10 +952,6 @@ async def _handle_update(
         lines.append("Thank you all for playing!")
         await _post(bot, announcement_id, "\n".join(lines))
 
-        # Tear down table/finals voice channels (category & text channels stay
-        # until /teardown).
-        await _cleanup_round_channels(bot, store, guild_id, tournament_uid)
-
         await _post(
             bot,
             judges_id,
@@ -906,240 +960,146 @@ async def _handle_update(
             f"Use `/teardown` when you're ready to remove the tournament channels.\n{webapp_url}",
         )
 
-    # Update state tracking LAST so comparisons above see previous state.
-    # If handler crashes mid-way, next SSE event retries the transition.
-    _last_state[key] = state
-    _last_round_count[key] = round_count
-    _last_tournament[key] = obj
 
-
-async def _setup_round(
+async def _announce_round_seating(
     bot,
     store: TokenStore,
     guild_id: str,
     tournament_uid: str,
     obj: dict,
-    *,
-    announce: bool,
-    new_round: bool = False,
+    link: dict,
 ) -> None:
-    """Set up the current round's table voice channels + (optionally) announce.
-
-    Two modes, both safe to call repeatedly:
-
-    - ``new_round=True`` (a genuine transition: ``round_count`` increased): any
-      ``Table N`` channels under the category are STALE — leftovers from a prior
-      round whose cleanup we missed, or a partial set from a timed-out attempt —
-      so delete them all, then create this round's tables fresh and announce.
-      Delete-then-create is what makes a timed-out retry idempotent (no duplicate
-      channels) without adopting the wrong round's channels by count.
-    - ``new_round=False`` (reconnect/reconcile): reuse channels that already
-      cover the round (silent — re-adopt the map and re-sync permissions to the
-      current seating); otherwise treat it as a missed round and set it up.
-    """
+    """Post a new round's seating to #announcement + #judges; warn unlinked players."""
     key = _task_key(guild_id, tournament_uid)
-    link = await store.get_tournament_link(guild_id, tournament_uid)
-    if not link:
-        return
-    rounds = obj.get("rounds", [])
-    if not rounds:
-        return
-
-    category_id = int(link["category_id"])
     announcement_id = int(link["announcement_channel_id"])
     judges_id = int(link["judges_channel_id"])
     name = obj.get("name", "Tournament")
     webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
     players = obj.get("players", [])
     organizer_uids = set(obj.get("organizers_uids", []))
+    rounds = obj.get("rounds", [])
     round_count = len(rounds)
-    tables_data: list[list[str]] = [
+    tables_data = [
         [s.get("player_uid", "") for s in table.get("seating", [])]
         for table in rounds[-1]
     ]
-
-    existing, _finals_id = await fetch_round_channel_ids(
-        bot, int(guild_id), category_id
-    )
-
-    if new_round and existing:
-        # Stale channels (missed prior cleanup, or a timed-out partial create).
-        await delete_channels(bot, existing)
-        existing = []
-
-    # A true new round always (re)creates; reconcile adopts channels that already
-    # cover the round and only creates when they're missing.
-    do_create = new_round or len(existing) < len(tables_data)
-    do_announce = announce and do_create
-    logger.info(
-        "Setup round %d for %s: %d tables, new_round=%s, existing=%d → %s",
-        round_count,
-        key,
-        len(tables_data),
-        new_round,
-        len(existing),
-        "create+announce" if do_announce else ("create" if do_create else "adopt"),
-    )
-
     all_player_uids = {uid for table in tables_data for uid in table}
     discord_id_map = await _build_discord_id_map(
         store, all_player_uids | organizer_uids
     )
 
-    if do_announce:
-        await _post(
-            bot,
-            announcement_id,
-            format_round_seating(
-                round_count,
-                tables_data,
-                players,
-                discord_id_map=discord_id_map,
-                user_names=_user_names[key],
-            ),
-        )
-
-    if do_create:
-        # Create only the not-yet-existing tables, numbered after the existing.
-        try:
-            new_ids = await create_table_channels(
-                bot,
-                int(guild_id),
-                category_id,
-                tables_data[len(existing) :],
-                discord_id_map=discord_id_map,
-                organizer_uids=organizer_uids,
-                start_index=len(existing),
-                round_number=round_count,
-            )
-            _table_channels[key] = existing + new_ids
-        except Exception as e:
-            logger.warning("Failed to create table channels: %s", e)
-            _table_channels[key] = existing
-    else:
-        # Channels already present (reconnect): adopt them, reconcile perms.
-        _table_channels[key] = existing[: len(tables_data)]
-        for i, table in enumerate(tables_data):
-            if i < len(_table_channels[key]):
-                try:
-                    await sync_table_permissions(
-                        bot,
-                        int(guild_id),
-                        _table_channels[key][i],
-                        set(table),
-                        organizer_uids,
-                        discord_id_map,
-                    )
-                except Exception as e:
-                    logger.warning("Failed to sync table %d permissions: %s", i + 1, e)
-
-    _last_seating[key] = [set(t) for t in tables_data]
-
-    if do_announce:
-        await _warn_unlinked_players(
-            bot, judges_id, all_player_uids, discord_id_map, players, _user_names[key]
-        )
-        await _post(
-            bot,
-            judges_id,
-            f"**{name}** — Round {round_count} started ({len(tables_data)} tables, "
-            f"{sum(len(t) for t in tables_data)} players).\n"
-            f"Use `/sanction @player` to issue sanctions.\n{webapp_url}",
-        )
+    await _post(
+        bot,
+        announcement_id,
+        format_round_seating(
+            round_count,
+            tables_data,
+            players,
+            discord_id_map=discord_id_map,
+            user_names=_user_names[key],
+        ),
+    )
+    await _warn_unlinked_players(
+        bot, judges_id, all_player_uids, discord_id_map, players, _user_names[key]
+    )
+    await _post(
+        bot,
+        judges_id,
+        f"**{name}** — Round {round_count} started ({len(tables_data)} tables, "
+        f"{sum(len(t) for t in tables_data)} players).\n"
+        f"Use `/sanction @player` to issue sanctions.\n{webapp_url}",
+    )
 
 
-async def _setup_finals(
+async def _announce_finals(
     bot,
     store: TokenStore,
     guild_id: str,
     tournament_uid: str,
     obj: dict,
-    *,
-    announce: bool,
+    link: dict,
 ) -> None:
-    """Idempotently set up the finals voice channel + announce the finalists.
-
-    Reuses an existing ``Finals`` channel under the category (reconnect/restart
-    safe); only announces + creates when none exists yet.
-    """
+    """Post the finalists to #announcement + #judges; warn unlinked finalists."""
     key = _task_key(guild_id, tournament_uid)
-    link = await store.get_tournament_link(guild_id, tournament_uid)
-    if not link:
-        return
-    finals = obj.get("finals") or {}
-    seating = finals.get("seating", [])
-    if not seating:
-        return
-
-    category_id = int(link["category_id"])
     announcement_id = int(link["announcement_channel_id"])
     judges_id = int(link["judges_channel_id"])
     name = obj.get("name", "Tournament")
     webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
     players = obj.get("players", [])
     organizer_uids = set(obj.get("organizers_uids", []))
+    finals = obj.get("finals") or {}
+    seating = finals.get("seating", [])
+    if not seating:
+        return
     seed_order = finals.get("seed_order", [])
-    finalists = [s.get("player_uid", "") for s in seating]
-    finalist_uids = set(finalists)
-
-    # Ignore any prelim `Table N` channels: during finals sanctions route to the
-    # single finals table, and teardown deletes whatever is in _table_channels —
-    # so the map must hold ONLY the finals channel, never stale prelim tables.
-    _existing_tables, finals_id = await fetch_round_channel_ids(
-        bot, int(guild_id), category_id
-    )
-    fresh = finals_id is None
-    logger.info(
-        "Setup finals for %s: %d finalists, existing_finals=%s → %s",
-        key,
-        len(seating),
-        finals_id,
-        "create+announce" if (announce and fresh) else "adopt",
-    )
-
+    finalist_uids = {s.get("player_uid", "") for s in seating}
     discord_id_map = await _build_discord_id_map(store, finalist_uids | organizer_uids)
 
-    if announce and fresh:
-        await _post(
-            bot,
-            announcement_id,
-            format_finals(
-                name,
-                seating,
-                seed_order,
+    await _post(
+        bot,
+        announcement_id,
+        format_finals(
+            name,
+            seating,
+            seed_order,
+            players,
+            discord_id_map=discord_id_map,
+            user_names=_user_names[key],
+        ),
+    )
+    await _warn_unlinked_players(
+        bot, judges_id, finalist_uids, discord_id_map, players, _user_names[key]
+    )
+    await _post(
+        bot,
+        judges_id,
+        f"**{name}** — Finals started ({len(seating)} finalists).\n{webapp_url}",
+    )
+
+
+async def _announce_seating_update(
+    bot,
+    store: TokenStore,
+    guild_id: str,
+    tournament_uid: str,
+    obj: dict,
+    link: dict,
+) -> None:
+    """Post updated mid-round seating to #announcement; warn newly unlinked players."""
+    key = _task_key(guild_id, tournament_uid)
+    announcement_id = int(link["announcement_channel_id"])
+    judges_id = int(link["judges_channel_id"])
+    players = obj.get("players", [])
+    organizer_uids = set(obj.get("organizers_uids", []))
+    rounds = obj.get("rounds", [])
+    round_count = len(rounds)
+    current_round = rounds[-1]
+    all_player_uids = {
+        s.get("player_uid", "")
+        for table in current_round
+        for s in table.get("seating", [])
+    }
+    discord_id_map = await _build_discord_id_map(
+        store, all_player_uids | organizer_uids
+    )
+
+    lines = [f"**Seating updated — Round {round_count}**\n"]
+    for ti, table in enumerate(current_round):
+        seat_names = [
+            player_display(
+                s.get("player_uid", ""),
                 players,
                 discord_id_map=discord_id_map,
                 user_names=_user_names[key],
-            ),
-        )
-
-    if fresh:
-        try:
-            ch_ids = await create_table_channels(
-                bot,
-                int(guild_id),
-                category_id,
-                [finalists],
-                discord_id_map=discord_id_map,
-                organizer_uids=organizer_uids,
-                is_finals=True,
+                mention=True,
             )
-            finals_id = ch_ids[0] if ch_ids else None
-        except Exception as e:
-            logger.warning("Failed to create finals channel: %s", e)
-
-    if finals_id is not None:
-        _table_channels[key] = [finals_id]
-
-    if announce and fresh:
-        await _warn_unlinked_players(
-            bot, judges_id, finalist_uids, discord_id_map, players, _user_names[key]
-        )
-        await _post(
-            bot,
-            judges_id,
-            f"**{name}** — Finals started ({len(seating)} finalists).\n{webapp_url}",
-        )
+            for s in table.get("seating", [])
+        ]
+        lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
+    await _post(bot, announcement_id, "\n".join(lines))
+    await _warn_unlinked_players(
+        bot, judges_id, all_player_uids, discord_id_map, players, _user_names[key]
+    )
 
 
 async def _reconcile(
@@ -1148,35 +1108,22 @@ async def _reconcile(
     guild_id: str,
     tournament_uid: str,
 ) -> None:
-    """Repair Discord to match current state after a (re)connect's catch-up.
+    """Repair channels to the seeded state after a (re)connect's silent catch-up.
 
-    Catch-up only SEEDS state silently (``_handle_snapshot``), so a round or
-    finals that started while the bot was disconnected — or before a restart —
-    would otherwise have no voice channels and no seating announcement. This
-    recreates them. ``_setup_round``/``_setup_finals`` reuse existing channels,
-    so a normal reconnect (channels already present) is silent.
-
-    The mirror case: a round that *closed* while we were disconnected. The live
-    Playing→Waiting cleanup is missed across the reconnect (snapshot seeds the
-    post-close state, so there's no transition to detect), leaving the old
-    round's table channels orphaned. So when we reconnect into a non-active state
-    we tear down any leftover round channels. (Reconnecting into Waiting after a
-    tournament reopen likewise clears the now-stale Finals channel — desired,
-    since the organizer is about to redo finals.)
+    reconcile_channels makes Discord match current state (create missing, delete a
+    closed round's, re-adopt existing), so a normal reconnect is silent. STRUCTURAL
+    ONLY by design: a seating announcement missed during the disconnect is not
+    replayed (it can't be edge-derived without re-spamming every reconnect); the
+    voice channels — what players need — are always restored.
     """
     key = _task_key(guild_id, tournament_uid)
     obj = _last_tournament.get(key)
     state = obj.get("state", "") if obj else "(none)"
     logger.info("Reconciling %s after (re)connect (state=%s)", key, state)
-    if not obj or state != "Playing":
-        if obj and state in ("Waiting", "Finished"):
-            await _cleanup_round_channels(bot, store, guild_id, tournament_uid)
+    if not obj:
         return
-    finals = obj.get("finals") or {}
-    if finals.get("seating") and not finals.get("result"):
-        await _setup_finals(bot, store, guild_id, tournament_uid, obj, announce=True)
-    elif obj.get("rounds"):
-        await _setup_round(bot, store, guild_id, tournament_uid, obj, announce=True)
+    async with structural_lock(guild_id, tournament_uid):
+        await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
 
 
 async def _handle_sanction_update(
@@ -1256,7 +1203,7 @@ async def _handle_sanction_update(
                 for ti, table in enumerate(current_round):
                     seating = table.get("seating", [])
                     if any(s.get("player_uid") == user_uid for s in seating):
-                        if ti < len(table_chs):
+                        if ti < len(table_chs) and table_chs[ti]:  # skip 0 sentinel
                             try:
                                 logger.info(
                                     "→ create_message sanction→table %d channel=%s",

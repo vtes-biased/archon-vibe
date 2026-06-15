@@ -10,7 +10,13 @@ from .. import config
 from ..archon_api import ArchonAPI
 from ..channel_manager import create_tournament_channels, teardown_tournament
 from ..oauth_utils import generate_pkce, make_oauth_url
-from ..sse_listener import start_sse, stop_sse, tracked_table_channels
+from ..sse_listener import (
+    start_sse,
+    stop_sse,
+    structural_lock,
+    sync_now,
+    tracked_table_channels,
+)
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
 from ._common import fetch_userinfo
@@ -223,34 +229,35 @@ class TeardownCommand(
             "Removing tournament channels...", flags=hikari.MessageFlag.EPHEMERAL
         )
 
-        # Every channel we know belongs to this tournament, so teardown is a
-        # reliable catch-all even if some drifted out of the category. Snapshot
-        # tracked table/finals channels BEFORE stop_sse, which clears the map.
-        extra_ids = [
-            int(link[k])
-            for k in (
-                "announcement_channel_id",
-                "lobby_channel_id",
-                "judges_channel_id",
-            )
-            if link.get(k)
-        ]
-        extra_ids += tracked_table_channels(guild_id, tournament_uid)
-
-        await stop_sse(guild_id, tournament_uid)
-
+        # Hold the structural lock for the whole delete and unlink FIRST, so a
+        # reconcile queued behind us re-reads a gone link and no-ops (teardown wins).
         failed: list[int] = []
-        try:
-            failed = await teardown_tournament(
-                ctx.client.app,
-                ctx.guild_id,
-                int(link["category_id"]),
-                extra_ids,
-            )
-        except Exception as e:
-            logger.warning("Teardown error: %s", e)
+        async with structural_lock(guild_id, tournament_uid):
+            # Snapshot tracked table/finals channels BEFORE stop_sse clears the map;
+            # teardown then also reaches channels that drifted out of the category.
+            extra_ids = [
+                int(link[k])
+                for k in (
+                    "announcement_channel_id",
+                    "lobby_channel_id",
+                    "judges_channel_id",
+                )
+                if link.get(k)
+            ]
+            extra_ids += tracked_table_channels(guild_id, tournament_uid)
 
-        await store.unlink_tournament(guild_id, tournament_uid)
+            await stop_sse(guild_id, tournament_uid)
+            await store.unlink_tournament(guild_id, tournament_uid)
+
+            try:
+                failed = await teardown_tournament(
+                    ctx.client.app,
+                    ctx.guild_id,
+                    int(link["category_id"]),
+                    extra_ids,
+                )
+            except Exception as e:
+                logger.warning("Teardown error: %s", e)
         if failed:
             await ctx.respond(
                 f"Removed tournament channels, but {len(failed)} could not be deleted "
@@ -316,3 +323,74 @@ class AnnounceCommand(
             await ctx.respond(
                 f"Failed to post announcement: {e}", flags=hikari.MessageFlag.EPHEMERAL
             )
+
+
+class SyncCommand(
+    lightbulb.SlashCommand,
+    name="sync",
+    description="Repair this tournament's voice channels to match its current state",
+):
+    @lightbulb.invoke
+    async def invoke(
+        self,
+        ctx: lightbulb.Context,
+        *,
+        store: TokenStore,
+        api: ArchonAPI,
+    ) -> None:
+        tournament_uid = await resolve_tournament(ctx, store)
+        if not tournament_uid:
+            return
+
+        guild_id = str(ctx.guild_id)
+        discord_id = str(ctx.user.id)
+
+        link = await store.get_tournament_link(guild_id, tournament_uid)
+        if not link:
+            await ctx.respond(
+                "Tournament link not found.", flags=hikari.MessageFlag.EPHEMERAL
+            )
+            return
+
+        # Same organizer gate as /announce and /teardown.
+        is_organizer = link["organizer_discord_id"] == discord_id
+        if not is_organizer:
+            info = await api.get_userinfo(discord_id)
+            if not info.ok or not set(info.data.get("roles", [])) & ORGANIZER_ROLES:
+                await ctx.respond(
+                    "Only the setup organizer or NC/Prince/IC can sync channels.",
+                    flags=hikari.MessageFlag.EPHEMERAL,
+                )
+                return
+
+        # Already deferred ephemerally by the PRE_INVOKE hook, so one respond after
+        # the reconcile's REST work delivers the result (no interim message needed).
+        summary = await sync_now(ctx.client.app, store, guild_id, tournament_uid)
+        if summary is None:
+            await ctx.respond(
+                "No live tournament state yet — the bot may still be connecting. "
+                "Try again in a moment.",
+                flags=hikari.MessageFlag.EPHEMERAL,
+            )
+            return
+        if summary.aborted:
+            await ctx.respond(
+                "Sync aborted: the tournament category is missing. See "
+                f"<#{link['judges_channel_id']}> — recreate it, or `/teardown` "
+                "then `/setup`.",
+                flags=hikari.MessageFlag.EPHEMERAL,
+            )
+            return
+
+        parts = []
+        if summary.created:
+            parts.append(f"created {len(summary.created)}")
+        if summary.deleted:
+            parts.append(f"removed {len(summary.deleted)}")
+        if summary.synced:
+            parts.append(f"updated {len(summary.synced)}")
+        detail = ", ".join(parts) if parts else "no changes — already in sync"
+        await ctx.respond(
+            f"Voice channels synced ({detail}).",
+            flags=hikari.MessageFlag.EPHEMERAL,
+        )
