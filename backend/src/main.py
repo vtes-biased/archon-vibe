@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 import signal
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -14,7 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from .broadcast import (
     SSEConnection,
@@ -561,6 +561,20 @@ async def _resolve_viewer(
     return None
 
 
+def _iter_file_chunks(path, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
+    """Yield a file's bytes in chunks, holding ONE fd open for the whole response.
+
+    The held fd pins the inode, so an atomic os.rename over the path mid-stream
+    (snapshot regen) is safe: this reader keeps serving the file it opened. Bounded
+    heap (one chunk). Sync generator → Starlette iterates it in a threadpool, so the
+    blocking reads stay off the event loop; the `with` closes the fd on completion
+    or client disconnect.
+    """
+    with open(path, "rb") as f:
+        while chunk := f.read(chunk_size):
+            yield chunk
+
+
 @app.get("/snapshot")
 async def get_snapshot(
     request: Request,
@@ -569,15 +583,16 @@ async def get_snapshot(
 ) -> Response:
     """Serve pre-computed gzip snapshot for the viewer's access level.
 
-    Streamed from disk (FileResponse, chunked) — never read whole into app heap.
-    The snapshot carries the entire global VEKN roster + all tournaments, so at
-    doors-open hundreds of clients hit this near-simultaneously; a read_bytes()
-    per request would stack hundreds of full-file copies in heap and blow the
-    small-VPS budget. Chunked streaming holds only one buffer per in-flight
-    request. Atomic-rename regen (snapshots.generate_snapshots) is safe mid-stream:
-    the open fd keeps serving the old inode. A further win for prod would be
-    nginx X-Accel-Redirect (zero app IO), but that needs an `internal` location
-    and a snapshot dir nginx can read — out of scope here.
+    Streamed from disk in chunks (see _iter_file_chunks) — never read whole into
+    app heap. The snapshot carries the entire global VEKN roster + all tournaments,
+    so at doors-open hundreds of clients hit this near-simultaneously; a
+    read_bytes() per request would stack hundreds of full-file copies in heap and
+    blow the small-VPS budget. The generator holds ONE fd for the whole response,
+    so the 15-min atomic-rename regen (which WILL fire during a long doors-open) is
+    consistent mid-stream: in-flight readers keep their inode, new requests get the
+    fresh file — no truncation, no spurious reconnect. A further prod win would be
+    nginx X-Accel-Redirect (zero app IO), but that needs an `internal` location and
+    a snapshot dir nginx can read — out of scope here.
     """
     from .snapshots import get_snapshot_path
 
@@ -596,13 +611,16 @@ async def get_snapshot(
     # The snapshot body is a per-LEVEL file shared across users, so the per-USER
     # access-version fingerprint can't live in it — seed it as a per-response header
     # the client reads (via fetch) before it opens /stream, so the first connect
-    # echoes a matching `av` and doesn't resync.
-    return FileResponse(
-        snapshot_path,
+    # echoes a matching `av` and doesn't resync. Chunked (no Content-Length) so a
+    # mid-stream regen can't size-mismatch, and ranges aren't offered (a partial
+    # gzip slice can't be inflated).
+    return StreamingResponse(
+        _iter_file_chunks(snapshot_path),
         media_type="application/json",
         headers={
             "Content-Encoding": "gzip",
             "Cache-Control": "no-cache",
+            "Accept-Ranges": "none",
             "X-Access-Version": await compute_access_version(viewer),
         },
     )
