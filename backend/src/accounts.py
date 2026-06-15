@@ -67,7 +67,7 @@ async def reassign_sanctions(
     """Reassign all sanctions from one user to another.
 
     Returns the BroadcastData for each moved sanction so the caller can push the
-    new user_uid to other clients' caches live, not only on reconnect (pst #78).
+    new user_uid to other clients' caches live, not only on reconnect.
     """
     sanctions = await get_sanctions_for_user(from_user_uid)
     broadcasts = []
@@ -81,7 +81,7 @@ async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[Broadcast
     """Reassign all decks from one user to another.
 
     Returns the BroadcastData for each moved deck so the caller can push the new
-    user_uid to other clients' caches live, not only on reconnect (pst #78).
+    user_uid to other clients' caches live, not only on reconnect.
     """
     async with get_connection() as conn:
         result = await conn.execute(
@@ -107,7 +107,7 @@ async def reassign_coopted_by_references(
     """Repoint every user whose coopted_by references from_user_uid to to_user_uid.
 
     Returns the BroadcastData for each repointed user so the caller can push the
-    change to other clients' caches live, not only on reconnect (pst #78).
+    change to other clients' caches live, not only on reconnect.
     """
     async with get_connection() as conn:
         result = await conn.execute(
@@ -142,7 +142,6 @@ async def merge_users(
     dying account's soft-delete; the caller must `broadcast_precomputed` each so
     other clients update their cached copies live, not only on their next
     reconnect (db.py can't import broadcast — layering — so the route does it).
-    pst #66 (survivor + soft-delete) / #78 (reassigned objects).
     """
     keep_user = await get_user_by_uid(keep_uid)
     delete_user_obj = await get_user_by_uid(delete_uid)
@@ -153,14 +152,14 @@ async def merge_users(
         return keep_user, []  # Same account — nothing to merge
     if not delete_user_obj:
         return keep_user, []  # Nothing to merge
-    # #59 invariant: a uid carrying a vekn_id is immovable and is NEVER
+    # invariant: a uid carrying a vekn_id is immovable and is NEVER
     # soft-deleted. merge soft-deletes delete_uid, so the absorbed account must
     # not hold a VEKN ID — which also forbids merging two VEKN identities.
     # /claim and /link structurally guarantee delete has no vekn_id; admin and
     # discord-link do not, so this is the single chokepoint. A non-VEKN account
     # can't be a tournament participant/organizer (engine requires a VEKN ID),
     # so this guarantees the soft-deleted account leaves no orphaned tournament
-    # refs — the reason the deeper cross-tournament remap is unnecessary (pst #77).
+    # refs — the reason the deeper cross-tournament remap is unnecessary.
     if delete_user_obj.vekn_id:
         raise ValueError(
             "Cannot merge an account that holds a VEKN ID — VEKN identities are "
@@ -210,7 +209,7 @@ async def merge_users(
     merged_bd = await save_user(merged)
     # Everything keyed to the dying delete_uid must migrate to the survivor.
     # auth_methods aren't synced objects (no SSE); the rest are, so collect their
-    # BroadcastData too (pst #78) — reassigned sanctions/decks/coopted-by users
+    # BroadcastData too — reassigned sanctions/decks/coopted-by users
     # otherwise stay stale on other clients until reconnect.
     await reassign_auth_methods(delete_uid, keep_uid)
     broadcasts = [merged_bd]
@@ -263,7 +262,7 @@ async def detach_user_from_vekn(
     and the nulled vekn_record; the caller must `broadcast_precomputed` each so
     other clients drop the moved-out PII (e.g. the orphan's now-nulled
     discord_id/contacts) live, not only on their next reconnect (db.py can't
-    import broadcast — layering — so the route does it). pst #66.
+    import broadcast — layering — so the route does it).
 
     Adding a User field: only null it on `vekn_record` (and let it ride on
     `personal`) if it is genuinely personal/login data; otherwise leave it on

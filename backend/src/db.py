@@ -72,7 +72,7 @@ class _ActiveTx(NamedTuple):
 # runs on that one connection instead of checking out a fresh one. This keeps a
 # single in-flight action to ONE pooled connection — it cannot starve the pool by
 # acquiring more while holding the FOR UPDATE lock — and makes every nested
-# read/write part of the same transaction. See `get_connection`. pst #12 #44
+# read/write part of the same transaction. See `get_connection`.
 #
 # INVARIANT: never start a DB-touching `asyncio.create_task`/`gather` inside a
 # transaction. A child task inherits this ContextVar (and the connection) and
@@ -124,7 +124,7 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
     must commit independently of an open `tournament_transaction` (e.g. the
     go-online VEKN-ID allocation loop, where each new user must be committed and
     visible before the next `allocate_next_vekn_id`) keep their own connection.
-    Reads that should join an open transaction go through `_acquire`. pst #12 #44
+    Reads that should join an open transaction go through `_acquire`.
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -146,7 +146,7 @@ async def _acquire(
     a pooled connection is used. Reaching the ambient connection from a *different*
     task raises — that only happens if DB work was spawned inside a transaction
     (`create_task`/`gather`), which would interleave operations on the shared
-    connection or outlive it. See `_tx_conn`. pst #12 #44
+    connection or outlive it. See `_tx_conn`.
 
     For WRITES inside a transaction, pass `conn=tx_conn` explicitly to join it, or
     use `get_connection` to commit independently — never rely on the ambient path
@@ -182,7 +182,7 @@ async def tournament_transaction(
 
     While this block is open, `_tx_conn` is set so every DB helper called on this
     task transparently runs on `conn` (one pooled connection per action, all reads
-    and writes inside the one transaction) — see `get_connection`. pst #12 #44
+    and writes inside the one transaction) — see `get_connection`.
     """
     if not _pool:
         raise RuntimeError("Database not initialized")

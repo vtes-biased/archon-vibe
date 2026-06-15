@@ -23,7 +23,7 @@ import wasmUrl from '../../../engine/pkg/archon_engine_bg.wasm?url';
 
 /**
  * Run a raw WASM engine call. wasm-bindgen throws the `Err` arm as a JS string
- * primitive — since #107 that string is the engine's `{code,params,message}`
+ * primitive — since that string is the engine's `{code,params,message}`
  * wire JSON — so re-throw it as a typed `EngineError` for localized display.
  * The catch wraps the call itself, NOT the `JSON.parse` of its success result.
  */

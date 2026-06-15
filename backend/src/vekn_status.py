@@ -1,4 +1,4 @@
-"""In-process status tracking for VEKN sync/push jobs (#123 observability).
+"""In-process status tracking for VEKN sync/push jobs (observability).
 
 A days-long vekn.net outage is otherwise invisible except in logs. The scheduled
 jobs (member sync, tournament sync, hourly batch_push) record their last success

@@ -10,7 +10,7 @@ Scope: the ROW-COUNT parity + uid-keyed spot-checks assume the **ETL/--truncate*
 population (uids preserved, every member live). The merge / sync-first path is
 validated by `check_merge.py` (vekn-keyed, snapshot deltas) instead — but the
 **orphan + internal-consistency scans below are mode-agnostic** and are the key
-guard for the #169 member-uid remap (a missed ref field orphans here).
+guard for the member-uid remap (a missed ref field orphans here).
 
     cd backend
     OLD_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_old \\
@@ -136,8 +136,8 @@ async def main(args) -> int:
             SELECT count(*) FROM objects t, jsonb_array_elements(t."full"->'players') p
             WHERE t.type='tournament'
               AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = p->>'user_uid')""",
-        # rounds[][].seating[] player/judge refs (the most-likely-missed remap sites,
-        # #169) — judge_uid is optional so empty strings are skipped.
+        # rounds[][].seating[] player/judge refs (the most-likely-missed remap sites)
+        # — judge_uid is optional so empty strings are skipped.
         "tournament.rounds[].seating[].player_uid → user": """
             SELECT count(*) FROM objects t,
                  jsonb_array_elements(t."full"->'rounds') rd,
@@ -175,7 +175,7 @@ async def main(args) -> int:
                  jsonb_array_elements_text(t."full"->'organizers_uids') o
             WHERE t.type='tournament'
               AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = o)""",
-        # internal consistency (#169): every member-uid across ALL play data
+        # internal consistency: every member-uid across ALL play data
         # (rounds + finals seating, finals seed_order, standings) must also be a
         # player — catches a partial remap that splits one tournament across the
         # old and live uid spaces (which the cross-object scans above miss).

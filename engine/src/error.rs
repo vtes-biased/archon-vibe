@@ -1,4 +1,4 @@
-//! Structured engine errors: the single greppable taxonomy (#107).
+//! Structured engine errors: the single greppable taxonomy.
 //!
 //! Every fallible core function returns `Result<T, EngineError>`. The enum is the
 //! contract with the frontend: `code()` strings map 1:1 to paraglide `err_*` keys

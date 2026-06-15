@@ -1,6 +1,6 @@
 """Tests for VEKN member sync role seeding (vekn_sync.sync_player).
 
-Invariant pair (one test each), the #134 contract restored after the outright
+Invariant pair (one test each), the contract restored after the outright
 removal in 364a7ec — guarding against an *accidental* re-swing of role handling
 in this access-control-sensitive path:
 

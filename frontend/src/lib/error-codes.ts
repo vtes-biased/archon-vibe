@@ -1,5 +1,5 @@
 /**
- * Engine error contract (#107): typed errors carrying the engine's stable
+ * Engine error contract: typed errors carrying the engine's stable
  * `{ code, params }` so the UI can render localized messages.
  *
  * The Rust engine serializes rejections as `{"code","params","message"}` JSON:
@@ -29,7 +29,7 @@ export class EngineError extends Error {
 
 /**
  * Parse a thrown value as the engine's wire JSON; returns null when it isn't
- * one (legacy free-text string throws keep the #102 passthrough path).
+ * one (legacy free-text string throws keep the passthrough path).
  */
 export function engineErrorFromThrown(e: unknown): EngineError | null {
   if (typeof e !== 'string' || !e.startsWith('{')) return null;

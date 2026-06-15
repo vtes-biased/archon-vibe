@@ -10,7 +10,7 @@ Invariants guarded (one test each):
 * member merge writes only archon-owned fields, respecting local_modifications
   (identity and roles untouched);
 * members are matched by VEKN id: the old-archon member merges INTO the live
-  (possibly claimed) account and is NEVER tombstoned/detached (#169);
+  (possibly claimed) account and is NEVER tombstoned/detached;
 * every old-archon member-uid reference is remapped to the live uid, and a
   vekn-less member is seeded as a shell so its references still resolve.
 
@@ -247,7 +247,7 @@ async def test_member_merge_respects_field_ownership(test_db):
 
 @pytest.mark.asyncio
 async def test_claimed_account_not_detached_by_merge(test_db):
-    """#169 regression: a user claimed a VEKN-sync copy (uuid7 ≠ old-archon uid),
+    """regression: a user claimed a VEKN-sync copy (uuid7 ≠ old-archon uid),
     so the old-archon member arrives under a different uid. The merge must match
     on the vekn id and merge INTO the claimed account — never tombstone it or
     null its vekn_id (the old bug wiped the claimed identity + its community

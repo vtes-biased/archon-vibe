@@ -469,7 +469,7 @@ app = FastAPI(title="Archon", version="0.1.0", lifespan=lifespan)
 @app.exception_handler(EngineRejection)
 async def engine_rejection_handler(request, exc: EngineRejection) -> JSONResponse:
     """Engine domain rejection: detail stays a human string (bot/legacy clients),
-    code+params are additive for frontend i18n (#107)."""
+    code+params are additive for frontend i18n."""
     return JSONResponse(
         status_code=400,
         content={"detail": exc.message, "code": exc.code, "params": exc.params},

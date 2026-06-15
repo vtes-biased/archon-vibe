@@ -914,7 +914,7 @@ async def tournament_action(
         # Reads below run on tx_conn (the locked transaction connection) rather
         # than acquiring extra pooled connections while holding FOR UPDATE — a
         # single in-flight action consumes one pooled connection, so concurrent
-        # actions can't starve the small pool (see db._acquire). pst #12
+        # actions can't starve the small pool (see db._acquire).
         # Build actor context for Rust engine
         can_organize = None
         if request.type == "UpdateConfig" and request.config:
@@ -979,7 +979,7 @@ async def tournament_action(
                 tournament_json, event_json, actor_json, sanctions_json, decks_json
             )
         except ValueError as e:
-            # Engine rejections arrive as ValueError carrying the #107 wire JSON
+            # Engine rejections arrive as ValueError carrying the wire JSON
             raise EngineRejection.from_engine(e) from e
 
         # Parse new result format: {"tournament": {...}, "deck_ops": [...]}
@@ -1534,7 +1534,7 @@ def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) ->
     UID-bearing field (players, seating, standings, finals seed_order, raffles,
     winner) without having to enumerate — and miss — them. Decks and sanctions are
     flat single objects, so `go_online` repoints their one UID field directly; a
-    deck's `attribution` (a vekn, not a UID) is repointed there too. pst #15
+    deck's `attribution` (a vekn, not a UID) is repointed there too.
     """
     raw = msgspec.json.encode(tournament_data)
     for temp_uid, real_uid in uid_map.items():
@@ -1563,7 +1563,7 @@ async def go_online(
     # wrong-device request. Re-checked authoritatively under the lock below; this
     # unlocked read only fails fast and gates side effects. A tournament created
     # offline may not exist server-side yet (existing is None → no org check, as
-    # before). pst #45
+    # before).
     existing = await get_tournament_by_uid(uid)
     if existing:
         if not permissions.is_organizer(current_user, existing):
@@ -1592,7 +1592,7 @@ async def go_online(
     # Resolve offline players → real user accounts. Done OUTSIDE the lock: each
     # resolution may create a user and allocate a VEKN ID (its own advisory-locked
     # transaction), so holding the FOR UPDATE lock here would check out extra
-    # pooled connections per player. pst #45
+    # pooled connections per player.
     # Benign race: if the caller's organizer rights are revoked between the
     # pre-check and the lock, the authoritative re-check below 403s after these
     # users were created — leaving orphaned (real, coopted) accounts. Acceptable.
@@ -1611,7 +1611,7 @@ async def go_online(
     # If a temp player resolves (by VEKN ID) to someone already in the tournament,
     # or two temps resolve to the same person, the remap below would create a
     # duplicate participant. We deliberately do NOT auto-merge tournament players
-    # (pst #77) — fail early so the organizer removes the duplicate registration.
+    # — fail early so the organizer removes the duplicate registration.
     final_player_uids = [
         uid_map.get(p.get("user_uid"), p.get("user_uid"))
         for p in request.tournament.get("players", [])
@@ -1706,7 +1706,7 @@ async def go_online(
     # 6. Save offline decks, repointing the owner and the attribution. A deck's
     # attribution is a vekn (the "designed by" credit), so a temp player's own-deck
     # attribution is their offline TEMP- vekn; repoint it to their resolved real
-    # vekn (or drop it if the temp player wasn't resolved). pst #15
+    # vekn (or drop it if the temp player wasn't resolved).
     for deck_data in request.offline_decks:
         deck_obj = msgspec.convert(deck_data, DeckObject)
         deck_obj.tournament_uid = uid
@@ -1722,7 +1722,7 @@ async def go_online(
 
     # An event run+finished offline would otherwise get its rating points only on
     # the next daily recompute (~24h late). Mirror the action route and recompute
-    # immediately on go-online so players' ratings reflect the result right away. pst #127
+    # immediately on go-online so players' ratings reflect the result right away.
     if updated.state == TournamentState.FINISHED:
         try:
             from ..ratings import (

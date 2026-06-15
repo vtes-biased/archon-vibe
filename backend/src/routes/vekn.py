@@ -100,7 +100,7 @@ async def claim_vekn_id(
         raise HTTPException(status_code=500, detail="Failed to merge accounts")
     merged, merge_bds = result
 
-    # Push the merge to other clients' caches live (pst #66), then resync the
+    # Push the merge to other clients' caches live, then resync the
     # owner (their data level changed — they gained a vekn_id).
     for bd in merge_bds:
         broadcast_precomputed(bd)
@@ -159,7 +159,7 @@ async def abandon_vekn_id(
     logger.info(
         f"User abandoned VEKN ID {current_user.vekn_id}: old={current_user.uid} new={new_user.uid}"
     )
-    # Push the orphaned record's nulled PII to other clients' caches live (pst #66).
+    # Push the orphaned record's nulled PII to other clients' caches live.
     for bd in detach_bds:
         broadcast_precomputed(bd)
     await broadcast_resync(new_user.uid)
@@ -308,7 +308,7 @@ async def link_vekn_to_user(
         if result:
             displaced_user, _vekn_record, displace_bds = result
             # The displaced personal account + the freed record (the merge below
-            # repopulates the latter) propagate to other caches live (pst #66).
+            # repopulates the latter) propagate to other caches live.
             for bd in displace_bds:
                 broadcast_precomputed(bd)
             message = (
@@ -399,7 +399,7 @@ async def force_abandon_vekn_id(
     logger.info(
         f"Force-abandoned VEKN ID {target.vekn_id} for user {target.uid} by {manager.uid}"
     )
-    # Push the orphaned record's nulled PII to other clients' caches live (pst #66).
+    # Push the orphaned record's nulled PII to other clients' caches live.
     for bd in detach_bds:
         broadcast_precomputed(bd)
     await broadcast_resync(new_user.uid)

@@ -82,7 +82,7 @@ type UpgradeTx = IDBPTransaction<ArchonDB, ArrayLike<StoreNames<ArchonDB>>, 'ver
  * Unsynced offline-tournament data lifted out of the old stores so it survives
  * the destructive version upgrade below. Synced data is re-fetched from SSE, but
  * an offline tournament is locked to this device and may hold changes not yet
- * pushed to the server — dropping it loses real work (pst #14). The `offline_*`
+ * pushed to the server — dropping it loses real work. The `offline_*`
  * metadata keys are the manifest of what is unsynced; the referenced rows live
  * in the tournaments / users / sanctions / decks stores.
  */
@@ -205,7 +205,7 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
     async upgrade(db, _oldVersion, _newVersion, transaction) {
 
       // Rescue unsynced offline-tournament data before the destructive rebuild
-      // (pst #14). Read everything first, then drop/recreate stores, then write
+      // Read everything first, then drop/recreate stores, then write
       // it back — all in this versionchange transaction, awaiting only IDB ops.
       const rescued = await rescueOfflineData(db, transaction);
 
@@ -270,7 +270,7 @@ export async function getAllUsers(): Promise<User[]> {
   const db = await getDB();
   // Use the name index to get pre-sorted results. Exclude soft-deleted users
   // (e.g. merge_users dups) from listings — getUser still resolves them so
-  // tournament player references keep rendering (pst #77).
+  // tournament player references keep rendering.
   const users = await db.getAllFromIndex('users', 'by-name');
   return users.filter(u => !u.deleted_at);
 }
@@ -346,7 +346,7 @@ export async function getFilteredUsers(
     return users.filter(u => u.roles && expandedRoles.some(role => u.roles!.includes(role)));
   };
 
-  // Soft-deleted users (e.g. merge_users dups) never appear in listings (pst #77).
+  // Soft-deleted users (e.g. merge_users dups) never appear in listings.
   const notDeleted = (users: User[]): User[] => users.filter(u => !u.deleted_at);
 
   // Case 1: No country filter - get all sorted by name, then filter in JS

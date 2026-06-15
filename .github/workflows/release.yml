@@ -5,7 +5,7 @@ name: Release
 # create the GitHub Release. The artifacts job then calls release-artifacts.yml
 # directly (workflow_call) to build + attach the wheel/dist assets — we don't
 # rely on a `release: published` event, which a github.token-created Release
-# never fires (#152). So the chain is one run:
+# never fires. So the chain is one run:
 #
 #   git push origin v1.2.3  ->  e2e  ->  (green) create release  ->  artifacts  ->  manual deploy
 #

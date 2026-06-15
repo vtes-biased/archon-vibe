@@ -302,7 +302,7 @@ async def test_duplicate_participant_rejected(test_client, test_db):
 @pytest.mark.asyncio
 async def test_finished_go_online_recomputes_ratings(test_client, test_db):
     """An event run+finished offline gets its rating points immediately on
-    go-online — not only when the daily recompute job next fires (~24h late). pst #127
+    go-online — not only when the daily recompute job next fires (~24h late).
     """
     from src.ratings import rating_category_for_tournament
 

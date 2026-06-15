@@ -77,7 +77,7 @@ async def test_results_query_selects_in_app_excludes_imports(test_db):
 
 
 # ---------------------------------------------------------------------------
-# Fail-fast circuit (#121): a connection/auth failure aborts the whole batch
+# Fail-fast circuit: a connection/auth failure aborts the whole batch
 # (it reruns next cycle) instead of re-timing-out every pending item serially;
 # a per-item data error skips only that item and the batch continues.
 # ---------------------------------------------------------------------------

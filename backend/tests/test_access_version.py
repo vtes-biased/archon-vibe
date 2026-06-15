@@ -39,7 +39,7 @@ async def test_av_is_deterministic_and_level_sensitive(test_db):
 @pytest.mark.asyncio
 async def test_av_ignores_nonoverlay_roles(test_db):
     """A non-overlay role (Judge/PT/…) doesn't branch in access projection, so adding it
-    must NOT change the fp — else every such grant would force a needless resync (#204)."""
+    must NOT change the fp — else every such grant would force a needless resync."""
     plain = await compute_access_version(_member())
     judge = await compute_access_version(_member(roles=[Role.JUDGE, Role.PT]))
     assert plain == judge

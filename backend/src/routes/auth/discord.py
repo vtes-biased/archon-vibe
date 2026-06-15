@@ -203,7 +203,7 @@ async def discord_callback(
             else:
                 # Discord is linked to another account - merge accounts
                 # This reassigns all auth methods (including Discord) to keep_uid
-                # merge_users refuses to absorb a VEKN-bearing account (#59):
+                # merge_users refuses to absorb a VEKN-bearing account:
                 # re-linking Discord must not let one account swallow another's
                 # VEKN identity. Treat that refusal as a merge failure.
                 try:
@@ -217,7 +217,7 @@ async def discord_callback(
                         url=f"{frontend_url}{redirect_path}?error=merge_failed",
                         status_code=302,
                     )
-                # Push the merge to other clients' caches live (pst #66); the
+                # Push the merge to other clients' caches live; the
                 # survivor's discord-field update broadcasts again below.
                 _merged, merge_bds = merge_result
                 for bd in merge_bds:

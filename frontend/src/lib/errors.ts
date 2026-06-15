@@ -1,7 +1,7 @@
 /**
  * Map any thrown value to a user-facing message.
  *
- * Resolution order (#102 shape mapper + #107 structured codes):
+ * Resolution order (shape mapper + structured codes):
  * - `EngineError` (typed WASM rejection or coded JS pre-check) → localized
  *   message from its stable code; unknown code falls back to its English
  *   message. `internal` maps to a generic localized message (detail is logged,

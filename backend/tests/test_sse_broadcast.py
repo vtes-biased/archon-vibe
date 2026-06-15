@@ -156,7 +156,7 @@ def test_scope_matches_sanction_by_tournament_uid():
 def test_broadcast_precomputed_coalesces_repeat_frames_per_object():
     """Repeated whole-object frames for the same (type,uid) supersede each other:
     the stalled queue holds ONE frame (the latest) per object, not a backlog —
-    the #198 memory fix. Distinct objects are NOT coalesced."""
+    the memory fix. Distinct objects are NOT coalesced."""
     conn = SSEConnection(user=None)  # public projection
     _sse_connections.clear()
     _sse_connections.add(conn)

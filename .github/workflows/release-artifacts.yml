@@ -3,7 +3,7 @@ name: Release Artifacts
 # Builds every deployable artifact in CI and attaches it to a GitHub Release.
 # Called directly by release.yml (workflow_call) right after the e2e-gated
 # Release is created — no `release: published` event handoff, which a
-# github.token-created Release never fires (#152). The deploy playbooks fetch
+# github.token-created Release never fires. The deploy playbooks fetch
 # these assets themselves (ansible/tasks/fetch_release.yml) instead of building
 # locally — CI is the single source of deployed builds. Card data freshness is
 # owned by update-cards.yml (daily).

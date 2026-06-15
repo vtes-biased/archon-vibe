@@ -1,4 +1,4 @@
-"""Structured engine rejections (#107).
+"""Structured engine rejections.
 
 The Rust engine raises ValueError whose message is the EngineError wire JSON
 ``{"code": ..., "params": {...}, "message": ...}`` (see engine/src/error.rs).

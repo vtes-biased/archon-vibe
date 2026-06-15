@@ -13,7 +13,7 @@
 
   let expanded = $state(false);
 
-  // Sync-job health (#123): last success/error of the scheduled VEKN jobs.
+  // Sync-job health: last success/error of the scheduled VEKN jobs.
   // In-process server state, loaded on first expand (and after a manual run).
   let status = $state<VeknStatusResponse | null>(null);
   let statusLoading = $state(false);
@@ -98,7 +98,7 @@
   </button>
   {#if expanded}
     <div class="mt-4 space-y-3">
-      <!-- Sync-job health (#123) -->
+      <!-- Sync-job health -->
       <div class="bg-dusk-900 rounded-lg border border-ash-700 p-4">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">

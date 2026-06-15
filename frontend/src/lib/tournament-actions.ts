@@ -61,7 +61,7 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
   for (const s of sanctions) {
     if (s.deleted_at || s.lifted_at) continue;
     if (s.level === 'suspension' && (!s.expires_at || new Date(s.expires_at) > now)) {
-      // Coded like the engine/backend twins so the offline path localizes too (#107)
+      // Coded like the engine/backend twins so the offline path localizes too
       throw new EngineError(
         'tournament.player_suspended',
         {},
@@ -178,7 +178,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
     } catch (e) {
       // WASM rejected. When this tournament is offline (or the device is), there's
       // no server to defer to — surface the engine's actual reason (a typed
-      // EngineError since #107) instead of a misleading "requires online".
+      // EngineError) instead of a misleading "requires online".
       // Otherwise fall through to server-only (covers genuine unknown-action drift).
       if (isOffline(uid) || !isOnline()) throw e;
     }

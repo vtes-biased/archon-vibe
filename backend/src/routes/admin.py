@@ -111,7 +111,7 @@ async def trigger_vekn_tournament_sync(
 async def vekn_status(
     manager: CurrentUser,
 ) -> dict:
-    """Last success/error of VEKN sync & push jobs (#123). Requires IC role.
+    """Last success/error of VEKN sync & push jobs. Requires IC role.
 
     Lets admins spot a days-long vekn.net outage without grepping logs. State is
     in-process (resets on restart); keys: member_sync, tournament_sync, batch_push.
@@ -189,7 +189,7 @@ async def merge_user_accounts(
         )
 
     # Perform merge. merge_users refuses to absorb a VEKN-bearing account
-    # (#59 invariant); surface that as a 400 rather than a generic 500.
+    # (invariant); surface that as a 400 rather than a generic 500.
     try:
         result = await merge_users(request.keep_uid, request.delete_uid)
     except ValueError as e:
@@ -197,7 +197,7 @@ async def merge_user_accounts(
     if not result:
         raise HTTPException(status_code=500, detail="Failed to merge users")
     merged, merge_bds = result
-    # Propagate the merge to other clients' caches live (pst #66).
+    # Propagate the merge to other clients' caches live.
     for bd in merge_bds:
         broadcast_precomputed(bd)
 

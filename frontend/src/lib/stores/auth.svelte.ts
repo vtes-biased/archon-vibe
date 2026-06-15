@@ -141,7 +141,7 @@ export function getAccessToken(): string | null {
  * the effective access level for every tab — but only the tab that made the
  * change knows. A tab that doesn't notice keeps its old-level SSE writing into
  * the *shared* IndexedDB, clobbering the other tab's data and silently dropping
- * it to a lower-access view (pst #94). Here we converge this tab to the new
+ * it to a lower-access view. Here we converge this tab to the new
  * auth level so all same-origin tabs stay at one level and write identical
  * projections.
  *

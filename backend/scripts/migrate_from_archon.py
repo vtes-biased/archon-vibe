@@ -21,7 +21,7 @@ Two modes against the same mapping code:
   old-archon uid — which diverges whenever the live account was VEKN-sync-created
   (fresh uuid7) and then claimed. The merge merges archon-owned fields into that
   live account and NEVER tombstones it (matching on uid used to detach claimed
-  accounts, #169); every play-data reference to an old-archon member uid is
+  accounts); every play-data reference to an old-archon member uid is
   remapped to the live uid via `member_uid_map`. Members with no VEKN id are
   seeded as soft-deleted shells (historical tournaments reference them; they
   aren't live identities). This is what makes the prod migration **sync-first**
@@ -459,7 +459,7 @@ async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
     than on the old-archon uid — which diverges whenever the live account was
     created by the VEKN sync (fresh uuid7) and then claimed. Matching on uid here
     used to tombstone such a claimed account and null its vekn_id (silent data
-    loss, #169); this never tombstones a live account.
+    loss); this never tombstones a live account.
 
     - no vekn_id        → soft-deleted shell (refs resolve; not a live identity)
     - vekn_id matches a live account → merge archon-owned fields into it
@@ -994,8 +994,8 @@ def build_tournament(
         winner=winner_uid,
         standings=standings,
         # Migrated events owe new archon no VEKN push. Under one-app-per-event
-        # (#39) legacy owns each event until it's finished there; legacy pushes it
-        # and the daily #115 --merge then carries the vekn id + results + this
+        # legacy owns each event until it's finished there; legacy pushes it
+        # and the daily --merge then carries the vekn id + results + this
         # stamp back, so new archon must never (re)create a calendar event or
         # (re)upload results for a migrated event. Stamp every NON-PLANNED import
         # — finished AND in-flight — the exact inverse of batch_push's
@@ -1276,7 +1276,7 @@ async def save_sanctions(
     for s in sanctions.values():
         # Remap tournament refs to the surviving uid for events whose rich
         # payload merged into a vekn-created copy, and the sanctioned member +
-        # issuing judge to their live uids (old-archon uid → live, #169).
+        # issuing judge to their live uids (old-archon uid → live).
         if s.tournament_uid:
             s.tournament_uid = uid_map.get(s.tournament_uid, s.tournament_uid)
         s.user_uid = member_uid_map.get(s.user_uid, s.user_uid)

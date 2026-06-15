@@ -14,7 +14,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 /**
  * API error class with message extraction.
  * `code`/`params` carry the engine's structured rejection when the 400 body
- * has them (#107) — `toUserMessage` maps the code to a localized message.
+ * has them — `toUserMessage` maps the code to a localized message.
  */
 export class ApiError extends Error {
   constructor(
@@ -85,7 +85,7 @@ export async function apiRequest<T>(
     try {
       const data = await response.json();
       detail = data.detail || data.message;
-      // Engine rejection bodies carry top-level code+params next to detail (#107)
+      // Engine rejection bodies carry top-level code+params next to detail
       if (typeof data.code === 'string') {
         code = data.code;
         params = data.params ?? {};

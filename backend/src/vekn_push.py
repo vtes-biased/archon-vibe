@@ -195,7 +195,7 @@ async def push_tournament_event(
         logger.error(f"Failed to create VEKN event for {tournament.uid}: {e}")
         return None
 
-    # Store the VEKN event ID. Re-fetch first (#122): batch_push loads rows up
+    # Store the VEKN event ID. Re-fetch first: batch_push loads rows up
     # front but saves here minutes later — only the vekn fields are ours, so we
     # write them onto a fresh snapshot instead of clobbering interim edits.
     fresh = await get_tournament_by_uid(tournament.uid) or tournament
@@ -253,7 +253,7 @@ async def push_tournament_results(
         logger.error(f"Failed to upload results for {tournament.uid}: {e}")
         return False
 
-    # Mark as pushed. Re-fetch first (#122): the snapshot we computed archondata
+    # Mark as pushed. Re-fetch first: the snapshot we computed archondata
     # from may be minutes stale by now — write only the vekn fields onto a fresh
     # one so concurrent edits aren't clobbered. push_tournament_event above may
     # have already bumped external_ids.vekn; re-reading picks that up too.
@@ -303,7 +303,7 @@ async def push_member(
         logger.error(f"Failed to push member {user.vekn_id}: {e}")
         return False
 
-    # Re-fetch before save (#122): batch_push may have loaded this user minutes
+    # Re-fetch before save: batch_push may have loaded this user minutes
     # ago — write only the vekn-sync flags onto a fresh snapshot so interim
     # profile edits (name, city, roles) aren't clobbered.
     fresh = await get_user_by_uid(user.uid) or user
@@ -365,7 +365,7 @@ UNPUSHED_RESULTS_QUERY = """
 async def batch_push(client: VEKNAPIClient) -> dict:
     """Push all unpushed tournaments and members. Returns stats dict.
 
-    Fail-fast (#121): the first VEKNAPIConnectionError (transport down, timeout,
+    Fail-fast: the first VEKNAPIConnectionError (transport down, timeout,
     auth failure) aborts the whole batch rather than letting every remaining
     item re-time-out serially (30-120s each) during an outage — it reruns next
     cycle anyway. Per-item data errors (bad VEKN id, parse error) still skip just

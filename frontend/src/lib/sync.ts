@@ -84,7 +84,7 @@ const SPECS: ObjectSpec<any>[] = [
   // Users are never hard-deleted from the cache: a soft-deleted user (e.g. a
   // merge_users dup) may still be referenced by tournament players, so we keep
   // the row (saving its deleted_at) for getUser to resolve, and filter it out of
-  // the list/search queries instead (pst #77). Without the payload we no-op.
+  // the list/search queries instead. Without the payload we no-op.
   { batchType: 'users', singleType: 'user', save: saveUser, saveBatch: saveUsersBatch, del: async (_uid, item) => { if (item) await saveUser(item); } },
   { batchType: 'sanctions', singleType: 'sanction', save: saveSanction, saveBatch: saveSanctionsBatch, del: deleteSanction },
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
@@ -454,7 +454,7 @@ class SyncManager {
     // The offline_* metadata keys survive (only the last_sync_* cursor keys are removed),
     // but the rows they point to live in the cleared stores, so rescue them too —
     // otherwise go-online's getSanction/getDeck lookups return undefined and the
-    // offline sanctions/decks are silently dropped from reconciliation (pst #14).
+    // offline sanctions/decks are silently dropped from reconciliation.
     const offlineUids = getOfflineTournamentUids();
     const tournaments: Tournament[] = [];
     const users: User[] = [];
