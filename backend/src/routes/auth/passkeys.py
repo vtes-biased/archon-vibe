@@ -4,11 +4,11 @@ import base64
 import json
 import os
 from datetime import UTC, datetime, timedelta
+from uuid import uuid7
 
 import msgspec
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel
-from uuid import uuid7
 from webauthn import (
     generate_authentication_options,
     generate_registration_options,

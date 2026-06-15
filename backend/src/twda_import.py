@@ -2,10 +2,10 @@
 
 import logging
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import aiohttp
 import msgspec
-from uuid import uuid7
 
 from .broadcast import broadcast_precomputed
 from .db import get_connection, save_object_from_model

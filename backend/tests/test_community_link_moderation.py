@@ -12,12 +12,12 @@ while any loosening of the policy turns it red.
 """
 
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import pytest
 from httpx import AsyncClient
 from src import db
 from src.models import CommunityLink, Role, User
-from uuid import uuid7
 
 from tests.conftest import make_auth_header
 

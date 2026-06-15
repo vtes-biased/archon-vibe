@@ -4,10 +4,10 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
+from uuid import uuid7
 from zoneinfo import ZoneInfo
 
 import msgspec
-from uuid import uuid7
 
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE

@@ -18,6 +18,7 @@ down explicitly (the test_db fixture only wipes ``type='user'``).
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from uuid import uuid7
 
 import pytest
 import src.accounts as accounts
@@ -35,7 +36,6 @@ from src.models import (
     SanctionLevel,
     User,
 )
-from uuid import uuid7
 
 from tests.conftest import make_auth_header
 

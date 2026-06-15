@@ -8,9 +8,9 @@ push the change to other clients' caches live; db.py can't import broadcast
 """
 
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import msgspec
-from uuid import uuid7
 
 from .db import (
     BroadcastData,

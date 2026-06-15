@@ -10,13 +10,13 @@ known-IC / known-non-IC selection is deterministic.
 """
 
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import pytest
 import pytest_asyncio
 import src.db as db
 from httpx import AsyncClient
 from src.models import Role, User
-from uuid import uuid7
 
 from tests.conftest import make_auth_header
 

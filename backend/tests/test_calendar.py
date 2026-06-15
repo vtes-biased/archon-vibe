@@ -7,6 +7,7 @@ Focuses on:
 """
 
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import pytest
 from src import db
@@ -24,7 +25,6 @@ from src.routes.calendar import (
     _matches_agenda,
     _tournament_to_vevent,
 )
-from uuid import uuid7
 
 NOW = datetime.now(UTC)
 JUNE_15_10AM = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)

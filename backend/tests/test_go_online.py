@@ -8,13 +8,13 @@ WITHOUT creating any users.
 
 import json
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import msgspec
 import pytest
 import pytest_asyncio
 import src.db as db
 from src.models import Player, Seat, Table, Tournament, TournamentState, User
-from uuid import uuid7
 
 from tests.conftest import make_auth_header
 

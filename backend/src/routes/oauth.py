@@ -5,6 +5,7 @@ import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
+from uuid import uuid7
 
 import jwt
 import msgspec
@@ -12,7 +13,6 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from uuid import uuid7
 
 from ..db_oauth import (
     get_oauth_client_by_client_id,

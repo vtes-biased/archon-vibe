@@ -14,11 +14,11 @@ if str(backend_dir) not in sys.path:
 import random
 from datetime import UTC, datetime, timedelta
 
-from src import db
-from src.models import Role, User
-
 # Import uuid7 for generating IDs
 from uuid import uuid7
+
+from src import db
+from src.models import Role, User
 
 
 def generate_mock_users(count: int = 300) -> list[User]:

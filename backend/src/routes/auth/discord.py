@@ -5,11 +5,11 @@ import os
 import secrets
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
+from uuid import uuid7
 
 import aiohttp
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
-from uuid import uuid7
 
 from ...accounts import merge_users
 from ...broadcast import broadcast_precomputed

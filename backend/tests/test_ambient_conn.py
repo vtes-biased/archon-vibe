@@ -12,11 +12,11 @@ ambient connection; doing so raises.
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import pytest
 import src.db as db
 from src.models import User
-from uuid import uuid7
 
 
 @asynccontextmanager

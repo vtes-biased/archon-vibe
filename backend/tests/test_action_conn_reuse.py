@@ -9,11 +9,11 @@ sanction fan-out is also collapsed into a single batched query.
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import pytest
 import src.db as db
 from src.models import Sanction, SanctionCategory, SanctionLevel
-from uuid import uuid7
 
 
 def _sanction(user_uid: str, level: SanctionLevel) -> Sanction:

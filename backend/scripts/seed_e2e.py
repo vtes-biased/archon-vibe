@@ -15,6 +15,7 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 from datetime import UTC, datetime  # noqa: E402
+from uuid import uuid7  # noqa: E402
 
 from argon2 import PasswordHasher  # noqa: E402
 from src.db import (  # noqa: E402
@@ -34,7 +35,6 @@ from src.models import (  # noqa: E402
     User,
 )
 from src.snapshots import generate_snapshots  # noqa: E402
-from uuid import uuid7  # noqa: E402
 
 ph = PasswordHasher()
 

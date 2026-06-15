@@ -1,12 +1,12 @@
 """Tests for PATCH /auth/me profile update — community_links security boundary."""
 
 from datetime import UTC, datetime
+from uuid import uuid7
 
 import pytest
 from httpx import AsyncClient
 from src import db
 from src.models import Role, User
-from uuid import uuid7
 
 from tests.conftest import make_auth_header
 

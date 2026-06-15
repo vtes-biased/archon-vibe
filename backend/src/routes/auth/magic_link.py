@@ -3,12 +3,12 @@
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
+from uuid import uuid7
 
 import msgspec
 from argon2 import PasswordHasher
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel, EmailStr
-from uuid import uuid7
 
 from ...db import (
     delete_transient_token,
