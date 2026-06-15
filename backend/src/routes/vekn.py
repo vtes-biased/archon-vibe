@@ -23,7 +23,6 @@ from ..db import (
     get_user_by_vekn_id,
     is_vekn_id_claimed,
     save_user,
-    set_user_resync_after,
 )
 from ..middleware.auth import CurrentUser
 from ..models import User
@@ -105,7 +104,6 @@ async def claim_vekn_id(
     # owner (their data level changed — they gained a vekn_id).
     for bd in merge_bds:
         broadcast_precomputed(bd)
-    await set_user_resync_after(merged.uid)
     logger.info(f"User claimed VEKN ID {request.vekn_id}: {merged.uid}")
     await broadcast_resync(merged.uid)
 
@@ -164,7 +162,6 @@ async def abandon_vekn_id(
     # Push the orphaned record's nulled PII to other clients' caches live (pst #66).
     for bd in detach_bds:
         broadcast_precomputed(bd)
-    await set_user_resync_after(new_user.uid)
     await broadcast_resync(new_user.uid)
 
     # Update Discord Linked Roles (lost vekn_id)
@@ -235,7 +232,6 @@ async def sponsor_new_member(
 
     bd = await save_user(updated)
     broadcast_precomputed(bd)
-    await set_user_resync_after(updated.uid)
     logger.info(
         f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}"
     )
@@ -335,11 +331,9 @@ async def link_vekn_to_user(
     )
 
     # Trigger resync for affected users
-    await set_user_resync_after(merged.uid)
     await broadcast_resync(merged.uid)
     asyncio.create_task(sync_user_discord_roles(merged.uid))
     if displaced_user:
-        await set_user_resync_after(displaced_user.uid)
         await broadcast_resync(displaced_user.uid)
         asyncio.create_task(sync_user_discord_roles(displaced_user.uid))
 
@@ -408,7 +402,6 @@ async def force_abandon_vekn_id(
     # Push the orphaned record's nulled PII to other clients' caches live (pst #66).
     for bd in detach_bds:
         broadcast_precomputed(bd)
-    await set_user_resync_after(new_user.uid)
     await broadcast_resync(new_user.uid)
 
     # Update Discord Linked Roles (lost vekn_id + roles)

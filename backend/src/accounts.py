@@ -174,8 +174,8 @@ async def merge_users(
     ) or await get_calendar_token(keep_uid)
 
     # Merge from keep_user as the base so every field survives by default
-    # (identity, roles, ratings, wins, resync_after, and any future field) —
-    # building User(...) from scratch silently dropped unlisted fields. Only the
+    # (identity, roles, ratings, wins, and any future field) — building User(...)
+    # from scratch silently dropped unlisted fields. Only the
     # fields with a real merge policy are overridden below: identity prefers
     # keep_user, contact info prefers delete_user (the claiming account),
     # roles/local_modifications union.

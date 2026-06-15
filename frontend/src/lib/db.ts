@@ -402,6 +402,26 @@ export async function clearLastSyncGeneratedAt(): Promise<void> {
   await db.delete('metadata', 'last_sync_generated_at');
 }
 
+// Opaque access-version fingerprint: seeded from the /snapshot X-Access-Version header,
+// echoed on /stream as ?av=, and refreshed by targeted-push frames. The client never
+// parses it — a mismatch at connect tells the server the cached corpus predates an
+// entitlement change and triggers one resync.
+export async function getLastSyncAccessVersion(): Promise<string | null> {
+  const db = await getDB();
+  const value = await db.get('metadata', 'last_sync_access_version');
+  return value || null;
+}
+
+export async function setLastSyncAccessVersion(av: string): Promise<void> {
+  const db = await getDB();
+  await db.put('metadata', av, 'last_sync_access_version');
+}
+
+export async function clearLastSyncAccessVersion(): Promise<void> {
+  const db = await getDB();
+  await db.delete('metadata', 'last_sync_access_version');
+}
+
 // Sanction operations
 export async function getSanction(uid: string): Promise<Sanction | undefined> {
   const db = await getDB();

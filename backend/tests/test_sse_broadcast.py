@@ -10,17 +10,35 @@ Covers two sync-correctness invariants:
 """
 
 import asyncio
+import json
+from datetime import UTC, datetime
 
 from src.broadcast import (
     SSEConnection,
     _scope_matches,
     _sse_connections,
+    broadcast_personal,
     broadcast_precomputed,
 )
 from src.db import BroadcastData
-from src.models import ObjectType
+from src.models import ObjectType, User
 
 MODIFIED_AT = "2026-06-03T12:00:00.123456"
+
+
+def _member(uid: str = "viewer") -> User:
+    """A plain member viewer (vekn_id, no overlay-granting role, no org rights)."""
+    return User(uid=uid, modified=datetime.now(UTC), name="M", vekn_id="9999")
+
+
+def _private_deck(uid: str = "d1", owner: str = "owner") -> dict:
+    return {
+        "uid": uid,
+        "tournament_uid": "t1",
+        "user_uid": owner,
+        "public": False,
+        "cards": {"Some Card": 1},
+    }
 
 
 def _bd(modified_at: str | None = MODIFIED_AT, uid: str = "t1") -> BroadcastData:
@@ -150,5 +168,106 @@ def test_broadcast_precomputed_closes_connection_on_overflow():
         broadcast_precomputed(_bd())
         assert conn.closed is True
         assert conn not in _sse_connections
+    finally:
+        _sse_connections.clear()
+
+
+# ---------------------------------------------------------------------------
+# broadcast_personal — targeted per-user/per-object invalidation (205b)
+# ---------------------------------------------------------------------------
+
+
+def test_personal_private_deck_demote_emits_tombstone():
+    """THE gate: a demoted organizer (no longer in org_uids) has only member
+    entitlement for a private deck, whose member projection is None — so the push
+    is a tombstone (uid + deleted_at, no deck contents) that evicts just that deck."""
+    viewer = _member()
+    conn = SSEConnection(user=viewer)
+    _sse_connections.clear()
+    _sse_connections.add(conn)
+    try:
+        broadcast_personal(
+            viewer.uid,
+            obj_type=ObjectType.DECK,
+            uid="d1",
+            full_dict=_private_deck(),
+            obj_user_uid="owner",  # not the viewer's own deck
+            org_uids=[],  # no longer an organizer
+            modified_at=MODIFIED_AT,
+        )
+        data = json.loads(conn.queue.get_nowait().removeprefix("data: ").strip())
+        assert data["type"] == "deck"
+        assert data["data"] == {"uid": "d1", "deleted_at": MODIFIED_AT}
+        assert "cards" not in data["data"]  # contents evicted, not leaked
+    finally:
+        _sse_connections.clear()
+
+
+def test_personal_organizer_gets_private_deck_at_full():
+    """Promote: the same private deck, but the viewer IS now an organizer, so the
+    full projection (with contents) is delivered — no tombstone."""
+    viewer = _member()
+    conn = SSEConnection(user=viewer)
+    _sse_connections.clear()
+    _sse_connections.add(conn)
+    try:
+        broadcast_personal(
+            viewer.uid,
+            obj_type=ObjectType.DECK,
+            uid="d1",
+            full_dict=_private_deck(),
+            obj_user_uid="owner",
+            org_uids=[viewer.uid],  # organizer → full
+        )
+        data = json.loads(conn.queue.get_nowait().removeprefix("data: ").strip())
+        assert data["data"]["cards"] == {"Some Card": 1}
+        assert "deleted_at" not in data["data"]
+    finally:
+        _sse_connections.clear()
+
+
+def test_personal_carries_access_version():
+    """The frame rides the new fingerprint so the client refreshes `av` without a
+    reconnect."""
+    viewer = _member()
+    conn = SSEConnection(user=viewer)
+    _sse_connections.clear()
+    _sse_connections.add(conn)
+    try:
+        broadcast_personal(
+            viewer.uid,
+            obj_type=ObjectType.DECK,
+            uid="d1",
+            full_dict=_private_deck(),
+            obj_user_uid="owner",
+            org_uids=[],
+            access_version="abc123",
+        )
+        assert '"av":"abc123"' in conn.queue.get_nowait()
+    finally:
+        _sse_connections.clear()
+
+
+def test_personal_skips_other_users_and_scoped_streams():
+    """Targets only the named user's browser connections — never another user, and
+    never a scoped (bot) stream (which replays full state and isn't IDB-backed)."""
+    viewer = _member("viewer")
+    other = SSEConnection(user=_member("someone-else"))
+    scoped = SSEConnection(user=viewer, tournament_uid="t1")
+    target = SSEConnection(user=viewer)
+    _sse_connections.clear()
+    _sse_connections.update({other, scoped, target})
+    try:
+        broadcast_personal(
+            viewer.uid,
+            obj_type=ObjectType.DECK,
+            uid="d1",
+            full_dict=_private_deck(),
+            obj_user_uid="owner",
+            org_uids=[],
+        )
+        assert not target.queue.empty()
+        assert other.queue.empty()
+        assert scoped.queue.empty()
     finally:
         _sse_connections.clear()

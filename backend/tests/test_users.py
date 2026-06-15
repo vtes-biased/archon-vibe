@@ -70,14 +70,18 @@ async def test_update_user(test_client: AsyncClient, populated_db):
 async def test_role_change_resyncs_only_for_access_roles(
     test_client: AsyncClient, populated_db
 ):
-    """Only NC/Prince/IC role changes set resync_after; other roles must not.
+    """Only NC/Prince/IC role changes nudge a resync; other roles must not.
 
-    Resync clears every client's IndexedDB and forces a snapshot re-fetch
-    (~10s blank community page). Only NC/Prince/IC change what a user can see
-    or is seen as, so only those warrant it. Granting a non-access role like PT
-    must NOT trigger a resync. Guards the regression behind the resync fix.
+    Resync clears every client's IndexedDB and forces a snapshot re-fetch (~10s
+    blank community page). Only NC/Prince/IC change what a user can see or is seen
+    as, so only those warrant it. The online nudge is broadcast_resync (asserted
+    here via the user's SSE connection); the offline path is the access-version fp
+    (test_access_version: a non-overlay role like PT doesn't move it).
     """
+    import json
+
     from src import db
+    from src.broadcast import SSEConnection, _sse_connections
 
     # IC can change any role; target needs a vekn_id to be assigned roles.
     admin = next(u for u in populated_db if Role.IC in u.roles)
@@ -90,27 +94,41 @@ async def test_role_change_resyncs_only_for_access_roles(
     )
     headers = make_auth_header(admin.uid)
 
-    # Non-access role change (add PT) must NOT set resync_after.
-    resp = await test_client.put(
-        f"/api/users/{target.uid}",
-        json={"roles": [*(r.value for r in target.roles), Role.PT.value]},
-        headers=headers,
-    )
-    assert resp.status_code == 200
-    after = await db.get_user_by_uid(target.uid)
-    assert Role.PT in after.roles
-    assert after.resync_after is None
+    conn = SSEConnection(user=target)
+    _sse_connections.clear()
+    _sse_connections.add(conn)
 
-    # Access role change (add Prince) MUST set resync_after.
-    resp = await test_client.put(
-        f"/api/users/{target.uid}",
-        json={"roles": [*(r.value for r in after.roles), Role.PRINCE.value]},
-        headers=headers,
-    )
-    assert resp.status_code == 200
-    after = await db.get_user_by_uid(target.uid)
-    assert Role.PRINCE in after.roles
-    assert after.resync_after is not None
+    def drained_types() -> list[str]:
+        types = []
+        while not conn.queue.empty():
+            msg = conn.queue.get_nowait()
+            types.append(json.loads(msg.removeprefix("data: ").strip()).get("type"))
+        return types
+
+    try:
+        # Non-access role change (add PT) must NOT emit a resync.
+        resp = await test_client.put(
+            f"/api/users/{target.uid}",
+            json={"roles": [*(r.value for r in target.roles), Role.PT.value]},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        after = await db.get_user_by_uid(target.uid)
+        assert Role.PT in after.roles
+        assert "resync" not in drained_types()
+
+        # Access role change (add Prince) MUST emit a resync.
+        resp = await test_client.put(
+            f"/api/users/{target.uid}",
+            json={"roles": [*(r.value for r in after.roles), Role.PRINCE.value]},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        after = await db.get_user_by_uid(target.uid)
+        assert Role.PRINCE in after.roles
+        assert "resync" in drained_types()
+    finally:
+        _sse_connections.clear()
 
 
 @pytest.mark.asyncio

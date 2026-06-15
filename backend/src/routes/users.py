@@ -15,7 +15,6 @@ from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
     get_user_by_uid,
-    set_user_resync_after,
 )
 from ..db import delete_avatar as db_delete_avatar
 from ..db import get_avatar as db_get_avatar
@@ -272,7 +271,8 @@ async def update_user(
         # everyone's cache for ~10s for nothing.
         access_roles = {Role.NC, Role.PRINCE, Role.IC}
         if (old_roles & access_roles) != (new_roles & access_roles):
-            await set_user_resync_after(user.uid)
+            # Online nudge; an offline client is caught by the access-version fp at connect
+            # (the roles term moves). Non-access roles change no projection → no resync.
             await broadcast_resync(user.uid)
         # Update Discord Linked Roles metadata (any role change, access-affecting or not)
         import asyncio

@@ -316,10 +316,6 @@ class User(BaseObject, kw_only=True):
     # VEKN prefix (for Prince/NC users, extracted from princeid/coordinatorid)
     vekn_prefix: str | None = None  # Used to infer coopted_by during sync
 
-    # Resync tracking: set to DB now() when roles or vekn_id changes,
-    # triggers full SSE resync for this user on next connect
-    resync_after: datetime | None = None
-
     # Calendar feed: URL-safe token for iCal subscription authentication
     calendar_token: str | None = None
 

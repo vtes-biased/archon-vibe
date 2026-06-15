@@ -1,6 +1,7 @@
 """Database connection and initialization."""
 
 import asyncio
+import hashlib
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -19,6 +20,7 @@ from .models import (
     AuthMethod,
     League,
     ObjectType,
+    Role,
     Sanction,
     Tournament,
     User,
@@ -201,6 +203,80 @@ async def tournament_transaction(
 
 # JSON encoder/decoder
 _encoder = msgspec.json.Encoder()
+
+
+# ---------------------------------------------------------------------------
+# Access-version fingerprint (SSE connect handshake) — see SYNC.md
+# ---------------------------------------------------------------------------
+
+# Global wire-shape lever: bump on any change to the projected JSON shape that does
+# NOT also ride a frontend DB_VERSION bump (a field rename/remove in models.py, an
+# access_levels projection-policy change, a nested engine-struct change). One bump
+# flips every client's fingerprint → exactly one resync. The narrow backstop, not
+# the primary mechanism (a DB_VERSION bump self-heals client-side).
+DATA_SCHEMA_VERSION = 1
+
+# Roles that branch in base_data_level / entitled_level / access_levels — the only
+# roles whose presence changes a viewer's entitlement (so only these enter the fp).
+_OVERLAY_ROLES = (Role.IC, Role.NC, Role.PRINCE)
+
+
+def base_data_level(viewer: User | None) -> str:
+    """The viewer's base projection level BEFORE any personal overlay.
+
+    Single source of truth (main._viewer_level delegates here and the fingerprint
+    reuses it): IC → full; any vekn member → member; otherwise public.
+    """
+    if not viewer:
+        return "public"
+    if Role.IC in viewer.roles:
+        return "full"
+    if viewer.vekn_id:
+        return "member"
+    return "public"
+
+
+async def organizer_tournament_uids(user_uid: str) -> list[str]:
+    """Sorted uids of non-deleted tournaments this user organizes (GIN-indexed)."""
+    async with get_connection() as conn:
+        rows = await (
+            await conn.execute(
+                # Literal type (not a %s param) so the planner can prove the partial
+                # index's `WHERE type = 'tournament'` predicate; @> (not ?) so its
+                # jsonb_path_ops opclass applies. See idx_objects_tournament_organizers.
+                "SELECT uid FROM objects WHERE type = 'tournament' "
+                "AND (\"full\"->'organizers_uids') @> %s::jsonb AND deleted_at IS NULL",
+                (_encoder.encode([user_uid]).decode(),),
+            )
+        ).fetchall()
+    return sorted(r[0] for r in rows)
+
+
+async def compute_access_version(viewer: User | None) -> str:
+    """Opaque per-user entitlement fingerprint for the SSE connect handshake.
+
+    Hashes everything that changes WHICH objects (or which projection of them) a
+    viewer is entitled to: the wire-shape version, base level, overlay-granting
+    roles, the country that scopes an NC/Prince overlay, and the tournaments they
+    organize. A mismatch at connect ⇒ the cached corpus predates an entitlement
+    change a since-delta can't repair ⇒ resync. Backend-only + opaque: the client
+    stores + echoes it, never parses it, so the inputs stay server-evolvable.
+    """
+    level = base_data_level(viewer)
+    roles = sorted(r.value for r in _OVERLAY_ROLES if viewer and r in viewer.roles)
+    # country enters the fp ONLY for officials — it scopes their same-country overlay.
+    # Must stay in lockstep with entitled_level's same-country branch (broadcast.py).
+    official = bool(viewer and (Role.NC in viewer.roles or Role.PRINCE in viewer.roles))
+    country = viewer.country if official else None
+    # The org-set only changes a MEMBER's entitlement (IC already sees full
+    # everywhere; public/anon have no overlay) — so only members pay the query.
+    org_uids = (
+        await organizer_tournament_uids(viewer.uid)
+        if viewer and level == "member"
+        else []
+    )
+    payload = _encoder.encode([DATA_SCHEMA_VERSION, level, roles, country, org_uids])
+    return hashlib.sha256(payload).hexdigest()[:16]
 
 
 @cache
@@ -470,15 +546,6 @@ async def get_user_by_uid(
     re-read it. Owner display reads it explicitly via get_calendar_token().
     """
     return await get_object_full(uid, User, conn=conn)
-
-
-async def set_user_resync_after(user_uid: str) -> None:
-    """Set resync_after to now() on a user, triggering full resync on next SSE connect."""
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        return
-    user.resync_after = datetime.now(UTC)
-    await save_user(user)
 
 
 async def delete_user(uid: str) -> None:

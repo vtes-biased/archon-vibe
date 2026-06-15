@@ -41,6 +41,10 @@ server {
   gzip_static on;
 
   # ---- backend reverse proxy (same origin) ------------------------------
+  # Same-origin is load-bearing for the sync handshake: the client reads the
+  # /snapshot `X-Access-Version` response header (the per-user access fingerprint).
+  # A split-origin deploy would need `Access-Control-Expose-Headers: X-Access-Version`
+  # here (mind nginx add_header inheritance — re-add the server-level security headers).
 {% for path in _backend_paths %}
   location {{ path }} {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

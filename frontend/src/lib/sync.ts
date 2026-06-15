@@ -34,6 +34,9 @@ import {
   setLastSyncGeneratedAt,
   getLastSyncGeneratedAt,
   clearLastSyncGeneratedAt,
+  setLastSyncAccessVersion,
+  getLastSyncAccessVersion,
+  clearLastSyncAccessVersion,
   getTournament,
   getUser,
   getSanction,
@@ -153,6 +156,11 @@ class SyncManager {
         return null;
       }
 
+      // Seed the access-version fingerprint from the response header BEFORE opening
+      // /stream, so the first connect echoes a matching `av` and doesn't resync. It's
+      // per-user (not in the shared snapshot body); the client only stores + echoes it.
+      const accessVersion = response.headers.get('X-Access-Version');
+
       // Browser may auto-decompress gzip via Content-Encoding header.
       // If not, detect gzip magic bytes and decompress manually.
       const arrayBuffer = await response.arrayBuffer();
@@ -224,6 +232,9 @@ class SyncManager {
       if (generatedAt) {
         await setLastSyncGeneratedAt(generatedAt);
       }
+      if (accessVersion) {
+        await setLastSyncAccessVersion(accessVersion);
+      }
 
       return timestamp;
     } catch (e) {
@@ -283,9 +294,15 @@ class SyncManager {
     const generatedAt = await getLastSyncGeneratedAt();
     if (this.superseded(epoch)) return;
 
+    // Opaque entitlement fingerprint: the server resyncs us if it no longer matches the
+    // access we currently have (level/role/country/organizer-set change while away).
+    const accessVersion = await getLastSyncAccessVersion();
+    if (this.superseded(epoch)) return;
+
     const params = new URLSearchParams();
     if (lastSync) params.set('since', lastSync);
     if (generatedAt) params.set('generated_at', generatedAt);
+    if (accessVersion) params.set('av', accessVersion);
     if (token) params.set('token', token);
     const qs = params.toString();
     const url = qs ? `${API_URL}/stream?${qs}` : `${API_URL}/stream`;
@@ -366,6 +383,15 @@ class SyncManager {
             if (ts && (this.lastTimestamp === null || ts > this.lastTimestamp)) {
               this.lastTimestamp = ts;
               try { await setLastSyncTimestamp(ts); } catch (e) { console.error('Save cursor failed:', e); }
+            }
+            // A targeted entitlement-invalidation frame carries the new fingerprint so
+            // we don't mismatch (and resync needlessly) on the next reconnect. We trust it
+            // blindly, so the server invariant is load-bearing: `av` rides ONLY per-user
+            // (broadcast_personal) frames, never per-level shared ones — a shared av would
+            // be wrong for some recipients and resync-loop them.
+            const newAv: string | undefined = message.av;
+            if (newAv) {
+              try { await setLastSyncAccessVersion(newAv); } catch (e) { console.error('Save access version failed:', e); }
             }
             this.emit({ type: spec.singleType as SyncEventType, data: item });
             return;
@@ -458,6 +484,7 @@ class SyncManager {
     await clearAllLeagues();
     await clearLastSyncTimestamp();
     await clearLastSyncGeneratedAt();
+    await clearLastSyncAccessVersion();
 
     // Restore preserved offline data.
     if (tournaments.length > 0) await saveTournamentsBatch(tournaments);

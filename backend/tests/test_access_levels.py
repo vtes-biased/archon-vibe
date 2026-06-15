@@ -37,7 +37,6 @@ def _make_user(**overrides) -> dict:
         "vekn_synced_at": "2025-06-01T00:00:00",
         "local_modifications": [],
         "vekn_prefix": None,
-        "resync_after": None,
         "calendar_token": "cal_secret_token",
         # In-memoriam marker (deceased member feature)
         "deceased_at": "2026-05-01T00:00:00",
@@ -247,7 +246,6 @@ class TestUserMember:
         assert "coopted_at" not in result
         assert "vekn_synced" not in result
         assert "local_modifications" not in result
-        assert "resync_after" not in result
         assert "calendar_token" not in result
 
 
@@ -263,7 +261,6 @@ class TestUserFull:
         result = compute_full(ObjectType.USER, user)
         assert result["contact_email"] == "alice@example.com"
         assert result["coopted_by"] == "u-prince"
-        assert result["resync_after"] is None
         assert "calendar_token" not in result
 
     def test_calendar_token_stripped(self):

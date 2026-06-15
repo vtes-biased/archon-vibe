@@ -15,11 +15,16 @@ from pydantic import BaseModel
 from uuid6 import uuid7
 
 from .. import permissions
-from ..broadcast import broadcast_judge_call, broadcast_precomputed, broadcast_resync
+from ..broadcast import (
+    broadcast_judge_call,
+    broadcast_personal,
+    broadcast_precomputed,
+)
 from ..card_data import cards_json_text
 from ..db import (
     BroadcastData,
     allocate_next_vekn_id,
+    compute_access_version,
     get_all_leagues,
     get_auth_method_by_identifier,
     get_decks_for_tournament,
@@ -35,7 +40,6 @@ from ..db import (
     save_sanction,
     save_tournament,
     save_user,
-    set_user_resync_after,
     soft_delete_tournament,
     tournament_transaction,
 )
@@ -322,6 +326,46 @@ class OrganizerAction(BaseModel):
     user_uid: str
 
 
+async def _invalidate_organizer_view(
+    tournament: Tournament, user_uid: str, modified_at: str | None
+) -> None:
+    """Targeted SSE invalidation for the user whose organizer status just changed.
+
+    Pushes the tournament + each of its decks to that one user at their NEWLY-entitled
+    projection — full on add (the organizer upgrade), member-or-tombstone on remove (a
+    private deck whose member projection is null is tombstoned, evicting the leaked full
+    copy from their IDB) — each frame carrying the recomputed access-version so the client
+    refreshes its fingerprint without a full resync. broadcast_precomputed already
+    propagated the org-set change to everyone else; this is the per-user overlay delta.
+    """
+    user = await get_user_by_uid(user_uid)
+    if not user:
+        return
+    av = await compute_access_version(user)
+    org_uids = tournament.organizers_uids
+    broadcast_personal(
+        user_uid,
+        obj_type=ObjectType.TOURNAMENT,
+        uid=tournament.uid,
+        full_dict=msgspec.to_builtins(tournament),
+        country=tournament.country,
+        org_uids=org_uids,
+        modified_at=modified_at,
+        access_version=av,
+    )
+    for deck in await get_decks_for_tournament(tournament.uid):
+        broadcast_personal(
+            user_uid,
+            obj_type=ObjectType.DECK,
+            uid=deck.uid,
+            full_dict=msgspec.to_builtins(deck),
+            org_uids=org_uids,
+            obj_user_uid=deck.user_uid,
+            modified_at=modified_at,
+            access_version=av,
+        )
+
+
 @router.post("/{uid}/organizers")
 async def add_organizer(
     uid: str,
@@ -346,6 +390,9 @@ async def add_organizer(
         tournament.modified = datetime.now(UTC)
         bd = await save_tournament(tournament)
         broadcast_precomputed(bd)
+        # Grant access: push the tournament + its (private) decks at full to the new
+        # organizer — broadcast_precomputed delivers the tournament but never the decks.
+        await _invalidate_organizer_view(tournament, body.user_uid, bd.modified_at)
 
     return Response(
         content=encoder.encode(tournament),
@@ -379,11 +426,14 @@ async def remove_organizer(
             )
         tournament.organizers_uids.remove(organizer_uid)
         tournament.modified = datetime.now(UTC)
+        # save_tournament advances modified_at, so the member-level tournament self-heals
+        # via the since-catch-up too (checkin_code/vekn_pushed_at drop) — the targeted push
+        # below additionally tombstones the now-invisible private decks (the leak fix).
         bd = await save_tournament(tournament)
         broadcast_precomputed(bd)
-        # Revoke access: force removed organizer to resync
-        await set_user_resync_after(organizer_uid)
-        await broadcast_resync(organizer_uid)
+        # Revoke access without a full resync: downgrade the tournament + tombstone the
+        # private decks for just this user (offline removal is caught by the fp at connect).
+        await _invalidate_organizer_view(tournament, organizer_uid, bd.modified_at)
 
     return Response(
         content=encoder.encode(tournament),

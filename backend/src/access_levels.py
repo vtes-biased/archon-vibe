@@ -79,19 +79,6 @@ _USER_MEMBER_FIELDS = (
         "wins",
     }
 )
-_USER_FULL_EXTRA = (
-    _USER_CONTACT_FIELDS
-    | _USER_COMMUNITY_LINKS
-    | {
-        "coopted_by",
-        "coopted_at",
-        "vekn_synced",
-        "vekn_synced_at",
-        "local_modifications",
-        "vekn_prefix",
-        "resync_after",
-    }
-)
 
 
 def _pick(d: dict, keys: set[str]) -> dict:

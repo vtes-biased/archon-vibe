@@ -3,8 +3,8 @@
 Covers the three db-layer primitives the detach/merge invariant rests on
 (.pst/details/59-vekn-detach.md) plus the self-abandon suspension guard:
 
-- ``merge_users``       — survivor keeps identity + ``resync_after``; the dying
-                          uid's contacts/roles/sanctions/decks/auth migrate over.
+- ``merge_users``       — survivor keeps identity + unlisted fields (e.g. wins); the
+                          dying uid's contacts/roles/sanctions/decks/auth migrate over.
 - ``detach_user_from_vekn`` — the vekn-bearing uid is immovable (keeps vekn_id,
                           roles, ratings, wins, links, and its sanctions+decks);
                           only PII + login walk away on a fresh uid.
@@ -114,14 +114,13 @@ async def _deck_uids_for_user(user_uid: str) -> set[str]:
 
 
 @pytest.mark.asyncio
-async def test_merge_preserves_resync_after_and_identity(test_db):
-    """The latent bug: rebuilding User(...) from scratch dropped resync_after.
+async def test_merge_preserves_unlisted_field_and_identity(test_db):
+    """The latent bug: rebuilding User(...) from scratch dropped unlisted fields.
 
-    msgspec.structs.replace(keep_user, …) must carry every unlisted field —
-    here resync_after — through the merge, while identity stays with the
+    msgspec.structs.replace(keep_user, …) must carry every field NOT explicitly
+    overridden — here `wins` — through the merge, while identity stays with the
     survivor and contact info prefers the dying (claiming) account.
     """
-    resync = datetime.now(UTC) - timedelta(minutes=5)
     keep = User(
         uid=str(uuid7()),
         modified=datetime.now(UTC),
@@ -129,7 +128,7 @@ async def test_merge_preserves_resync_after_and_identity(test_db):
         vekn_id="1234567",
         roles=[Role.PRINCE],
         contact_email="keep@example.com",
-        resync_after=resync,
+        wins=["tourn-1"],
     )
     delete = User(
         uid=str(uuid7()),
@@ -149,8 +148,8 @@ async def test_merge_preserves_resync_after_and_identity(test_db):
     # The survivor's update + the dying account's soft-delete are surfaced so
     # the route can push them to other clients' caches live.
     assert len(broadcasts) == 2
-    # (a) resync_after PRESERVED from keep_user.
-    assert merged.resync_after == resync
+    # (a) an unlisted field (wins) is PRESERVED from keep_user, not dropped.
+    assert merged.wins == ["tourn-1"]
     # identity prefers keep_user.
     assert merged.uid == keep.uid
     assert merged.name == "Keep Name"

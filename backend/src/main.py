@@ -24,8 +24,10 @@ from .broadcast import (
     encoder,
 )
 from .db import (
+    base_data_level,
     cleanup_expired_tokens,
     close_db,
+    compute_access_version,
     delete_sanction_hard,
     get_expired_sanctions,
     get_sanctions_for_cleanup,
@@ -484,6 +486,9 @@ if os.getenv("ENVIRONMENT", "development") == "development":
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # The snapshot's access-version fingerprint rides a custom response header;
+        # a cross-origin dev frontend can only read it if it's explicitly exposed.
+        expose_headers=["X-Access-Version"],
     )
 
 # Include routers
@@ -505,24 +510,15 @@ async def root() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# Bump this on releases that require a full client resync
-MINIMUM_SYNC_EPOCH = "2026-01-31T00:00:00"
-
-
 # ---------------------------------------------------------------------------
 # Data-level helpers
 # ---------------------------------------------------------------------------
 
 
 def _viewer_level(viewer: User | None) -> DataLevel:
-    """Determine the viewer's base data level."""
-    if not viewer:
-        return DataLevel.PUBLIC
-    if Role.IC in viewer.roles:
-        return DataLevel.FULL
-    if viewer.vekn_id:
-        return DataLevel.MEMBER
-    return DataLevel.PUBLIC
+    """Determine the viewer's base data level (delegates to db.base_data_level —
+    the single source the access-version fingerprint also reuses)."""
+    return DataLevel(base_data_level(viewer))
 
 
 async def _resolve_user_from_token(token: str | None) -> User | None:
@@ -590,7 +586,10 @@ async def get_snapshot(
             headers={"Retry-After": "60"},
         )
 
-    # Read and serve the gzip file directly
+    # Read and serve the gzip file directly. The snapshot body is a per-LEVEL file
+    # shared across users, so the per-USER access-version fingerprint can't live in
+    # it — seed it as a per-response header the client reads (via fetch) before it
+    # opens /stream, so the first connect echoes a matching `av` and doesn't resync.
     data = snapshot_path.read_bytes()
     return Response(
         content=data,
@@ -598,6 +597,7 @@ async def get_snapshot(
         headers={
             "Content-Encoding": "gzip",
             "Cache-Control": "no-cache",
+            "X-Access-Version": await compute_access_version(viewer),
         },
     )
 
@@ -831,9 +831,11 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
         # Organizer: full for organized tournaments + their decks
         rows = await (
             await db_conn.execute(
-                'SELECT uid, "full"::text FROM objects WHERE type = %s '
-                "AND \"full\"->'organizers_uids' ? %s AND deleted_at IS NULL",
-                (ObjectType.TOURNAMENT, viewer.uid),
+                # Literal type (not %s) so the partial index's `type = 'tournament'`
+                # predicate provably holds; @> (not ?) so its jsonb_path_ops applies.
+                "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
+                "AND (\"full\"->'organizers_uids') @> %s::jsonb AND deleted_at IS NULL",
+                (msgspec.json.encode([viewer.uid]).decode(),),
             )
         ).fetchall()
         if rows:
@@ -863,6 +865,7 @@ async def stream_updates(
     request: Request,
     since: str | None = None,
     generated_at: str | None = None,
+    av: str | None = None,
     token: str | None = None,
     tournament: str | None = None,
     authorization: Annotated[str | None, Header()] = None,
@@ -894,12 +897,6 @@ async def stream_updates(
     # Determine base level
     level = _viewer_level(stream_user)
 
-    # Resync detection. The client is "current as of" the LATER of its data cursor
-    # (`since` = max modified_at it has applied) and the snapshot it bootstrapped from
-    # (`generated_at` = that snapshot's DB generation instant). `since` alone is a data
-    # timestamp, not a wall-clock one: on a quiet system it lags real time and made the
-    # staleness guard misfire into an endless resync, and it made the resync_after compare
-    # loop until the next snapshot regen. `generated_at` is the real freshness signal.
     from datetime import UTC, datetime, timedelta
 
     def _parse_ts(ts: str | None) -> datetime | None:
@@ -911,25 +908,30 @@ async def stream_updates(
         except (ValueError, TypeError):
             return None
 
+    # "Current as of" = the LATER of the data cursor (`since` = max modified_at applied)
+    # and the snapshot's generation instant (`generated_at`). `since` alone is a data
+    # timestamp, not wall-clock: on a quiet system it lags real time, so it can't measure
+    # client-away time. `generated_at` is the real freshness signal (used by the guard below).
     fresh_dts = [d for d in (_parse_ts(since), _parse_ts(generated_at)) if d]
     fresh_dt = max(fresh_dts) if fresh_dts else None
 
     effective_since = since
     force_resync = False
+    scoped_stream = tournament is not None
 
-    # Access-change resync: viewer gained/lost visibility since they last synced, so the
-    # delta (which only carries content changes) can't deliver it — re-snapshot.
-    threshold_dt = _parse_ts(MINIMUM_SYNC_EPOCH)
-    if stream_user and stream_user.resync_after:
-        ra = stream_user.resync_after
-        ra = ra.replace(tzinfo=UTC) if ra.tzinfo is None else ra
-        threshold_dt = max(d for d in (threshold_dt, ra) if d)
-    if fresh_dt and threshold_dt and threshold_dt > fresh_dt:
+    # Access-version handshake: the SOLE access-change mechanism. The client echoes the
+    # opaque fingerprint it was seeded with; if it no longer matches the entitlements it
+    # CURRENTLY has, its cached corpus predates a level/role/country/org-set change the
+    # since-delta can't repair — re-snapshot. A tagless client (no `av`) mismatches once,
+    # then carries the fp from the snapshot header. Scoped (bot) streams replay full state
+    # every connect, carry no `av`, and never resync — skip the compare (and its org query).
+    if not scoped_stream and av != await compute_access_version(stream_user):
         force_resync = True
         effective_since = None
 
-    # Stale-client guard: genuinely away >3 days, so a soft-deleted object may have been
-    # hard-purged (30-day purge) and the delta would miss the deletion — re-snapshot.
+    # Stale-client guard (orthogonal to entitlement, so the fingerprint can't cover it):
+    # away >3 days, so a soft-deleted object may have been hard-purged (30-day purge) and
+    # the delta would miss the deletion — re-snapshot.
     if fresh_dt and datetime.now(UTC) - fresh_dt > timedelta(days=3):
         force_resync = True
         effective_since = None

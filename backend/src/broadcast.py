@@ -7,9 +7,11 @@ module that needs to push events — no monkey-patching required.
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 import msgspec
 
+from .access_levels import compute_full, compute_member, compute_public
 from .db import BroadcastData
 from .models import ObjectType, Role, User
 
@@ -131,6 +133,9 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
     def _make_msg(json_str: str) -> str:
         # `ts` carries the authoritative modified_at so clients advance their
         # sync cursor in the same value space as the `since` catch-up filter.
+        # NO `av` here: this is a per-LEVEL shared frame, but the fingerprint is
+        # per-USER — only broadcast_personal (per-user) may carry `av`. A shared
+        # frame's av would be wrong for some recipients → resync loop.
         ts = f',"ts":"{bd.modified_at}"' if bd.modified_at else ""
         return f'data: {{"type":"{bd.obj_type}","data":{json_str}{ts}}}\n\n'
 
@@ -239,3 +244,73 @@ async def broadcast_resync(user_uid: str) -> None:
                     f"SSE queue full for resync user {user_uid}, closing connection"
                 )
                 conn.closed = True
+
+
+_LEVEL_PROJECTORS = {"public": compute_public, "member": compute_member}
+
+
+def broadcast_personal(
+    user_uid: str,
+    *,
+    obj_type: ObjectType,
+    uid: str,
+    full_dict: dict,
+    country: str | None = None,
+    org_uids: list[str] | None = None,
+    obj_user_uid: str | None = None,
+    modified_at: str | None = None,
+    access_version: str | None = None,
+) -> None:
+    """Push ONE object to ONE user at that user's *currently*-entitled projection.
+
+    Targeted counterpart to broadcast_precomputed's per-level shared frame: it
+    re-derives the user's entitled_level for this object NOW and sends the matching
+    projection, so an entitlement transition (organizer add/remove) is delivered as
+    a single targeted update with no full resync. If the entitled projection is None
+    (e.g. a private deck once the viewer is no longer its organizer), a TOMBSTONE
+    frame (deleted_at) is sent so the client evicts just that one object.
+    `access_version`, when given, rides the frame so the client refreshes its stored
+    fingerprint without a reconnect (else it would mismatch and resync needlessly).
+
+    Browser (full-corpus) connections only — scoped (bot) streams replay full state
+    on every connect and never need targeted invalidation.
+    """
+    av = f',"av":"{access_version}"' if access_version else ""
+    ts = f',"ts":"{modified_at}"' if modified_at else ""
+
+    disconnected: set[SSEConnection] = set()
+    for conn in _sse_connections:
+        if conn.tournament_uid is not None or not (
+            conn.user and conn.user.uid == user_uid
+        ):
+            continue
+        level = entitled_level(
+            conn.user,
+            obj_type=obj_type,
+            uid=uid,
+            country=country,
+            org_uids=org_uids,
+            obj_user_uid=obj_user_uid,
+        )
+        proj = (
+            compute_full(obj_type, full_dict)
+            if level == "full"
+            else _LEVEL_PROJECTORS[level](obj_type, full_dict)
+        )
+        if proj is None:
+            # No entitlement at this level → evict the stale copy from the user's IDB.
+            deleted_at = modified_at or datetime.now(UTC).isoformat()
+            json_str = encoder.encode({"uid": uid, "deleted_at": deleted_at}).decode()
+        else:
+            json_str = encoder.encode(proj).decode()
+        msg = f'data: {{"type":"{obj_type}","data":{json_str}{ts}{av}}}\n\n'
+        try:
+            conn.queue.put_nowait(msg)
+        except asyncio.QueueFull:
+            logger.warning(
+                "SSE queue full for personal push (%s), closing connection",
+                _conn_label(conn),
+            )
+            conn.closed = True
+            disconnected.add(conn)
+    _sse_connections.difference_update(disconnected)

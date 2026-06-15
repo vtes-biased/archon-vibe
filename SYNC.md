@@ -69,6 +69,8 @@ No per-viewer filtering at read time — projections are pre-computed. After the
 
 **Tournament-scoped stream** — `/stream?tournament=<uid>` opens a scoped connection (used by the Discord bot). The catch-up delivers only that tournament, its sanctions, and its **participant identities** (`_scoped_catchup_frames`); the live phase filters to that tournament's object, its sanctions, and its judge calls via `SSEConnection.tournament_uid` + `_scope_matches`. Access rules are unchanged — `entitled_level()` (see below) applies per object, just restricted to one tournament's scope. The bot opens one scoped stream per watched tournament instead of streaming the whole corpus.
 
+*No access-version handshake (by design, not an omission)*: scoped streams carry no `av` and skip the fingerprint compare. The fingerprint exists to detect a *visibility-only* change a browser's `since`-delta on a stale shared-snapshot corpus would miss — but a scoped stream **replays its full (small) state every connect** (`since` is ignored), so it's never stale, and it **receives no decks** (`_scope_matches` passes only tournament + sanctions), so the private-deck leak the fingerprint/tombstones guard cannot occur. Entitlement shifts reach the bot via the live per-object `entitled_level` re-eval + the next full replay — no resync mechanism needed. (If the bot ever moved to *incremental* scoped catch-up, that — not `av` — would be the reason to revisit; a #197-class efficiency call, separate from entitlement correctness.)
+
 *Participant identities*: the bot needs each seated player's name/nickname to render seating (it has no User store), but `_scope_matches` drops generic `user` broadcasts. So identities ride **alongside the tournament**: `_participant_user_frames()` emits the `member`-level User object for every player + organizer (deliberately the `member` column for *all* of them, **not** `entitled_level` — member carries name/nickname but no contact info, so this never leaks participant contacts to the Discord process). Catch-up seeds them; live, a tournament delivery sets `SSEConnection.needs_participant_refresh` and the async stream loop then pushes identities for any participants not yet sent (`sent_participant_uids`), so players who register *after* the bot connects still resolve. The bot caches `uid → {name, nickname}` and falls back to it (after a Discord `@mention`, then the per-tournament `display_name`) in `announcements.player_display`.
 
 The stream then enters the **live phase**, relaying single-object events from `broadcast_precomputed()`:
@@ -113,20 +115,51 @@ Frontend handles in `JudgeCallBanner.svelte` — accumulates calls in component 
 
 Triggered when a viewer's data level changes — the delta only carries content changes, so an object whose *visibility* changed (without its content changing) can't reach the client any other way.
 
-**Backend**:
-- `resync_after` field on User, set via `set_user_resync_after()` (uses DB `now()`)
-- `MINIMUM_SYNC_EPOCH` constant bumped on releases requiring global resync
-- On SSE connect: if the client's freshness (`max(since, generated_at)`) is behind `max(MINIMUM_SYNC_EPOCH, resync_after)` — or older than 3 days — emit `{"type": "resync"}` and **return immediately**. The browser clears IndexedDB and re-fetches the snapshot (already served at the viewer's *current* level), so there's no point streaming the corpus after the resync line — and doing so discards a pooled connection when the client tears down mid-`fetchall`. Tournament-scoped (bot) streams skip the resync line entirely (they replay full state every connect).
+#### Access-version fingerprint (primary, connect-time)
+
+The connect handshake asks the precise question — *"is the client based on the entitlements it currently has?"* — rather than comparing timestamps. `compute_access_version(viewer)` (`db.py`) hashes everything that determines **which** objects (and which projection) a viewer is entitled to:
+
+```
+fp = hash( DATA_SCHEMA_VERSION,                  # global wire-shape lever (replaces MINIMUM_SYNC_EPOCH)
+           base_level,                           # base_data_level: full | member | public
+           sorted({IC,NC,PRINCE} ∩ roles),       # overlay-granting roles only
+           country if (NC or Prince) else None,  # scopes the official overlay
+           sorted(organizer_tournament_uids) )   # member-only; from the GIN-indexed org query
+```
+
+- **Backend-only + opaque.** The client stores the fingerprint and echoes it; it never computes or parses it, so the input set stays server-evolvable (add/remove inputs with zero client coordination) and a lying client can only over/under-resync *itself*.
+- **Self-maintaining.** Derived from current truth at connect — no write paths to enumerate, no silent-missed-bump leak. The org-set is the only DB input; it rides the GIN index on `("full"->'organizers_uids')` and only members pay the query (IC sees full everywhere; public/anon have no overlay).
+- **`DATA_SCHEMA_VERSION`** is the one global lever: bump it on a wire-shape change that does **not** also bump the frontend `DB_VERSION` (a `models.py` field rename/remove, an `access_levels` projection-policy change). One bump flips every client's fp → exactly one resync. (A change that *does* ride a `DB_VERSION` bump self-heals client-side and needs no lever.)
+
+**Transport**:
+- **Seed** — `/snapshot` returns the fingerprint in an `X-Access-Version` response header (per-request, computed from the resolved viewer). It can't live in the snapshot *body* (one shared per-level file; the fp is per-user). The client reads the header via `fetch()` before opening `/stream`, so the first connect echoes a matching `av` and doesn't spuriously resync.
+- **Echo** — the client persists the fp (IDB `metadata` key `last_sync_access_version`) and sends it as `/stream?av=<fp>` (EventSource can't set headers).
+- **Compare** — the server recomputes the current fp from the resolved `stream_user`; `av` absent or `!=` current → resync. Tournament-scoped (bot) streams carry no `av` and skip the compare.
+- **Live refresh** — a targeted-push frame (below) carries the new `av`, so the client updates its stored fp without a reconnect.
+
+**On `av` mismatch** (or the staleness guard below): emit `{"type": "resync"}` and **return immediately**. The browser clears IndexedDB and re-fetches the snapshot (served at the viewer's *current* level), so streaming the corpus after the resync line is wasted and discards a pooled connection on the client's mid-`fetchall` teardown. Tournament-scoped (bot) streams skip the resync line (they replay full state every connect).
+
+**Staleness guard** (orthogonal to entitlement, so the fingerprint can't replace it): the `>3-day` freshness guard (`max(since, generated_at)`) catches a client away long enough that a soft-deleted object may have been hard-purged (30-day purge), so the since-delta would miss the deletion. The old per-user `resync_after` timestamp and the global `MINIMUM_SYNC_EPOCH` are both **retired** — the fingerprint subsumes every entitlement/wire-shape resync, online changes still fire `broadcast_resync` as a live nudge, and offline changes are caught by the `av` compare at connect.
 
 **Frontend**:
-- On `resync` event: clear all IndexedDB stores + sync cursor keys (`last_sync_timestamp`, `last_sync_generated_at`)
-- Full data follows automatically (re-snapshot → catch-up)
+- On `resync` event: clear all IndexedDB stores + cursor keys (`last_sync_timestamp`, `last_sync_generated_at`, `last_sync_access_version`); the new snapshot re-seeds the fingerprint from its header.
+- Full data follows automatically (re-snapshot → catch-up).
 
-**Triggers**:
-- VEKN operations: `/claim`, `/sponsor`, `/link`, `/force-abandon`, `/abandon` (vekn_id gained/lost → data level changes)
-- Organizer removed from a tournament (loses that tournament's full overlay)
-- User update: an **access-affecting** role (`NC`/`Prince`/`IC` — the closed set `_viewer_level`/`access_levels.py` branch on) gained/lost, or vekn_id changed. A non-access role (PT/Judge/…) changes no projection, so it does **not** resync.
-- Release bump: `MINIMUM_SYNC_EPOCH` in main.py
+#### Targeted overlay invalidation (no resync)
+
+`broadcast_personal(user_uid, *, obj_type, uid, full_dict, …, access_version)` (`broadcast.py`) pushes **one object to one user** at that user's *currently*-entitled projection — the per-user counterpart to `broadcast_precomputed`'s shared per-level frame. It re-derives `entitled_level` for the object *now*, so an entitlement transition is delivered as a single update:
+
+- **promote** → push the object at full (upgrade the one object in IDB);
+- **demote, lower projection non-null** → push the lower projection (`db.put` replaces; full-only fields drop);
+- **demote, lower projection null** (a private deck → member is `None`) → push a **tombstone** (`deleted_at`) so the client evicts just that object. This is the leak fix: `compute_deck_member` is null for a private deck, so the since-catch-up could never re-send *or* evict it.
+
+Every targeted frame carries the recomputed `access_version`. **Organizer add/remove** uses this (`_invalidate_organizer_view` in `tournaments.py`): the new organizer gets the tournament + its private decks at full; the removed organizer gets the tournament downgraded to member + a tombstone per private deck — no full resync. An **offline** organizer change is still caught by the fingerprint at the next connect (the org-set term), which is why a resync remains the offline fallback.
+
+**Triggers** (fingerprint at connect / live nudge while connected):
+- VEKN operations: `/claim`, `/sponsor`, `/link`, `/force-abandon`, `/abandon` (vekn_id gained/lost → base level changes).
+- Organizer add/remove on a tournament → **targeted push** while online (no resync); fingerprint org-set term while offline.
+- User update: an **access-affecting** role (`NC`/`Prince`/`IC` — the closed set `base_data_level`/`access_levels.py` branch on) gained/lost, or vekn_id changed. A non-access role (PT/Judge/…) changes no projection, so it does **not** move the fingerprint.
+- Wire-shape change: bump `DATA_SCHEMA_VERSION` in `db.py`.
 
 ### Access Entitlement
 

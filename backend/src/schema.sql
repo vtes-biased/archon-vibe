@@ -152,6 +152,12 @@ WHERE type = 'user' AND calendar_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_vekn
 ON objects(("full"->'external_ids'->>'vekn'))
 WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' IS NOT NULL;
+-- Backs the personal-overlay organizer lookup (`organizers_uids @> [uid]`), run on every
+-- member reconnect (ungated by `since`) — else a seq-scan of all tournaments each time.
+-- jsonb_path_ops is smaller than the default opclass and supports @> (but not `?`, hence @>).
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_organizers
+ON objects USING GIN (("full"->'organizers_uids') jsonb_path_ops)
+WHERE type = 'tournament';
 -- Deck lookups by tournament and user
 CREATE INDEX IF NOT EXISTS idx_objects_deck_tournament
 ON objects(("full"->>'tournament_uid'))
