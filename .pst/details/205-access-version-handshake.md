@@ -43,25 +43,82 @@ instinct → self-maintaining wins.
 ### The fingerprint
 
 ```
-fp = hash( MINIMUM_SYNC_EPOCH,                      # deploy-wide resync lever, folded in
+fp = hash( DATA_SCHEMA_VERSION,                     # global wire-shape lever (was MINIMUM_SYNC_EPOCH)
            base_level,                              # _viewer_level: FULL | MEMBER | PUBLIC
            sorted({IC, NC, PRINCE} ∩ roles),        # overlay-granting roles only
            country if (NC or PRINCE in roles) else None,   # scopes the NC/Prince overlay
            sorted(organizer_tournament_uids) )      # from the overlay query (member only)
+# computed BACKEND-ONLY; opaque to the client (stored + echoed, never parsed/recomputed).
 ```
 
 - **All fields are on the already-resolved `stream_user`** except the org-set, which comes
   from the overlay query that already runs. IC/anon/PUBLIC viewers have an empty org-set
   (no overlay) → fp is a pure field hash, no query.
-- **`MINIMUM_SYNC_EPOCH` folded in** so there is exactly ONE resync mechanism. A breaking
-  release bumps the epoch → every client's stored fp mismatches → one resync. Retire the
-  separate epoch compare (`main.py:899-905`).
+- **`DATA_SCHEMA_VERSION` folded in** (the global wire-shape lever, replacing the
+  `MINIMUM_SYNC_EPOCH` timestamp) so there is exactly ONE resync mechanism: a shape change
+  bumps it → every client's stored fp mismatches → one resync. Retire the separate epoch
+  compare (`main.py:899-905`). See §What enters the hash for why it stays a dedicated lever
+  (not release semver, not the frontend IDB version).
 - **Country only participates when NC/Prince** — otherwise a cosmetic country edit by a
   plain member would needlessly trip a resync. (Note: #206 makes an official's country a
   gated, authority-only change; this design makes an official country change correctly
   invalidate via the `country` term — see §Interactions.)
 - **Non-overlay roles excluded** (playtester/PT/Judge/...) — they don't branch in
   `_viewer_level` or `access_levels.py`. (This is exactly the #204 narrowing, now structural.)
+
+### What enters the hash — and who computes it
+
+**Backend-only, opaque blob.** The client never computes or parses the fp — it stores the
+string and echoes it. This is load-bearing: because the input-set lives entirely
+server-side, we can add/remove inputs anytime with **zero client coordination** (the client
+just sees "blob changed → resync"). It also keeps the security invariant — a lying client
+can only over/under-resync *itself*. Delivered at initial sync (the `X-Access-Version` header
+on `/snapshot`, §Transport). The bot/tournament-scoped path needs no tag (replays full state
+every connect; deployed in lockstep with the backend).
+
+There are **three** version-like concepts; only two belong in the hash, and they are not the
+same thing:
+
+1. **Per-user entitlement** (varies by user) — `base_level`, `{IC,NC,PRINCE}` roles,
+   `country`-if-official, org-set. **In the hash.**
+2. **Backend wire-shape version** (`DATA_SCHEMA_VERSION`, global, one per deploy) — the
+   "the projected JSON shape changed, cached clients must refetch" lever. **In the hash.**
+   Its *narrow real job* is a **backend-only** shape change that does NOT bump the frontend
+   `DB_VERSION` — e.g. promoting a field from full-only into the **member** projection: the
+   frontend already knows the field and needs no IDB migration, but cached member objects
+   only receive it on a resync. Bump it on any such wire-shape change (`models.py` field
+   rename/remove, an `access_levels.py` projection-policy change, a nested engine-struct
+   change).
+3. **Frontend IndexedDB version** (`DB_VERSION`, `db.ts:77`, currently 15) — **NOT in the
+   hash.** It is client-owned and *self-heals*: bumping it makes the browser's
+   `onupgradeneeded` wipe + recreate every store (`db.ts:212-216`) → fresh snapshot on next
+   connect. Putting it in the backend hash would require the client to send it (breaking the
+   opacity above) and would be redundant with the wipe it already triggers. So any shape
+   change that *does* ride a `DB_VERSION` bump needs no backend lever at all — which is why
+   `DATA_SCHEMA_VERSION` is a narrow backstop, not the primary mechanism.
+
+**No auto-net (considered + rejected).** We considered deriving `DATA_SCHEMA_VERSION`
+automatically by hashing the projection field-sets. It does not work cleanly: there is **no
+`full` field-set** — `full` is a pass-through (user = everything minus `calendar_token`,
+`access_levels.py:145`; tournament/deck = `dict(d)`; sanction/league = `_identity`), and
+*only* public + member have explicit field policy. So a field-set hash is **blind to
+full/model shape changes** — exactly the changes most likely to break a full-level
+(IC/organizer/NC) client. Hashing the model structs instead would *over*-trigger (a
+full-only field change would resync member/public clients whose wire shape didn't change).
+The manual lever is *complete* (covers public, member, and full/model); the auto-net was
+*incomplete and riskier*. Keep it manual. (Aside: `_USER_FULL_EXTRA`, `access_levels.py:82`,
+is **defined but never used** — a one-line dead-code cleanup to do alongside.)
+
+**Why not reuse the release semver `major.minor`?** Tempting (one fewer number), but
+deferred: the repo versions are all a static `0.1.0` today (root/`frontend`/`bot`
+`pyproject.toml`/`package.json`) with no live versioning discipline and no runtime
+`__version__` plumbed into the backend. Adopting "bump minor on shape change" is the *same*
+discipline as maintaining `DATA_SCHEMA_VERSION`, just relocated onto a currently-inert number
+(plus version plumbing). And full semver `minor` *over-triggers* — every feature release
+would resync all online clients even with no shape change (benign outside live events, since
+releases freeze during them, but it couples cache-resync to release cadence, which a
+dedicated lever avoids). **Revisit post-1.0** once a real, plumbed release version exists; at
+that point reusing `major.minor` is reasonable.
 
 ### Why the org-set MUST be in the fingerprint (the demote question)
 
