@@ -83,6 +83,8 @@ Note the envelope differences from the catch-up batches: singular `type` (`tourn
 
 The client reconnects with `?since=<cursor>`; the server filters `modified_at > since` (`stream_objects_new`) and re-streams everything newer. The cursor is therefore a high-water mark over the **`modified_at` column** (DB clock, naive `TIMESTAMP`, set by a `BEFORE` trigger), which is also what `sync_complete.timestamp` and the snapshot `meta.timestamp` report.
 
+The snapshot meta **also** carries `generated_at` — the DB-clock instant the snapshot was generated (`SELECT now()`), distinct from `timestamp` (= max `modified_at` in it). The client echoes it back as `?generated_at=<…>`. It is **not** a data cursor (it never filters `modified_at`); it is a *freshness* signal. The server's resync guards key off `max(since, generated_at)` so they measure how long the client has actually been away, not when the data last changed — without it, a system with no writes for >3 days yields a `since` older than the stale-guard window and every client loops on a forced resync (`since` is a data timestamp masquerading as a wall-clock one).
+
 **Two timestamps, do not confuse them:**
 
 | Field | Source | Format | Use |
@@ -109,20 +111,21 @@ Frontend handles in `JudgeCallBanner.svelte` — accumulates calls in component 
 
 ### Resync Mechanism
 
-Triggered when a viewer's data level changes (role or vekn_id change).
+Triggered when a viewer's data level changes — the delta only carries content changes, so an object whose *visibility* changed (without its content changing) can't reach the client any other way.
 
 **Backend**:
 - `resync_after` field on User, set via `set_user_resync_after()` (uses DB `now()`)
 - `MINIMUM_SYNC_EPOCH` constant bumped on releases requiring global resync
-- On SSE connect: if `since` is stale (threshold > since), send `{"type": "resync"}` + full stream
+- On SSE connect: if the client's freshness (`max(since, generated_at)`) is behind `max(MINIMUM_SYNC_EPOCH, resync_after)` — or older than 3 days — emit `{"type": "resync"}` and **return immediately**. The browser clears IndexedDB and re-fetches the snapshot (already served at the viewer's *current* level), so there's no point streaming the corpus after the resync line — and doing so discards a pooled connection when the client tears down mid-`fetchall`. Tournament-scoped (bot) streams skip the resync line entirely (they replay full state every connect).
 
 **Frontend**:
-- On `resync` event: clear all IndexedDB stores + sync timestamp
-- Full data follows automatically
+- On `resync` event: clear all IndexedDB stores + sync cursor keys (`last_sync_timestamp`, `last_sync_generated_at`)
+- Full data follows automatically (re-snapshot → catch-up)
 
 **Triggers**:
-- VEKN operations: `/claim`, `/sponsor`, `/link`, `/force-abandon`, `/abandon`
-- User update: roles or vekn_id changed
+- VEKN operations: `/claim`, `/sponsor`, `/link`, `/force-abandon`, `/abandon` (vekn_id gained/lost → data level changes)
+- Organizer removed from a tournament (loses that tournament's full overlay)
+- User update: an **access-affecting** role (`NC`/`Prince`/`IC` — the closed set `_viewer_level`/`access_levels.py` branch on) gained/lost, or vekn_id changed. A non-access role (PT/Judge/…) changes no projection, so it does **not** resync.
 - Release bump: `MINIMUM_SYNC_EPOCH` in main.py
 
 ### Access Entitlement
@@ -139,7 +142,7 @@ Each connection has a bounded `asyncio.Queue` (maxsize 100). On `QueueFull` (a s
 
 On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects. The same `_resolve_viewer()` credential logic applies (see **Credential Transport** above).
 
-After the snapshot loads, the SSE stream picks up from the snapshot's timestamp, delivering any changes that occurred since generation.
+After the snapshot loads, the SSE stream picks up from the snapshot's `timestamp` (`?since=`) plus its `generated_at` (`?generated_at=`), delivering any changes that occurred since generation.
 
 ## Frontend: IndexedDB
 

@@ -383,6 +383,25 @@ export async function clearLastSyncTimestamp(): Promise<void> {
   await db.delete('metadata', 'last_sync_timestamp');
 }
 
+// Snapshot generation instant (DB clock), echoed on /stream as a freshness signal so the
+// server's staleness guard measures real client-away time rather than the data's
+// last-modified time. Separate from last_sync_timestamp, which is the data cursor (since).
+export async function getLastSyncGeneratedAt(): Promise<string | null> {
+  const db = await getDB();
+  const value = await db.get('metadata', 'last_sync_generated_at');
+  return value || null;
+}
+
+export async function setLastSyncGeneratedAt(generatedAt: string): Promise<void> {
+  const db = await getDB();
+  await db.put('metadata', generatedAt, 'last_sync_generated_at');
+}
+
+export async function clearLastSyncGeneratedAt(): Promise<void> {
+  const db = await getDB();
+  await db.delete('metadata', 'last_sync_generated_at');
+}
+
 // Sanction operations
 export async function getSanction(uid: string): Promise<Sanction | undefined> {
   const db = await getDB();

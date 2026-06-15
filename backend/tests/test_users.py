@@ -67,6 +67,51 @@ async def test_update_user(test_client: AsyncClient, populated_db):
 
 
 @pytest.mark.asyncio
+async def test_role_change_resyncs_only_for_access_roles(
+    test_client: AsyncClient, populated_db
+):
+    """Only NC/Prince/IC role changes set resync_after; other roles must not.
+
+    Resync clears every client's IndexedDB and forces a snapshot re-fetch
+    (~10s blank community page). Only NC/Prince/IC change what a user can see
+    or is seen as, so only those warrant it. Granting a non-access role like PT
+    must NOT trigger a resync. Guards the regression behind the resync fix.
+    """
+    from src import db
+
+    # IC can change any role; target needs a vekn_id to be assigned roles.
+    admin = next(u for u in populated_db if Role.IC in u.roles)
+    target = next(
+        u
+        for u in populated_db
+        if u.uid != admin.uid and u.vekn_id and not (set(u.roles) & {Role.NC, Role.PRINCE, Role.IC})
+    )
+    headers = make_auth_header(admin.uid)
+
+    # Non-access role change (add PT) must NOT set resync_after.
+    resp = await test_client.put(
+        f"/api/users/{target.uid}",
+        json={"roles": [*(r.value for r in target.roles), Role.PT.value]},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    after = await db.get_user_by_uid(target.uid)
+    assert Role.PT in after.roles
+    assert after.resync_after is None
+
+    # Access role change (add Prince) MUST set resync_after.
+    resp = await test_client.put(
+        f"/api/users/{target.uid}",
+        json={"roles": [*(r.value for r in after.roles), Role.PRINCE.value]},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    after = await db.get_user_by_uid(target.uid)
+    assert Role.PRINCE in after.roles
+    assert after.resync_after is not None
+
+
+@pytest.mark.asyncio
 async def test_create_user_requires_auth(test_client: AsyncClient, populated_db):
     """Test that creating a user without auth returns 401."""
     response = await test_client.post(

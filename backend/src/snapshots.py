@@ -2,7 +2,7 @@
 
 Generates gzip-compressed JSON snapshots per access level.
 Snapshots contain all non-deleted objects grouped by type.
-Format: [{"type":"user","data":[...]}, ..., {"type":"meta","timestamp":"..."}]
+Format: [{"type":"user","data":[...]}, ..., {"type":"meta","timestamp":"...","generated_at":"..."}]
 """
 
 import gzip
@@ -40,6 +40,15 @@ async def generate_snapshots() -> dict[str, int]:
 
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
     stats: dict[str, int] = {}
+
+    # DB-clock instant this batch was generated. The client echoes it on /stream as a
+    # freshness signal so the staleness guard measures real client-away time, not the
+    # data's last-modified time (`timestamp` below), which is stale on a quiet system.
+    # `::timestamp` keeps it naive, in the same clock/format as the modified_at column
+    # (and the client's `since`), so the server compares them without tz-format skew.
+    async with _pool.connection() as conn:
+        gen_row = await (await conn.execute("SELECT now()::timestamp")).fetchone()
+    generated_at = gen_row[0].isoformat()
 
     for level in ("public", "member", "full"):
         start = time.time()
@@ -85,10 +94,14 @@ async def generate_snapshots() -> dict[str, int]:
 
                     gz.write("]}")
 
-                # Meta section with timestamp
+                # Meta section: `timestamp` (max modified_at) seeds the client's `since`
+                # cursor; `generated_at` is the freshness signal (see above).
                 if timestamp is None:
                     timestamp = datetime.now(UTC).isoformat()
-                gz.write(f',{{"type":"meta","timestamp":"{timestamp}"}}')
+                gz.write(
+                    f',{{"type":"meta","timestamp":"{timestamp}",'
+                    f'"generated_at":"{generated_at}"}}'
+                )
                 gz.write("]")
 
             # Atomic rename

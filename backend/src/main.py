@@ -862,6 +862,7 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
 async def stream_updates(
     request: Request,
     since: str | None = None,
+    generated_at: str | None = None,
     token: str | None = None,
     tournament: str | None = None,
     authorization: Annotated[str | None, Header()] = None,
@@ -893,30 +894,45 @@ async def stream_updates(
     # Determine base level
     level = _viewer_level(stream_user)
 
-    # Resync detection
+    # Resync detection. The client is "current as of" the LATER of its data cursor
+    # (`since` = max modified_at it has applied) and the snapshot it bootstrapped from
+    # (`generated_at` = that snapshot's DB generation instant). `since` alone is a data
+    # timestamp, not a wall-clock one: on a quiet system it lags real time and made the
+    # staleness guard misfire into an endless resync, and it made the resync_after compare
+    # loop until the next snapshot regen. `generated_at` is the real freshness signal.
+    from datetime import UTC, datetime, timedelta
+
+    def _parse_ts(ts: str | None) -> datetime | None:
+        if not ts:
+            return None
+        try:
+            dt = datetime.fromisoformat(ts)
+            return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+        except (ValueError, TypeError):
+            return None
+
+    fresh_dts = [d for d in (_parse_ts(since), _parse_ts(generated_at)) if d]
+    fresh_dt = max(fresh_dts) if fresh_dts else None
+
     effective_since = since
     force_resync = False
-    threshold_parts = [MINIMUM_SYNC_EPOCH]
+
+    # Access-change resync: viewer gained/lost visibility since they last synced, so the
+    # delta (which only carries content changes) can't deliver it — re-snapshot.
+    threshold_dt = _parse_ts(MINIMUM_SYNC_EPOCH)
     if stream_user and stream_user.resync_after:
-        threshold_parts.append(stream_user.resync_after.isoformat())
-    threshold = max(threshold_parts)
-    if since and threshold > since:
+        ra = stream_user.resync_after
+        ra = ra.replace(tzinfo=UTC) if ra.tzinfo is None else ra
+        threshold_dt = max(d for d in (threshold_dt, ra) if d)
+    if fresh_dt and threshold_dt and threshold_dt > fresh_dt:
         force_resync = True
         effective_since = None
 
-    # Stale SSE prevention: if since is older than 3 days, force resync via snapshot
-    if since:
-        from datetime import UTC, datetime, timedelta
-
-        try:
-            since_dt = datetime.fromisoformat(since)
-            if since_dt.tzinfo is None:
-                since_dt = since_dt.replace(tzinfo=UTC)
-            if datetime.now(UTC) - since_dt > timedelta(days=3):
-                force_resync = True
-                effective_since = None
-        except (ValueError, TypeError):
-            pass
+    # Stale-client guard: genuinely away >3 days, so a soft-deleted object may have been
+    # hard-purged (30-day purge) and the delta would miss the deletion — re-snapshot.
+    if fresh_dt and datetime.now(UTC) - fresh_dt > timedelta(days=3):
+        force_resync = True
+        effective_since = None
 
     async def event_generator():
         """Generate SSE events from pre-computed columns."""
@@ -926,8 +942,16 @@ async def stream_updates(
         try:
             yield ": connected\n\n"
 
-            if force_resync:
+            # Tournament-scoped (bot) streams replay full state every connect, so a forced
+            # resync is a no-op for them — skip the line and fall through to the replay.
+            scoped = tournament is not None
+            if force_resync and not scoped:
+                # Tell the browser to clear IndexedDB and re-fetch the snapshot, then STOP:
+                # the client tears down on this line, so streaming the whole corpus after it
+                # is wasted AND a mid-fetchall teardown discards the pooled connection
+                # ("another command is already in progress").
                 yield 'data: {"type":"resync"}\n\n'
+                return
 
             import time
 
@@ -939,7 +963,6 @@ async def stream_updates(
             # + its sanctions, instead of the whole corpus. Skips the per-type
             # catch-up and personal overlay below. `since` is ignored here — the
             # scoped state is small, so every (re)connect replays it in full.
-            scoped = tournament is not None
             if scoped:
                 frames, last_timestamp = await _scoped_catchup_frames(
                     stream_user, tournament, conn.sent_participant_uids

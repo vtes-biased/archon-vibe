@@ -262,11 +262,19 @@ async def update_user(
     # Save to database
     bd = await db_save_user(user)
 
-    # Trigger resync if roles changed
-    if set(user.roles) != old_roles:
-        await set_user_resync_after(user.uid)
-        await broadcast_resync(user.uid)
-        # Update Discord Linked Roles metadata
+    # Roles changed?
+    new_roles = set(user.roles)
+    if new_roles != old_roles:
+        # Only a change to the access-affecting roles alters what this user can see or is
+        # seen as, and only that warrants a full resync. _viewer_level and the
+        # access_levels projections branch solely on these three; other roles
+        # (PT/Judge/...) change no projection, so resyncing on them just empties
+        # everyone's cache for ~10s for nothing.
+        access_roles = {Role.NC, Role.PRINCE, Role.IC}
+        if (old_roles & access_roles) != (new_roles & access_roles):
+            await set_user_resync_after(user.uid)
+            await broadcast_resync(user.uid)
+        # Update Discord Linked Roles metadata (any role change, access-affecting or not)
         import asyncio
 
         from ..roles_hook import sync_user_discord_roles

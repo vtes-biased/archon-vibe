@@ -31,6 +31,9 @@ import {
   setLastSyncTimestamp,
   getLastSyncTimestamp,
   clearLastSyncTimestamp,
+  setLastSyncGeneratedAt,
+  getLastSyncGeneratedAt,
+  clearLastSyncGeneratedAt,
   getTournament,
   getUser,
   getSanction,
@@ -165,7 +168,12 @@ class SyncManager {
         text = new TextDecoder().decode(bytes);
       }
 
-      const sections = JSON.parse(text) as { type: string; data?: any[]; timestamp?: string }[];
+      const sections = JSON.parse(text) as {
+        type: string;
+        data?: any[];
+        timestamp?: string;
+        generated_at?: string;
+      }[];
 
       // A newer connect() may have superseded us while the snapshot was in
       // flight; bail before touching IndexedDB so we don't clear/clobber the
@@ -178,10 +186,12 @@ class SyncManager {
 
       // Load each section into IDB
       let timestamp: string | null = null;
+      let generatedAt: string | null = null;
       for (const section of sections) {
         if (this.superseded(epoch)) return null;
         if (section.type === 'meta') {
           timestamp = section.timestamp || null;
+          generatedAt = section.generated_at || null;
           continue;
         }
         // Find matching spec by singleType (snapshot uses singular: "user", "tournament", etc.)
@@ -210,6 +220,9 @@ class SyncManager {
       if (this.superseded(epoch)) return null;
       if (timestamp) {
         await setLastSyncTimestamp(timestamp);
+      }
+      if (generatedAt) {
+        await setLastSyncGeneratedAt(generatedAt);
       }
 
       return timestamp;
@@ -265,8 +278,14 @@ class SyncManager {
     // Seed the in-memory high-water mark from the cursor we connect with.
     this.lastTimestamp = lastSync;
 
+    // Snapshot freshness signal: lets the server's staleness/access guards measure real
+    // client-away time instead of the data's last-modified time (see backend stream guard).
+    const generatedAt = await getLastSyncGeneratedAt();
+    if (this.superseded(epoch)) return;
+
     const params = new URLSearchParams();
     if (lastSync) params.set('since', lastSync);
+    if (generatedAt) params.set('generated_at', generatedAt);
     if (token) params.set('token', token);
     const qs = params.toString();
     const url = qs ? `${API_URL}/stream?${qs}` : `${API_URL}/stream`;
@@ -406,7 +425,7 @@ class SyncManager {
   private async clearAllStores(): Promise<void> {
     // Preserve unsynced offline-tournament data before clearing — it isn't
     // re-fetchable from SSE (offline tournaments are locked to this device).
-    // The offline_* metadata keys survive (only last_sync_timestamp is removed),
+    // The offline_* metadata keys survive (only the last_sync_* cursor keys are removed),
     // but the rows they point to live in the cleared stores, so rescue them too —
     // otherwise go-online's getSanction/getDeck lookups return undefined and the
     // offline sanctions/decks are silently dropped from reconciliation (pst #14).
@@ -438,6 +457,7 @@ class SyncManager {
     await clearAllDecks();
     await clearAllLeagues();
     await clearLastSyncTimestamp();
+    await clearLastSyncGeneratedAt();
 
     // Restore preserved offline data.
     if (tournaments.length > 0) await saveTournamentsBatch(tournaments);
