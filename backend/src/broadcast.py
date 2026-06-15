@@ -6,6 +6,7 @@ module that needs to push events — no monkey-patching required.
 
 import asyncio
 import logging
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -19,10 +20,67 @@ logger = logging.getLogger(__name__)
 
 encoder = msgspec.json.Encoder()
 
+# Distinct pending frames a per-connection queue holds before overflow→close.
+# Each whole-tournament frame is ~300KB, so coalescing (below) already caps a
+# stalled tournament viewer at ~1 frame; this just bounds the count of DISTINCT
+# objects a stalled full-corpus browser can pile up. 100→30 as cheap insurance.
+_SSE_QUEUE_MAXSIZE = 30
+
+
+class CoalescingQueue:
+    """Per-connection SSE queue that keeps only the LATEST frame per key.
+
+    Tournament actions rebroadcast the WHOLE object, so a newer frame for a given
+    (type, uid) fully supersedes any older one still pending. Keying object frames
+    by (type, uid) and replacing in place bounds a stalled consumer to ~1 frame per
+    distinct object (~300KB for a 400-player tournament) instead of a backlog of
+    up-to-maxsize stale whole-object snapshots — the Peak-1 memory blowup. The
+    consumer then drains *current* state, not a replay of superseded frames.
+
+    Non-object events (resync, judge_call, shutdown wakeup) pass a distinct key so
+    they are never coalesced away. `maxsize` counts DISTINCT pending keys and a put
+    over the cap raises asyncio.QueueFull, so the existing overflow→close→reconnect
+    valve is unchanged. Single-consumer / event-loop-only: no locking needed.
+    """
+
+    def __init__(self, maxsize: int = _SSE_QUEUE_MAXSIZE) -> None:
+        self._maxsize = maxsize
+        self._items: OrderedDict[object, str] = OrderedDict()
+        self._event = asyncio.Event()
+        self._seq = 0
+
+    def put_nowait(self, msg: str, *, key: object = None) -> None:
+        """Enqueue `msg`. With `key`, an existing frame for that key is replaced in
+        place (coalesced, keeping its FIFO position); without one, the frame gets a
+        unique key and is never coalesced. Raises asyncio.QueueFull past maxsize."""
+        if key is None:
+            key = self._seq
+            self._seq += 1
+        if key not in self._items and len(self._items) >= self._maxsize:
+            raise asyncio.QueueFull
+        self._items[key] = msg  # replace keeps original position (no reorder)
+        self._event.set()
+
+    def get_nowait(self) -> str:
+        if not self._items:
+            raise asyncio.QueueEmpty
+        _, msg = self._items.popitem(last=False)
+        return msg
+
+    async def get(self) -> str:
+        while not self._items:
+            self._event.clear()
+            await self._event.wait()
+        _, msg = self._items.popitem(last=False)  # FIFO
+        return msg
+
+    def empty(self) -> bool:
+        return not self._items
+
 
 @dataclass(eq=False)
 class SSEConnection:
-    queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=100))
+    queue: CoalescingQueue = field(default_factory=CoalescingQueue)
     user: User | None = None
     # Set when the queue overflows: the SSE generator checks this and ends the
     # stream so the browser EventSource reconnects and runs a catch-up sync,
@@ -122,7 +180,8 @@ def _wake_sse_connections() -> None:
     """Wake up all SSE connections so they can check for shutdown."""
     for conn in list(_sse_connections):
         try:
-            conn.queue.put_nowait("")  # Empty message to wake up the queue.get()
+            # Fixed key: repeat wakeups coalesce to one pending nudge.
+            conn.queue.put_nowait("", key="__wake__")  # wake up the queue.get()
         except Exception:
             pass
 
@@ -160,7 +219,9 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
             )
             msg = msg_by_level.get(level)
             if msg:
-                sse_conn.queue.put_nowait(msg)
+                # Coalesce by (type, uid): a newer whole-object frame supersedes
+                # any older one still pending for the same object.
+                sse_conn.queue.put_nowait(msg, key=(bd.obj_type, bd.uid))
                 # A tournament delivery to the bot may carry new participants;
                 # flag the live loop to push their identities (see SSEConnection).
                 if (
@@ -238,7 +299,8 @@ async def broadcast_resync(user_uid: str) -> None:
     for conn in _sse_connections:
         if conn.user and conn.user.uid == user_uid:
             try:
-                conn.queue.put_nowait(message)
+                # Coalesce: a pending resync makes a second one redundant.
+                conn.queue.put_nowait(message, key="__resync__")
             except asyncio.QueueFull:
                 logger.warning(
                     f"SSE queue full for resync user {user_uid}, closing connection"
@@ -305,7 +367,7 @@ def broadcast_personal(
             json_str = encoder.encode(proj).decode()
         msg = f'data: {{"type":"{obj_type}","data":{json_str}{ts}{av}}}\n\n'
         try:
-            conn.queue.put_nowait(msg)
+            conn.queue.put_nowait(msg, key=(obj_type, uid))
         except asyncio.QueueFull:
             logger.warning(
                 "SSE queue full for personal push (%s), closing connection",

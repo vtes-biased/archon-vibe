@@ -153,6 +153,28 @@ def test_scope_matches_sanction_by_tournament_uid():
     assert _scope_matches(unscoped, other) is True
 
 
+def test_broadcast_precomputed_coalesces_repeat_frames_per_object():
+    """Repeated whole-object frames for the same (type,uid) supersede each other:
+    the stalled queue holds ONE frame (the latest) per object, not a backlog —
+    the #198 memory fix. Distinct objects are NOT coalesced."""
+    conn = SSEConnection(user=None)  # public projection
+    _sse_connections.clear()
+    _sse_connections.add(conn)
+    try:
+        broadcast_precomputed(_bd(modified_at="2026-06-03T12:00:00.1", uid="t1"))
+        broadcast_precomputed(_bd(modified_at="2026-06-03T12:00:00.2", uid="t1"))
+        broadcast_precomputed(_bd(modified_at="2026-06-03T12:00:00.3", uid="t2"))
+        # t1 collapsed to one frame; t2 distinct → two frames total.
+        first = conn.queue.get_nowait()
+        second = conn.queue.get_nowait()
+        assert conn.queue.empty()
+        # t1's surviving frame is the LATEST snapshot (drains current state).
+        assert '"ts":"2026-06-03T12:00:00.2"' in first
+        assert '"data":{"uid":"t2"}' in second
+    finally:
+        _sse_connections.clear()
+
+
 def test_broadcast_precomputed_closes_connection_on_overflow():
     """QueueFull marks the connection closed and evicts it."""
     conn = SSEConnection(user=None)
