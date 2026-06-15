@@ -128,7 +128,20 @@ async def update_current_user(
         user.nickname = request.nickname if request.nickname else None
         local_mods.add("nickname")
     if request.country is not None:
-        user.country = request.country.upper() if request.country else None
+        new_country = request.country.upper() if request.country else None
+        # An NC/Prince may not change their OWN country — it scopes their
+        # FULL-data overlay, so a self-service change is an unauthorized
+        # data-scope change. can_change_country(self, self) blocks them; IC
+        # (overlay-neutral) and regular members pass.
+        if new_country != user.country and not permissions.can_change_country(
+            user, user
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="An NC or Prince cannot change their own country; "
+                "it must be changed by IC (or the country's NC for a Prince).",
+            )
+        user.country = new_country
         local_mods.add("country")
     if request.city is not None:
         user.city = request.city if request.city else None

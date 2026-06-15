@@ -1,12 +1,29 @@
 """Tests for user API endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
-from src.models import Role
+from src import db
+from src.models import Role, User
+from uuid6 import uuid7
 
 from tests.conftest import make_auth_header
+
+
+async def _mk_user(country: str, roles: list[Role], vekn: str) -> User:
+    """Persist a minimal user with explicit country/roles (deterministic tests)."""
+    user = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Test",
+        country=country,
+        vekn_id=vekn,
+        roles=list(roles),
+        local_modifications=set(),
+    )
+    await db.save_user(user)
+    return user
 
 
 @pytest.mark.asyncio
@@ -41,10 +58,8 @@ async def test_create_user(test_client: AsyncClient, populated_db):
 @pytest.mark.asyncio
 async def test_update_user(test_client: AsyncClient, populated_db):
     """Test updating a user's information (requires auth)."""
-    # Find an admin who can update users
-    admin = next(
-        u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles
-    )
+    # IC can edit any user in any country (mock targets have random countries).
+    admin = next(u for u in populated_db if Role.IC in u.roles)
     target = next(u for u in populated_db if u.uid != admin.uid)
     headers = make_auth_header(admin.uid)
 
@@ -149,3 +164,71 @@ async def test_update_user_requires_auth(test_client: AsyncClient, populated_db)
         json={"name": "Nope"},
     )
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_update_user_requires_edit_authority(test_db, test_client: AsyncClient):
+    """A member with no official role cannot edit another user's profile.
+
+    Closes the gap where PUT /api/users/{uid} had no edit-authority gate at all —
+    any authenticated user could change any user's name/country. Now gated by
+    can_edit_user (self / IC / NC-Prince same-country).
+    """
+    actor = await _mk_user("FR", [], vekn="2000001")
+    target = await _mk_user("FR", [], vekn="2000002")
+    resp = await test_client.put(
+        f"/api/users/{target.uid}",
+        json={"name": "Hijacked"},
+        headers=make_auth_header(actor.uid),
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_country_change_authority_for_officials(
+    test_db, test_client: AsyncClient
+):
+    """Changing an official's country (it scopes their FULL-data overlay) takes the
+    authority that could change their official role; a regular member keeps
+    self-service country edit."""
+    ic = await _mk_user("US", [Role.IC], vekn="3000001")
+    nc_fr = await _mk_user("FR", [Role.NC], vekn="3000002")
+    prince_fr = await _mk_user("FR", [Role.PRINCE], vekn="3000003")
+    nc_fr2 = await _mk_user("FR", [Role.NC], vekn="3000004")
+    member_fr = await _mk_user("FR", [], vekn="3000005")
+
+    # An NC may NOT change their OWN country (self-edit).
+    resp = await test_client.patch(
+        "/auth/me", json={"country": "DE"}, headers=make_auth_header(nc_fr.uid)
+    )
+    assert resp.status_code == 403
+
+    # An NC MAY change a same-country Prince's country.
+    resp = await test_client.put(
+        f"/api/users/{prince_fr.uid}",
+        json={"country": "DE"},
+        headers=make_auth_header(nc_fr.uid),
+    )
+    assert resp.status_code == 200
+
+    # An NC may NOT change another NC's country (IC only), even same-country.
+    resp = await test_client.put(
+        f"/api/users/{nc_fr2.uid}",
+        json={"country": "DE"},
+        headers=make_auth_header(nc_fr.uid),
+    )
+    assert resp.status_code == 403
+
+    # IC may change an NC's country.
+    resp = await test_client.put(
+        f"/api/users/{nc_fr2.uid}",
+        json={"country": "DE"},
+        headers=make_auth_header(ic.uid),
+    )
+    assert resp.status_code == 200
+
+    # A regular member keeps self-service country edit.
+    resp = await test_client.patch(
+        "/auth/me", json={"country": "DE"}, headers=make_auth_header(member_fr.uid)
+    )
+    assert resp.status_code == 200

@@ -1,11 +1,9 @@
 """User API endpoints."""
 
-import json
 import logging
 from datetime import UTC, datetime
 
 import msgspec
-from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 from uuid6 import uuid7
@@ -22,27 +20,12 @@ from ..db import save_user as db_save_user
 from ..db import upsert_avatar as db_upsert_avatar
 from ..middleware.auth import CurrentUser, OptionalUser
 from ..models import LinkModeration, Role, User
-from ..utils import user_to_context
 from .auth import send_invite_email
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
 # Encoder with decimal_format to handle all types properly
 encoder = msgspec.json.Encoder()
-
-# Rust engine for permission checks
-_engine = PyEngine()
-
-
-def _can_change_role(manager: User, role: Role, target_user: User) -> bool:
-    """Check if manager can change a specific role on target user (uses Rust engine)."""
-    result_json = _engine.can_change_role(
-        json.dumps(user_to_context(manager)),
-        json.dumps(user_to_context(target_user)),
-        role.value,
-    )
-    result = json.loads(result_json)
-    return result["allowed"]
 
 
 class CreateUserRequest(BaseModel):
@@ -79,7 +62,10 @@ async def create_user(
     Auto-allocates a VEKN ID for the new user.
     If email is provided, sends an invite email so they can log in.
     """
-    name, country = body.name, body.country
+    name = body.name
+    # Normalize country casing: storage + the same-country overlay match
+    # (broadcast.py) compare exact, so a raw lower-case payload would corrupt it.
+    country = body.country.upper() if body.country else body.country
     city, city_geoname_id = body.city, body.city_geoname_id
     state, nickname, email, roles = body.state, body.nickname, body.email, body.roles
     # Authenticate current user
@@ -128,7 +114,7 @@ async def create_user(
 
     # Check role permissions if assigning roles
     for role in validated_roles:
-        if not _can_change_role(current_user, role, user):
+        if not permissions.can_change_role(current_user, user, role):
             raise HTTPException(
                 status_code=403,
                 detail=f"You don't have permission to assign the {role.value} role",
@@ -167,7 +153,10 @@ async def update_user(
     uid: str, body: UpdateUserRequest, current_user: OptionalUser = None
 ) -> Response:
     """Update an existing user."""
-    name, country = body.name, body.country
+    name = body.name
+    # Normalize country casing: storage + the same-country overlay match
+    # (broadcast.py) compare exact, so a raw lower-case payload would corrupt it.
+    country = body.country.upper() if body.country else body.country
     city, city_geoname_id = body.city, body.city_geoname_id
     state, nickname, roles = body.state, body.nickname, body.roles
     # Authenticate current user
@@ -178,7 +167,28 @@ async def update_user(
     user = await get_user_by_uid(uid)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Baseline edit authority: self, IC (anyone), or NC/Prince same-country.
+    if not permissions.can_edit_user(current_user, user):
+        raise HTTPException(
+            status_code=403, detail="You don't have permission to edit this user"
+        )
+
     old_roles = set(user.roles)
+    old_country = user.country
+
+    # Country scopes an official's FULL-data overlay, so changing an official's
+    # country takes the authority that could change their official role. Gated on
+    # the target's current roles (what they are), not any roles in this request.
+    if (
+        country is not None
+        and country != old_country
+        and not permissions.can_change_country(current_user, user)
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have permission to change this official's country",
+        )
 
     # Track which fields are being modified locally
     local_mods = set(user.local_modifications)
@@ -206,7 +216,7 @@ async def update_user(
         removed_roles = old_roles - new_roles
 
         for role in added_roles | removed_roles:
-            if not _can_change_role(current_user, role, user):
+            if not permissions.can_change_role(current_user, user, role):
                 raise HTTPException(
                     status_code=403,
                     detail=f"You don't have permission to change the {role.value} role",
@@ -261,19 +271,25 @@ async def update_user(
     # Save to database
     bd = await db_save_user(user)
 
-    # Roles changed?
+    # Resync when the user's access-affecting entitlement changes: the overlay
+    # roles they hold (NC/Prince/IC), or — for an NC/Prince — their country,
+    # which scopes their FULL-level overlay (IC sees full everywhere, so an IC
+    # country change is overlay-neutral). _viewer_level and the access_levels
+    # projections branch solely on these; other roles (PT/Judge/...) change no
+    # projection, so resyncing on them just empties caches for ~10s for nothing.
+    # Offline clients self-heal via the access-version fingerprint at connect;
+    # this is the online nudge.
     new_roles = set(user.roles)
+    access_roles = {Role.NC, Role.PRINCE, Role.IC}
+    roles_access_changed = (old_roles & access_roles) != (new_roles & access_roles)
+    country_overlay_changed = (
+        country is not None
+        and country != old_country
+        and bool(old_roles & {Role.NC, Role.PRINCE})
+    )
+    if roles_access_changed or country_overlay_changed:
+        await broadcast_resync(user.uid)
     if new_roles != old_roles:
-        # Only a change to the access-affecting roles alters what this user can see or is
-        # seen as, and only that warrants a full resync. _viewer_level and the
-        # access_levels projections branch solely on these three; other roles
-        # (PT/Judge/...) change no projection, so resyncing on them just empties
-        # everyone's cache for ~10s for nothing.
-        access_roles = {Role.NC, Role.PRINCE, Role.IC}
-        if (old_roles & access_roles) != (new_roles & access_roles):
-            # Online nudge; an offline client is caught by the access-version fp at connect
-            # (the roles term moves). Non-access roles change no projection → no resync.
-            await broadcast_resync(user.uid)
         # Update Discord Linked Roles metadata (any role change, access-affecting or not)
         import asyncio
 

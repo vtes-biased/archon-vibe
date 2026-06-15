@@ -10,7 +10,7 @@ import json
 
 from archon_engine import PyEngine
 
-from .models import League, Sanction, SanctionLevel, Tournament, User
+from .models import League, Role, Sanction, SanctionLevel, Tournament, User
 from .utils import user_to_context
 
 _engine = PyEngine()
@@ -28,6 +28,50 @@ def _resource(obj: Tournament | League) -> str:
 def is_official(user: User) -> bool:
     """IC/NC/Prince — can create/manage tournaments and members."""
     return _allowed(_engine.can_manage_tournaments(json.dumps(user_to_context(user))))
+
+
+def can_edit_user(actor: User, target: User) -> bool:
+    """Edit a user's profile fields: self, IC (anyone), or NC/Prince (same country)."""
+    return _allowed(
+        _engine.can_edit_user(
+            json.dumps(user_to_context(actor)),
+            actor.uid,
+            target.uid,
+            json.dumps(user_to_context(target)),
+        )
+    )
+
+
+def can_change_role(actor: User, target: User, role: Role) -> bool:
+    """IC any; NC only Prince same-country; PTC→PT; Rulemonger→Judge/Judgekin."""
+    return _allowed(
+        _engine.can_change_role(
+            json.dumps(user_to_context(actor)),
+            json.dumps(user_to_context(target)),
+            role.value,
+        )
+    )
+
+
+# Official roles, highest authority first. Their country scopes a FULL-data
+# overlay, so changing it takes the authority that could change that role.
+_OFFICIAL_ROLES = (Role.IC, Role.NC, Role.PRINCE)
+
+
+def can_change_country(actor: User, target: User) -> bool:
+    """Whether ``actor`` may change ``target``'s country.
+
+    For an official target, gated by the authority that could change their
+    highest official role (``can_change_role``) — a self-service country change
+    by an NC/Prince is an unauthorized data-scope change. A non-official target
+    is unrestricted (ordinary self-service / same-country admin edit).
+
+    Highest role = strictest gate (an NC+Prince target needs NC-level authority).
+    can_change_role's vekn_id precondition is unreachable here: an official always
+    has a vekn_id (roles can't be assigned without one).
+    """
+    highest = next((r for r in _OFFICIAL_ROLES if r in target.roles), None)
+    return highest is None or can_change_role(actor, target, highest)
 
 
 def can_manage_country(manager: User, target_country: str | None) -> bool:

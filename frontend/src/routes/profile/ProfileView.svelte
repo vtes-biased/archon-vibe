@@ -33,6 +33,13 @@
     user?.roles?.some((r: string) => r === "IC" || r === "NC" || r === "Prince") ?? false
   );
 
+  // NC/Prince may not change their own country (the backend returns 403): changing it
+  // would move the scope their FULL projection is computed for. IC is unrestricted.
+  const isCountryLocked = $derived(
+    !user?.roles?.includes("IC") &&
+      (user?.roles?.some((r: string) => r === "NC" || r === "Prince") ?? false)
+  );
+
   // svelte-ignore state_referenced_locally
   const initial = { ...user };
   // Editable field values — initialized from user
@@ -250,12 +257,17 @@
   <div>
     <label for="edit-country" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
     <select id="edit-country" bind:value={editCountry} onchange={handleCountryChange}
-      class="{inputClass}">
+      disabled={isCountryLocked}
+      aria-describedby={isCountryLocked ? "edit-country-help" : undefined}
+      class="{inputClass} disabled:opacity-50">
       <option value="">{m.user_country_placeholder()}</option>
       {#each sortedCountries as country}
         <option value={country.iso_code}>{country.name} {getCountryFlag(country.iso_code)}</option>
       {/each}
     </select>
+    {#if isCountryLocked}
+      <p id="edit-country-help" class="mt-1 text-xs text-mist-500">{m.profile_country_locked_help()}</p>
+    {/if}
   </div>
 
   <div>

@@ -162,6 +162,44 @@
     autoSave();
   }
 
+  // Changing an official's country changes the data-access scope their FULL
+  // projection is computed for, so it needs explicit confirmation (and the
+  // backend gates it with the same authority required to change their role).
+  const isTargetOfficial = $derived(
+    user?.roles?.some((r) => r === "IC" || r === "NC" || r === "Prince") ?? false,
+  );
+  let showCountryConfirm = $state(false);
+
+  // Called when the country select changes. Returns true if the change is being
+  // gated by the confirm dialog (so the caller skips the immediate save).
+  function handleCountryChange(): boolean {
+    if (editCity) {
+      editCity = "";
+      editCityGeonameId = null;
+    }
+    if (mode === "create") return false;
+    const changed = editCountry.toUpperCase() !== (user?.country || "").toUpperCase();
+    if (isTargetOfficial && changed) {
+      showCountryConfirm = true;
+      return true;
+    }
+    immediateAutoSave();
+    return false;
+  }
+
+  function confirmCountryChange() {
+    showCountryConfirm = false;
+    immediateAutoSave();
+  }
+
+  function cancelCountryChange() {
+    showCountryConfirm = false;
+    // Revert the select to the original country; nothing was saved.
+    editCity = user?.city || "";
+    editCityGeonameId = user?.city_geoname_id ?? null;
+    editCountry = user?.country || "";
+  }
+
   // Load countries for select box
   const countries = getCountries();
   const sortedCountries = Object.values(countries).sort((a, b) =>
@@ -346,15 +384,7 @@
           id="edit-country"
           bind:value={editCountry}
           required
-          onchange={() => {
-            // Clear city when country changes
-            if (editCity) {
-              editCity = "";
-              editCityGeonameId = null;
-            }
-            // Immediate save for country changes
-            if (mode !== "create") immediateAutoSave();
-          }}
+          onchange={handleCountryChange}
           class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
         >
           <option value="">{m.user_country_placeholder()}</option>
@@ -620,4 +650,48 @@
     onSave={handleAvatarSave}
     onCancel={() => (showAvatarCropper = false)}
   />
+{/if}
+
+<!-- Confirm changing an official's country (changes their data-access scope) -->
+{#if showCountryConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+    role="presentation"
+    onclick={(e) => { e.stopPropagation(); cancelCountryChange(); }}
+    onkeydown={(e) => { e.stopPropagation(); if (e.key === "Escape") cancelCountryChange(); }}
+  >
+    <div
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="country-confirm-title"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 id="country-confirm-title" class="text-xl font-medium text-bone-100">
+          {m.user_country_change_official_title()}
+        </h2>
+      </div>
+      <div class="p-6">
+        <p class="banner-amber border rounded-lg p-3 text-sm mb-6">
+          {m.user_country_change_official_warning()}
+        </p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            onclick={confirmCountryChange}
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded font-medium transition-colors"
+          >{m.common_confirm()}</button>
+          <button
+            type="button"
+            onclick={cancelCountryChange}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >{m.common_cancel()}</button>
+        </div>
+      </div>
+    </div>
+  </div>
 {/if}
