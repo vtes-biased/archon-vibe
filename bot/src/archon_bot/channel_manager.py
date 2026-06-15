@@ -3,6 +3,7 @@
 import logging
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 import hikari
 
@@ -21,6 +22,73 @@ def _table_channel_name(table_num: int, round_number: int | None) -> str:
     if round_number is not None:
         return f"R{round_number} - Table {table_num}"
     return f"Table {table_num}"
+
+
+@dataclass(frozen=True)
+class DesiredChannel:
+    """One voice channel the current tournament state requires to exist.
+
+    ``member_uids`` is the CONNECT+SPEAK allow-set (seated players ∪ organizers)
+    layered over the constant ``@everyone DENY CONNECT`` baseline every table /
+    finals channel carries. Channels are matched and diffed by ``name``.
+    """
+
+    name: str
+    member_uids: frozenset[str]
+
+
+def _seat_uids(seating: Iterable[dict]) -> frozenset[str]:
+    """The non-empty ``player_uid`` set of a list of seat dicts."""
+    return frozenset(s.get("player_uid", "") for s in seating) - {""}
+
+
+def desired_channels(obj: dict) -> list[DesiredChannel]:
+    """Pure: the deterministic target voice-channel set for a tournament's state.
+
+    The single source of truth for *which* round/finals channels must exist and
+    who may connect — ``reconcile_channels`` diffs this against Discord.
+
+    - Empty unless the tournament is ``Playing``.
+    - Finals (``finals.seating`` present, no result yet): a single ``Finals``
+      channel for all finalists ∪ organizers. A finished finals (result in) — like
+      any non-Playing state — yields nothing, so its channel gets torn down.
+    - Otherwise the current (latest) round: one ``R{n} - Table {m}`` channel per
+      table, ordered by table number, each scoped to that table's seated players ∪
+      organizers.
+    """
+    if obj.get("state") != "Playing":
+        return []
+    organizer_uids = frozenset(obj.get("organizers_uids", []))
+    finals = obj.get("finals") or {}
+    finals_seating = finals.get("seating")
+    if finals_seating:
+        if finals.get("result"):
+            return []
+        return [DesiredChannel("Finals", _seat_uids(finals_seating) | organizer_uids)]
+    rounds = obj.get("rounds", [])
+    if not rounds:
+        return []
+    round_number = len(rounds)
+    return [
+        DesiredChannel(
+            _table_channel_name(i + 1, round_number),
+            _seat_uids(table.get("seating", [])) | organizer_uids,
+        )
+        for i, table in enumerate(rounds[-1])
+    ]
+
+
+def structure_signature(obj: dict) -> tuple:
+    """Pure, hashable digest of the STRUCTURE-affecting fields only.
+
+    A cheap guard: when it is unchanged between two tournament snapshots, no
+    channel/permission reconcile is needed (skips the per-score-report churn). It
+    keys on each desired channel's name and full member set — i.e. per-table
+    membership, the organizer set, and finals-vs-prelim mode — but deliberately
+    NOT on table *count* alone: a same-size seat swap (same number of tables,
+    different players) changes a member set and so must still trigger a reconcile.
+    """
+    return tuple((dc.name, dc.member_uids) for dc in desired_channels(obj))
 
 
 async def create_tournament_channels(
