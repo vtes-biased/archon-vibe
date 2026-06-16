@@ -62,6 +62,10 @@ Dropping a zero-round player does NOT change anyone's rating: `ratings.py:71`
 excluded from the field-size coefficient. This also matches vekn.net (the 13209
 report has 9 players, Lusca dropped → field size 9 both sides). So dropping
 Lusca is RTP-neutral and keeps us aligned with the vekn api data.
+Legacy archon agrees too: `engine.ratings()` sets `size = len([p for p in
+players if p.rounds_played > 0])` and `update_tournament` recomputes it for every
+finished tournament (imported included) — so the post-import rating recompute is
+migration-stable, not just internally consistent.
 
 ## Net actions (in the ETL, re-applies on the prod cutover import)
 - **Drop (2):** Lusca + Morgan phantom (0 seating). Dropping Lusca also makes the

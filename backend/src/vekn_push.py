@@ -83,6 +83,8 @@ def generate_archondata(
     # reflected in the pushed rating; the {vp} field below reads standing.vp,
     # which the engine already SA-adjusts.
     parts: list[str] = []
+    # Guard: iterate standings (seating-derived), not tournament.players, so a
+    # registered no-show stays out and our pushed RTP field size matches vekn's.
     for rank_idx, standing in enumerate(tournament.standings, 1):
         user = users_by_uid.get(standing.user_uid)
         if not user:
