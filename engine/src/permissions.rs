@@ -275,6 +275,20 @@ pub fn can_mark_deceased(actor: &UserContext, target_country: Option<&str>) -> P
     )
 }
 
+/// Check if actor can soft-delete a member (IC only).
+///
+/// The inverse of marking deceased: reserved to IC, and only ever applied to
+/// VEKN-less members (junk/legacy-import shells). That the target must be
+/// VEKN-less is a target-state rule enforced at the application layer — a
+/// VEKN-bearing member would just be recreated by the next VEKN sync and is
+/// handled via deceased status instead.
+pub fn can_delete_member(actor: &UserContext) -> PermissionResult {
+    if actor.has_role(Role::IC) {
+        return PermissionResult::allow();
+    }
+    PermissionResult::deny("Only IC can delete members")
+}
+
 /// Check if actor can create/manage tournaments (IC/NC/Prince).
 pub fn can_manage_tournaments(actor: &UserContext) -> PermissionResult {
     if is_official(actor) {
@@ -634,6 +648,18 @@ mod tests {
         assert!(!can_mark_deceased(&ctx(vec![Role::NC], None), None).allowed);
         // Non-official never
         assert!(!can_mark_deceased(&ctx(vec![Role::Judge], Some("FR")), Some("FR")).allowed);
+    }
+
+    #[test]
+    fn test_can_delete_member() {
+        // IC only, country-agnostic
+        assert!(can_delete_member(&ctx(vec![Role::IC], Some("US"))).allowed);
+        assert!(can_delete_member(&ctx(vec![Role::IC], None)).allowed);
+        // NC/Prince/others never
+        assert!(!can_delete_member(&ctx(vec![Role::NC], Some("FR"))).allowed);
+        assert!(!can_delete_member(&ctx(vec![Role::Prince], Some("FR"))).allowed);
+        assert!(!can_delete_member(&ctx(vec![Role::Judge], Some("FR"))).allowed);
+        assert!(!can_delete_member(&ctx(vec![], Some("FR"))).allowed);
     }
 
     #[test]

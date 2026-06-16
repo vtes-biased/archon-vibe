@@ -14,10 +14,10 @@ pub use error::EngineError;
 
 // Re-export permissions module items
 pub use permissions::{
-    can_change_role, can_delete_sanction, can_edit_league, can_edit_user, can_issue_sanction,
-    can_lift_sanction, can_manage_country, can_manage_leagues, can_manage_tournaments,
-    can_manage_vekn, can_mark_deceased, is_organizer, OwnedResource, PermissionResult, Role,
-    SanctionContext, UserContext,
+    can_change_role, can_delete_member, can_delete_sanction, can_edit_league, can_edit_user,
+    can_issue_sanction, can_lift_sanction, can_manage_country, can_manage_leagues,
+    can_manage_tournaments, can_manage_vekn, can_mark_deceased, is_organizer, OwnedResource,
+    PermissionResult, Role, SanctionContext, UserContext,
 };
 
 // ============================================================================
@@ -92,6 +92,11 @@ mod shared {
     pub fn can_manage_tournaments_json(actor_json: &str) -> Result<String, EngineError> {
         let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         Ok(can_manage_tournaments(&actor).to_json().dump())
+    }
+
+    pub fn can_delete_member_json(actor_json: &str) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        Ok(can_delete_member(&actor).to_json().dump())
     }
 
     pub fn can_manage_leagues_json(actor_json: &str) -> Result<String, EngineError> {
@@ -437,6 +442,11 @@ mod wasm {
             js_str(can_manage_tournaments_json(actor_json))
         }
 
+        #[wasm_bindgen(js_name = canDeleteMember)]
+        pub fn can_delete_member(&self, actor_json: &str) -> Result<String, String> {
+            js_str(can_delete_member_json(actor_json))
+        }
+
         #[wasm_bindgen(js_name = canManageLeagues)]
         pub fn can_manage_leagues(&self, actor_json: &str) -> Result<String, String> {
             js_str(can_manage_leagues_json(actor_json))
@@ -651,6 +661,10 @@ mod python {
 
         fn can_manage_tournaments(&self, actor_json: &str) -> PyResult<String> {
             py_str(can_manage_tournaments_json(actor_json))
+        }
+
+        fn can_delete_member(&self, actor_json: &str) -> PyResult<String> {
+            py_str(can_delete_member_json(actor_json))
         }
 
         fn can_manage_leagues(&self, actor_json: &str) -> PyResult<String> {

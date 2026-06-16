@@ -231,7 +231,16 @@ const SPECS = [
 
 ### Universal Soft-Delete
 
-All objects have `deleted_at`. If `item.deleted_at` → delete from store, else → save.
+All objects have `deleted_at`. On a tombstone (`item.deleted_at` set) the client
+**hard-deletes** the row from its store; otherwise it saves. No type is exempt —
+**users included**: even though tournament standings/seating store only `user_uid`
+(name resolved via `getUser`), every deletable member is VEKN-less (delete refuses
+VEKN-bearing members; `merge_users` and the import shells omit the id) and
+tournament participation requires a `vekn_id`, so a deleted user is never a live
+player reference. Server-side `deleted_at` is only a retention window so the
+deletion can be streamed to catch-up clients — persisting tombstones client-side
+buys nothing. (Legacy pre-VEKN imported events may then render a raw uid for a
+deleted nameless player — cosmetic, accepted.)
 
 ### Sync State
 

@@ -97,6 +97,11 @@ def can_mark_deceased(actor: User, target_country: str | None) -> bool:
     )
 
 
+def can_delete_member(actor: User) -> bool:
+    """IC only. The target-must-be-VEKN-less rule is enforced at the route."""
+    return _allowed(_engine.can_delete_member(json.dumps(user_to_context(actor))))
+
+
 def is_organizer(user: User, tournament: Tournament) -> bool:
     """Explicit organizer, or implicit: IC (any) or NC (same country)."""
     return _allowed(

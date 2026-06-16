@@ -268,9 +268,9 @@ export async function getUser(uid: string): Promise<User | undefined> {
 
 export async function getAllUsers(): Promise<User[]> {
   const db = await getDB();
-  // Use the name index to get pre-sorted results. Exclude soft-deleted users
-  // (e.g. merge_users dups) from listings — getUser still resolves them so
-  // tournament player references keep rendering.
+  // Use the name index to get pre-sorted results. Tombstones now hard-delete the
+  // row (sync.ts), so this !deleted_at filter is defensive: it hides any
+  // pre-change soft-deleted row a client still holds until its next full resync.
   const users = await db.getAllFromIndex('users', 'by-name');
   return users.filter(u => !u.deleted_at);
 }

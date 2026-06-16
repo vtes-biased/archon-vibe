@@ -1,9 +1,10 @@
 <script lang="ts">
   import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn, canMarkDeceased } from "$lib/engine";
+  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
@@ -68,6 +69,18 @@
     }
   });
 
+  // Soft-delete is IC-only; the button itself only shows for VEKN-less members
+  // (handled in VeknManagement) — VEKN members are removed via deceased status.
+  const canDelete = $derived(() => {
+    if (!auth.user || !user || !isOnline || !engineReady()) return false;
+    if (auth.user.uid === user.uid) return false;
+    try {
+      return canDeleteMember(auth.user).allowed;
+    } catch {
+      return false;
+    }
+  });
+
   const canIssueSanctions = $derived(() => {
     if (!auth.user || !user || !isOnline) return false;
     if (auth.user.uid === user.uid) return false;
@@ -94,6 +107,12 @@
 
   async function handleUserUpdated(_updated: User) {
     await loadData();
+  }
+
+  // After a soft-delete the profile no longer belongs in any listing; leave the
+  // now-orphaned detail page for the members list.
+  async function handleMemberDeleted() {
+    await goto("/users?tab=members");
   }
 
   $effect(() => {
@@ -170,7 +189,7 @@
 
     {#if canManage()}
       <div class="mt-6">
-        <VeknManagement {user} onaction={handleUserUpdated} canMarkDeceased={canManageDeceased()} />
+        <VeknManagement {user} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased()} canDelete={canDelete()} />
       </div>
     {/if}
 

@@ -13,6 +13,7 @@ from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
     get_user_by_uid,
+    soft_delete_user,
 )
 from ..db import delete_avatar as db_delete_avatar
 from ..db import get_avatar as db_get_avatar
@@ -554,6 +555,15 @@ async def set_deceased(
             detail="Only IC, or the member's national coordinator, can change deceased status",
         )
 
+    # Symmetric with delete: deceased is for VEKN members (real people); a
+    # VEKN-less member is local junk, removed via delete instead. Block only
+    # SETTING — clearing a legacy mis-mark stays allowed so it can't get stuck.
+    if body.deceased and not target.vekn_id:
+        raise HTTPException(
+            status_code=400,
+            detail="VEKN-less members cannot be marked deceased; delete them instead",
+        )
+
     # Deceased is archon-local and must always win over VEKN, set or cleared —
     # so the field stays flagged local even on clear (append-only is intentional).
     local_mods = set(target.local_modifications)
@@ -569,3 +579,39 @@ async def set_deceased(
     bd = await db_save_user(target)
     broadcast_precomputed(bd)
     return Response(content=encoder.encode(target), media_type="application/json")
+
+
+@router.delete("/{uid}")
+async def delete_member(uid: str, current_user: CurrentUser) -> Response:
+    """Soft-delete a VEKN-less member (IC only).
+
+    Soft, never hard: historical tournament references must still resolve, so
+    the row stays cached and is only filtered out of listings. The inverse of
+    marking deceased — VEKN-bearing members are upstream-authoritative (the next
+    VEKN sync would recreate a tombstoned one), so they're refused here and
+    handled via deceased status instead.
+    """
+    if current_user.uid == uid:
+        raise HTTPException(
+            status_code=403, detail="You cannot delete your own account"
+        )
+
+    if not permissions.can_delete_member(current_user):
+        raise HTTPException(status_code=403, detail="Only IC can delete members")
+
+    target = await get_user_by_uid(uid)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.vekn_id:
+        raise HTTPException(
+            status_code=400,
+            detail="VEKN members cannot be deleted; mark them deceased instead",
+        )
+
+    result = await soft_delete_user(uid)
+    if result is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user, bd = result
+    broadcast_precomputed(bd)
+    return Response(content=encoder.encode(user), media_type="application/json")

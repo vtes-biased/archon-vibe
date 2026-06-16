@@ -190,6 +190,12 @@ export async function setMemberDeceased(uid: string, deceased: boolean): Promise
   );
 }
 
+/** Soft-delete a VEKN-less member (IC only). Returns the soft-deleted user. */
+export async function deleteMember(uid: string): Promise<User> {
+  requireOnline();
+  return apiRequest<User>(`/api/users/${uid}`, { method: 'DELETE' });
+}
+
 // VEKN ID Management API
 
 export interface VeknClaimResponse {

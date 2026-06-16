@@ -366,6 +366,25 @@ export function canMarkDeceased(
 }
 
 /**
+ * Check if actor can soft-delete a member (sync version). IC only.
+ * The target-must-be-VEKN-less rule is enforced by the caller/route.
+ * Returns {allowed: false, reason: null} if engine not initialized.
+ */
+export function canDeleteMember(actor: UserContext): PermissionResult {
+  const engine = getEngineReactive();
+  if (!engine) return { allowed: false, reason: null };
+
+  const actorJson = JSON.stringify({
+    uid: actor.uid,
+    roles: actor.roles,
+    country: actor.country,
+  });
+
+  const resultJson = callEngine(() => engine.canDeleteMember(actorJson));
+  return JSON.parse(resultJson);
+}
+
+/**
  * Check if actor can edit target user's profile (sync version).
  * Returns {allowed: false, reason: null} if engine not initialized.
  */

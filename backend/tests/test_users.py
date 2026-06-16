@@ -11,7 +11,7 @@ from src.models import Role, User
 from tests.conftest import make_auth_header
 
 
-async def _mk_user(country: str, roles: list[Role], vekn: str) -> User:
+async def _mk_user(country: str, roles: list[Role], vekn: str | None = None) -> User:
     """Persist a minimal user with explicit country/roles (deterministic tests)."""
     user = User(
         uid=str(uuid7()),
@@ -246,3 +246,48 @@ async def test_get_users_by_uids_batch_matches_per_uid(populated_db):
         one = await db.get_user_by_uid(uid)
         assert batch[uid].uid == one.uid and batch[uid].name == one.name
     assert await db.get_users_by_uids(set()) == {}  # empty in → empty out
+
+
+@pytest.mark.asyncio
+async def test_delete_member(test_db, test_client: AsyncClient):
+    """IC soft-deletes a VEKN-less member; every other case is refused.
+
+    These guards are route-only — the engine permission knows just "IC-only".
+    The VEKN-bearing 400 is load-bearing: a soft-deleted VEKN member would be
+    resurrected as a tombstone by the next VEKN member sync, so it must stay.
+    """
+    ic = await _mk_user("US", [Role.IC], vekn="4000001")
+    junk = await _mk_user("FR", [])  # VEKN-less ETL residue
+    member = await _mk_user("FR", [], vekn="4000002")  # real VEKN member
+
+    # Non-IC cannot delete.
+    resp = await test_client.delete(
+        f"/api/users/{junk.uid}", headers=make_auth_header(member.uid)
+    )
+    assert resp.status_code == 403
+
+    # IC cannot delete their own account.
+    resp = await test_client.delete(
+        f"/api/users/{ic.uid}", headers=make_auth_header(ic.uid)
+    )
+    assert resp.status_code == 403
+
+    # IC cannot delete a VEKN-bearing member (would resurrect on next sync).
+    resp = await test_client.delete(
+        f"/api/users/{member.uid}", headers=make_auth_header(ic.uid)
+    )
+    assert resp.status_code == 400
+
+    # Unknown uid → 404.
+    resp = await test_client.delete(
+        f"/api/users/{uuid7()}", headers=make_auth_header(ic.uid)
+    )
+    assert resp.status_code == 404
+
+    # Happy path: IC soft-deletes the VEKN-less member (row kept, deleted_at set).
+    resp = await test_client.delete(
+        f"/api/users/{junk.uid}", headers=make_auth_header(ic.uid)
+    )
+    assert resp.status_code == 200
+    deleted = await db.get_user_by_uid(junk.uid)
+    assert deleted is not None and deleted.deleted_at is not None

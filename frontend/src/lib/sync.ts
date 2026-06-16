@@ -11,6 +11,7 @@ import type { User, Sanction, Tournament, DeckObject, League } from '$lib/types'
 import {
   saveUser,
   saveUsersBatch,
+  deleteUser,
   saveSanction,
   saveSanctionsBatch,
   deleteSanction,
@@ -74,18 +75,19 @@ interface ObjectSpec<T> {
   singleType: string;    // "user", "sanction", "tournament", "deck", "league"
   save: (item: T) => Promise<void>;
   saveBatch: (items: T[]) => Promise<void>;
-  // `item` carries the full (soft-deleted) payload when available. Most types
-  // hard-delete by uid; users instead persist the deleted_at-marked row (see
-  // the users spec) so getUser still resolves it for tournament player refs.
+  // All types hard-delete by uid on a tombstone (Universal Soft-Delete, SYNC.md).
+  // `item` carries the full soft-deleted payload when available, but isn't needed.
   del: (uid: string, item?: T) => Promise<void>;
 }
 
 const SPECS: ObjectSpec<any>[] = [
-  // Users are never hard-deleted from the cache: a soft-deleted user (e.g. a
-  // merge_users dup) may still be referenced by tournament players, so we keep
-  // the row (saving its deleted_at) for getUser to resolve, and filter it out of
-  // the list/search queries instead. Without the payload we no-op.
-  { batchType: 'users', singleType: 'user', save: saveUser, saveBatch: saveUsersBatch, del: async (_uid, item) => { if (item) await saveUser(item); } },
+  // Users hard-delete on a tombstone like every other type. Safe even though
+  // tournament standings/seating store only user_uid (name via getUser): every
+  // deletable member is VEKN-less (delete refuses VEKN-bearing; merge_users and
+  // the import shells omit the id) and tournament participation requires a
+  // vekn_id, so a deleted user is never a live player ref. (A legacy pre-VEKN
+  // imported event may then show a raw uid for a nameless player — cosmetic.)
+  { batchType: 'users', singleType: 'user', save: saveUser, saveBatch: saveUsersBatch, del: deleteUser },
   { batchType: 'sanctions', singleType: 'sanction', save: saveSanction, saveBatch: saveSanctionsBatch, del: deleteSanction },
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
   { batchType: 'decks', singleType: 'deck', save: saveDeck, saveBatch: saveDecksBatch, del: deleteDeck },

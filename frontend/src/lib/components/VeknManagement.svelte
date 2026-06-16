@@ -1,18 +1,22 @@
 <script lang="ts">
   import type { User } from "$lib/types";
-  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased } from "$lib/api";
+  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2 } from "@lucide/svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
     user,
     onaction,
+    ondelete,
     canMarkDeceased = false,
+    canDelete = false,
   }: {
     user: User;
     onaction: (user: User) => void;
+    ondelete?: () => void;
     canMarkDeceased?: boolean;
+    canDelete?: boolean;
   } = $props();
 
   const isDeceased = $derived(!!user.deceased_at);
@@ -27,6 +31,7 @@
   let showSponsorConfirm = $state(false);
   let showForceAbandonConfirm = $state(false);
   let showMergeModal = $state(false);
+  let showDeleteConfirm = $state(false);
   let linkVeknIdInput = $state("");
   let mergeTargetUid = $state("");
   let processingAction = $state(false);
@@ -96,6 +101,20 @@
     }
   }
 
+  async function handleDelete() {
+    processingAction = true;
+    try {
+      await deleteMember(user.uid);
+      showToast({ type: "success", message: m.member_deleted_toast() });
+      showDeleteConfirm = false;
+      ondelete?.();
+    } catch {
+      // Error toast shown by apiRequest
+    } finally {
+      processingAction = false;
+    }
+  }
+
   async function handleMerge() {
     if (!mergeTargetUid.trim()) return;
     processingAction = true;
@@ -153,6 +172,17 @@
           <Link class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_link_btn()}
         </button>
+        {#if canDelete}
+          <button
+            type="button"
+            onclick={() => showDeleteConfirm = true}
+            class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded transition-colors"
+            title={m.member_delete_title()}
+          >
+            <Trash2 class="inline w-3.5 h-3.5 mr-1" />
+            {m.member_delete()}
+          </button>
+        {/if}
       {:else}
         <button
           type="button"
@@ -175,8 +205,9 @@
       </button>
     </div>
 
-    <!-- Deceased status: mention only when set; no indication otherwise -->
-    {#if isDeceased || canMarkDeceased}
+    <!-- Deceased status: VEKN members only (symmetric with delete for VEKN-less);
+         still shown if already set on a VEKN-less member so it can be cleared. -->
+    {#if isDeceased || (user.vekn_id && canMarkDeceased)}
       <div class="mt-3 pt-3 border-t border-ash-800 flex items-center justify-between gap-2">
         {#if isDeceased}
           <span class="text-sm text-ash-300 inline-flex items-center gap-1.5">
@@ -421,6 +452,53 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+{/if}
+
+<!-- Delete Member Confirmation Modal -->
+{#if showDeleteConfirm}
+  <div
+    role="presentation"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) showDeleteConfirm = false; }}
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
+      tabindex="-1"
+      use:focusOnMount
+      onkeydown={(e) => e.key === 'Escape' && (showDeleteConfirm = false)}
+      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+    >
+      <div class="p-6 border-b border-ash-800">
+        <h2 id="delete-modal-title" class="text-xl font-medium text-crimson-400">{m.member_delete_modal_title()}</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ash-300 mb-4">
+          {m.member_delete_confirm({ name: user.name })}
+        </p>
+        <p class="text-sm text-crimson-400 mb-6">
+          {m.member_delete_warning()}
+        </p>
+        <div class="flex gap-2">
+          <button
+            onclick={handleDelete}
+            disabled={processingAction}
+            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
+          >
+            {processingAction ? m.member_deleting() : m.member_delete()}
+          </button>
+          <button
+            onclick={() => (showDeleteConfirm = false)}
+            disabled={processingAction}
+            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+          >
+            {m.common_cancel()}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 {/if}

@@ -943,9 +943,13 @@ Canvas-rendered PNG card and plain text generator for sharing finished tournamen
 `User` carries two fields: `deceased_at: datetime | None` (the in-memoriam flag + date) and `deceased_by_uid: str | None` (audit, full-only). This is **not** a soft-delete — tournament history, ratings, and rankings are preserved; the record stays active in the system.
 
 - **Set/cleared** via `PATCH /api/users/{uid}/deceased` (`{ deceased: bool }`). Reversible.
-- **Permission**: IC (any country) or NC (same country only); Prince excluded. Engine: `can_mark_deceased` / WASM: `canMarkDeceased`.
+- **Permission**: IC (any country) or NC (same country only); Prince excluded; **requires `vekn_id`** (cannot mark a VEKN-less account deceased). Engine: `can_mark_deceased` / WASM: `canMarkDeceased`.
 - **VEKN sync**: never pushed to VEKN; `"deceased_at"` tracked in `local_modifications` to prevent VEKN-sync overwrite.
 - **Access levels**: `deceased_at` visible at member+; `deceased_by_uid` full-only.
+
+### Delete Member (`DELETE /api/users/{uid}`)
+
+IC-only. Soft-deletes a VEKN-**less** account — the mirror of `set_deceased`: deceased targets VEKN-bearing accounts, delete targets VEKN-less ones. Engine: `can_delete_member` / WASM: `canDeleteMember`. Uses the standard soft-delete + SSE broadcast path.
 
 **Immovable-uid invariant**: a uid that carries a `vekn_id` is never re-keyed and never soft-deleted. Everything keyed to it — sanctions, decks, tournament results, ratings, wins, cooptation — stays attached. Only the account WITHOUT the `vekn_id` ever moves. See `.pst/details/59-vekn-detach.md` for the full rule.
 
