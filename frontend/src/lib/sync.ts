@@ -285,7 +285,17 @@ class SyncManager {
     if (!lastSync) {
       lastSync = await this.fetchSnapshot(epoch, token);
       if (this.superseded(epoch)) return;
-      // If snapshot failed, fall back to full SSE sync (no since param)
+      if (!lastSync) {
+        // Snapshot unavailable — typically the first-VEKN-sync warm-up window on a
+        // fresh deploy, where /snapshot 503s until generate_snapshots first runs.
+        // We must NOT fall through to /stream here: with no `av` the server's
+        // entitlement handshake always mismatches and answers with an immediate
+        // `resync`, which clears IDB and reconnects with no delay — a tight loop
+        // (the /stream open/close + 503 churn in the backend log). Back off and
+        // retry the snapshot instead; it self-heals the moment the first sync lands.
+        void this.handleError(true);
+        return;
+      }
     }
 
     // Seed the in-memory high-water mark from the cursor we connect with.
@@ -498,12 +508,15 @@ class SyncManager {
   /**
    * Handle SSE error: disconnect (flushing buffers) then schedule reconnect.
    * When any tournament is offline, retry indefinitely with a higher backoff ceiling.
+   * `transient` (snapshot not generated yet — first-sync warm-up) likewise retries
+   * indefinitely with the capped backoff: the snapshot WILL appear once the first
+   * sync completes, so giving up after maxReconnectAttempts would strand the client.
    */
-  private async handleError(): Promise<void> {
+  private async handleError(transient = false): Promise<void> {
     await this.disconnect();
     const { getOfflineTournamentUids } = await import('$lib/stores/offline.svelte');
     const hasOfflineTournaments = getOfflineTournamentUids().size > 0;
-    const maxAttempts = hasOfflineTournaments ? Infinity : this.maxReconnectAttempts;
+    const maxAttempts = transient || hasOfflineTournaments ? Infinity : this.maxReconnectAttempts;
 
     if (this.reconnectAttempts < maxAttempts) {
       this.reconnectAttempts++;
