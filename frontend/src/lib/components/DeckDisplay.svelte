@@ -7,6 +7,7 @@
   import { validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
   import { CircleX, TriangleAlert } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -260,22 +261,13 @@
   {#if editable || onreplace || ondelete}
     <div class="flex gap-2 mb-3">
       {#if editable}
-        <button
-          onclick={startEditing}
-          class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-        >{m.deck_edit()}</button>
+        <Button variant="secondary" size="lg" onclick={startEditing}>{m.deck_edit()}</Button>
       {/if}
       {#if onreplace}
-        <button
-          onclick={onreplace}
-          class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-        >{m.decks_replace()}</button>
+        <Button variant="secondary" size="lg" onclick={onreplace}>{m.decks_replace()}</Button>
       {/if}
       {#if ondelete}
-        <button
-          onclick={ondelete}
-          class="px-3 py-1.5 text-sm font-medium text-crimson-400 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-        >{m.decks_delete()}</button>
+        <Button variant="secondary" size="lg" onclick={ondelete}>{m.decks_delete()}</Button>
       {/if}
     </div>
   {/if}
@@ -373,15 +365,8 @@
     <p class="text-sm text-red-400 mt-2">{saveError}</p>
   {/if}
   <div class="flex gap-2 mt-3">
-    <button
-      onclick={saveDeck}
-      disabled={saving}
-      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
-    >{saving ? m.common_saving() : m.deck_save_changes()}</button>
-    <button
-      onclick={cancelEditing}
-      class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-    >{m.common_cancel()}</button>
+    <Button variant="danger" size="lg" loading={saving} onclick={saveDeck}>{saving ? m.common_saving() : m.deck_save_changes()}</Button>
+    <Button variant="secondary" size="lg" onclick={cancelEditing}>{m.common_cancel()}</Button>
   </div>
 {/if}
 

@@ -4,6 +4,7 @@
   import type { User } from '$lib/types';
   import { getFilteredUsers } from '$lib/db';
   import { getCountryFlag } from '$lib/geonames';
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -325,12 +326,14 @@
   {/if}
 
   {#if mode !== 'qr'}
-    <button
+    <Button
+      variant="danger"
+      size="lg"
+      loading={loading}
+      disabled={mode === 'text' ? !deckText.trim() : !deckUrl.trim()}
       onclick={upload}
-      disabled={loading || (mode === 'text' ? !deckText.trim() : !deckUrl.trim())}
-      class="px-4 py-2 text-sm font-medium text-white bg-crimson-600 hover:bg-crimson-500 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
     >
       {loading ? m.deck_upload_uploading() : m.deck_upload_submit()}
-    </button>
+    </Button>
   {/if}
 </div>

@@ -5,6 +5,7 @@
   import { getPlayerSanctionsInTournament } from "$lib/db";
   import { showToast } from "$lib/stores/toast.svelte";
   import { TriangleAlert, CircleArrowDown } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -324,21 +325,19 @@
 
       <!-- Actions -->
       <div class="flex gap-2 pt-2">
-        <button
+        <Button
           type="submit"
-          disabled={creating || !description.trim() || (roundRequired && roundNumber === null)}
-          class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
+          variant="danger"
+          size="lg"
+          class="flex-1"
+          loading={creating}
+          disabled={!description.trim() || (roundRequired && roundNumber === null)}
         >
           {creating ? m.sanction_mgr_issuing() : m.sanction_mgr_issue_btn()}
-        </button>
-        <button
-          type="button"
-          onclick={onClose}
-          disabled={creating}
-          class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-        >
+        </Button>
+        <Button variant="secondary" size="lg" disabled={creating} onclick={onClose}>
           {m.common_cancel()}
-        </button>
+        </Button>
       </div>
     </form>
   </div>

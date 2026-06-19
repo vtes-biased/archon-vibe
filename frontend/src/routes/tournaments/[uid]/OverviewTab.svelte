@@ -13,6 +13,7 @@
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import { Share2, ClipboardCopy, Upload, Download, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
 
   import * as m from '$lib/paraglide/messages.js';
 
@@ -170,16 +171,14 @@
   <!-- Share buttons (finished tournaments with standings) -->
   {#if isFinished && standings.length > 0}
     <div class="flex flex-wrap gap-2">
-      <button onclick={shareImage} disabled={sharingImage}
-        class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors disabled:opacity-40">
+      <Button variant="secondary" size="md" loading={sharingImage} onclick={shareImage}>
         <Share2 class="w-4 h-4" />
         {sharingImage ? m.common_loading() : m.share_results_image()}
-      </button>
-      <button onclick={copyText}
-        class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors">
+      </Button>
+      <Button variant="secondary" size="md" onclick={copyText}>
         <ClipboardCopy class="w-4 h-4" />
         {m.share_results_text()}
-      </button>
+      </Button>
       {#if isOrganizer}
         <a href="{API_BASE}/api/tournaments/{tournament.uid}/report"
           class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors"
@@ -254,14 +253,12 @@
             <div class="bg-amber-900/30 border border-amber-700 rounded p-3 text-sm text-amber-200">
               <p>{m.archon_import_confirm_overwrite()}</p>
               <div class="flex gap-2 mt-2">
-                <button onclick={handleArchonImport}
-                  class="px-3 py-1 text-sm bg-amber-600 hover:bg-amber-500 text-bone-100 rounded">
+                <Button variant="warning" size="md" onclick={handleArchonImport}>
                   {m.common_confirm()}
-                </button>
-                <button onclick={() => archonConfirmOverwrite = false}
-                  class="px-3 py-1 text-sm bg-ash-700 hover:bg-ash-600 text-ash-200 rounded">
+                </Button>
+                <Button variant="secondary" size="md" onclick={() => archonConfirmOverwrite = false}>
                   {m.common_cancel()}
-                </button>
+                </Button>
               </div>
             </div>
           {/if}

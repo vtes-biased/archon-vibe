@@ -8,6 +8,7 @@
   import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
   import { Loader2, Trophy, Calendar, Copy, Check } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -329,16 +330,9 @@
         <Calendar class="h-4 w-4 text-ash-500 shrink-0" />
         <span class="text-xs text-ash-500">{m.tournaments_calendar_subscribe()}:</span>
         {#if viewMode === "agenda" && !auth.user?.calendar_token}
-          <button
-            onclick={handleGenerateCalendarToken}
-            disabled={calendarLoading}
-            class="px-3 py-1.5 text-xs rounded bg-crimson-700 hover:bg-crimson-600 text-white disabled:bg-ash-800 disabled:text-ash-500 transition-colors"
-          >
-            {#if calendarLoading}
-              <Loader2 class="inline h-3 w-3 animate-spin mr-1" />
-            {/if}
+          <Button variant="danger" size="sm" loading={calendarLoading} onclick={handleGenerateCalendarToken}>
             {m.tournaments_calendar_generate()}
-          </button>
+          </Button>
         {:else}
           <input
             type="text"
@@ -346,10 +340,7 @@
             value={calendarUrl}
             class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-ash-700 rounded bg-dusk-950 text-ash-400 select-all"
           />
-          <button
-            onclick={() => copyToClipboard(calendarUrl)}
-            class="px-2 py-1.5 text-xs rounded bg-ash-800 hover:bg-ash-700 text-ash-200 flex items-center gap-1 shrink-0"
-          >
+          <Button variant="secondary" size="sm" class="shrink-0" onclick={() => copyToClipboard(calendarUrl)}>
             {#if copied}
               <Check class="h-3 w-3" />
               {m.tournaments_calendar_copied()}
@@ -357,7 +348,7 @@
               <Copy class="h-3 w-3" />
               {m.tournaments_calendar_copy()}
             {/if}
-          </button>
+          </Button>
         {/if}
       </div>
     {/if}
@@ -460,17 +451,9 @@
         <span>{m.tournaments_total_count({ count: totalCount.toString() })}</span>
         {#if totalPages > 1}
           <div class="flex items-center gap-2">
-            <button
-              onclick={() => page = Math.max(0, page - 1)}
-              disabled={page === 0}
-              class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 text-ash-200"
-            >{m.tournaments_prev()}</button>
+            <Button variant="secondary" size="md" disabled={page === 0} onclick={() => page = Math.max(0, page - 1)}>{m.tournaments_prev()}</Button>
             <span>{m.tournaments_page_info({ current: String(page + 1), total: String(totalPages) })}</span>
-            <button
-              onclick={() => page = Math.min(totalPages - 1, page + 1)}
-              disabled={page >= totalPages - 1}
-              class="px-3 py-1 rounded bg-ash-800 hover:bg-ash-700 disabled:opacity-40 text-ash-200"
-            >{m.common_next()}</button>
+            <Button variant="secondary" size="md" disabled={page >= totalPages - 1} onclick={() => page = Math.min(totalPages - 1, page + 1)}>{m.common_next()}</Button>
           </div>
         {/if}
       </div>

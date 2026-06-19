@@ -2,6 +2,7 @@
   import type { Tournament, RafflePool } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
   import { Dices, Undo2, Trash2 } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -162,33 +163,33 @@
             class="ml-1 w-16 px-2 py-1 text-sm bg-ash-800 border border-ash-700 rounded text-bone-100"
           />
         </label>
-        <button
+        <Button
+          variant="warning"
           onclick={handleDraw}
           disabled={actionLoading || !label.trim() || currentEligible === 0}
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm btn-amber rounded-lg transition-colors"
         >
           <Dices class="w-4 h-4" />
           {m.raffle_draw()}
-        </button>
+        </Button>
         {#if hasRaffles}
-          <button
+          <Button
+            variant="ghost"
             onclick={() => doAction!("RaffleUndo")}
             disabled={actionLoading}
-            class="flex items-center gap-1 px-2 py-1.5 text-sm text-ash-300 hover:text-bone-100 border border-ash-700 hover:border-ash-600 rounded-lg transition-colors"
             title={m.raffle_undo()}
           >
             <Undo2 class="w-3.5 h-3.5" />
             {m.raffle_undo()}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="danger"
             onclick={() => { if (confirm(m.raffle_clear_confirm())) doAction!("RaffleClear"); }}
             disabled={actionLoading}
-            class="flex items-center gap-1 px-2 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
             title={m.raffle_clear()}
           >
             <Trash2 class="w-3.5 h-3.5" />
             {m.raffle_clear()}
-          </button>
+          </Button>
         {/if}
       </div>
     </div>

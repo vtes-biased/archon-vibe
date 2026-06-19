@@ -5,6 +5,7 @@
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import VpInput from "./VpInput.svelte";
+  import Button from '$lib/components/Button.svelte';
   import { ArrowRightLeft, ShieldCheck, Lock } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
@@ -108,12 +109,9 @@
         <div class="flex items-center gap-2">
           <h3 class="text-sm font-medium text-bone-100">{m.finals_table()}</h3>
           {#if canEditSeating && !alterMode}
-            <button
-              onclick={enterAlterMode}
-              class="px-2 py-1 text-xs text-ash-300 bg-ash-800 hover:bg-ash-700 rounded transition-colors"
-            >
-              <ArrowRightLeft class="w-3.5 h-3.5 inline mr-0.5" />{m.rounds_alter_seating()}
-            </button>
+            <Button variant="secondary" size="sm" onclick={enterAlterMode}>
+              <ArrowRightLeft class="w-3.5 h-3.5" />{m.rounds_alter_seating()}
+            </Button>
           {/if}
         </div>
         <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-emerald' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
@@ -131,15 +129,8 @@
           onchange={() => { alterSeating = alterTables[0] ?? []; }}
         />
         <div class="flex gap-2 mt-3">
-          <button
-            onclick={saveAlterSeating}
-            disabled={actionLoading}
-            class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-          >{m.rounds_save_seating()}</button>
-          <button
-            onclick={cancelAlterMode}
-            class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="primary" size="lg" onclick={saveAlterSeating} disabled={actionLoading}>{m.rounds_save_seating()}</Button>
+          <Button variant="secondary" size="lg" onclick={cancelAlterMode}>{m.common_cancel()}</Button>
         </div>
       {:else}
       <div class="divide-y divide-ash-800">
@@ -193,7 +184,11 @@
             </label>
             <div class="flex gap-2 mt-1 justify-end">
               <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">{m.common_cancel()}</button>
-              <button
+              <Button
+                variant="warning"
+                size="sm"
+                loading={overrideSaving}
+                disabled={overrideSaving || !overrideComment.trim()}
                 onclick={async () => {
                   if (!overrideComment.trim()) return;
                   overrideSaving = true;
@@ -204,9 +199,7 @@
                     overrideComment = "";
                   } catch (e) { error = toUserMessage(e, m.override_error()); } finally { overrideSaving = false; }
                 }}
-                disabled={overrideSaving || !overrideComment.trim()}
-                class="px-3 py-1 text-xs font-medium btn-amber rounded transition-colors"
-              >{overrideSaving ? m.common_saving() : m.override_save()}</button>
+              >{overrideSaving ? m.common_saving() : m.override_save()}</Button>
             </div>
           </div>
         {:else}

@@ -2,6 +2,7 @@
   import type { Tournament } from "$lib/types";
   import { timerStart, timerPause, timerReset, timerAddTime } from "$lib/api";
   import { Play, Pause, RotateCcw, Clock } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -113,17 +114,17 @@
     {#if isOrganizer && tableIndex == null}
       <div class="flex items-center gap-2">
         {#if isPaused}
-          <button onclick={doStart} disabled={loading} class="px-3 py-1.5 text-xs btn-emerald rounded-lg flex items-center gap-1" title={m.timer_start()}>
+          <Button variant="primary" size="sm" onclick={doStart} disabled={loading} title={m.timer_start()}>
             <Play class="w-3 h-3" /> {m.timer_start()}
-          </button>
+          </Button>
         {:else}
-          <button onclick={doPause} disabled={loading} class="px-3 py-1.5 text-xs btn-amber rounded-lg flex items-center gap-1" title={m.timer_pause()}>
+          <Button variant="warning" size="sm" onclick={doPause} disabled={loading} title={m.timer_pause()}>
             <Pause class="w-3 h-3" /> {m.timer_pause()}
-          </button>
+          </Button>
         {/if}
-        <button onclick={doReset} disabled={loading} class="px-3 py-1.5 text-xs text-ash-400 hover:text-ash-200 border border-ash-700 rounded-lg flex items-center gap-1" title={m.timer_reset()}>
+        <Button variant="ghost" size="sm" onclick={doReset} disabled={loading} title={m.timer_reset()}>
           <RotateCcw class="w-3 h-3" /> {m.timer_reset()}
-        </button>
+        </Button>
       </div>
     {/if}
 
@@ -131,10 +132,9 @@
     {#if isOrganizer && tableIndex != null}
       <div class="flex items-center gap-1 flex-wrap">
         {#each [60, 120, 180, 300] as secs}
-          <button onclick={() => doAddTime(secs)} disabled={loading || tableExtraTime + secs > 600}
-            class="px-2 py-1 text-xs text-ash-300 hover:text-bone-100 border border-ash-700 hover:border-ash-600 rounded transition-colors">
+          <Button variant="ghost" size="sm" onclick={() => doAddTime(secs)} disabled={loading || tableExtraTime + secs > 600}>
             +{secs / 60}min
-          </button>
+          </Button>
         {/each}
       </div>
     {/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from '$lib/paraglide/messages.js';
+  import Button from '$lib/components/Button.svelte';
 
   let {
     showDeleteConfirm = $bindable(false),
@@ -52,14 +53,8 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.tournament_delete_msg()}</p>
         <div class="flex gap-2">
-          <button
-            onclick={onDelete}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded font-medium transition-colors"
-          >{m.common_delete()}</button>
-          <button
-            onclick={() => (showDeleteConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="danger" size="lg" class="flex-1" onclick={onDelete}>{m.common_delete()}</Button>
+          <Button variant="secondary" size="lg" onclick={() => (showDeleteConfirm = false)}>{m.common_cancel()}</Button>
         </div>
       </div>
     </div>
@@ -90,15 +85,10 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_go_offline_msg()}</p>
         <div class="flex gap-2">
-          <button
-            onclick={onGoOffline}
-            disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-amber rounded font-medium transition-colors"
-          >{offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}</button>
-          <button
-            onclick={() => (showGoOfflineConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="warning" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onGoOffline}>
+            {offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}
+          </Button>
+          <Button variant="secondary" size="lg" onclick={() => (showGoOfflineConfirm = false)}>{m.common_cancel()}</Button>
         </div>
       </div>
     </div>
@@ -129,15 +119,10 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_go_online_msg()}</p>
         <div class="flex gap-2">
-          <button
-            onclick={onGoOnline}
-            disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-emerald rounded font-medium transition-colors"
-          >{offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}</button>
-          <button
-            onclick={() => (showGoOnlineConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="primary" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onGoOnline}>
+            {offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}
+          </Button>
+          <Button variant="secondary" size="lg" onclick={() => (showGoOnlineConfirm = false)}>{m.common_cancel()}</Button>
         </div>
       </div>
     </div>
@@ -168,15 +153,10 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_force_takeover_msg()}</p>
         <div class="flex gap-2">
-          <button
-            onclick={onForceTakeover}
-            disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 btn-amber rounded font-medium transition-colors"
-          >{offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}</button>
-          <button
-            onclick={() => (showForceTakeoverConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="warning" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceTakeover}>
+            {offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}
+          </Button>
+          <Button variant="secondary" size="lg" onclick={() => (showForceTakeoverConfirm = false)}>{m.common_cancel()}</Button>
         </div>
       </div>
     </div>
@@ -207,15 +187,10 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_force_unlock_msg()}</p>
         <div class="flex gap-2">
-          <button
-            onclick={onForceUnlock}
-            disabled={offlineActionLoading}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
-          >{offlineActionLoading ? m.common_loading() : m.offline_force_unlock_confirm()}</button>
-          <button
-            onclick={() => (showForceUnlockConfirm = false)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceUnlock}>
+            {offlineActionLoading ? m.common_loading() : m.offline_force_unlock_confirm()}
+          </Button>
+          <Button variant="secondary" size="lg" onclick={() => (showForceUnlockConfirm = false)}>{m.common_cancel()}</Button>
         </div>
       </div>
     </div>

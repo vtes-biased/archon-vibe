@@ -8,6 +8,7 @@
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
+  import Button from '$lib/components/Button.svelte';
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
   import PlayerDecksSection from "./PlayerDecksSection.svelte";
@@ -157,11 +158,12 @@
     {:else if !userVeknId}
       <div class="text-sm text-amber-400">{m.tournament_vekn_id_required_to_register()}</div>
     {:else}
-      <button
+      <Button
+        variant="primary"
+        size="lg"
         onclick={() => doAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
         disabled={actionLoading}
-        class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-      >{m.tournament_register_btn()}</button>
+      >{m.tournament_register_btn()}</Button>
     {/if}
   {:else if tournament.state === "Registration" && currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
@@ -169,21 +171,22 @@
         <span class="text-ash-500">{m.tournament_your_status()}</span>
         <span class="ml-2 text-ash-200">{translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
-      <button
+      <Button
+        variant="danger"
         onclick={() => doAction("Unregister", { user_uid: userUid })}
         disabled={actionLoading}
-        class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-      >{m.tournament_unregister_btn()}</button>
+      >{m.tournament_unregister_btn()}</Button>
     </div>
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
-    <button
+    <Button
+      variant="primary"
+      size="lg"
       onclick={() => showQrScanner = true}
       disabled={actionLoading}
-      class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors flex items-center gap-1.5"
     >
       <QrCode class="w-4 h-4" />
       {m.tournament_register_checkin_btn()}
-    </button>
+    </Button>
   {:else if currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
@@ -198,14 +201,14 @@
           {m.tournament_upload_valid_deck()}
         </div>
       {:else if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
-        <button
+        <Button
+          variant="ghost"
           onclick={() => showQrScanner = !showQrScanner}
           disabled={actionLoading}
-          class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors flex items-center gap-1.5"
         >
           <QrCode class="w-4 h-4" />
           {m.checkin_qr_scan_btn()}
-        </button>
+        </Button>
       {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
         {#if !playerHasValidDeck}
           <div class="flex items-center gap-2 text-amber-400 text-sm">
@@ -213,21 +216,21 @@
             {m.tournament_upload_valid_deck()}
           </div>
         {:else}
-          <button
+          <Button
+            variant="ghost"
             onclick={() => showQrScanner = true}
             disabled={actionLoading}
-            class="px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 border border-emerald-800 hover:border-emerald-700 rounded-lg transition-colors flex items-center gap-1.5"
           >
             <QrCode class="w-4 h-4" />
             {m.tournament_check_in_btn()}
-          </button>
+          </Button>
         {/if}
       {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
-        <button
+        <Button
+          variant="danger"
           onclick={() => dropPlayer(userUid)}
           disabled={actionLoading}
-          class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-        >{m.tournament_drop_out_btn()}</button>
+        >{m.tournament_drop_out_btn()}</Button>
       {/if}
     </div>
     <!-- Player's current score -->

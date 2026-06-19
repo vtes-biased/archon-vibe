@@ -6,6 +6,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
   import { Pencil, TriangleAlert, CircleCheck, Trash2 } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -244,15 +245,10 @@
 
         {#if canIssueSanctions}
           <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onclick={() => openSanctionModal()}
-              class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded transition-colors"
-              title={m.sanction_mgr_issue_btn()}
-            >
+            <Button variant="danger" size="md" onclick={() => openSanctionModal()} title={m.sanction_mgr_issue_btn()}>
               <TriangleAlert class="inline w-3.5 h-3.5 mr-1" />
               {m.sanction_mgr_issue_btn()}
-            </button>
+            </Button>
           </div>
         {/if}
       </div>
@@ -357,21 +353,24 @@
         {/if}
 
         <div class="flex gap-2 pt-2">
-          <button
+          <Button
             type="submit"
-            disabled={creatingSanction || !sanctionDescription.trim() || (expiryRequired && !sanctionExpiresAt)}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
+            variant="danger"
+            size="lg"
+            class="flex-1"
+            loading={creatingSanction}
+            disabled={!sanctionDescription.trim() || (expiryRequired && !sanctionExpiresAt)}
           >
             {creatingSanction ? m.sanction_mgr_issuing() : m.sanction_mgr_issue_btn()}
-          </button>
-          <button
-            type="button"
-            onclick={() => { showSanctionModal = false; sanctionTargetUser = null; }}
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
             disabled={creatingSanction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+            onclick={() => { showSanctionModal = false; sanctionTargetUser = null; }}
           >
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
@@ -476,47 +475,34 @@
 
         <div class="flex flex-col gap-2 pt-4 border-t border-ash-800">
           {#if !editingSanction.lifted_at && editSanctionHasChanges()}
-            <button
-              type="button"
+            <Button
+              variant="danger"
+              size="lg"
+              block
+              loading={processingSanctionAction}
+              disabled={!editSanctionDescription.trim() || (editExpiryRequired && !editSanctionExpiresAt)}
               onclick={handleSaveSanction}
-              disabled={processingSanctionAction || !editSanctionDescription.trim() || (editExpiryRequired && !editSanctionExpiresAt)}
-              class="w-full px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
             >
               {processingSanctionAction ? m.common_saving() : m.sanction_mgr_save_changes()}
-            </button>
+            </Button>
           {/if}
 
           <div class="flex gap-2">
             {#if (editingSanction.level === "probation" || editingSanction.level === "suspension") && !editingSanction.lifted_at}
-              <button
-                type="button"
-                onclick={handleLiftSanction}
-                disabled={processingSanctionAction}
-                class="flex-1 px-4 py-2 btn-emerald rounded font-medium transition-colors"
-              >
+              <Button variant="primary" size="lg" class="flex-1" loading={processingSanctionAction} onclick={handleLiftSanction}>
                 <CircleCheck class="inline w-4 h-4 mr-1" />
                 {processingSanctionAction ? m.sanction_mgr_lifting() : m.sanction_mgr_lift()}
-              </button>
+              </Button>
             {/if}
 
-            <button
-              type="button"
-              onclick={handleDeleteSanction}
-              disabled={processingSanctionAction}
-              class="flex-1 px-4 py-2 bg-crimson-800 hover:bg-crimson-700 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
-            >
+            <Button variant="danger" size="lg" class="flex-1" loading={processingSanctionAction} onclick={handleDeleteSanction}>
               <Trash2 class="inline w-4 h-4 mr-1" />
               {processingSanctionAction ? m.common_deleting() : m.common_delete()}
-            </button>
+            </Button>
 
-            <button
-              type="button"
-              onclick={closeEditSanctionModal}
-              disabled={processingSanctionAction}
-              class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-            >
+            <Button variant="secondary" size="lg" disabled={processingSanctionAction} onclick={closeEditSanctionModal}>
               {m.common_cancel()}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

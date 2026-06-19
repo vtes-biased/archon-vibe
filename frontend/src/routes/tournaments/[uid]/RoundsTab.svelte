@@ -7,6 +7,7 @@
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
+  import Button from '$lib/components/Button.svelte';
   import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
@@ -357,15 +358,8 @@
       <p class="text-crimson-300 text-sm font-medium">{m.rounds_cancel_title()}</p>
       <p class="text-ash-400 text-sm">{m.rounds_cancel_msg()}</p>
       <div class="flex gap-2">
-        <button
-          onclick={cancelRound}
-          disabled={actionLoading}
-          class="px-4 py-2 text-sm font-medium text-white bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 rounded-lg transition-colors"
-        >{m.rounds_cancel_yes()}</button>
-        <button
-          onclick={() => showCancelConfirm = false}
-          class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-        >{m.rounds_cancel_keep()}</button>
+        <Button variant="danger" size="lg" onclick={cancelRound} disabled={actionLoading}>{m.rounds_cancel_yes()}</Button>
+        <Button variant="secondary" size="lg" onclick={() => showCancelConfirm = false}>{m.rounds_cancel_keep()}</Button>
       </div>
     </div>
   {/snippet}
@@ -417,11 +411,7 @@
           {/if}
         </div>
         <div class="flex gap-2">
-          <button
-            onclick={() => showCancelConfirm = true}
-            disabled={actionLoading}
-            class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-          >{m.rounds_cancel_round()}</button>
+          <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}>{m.rounds_cancel_round()}</Button>
         </div>
       </div>
 
@@ -549,15 +539,8 @@
                 <p class="text-sm text-crimson-400">{m.rounds_alter_size_error()}</p>
               {/if}
               <div class="flex gap-2 flex-wrap">
-                <button
-                  onclick={saveAlterSeating}
-                  disabled={actionLoading || hasR1Issue || hasUndersizedTable}
-                  class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-                >{m.rounds_save_seating()}</button>
-                <button
-                  onclick={cancelAlterMode}
-                  class="px-4 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                >{m.common_cancel()}</button>
+                <Button variant="primary" size="lg" onclick={saveAlterSeating} disabled={actionLoading || hasR1Issue || hasUndersizedTable}>{m.rounds_save_seating()}</Button>
+                <Button variant="secondary" size="lg" onclick={cancelAlterMode}>{m.common_cancel()}</Button>
               </div>
               <SeatingSortable
                 bind:tables={alterTables}
@@ -567,38 +550,22 @@
                 tableRooms={tournament.table_rooms}
                 onchange={recomputeIssues}
               />
-              <button
-                onclick={addTableInAlter}
-                disabled={actionLoading}
-                class="px-3 py-2 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-              >
-                <SquarePlus class="w-4 h-4 inline mr-1" />{m.rounds_add_table()}
-              </button>
+              <Button variant="secondary" size="md" onclick={addTableInAlter} disabled={actionLoading}>
+                <SquarePlus class="w-4 h-4" />{m.rounds_add_table()}
+              </Button>
             {:else}
             {#if isOrganizer}
               <div class="flex gap-2 flex-wrap">
                 {#if isEditable && !alterMode}
-                  <button
-                    onclick={() => enterAlterMode(r)}
-                    disabled={actionLoading}
-                    class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                  >
-                    <ArrowRightLeft class="w-4 h-4 inline mr-1" />{m.rounds_alter_seating()}
-                  </button>
+                  <Button variant="secondary" size="md" onclick={() => enterAlterMode(r)} disabled={actionLoading}>
+                    <ArrowRightLeft class="w-4 h-4" />{m.rounds_alter_seating()}
+                  </Button>
                 {/if}
                 {#if hasParallelRounds && isRoundAllFinished(r)}
-                  <button
-                    onclick={() => doAction("FinishRound", { round: r })}
-                    disabled={actionLoading}
-                    class="px-3 py-1.5 text-sm font-medium btn-amber rounded-lg transition-colors"
-                  >{m.rounds_finish_round_n({ n: String(r + 1) })}</button>
+                  <Button variant="warning" size="lg" onclick={() => doAction("FinishRound", { round: r })} disabled={actionLoading}>{m.rounds_finish_round_n({ n: String(r + 1) })}</Button>
                 {/if}
                 {#if hasParallelRounds && isLast && tournament.state === "Playing" && !tournament.finals}
-                  <button
-                    onclick={() => showCancelConfirm = true}
-                    disabled={actionLoading}
-                    class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 border border-crimson-800 hover:border-crimson-700 rounded-lg transition-colors"
-                  >{m.rounds_cancel_round()}</button>
+                  <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}>{m.rounds_cancel_round()}</Button>
                 {/if}
               </div>
               {#if showCancelConfirm && hasParallelRounds && isLast}
@@ -717,11 +684,13 @@
                       </label>
                       <div class="flex gap-2 mt-1 justify-end">
                         <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">{m.common_cancel()}</button>
-                        <button
-                          onclick={() => submitOverride(r, i)}
+                        <Button
+                          variant="warning"
+                          size="sm"
+                          loading={overrideSaving}
                           disabled={overrideSaving || !overrideComment.trim()}
-                          class="px-3 py-1 text-xs font-medium btn-amber rounded transition-colors"
-                        >{overrideSaving ? m.common_saving() : m.override_save()}</button>
+                          onclick={() => submitOverride(r, i)}
+                        >{overrideSaving ? m.common_saving() : m.override_save()}</Button>
                       </div>
                     </div>
                   {:else}

@@ -12,6 +12,7 @@
   import { ChevronDown, ChevronRight, CircleCheck, Lock } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -234,14 +235,15 @@
                   <p class="text-sm text-crimson-200 font-medium">{m.decks_delete_confirm_title()}</p>
                   <p class="text-xs text-ash-400">{m.decks_delete_confirm_msg()}</p>
                   <div class="flex gap-2">
-                    <button
+                    <Button
+                      variant="danger"
+                      size="lg"
                       onclick={() => { deleteDeck(myUid, slotIdx); confirmDeleteSlot = null; }}
-                      class="px-3 py-1.5 text-sm font-medium text-crimson-100 bg-crimson-700 hover:bg-crimson-600 rounded-lg transition-colors"
-                    >{m.decks_delete_confirm_yes()}</button>
-                    <button
+                    >{m.decks_delete_confirm_yes()}</Button>
+                    <Button
+                      variant="secondary"
                       onclick={() => confirmDeleteSlot = null}
-                      class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                    >{m.common_cancel()}</button>
+                    >{m.common_cancel()}</Button>
                   </div>
                 </div>
               {/if}
@@ -249,10 +251,11 @@
                 <p class="text-sm text-ash-500">{m.decks_locked()}</p>
               {/if}
             {:else if canModify}
-              <button
+              <Button
+                variant="secondary"
+                size="lg"
                 onclick={() => { uploadingFor = myUid; uploadingSlot = slotIdx; }}
-                class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-              >{m.decks_upload()}</button>
+              >{m.decks_upload()}</Button>
             {:else}
               <p class="text-sm text-ash-500">{m.decks_no_deck()}</p>
             {/if}
@@ -285,14 +288,15 @@
                     <p class="text-sm text-crimson-200 font-medium">{m.decks_delete_confirm_title()}</p>
                     <p class="text-xs text-ash-400">{m.decks_delete_confirm_msg()}</p>
                     <div class="flex gap-2">
-                      <button
+                      <Button
+                        variant="danger"
+                        size="lg"
                         onclick={() => { deleteDeck(myUid); confirmDeleteSlot = null; }}
-                        class="px-3 py-1.5 text-sm font-medium text-crimson-100 bg-crimson-700 hover:bg-crimson-600 rounded-lg transition-colors"
-                      >{m.decks_delete_confirm_yes()}</button>
-                      <button
+                      >{m.decks_delete_confirm_yes()}</Button>
+                      <Button
+                        variant="secondary"
                         onclick={() => confirmDeleteSlot = null}
-                        class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                      >{m.common_cancel()}</button>
+                      >{m.common_cancel()}</Button>
                     </div>
                   </div>
                 {/if}

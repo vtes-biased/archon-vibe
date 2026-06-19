@@ -12,6 +12,7 @@
   import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
+  import Button from "$lib/components/Button.svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import { sponsorVeknMember, createUser, isOnline } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -384,11 +385,12 @@
               placeholder={m.offline_player_email()}
               class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
             />
-            <button
+            <Button
+              variant="warning"
+              size="lg"
               onclick={addOfflinePlayerAction}
               disabled={!offlinePlayerName.trim() || actionLoading}
-              class="px-4 py-2 text-sm font-medium btn-amber rounded transition-colors"
-            >{m.offline_player_add()}</button>
+            >{m.offline_player_add()}</Button>
           </div>
         {/if}
       </div>
@@ -399,28 +401,28 @@
   {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings)}
     <div class="flex items-center gap-2">
       {#if editingToss}
-        <button
+        <Button
+          variant="secondary"
           onclick={saveTossEdits}
           disabled={actionLoading}
-          class="px-3 py-1.5 text-sm text-emerald-400 bg-ash-800 hover:bg-ash-700 border border-emerald-800 rounded-lg transition-colors"
-        >{m.common_save()}</button>
-        <button
+        >{m.common_save()}</Button>
+        <Button
+          variant="secondary"
           onclick={cancelTossEdit}
-          class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-        >{m.common_cancel()}</button>
+        >{m.common_cancel()}</Button>
       {:else}
-        <button
+        <Button
+          variant="secondary"
           onclick={randomToss}
           disabled={actionLoading}
-          class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
         >
           <Dice3 class="w-4 h-4 inline mr-1" />
           {m.players_random_toss()}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           onclick={enterTossEdit}
-          class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-        >{m.players_edit_toss()}</button>
+        >{m.players_edit_toss()}</Button>
         {#if top5HasTiesFn(standings)}
           <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
         {/if}
@@ -545,15 +547,12 @@
                 </button>
               {/if}
               {#if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
-                <button onclick={() => doAction("CheckIn", { player_uid: puid })}
-                  class="px-3 py-2 text-xs text-emerald-400 border border-emerald-800 rounded transition-colors">{m.players_check_in()}</button>
+                <Button variant="ghost" size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
               {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
-                <button onclick={() => doAction("CheckOut", { player_uid: puid })}
-                  class="px-3 py-2 text-xs text-amber-400 border border-amber-800 rounded transition-colors">{m.players_check_out()}</button>
+                <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
               {/if}
               {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
-                <button onclick={() => dropPlayer(puid)}
-                  class="px-3 py-2 text-xs text-crimson-400 border border-crimson-800 rounded transition-colors">{m.players_drop()}</button>
+                <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}>{m.players_drop()}</Button>
               {:else if puid && !hasRounds}
                 <button onclick={() => removePlayer(puid)} class="p-1.5 text-crimson-400 hover:text-crimson-300 transition-colors" title={m.players_remove_title()}>
                   <X class="w-4 h-4" />
@@ -590,10 +589,11 @@
                           <EyeOff class="w-4 h-4 shrink-0" />
                           {m.decks_hidden_until_round()}
                         </p>
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="lg"
                           onclick={() => { uploadingFor = puid; uploadingRound = slot.round; }}
-                          class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                        >{m.decks_replace()}</button>
+                        >{m.decks_replace()}</Button>
                       {:else if slot.deck}
                         <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round; } : undefined} />
                       {:else if isOrganizer}
@@ -610,10 +610,11 @@
                       {m.decks_hidden_until_round()}
                     </p>
                     {#if isOrganizer}
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="lg"
                         onclick={() => { uploadingFor = puid; uploadingRound = undefined; }}
-                        class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                      >{m.decks_replace()}</button>
+                      >{m.decks_replace()}</Button>
                     {/if}
                   {:else}
                     <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
@@ -758,18 +759,12 @@
               {#if isOrganizer}
                 <td class="py-1.5 text-right whitespace-nowrap">
                   {#if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
-                    <button onclick={() => doAction("CheckIn", { player_uid: puid })}
-                      class="px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800 rounded transition-colors"
-                    >{m.players_check_in()}</button>
+                    <Button variant="ghost" size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
                   {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
-                    <button onclick={() => doAction("CheckOut", { player_uid: puid })}
-                      class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 border border-amber-800 rounded transition-colors"
-                    >{m.players_check_out()}</button>
+                    <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
                   {/if}
                   {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
-                    <button onclick={() => dropPlayer(puid)}
-                      class="px-2 py-1 text-xs text-crimson-400 hover:text-crimson-300 border border-crimson-800 rounded transition-colors"
-                    >{m.players_drop()}</button>
+                    <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}>{m.players_drop()}</Button>
                   {:else if puid && !hasRounds}
                     <button onclick={() => removePlayer(puid)} class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors" title={m.players_remove_title()}>
                       <X class="w-4 h-4" />
@@ -809,10 +804,11 @@
                                 <EyeOff class="w-4 h-4 shrink-0" />
                                 {m.decks_hidden_until_round()}
                               </p>
-                              <button
+                              <Button
+                                variant="secondary"
+                                size="lg"
                                 onclick={() => { uploadingFor = puid; uploadingRound = slot.round; }}
-                                class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                              >{m.decks_replace()}</button>
+                              >{m.decks_replace()}</Button>
                             {:else if slot.deck}
                               <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round; } : undefined} />
                             {:else if isOrganizer}
@@ -829,10 +825,11 @@
                             {m.decks_hidden_until_round()}
                           </p>
                           {#if isOrganizer}
-                            <button
+                            <Button
+                              variant="secondary"
+                              size="lg"
                               onclick={() => { uploadingFor = puid; uploadingRound = undefined; }}
-                              class="px-3 py-1.5 text-sm font-medium text-ash-200 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
-                            >{m.decks_replace()}</button>
+                            >{m.decks_replace()}</Button>
                           {/if}
                         {:else}
                           <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
@@ -894,15 +891,17 @@
       <h3 class="text-lg font-medium text-bone-100">{m.vekn_sponsor_to_register_title()}</h3>
       <p class="text-sm text-ash-300">{m.vekn_sponsor_to_register_message({ name: sponsorTarget.name })}</p>
       <div class="flex gap-2 justify-end">
-        <button
+        <Button
+          variant="ghost"
+          size="lg"
           onclick={() => sponsorTarget = null}
-          class="px-4 py-2 text-sm text-ash-300 hover:text-ash-100 border border-ash-700 rounded-lg transition-colors"
-        >{m.common_cancel()}</button>
-        <button
+        >{m.common_cancel()}</Button>
+        <Button
+          variant="primary"
+          size="lg"
+          loading={sponsorLoading}
           onclick={handleSponsorAndRegister}
-          disabled={sponsorLoading}
-          class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-        >{sponsorLoading ? m.common_loading() : m.vekn_sponsor_and_register()}</button>
+        >{m.vekn_sponsor_and_register()}</Button>
       </div>
     </div>
   </div>
@@ -929,15 +928,18 @@
         />
       </div>
       <div class="flex gap-2 justify-end">
-        <button
+        <Button
+          variant="ghost"
+          size="lg"
           onclick={() => showCreateModal = false}
-          class="px-4 py-2 text-sm text-ash-300 hover:text-ash-100 border border-ash-700 rounded-lg transition-colors"
-        >{m.common_cancel()}</button>
-        <button
+        >{m.common_cancel()}</Button>
+        <Button
+          variant="primary"
+          size="lg"
+          loading={createLoading}
+          disabled={!createName.trim() || !createEmail.trim()}
           onclick={handleCreateAndRegister}
-          disabled={!createName.trim() || !createEmail.trim() || createLoading}
-          class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors"
-        >{createLoading ? m.common_loading() : m.create_and_register_btn()}</button>
+        >{m.create_and_register_btn()}</Button>
       </div>
     </div>
   </div>

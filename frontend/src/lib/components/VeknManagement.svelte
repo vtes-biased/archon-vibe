@@ -3,6 +3,7 @@
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2 } from "@lucide/svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -154,55 +155,30 @@
     {/if}
     <div class="flex flex-wrap gap-2">
       {#if !user.vekn_id}
-        <button
-          type="button"
-          onclick={() => showSponsorConfirm = true}
-          class="px-3 py-1.5 text-sm btn-emerald rounded transition-colors"
-          title={m.vekn_sponsor_title()}
-        >
+        <Button variant="primary" size="md" onclick={() => showSponsorConfirm = true} title={m.vekn_sponsor_title()}>
           <UserPlus class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_sponsor()}
-        </button>
-        <button
-          type="button"
-          onclick={() => showLinkModal = true}
-          class="px-3 py-1.5 text-sm bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
-          title={m.vekn_link_modal_title()}
-        >
+        </Button>
+        <Button variant="secondary" size="md" onclick={() => showLinkModal = true} title={m.vekn_link_modal_title()}>
           <Link class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_link_btn()}
-        </button>
+        </Button>
         {#if canDelete}
-          <button
-            type="button"
-            onclick={() => showDeleteConfirm = true}
-            class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded transition-colors"
-            title={m.member_delete_title()}
-          >
+          <Button variant="danger" size="md" onclick={() => showDeleteConfirm = true} title={m.member_delete_title()}>
             <Trash2 class="inline w-3.5 h-3.5 mr-1" />
             {m.member_delete()}
-          </button>
+          </Button>
         {/if}
       {:else}
-        <button
-          type="button"
-          onclick={() => showForceAbandonConfirm = true}
-          class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded transition-colors"
-          title={m.vekn_abandon_title()}
-        >
+        <Button variant="danger" size="md" onclick={() => showForceAbandonConfirm = true} title={m.vekn_abandon_title()}>
           <Unlink class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_force_abandon()}
-        </button>
+        </Button>
       {/if}
-      <button
-        type="button"
-        onclick={() => showMergeModal = true}
-        class="px-3 py-1.5 text-sm bg-ash-700 hover:bg-ash-600 text-bone-100 rounded transition-colors"
-        title={m.vekn_merge_modal_title()}
-      >
+      <Button variant="secondary" size="md" onclick={() => showMergeModal = true} title={m.vekn_merge_modal_title()}>
         <GitMerge class="inline w-3.5 h-3.5 mr-1" />
         {m.vekn_merge()}
-      </button>
+      </Button>
     </div>
 
     <!-- Deceased status: VEKN members only (symmetric with delete for VEKN-less);
@@ -218,15 +194,10 @@
           <span></span>
         {/if}
         {#if canMarkDeceased}
-          <button
-            type="button"
-            onclick={handleDeceased}
-            disabled={processingAction}
-            class="px-3 py-1.5 text-sm bg-ash-700 hover:bg-ash-600 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded transition-colors inline-flex items-center gap-1.5 shrink-0"
-          >
+          <Button variant="secondary" size="md" class="shrink-0" disabled={processingAction} onclick={handleDeceased}>
             {#if !isDeceased}<Flower2 class="w-3.5 h-3.5" aria-hidden="true" />{/if}
             {isDeceased ? m.deceased_clear() : m.deceased_mark()}
-          </button>
+          </Button>
         {/if}
       </div>
     {/if}
@@ -257,20 +228,12 @@
           {m.vekn_sponsor_confirm({ name: user.name })}
         </p>
         <div class="flex gap-2">
-          <button
-            onclick={handleSponsor}
-            disabled={processingAction}
-            class="flex-1 px-4 py-2 btn-emerald rounded font-medium transition-colors"
-          >
+          <Button variant="primary" size="lg" class="flex-1" loading={processingAction} onclick={handleSponsor}>
             {processingAction ? m.vekn_sponsoring() : m.vekn_sponsor()}
-          </button>
-          <button
-            onclick={() => (showSponsorConfirm = false)}
-            disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >
+          </Button>
+          <Button variant="secondary" size="lg" disabled={processingAction} onclick={() => (showSponsorConfirm = false)}>
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -319,24 +282,20 @@
           />
         </div>
         <div class="flex gap-2">
-          <button
-            type="submit"
-            disabled={processingAction || !linkVeknIdInput.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
-          >
+          <Button type="submit" variant="danger" size="lg" class="flex-1" loading={processingAction} disabled={!linkVeknIdInput.trim()}>
             {processingAction ? m.vekn_linking() : m.vekn_link_submit()}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            disabled={processingAction}
             onclick={() => {
               showLinkModal = false;
               linkVeknIdInput = "";
             }}
-            disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
@@ -370,20 +329,12 @@
           {m.vekn_abandon_warning()}
         </p>
         <div class="flex gap-2">
-          <button
-            onclick={handleForceAbandon}
-            disabled={processingAction}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
-          >
+          <Button variant="danger" size="lg" class="flex-1" loading={processingAction} onclick={handleForceAbandon}>
             {processingAction ? m.vekn_abandoning() : m.vekn_force_abandon()}
-          </button>
-          <button
-            onclick={() => (showForceAbandonConfirm = false)}
-            disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >
+          </Button>
+          <Button variant="secondary" size="lg" disabled={processingAction} onclick={() => (showForceAbandonConfirm = false)}>
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -432,24 +383,20 @@
           />
         </div>
         <div class="flex gap-2">
-          <button
-            type="submit"
-            disabled={processingAction || !mergeTargetUid.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
-          >
+          <Button type="submit" variant="danger" size="lg" class="flex-1" loading={processingAction} disabled={!mergeTargetUid.trim()}>
             {processingAction ? m.vekn_merging() : m.vekn_merge()}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            disabled={processingAction}
             onclick={() => {
               showMergeModal = false;
               mergeTargetUid = "";
             }}
-            disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
@@ -483,20 +430,12 @@
           {m.member_delete_warning()}
         </p>
         <div class="flex gap-2">
-          <button
-            onclick={handleDelete}
-            disabled={processingAction}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
-          >
+          <Button variant="danger" size="lg" class="flex-1" loading={processingAction} onclick={handleDelete}>
             {processingAction ? m.member_deleting() : m.member_delete()}
-          </button>
-          <button
-            onclick={() => (showDeleteConfirm = false)}
-            disabled={processingAction}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >
+          </Button>
+          <Button variant="secondary" size="lg" disabled={processingAction} onclick={() => (showDeleteConfirm = false)}>
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
