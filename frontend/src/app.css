@@ -284,10 +284,6 @@ html.light {
     .status-update  { background: #3730a3; color: white; }
 }
 
-/* ── Drag & drop seating ── */
-.drag-handle { cursor: grab; touch-action: none; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
-.drag-handle:active { cursor: grabbing; }
-
 /* ── Help/Documentation ── */
 
 /* Callout boxes for rulebook inserts */

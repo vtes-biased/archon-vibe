@@ -5,7 +5,7 @@
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import VpInput from "./VpInput.svelte";
-  import { GripVertical, ShieldCheck, Lock } from "@lucide/svelte";
+  import { ArrowRightLeft, ShieldCheck, Lock } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -112,7 +112,7 @@
               onclick={enterAlterMode}
               class="px-2 py-1 text-xs text-ash-300 bg-ash-800 hover:bg-ash-700 rounded transition-colors"
             >
-              <GripVertical class="w-3.5 h-3.5 inline mr-0.5" />{m.rounds_alter_seating()}
+              <ArrowRightLeft class="w-3.5 h-3.5 inline mr-0.5" />{m.rounds_alter_seating()}
             </button>
           {/if}
         </div>

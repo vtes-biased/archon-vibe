@@ -20,6 +20,9 @@
 | standings adjustment | — | ajuste de clasificación | ajuste de classificação | aggiustamento di classifica |
 | finals | Finale | final | final | finale† |
 | seating | Placement | distribución | assentos | disposizione |
+| seat (position) | Placement | asiento | assento | posto |
+| open seat | Placement libre | asiento libre | assento livre | posto libero |
+| move here | Déplacer ici | mover aquí | mover aqui | sposta qui |
 | seed | — | cabeza de serie | cabeça de chave | testa di serie |
 | toss | — | sorteo | sorteio | sorteggio |
 | raffle | — | sorteo | sorteio | estrazione |

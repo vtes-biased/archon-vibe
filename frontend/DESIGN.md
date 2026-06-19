@@ -95,7 +95,7 @@ Design for touch devices first, then enhance for desktop.
 
 - **Touch targets**: Minimum 44x44px
 - **No hover-only interactions**: Always have tap/click equivalent
-- **Drag and drop**: Must not conflict with scrolling; provide alternative (buttons/menus)
+- **Tap-to-swap**: seating editor uses tap-a-player then tap-a-seat (same table = reorder, cross-table = swap, open seat = move); no drag-and-drop anywhere in the app
 - **Focus ring**: A global `:focus-visible` crimson outline (2px, `--color-crimson-500`) is defined in `@layer base` in `app.css` — do not add bespoke outlines to buttons, links, or nav items. Form inputs may opt out with `focus:outline-none` only if they provide their own visible crimson focus indicator (border or ring).
 - **Navigation**: Bottom nav or hamburger, not top-heavy headers
 - **Forms**: Large inputs, avoid complex multi-column layouts on mobile

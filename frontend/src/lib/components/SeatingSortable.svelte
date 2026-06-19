@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { GripVertical, CircleAlert } from "@lucide/svelte";
+  import { CircleAlert, ArrowRightLeft, X } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, resolveTableLabel } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
-  import { onMount } from 'svelte';
+  import { tick } from 'svelte';
 
   let {
     tables = $bindable(),
@@ -20,117 +20,68 @@
     onchange: () => void;
   } = $props();
 
-  // Drag state
-  let dragOrigin: { table: number; seat: number } | null = $state(null);
-  // Cross-table operations commit on drop, not on hover; seat -1 = phantom (move)
-  let dropTarget: { table: number; seat: number } | null = $state(null);
-  let scrollDirection = 0;
-  let scrollInterval: ReturnType<typeof setInterval> | null = null;
-  let scrollHandler: ((ev: DragEvent) => void) | null = null;
-
-  // Touch polyfill (side-effect import)
-  onMount(async () => {
-    // @ts-ignore -- side-effect import, no types needed
-    await import('@dragdroptouch/drag-drop-touch');
-  });
-
-  function handleDragStart(e: DragEvent, tableIdx: number, seatIdx: number) {
-    dragOrigin = { table: tableIdx, seat: seatIdx };
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
-    }
-    // Auto-scroll
-    scrollHandler = (ev: DragEvent) => {
-      const vh = window.innerHeight;
-      if (ev.clientY < 60) scrollDirection = -1;
-      else if (ev.clientY > vh - 60) scrollDirection = 1;
-      else scrollDirection = 0;
-    };
-    document.addEventListener('dragover', scrollHandler);
-    scrollInterval = setInterval(() => {
-      if (scrollDirection !== 0) window.scrollTo(0, window.scrollY + scrollDirection * 12);
-    }, 16);
-  }
-
-  function handleDragEnter(e: DragEvent, tableIdx: number, seatIdx: number) {
-    e.preventDefault();
-    if (!dragOrigin) return;
-    if (dragOrigin.table === tableIdx && dragOrigin.seat === seatIdx) {
-      dropTarget = null;
-      return;
-    }
-
-    if (dragOrigin.table === tableIdx) {
-      // Same table: live adjacent swap (continuous reorder)
-      dropTarget = null;
-      if (Math.abs(seatIdx - dragOrigin.seat) !== 1) return;
-      const t = tables[tableIdx]!;
-      [t[dragOrigin.seat], t[seatIdx]] = [t[seatIdx]!, t[dragOrigin.seat]!];
-      dragOrigin = { table: tableIdx, seat: seatIdx };
-      // Trigger Svelte reactivity
-      tables = [...tables];
-    } else {
-      // Cross table: highlight only — the swap commits on drop
-      dropTarget = { table: tableIdx, seat: seatIdx };
-    }
-  }
-
-  // Phantom seat: highlight only — the move commits on drop
-  function handleDragEnterPhantom(e: DragEvent, tableIdx: number) {
-    e.preventDefault();
-    if (!dragOrigin || dragOrigin.table === tableIdx) return;
-    if (tables[tableIdx]!.length >= 5) return;
-    dropTarget = { table: tableIdx, seat: -1 };
-  }
-
-  function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    if (!dragOrigin || !dropTarget) return;
-    const src = tables[dragOrigin.table]!;
-    const dst = tables[dropTarget.table]!;
-    if (dropTarget.seat === -1) {
-      // Move: remove from source, append to target
-      const [uid] = src.splice(dragOrigin.seat, 1);
-      dst.push(uid!);
-    } else {
-      // Swap with the occupied target seat
-      [src[dragOrigin.seat], dst[dropTarget.seat]] = [dst[dropTarget.seat]!, src[dragOrigin.seat]!];
-    }
-    dropTarget = null;
-    tables = [...tables];
-  }
-
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-  }
-
-  function handleDragEnd() {
-    dragOrigin = null;
-    dropTarget = null;
-    // Cleanup auto-scroll
-    if (scrollHandler) {
-      document.removeEventListener('dragover', scrollHandler);
-      scrollHandler = null;
-    }
-    if (scrollInterval) {
-      clearInterval(scrollInterval);
-      scrollInterval = null;
-    }
-    scrollDirection = 0;
-    onchange();
-  }
+  // Tap-to-rearrange: select a seat, then tap another seat to swap (same table
+  // = reorder, other table = cross-table swap) or an open seat to move. No drag.
+  let selected: { table: number; seat: number } | null = $state(null);
+  // Polite screen-reader announcement of the last selection/swap/move.
+  let announce = $state('');
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo);
   }
 
-  const RULE_LABELS: Record<number, () => string> = {
-    0: () => m.rounds_r1(), 1: () => m.rounds_r2(), 2: () => m.rounds_r3(),
-    3: () => m.rounds_r4(), 4: () => m.rounds_r5(), 5: () => m.rounds_r6(),
-    6: () => m.rounds_r7(), 7: () => m.rounds_r8(), 8: () => m.rounds_r9(),
-  };
+  function tableLabel(t: number): string {
+    return resolveTableLabel(tableRooms, t) ?? m.rounds_table_n({ n: String(t + 1) });
+  }
+
+  // Restore keyboard focus to the moved player's new seat after the list reflows.
+  async function focusSeat(uid: string) {
+    await tick();
+    const el = document.querySelector(`[data-seat-uid="${uid}"]`);
+    if (el instanceof HTMLElement) el.focus();
+  }
+
+  function clearSelection() {
+    selected = null;
+    announce = '';
+  }
+
+  function tapSeat(t: number, s: number) {
+    const uid = tables[t]![s]!;
+    if (!selected) {
+      selected = { table: t, seat: s };
+      announce = isFinals
+        ? m.rounds_seating_moving_finals({ name: seatDisplay(uid) })
+        : m.rounds_seating_moving({ name: seatDisplay(uid) });
+      return;
+    }
+    if (selected.table === t && selected.seat === s) {
+      clearSelection(); // re-tap to deselect
+      return;
+    }
+    const src = tables[selected.table]!;
+    const dst = tables[t]!;
+    const movingUid = src[selected.seat]!;
+    const targetUid = dst[s]!;
+    [src[selected.seat], dst[s]] = [targetUid, movingUid];
+    announce = m.rounds_seating_swapped({ a: seatDisplay(movingUid), b: seatDisplay(targetUid) });
+    selected = null;
+    tables = [...tables];
+    onchange();
+    focusSeat(movingUid);
+  }
+
+  function tapOpenSeat(t: number) {
+    if (!selected || selected.table === t || tables[t]!.length >= 5) return;
+    const src = tables[selected.table]!;
+    const [movingUid] = src.splice(selected.seat, 1);
+    tables[t]!.push(movingUid!);
+    announce = m.rounds_seating_moved({ name: seatDisplay(movingUid!), table: tableLabel(t) });
+    selected = null;
+    tables = [...tables];
+    onchange();
+    focusSeat(movingUid!);
+  }
 
   function issueColor(level: number): string {
     if (level === 0) return 'text-crimson-400';
@@ -139,10 +90,30 @@
   }
 </script>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape' && selected) { e.preventDefault(); clearSelection(); } }} />
+
+<div aria-live="polite" class="sr-only">{announce}</div>
+
+{#if selected}
+  {@const selName = seatDisplay(tables[selected.table]?.[selected.seat] ?? '')}
+  <div class="sticky top-2 z-10 mb-3 flex items-center justify-between gap-2 bg-ash-800 border border-emerald-700 rounded-lg px-3 py-2 text-sm shadow-lg">
+    <span class="text-emerald-300">
+      {isFinals ? m.rounds_seating_moving_finals({ name: selName }) : m.rounds_seating_moving({ name: selName })}
+    </span>
+    <button
+      type="button"
+      onclick={clearSelection}
+      class="inline-flex items-center gap-1 shrink-0 text-ash-300 hover:text-bone-100"
+    >
+      <X class="w-4 h-4" />{m.common_cancel()}
+    </button>
+  </div>
+{/if}
+
 {#each tables as table, t}
   <div class="bg-ash-900/50 rounded-lg p-4">
     <h3 class="text-sm font-medium text-bone-100 mb-2 flex items-center gap-2">
-      {isFinals ? m.finals_table() : resolveTableLabel(tableRooms, t) ?? m.rounds_table_n({ n: String(t + 1) })}
+      {isFinals ? m.finals_table() : tableLabel(t)}
       {#if !isFinals && table.length > 0 && table.length < 4}
         <span class="text-xs font-normal text-crimson-400">{m.rounds_n_players({ count: String(table.length) })}</span>
       {/if}
@@ -150,48 +121,44 @@
     <div class="divide-y divide-ash-800">
       {#each table as uid, s (uid)}
         {@const issue = playerIssues.get(uid)}
-        {@const isDragging = dragOrigin?.table === t && dragOrigin?.seat === s}
-        {@const isDropTarget = dropTarget?.table === t && dropTarget?.seat === s}
-        <div
-          class="seat-row py-1.5 flex items-center gap-2 text-sm {isDragging ? 'opacity-50' : ''} {isDropTarget ? 'bg-emerald-900/30 rounded' : ''}"
-          role="listitem"
-          ondragenter={(e) => handleDragEnter(e, t, s)}
-          ondragover={handleDragOver}
-          ondrop={handleDrop}
+        {@const isSelected = selected?.table === t && selected?.seat === s}
+        {@const isSwapTarget = selected != null && !isSelected}
+        <button
+          type="button"
+          data-seat-uid={uid}
+          onclick={() => tapSeat(t, s)}
+          aria-pressed={isSelected}
+          aria-label={m.rounds_seat_n({ n: String(s + 1), name: seatDisplay(uid) })}
+          class="w-full min-h-[44px] py-1.5 px-1 -mx-1 flex items-center gap-2 text-sm text-left rounded transition-colors
+            {isSelected ? 'ring-2 ring-emerald-500 bg-emerald-900/30' : isSwapTarget ? 'ring-1 ring-inset ring-emerald-800/50 hover:bg-emerald-900/20' : 'hover:bg-ash-800/60'}"
         >
-          <!-- Drag handle -->
-          <span
-            class="drag-handle flex items-center justify-center text-ash-500"
-            role="button"
-            tabindex="0"
-            draggable="true"
-            ondragstart={(e) => handleDragStart(e, t, s)}
-            ondragend={handleDragEnd}
-          >
-            <GripVertical class="w-5 h-5" />
-          </span>
-          <!-- Player name -->
+          <span class="w-5 text-center text-xs text-ash-500 tabular-nums">{s + 1}</span>
           <span class="flex-1 text-ash-300">{seatDisplay(uid)}</span>
-          <!-- Issue indicator -->
           {#if issue}
             <span class="inline-flex items-center gap-1 {issueColor(issue.level)}" title={issue.message}>
               <CircleAlert class="w-4 h-4 shrink-0" />
               <span class="text-xs">{issue.message}</span>
             </span>
+          {:else}
+            <ArrowRightLeft class="w-4 h-4 shrink-0 {isSelected ? 'text-emerald-400' : 'text-ash-600'}" />
           {/if}
-        </div>
+        </button>
       {/each}
       {#if !isFinals && table.length < 5}
-        {@const isPhantomTarget = dropTarget?.table === t && dropTarget?.seat === -1}
-        <div
-          class="py-3 min-h-[44px] flex items-center justify-center text-xs text-ash-500 border border-dashed border-ash-700 rounded mt-1.5 {isPhantomTarget ? 'border-emerald-500 bg-emerald-900/30 text-emerald-300' : dragOrigin && dragOrigin.table !== t ? 'border-emerald-700 text-emerald-400' : ''}"
-          role="listitem"
-          ondragenter={(e) => handleDragEnterPhantom(e, t)}
-          ondragover={handleDragOver}
-          ondrop={handleDrop}
-        >
-          {m.rounds_drop_here()}
-        </div>
+        {@const canMoveHere = selected != null && selected.table !== t}
+        {#if canMoveHere}
+          <button
+            type="button"
+            onclick={() => tapOpenSeat(t)}
+            class="w-full py-3 min-h-[44px] flex items-center justify-center gap-1.5 text-xs border border-dashed border-emerald-500 text-emerald-300 hover:bg-emerald-900/30 rounded mt-1.5 transition-colors"
+          >
+            <ArrowRightLeft class="w-3.5 h-3.5" />{m.rounds_seating_move_here()}
+          </button>
+        {:else}
+          <div class="w-full py-3 min-h-[44px] flex items-center justify-center text-xs border border-dashed border-ash-700 text-ash-500 rounded mt-1.5">
+            {m.rounds_seating_open_seat()}
+          </div>
+        {/if}
       {/if}
     </div>
   </div>
