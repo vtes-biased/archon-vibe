@@ -48,7 +48,7 @@
       aria-pressed={opt === value}
       class="h-11 min-w-11 px-2 rounded-lg border text-sm font-semibold tabular-nums transition-colors disabled:opacity-40
         {opt === value
-          ? 'bg-crimson-700 text-bone-100 border-crimson-600'
+          ? 'bg-crimson-700 text-white border-crimson-600 ring-2 ring-crimson-400'
           : 'bg-ash-800 text-bone-100 border-ash-700 hover:border-ash-600'}"
     >{opt}</button>
   {/each}

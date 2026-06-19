@@ -97,9 +97,16 @@
   // Active rounds where the player is seated (for parallel round support)
   const myActiveRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.state !== "Playing" || isFinals) return [];
+    const lastRoundIdx = tournament.rounds.length - 1;
     return tournament.rounds
       .map((round, r) => ({ round, r }))
-      .filter(({ round }) => round.some(t => t.state !== "Finished"))
+      // Players may keep revising their table until the round is actually closed —
+      // i.e. until the organizer advances (a later round exists) or finals/finish.
+      // The current (last) round stays editable even once every table reads
+      // Finished; earlier rounds stay editable only while a table is unfinished
+      // (parallel-round safety). The engine permits this: a player-scored table
+      // carries no judge_uid, so SetScore is allowed while the tournament Plays.
+      .filter(({ round, r }) => r === lastRoundIdx || round.some(t => t.state !== "Finished"))
       .map(({ round, r }) => {
         const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
         return tIdx >= 0 ? { roundIdx: r, tableIdx: tIdx, table: round[tIdx]! } : null;

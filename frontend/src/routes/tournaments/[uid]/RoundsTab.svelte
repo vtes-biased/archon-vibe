@@ -90,6 +90,15 @@
     expandedRounds = next;
   }
 
+  // One-table-at-a-time scoring: only the expanded table shows its VP chip grid;
+  // others stay compact (read-only scores). You never score two tables at once,
+  // so this is an accordion — opening one collapses the rest. Keyed "round:table".
+  let scoringTable = $state<string | null>(null);
+  function toggleScoring(r: number, i: number) {
+    const key = `${r}:${i}`;
+    scoringTable = scoringTable === key ? null : key;
+  }
+
   const currentRoundIdx = $derived(
     tournament.state === "Playing" && !tournament.finals ? tournament.rounds!.length - 1 : -1
   );
@@ -597,15 +606,23 @@
               {/if}
             {/if}
             {#each round as table, i}
+              {@const isScoring = scoringTable === `${r}:${i}`}
               <div class="bg-ash-900/50 rounded-lg p-4">
-                <div class="flex items-center justify-between mb-2">
-                  <div class="flex items-center gap-2">
-                    <h3 class="text-sm font-medium text-bone-100">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
-                    {#if table.seating.length < 4 || table.seating.length > 5}
-                      <span class="text-xs text-amber-400">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
+                <div class="flex items-center justify-between mb-2 gap-2">
+                  <button
+                    onclick={() => toggleScoring(r, i)}
+                    class="flex items-center gap-2 text-left min-w-0 flex-1"
+                    aria-expanded={isScoring}
+                  >
+                    {#if table.seating.length > 0}
+                      {#if isScoring}<ChevronDown class="w-4 h-4 text-ash-500 shrink-0" />{:else}<ChevronRight class="w-4 h-4 text-ash-500 shrink-0" />{/if}
                     {/if}
-                  </div>
-                  <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-medium text-bone-100 truncate">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
+                    {#if table.seating.length < 4 || table.seating.length > 5}
+                      <span class="text-xs text-amber-400 shrink-0">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
+                    {/if}
+                  </button>
+                  <div class="flex items-center gap-2 shrink-0">
                     <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-emerald' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
                       {translateTableState(table.state)}
                     </span>
@@ -643,7 +660,7 @@
                           {/if}
                         </span>
                         <div class="flex items-center gap-2 shrink-0">
-                          <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
+                          <span class="text-ash-500 text-xs">{#if !isScoring}<span class="text-bone-100 font-medium tabular-nums">{seat.result.vp}VP</span> {/if}{tGws[j]}GW {tTps[j]}TP</span>
                           {#if isEditable && isLast}
                             <button
                               onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
@@ -664,23 +681,25 @@
                           {/if}
                         </div>
                       </div>
-                      <div class="mt-1.5">
-                        {#if !isOrganizer && table.seating.some(s => s.judge_uid)}
-                          <span class="inline-flex items-center gap-1 text-xs text-ash-400">
-                            {seat.result.vp}
-                            <Lock class="w-3.5 h-3.5" />
-                          </span>
-                        {:else}
-                          <VpInput
-                            value={seat.result.vp}
-                            options={vpOptions(table.seating.length, isOrganizer)}
-                            label={seatDisplay(seat.player_uid)}
-                            disabled={scoreSaving === i}
-                            saving={scoreSavingSeat === seat.player_uid && scoreSaving === i}
-                            onchange={(v) => setVp(r, i, seat.player_uid, v, table.seating)}
-                          />
-                        {/if}
-                      </div>
+                      {#if isScoring}
+                        <div class="mt-1.5">
+                          {#if !isOrganizer && table.seating.some(s => s.judge_uid)}
+                            <span class="inline-flex items-center gap-1 text-xs text-ash-400">
+                              {seat.result.vp}
+                              <Lock class="w-3.5 h-3.5" />
+                            </span>
+                          {:else}
+                            <VpInput
+                              value={seat.result.vp}
+                              options={vpOptions(table.seating.length, isOrganizer)}
+                              label={seatDisplay(seat.player_uid)}
+                              disabled={scoreSaving === i}
+                              saving={scoreSavingSeat === seat.player_uid && scoreSaving === i}
+                              onchange={(v) => setVp(r, i, seat.player_uid, v, table.seating)}
+                            />
+                          {/if}
+                        </div>
+                      {/if}
                     </div>
                   {/each}
                 </div>
