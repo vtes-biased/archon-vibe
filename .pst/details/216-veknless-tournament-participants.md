@@ -112,3 +112,37 @@ After ETL on the prod dump: 0 tournament refs resolve to a VEKN-less member; the
 matched dup's results attribute to VEKN 3390002; the 2 genuine participants are
 live VEKN-bearing + queued for vekn.net push; non-participant VEKN-less members
 remain shells; daily re-run is idempotent (no re-allocation, no new push).
+
+## As-built refinement — the funeral-wake THREE-Morgan collision (owner-approved)
+Probing the dump for the implementation surfaced a case the plan above missed:
+the funeral wake holds **three** Morgan registrations, not two. Besides the
+played throwaway (06194fea, 3 rounds) and the organiser-email phantom (19656201,
+0 rounds), the **real account d9ca427b (VEKN 3390002) is itself a 0-round no-show
+player in the same event**. So remapping the throwaway → 3390002 collides with
+d9ca427b's own entry → a duplicate 3390002 player. d9ca427b is a real, active
+member (plays 2 OTHER events: Dune vtes, VTES Granada), so it cannot be globally
+dropped/shelled. Resolution: **scoped-drop d9ca427b's funeral-wake no-show entry
+only** — a new `KNOWN_DROP_IN_TOURNAMENT` table keyed by `(tournament_uid,
+member_uid)` — so the played throwaway folds onto the real account as a single
+played entry (tp 130, 3 seats), leaving the member untouched elsewhere. Net for
+the funeral wake: 31 → 29 players (drop phantom + the real account's no-show;
+throwaway remaps onto the kept 3390002 entry).
+
+## As-built notes
+- The fixup runs in **both** ETL (`--truncate`) and merge (`--merge`) modes, off
+  three module tables in `migrate_from_archon.py`: `KNOWN_REMAP` (uid→vekn),
+  `KNOWN_DROP` (wholesale, frozenset of uids), `KNOWN_DROP_IN_TOURNAMENT`
+  (scoped, frozenset of (tuid, uid)).
+- **Allocation + remap resolution are DEFERRED to a post-member-loop pass** so
+  `allocate_next_vekn_id` sees a stable vekn-id space (mid-loop the first gap may
+  be a not-yet-imported member → duplicate id) and the remap target resolves
+  regardless of member import order. `allocate_veknless_participant` resurrects a
+  prior #169 soft-deleted shell into the live allocated row (the Phase-1 state).
+- Dropped/remapped members are not re-seeded; their pre-existing #169 shells (if
+  any) stay soft-deleted + unreferenced (harmless). Allocated members stay live,
+  so the validator's live-count delta is `len(KNOWN_DROP)+len(KNOWN_REMAP)` = 3.
+- Verified end-to-end on the throwaway dump: fresh ETL + `migrate_validate`
+  PASS (0 hard failures, new "participant ref → VEKN-less member" scan = 0, live
+  19000 == 19003−3); `--merge` re-run is idempotent (no re-allocation). Covered
+  by 3 unit tests in `test_archon_merge.py` (collapse, remap-resolution,
+  allocate/idempotent/shell-resurrection).

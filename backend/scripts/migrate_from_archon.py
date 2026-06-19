@@ -358,6 +358,52 @@ async def other_live_vekn_holders(ext_id: str, but_uid: str) -> list[Tournament]
 
 
 # --------------------------------------------------------------------------- #
+# #216 — VEKN-less legacy tournament-participant fixups                         #
+#                                                                              #
+# Old archon's Register never enforced vekn_id, so a handful of players landed #
+# in finished tournaments with no VEKN id; the new engine's VeknIdRequired     #
+# blocks new ones, so this set is fully bounded by the prod dump. The rule: a   #
+# VEKN-less player with NO round seating is a registration artifact → drop; one #
+# who actually played must be resolved (match a real account → remap, else      #
+# allocate a real id + push). Keyed by opaque old-archon uid only (no           #
+# names/emails — the per-case detail lives in                                   #
+# .pst/details/216-veknless-tournament-participants.md).                        #
+# --------------------------------------------------------------------------- #
+
+# old-archon member uid → the real VEKN id its tournament refs remap onto (the
+# played throwaway of a member who already holds that VEKN account; resolved to
+# the live account by resolve_known_remaps after the full member pass).
+KNOWN_REMAP: dict[str, str] = {
+    "06194fea-a366-4d28-a89c-eb2ead795d65": "3390002",
+}
+
+# VEKN-less member uids dropped wholesale: registration artifacts with 0 seating,
+# each in a single tournament. Never seeded; their lone players-dict entry is
+# stripped from the tournament at build time (no seating/standings ref to fix).
+KNOWN_DROP: frozenset[str] = frozenset(
+    {
+        "021937b2-a40a-415d-a021-6ff3fe7da4a3",  # Neonate Revolution registrant, 0 rounds
+        "19656201-a2fb-4925-93d6-c9e47eba1c28",  # funeral-wake phantom (organiser-entered dup)
+    }
+)
+
+# (tournament_uid, member_uid) entries dropped from ONE tournament's players dict
+# only. Here: the real account's redundant 0-round no-show registration in the
+# funeral wake — the person actually played under the VEKN-less throwaway that
+# KNOWN_REMAP folds onto this same account, so keeping it would duplicate the
+# remapped entry. That member is a real, active player in OTHER events, so the
+# drop must be tournament-scoped, never a wholesale KNOWN_DROP.
+KNOWN_DROP_IN_TOURNAMENT: frozenset[tuple[str, str]] = frozenset(
+    {
+        (
+            "51aa6745-d409-42e8-8a8b-a8a214530bf6",
+            "d9ca427b-c31a-4b22-a649-d32a6e622dd3",
+        ),
+    }
+)
+
+
+# --------------------------------------------------------------------------- #
 # Members                                                                      #
 # --------------------------------------------------------------------------- #
 
@@ -450,6 +496,70 @@ async def seed_vekn_less_shell(user: db.User, stats: Stats) -> None:
     stats.bump("members.vekn_less_shell")
 
 
+async def collect_tournament_participant_uids(old: psycopg.AsyncConnection) -> set[str]:
+    """Member uids referenced as tournament participants (players-dict keys ∪
+    round-seating player_uid). #216 uses it to tell a VEKN-less member that
+    ACTUALLY played (→ allocate a real id + push) from a non-participant
+    (→ soft-deleted shell). One server-side DISTINCT scan; ~11k uids for prod
+    (a few hundred KB — within the VPS budget)."""
+    async with old.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            """
+            SELECT DISTINCT key AS uid FROM tournaments,
+                 jsonb_each(COALESCE(data->'players', '{}'::jsonb))
+            UNION
+            SELECT DISTINCT s->>'player_uid' FROM tournaments,
+                 jsonb_array_elements(COALESCE(data->'rounds', '[]'::jsonb)) rd,
+                 jsonb_array_elements(COALESCE(rd->'tables', '[]'::jsonb)) tb,
+                 jsonb_array_elements(COALESCE(tb->'seating', '[]'::jsonb)) s
+              WHERE s->>'player_uid' IS NOT NULL
+            """
+        )
+        return {str(r["uid"]) for r in await cur.fetchall()}
+
+
+async def allocate_veknless_participant(
+    user: db.User, discord: dict, stats: Stats
+) -> None:
+    """A genuinely VEKN-less legacy tournament participant (#216): allocate a real
+    VEKN id, create a LIVE member under the old-archon uid, and mark it
+    push-eligible (vekn_synced=False) so batch_push registers the id on vekn.net —
+    claiming the gap-filled id so a future vekn.net assignment of it can't collide
+    (#184-class). Called AFTER the full member pass so allocate_next_vekn_id sees
+    the complete vekn-id space (mid-pass the first gap may be a not-yet-imported
+    member). Idempotent: a live VEKN-bearing row from a prior run is reused; a
+    leftover #169 soft-deleted shell under this uid is resurrected into it."""
+    existing = await db.get_user_by_uid(user.uid)
+    if existing is not None and not existing.deleted_at and existing.vekn_id:
+        return
+    vekn_id = await db.allocate_next_vekn_id()
+    live = msgspec.structs.replace(user, vekn_id=vekn_id, vekn_synced=False)
+    await db.save_user(live)
+    await ensure_discord_auth(user.uid, discord, stats)
+    stats.bump("members.veknless_allocated")
+
+
+async def resolve_known_remaps(member_uid_map: dict[str, str], stats: Stats) -> None:
+    """Point each #216 KNOWN_REMAP source uid at the LIVE account carrying its
+    target VEKN id. Run after the full member pass so the lookup is
+    order-independent (the real account may be imported/VEKN-synced in the same
+    run). The source member is never seeded; its tournament refs flow through this
+    remap instead."""
+    for old_uid, target_vekn in KNOWN_REMAP.items():
+        if old_uid not in member_uid_map:
+            continue  # not in this import (e.g. --limit subset)
+        live = await live_user_by_vekn_id(target_vekn)
+        if live is not None and not live.deleted_at:
+            member_uid_map[old_uid] = live.uid
+            stats.bump("members.veknless_remapped")
+        else:
+            loud(
+                f"#216 remap target vekn {target_vekn} not live; refs from "
+                f"{old_uid} will orphan — verify that account exists"
+            )
+            stats.bump("warn.remap_target_missing")
+
+
 async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
     """Idempotent member upsert keyed on VEKN id. Returns the LIVE uid this
     old-archon member maps to (the caller records old_uid → live_uid in
@@ -529,13 +639,19 @@ async def migrate_members(
     limit: int | None,
     merge: bool,
     coopted_pending: list[tuple[str, str]],
+    participant_uids: set[str],
 ) -> dict[str, str]:
     """members → User (+ AuthMethod rows). Returns `member_uid_map`: old-archon
     member uid → the LIVE uid it maps to (identity in ETL mode where uids are
     preserved; the vekn-matched live account in merge mode). Every downstream
     member-uid reference is remapped through this map. Also collects
-    (live_uid, old_sponsor_uid) pairs for the deferred coopted_by remap."""
+    (live_uid, old_sponsor_uid) pairs for the deferred coopted_by remap.
+
+    `participant_uids` is the set of member uids any tournament references (#216):
+    a VEKN-less member in it that actually played is allocated a real id, a
+    VEKN-less non-participant stays a shell."""
     member_uid_map: dict[str, str] = {}
+    veknless_participants: list[tuple[db.User, dict]] = []
     q = "SELECT uid, vekn, data, last_updated FROM members"
     if limit:
         q += f" LIMIT {limit}"
@@ -544,6 +660,26 @@ async def migrate_members(
         await cur.execute(q)
         async for row in cur:
             user, discord = build_user(row, stats)
+            # #216 VEKN-less legacy tournament-participant fixups (both modes;
+            # allocation deferred to the post-loop pass below for a stable id
+            # space). A non-participant VEKN-less member falls through to the
+            # normal path (merge: shell; ETL: live row, as before).
+            if not user.vekn_id:
+                if user.uid in KNOWN_DROP:
+                    # unseeded; the lone players-dict ref is stripped at build
+                    member_uid_map[user.uid] = user.uid
+                    stats.bump("members.veknless_dropped")
+                    continue
+                if user.uid in KNOWN_REMAP:
+                    # placeholder; resolve_known_remaps rewrites it post-loop
+                    member_uid_map[user.uid] = user.uid
+                    stats.bump("members.veknless_remap_pending")
+                    continue
+                if user.uid in participant_uids:
+                    # allocated under this uid in the post-loop pass
+                    member_uid_map[user.uid] = user.uid
+                    veknless_participants.append((user, discord))
+                    continue
             if merge:
                 live_uid = await merge_member(user, discord, stats)
             else:
@@ -556,6 +692,11 @@ async def migrate_members(
             stats.bump("users")
             if stats["users"] % 2000 == 0:
                 print(f"  …{stats['users']} users")
+    # Post-loop, with the full member set written: the vekn-id space is now stable
+    # for allocation, and remap targets are resolvable regardless of import order.
+    for puser, pdiscord in veknless_participants:
+        await allocate_veknless_participant(puser, pdiscord, stats)
+    await resolve_known_remaps(member_uid_map, stats)
     return member_uid_map
 
 
@@ -1089,6 +1230,19 @@ async def process_tournament_row(
     d = dict(row["data"] or {})
     old_uid = str(row["uid"])
     d["uid"] = old_uid  # build_tournament reads it for the external_ids marker
+    # #216: strip VEKN-less orphan participants (registration artifacts, no
+    # seating) and a real account's redundant no-show registration that a remap
+    # would otherwise duplicate. Every dropped uid is verified 0-seating, so only
+    # the players dict needs editing — rounds/standings carry no ref to them.
+    players_in = d.get("players") or {}
+    drop = {
+        k
+        for k in players_in
+        if k in KNOWN_DROP or (old_uid, k) in KNOWN_DROP_IN_TOURNAMENT
+    }
+    if drop:
+        d["players"] = {k: v for k, v in players_in.items() if k not in drop}
+        stats.bump("tournaments.veknless_player_dropped", len(drop))
     extra = d.get("extra") or {}
     vekn_eid = (
         str(extra["vekn_id"]) if extra.get("vekn_id") not in (None, "", 0) else None
@@ -1336,8 +1490,12 @@ async def run(args: argparse.Namespace) -> None:
     coopted_pending: list[tuple[str, str]] = []
     try:
         print("→ members")
+        # #216 pre-pass: which member uids any tournament references, so a
+        # VEKN-less member who actually played is allocated a real id rather than
+        # shelled. Full scan, unaffected by --limit (a smoke-test classification).
+        participant_uids = await collect_tournament_participant_uids(old)
         member_uid_map = await migrate_members(
-            old, stats, args.limit, args.merge, coopted_pending
+            old, stats, args.limit, args.merge, coopted_pending, participant_uids
         )
         await remap_coopted_by(coopted_pending, member_uid_map, stats)
         print("→ member_deletions")

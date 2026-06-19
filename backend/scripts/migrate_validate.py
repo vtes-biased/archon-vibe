@@ -22,9 +22,17 @@ import argparse
 import asyncio
 import os
 import sys
+from pathlib import Path
 
 import psycopg
 from psycopg.rows import dict_row
+
+# Make backend/ importable so the #216 fixup tables stay single-sourced.
+backend_dir = Path(__file__).parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+from scripts.migrate_from_archon import KNOWN_DROP, KNOWN_REMAP  # noqa: E402
 
 FAIL = "\033[31mFAIL\033[0m"
 OK = "\033[32mok\033[0m"
@@ -75,10 +83,14 @@ async def main(args) -> int:
     new_decks = await scalar(new, "SELECT count(*) FROM objects WHERE type='deck'")
     new_auth = await scalar(new, "SELECT count(*) FROM auth_methods")
 
+    # #216 leaves the dropped + remapped VEKN-less participants UNSEEDED (the
+    # allocated ones stay live, so they don't shift this count); see KNOWN_DROP /
+    # KNOWN_REMAP in migrate_from_archon.py.
+    veknless_unseeded = len(KNOWN_DROP) + len(KNOWN_REMAP)
     check(
-        "live users == members",
-        new_live_users == old_members,
-        f"{new_live_users} vs {old_members}",
+        "live users == members (minus #216 dropped/remapped)",
+        new_live_users == old_members - veknless_unseeded,
+        f"{new_live_users} vs {old_members} - {veknless_unseeded}",
     )
     check(
         "deleted-user shells <= member_deletions",
@@ -175,6 +187,24 @@ async def main(args) -> int:
                  jsonb_array_elements_text(t."full"->'organizers_uids') o
             WHERE t.type='tournament'
               AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = o)""",
+        # #216 invariant: no tournament participant ref resolves to a VEKN-less
+        # member. The fixup drops registration artifacts, remaps matched dups, and
+        # allocates real ids for genuine players, so every players/seating uid
+        # points at a VEKN-bearing member. This JOIN only catches refs to an
+        # EXISTING vekn-less user; a ref to a NON-existent member (e.g. a botched
+        # drop) is caught by the players/seating NOT-EXISTS scans above — keep both.
+        "tournament participant ref → VEKN-less member": """
+            WITH refs AS (
+                SELECT p->>'user_uid' u FROM objects t,
+                     jsonb_array_elements(t."full"->'players') p WHERE t.type='tournament'
+                UNION
+                SELECT s->>'player_uid' FROM objects t,
+                     jsonb_array_elements(t."full"->'rounds') rd, jsonb_array_elements(rd) tb,
+                     jsonb_array_elements(tb->'seating') s WHERE t.type='tournament'
+            )
+            SELECT count(*) FROM refs JOIN objects u
+              ON u.type='user' AND u.uid = refs.u
+            WHERE COALESCE(u."full"->>'vekn_id','') = ''""",
         # internal consistency: every member-uid across ALL play data
         # (rounds + finals seating, finals seed_order, standings) must also be a
         # player — catches a partial remap that splits one tournament across the
