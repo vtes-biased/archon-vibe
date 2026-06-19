@@ -53,6 +53,7 @@
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — holds player user_uids; easily missed in any per-player UID remap.
 - [User delete SSE](user-delete-sse-noop.md) — soft-deleted users are SAVED (not removed) so by-uid refs resolve; filtered only from listing queries.
 - [Error localization offline-path trap](error-localization-offline-path-trap.md) — localizing engine errors must cover the offline WASM path + JS pre-checks (toUserMessage has no EngineError branch), not just the HTTP body, or offline-first stays English.
+- [Resync branch zero-delay loop](sync-resync-branch-zero-delay-loop.md) — sync.ts resync onmessage branch reconnects with NO delay; cold-start trigger fixed, branch unguarded for any other persistent resync cause; route resync reconnects through backoff.
 
 ## Scoring & Standings
 - [Final standings helper](project_final_standings_helper.md) — `compute_final_standings` is the shared VEKN placement fn (winner=1, finalists tie 2nd).

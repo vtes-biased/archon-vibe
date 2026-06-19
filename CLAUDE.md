@@ -6,6 +6,8 @@ This repo tracks work in **pst** (`.pst/tickets`), not plan-mode plans or a `TOD
 
 **Close on commit, not on deploy.** `close` a ticket in the same commit as the change that resolves it — do **not** hold it open waiting for the fix to be deployed or verified in production/beta. The board tracks what's *done in the tree*, not what's *live*. If a later deploy doesn't confirm the fix, `reopen` it. (So a deploy-bug fix lands closed even though a redeploy is still pending; the redeploy is itself tracked by the deploy/runbook ticket.)
 
+**Committing agent memory.** Agent memory under `.claude/agent-memory/` is tracked in this repo (we commit memories, not gitignore them). When an agent writes or updates a memory file while working a task, commit those memory changes **bundled into the same commit as the work that produced them** — not a separate `chore` commit, not left dangling in the tree. Stage only the memory files your own agents touched this session (`git add .claude/agent-memory/<that-agent>/...`); leave other sessions' memory edits unstaged, same as the pst-hunk rule above. If the originating commit is already sealed (memory landed late), commit the memory on its own with a message naming the work it documents.
+
 **Tags — priority only.** The sole tag axis is priority, one per ticket: `p1` (do it ASAP), `p2` (important), `p3` (nice-to-have, not urgent). Everything else — stack, kind, subsystem — goes in the ticket **body**, not as a tag (a label only earns a tag when you filter the board by it *and* it isn't already in the prose; only priority qualifies). There is no `deferred`/parked tag: anything on the board must be looked into, so `p3` is the floor, not a graveyard.
 
 # Agent Workflow (PROACTIVE — do not wait for user to ask)
