@@ -1,3 +1,73 @@
+# 217 — Production design-review remediation
+
+Epic tracking the pre-production UX / accessibility / visual-system review of the
+mobile-first PWA. The ticket map + sequencing are below; the **full source review is
+folded in verbatim at the bottom** of this file (its root `archon-design-review.md`
+was removed once captured here, so this detail file is the single source of truth).
+
+## Framing
+- ~90% of users are players → player flow leads.
+- In-venue context: a phone, one hand, poor light, time pressure, five languages.
+- Severity reflects **launch risk** for that context, not abstract polish.
+
+## Priority mapping (review level → pst tag)
+| Review | Meaning | pst tag |
+|---|---|---|
+| **P0** | Blockers — fix before launch | **p1** |
+| **P1** | High — fix in the launch window | **p2** |
+| **P2** | Polish — fast-follow | **p3** |
+
+## Launch sequencing (#39)
+The review frames the **p1 set (#218–#222)** as "land before the #39 phase-1 cutover."
+Recorded here as `relates:#39`, **not** a hard `depends` — #39 is the one active
+thread and gating it is the owner's call. Revisit when scheduling the cutover.
+
+## Children
+### p1 — review P0 · launch blockers
+| # | Finding | Primary file |
+|---|---|---|
+| 218 | Enlarge player VP-report control (tiny `<select>` → ≥44px stepper, hero control) | `tournaments/[uid]/PlayerView.svelte` |
+| 219 | Hoist "your table + seat" to top of player view when Playing | `tournaments/[uid]/PlayerView.svelte` |
+| 220 | Global `:focus-visible` ring (WCAG 2.4.7) | `app.css`, `+layout.svelte` |
+| 221 | Seating editor tap/keyboard alternative to drag (DESIGN.md requires it) | `lib/components/SeatingSortable.svelte` |
+| 222 | Fixed status/update banners cover content → normal-flow layout | `+layout.svelte` |
+
+### p2 — review P1 · launch window
+| # | Finding | Primary file |
+|---|---|---|
+| 223 | "Call Judge" emergency action → prominent ≥44px control | `tournaments/[uid]/PlayerView.svelte` |
+| 224 | "Upload a valid deck" → inline actionable CTA + validation errors | `tournaments/[uid]/PlayerView.svelte` |
+| 225 | Colourblind-safe severity + connection (icon/shape + text) | `SeatingSortable.svelte`, `+layout.svelte` |
+| 226 | Bottom-nav label size 10px → 11–12px; verify longest locale | `+layout.svelte` |
+| 227 | Single `<Button variant>` component (collapses 3-tier disabled rule) | `app.css` + tournament views |
+| 228 | Reduce action-bar density → 1 primary CTA + "More" overflow | `tournaments/[uid]/+page.svelte` |
+| 229 | Strengthen offline ownership / data-loss model + first-run explainer | `tournaments/[uid]/+page.svelte`, `TournamentModals.svelte` |
+
+### p3 — review P2 · polish / fast-follow
+| # | Finding | Primary file |
+|---|---|---|
+| 230 | Legend/tooltips for GW / VP / TP | `tournaments/[uid]/PlayerView.svelte` + standings |
+| 231 | Number seats, mark player's row, loosen spacing | `tournaments/[uid]/PlayerView.svelte` |
+| 232 | AA contrast audit both themes + semantic-token migration | `app.css` |
+| 233 | Tighten type scale + weight hierarchy | `app.css` |
+| 234 | Non-QR check-in fallback + camera-error path | `PlayerView.svelte`, `QrCheckinScanner.svelte` |
+| 235 | Degraded-mode states: toast → durable banner | `+layout.svelte` |
+
+## Cross-cutting notes
+- **i18n x5** on implementation for any child adding user-facing strings: 221, 224,
+  229, 230, 234 (and any new labels in 223/225/226).
+- **Agent workflow**: route each child's implementation through `staff-frontend-engineer`
+  (UX/mobile) and `i18n-translator` (strings); `documentalist` for `frontend/DESIGN.md`
+  where a finding contradicts the documented rule (e.g. 221 non-drag alternative, 227
+  three-tier disabled states).
+- **Natural batches** (land together if picked up): 227+228 (Button component then
+  action-bar density consume it); 219+231 (player table/seat card + seat numbering);
+  225 severity icons reuse for any new status iconography.
+
+---
+
+## Source review (verbatim — from the removed root `archon-design-review.md`)
+
 # Archon — Production Design Review
 
 **Design Review · Pre-production**
