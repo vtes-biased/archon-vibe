@@ -291,6 +291,7 @@ import TournamentModals from "./TournamentModals.svelte";
   }
 
   let scoreSaving = $state<number | null>(null);
+  let scoreSavingSeat = $state<string | null>(null);
 
   async function setVp(roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
     if (!tournament) return;
@@ -299,6 +300,7 @@ import TournamentModals from "./TournamentModals.svelte";
       vp: s.player_uid === playerUid ? vp : s.result.vp,
     }));
     scoreSaving = tableIndex;
+    scoreSavingSeat = playerUid;
     try {
       tournament = await setTableScore(uid, roundIndex, tableIndex, scores);
       await loadPlayerNames();
@@ -306,6 +308,7 @@ import TournamentModals from "./TournamentModals.svelte";
       error = toUserMessage(e, m.tournament_error_save_scores());
     } finally {
       scoreSaving = null;
+      scoreSavingSeat = null;
     }
   }
 
@@ -317,6 +320,7 @@ import TournamentModals from "./TournamentModals.svelte";
       vp: s.player_uid === playerUid ? vp : s.result.vp,
     }));
     scoreSaving = -1;
+    scoreSavingSeat = playerUid;
     try {
       tournament = await setTableScore(uid, roundIndex, 0, scores);
       await loadPlayerNames();
@@ -324,6 +328,7 @@ import TournamentModals from "./TournamentModals.svelte";
       error = toUserMessage(e, m.tournament_error_save_finals());
     } finally {
       scoreSaving = null;
+      scoreSavingSeat = null;
     }
   }
 
@@ -946,6 +951,7 @@ import TournamentModals from "./TournamentModals.svelte";
           userVeknId={auth.user?.vekn_id ?? null}
           {actionLoading}
           {scoreSaving}
+          {scoreSavingSeat}
           {doAction}
           {dropPlayer}
           {setVp}

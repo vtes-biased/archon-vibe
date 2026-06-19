@@ -9,6 +9,7 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
+  import VpInput from "./VpInput.svelte";
   import PlayerDecksSection from "./PlayerDecksSection.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import { callJudge } from "$lib/api";
@@ -30,6 +31,7 @@
     userVeknId,
     actionLoading,
     scoreSaving,
+    scoreSavingSeat,
     doAction,
     dropPlayer,
     setVp,
@@ -50,6 +52,7 @@
     userVeknId: string | null;
     actionLoading: boolean;
     scoreSaving: number | null;
+    scoreSavingSeat: string | null;
     doAction: (action: string, body?: any) => Promise<void>;
     dropPlayer: (uid: string) => Promise<void>;
     setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
@@ -285,25 +288,21 @@
             {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
             {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
             {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
-            <div class="py-1.5 flex items-center justify-between text-sm">
-              <div>
-                <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+            <div class="py-2.5">
+              <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
+                <div class="min-w-0">
+                  <span class="text-ash-300 truncate">{seatDisplay(seat.player_uid)}</span>
+                  <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if} · {tGws[j]}GW {tTps[j]}TP</div>
+                </div>
               </div>
-              <div class="flex items-center gap-2">
-                <span class="text-ash-400 text-xs">VP:</span>
-                <select
-                  class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
-                  disabled={scoreSaving === -1}
-                  value={seat.result.vp}
-                  onchange={(e) => setFinalsVp(seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), tournament.finals!.seating)}
-                >
-                  {#each vpOptions(tournament.finals.seating.length, false) as v}
-                    <option value={v}>{v}</option>
-                  {/each}
-                </select>
-                <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
-              </div>
+              <VpInput
+                value={seat.result.vp}
+                options={vpOptions(tournament.finals.seating.length, false)}
+                label={seatDisplay(seat.player_uid)}
+                disabled={scoreSaving === -1}
+                saving={scoreSavingSeat === seat.player_uid && scoreSaving === -1}
+                onchange={(v) => setFinalsVp(seat.player_uid, v, tournament.finals!.seating)}
+              />
             </div>
           {/each}
         </div>
@@ -351,22 +350,19 @@
                 {@const tVps = myTable.seating.map(s => s.result.vp)}
                 {@const tGws = computeGwLocal(tVps)}
                 {@const tTps = computeTpLocal(myTable.seating.length, tVps)}
-                <div class="py-1.5 flex items-center justify-between text-sm">
-                  <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-ash-400 text-xs">VP:</span>
-                    <select
-                      class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
-                      disabled={scoreSaving === myTableIdx}
-                      value={seat.result.vp}
-                      onchange={(e) => setVp(roundIdx, myTableIdx, seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), myTable.seating)}
-                    >
-                      {#each vpOptions(myTable.seating.length, false) as v}
-                        <option value={v}>{v}</option>
-                      {/each}
-                    </select>
-                    <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
+                <div class="py-2.5">
+                  <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
+                    <span class="text-ash-300 truncate">{seatDisplay(seat.player_uid)}</span>
+                    <span class="text-ash-500 text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
                   </div>
+                  <VpInput
+                    value={seat.result.vp}
+                    options={vpOptions(myTable.seating.length, false)}
+                    label={seatDisplay(seat.player_uid)}
+                    disabled={scoreSaving === myTableIdx}
+                    saving={scoreSavingSeat === seat.player_uid && scoreSaving === myTableIdx}
+                    onchange={(v) => setVp(roundIdx, myTableIdx, seat.player_uid, v, myTable.seating)}
+                  />
                 </div>
               {/each}
             </div>

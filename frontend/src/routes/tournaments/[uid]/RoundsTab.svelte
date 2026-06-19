@@ -9,6 +9,7 @@
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import { ChevronDown, ChevronRight, SquarePlus, GripVertical, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
+  import VpInput from "./VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -54,6 +55,7 @@
   let playerIssues = $state<Map<string, { level: number; message: string }>>(new Map());
   let showScoreDetails = $state(false);
   let scoreSaving = $state<number | null>(null);
+  let scoreSavingSeat = $state<string | null>(null);
   let overrideTable_ = $state<number | null>(null);
   let overrideComment = $state("");
   let overrideSaving = $state(false);
@@ -236,6 +238,7 @@
       vp: s.player_uid === playerUid ? vp : s.result.vp,
     }));
     scoreSaving = tableIndex;
+    scoreSavingSeat = playerUid;
     try {
       tournament = await setTableScore(tournament.uid, roundIndex, tableIndex, scores);
       await loadPlayerNames();
@@ -244,6 +247,7 @@
       error = toUserMessage(e, m.rounds_error_save());
     } finally {
       scoreSaving = null;
+      scoreSavingSeat = null;
     }
   }
 
@@ -627,53 +631,54 @@
                     {@const tVps = table.seating.map(s => s.result.vp)}
                     {@const tGws = computeGwLocal(tVps)}
                     {@const tTps = computeTpLocal(table.seating.length, tVps)}
-                    <div class="py-1.5 flex items-center justify-between text-sm">
-                      <span class="text-ash-300 inline-flex items-center gap-1">
-                        {seatDisplay(seat.player_uid)}
-                        {#if playerSanctionsMap[seat.player_uid]?.length}
-                          <SanctionIndicator
-                            sanctions={playerSanctionsMap[seat.player_uid]!}
-                            onclick={() => sanctionListTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid) }}
-                          />
-                        {/if}
-                      </span>
-                      <div class="flex items-center gap-2">
-                        <span class="text-ash-400 text-xs">VP:</span>
+                    <div class="py-2.5">
+                      <div class="flex items-center justify-between gap-2 text-sm">
+                        <span class="text-ash-300 inline-flex items-center gap-1 min-w-0">
+                          {seatDisplay(seat.player_uid)}
+                          {#if playerSanctionsMap[seat.player_uid]?.length}
+                            <SanctionIndicator
+                              sanctions={playerSanctionsMap[seat.player_uid]!}
+                              onclick={() => sanctionListTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid) }}
+                            />
+                          {/if}
+                        </span>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
+                          {#if isEditable && isLast}
+                            <button
+                              onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
+                              class="p-2 sm:p-0.5 text-ash-500 hover:text-crimson-400 transition-colors"
+                              title={m.rounds_unseat_title()}
+                            >
+                              <UserMinus class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
+                            </button>
+                          {/if}
+                          {#if isOrganizer}
+                            <button
+                              onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
+                              class="p-2 sm:p-0.5 text-ash-500 hover:text-amber-400 transition-colors"
+                              title={m.sanction_tournament_issue_title()}
+                            >
+                              <TriangleAlert class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
+                            </button>
+                          {/if}
+                        </div>
+                      </div>
+                      <div class="mt-1.5">
                         {#if !isOrganizer && table.seating.some(s => s.judge_uid)}
                           <span class="inline-flex items-center gap-1 text-xs text-ash-400">
                             {seat.result.vp}
                             <Lock class="w-3.5 h-3.5" />
                           </span>
                         {:else}
-                          <select
-                              class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-1.5 sm:py-0.5 border border-ash-700"
-                              disabled={scoreSaving === i}
-                              value={seat.result.vp}
-                              onchange={(e) => setVp(r, i, seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), table.seating)}
-                            >
-                              {#each vpOptions(table.seating.length, isOrganizer) as v}
-                                <option value={v}>{v}</option>
-                              {/each}
-                            </select>
-                        {/if}
-                        <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
-                        {#if isEditable && isLast}
-                          <button
-                            onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
-                            class="p-2 sm:p-0.5 text-ash-500 hover:text-crimson-400 transition-colors"
-                            title={m.rounds_unseat_title()}
-                          >
-                            <UserMinus class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
-                          </button>
-                        {/if}
-                        {#if isOrganizer}
-                          <button
-                            onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
-                            class="p-2 sm:p-0.5 text-ash-500 hover:text-amber-400 transition-colors"
-                            title={m.sanction_tournament_issue_title()}
-                          >
-                            <TriangleAlert class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
-                          </button>
+                          <VpInput
+                            value={seat.result.vp}
+                            options={vpOptions(table.seating.length, isOrganizer)}
+                            label={seatDisplay(seat.player_uid)}
+                            disabled={scoreSaving === i}
+                            saving={scoreSavingSeat === seat.player_uid && scoreSaving === i}
+                            onchange={(v) => setVp(r, i, seat.player_uid, v, table.seating)}
+                          />
                         {/if}
                       </div>
                     </div>

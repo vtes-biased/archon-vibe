@@ -4,6 +4,7 @@
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
+  import VpInput from "./VpInput.svelte";
   import { GripVertical, ShieldCheck, Lock } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
@@ -28,6 +29,7 @@
 
   let error = $state<string | null>(null);
   let scoreSaving = $state<number | null>(null);
+  let scoreSavingSeat = $state<string | null>(null);
 
   // Alter seating mode
   let alterMode = $state(false);
@@ -71,6 +73,7 @@
       vp: s.player_uid === playerUid ? vp : s.result.vp,
     }));
     scoreSaving = -1;
+    scoreSavingSeat = playerUid;
     try {
       tournament = await setTableScore(tournament.uid, roundIndex, 0, scores);
       await loadPlayerNames();
@@ -78,6 +81,7 @@
       error = toUserMessage(e, m.finals_error_save());
     } finally {
       scoreSaving = null;
+      scoreSavingSeat = null;
     }
   }
 
@@ -145,31 +149,30 @@
           {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
           {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
           {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
-          <div class="py-1.5 flex items-center justify-between text-sm">
-            <div>
-              <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-              <div class="text-xs text-ash-500">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+          <div class="py-2.5">
+            <div class="flex items-center justify-between gap-2 text-sm">
+              <div class="min-w-0">
+                <span class="text-ash-300 truncate">{seatDisplay(seat.player_uid)}</span>
+                <div class="text-xs text-ash-500">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+              </div>
+              <span class="text-ash-500 text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-ash-400 text-xs">VP:</span>
+            <div class="mt-1.5">
               {#if !isOrganizer && tournament.finals.seating.some(s => s.judge_uid)}
                 <span class="inline-flex items-center gap-1 text-xs text-ash-400">
                   {seat.result.vp}
                   <Lock class="w-3.5 h-3.5" />
                 </span>
               {:else}
-                <select
-                  class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-1.5 sm:py-0.5 border border-ash-700"
-                  disabled={scoreSaving === -1}
+                <VpInput
                   value={seat.result.vp}
-                  onchange={(e) => setFinalsVp(seat.player_uid, parseFloat((e.target as HTMLSelectElement).value), tournament.finals!.seating)}
-                >
-                  {#each vpOptions(tournament.finals.seating.length, isOrganizer) as v}
-                    <option value={v}>{v}</option>
-                  {/each}
-                </select>
+                  options={vpOptions(tournament.finals.seating.length, isOrganizer)}
+                  label={seatDisplay(seat.player_uid)}
+                  disabled={scoreSaving === -1}
+                  saving={scoreSavingSeat === seat.player_uid && scoreSaving === -1}
+                  onchange={(v) => setFinalsVp(seat.player_uid, v, tournament.finals!.seating)}
+                />
               {/if}
-              <span class="text-ash-500 text-xs">{tGws[j]}GW {tTps[j]}TP</span>
             </div>
           </div>
         {/each}
