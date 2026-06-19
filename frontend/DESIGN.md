@@ -40,20 +40,38 @@ Available colors: `emerald`, `amber`, `red`, `yellow`, `orange`, `purple`, `blue
 
 **When to use what:**
 - `badge-*` — for any small status indicator or tag
-- `btn-*` — for solid action buttons (`:disabled` styling is automatic via CSS, just add `rounded-lg` etc.)
+- `btn-*` — underlying solid-button classes. **Prefer the `<Button>` component** (below) for action buttons; `btn-emerald`/`btn-amber` are reused internally by it and by the few `<a>`-styled-as-button links.
 - `banner-*` — for info/warning boxes (add `border rounded-lg p-3` etc.)
 - Crimson palette classes (`bg-crimson-*`, `text-crimson-*`) — already handled by scale inversion, use directly
 
+### Buttons — use `<Button>`
+
+All action buttons go through `$lib/components/Button.svelte`. It owns colour, size, and the disabled/loading states, so call-sites pass intent, not classes.
+
+| Variant | Today's colour | Intent |
+|---------|---------------|--------|
+| `primary` | emerald | Positive lifecycle CTA (Start Round, Register, Create tournament) |
+| `brand` | crimson | Primary form/auth submit (Sign in, Create, Upload, Save, Approve) |
+| `danger` | crimson | Destructive (Delete, Drop, Force unlock, Cancel round, Abandon) |
+| `warning` | amber | Caution (Close Registration, Finish Round, Go Offline) |
+| `secondary` | neutral ash (solid) | Neutral secondary action |
+| `ghost` | neutral ash (outline) | Tertiary / de-emphasised |
+
+- **Tag by intent, not colour.** `brand` and `danger` are both crimson *today* but kept separate so the planned palette rework (#232) can recolour them centrally — see below.
+- Props: `size` (`sm`/`md`/`lg`), `block` (full width), `loading` (spinner + `aria-busy`, auto-disables), `disabled`; extra layout classes (`flex-1`, margins) via `class`. Focus comes from the global `:focus-visible` ring — never add a bespoke outline.
+- **Do not** route through `<Button>`: icon-only buttons, toggles/tabs/segmented controls, dropdown options, row/card-wrapping buttons, `<a>`-styled links, or Discord brand-fill buttons — leave those as raw elements.
+
+**Planned palette (#232 — semantic role tokens):** crimson reverts to brand/chrome only; `danger` moves to a distinct red (`btn-red`, already defined) paired with an icon + verb (#225, colourblind-safe); `brand` submits fold into emerald `primary`; emerald/amber get token-ified (dropping their bespoke light overrides). Because every action button now goes through `<Button>`, this is a central change to its `VARIANT` map, not a call-site sweep.
+
 ### Disabled States
 
-Three tiers of disabled styling, applied consistently:
+Action buttons use `<Button>`, which owns its disabled + loading states — never hand-roll them. For the remaining non-`<Button>` cases:
 
-| Element | Disabled style | Notes |
-|---------|---------------|-------|
-| `btn-*` buttons | Automatic via CSS (`ash-800` bg, `ash-500` text) | No inline classes needed |
-| Non-`btn-*` colored buttons | `disabled:bg-ash-800 disabled:text-ash-500` | Inline, replaces original bg |
-| Form inputs (text, select, textarea) | `disabled:opacity-50` | Borders/placeholders give extra context |
-| Icon-only / small buttons | `disabled:opacity-40` | Preserves icon visibility |
+| Element | Disabled style |
+|---------|---------------|
+| `<Button>` | Built-in — pass `disabled` / `loading` |
+| Form inputs (text, select, textarea) | `disabled:opacity-50` |
+| Icon-only / small raw buttons | `disabled:opacity-40` |
 
 `button:disabled { cursor: not-allowed }` is global in `app.css` — never add `disabled:cursor-not-allowed` inline.
 
