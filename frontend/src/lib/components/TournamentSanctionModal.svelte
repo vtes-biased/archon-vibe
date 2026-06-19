@@ -327,7 +327,7 @@
       <div class="flex gap-2 pt-2">
         <Button
           type="submit"
-          variant="danger"
+          variant="brand"
           size="lg"
           class="flex-1"
           loading={creating}

@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "$lib/stores/auth.svelte";
   import { Loader2, X } from '@lucide/svelte';
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
@@ -147,16 +148,16 @@
               />
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={auth.isLoading || !password}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              variant="brand"
+              size="lg"
+              block
+              loading={auth.isLoading}
+              disabled={!password}
             >
-              {#if auth.isLoading}
-                <Loader2 class="w-5 h-5 animate-spin" />
-              {/if}
               {buttonText}
-            </button>
+            </Button>
           </form>
 
           <p class="text-center text-xs text-ash-500 mt-4">

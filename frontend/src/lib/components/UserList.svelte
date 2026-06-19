@@ -10,6 +10,7 @@
   import { syncManager } from "$lib/sync";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
+  import Button from '$lib/components/Button.svelte';
   import { RefreshCw, Users } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -305,14 +306,16 @@
         <h1 class="text-3xl font-light text-crimson-500">{m.nav_users()}</h1>
 
         <div class="flex items-center gap-3">
-          <button
+          <Button
             id="new-user-button"
+            variant="primary"
+            size="lg"
+            class="shadow-md hover:shadow-lg"
             onclick={toggleCreateForm}
             disabled={!isOnline}
-            class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
           >
             {showCreateForm ? m.common_cancel() : m.user_list_new_user()}
-          </button>
+          </Button>
 
         </div>
       </div>

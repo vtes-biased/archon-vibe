@@ -3,6 +3,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
   import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
+  import Button from "$lib/components/Button.svelte";
   import { updateProfile } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
@@ -245,12 +246,9 @@
   {:else}
     <div class="flex justify-between items-center">
       <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
-      <button
-        onclick={onClaimVekn}
-        class="px-3 py-1 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded transition-colors"
-      >
+      <Button variant="brand" size="md" onclick={onClaimVekn}>
         {m.profile_claim_vekn_title()}
-      </button>
+      </Button>
     </div>
   {/if}
 

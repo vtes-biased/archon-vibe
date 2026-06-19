@@ -11,6 +11,7 @@
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
+  import Button from '$lib/components/Button.svelte';
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -469,21 +470,23 @@
       {#if mode === "create"}
         <!-- Create mode: show save/cancel buttons -->
         <div class="flex gap-2 pt-2">
-          <button
+          <Button
             type="submit"
-            disabled={saving}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors"
+            variant="brand"
+            size="lg"
+            class="flex-1"
+            loading={saving}
           >
             {saving ? m.user_creating() : m.user_create_btn()}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
             onclick={cancelEdit}
             disabled={saving}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
           >
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       {/if}
     </form>
@@ -680,16 +683,8 @@
           {m.user_country_change_official_warning()}
         </p>
         <div class="flex gap-2">
-          <button
-            type="button"
-            onclick={confirmCountryChange}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded font-medium transition-colors"
-          >{m.common_confirm()}</button>
-          <button
-            type="button"
-            onclick={cancelCountryChange}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="brand" size="lg" class="flex-1" onclick={confirmCountryChange}>{m.common_confirm()}</Button>
+          <Button variant="secondary" size="lg" onclick={cancelCountryChange}>{m.common_cancel()}</Button>
         </div>
       </div>
     </div>

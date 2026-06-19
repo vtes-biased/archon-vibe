@@ -3,6 +3,7 @@
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { ChevronDown, Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff } from "@lucide/svelte";
+  import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
@@ -133,13 +134,10 @@
       <!-- Header with register button -->
       <div class="flex items-center justify-between">
         <p class="text-ash-400 text-sm">{m.developer_subtitle()}</p>
-        <button
-          onclick={() => (showRegister = !showRegister)}
-          class="px-3 py-1.5 bg-crimson-700 hover:bg-crimson-600 text-white rounded text-sm font-medium transition-colors flex items-center gap-1.5"
-        >
+        <Button variant="brand" size="lg" onclick={() => (showRegister = !showRegister)}>
           <Plus class="w-3.5 h-3.5" />
           {m.developer_register_btn()}
-        </button>
+        </Button>
       </div>
 
       <!-- Secret display banner -->
@@ -208,13 +206,10 @@
               </div>
             </div>
             <div class="flex gap-2">
-              <button type="button" onclick={() => (showRegister = false)}
-                class="flex-1 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded text-sm font-medium transition-colors">{m.common_cancel()}</button>
-              <button type="submit" disabled={registering || !newName.trim() || !newRedirectUris.trim() || newScopes.length === 0}
-                class="flex-1 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1.5">
-                {#if registering}<Loader2 class="w-4 h-4 animate-spin" />{/if}
+              <Button type="button" variant="secondary" size="lg" class="flex-1" onclick={() => (showRegister = false)}>{m.common_cancel()}</Button>
+              <Button type="submit" variant="brand" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || !newRedirectUris.trim() || newScopes.length === 0}>
                 {m.developer_register_submit()}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -301,19 +296,15 @@
         <h3 class="text-bone-100 font-medium mb-2">{m.developer_confirm_regenerate()}</h3>
         <p class="text-ash-400 text-sm mb-4">{m.developer_confirm_regenerate_msg()}</p>
         <div class="flex gap-3">
-          <button onclick={() => (confirmAction = null)}
-            class="flex-1 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg text-sm transition-colors">{m.common_cancel()}</button>
-          <button onclick={() => handleRegenerate(confirmAction!.clientId)}
-            class="flex-1 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg text-sm transition-colors">{m.developer_regenerate_btn()}</button>
+          <Button variant="secondary" size="md" class="flex-1" onclick={() => (confirmAction = null)}>{m.common_cancel()}</Button>
+          <Button variant="danger" size="md" class="flex-1" onclick={() => handleRegenerate(confirmAction!.clientId)}>{m.developer_regenerate_btn()}</Button>
         </div>
       {:else}
         <h3 class="text-bone-100 font-medium mb-2">{m.developer_confirm_deactivate()}</h3>
         <p class="text-ash-400 text-sm mb-4">{m.developer_confirm_deactivate_msg()}</p>
         <div class="flex gap-3">
-          <button onclick={() => (confirmAction = null)}
-            class="flex-1 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg text-sm transition-colors">{m.common_cancel()}</button>
-          <button onclick={() => handleDeactivate(confirmAction!.clientId)}
-            class="flex-1 py-2 btn-red rounded-lg text-sm transition-colors">{m.developer_deactivate_btn()}</button>
+          <Button variant="secondary" size="md" class="flex-1" onclick={() => (confirmAction = null)}>{m.common_cancel()}</Button>
+          <Button variant="danger" size="md" class="flex-1" onclick={() => handleDeactivate(confirmAction!.clientId)}>{m.developer_deactivate_btn()}</Button>
         </div>
       {/if}
     </div>

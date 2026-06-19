@@ -6,6 +6,7 @@
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { League, LeagueKind, LeagueStandingsMode } from "$lib/types";
+  import Button from '$lib/components/Button.svelte';
   import { ArrowLeft } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -202,13 +203,16 @@
           <a href="/leagues" class="px-4 py-2 text-sm font-medium text-ash-400 hover:text-bone-100 transition-colors">
             {m.common_cancel()}
           </a>
-          <button
+          <Button
             type="submit"
-            disabled={isSubmitting || !name.trim() || !startDate}
-            class="px-6 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
+            variant="primary"
+            size="lg"
+            class="shadow-md"
+            loading={isSubmitting}
+            disabled={!name.trim() || !startDate}
           >
             {isSubmitting ? m.league_new_creating() : m.league_new_create_btn()}
-          </button>
+          </Button>
         </div>
       </form>
     {/if}

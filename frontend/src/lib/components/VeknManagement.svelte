@@ -282,7 +282,7 @@
           />
         </div>
         <div class="flex gap-2">
-          <Button type="submit" variant="danger" size="lg" class="flex-1" loading={processingAction} disabled={!linkVeknIdInput.trim()}>
+          <Button type="submit" variant="brand" size="lg" class="flex-1" loading={processingAction} disabled={!linkVeknIdInput.trim()}>
             {processingAction ? m.vekn_linking() : m.vekn_link_submit()}
           </Button>
           <Button
@@ -383,7 +383,7 @@
           />
         </div>
         <div class="flex gap-2">
-          <Button type="submit" variant="danger" size="lg" class="flex-1" loading={processingAction} disabled={!mergeTargetUid.trim()}>
+          <Button type="submit" variant="brand" size="lg" class="flex-1" loading={processingAction} disabled={!mergeTargetUid.trim()}>
             {processingAction ? m.vekn_merging() : m.vekn_merge()}
           </Button>
           <Button

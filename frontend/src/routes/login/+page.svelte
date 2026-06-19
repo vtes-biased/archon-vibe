@@ -12,8 +12,9 @@
     createAccountWithPasskey,
     loginWithPasskey,
   } from "$lib/stores/passkeys.svelte";
-  import { Mail, Loader2, KeyRound } from '@lucide/svelte';
+  import { Mail, KeyRound } from '@lucide/svelte';
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -249,16 +250,16 @@
                 class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
               />
             </div>
-            <button
+            <Button
               type="submit"
-              disabled={auth.isLoading || !email.trim()}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              variant="brand"
+              size="lg"
+              block
+              loading={auth.isLoading}
+              disabled={!email.trim()}
             >
-              {#if auth.isLoading}
-                <Loader2 class="w-5 h-5 animate-spin" />
-              {/if}
               {m.login_send_reset_link()}
-            </button>
+            </Button>
           </form>
 
           <button
@@ -304,16 +305,16 @@
                 class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
               />
             </div>
-            <button
+            <Button
               type="submit"
-              disabled={auth.isLoading || !email.trim() || !password}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              variant="brand"
+              size="lg"
+              block
+              loading={auth.isLoading}
+              disabled={!email.trim() || !password}
             >
-              {#if auth.isLoading}
-                <Loader2 class="w-5 h-5 animate-spin" />
-              {/if}
               {m.login_sign_in()}
-            </button>
+            </Button>
           </form>
 
           <button
@@ -334,14 +335,16 @@
           </div>
 
           {#if passkeySupported}
-            <button
-              onclick={handlePasskeyLogin}
+            <Button
+              variant="secondary"
+              size="lg"
+              block
               disabled={auth.isLoading}
-              class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              onclick={handlePasskeyLogin}
             >
               <KeyRound class="w-5 h-5" />
               {m.login_passkey_login()}
-            </button>
+            </Button>
           {/if}
 
           <!-- Discord OAuth -->
@@ -380,18 +383,17 @@
           </div>
 
           {#if passkeySupported}
-            <button
+            <Button
+              variant="brand"
+              size="lg"
+              block
+              loading={auth.isLoading}
+              disabled={!consentChecked}
               onclick={handleCreateAccount}
-              disabled={auth.isLoading || !consentChecked}
-              class="w-full py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
-              {#if auth.isLoading}
-                <Loader2 class="w-5 h-5 animate-spin" />
-              {:else}
-                <KeyRound class="w-5 h-5" />
-              {/if}
+              {#if !auth.isLoading}<KeyRound class="w-5 h-5" />{/if}
               {m.login_passkey_signup()}
-            </button>
+            </Button>
           {/if}
 
           <!-- Discord OAuth -->
@@ -427,18 +429,17 @@
               disabled={auth.isLoading}
               class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
             />
-            <button
+            <Button
               type="submit"
-              disabled={auth.isLoading || !email.trim() || !consentChecked}
-              class="w-full py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              variant="secondary"
+              size="lg"
+              block
+              loading={auth.isLoading}
+              disabled={!email.trim() || !consentChecked}
             >
-              {#if auth.isLoading}
-                <Loader2 class="w-5 h-5 animate-spin" />
-              {:else}
-                <Mail class="w-5 h-5" />
-              {/if}
+              {#if !auth.isLoading}<Mail class="w-5 h-5" />{/if}
               {m.login_email_signup()}
-            </button>
+            </Button>
           </form>
 
           {#if !passkeySupported}

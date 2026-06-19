@@ -14,6 +14,7 @@
 
   import { User } from "@lucide/svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
+  import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   import ProfileView from "./ProfileView.svelte";
@@ -247,14 +248,12 @@
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent" />
         </div>
         <div class="flex gap-2">
-          <button type="submit" disabled={claimingVekn || !claimVeknIdInput.trim()}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors">
+          <Button type="submit" variant="brand" size="lg" class="flex-1" loading={claimingVekn} disabled={!claimVeknIdInput.trim()}>
             {claimingVekn ? m.profile_claiming() : m.profile_claim_btn()}
-          </button>
-          <button type="button" onclick={() => { showClaimModal = false; claimVeknIdInput = ""; }} disabled={claimingVekn}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors">
+          </Button>
+          <Button variant="secondary" size="lg" disabled={claimingVekn} onclick={() => { showClaimModal = false; claimVeknIdInput = ""; }}>
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
@@ -289,14 +288,12 @@
         <p class="text-ash-300 mb-4">{m.profile_abandon_vekn_description()}</p>
         <p class="text-sm text-ash-400 mb-6">{m.profile_abandon_vekn_hint()}</p>
         <div class="flex gap-2">
-          <button onclick={handleAbandonVekn} disabled={abandoningVekn}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors">
+          <Button variant="danger" size="lg" class="flex-1" loading={abandoningVekn} onclick={handleAbandonVekn}>
             {abandoningVekn ? m.profile_abandoning() : m.profile_abandon_btn()}
-          </button>
-          <button onclick={() => (showAbandonConfirm = false)} disabled={abandoningVekn}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors">
+          </Button>
+          <Button variant="secondary" size="lg" disabled={abandoningVekn} onclick={() => (showAbandonConfirm = false)}>
             {m.common_cancel()}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

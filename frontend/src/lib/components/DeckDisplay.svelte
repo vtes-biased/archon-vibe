@@ -365,7 +365,7 @@
     <p class="text-sm text-red-400 mt-2">{saveError}</p>
   {/if}
   <div class="flex gap-2 mt-3">
-    <Button variant="danger" size="lg" loading={saving} onclick={saveDeck}>{saving ? m.common_saving() : m.deck_save_changes()}</Button>
+    <Button variant="brand" size="lg" loading={saving} onclick={saveDeck}>{saving ? m.common_saving() : m.deck_save_changes()}</Button>
     <Button variant="secondary" size="lg" onclick={cancelEditing}>{m.common_cancel()}</Button>
   </div>
 {/if}

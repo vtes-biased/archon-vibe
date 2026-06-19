@@ -5,6 +5,7 @@
   import { saveTournament } from "$lib/db";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
+  import Button from '$lib/components/Button.svelte';
   import { ArrowLeft } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -131,13 +132,16 @@
           <a href="/tournaments" class="px-4 py-2 text-sm font-medium text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
             {m.common_cancel()}
           </a>
-          <button
+          <Button
             type="submit"
-            disabled={isSubmitting || !values.name.trim() || !values.start || (!values.online && !values.country)}
-            class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg transition-colors shadow-md"
+            variant="primary"
+            size="lg"
+            class="shadow-md"
+            loading={isSubmitting}
+            disabled={!values.name.trim() || !values.start || (!values.online && !values.country)}
           >
             {isSubmitting ? m.tournament_new_creating() : m.tournament_new_create_btn()}
-          </button>
+          </Button>
         </div>
       </form>
     {/if}

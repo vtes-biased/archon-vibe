@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from '$lib/components/Button.svelte';
   import { ImagePlus, ZoomOut, ZoomIn } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -264,20 +265,13 @@
 
     <!-- Actions -->
     <div class="flex gap-3 mt-6">
-      <button
-        onclick={onCancel}
-        class="flex-1 px-4 py-2 rounded-lg border border-ash-600 text-ash-300 hover:bg-ash-800 transition-colors"
-      >
+      <Button variant="ghost" size="lg" class="flex-1" onclick={onCancel}>
         {m.common_cancel()}
-      </button>
+      </Button>
       {#if image}
-        <button
-          onclick={handleSave}
-          disabled={saving}
-          class="flex-1 px-4 py-2 rounded-lg bg-crimson-600 text-white hover:bg-crimson-500 transition-colors disabled:bg-ash-800 disabled:text-ash-500"
-        >
+        <Button variant="brand" size="lg" class="flex-1" loading={saving} onclick={handleSave}>
           {saving ? m.common_saving() : m.common_save()}
-        </button>
+        </Button>
       {/if}
     </div>
   </div>

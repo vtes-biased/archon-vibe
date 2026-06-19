@@ -17,7 +17,7 @@
     children,
     ...rest
   }: {
-    variant?: 'primary' | 'secondary' | 'warning' | 'ghost' | 'danger';
+    variant?: 'primary' | 'brand' | 'secondary' | 'warning' | 'ghost' | 'danger';
     size?: 'sm' | 'md' | 'lg';
     block?: boolean;
     loading?: boolean;
@@ -36,6 +36,10 @@
   const VARIANT: Record<string, string> = {
     primary:   'btn-emerald',
     warning:   'btn-amber',
+    // brand and danger are both crimson today (crimson is the brand *and* the
+    // danger colour); kept as distinct variants so a future palette pass can
+    // diverge danger (e.g. icon-forward / different red) without touching submits.
+    brand:     'bg-crimson-700 enabled:hover:bg-crimson-600 text-white disabled:bg-ash-900 disabled:text-ash-500',
     danger:    'bg-crimson-700 enabled:hover:bg-crimson-600 text-white disabled:bg-ash-900 disabled:text-ash-500',
     secondary: 'bg-ash-800 enabled:hover:bg-ash-700 text-ash-200 disabled:bg-ash-900 disabled:text-ash-500',
     ghost:     'border border-ash-700 text-ash-300 enabled:hover:bg-ash-800/50 enabled:hover:text-ash-100 disabled:bg-ash-900 disabled:text-ash-500 disabled:border-transparent',

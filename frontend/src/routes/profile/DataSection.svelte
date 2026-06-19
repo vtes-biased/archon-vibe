@@ -1,5 +1,6 @@
 <script lang="ts">
   import { RefreshCw } from "@lucide/svelte";
+  import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface Props {
@@ -25,23 +26,16 @@
       <p class="text-bone-100">{m.profile_resync_title()}</p>
       <p class="text-sm text-ash-400">{m.profile_resync_description()}</p>
     </div>
-    <button
-      onclick={handleResync}
-      disabled={isSyncing}
-      class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors flex items-center gap-2"
-    >
-      <RefreshCw class="w-4 h-4 {isSyncing ? 'animate-spin' : ''}" />
+    <Button variant="brand" size="lg" loading={isSyncing} onclick={handleResync}>
+      {#if !isSyncing}<RefreshCw class="w-4 h-4" />{/if}
       {isSyncing ? m.profile_resyncing() : m.profile_resync_btn()}
-    </button>
+    </Button>
   </div>
 </div>
 
 <!-- Logout -->
 <div class="p-6 border-t border-ash-800">
-  <button
-    onclick={onLogout}
-    class="w-full px-6 py-3 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg font-medium transition-colors"
-  >
+  <Button variant="secondary" size="lg" block onclick={onLogout}>
     {m.profile_sign_out()}
-  </button>
+  </Button>
 </div>

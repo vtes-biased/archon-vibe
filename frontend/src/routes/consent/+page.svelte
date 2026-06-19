@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import { getAuthState, getAccessToken, initAuth } from "$lib/stores/auth.svelte";
   import { Loader2, CircleAlert, ShieldCheck, CircleCheck } from '@lucide/svelte';
+  import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -223,23 +224,24 @@
           </div>
 
           <div class="flex gap-3">
-            <button
-              onclick={handleDeny}
+            <Button
+              variant="secondary"
+              size="lg"
+              class="flex-1"
               disabled={submitting}
-              class="flex-1 py-3 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded-lg font-medium transition-colors"
+              onclick={handleDeny}
             >
               {m.oauth_deny()}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="brand"
+              size="lg"
+              class="flex-1"
+              loading={submitting}
               onclick={handleApprove}
-              disabled={submitting}
-              class="flex-1 py-3 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
-              {#if submitting}
-                <Loader2 class="w-5 h-5 animate-spin" />
-              {/if}
               {m.oauth_approve()}
-            </button>
+            </Button>
           </div>
 
           <p class="text-center text-xs text-ash-500">

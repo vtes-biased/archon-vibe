@@ -43,3 +43,6 @@
 
 ### Components
 - [Shared <Button> component](project_shared_button_component.md) — app-wide action button (variant primary|secondary|warning|ghost|danger); don't migrate icon-only/stepper/list buttons to it.
+
+### Design direction
+- [Crimson is brand, not primary CTA](feedback_crimson_is_brand_not_primary_cta.md) — push back on "brand=primary button"; crimson→chrome only, emerald=primary(go), btn-red=danger, amber=warning; palette rework belongs in #232 not the button migration.

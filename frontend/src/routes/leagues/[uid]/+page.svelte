@@ -14,6 +14,7 @@
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
+  import Button from '$lib/components/Button.svelte';
   import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -316,12 +317,12 @@
         </div>
         {#if isOrganizer}
           <div class="flex gap-2">
-            <button onclick={startEdit} class="px-3 py-1.5 text-sm text-ash-300 hover:text-bone-100 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
+            <Button variant="secondary" size="md" onclick={startEdit}>
               <Pencil class="w-4 h-4 inline -mt-0.5" /> {m.common_edit()}
-            </button>
-            <button onclick={handleDelete} class="px-3 py-1.5 text-sm text-crimson-400 hover:text-crimson-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
+            </Button>
+            <Button variant="secondary" size="md" onclick={handleDelete}>
               <Trash2 class="w-4 h-4 inline -mt-0.5" /> {m.common_delete()}
-            </button>
+            </Button>
           </div>
         {/if}
       </div>
@@ -402,8 +403,7 @@
 
           <div class="flex gap-3 justify-end">
             <button onclick={() => editing = false} class="px-4 py-2 text-sm text-ash-400 hover:text-bone-100">{m.common_cancel()}</button>
-            <button onclick={saveEdit} disabled={!editName.trim() || !editStart}
-              class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">{m.common_save()}</button>
+            <Button variant="primary" size="lg" onclick={saveEdit} disabled={!editName.trim() || !editStart}>{m.common_save()}</Button>
           </div>
         </div>
       {/if}
@@ -449,10 +449,9 @@
                   <option value={ol.uid}>{ol.name}</option>
                 {/each}
               </select>
-              <button onclick={addChildLeague} disabled={!addChildUid}
-                class="px-3 py-2 text-sm font-medium btn-emerald rounded-lg">
+              <Button variant="primary" size="lg" onclick={addChildLeague} disabled={!addChildUid}>
                 <Plus class="w-4 h-4 inline -mt-0.5" /> {m.common_add()}
-              </button>
+              </Button>
             </div>
           {/if}
           {#if childLeagues.length > 0}
@@ -582,7 +581,7 @@
         {:else if standingsError}
           <div class="bg-dusk-950 rounded-lg shadow p-8 border border-crimson-800/50 text-center">
             <p class="text-crimson-300 mb-3">{m.league_standings_error()}</p>
-            <button onclick={loadLeague} class="px-4 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded-lg text-sm font-medium">{m.common_retry()}</button>
+            <Button variant="secondary" size="lg" onclick={loadLeague}>{m.common_retry()}</Button>
           </div>
         {:else}
           <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">

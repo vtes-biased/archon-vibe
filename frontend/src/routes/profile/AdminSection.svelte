@@ -10,6 +10,7 @@
     type VeknStatusResponse,
   } from '$lib/api';
   import ConfirmActionModal from '$lib/components/ConfirmActionModal.svelte';
+  import Button from '$lib/components/Button.svelte';
 
   let expanded = $state(false);
 
@@ -158,13 +159,10 @@
             <h4 class="text-bone-100 font-medium text-sm">{op.label}</h4>
             <p class="text-ash-500 text-xs mt-0.5">{op.desc}</p>
           </div>
-          <button
-            onclick={() => (activeOp = op)}
-            class="px-3 py-1.5 bg-crimson-700 hover:bg-crimson-600 text-white rounded text-sm font-medium transition-colors flex items-center gap-1.5 shrink-0"
-          >
+          <Button variant="brand" size="lg" class="shrink-0" onclick={() => (activeOp = op)}>
             <RefreshCw class="w-3.5 h-3.5" />
             {m.admin_run_now()}
-          </button>
+          </Button>
         </div>
       {/each}
     </div>

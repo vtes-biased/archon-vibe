@@ -2,6 +2,7 @@
   import { KeyRound, Mail } from "@lucide/svelte";
   import { isPasskeySupported } from "$lib/stores/passkeys.svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
+  import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface Props {
@@ -74,10 +75,9 @@
     {#if hasEmail}
       <span class="px-3 py-1 text-sm text-green-500 bg-green-500/10 rounded">{m.profile_passkey_active()}</span>
     {:else if !showEmailSetup}
-      <button onclick={() => (showEmailSetup = true)}
-        class="px-4 py-2 bg-ash-800 hover:bg-ash-700 text-bone-100 rounded font-medium transition-colors">
+      <Button variant="secondary" size="lg" onclick={() => (showEmailSetup = true)}>
         {m.profile_email_setup()}
-      </button>
+      </Button>
     {/if}
   </div>
   {#if showEmailSetup && !hasEmail}
@@ -93,10 +93,9 @@
         <input type="email" bind:value={emailInput} required
           placeholder={m.login_placeholder_email()}
           class="flex-1 px-3 py-2 bg-dusk-900 border border-ash-700 rounded text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 text-sm" />
-        <button type="submit" disabled={sendingEmailLink || !emailInput.trim()}
-          class="px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium text-sm transition-colors whitespace-nowrap">
+        <Button type="submit" variant="brand" size="lg" class="whitespace-nowrap" loading={sendingEmailLink} disabled={!emailInput.trim()}>
           {sendingEmailLink ? m.profile_email_sending() : m.profile_email_send_link()}
-        </button>
+        </Button>
       </form>
     {/if}
     {#if emailError}
@@ -146,10 +145,9 @@
         </div>
       </div>
       {#if !hasPasskey}
-        <button onclick={handleRegisterPasskey} disabled={registeringPasskey}
-          class="px-4 py-2 bg-ash-800 hover:bg-ash-700 disabled:bg-ash-800 disabled:text-ash-500 text-bone-100 rounded font-medium transition-colors">
+        <Button variant="secondary" size="lg" loading={registeringPasskey} onclick={handleRegisterPasskey}>
           {registeringPasskey ? m.profile_passkey_adding() : m.common_add()}
-        </button>
+        </Button>
       {:else}
         <span class="px-3 py-1 text-sm text-green-500 bg-green-500/10 rounded">{m.profile_passkey_active()}</span>
       {/if}

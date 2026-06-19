@@ -245,7 +245,7 @@
 
         {#if canIssueSanctions}
           <div class="flex flex-wrap gap-2">
-            <Button variant="danger" size="md" onclick={() => openSanctionModal()} title={m.sanction_mgr_issue_btn()}>
+            <Button variant="brand" size="md" onclick={() => openSanctionModal()} title={m.sanction_mgr_issue_btn()}>
               <TriangleAlert class="inline w-3.5 h-3.5 mr-1" />
               {m.sanction_mgr_issue_btn()}
             </Button>
@@ -355,7 +355,7 @@
         <div class="flex gap-2 pt-2">
           <Button
             type="submit"
-            variant="danger"
+            variant="brand"
             size="lg"
             class="flex-1"
             loading={creatingSanction}
@@ -476,7 +476,7 @@
         <div class="flex flex-col gap-2 pt-4 border-t border-ash-800">
           {#if !editingSanction.lifted_at && editSanctionHasChanges()}
             <Button
-              variant="danger"
+              variant="brand"
               size="lg"
               block
               loading={processingSanctionAction}

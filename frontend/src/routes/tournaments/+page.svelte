@@ -330,7 +330,7 @@
         <Calendar class="h-4 w-4 text-ash-500 shrink-0" />
         <span class="text-xs text-ash-500">{m.tournaments_calendar_subscribe()}:</span>
         {#if viewMode === "agenda" && !auth.user?.calendar_token}
-          <Button variant="danger" size="sm" loading={calendarLoading} onclick={handleGenerateCalendarToken}>
+          <Button variant="brand" size="sm" loading={calendarLoading} onclick={handleGenerateCalendarToken}>
             {m.tournaments_calendar_generate()}
           </Button>
         {:else}

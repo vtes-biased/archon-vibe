@@ -112,13 +112,13 @@
           <span class="text-sm break-words">{errorMsg || m.admin_op_error()}</span>
         </div>
         <div class="flex gap-2">
-          <Button variant="danger" size="lg" class="flex-1" onclick={run}>{m.common_retry()}</Button>
+          <Button variant="brand" size="lg" class="flex-1" onclick={run}>{m.common_retry()}</Button>
           <Button variant="secondary" size="lg" onclick={onClose}>{m.common_close()}</Button>
         </div>
       {:else}
         <p class="text-ash-300 mb-6">{body}</p>
         <div class="flex gap-2">
-          <Button variant="danger" size="lg" class="flex-1" loading={status === 'loading'} onclick={run}>
+          <Button variant="brand" size="lg" class="flex-1" loading={status === 'loading'} onclick={run}>
             {#if status === 'loading'}{m.admin_op_running()}{:else}{confirmLabel}{/if}
           </Button>
           <Button variant="secondary" size="lg" disabled={status === 'loading'} onclick={requestClose}>{m.common_cancel()}</Button>

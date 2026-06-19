@@ -3,6 +3,7 @@
   import { deleteSanctionApi } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
+  import Button from '$lib/components/Button.svelte';
   import { Trash2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -94,13 +95,9 @@
         <p class="text-sm text-ash-400">{m.sanction_list_empty()}</p>
       {/each}
       <div class="pt-2">
-        <button
-          type="button"
-          onclick={onClose}
-          class="w-full px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-        >
+        <Button variant="secondary" size="lg" block onclick={onClose}>
           {m.common_close()}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
