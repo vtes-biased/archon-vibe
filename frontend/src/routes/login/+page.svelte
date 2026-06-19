@@ -374,7 +374,7 @@
               type="checkbox"
               bind:checked={consentChecked}
               disabled={auth.isLoading}
-              class="mt-0.5 shrink-0 w-5 h-5 accent-crimson-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-crimson-500"
+              class="mt-0.5 shrink-0 w-5 h-5 accent-crimson-600"
             />
             <label for="signup-consent">{@html consentHtml}</label>
           </div>

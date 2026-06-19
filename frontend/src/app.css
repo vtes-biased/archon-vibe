@@ -86,6 +86,36 @@
     button:disabled { cursor: not-allowed; }
 
     /*
+     * Global keyboard-focus ring (WCAG 2.4.7). Crimson, matching the design
+     * language. :focus-visible shows only for keyboard / programmatic focus,
+     * never on mouse click. Lives in @layer base so it's the floor: controls
+     * that manage their own focus (form inputs using focus:outline-none + a
+     * crimson border/ring) override it via Tailwind's later utilities layer.
+     *
+     * The hard outline carries 1.4.11/2.4.7 compliance on its own; the soft
+     * crimson box-shadow is the gothic glow (cf. .callout / .doc-img) that makes
+     * focus read as designed. color-mix derives it from crimson-500 so it follows
+     * the light-theme scale inversion automatically. The glow may be clipped by
+     * an overflow:hidden ancestor — harmless, the outline is never clipped.
+     */
+    :focus-visible {
+        outline: 2px solid var(--color-crimson-500);
+        outline-offset: 2px;
+        box-shadow: 0 0 8px color-mix(in srgb, var(--color-crimson-500) 45%, transparent);
+    }
+
+    /*
+     * Toggle switches hide their checkbox as .sr-only.peer and render a styled
+     * sibling track div, so the ring above lands on the 1px checkbox. Project it
+     * onto the visible track instead (outline follows the track's pill radius).
+     */
+    .sr-only.peer:focus-visible + div {
+        outline: 2px solid var(--color-crimson-500);
+        outline-offset: 2px;
+        box-shadow: 0 0 8px color-mix(in srgb, var(--color-crimson-500) 45%, transparent);
+    }
+
+    /*
      * Light theme — scale inversion.
      * Dark shade numbers (900/950) map to light values and vice versa.
      * This means all existing component classes (bg-dusk-950, text-ash-300, etc.)

@@ -38,3 +38,4 @@
 
 ### Gotchas
 - [No line-clamp on markdown](feedback_no_lineclamp_on_markdown.md) — never `line-clamp-N` over `{@html renderMarkdown(...)}`; derive a plain-text excerpt from source for folded previews.
+- [Focus-ring floor](project_focus_ring_floor.md) — global `:focus-visible` crimson ring in `@layer base`; components opt out only with a self-provided crimson focus indicator (DESIGN.md contract).

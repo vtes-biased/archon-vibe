@@ -1,5 +1,14 @@
 # Frontend Design Guidelines
 
+## This doc vs. the `frontend-design` skill
+
+This file is the project's **pinned visual direction** — the gothic VTES system below *is* the brief. The `frontend-design` skill (auto-invoked on UI work) contributes craft process and a quality floor; the two compose:
+
+- **Existing surfaces & new features inside the app** → this doc wins. The skill's *craft* still applies: intentional type scale + weight hierarchy, structure that encodes meaning (don't decorate), motion restraint, copy as design material, and its quality floor — responsive, visible keyboard focus, `prefers-reduced-motion` honored. Its "pick a bespoke palette / take an aesthetic risk" guidance does **not** — stay on the token scale and patterns here. The skill defers by its own rule: a pinned brief always wins.
+- **Genuinely new standalone surfaces** with no precedent here (e.g. a landing / onboarding page) → run the skill's full brainstorm → critique → build process, then fold durable decisions back into this doc.
+
+When in doubt, consistency with this system beats novelty.
+
 ## Color Palette
 
 VTES / Vampire: the Masquerade inspired. Gothic horror, pale and muted, with dark mode as primary.
@@ -87,6 +96,7 @@ Design for touch devices first, then enhance for desktop.
 - **Touch targets**: Minimum 44x44px
 - **No hover-only interactions**: Always have tap/click equivalent
 - **Drag and drop**: Must not conflict with scrolling; provide alternative (buttons/menus)
+- **Focus ring**: A global `:focus-visible` crimson outline (2px, `--color-crimson-500`) is defined in `@layer base` in `app.css` — do not add bespoke outlines to buttons, links, or nav items. Form inputs may opt out with `focus:outline-none` only if they provide their own visible crimson focus indicator (border or ring).
 - **Navigation**: Bottom nav or hamburger, not top-heavy headers
 - **Forms**: Large inputs, avoid complex multi-column layouts on mobile
 - **Containers**: Full-width on mobile, max-width on larger screens

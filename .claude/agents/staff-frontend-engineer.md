@@ -40,6 +40,9 @@ Assess: necessity (achievable in 50 lines?), bundle size (tree-shakeable?), repo
 - Optimistic updates feel instant; server corrections subtle
 - Users shouldn't fear losing data
 
+### Visual Craft (via the `frontend-design` skill)
+Judge design quality through the skill's craft lens: intentional type scale + weight hierarchy, structure that encodes meaning (not decoration), motion restraint, and copy as design material (active voice, user-facing names, an action's name kept consistent through its flow). For a **net-new standalone surface** with no precedent in DESIGN.md, recommend running the skill's full brainstorm → critique → build process. For existing surfaces, anchor aesthetics to `frontend/DESIGN.md` — the pinned gothic system wins over novelty, and the skill defers to it. See `frontend/DESIGN.md` § "This doc vs. the `frontend-design` skill".
+
 ## Review Process
 
 1. **User perspective**: Use this on a phone one-handed. Obvious what to do?
