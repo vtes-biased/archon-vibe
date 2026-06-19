@@ -39,3 +39,7 @@
 ### Gotchas
 - [No line-clamp on markdown](feedback_no_lineclamp_on_markdown.md) — never `line-clamp-N` over `{@html renderMarkdown(...)}`; derive a plain-text excerpt from source for folded previews.
 - Focus-ring floor: global `:focus-visible` crimson ring; opt out only with a self-provided crimson indicator — see DESIGN.md (Mobile First).
+- [Stock Tailwind color tokens skip light inversion](feedback_emerald_amber_tokens_no_light_inversion.md) — `bg-emerald/amber-*` don't follow `html.light`; only the `.btn-*`/`.badge-*` CSS classes hand-roll light contrast.
+
+### Components
+- [Shared <Button> component](project_shared_button_component.md) — app-wide action button (variant primary|secondary|warning|ghost|danger); don't migrate icon-only/stepper/list buttons to it.

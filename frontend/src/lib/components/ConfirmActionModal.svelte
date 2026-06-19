@@ -1,7 +1,8 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import * as m from '$lib/paraglide/messages.js';
-  import { Loader2, CircleCheck, TriangleAlert } from '@lucide/svelte';
+  import { CircleCheck, TriangleAlert } from '@lucide/svelte';
+  import Button from '$lib/components/Button.svelte';
 
   let {
     title,
@@ -104,45 +105,23 @@
             {/each}
           </dl>
         {/if}
-        <button
-          onclick={onClose}
-          class="w-full px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-100 rounded font-medium transition-colors"
-        >{m.common_close()}</button>
+        <Button variant="secondary" size="lg" block onclick={onClose}>{m.common_close()}</Button>
       {:else if status === 'error'}
         <div class="flex items-start gap-2 text-crimson-400 mb-4">
           <TriangleAlert class="w-5 h-5 shrink-0 mt-0.5" />
           <span class="text-sm break-words">{errorMsg || m.admin_op_error()}</span>
         </div>
         <div class="flex gap-2">
-          <button
-            onclick={run}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded font-medium transition-colors"
-          >{m.common_retry()}</button>
-          <button
-            onclick={onClose}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_close()}</button>
+          <Button variant="danger" size="lg" class="flex-1" onclick={run}>{m.common_retry()}</Button>
+          <Button variant="secondary" size="lg" onclick={onClose}>{m.common_close()}</Button>
         </div>
       {:else}
         <p class="text-ash-300 mb-6">{body}</p>
         <div class="flex gap-2">
-          <button
-            onclick={run}
-            disabled={status === 'loading'}
-            class="flex-1 px-4 py-2 bg-crimson-700 hover:bg-crimson-600 disabled:bg-ash-800 disabled:text-ash-500 text-white rounded font-medium transition-colors flex items-center justify-center gap-1.5"
-          >
-            {#if status === 'loading'}
-              <Loader2 class="w-4 h-4 animate-spin" />
-              {m.admin_op_running()}
-            {:else}
-              {confirmLabel}
-            {/if}
-          </button>
-          <button
-            onclick={requestClose}
-            disabled={status === 'loading'}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 disabled:opacity-50 text-ash-200 rounded font-medium transition-colors"
-          >{m.common_cancel()}</button>
+          <Button variant="danger" size="lg" class="flex-1" loading={status === 'loading'} onclick={run}>
+            {#if status === 'loading'}{m.admin_op_running()}{:else}{confirmLabel}{/if}
+          </Button>
+          <Button variant="secondary" size="lg" disabled={status === 'loading'} onclick={requestClose}>{m.common_cancel()}</Button>
         </div>
       {/if}
     </div>
