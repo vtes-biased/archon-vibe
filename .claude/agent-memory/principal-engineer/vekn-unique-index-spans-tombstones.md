@@ -20,9 +20,20 @@ The hazard surfaces when a lookup that DOES filter `deleted_at` (e.g. the merge'
 then the caller seed-inserts under a new uid → collision. `db.get_user_by_vekn_id`
 does NOT filter deleted_at, so it and `live_user_by_vekn_id` disagree.
 
+**Second blind spot (same root):** `allocate_next_vekn_id` (`db.py` ~:743) builds
+its `used_ids` CTE from `type='user' AND vekn_id ~ '^[0-9]+$'` with **no
+`deleted_at` filter** — so it correctly *avoids* a number reserved by a tombstone
+(matching the index), but a deleted_at-filtered lookup would think that number is
+free. The allocator and the lookup disagree in the safe direction for allocation
+(allocator skips reserved numbers) but the unsafe direction for any code that
+"frees" a number on soft-delete. Confirmed during the #216 veknless-participant
+review: #216's allocate path is safe (it allocates genuinely-unused gap ids and
+its members have no prior tombstone with that id), but the asymmetry is the same
+one the unique index has.
+
 **How to apply:** when adding any vekn-id-keyed insert/lookup, make the lookup's
-deleted_at filtering match the index (which spans tombstones) — or the insert can
-crash on a number reserved by a soft-deleted row. The #169 archon merge cutover is
-safe (its own vekn-less shells carry no vekn_id), but steady-state runtime
-soft-deletes that keep vekn_id (admin user-delete) make it reachable on later
-nightly merges — confirmed reachable, just not on cutover.
+deleted_at filtering match the index AND `allocate_next_vekn_id` (both span
+tombstones) — or the insert can crash on a number reserved by a soft-deleted row.
+The #169 archon merge cutover is safe (its own vekn-less shells carry no vekn_id),
+but steady-state runtime soft-deletes that keep vekn_id (admin user-delete) make it
+reachable on later nightly merges — confirmed reachable, just not on cutover.
