@@ -230,54 +230,7 @@
         <span class="ml-2 text-bone-100 font-medium">{formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}</span>
       </div>
     {/if}
-    <!-- Cutoff score threshold for players -->
-    {#if cutoffScore}
-      <div class="bg-ash-900/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-2">
-          {m.tournament_standings()}
-          <span class="text-xs text-ash-500 font-normal ml-1">({m.tournament_standings_cutoff()})</span>
-        </h3>
-        <p class="text-sm text-ash-300">
-          {m.tournament_cutoff_threshold()} <span class="text-bone-100 font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
-        </p>
-      </div>
-    {/if}
-    <!-- Standings for players -->
-    {#if tournament.state !== "Finished" && playerStandings.length > 0}
-      <div class="bg-ash-900/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-2">
-          {m.tournament_standings()}
-          {#if tournament.standings_mode !== "Public"}
-            <span class="text-xs text-ash-500 font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
-          {/if}
-        </h3>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-ash-500 text-xs">
-              <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
-              <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
-              <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each playerStandings as entry, idx}
-              <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
-                <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
-                <td class="py-1 pr-2">
-                  <span class="inline-flex items-center gap-1">
-                    {seatDisplay(entry.user_uid)}
-                    <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
-                    {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
-                  </span>
-                </td>
-                <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    {/if}
-    <!-- Finals table for player view -->
+    <!-- Your table + seat — the primary card during play; standings/cutoff/history follow below -->
     {#if isFinals && !isFinished && tournament.finals}
       <div class="bg-ash-900/50 rounded-lg p-4">
         <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_heading()}</h3>
@@ -369,6 +322,53 @@
           </div>
         {/each}
       {/if}
+    {/if}
+    <!-- Cutoff score threshold for players -->
+    {#if cutoffScore}
+      <div class="bg-ash-900/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-bone-100 mb-2">
+          {m.tournament_standings()}
+          <span class="text-xs text-ash-500 font-normal ml-1">({m.tournament_standings_cutoff()})</span>
+        </h3>
+        <p class="text-sm text-ash-300">
+          {m.tournament_cutoff_threshold()} <span class="text-bone-100 font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
+        </p>
+      </div>
+    {/if}
+    <!-- Standings for players -->
+    {#if tournament.state !== "Finished" && playerStandings.length > 0}
+      <div class="bg-ash-900/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-bone-100 mb-2">
+          {m.tournament_standings()}
+          {#if tournament.standings_mode !== "Public"}
+            <span class="text-xs text-ash-500 font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
+          {/if}
+        </h3>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-ash-500 text-xs">
+              <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
+              <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
+              <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each playerStandings as entry, idx}
+              <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
+                <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
+                <td class="py-1 pr-2">
+                  <span class="inline-flex items-center gap-1">
+                    {seatDisplay(entry.user_uid)}
+                    <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
+                    {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
+                  </span>
+                </td>
+                <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     {/if}
     <!-- Previous rounds history -->
     {#if previousRounds.length > 0}
