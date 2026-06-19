@@ -39,10 +39,10 @@ Online: Frontend → Backend (FastAPI) → Rust engine (PyO3) → updated state 
 | `Planned` | Initial state, config editable | OpenRegistration, UpdateConfig, Delete |
 | `Registration` | Players can register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
 | `Waiting` | Between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
-| `Playing` | Round in progress | SetScore, Override, FinishRound, CancelRound, seating edits |
-| `Finished` | Tournament complete | ReopenTournament, deck uploads, view results |
+| `Playing` | Round in progress | SetScore (players + organizers), Override, FinishRound, CancelRound, seating edits |
+| `Finished` | Tournament complete | ReopenTournament, SetScore/Override (organizers only), deck uploads, view results |
 
-Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig available in Planned/Registration and for timer/display settings in later states.
+Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig available in Planned/Registration and for timer/display settings in later states. SetScore/Override/Unoverride: players only during Playing; organizers may correct any round while Waiting, Playing, or Finished (i.e. whenever rounds exist) — standings recompute after each edit.
 
 ## Business Events
 
@@ -133,8 +133,8 @@ Events are processed by the Rust engine. Each event includes:
 
 ### Score / Override
 
-- `SetScore`: only VP is submitted per seat (`{player_uid, vp}`); GW and TP are auto-computed by the engine (see Scoring Rules below).
-- `Override` (organizer-only): forces a table to **Finished** regardless of score validity; requires a `comment`. `Unoverride` reverts.
+- `SetScore`: only VP is submitted per seat (`{player_uid, vp}`); GW and TP are auto-computed by the engine (see Scoring Rules below). Players may submit during Playing only; organizers may correct any round while Waiting, Playing, or Finished — stored standings recompute after each correction.
+- `Override` (organizer-only): forces a table to **Finished** regardless of score validity; requires a `comment`. Available while Waiting/Playing/Finished (same organizer-anytime rule as SetScore). `Unoverride` reverts.
 
 ## Scoring Rules (VEKN 3.7.3)
 
@@ -262,8 +262,8 @@ Actions are validated by the Rust engine:
 | Add/Remove/Drop Player | Organizers |
 | Check In / Check In All / Reset Check-in | Organizers |
 | Start/Finish/Cancel Round | Organizers |
-| Set Score | Organizers or any player at the table |
-| Override/Unoverride | Organizers |
+| Set Score | Players at the table (Playing only); organizers (Waiting/Playing/Finished) |
+| Override/Unoverride | Organizers (Waiting/Playing/Finished) |
 | Seating edits (Swap, Alter, Seat, Unseat, AddTable, RemoveTable) | Organizers |
 | Set Toss / Random Toss | Organizers |
 | Start/Finish Finals | Organizers |

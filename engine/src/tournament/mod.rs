@@ -31,8 +31,8 @@ use types::VpError;
 use crate::error::EngineError;
 use helpers::{
     all_rounds_finished, count_completed_rounds, find_player_index, is_deck_locked, player_exists,
-    players_in_other_active_rounds, require_organizer, require_state, require_state_or_finished,
-    validate_enum,
+    players_in_other_active_rounds, require_can_edit_results, require_organizer, require_state,
+    require_state_or_finished, validate_enum,
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
@@ -1244,12 +1244,9 @@ fn apply_event(
             table,
             scores,
         } => {
-            require_state_or_finished(state, TournamentState::Playing)?;
-
-            // Require organizer when tournament is Finished
-            if state == TournamentState::Finished {
-                require_organizer(actor)?;
-            }
+            // Players score only mid-round; organizers may correct any round between
+            // rounds (Waiting) or after the tournament has finished.
+            require_can_edit_results(actor, state)?;
 
             // If round == rounds.len() and finals exists, target finals table
             let rounds_len = tournament["rounds"].len();
@@ -1386,6 +1383,12 @@ fn apply_event(
                 }
             }
 
+            // Keep stored standings in sync with the edited result. Required for
+            // out-of-round corrections (Waiting/Finished) and edits to an already-
+            // finished round while another is still Playing — FinishRound won't run
+            // again to refresh them, and ratings/VEKN-push/exports read them.
+            update_standings(tournament, sanctions);
+
             Ok(())
         }
 
@@ -1395,7 +1398,7 @@ fn apply_event(
             comment,
         } => {
             require_organizer(actor)?;
-            require_state_or_finished(state, TournamentState::Playing)?;
+            require_can_edit_results(actor, state)?;
 
             let is_finals = *round == tournament["rounds"].len()
                 && !tournament["finals"].is_null()
@@ -1424,7 +1427,7 @@ fn apply_event(
 
         TournamentEvent::Unoverride { round, table } => {
             require_organizer(actor)?;
-            require_state_or_finished(state, TournamentState::Playing)?;
+            require_can_edit_results(actor, state)?;
 
             let is_finals = *round == tournament["rounds"].len()
                 && !tournament["finals"].is_null()

@@ -44,6 +44,28 @@ pub(super) fn require_state_or_finished(
     Ok(())
 }
 
+/// Gate for result-correction events (SetScore/Override/Unoverride). A player may
+/// only score while a round is live (`Playing`); an organizer may also correct any
+/// round between rounds (`Waiting`) or after the tournament has finished
+/// (`Finished`) — they must be able to fix a result at any time, not just mid-round.
+pub(super) fn require_can_edit_results(
+    actor: &ActorContext,
+    current: TournamentState,
+) -> Result<(), EngineError> {
+    let allowed = match current {
+        TournamentState::Playing => true,
+        TournamentState::Waiting | TournamentState::Finished => actor.is_organizer,
+        _ => false,
+    };
+    if !allowed {
+        return Err(EngineError::WrongState {
+            expected: TournamentState::Playing.as_str().to_string(),
+            current: current.as_str().to_string(),
+        });
+    }
+    Ok(())
+}
+
 pub(super) fn player_exists(players: &JsonValue, user_uid: &str) -> bool {
     players
         .members()

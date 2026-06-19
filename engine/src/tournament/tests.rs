@@ -1807,6 +1807,123 @@ fn test_organizer_can_rescore_judge_locked_table() {
     assert!(result.is_ok());
 }
 
+// --- Out-of-round score correction (organizer edits past round while Waiting) ---
+
+/// One finished round, tournament back to Waiting between rounds. Both tables carry
+/// a valid completed result (VPs ceil-sum to table size, valid oust order: p1/p5 win).
+fn waiting_after_round() -> JsonValue {
+    let mut t = tournament_with_round();
+    t["state"] = "Waiting".into();
+    let vps = [2.0, 1.0, 1.0, 0.0];
+    for tbl in 0..2 {
+        for (s, &vp) in vps.iter().enumerate() {
+            t["rounds"][0][tbl]["seating"][s]["result"]["vp"] = vp.into();
+        }
+        t["rounds"][0][tbl]["state"] = "Finished".into();
+    }
+    t
+}
+
+#[test]
+fn test_organizer_corrects_vp_in_waiting_refreshes_standings() {
+    // Between rounds an organizer fixes a data-entry error in a past round. This was
+    // blocked before (SetScore required Playing) and left stored standings stale.
+    let t = waiting_after_round();
+
+    // Make p2 the table winner with a valid oust sequence (p1,p2,p3,p4 = 0,2,1,1).
+    let event = json::object! {
+        type: "SetScore",
+        round: 0,
+        table: 0,
+        scores: [
+            { player_uid: "p1", vp: 0.0 },
+            { player_uid: "p2", vp: 2.0 },
+            { player_uid: "p3", vp: 1.0 },
+            { player_uid: "p4", vp: 1.0 },
+        ],
+    };
+    let updated = json::parse(&run_event(&t, &event, &make_organizer()).unwrap()).unwrap();
+
+    // Seat result applied...
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][1]["result"]["vp"].as_f64(),
+        Some(2.0)
+    );
+    assert_eq!(updated["rounds"][0][0]["state"].as_str(), Some("Finished"));
+    // ...and stored standings recomputed (was empty) to carry the corrected VP/GW.
+    let p2 = updated["standings"]
+        .members()
+        .find(|s| s["user_uid"] == "p2")
+        .expect("p2 in standings");
+    assert_eq!(p2["vp"].as_f64(), Some(2.0));
+    assert_eq!(p2["gw"].as_f64(), Some(1.0));
+}
+
+#[test]
+fn test_player_cannot_score_while_waiting() {
+    // A player may only score during their live round, not between rounds.
+    let t = waiting_after_round();
+    let event = json::object! {
+        type: "SetScore",
+        round: 0,
+        table: 0,
+        scores: [ { player_uid: "p1", vp: 1.0 } ],
+    };
+    let err = run_event(&t, &event, &make_player("p1")).unwrap_err();
+    assert!(err.to_string().contains("Playing state"));
+}
+
+#[test]
+fn test_organizer_corrects_earlier_round_during_parallel_round_refreshes_standings() {
+    // Online parallel rounds: round 0 finished, round 1 still in progress, tournament
+    // stays Playing. Correcting a VP in the already-finished round 0 must refresh stored
+    // standings — pre-fix, SetScore in Playing skipped update_standings, so a correction
+    // to a past round left ratings/VEKN-push reading stale totals.
+    let mut t = waiting_after_round();
+    t["state"] = "Playing".into();
+    t["online"] = true.into();
+    // A second, in-progress round (same four players at one table).
+    t["rounds"]
+        .push(json::array![[
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+        ]])
+        .unwrap();
+    // Stale stored standings that the recompute must overwrite.
+    t["standings"] = json::array![
+        { user_uid: "p2", gw: 0.0, vp: 99.0, tp: 0, toss: 0, finalist: false },
+    ];
+
+    // Move round 0 table 0's win from p1 to p2 (valid oust order: p1,p2,p3,p4 = 0,2,1,1).
+    let event = json::object! {
+        type: "SetScore",
+        round: 0,
+        table: 0,
+        scores: [
+            { player_uid: "p1", vp: 0.0 },
+            { player_uid: "p2", vp: 2.0 },
+            { player_uid: "p3", vp: 1.0 },
+            { player_uid: "p4", vp: 1.0 },
+        ],
+    };
+    let updated = json::parse(&run_event(&t, &event, &make_organizer()).unwrap()).unwrap();
+
+    // Edit landed on the finished round, tournament stays Playing for the live round...
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][1]["result"]["vp"].as_f64(),
+        Some(2.0)
+    );
+    assert_eq!(updated["state"].as_str(), Some("Playing"));
+    // ...and the stale standings were recomputed (p2 = 2.0 from round 0, 0.0 in round 1).
+    let p2 = updated["standings"]
+        .members()
+        .find(|s| s["user_uid"] == "p2")
+        .expect("p2 in standings");
+    assert_eq!(p2["vp"].as_f64(), Some(2.0));
+}
+
 // --- Raffle pool tests ---
 
 #[test]
