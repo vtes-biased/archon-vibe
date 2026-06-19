@@ -285,22 +285,9 @@
               <h3 class="text-sm font-medium text-bone-100">
                 {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
               </h3>
-              <div class="flex items-center gap-2">
-                <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
-                  {translateTableState(myTable.state)}
-                </span>
-                {#if !tournament.offline_mode && isOnline()}
-                  <button
-                    onclick={() => handleCallJudge(myTableIdx)}
-                    disabled={judgeCallCooldown}
-                    class="px-2 py-1 text-xs {judgeCallCooldown ? 'text-ash-500 border-ash-700' : 'text-amber-400 hover:text-amber-300 border-amber-800 hover:border-amber-700'} border rounded-lg transition-colors flex items-center gap-1"
-                    title={judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
-                  >
-                    <Gavel class="w-3 h-3" />
-                    {judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
-                  </button>
-                {/if}
-              </div>
+              <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
+                {translateTableState(myTable.state)}
+              </span>
             </div>
             <!-- Timer for player's table (hidden in offline tournaments and parallel rounds) -->
             {#if !hasParallelRounds && !tournament.offline_mode && (tournament.round_time ?? 0) > 0}
@@ -329,6 +316,20 @@
                 </div>
               {/each}
             </div>
+            <!-- Call Judge: prominent emergency action for the player at this table -->
+            {#if !tournament.offline_mode && isOnline()}
+              <Button
+                variant="warning"
+                size="lg"
+                block
+                disabled={judgeCallCooldown}
+                onclick={() => handleCallJudge(myTableIdx)}
+                class="mt-3 min-h-[44px]"
+              >
+                <Gavel class="w-5 h-5" />
+                {judgeCallCooldown ? m.judge_call_cooldown() : m.judge_call_btn()}
+              </Button>
+            {/if}
           </div>
         {/each}
       {/if}
