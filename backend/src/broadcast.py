@@ -90,6 +90,12 @@ class SSEConnection:
     # this tournament — its own object, its sanctions, and its judge calls —
     # instead of the whole corpus. None = unscoped (the browser's full sync).
     tournament_uid: str | None = None
+    # The offline-lock device this browser identifies as (getDeviceId on the
+    # client; None for the bot / pre-device clients). Lets a write self-exclude
+    # the originating device from its own broadcast — see broadcast_precomputed's
+    # exclude_device_id, used by go-online so the device doesn't receive the
+    # offline_mode=false echo that races ahead of its own HTTP response.
+    device_id: str | None = None
     # Scoped-only: the bot needs each seated participant's User identity
     # (name/nickname) to render seating, but _scope_matches drops generic user
     # broadcasts. So identities are pushed alongside the tournament: a tournament
@@ -186,8 +192,18 @@ def _wake_sse_connections() -> None:
             pass
 
 
-def broadcast_precomputed(bd: BroadcastData) -> None:
-    """Broadcast pre-computed projections to SSE connections. No DB access."""
+def broadcast_precomputed(
+    bd: BroadcastData, *, exclude_device_id: str | None = None
+) -> None:
+    """Broadcast pre-computed projections to SSE connections. No DB access.
+
+    `exclude_device_id` skips every connection that identifies as that device —
+    used by go-online so the initiating device doesn't receive the
+    offline_mode=false echo of its own write (which would race ahead of the HTTP
+    response and trip the client's lost-lock warning). Excludes the whole device,
+    not one tab; offline mode is single-tab in practice (the WASM engine writes
+    IndexedDB directly), so there's no sibling tab to starve of the update.
+    """
 
     def _make_msg(json_str: str) -> str:
         # `ts` carries the authoritative modified_at so clients advance their
@@ -207,6 +223,11 @@ def broadcast_precomputed(bd: BroadcastData) -> None:
     disconnected: set[SSEConnection] = set()
     for sse_conn in _sse_connections:
         try:
+            if (
+                exclude_device_id is not None
+                and sse_conn.device_id == exclude_device_id
+            ):
+                continue
             if not _scope_matches(sse_conn, bd):
                 continue
             level = entitled_level(

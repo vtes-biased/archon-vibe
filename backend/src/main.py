@@ -892,6 +892,7 @@ async def stream_updates(
     av: str | None = None,
     token: str | None = None,
     tournament: str | None = None,
+    device_id: str | None = None,
     authorization: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
     """Stream object updates via SSE (new sync architecture).
@@ -962,7 +963,9 @@ async def stream_updates(
 
     async def event_generator():
         """Generate SSE events from pre-computed columns."""
-        conn = SSEConnection(user=stream_user, tournament_uid=tournament)
+        conn = SSEConnection(
+            user=stream_user, tournament_uid=tournament, device_id=device_id
+        )
         _sse_connections.add(conn)
 
         try:

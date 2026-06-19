@@ -45,6 +45,7 @@ import {
   getOfflinePlayers,
   getOfflineSanctionUids,
   getOfflineDeckUids,
+  getDeviceId,
 } from './db';
 import { getAccessToken, ensureSyncToken, refreshTokens } from '$lib/stores/auth.svelte';
 import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLockLost } from '$lib/stores/offline.svelte';
@@ -316,6 +317,10 @@ class SyncManager {
     if (generatedAt) params.set('generated_at', generatedAt);
     if (accessVersion) params.set('av', accessVersion);
     if (token) params.set('token', token);
+    // Identify this device so the server can self-exclude it from its own
+    // offline-lock writes (go-online), whose echo would otherwise race ahead of
+    // the HTTP response — see broadcast_precomputed(exclude_device_id=...).
+    params.set('device_id', getDeviceId());
     const qs = params.toString();
     const url = qs ? `${API_URL}/stream?${qs}` : `${API_URL}/stream`;
 

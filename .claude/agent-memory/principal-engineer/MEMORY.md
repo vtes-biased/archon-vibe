@@ -53,6 +53,7 @@
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — holds player user_uids; easily missed in any per-player UID remap.
 - [Error localization across throw surfaces](error-localization-offline-path-trap.md) — engine-error localization covers HTTP + offline WASM + JS pre-checks (wired); preserve all three when changing error presentation.
 - [Resync branch zero-delay loop](sync-resync-branch-zero-delay-loop.md) — sync.ts resync onmessage branch reconnects with NO delay; cold-start trigger fixed, branch unguarded for any other persistent resync cause; route resync reconnects through backoff.
+- [go-online self-echo + 409 gap](go-online-self-echo-409-gap.md) — FIXED: broadcast_precomputed exclude_device_id self-excludes the initiating device + goingOnlineUids guard (HTTP response is sole authority in-flight) + 409→clearOfflineState. Residual: bounded in-flight reconciliation window.
 
 ## Scoring & Standings
 - compute_final_standings = shared VEKN placement (winner=1, finalists tie 2nd) — see ARCHITECTURE.md (engine modules / League System).

@@ -153,6 +153,25 @@ def test_scope_matches_sanction_by_tournament_uid():
     assert _scope_matches(unscoped, other) is True
 
 
+def test_broadcast_precomputed_excludes_originating_device():
+    """exclude_device_id skips every connection identifying as that device (the
+    go-online self-exclusion that stops the initiating device receiving its own
+    offline_mode=false echo) while other devices and unidentified connections
+    still get the frame."""
+    initiating = SSEConnection(user=None, device_id="dev-A")
+    other_device = SSEConnection(user=None, device_id="dev-B")
+    no_device = SSEConnection(user=None)  # bot / pre-device client
+    _sse_connections.clear()
+    _sse_connections.update({initiating, other_device, no_device})
+    try:
+        broadcast_precomputed(_bd(uid="t1"), exclude_device_id="dev-A")
+        assert initiating.queue.empty()  # self-excluded
+        assert not other_device.queue.empty()  # different device still served
+        assert not no_device.queue.empty()  # no device_id never matches the filter
+    finally:
+        _sse_connections.clear()
+
+
 def test_broadcast_precomputed_coalesces_repeat_frames_per_object():
     """Repeated whole-object frames for the same (type,uid) supersede each other:
     the stalled queue holds ONE frame (the latest) per object, not a backlog —

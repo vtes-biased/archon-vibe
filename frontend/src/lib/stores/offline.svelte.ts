@@ -26,6 +26,15 @@ let lastSyncTimes = $state<Map<string, string>>(new Map());
 const syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const SYNC_DEBOUNCE_MS = 30_000;
 
+// Tournaments this device is actively bringing back online. While a go-online
+// is in flight its HTTP response is the sole authority on the lock outcome, so
+// any SSE lock-state frame for the tournament is ignored until it resolves (see
+// lostOfflineLock). The server already self-excludes this device from the
+// go-online echo (broadcast exclude_device_id); this guard is the tab-precise
+// backstop and also collapses a concurrent force-unlock/takeover frame into the
+// single warning the 410/409 response path raises. See lostOfflineLock.
+const goingOnlineUids = new Set<string>();
+
 /** Initialize offline state from IndexedDB on app startup. */
 export async function initOfflineState(): Promise<void> {
   const entries = await getMetadataByPrefix('offline_tournament:');
@@ -101,6 +110,12 @@ export function lostOfflineLock(t: {
   offline_device_id?: string;
 }): boolean {
   if (!isOffline(t.uid)) return false;
+  // A go-online we initiated is in flight: its HTTP response decides the lock
+  // outcome (success, 410 force-unlock, or 409 takeover all reconcile there), so
+  // ignore every SSE lock-state frame for this tournament until then — the
+  // server's own offline_mode=false echo AND a concurrent unlock/takeover alike.
+  // Acting on them here would double-report the transition the response handles.
+  if (goingOnlineUids.has(t.uid)) return false;
   return t.offline_mode !== true || t.offline_device_id !== getDeviceId();
 }
 
@@ -127,68 +142,80 @@ export async function goOffline(tournamentUid: string): Promise<void> {
 
 /** Bring a tournament back online with full reconciliation. */
 export async function goOnline(tournamentUid: string): Promise<Tournament> {
-  const deviceId = getDeviceId();
-  const tournament = await getTournament(tournamentUid);
-  if (!tournament) throw new Error('Tournament not found locally');
-
-  const offlinePlayers = await getOfflinePlayers(tournamentUid);
-
-  // Gather offline sanctions
-  const sanctionUids = await getOfflineSanctionUids(tournamentUid);
-  const offlineSanctions: Sanction[] = [];
-  for (const uid of sanctionUids) {
-    const s = await getSanction(uid);
-    if (s) offlineSanctions.push(s);
-  }
-
-  // Gather offline decks
-  const deckUids = await getOfflineDeckUids(tournamentUid);
-  const offlineDecks: DeckObject[] = [];
-  for (const uid of deckUids) {
-    const d = await getDeck(uid);
-    if (d) offlineDecks.push(d);
-  }
-
-  let result: Tournament;
+  // Suppress the go-online self-echo (offline_mode=false) over SSE until local
+  // offline state is cleared below — see goingOnlineUids / lostOfflineLock.
+  goingOnlineUids.add(tournamentUid);
   try {
-    result = await apiRequest<Tournament>(
-      `/api/tournaments/${tournamentUid}/go-online`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          device_id: deviceId,
-          tournament,
-          offline_players: offlinePlayers,
-          offline_sanctions: offlineSanctions,
-          offline_decks: offlineDecks,
-        }),
-      },
-      // handleGoOnline's catch toasts (incl. the localized 410 lock-lost
-      // message) and covers network errors — suppress apiRequest's duplicate.
-      { suppressErrorToast: true },
-    );
-  } catch (e) {
-    // 410: the server is no longer in offline mode (admin force-unlocked it, or
-    // it was already brought online). Don't leave the device wedged — drop the
-    // orphaned offline state and surface the data-loss; SSE delivers the
-    // authoritative state. (Distinct from the 409 device-mismatch, which offers force.)
-    if (e instanceof ApiError && e.status === 410) {
-      await clearOfflineState(tournamentUid);
-      throw new Error(m.offline_lock_lost_warning());
+    const deviceId = getDeviceId();
+    const tournament = await getTournament(tournamentUid);
+    if (!tournament) throw new Error('Tournament not found locally');
+
+    const offlinePlayers = await getOfflinePlayers(tournamentUid);
+
+    // Gather offline sanctions
+    const sanctionUids = await getOfflineSanctionUids(tournamentUid);
+    const offlineSanctions: Sanction[] = [];
+    for (const uid of sanctionUids) {
+      const s = await getSanction(uid);
+      if (s) offlineSanctions.push(s);
     }
-    throw e;
+
+    // Gather offline decks
+    const deckUids = await getOfflineDeckUids(tournamentUid);
+    const offlineDecks: DeckObject[] = [];
+    for (const uid of deckUids) {
+      const d = await getDeck(uid);
+      if (d) offlineDecks.push(d);
+    }
+
+    let result: Tournament;
+    try {
+      result = await apiRequest<Tournament>(
+        `/api/tournaments/${tournamentUid}/go-online`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            device_id: deviceId,
+            tournament,
+            offline_players: offlinePlayers,
+            offline_sanctions: offlineSanctions,
+            offline_decks: offlineDecks,
+          }),
+        },
+        // handleGoOnline's catch toasts (incl. the localized 410 lock-lost
+        // message) and covers network errors — suppress apiRequest's duplicate.
+        { suppressErrorToast: true },
+      );
+    } catch (e) {
+      // The offline session ended under this device — 410 (an IC force-unlocked
+      // it, or it was already brought online) or 409 (another device force-took
+      // over the lock). Either way this device's offline snapshot can't be
+      // synced: drop the orphaned local state and surface the loss (the lock-lost
+      // warning's "unlocked or taken over" covers both); SSE/snapshot then
+      // delivers the authoritative state. Without clearing on 409 the device
+      // wedges as offline, relying solely on the takeover's SSE frame landing.
+      // Reclaiming, if wanted, is a deliberate separate force-takeover — not a
+      // silent clobber of the other device from this sync path.
+      if (e instanceof ApiError && (e.status === 410 || e.status === 409)) {
+        await clearOfflineState(tournamentUid);
+        throw new Error(m.offline_lock_lost_warning());
+      }
+      throw e;
+    }
+
+    // Clean up temp user stubs (server created real users with uuid7 UIDs)
+    for (const p of offlinePlayers) {
+      await deleteUser(p.temp_uid);
+    }
+
+    // Update local state with server-reconciled version
+    await saveTournament(result);
+    await clearOfflineState(tournamentUid);
+
+    return result;
+  } finally {
+    goingOnlineUids.delete(tournamentUid);
   }
-
-  // Clean up temp user stubs (server created real users with uuid7 UIDs)
-  for (const p of offlinePlayers) {
-    await deleteUser(p.temp_uid);
-  }
-
-  // Update local state with server-reconciled version
-  await saveTournament(result);
-  await clearOfflineState(tournamentUid);
-
-  return result;
 }
 
 /** Force-takeover: claim offline lock from another device. */

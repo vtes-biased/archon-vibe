@@ -86,7 +86,7 @@ go-online resolves/creates offline players (`save_user` / `allocate_next_vekn_id
 - **Force-takeover**: another organizer can claim the lock (warned about losing the primary's unsaved data).
 - **Opportunistic sync**: the primary can background-sync without unlocking (`sync-offline`).
 - **IC force-unlock**: emergency unlock without syncing offline data (first-party IC sessions only — OAuth tokens rejected).
-- **Lock-loss reconciliation**: when a force-unlock or takeover reaches the previously isolated device via SSE/snapshot, it clears local offline state and warns the user their unsynced changes are discarded. `go-online` returns 410 if the server is no longer in offline mode, preventing a stale snapshot from clobbering authoritative state. (Full mechanics: SYNC.md.)
+- **Lock-loss reconciliation**: when a force-unlock or takeover reaches the previously isolated device via SSE/snapshot, it clears local offline state and warns the user their unsynced changes are discarded. `go-online` returns 410 (no longer offline) or 409 (another device took over) so a stale snapshot can't clobber authoritative state, and the server self-excludes the initiating device from its own go-online broadcast so a normal online transition doesn't self-trip that warning. (Full mechanics: SYNC.md.)
 
 ## Mutation Pipeline
 

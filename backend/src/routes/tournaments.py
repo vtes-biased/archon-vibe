@@ -1717,8 +1717,13 @@ async def go_online(
         bd.org_uids = updated.organizers_uids
         broadcast_precomputed(bd)
 
-    # 7. Broadcast updated tournament
-    broadcast_precomputed(tournament_bd)
+    # 7. Broadcast updated tournament — but NOT back to the initiating device:
+    # it gets the authoritative reconciled tournament in this endpoint's HTTP
+    # response (saveTournament), and its own offline_mode=false echo would race
+    # ahead of that response and trip the client's lost-lock warning. Only the
+    # tournament frame self-excludes; the resolved users / decks / sanctions /
+    # ratings broadcasts above intentionally reach the device (it lacks them).
+    broadcast_precomputed(tournament_bd, exclude_device_id=request.device_id)
 
     # An event run+finished offline would otherwise get its rating points only on
     # the next daily recompute (~24h late). Mirror the action route and recompute
