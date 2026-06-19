@@ -9,8 +9,8 @@ metadata:
 
 Consumers that rely on prelim-only standings + add finals separately: `engine/src/league.rs` RTP/GP modes (re-add `tournament["finals"]` seats on top), frontend `leagues/[uid]/+page.svelte` via `computeLeagueStandings`.
 
-**Violation (pre-#67, surfaced by #67):** `backend/src/archon_import.py` (~lines 401-403, 438-447) hand-sums finals gw/vp/tp INTO `tournament.standings`. An imported tournament in a league therefore **double-counts finals** in RTP/GP, and its standings GW won't match a prelim recompute.
+**Violation (pre-existing, surfaced during the SA single-sourcing work):** `backend/src/archon_import.py` (~lines 401-403, 438-447) hand-sums finals gw/vp/tp INTO `tournament.standings`. An imported tournament in a league therefore **double-counts finals** in RTP/GP, and its standings GW won't match a prelim recompute.
 
-**Why:** pst #67 single-sourced the SA scoring rule into Rust and made "standings = SA-adjusted prelim" the explicit engine contract; the Python importer builds state by hand instead of routing through the engine, so it drifted.
+**Why:** the SA single-sourcing work moved the SA scoring rule into Rust and made "standings = SA-adjusted prelim" the explicit engine contract; the Python importer builds state by hand instead of routing through the engine, so it drifted.
 
 **How to apply:** any change touching imported-tournament standings, league scoring, or the standings shape must keep stored standings prelim-only. Prefer routing imports through `engine.update_standings` over hand-summing in Python. See [[sa-penalty-duplicated-in-python]] and [[final-standings-helper]].

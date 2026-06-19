@@ -1,6 +1,6 @@
 ---
 name: error-codes-contract
-description: Structured engine error-code contract (#107) — code/params wire format spanning Rust, WASM, PyO3, HTTP, frontend i18n
+description: Structured engine error-code contract — code/params wire format spanning Rust, WASM, PyO3, HTTP, frontend i18n
 metadata:
   type: project
 ---

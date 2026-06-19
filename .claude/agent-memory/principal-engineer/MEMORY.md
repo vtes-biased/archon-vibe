@@ -28,7 +28,7 @@
 - **SSE serves raw JSON via `SELECT col::text`** — never reintroduce a parse→Struct→reserialize cycle (that was the original perf sink; design intent is zero re-serialization on the stream path).
 - Optimistic updates: WASM applies locally first, server confirms via SSE, frontend rolls back on rejection. Reads stay offline-first (IndexedDB only) — no API GET for display.
 - Pydantic for request parsing, msgspec for response serialization.
-- Authz decisions are single-sourced in Rust (`engine/src/permissions.rs`), exposed via PyO3 + WASM — see [Authz single source](project_authz_single_source_rust.md).
+- Authz decisions are single-sourced in Rust (`engine/src/permissions.rs`), exposed via PyO3 + WASM — see ARCHITECTURE.md (Authorization).
 
 ## Open items (verified residual, 2026-06)
 - `engine.ts` `TournamentEventType` is missing `CheckOut` vs the Rust enum (optimistic update silently falls back to server-only for that event).
@@ -43,37 +43,31 @@
 
 ## Recurring trap: manual object reconstruction
 - Several call sites hand-rebuild a `Sanction(...)` / `User(...)` from fields (sanction cleanup in `main.py`, sanctions delete endpoint, merge/detach in `db.py`). When a model gains a field, grep ALL manual constructors — prefer `msgspec.structs.replace` over hand-listing fields (hand-listing silently drops new fields, e.g. `resync_after`).
-- Reassigning object refs (sanctions/decks/coopted_by on merge/detach) MUST return `BroadcastData` and broadcast, or other clients stay stale until snapshot resync. This is the established pattern as of pst #78 — preserve it in any new merge-like flow.
+- Reassigning object refs (sanctions/decks/coopted_by on merge/detach) MUST return `BroadcastData` and broadcast, or other clients stay stale until snapshot resync — the established pattern; preserve it in any new merge-like flow.
 - Svelte 5 `$props()`: props must be listed in the destructure, not just the type annotation.
 
 ## Sync-correctness traps
 - [Destructive store-wipe offline rescue](destructive-store-wipe-offline-rescue.md) — db.ts upgrade AND sync.ts clearAllStores both wipe stores; must rescue the FULL offline set (tournament + sanctions + decks + player-stubs).
-- [Sync cursor timestamp trap](sync-cursor-timestamp-trap.md) — objects table has TWO modified timestamps (column `modified_at` vs JSONB `modified`); diverge in value AND format; never mix in a since-cursor.
-- [tournament_transaction nested pool](tournament-transaction-nested-pool.md) — reads join the txn (ambient `_tx_conn`), writes acquire the pool independently; the asymmetry is load-bearing (go_online VEKN-id collision).
+- objects has two timestamps (column modified_at vs JSONB modified); never mix in the since-cursor — see SYNC.md (Sync Cursor).
+- tournament_transaction connection discipline (reads join txn; writes acquire pool independently; never a 2nd conn under lock) — see ARCHITECTURE.md (Database Access & Connection Model).
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — holds player user_uids; easily missed in any per-player UID remap.
-- [User delete SSE](user-delete-sse-noop.md) — soft-deleted users are SAVED (not removed) so by-uid refs resolve; filtered only from listing queries.
-- [Error localization offline-path trap](error-localization-offline-path-trap.md) — localizing engine errors must cover the offline WASM path + JS pre-checks (toUserMessage has no EngineError branch), not just the HTTP body, or offline-first stays English.
+- [Error localization across throw surfaces](error-localization-offline-path-trap.md) — engine-error localization covers HTTP + offline WASM + JS pre-checks (wired); preserve all three when changing error presentation.
 - [Resync branch zero-delay loop](sync-resync-branch-zero-delay-loop.md) — sync.ts resync onmessage branch reconnects with NO delay; cold-start trigger fixed, branch unguarded for any other persistent resync cause; route resync reconnects through backoff.
 
 ## Scoring & Standings
-- [Final standings helper](project_final_standings_helper.md) — `compute_final_standings` is the shared VEKN placement fn (winner=1, finalists tie 2nd).
+- compute_final_standings = shared VEKN placement (winner=1, finalists tie 2nd) — see ARCHITECTURE.md (engine modules / League System).
 - [SA penalty single-sourced in Rust](sa-penalty-duplicated-in-python.md) — SA scoring lives only in `engine.compute_rating_vp_gw`; never re-derive in Python.
 - [Standings are prelim-only](standings-prelim-only-contract.md) — `tournament.standings` = SA-adjusted prelim, finals excluded; the Python archon importer violates this (stores finals-inclusive) → league double-counts finals.
 - [Rounds⇔standings coupling](rounds-standings-coupling-engine.md) — engine invariant: standings non-empty iff rounds non-empty; makes the VEKN `batch_push` `rounds>0` guard safe (excludes imports, keeps in-app tournaments).
 
 ## Authorization (cross-stack)
-- [Authz single source = Rust](project_authz_single_source_rust.md) — predicates live in `engine/src/permissions.rs` (PyO3 + WASM), the agreed cross-stack-DRY exception.
+- Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).
 
 ## Error handling (cross-stack)
 - [Error-codes contract](error-codes-contract.md) — `EngineError` enum = single error taxonomy; `{code,params,message}` wire JSON across WASM/PyO3/HTTP; domain rejection MUST be an explicit variant (From-impls silently demote to internal); EngineRejection-in-transaction is sound FastAPI.
 
-## Legacy-archon merge (#115)
-- [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; tournament meta + officials' contact_email can oscillate daily unless single-writer enforced (member side is, tournament side isn't).
-
-## Migration redesign (#169 vekn-matching + sync-first, 2026-06)
-The redesign shipped (vekn-id member matching, no tombstone, vekn-less shells,
-`member_uid_map` remap of all member-uid refs). Implementation + the full ref
-surface + the now-fixed coopted_by/idempotence detail all live in
-`.pst/details/169-vekn-id-matching-merge.md`. Two residual hazards worth keeping:
-- [Vekn-less drop is NOT ref-free (measured)](migration-veknless-orphan-measured.md) — dropping the 142 vekn-less members orphans 9 refs (4 players + 5 seats) in 3 Finished RICH tournaments; old archon never enforced vekn at registration. Probe recipe in file (reusable for the #39/#40 prod runs).
-- [vekn_id unique index spans tombstones](vekn-unique-index-spans-tombstones.md) — index has no deleted_at exclusion; soft-deleted user reserves its vekn_id; lookups that filter deleted_at disagree → seed-insert can crash on a reserved number. UNFIXED, reachable on steady-state nightly merges (admin user-delete keeps vekn_id).
+## Migration / legacy-archon merge (residual hazards)
+- [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; tournament meta + officials' contact_email oscillate daily unless single-writer enforced (member side is, tournament side isn't).
+- [Vekn-less drop is NOT ref-free (measured)](migration-veknless-orphan-measured.md) — dropping the 142 vekn-less members orphans 9 refs (4 players + 5 seats) in 3 Finished tournaments; old archon never enforced vekn at registration. Reusable probe recipe in file.
+- [vekn_id unique index spans tombstones](vekn-unique-index-spans-tombstones.md) — index has no deleted_at exclusion; soft-deleted user reserves its vekn_id; deleted_at-filtered lookups disagree → seed-insert can crash on a reserved number. UNFIXED, reachable on steady-state nightly merges (admin user-delete keeps vekn_id).
+- The vekn-id-matching redesign (member matching, no tombstone, vekn-less shells, `member_uid_map` remap of all member-uid refs) shipped; full impl + ref surface in `.pst/details/169-vekn-id-matching-merge.md`.

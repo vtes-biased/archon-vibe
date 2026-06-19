@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-The `--merge` mode of `backend/scripts/migrate_from_archon.py` (pst #115, runs daily during the production parallel run alongside both VEKN syncs) shares fields with `vekn_sync.py` and `vekn_tournament_sync.py`. "Single writer per field" is enforced for **members** (via `ARCHON_USER_FIELDS`) but NOT for **tournaments** — `build_tournament` writes the whole object.
+The `--merge` mode of `backend/scripts/migrate_from_archon.py` (runs daily during the production parallel run alongside both VEKN syncs) shares fields with `vekn_sync.py` and `vekn_tournament_sync.py`. "Single writer per field" is enforced for **members** (via `ARCHON_USER_FIELDS`) but NOT for **tournaments** — `build_tournament` writes the whole object.
 
 Two cross-sync daily-churn (flip-flop) vectors, each silent and producing daily SSE catch-up churn:
 

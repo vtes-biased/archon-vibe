@@ -33,10 +33,6 @@ build roles like "Prince" → `organization >= 2`, "Judge" → `judge >= 2`, "VE
 The user's Discord profile shows `platform_name = "Archon"`,
 `platform_username = vekn_id or name` (`build_platform_info()`).
 
-> Earlier drafts of this doc proposed a 5-field design (`admin_level`, `judge_level`,
-> `pt_level`, `is_member`, `member_since`) with Fernet-encrypted tokens on `AuthMethod`.
-> That was never shipped — the 3-field design above is what the code registers.
-
 ## Implementation
 
 - `backend/src/roles_hook/__init__.py` —
@@ -53,8 +49,6 @@ The user's Discord profile shows `platform_name = "Archon"`,
   (`routes/vekn.py`, `routes/users.py`).
 - Frontend entry points: "Login with Discord" (`routes/login`) and the profile
   "Link Discord" button (`routes/profile`, `link=true`).
-
-Tokens live in the transient-token store, not encrypted on `AuthMethod`.
 
 ## Discord Developer Portal setup (one-time per app / environment)
 
@@ -73,8 +67,7 @@ Then, in any server: Server Settings → Roles → a role → **Links → Add re
 pick the app → set criteria. Members opt in via the server-name menu → **Linked Roles →
 Connect**.
 
-Verified working on **beta** (`new.archon.krcg.org`). Prod cutover repeats steps 1–2
-against `archon.vekn.net` (tracked on the Phase 3 cutover ticket).
+Prod cutover repeats steps 1–2 against the production domain (`archon.vekn.net`).
 
 ## Environment variables
 

@@ -25,5 +25,5 @@ Round seating-alteration (RoundsTab.svelte AlterSeating / SwapSeats / SeatPlayer
 **How to apply:**
 - Scope call: minimal correctness fix FIRST (p2) — save-time {4,5} block + empty-table block + downgrade repeat to warn + gate AddTable behind draft. Cheap, isolated, no architecture risk.
 - Unifying swap/seat/unseat/add/remove into one "edit seating" draft with a changed-player-set save is a larger p3 — it breaks AlterSeating's same-player-set invariant (must absorb SeatPlayer/UnseatPlayer), so it's an engine-contract change needing principal-engineer review, not just Svelte. File separately; don't bundle.
-- Reuse the existing `check_table_vps` "size 4 or 5" guard (TOURNAMENTS.md ~line 218) at the AlterSeating save path, not only at scoring.
+- Reuse the existing `check_table_vps` "size 4 or 5" guard (see TOURNAMENTS.md) at the AlterSeating save path, not only at scoring.
 - See [[vekn-standings-toss-scope]] for the "when possible" / best-effort framing precedent.

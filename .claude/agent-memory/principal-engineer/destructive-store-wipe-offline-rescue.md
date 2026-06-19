@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-Destructive IndexedDB store-wipes must rescue the FULL in-flight offline set, not just the tournament row. There are TWO triggers of the same data-loss class (epic #1, pst #14):
+Destructive IndexedDB store-wipes must rescue the FULL in-flight offline set, not just the tournament row. There are TWO triggers of the same data-loss class:
 
 1. `frontend/src/lib/db.ts` `getDB()` upgrade handler — destructive drop/recreate on any DB_VERSION bump (forces full SSE resync). Fixed via `rescueOfflineData()`/`restoreOfflineData()` inside the versionchange tx.
 2. `frontend/src/lib/sync.ts` `clearAllStores()` — server-driven resync (stale cursor / role change) + refresh + logout reset. More frequent trigger. Historically rescued ONLY the tournament row, dropping offline sanction/deck rows and player user-stubs.

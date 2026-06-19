@@ -36,6 +36,17 @@ Steps 3-6 should run in parallel when applicable. Skip agents only for trivial c
 - **Packaged data files** (backend): load bundled data (JSON/SQL/xlsx under `backend/src/data/`) via `importlib.resources.files(__package__).joinpath(...).read_text()` — never `Path(__file__).parent`. `files()` resolves correctly when the backend runs as an installed wheel (CI artifact), not just from the source tree; `Path(__file__)` is the `#80`-class runtime-path bug. See `geonames.py`, `card_data.py`, `db.py` for the pattern.
 - **Personal data / secrets are never committed** (the repo is public and CI publishes wheels as release assets). Don't bundle PII (e.g. scraped contact emails) into the package — it would ship inside the public wheel. Deliver it out of band: an `ansible-vault` file decrypted at deploy to a runtime path (env-pointed, e.g. `OFFICIALS_CONTACTS_FILE`), with an untracked dev copy and graceful absence. See `vekn_sync.py`'s officials-contacts loader.
 
+## Working conventions
+
+- **No red builds**: never report done over a failing build/test/lint — fix it or file a pst ticket. When touching build/packaging/test config, run the affected `just`/`make` targets and confirm green.
+- **Minimal, meaningful tests**: default to zero new tests; add one only for a real regression with consequences — asserted at an interface, against the shipped artifact (import shared constants, never copy; no heavy mocks/seeds), one per invariant. Never encode engine-impossible states (VP sums = table size, 4–5-seat tables, stored `gw`/`tp` consistent with `compute_gw`/`compute_tp`).
+- **Terse comments**: explain only the non-obvious (a why/gotcha/invariant) — never restate the code or narrate a change's history.
+- **Locality over DRY**: prefer explicit, greppable local code over clever wrappers; dedup only large or fragile/hazardous duplication, not a few near-identical lines.
+- **No pst numbers in commits or code**: never put `#N` / `pst #N` in commit messages or comments/docstrings (they clash with GitHub issue refs) — track linkage via the board; reference a `.pst/details/<slug>.md` path if needed.
+- **Keep overview docs lean**: when an issue is fixed, remove its mention from the docs (don't annotate "Resolved") — resolution detail lives in the pst detail file.
+- **Discuss before filing simplifications**: a simplify/refactor ticket is itself a decision — ground it in code and agree it *should* change before filing; cheap + isolated + useful features aren't simplification targets.
+- **Context lives in-repo**: put durable project facts in the right doc (ARCHITECTURE/SYNC/PRODUCT/TOURNAMENTS, this file, agent definitions, `.pst/details/`), not in personal auto-memory. Agent memory under `.claude/agent-memory/` is the in-repo exception, for agent-specific traps.
+
 # Architecture
 
 Offline-first PWA. Keep deep design detail in the dedicated docs, not here:

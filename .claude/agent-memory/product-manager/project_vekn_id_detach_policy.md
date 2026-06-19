@@ -18,14 +18,14 @@ vekn_prefix, all 4 ratings, wins, vekn_synced bookkeeping, decks, sanctions,
 community_links.
 **Person (new uid) gets:** auth methods, name (copied), nickname, avatar,
 contact_email/discord/phone, discord_id, phone_is_whatsapp, **calendar_token (carried,
-follows the human — both merge and detach re-home it via get_calendar_token; #4 had
-fixed merge to carry but left strip/split dropping it; #59 made them consistent)**.
+follows the human — both merge and detach re-home it via get_calendar_token; an earlier fix
+made merge carry it but left strip/split dropping it; a later one made them consistent)**.
 
 **FINAL DECISION — owner REJECTED the sanction-level exception (do not reintroduce).**
 Sanctions are NOT partitioned by level and NEVER follow the person; all stay with the
 VEKN record (keying on the stable uid, untouched). The level-aware "active suspension/
 probation follows the human" idea was rejected as exactly the acrobatic special-casing
-#59 set out to remove. The sanction-dodge is closed instead by a single guard:
+the detach rework set out to remove. The sanction-dodge is closed instead by a single guard:
 **self-`/abandon` is blocked while the user holds an active suspension/probation**
 (`user_has_active_suspension`: not deleted, not lifted, not expired). Admin
 `/force-abandon` is EXEMPT (officials act deliberately).
@@ -43,11 +43,11 @@ record's uid stable, so whatever stays on that uid stays linked; whatever moves 
 new uid is severed. Policy only decides which side each *User-table field* lands on; the
 default for any new field is "stays with the record" (never leak VEKN history).
 
-**Status: IMPLEMENTED (#59 + #65).** `strip_vekn_from_user` + `split_user_from_vekn`
+**Status: IMPLEMENTED.** `strip_vekn_from_user` + `split_user_from_vekn`
 collapsed into one `detach_user_from_vekn(uid) -> (personal_account, vekn_record)`; the
 displace/abandon difference (re-merge the freed record into a new owner) lives in the
 caller `/link`, not in detach. `merge_users` is now field-driven via
 `msgspec.structs.replace(keep_user, …)` and reassigns decks. Live-SSE propagation of the
-orphan/merged record is a known pre-existing lag (#66). country/city/state and
+orphan/merged record is a known pre-existing lag. country/city/state and
 community_links stay with the RECORD (jurisdiction + office). See
 [[vekn-account-surgery-bugs]] and .pst/details/59-vekn-detach.md.

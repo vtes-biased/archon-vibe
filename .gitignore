@@ -83,10 +83,12 @@ INCOMING/
 # Claude Code (user-specific settings and private memory)
 .claude/settings.local.json
 .claude/projects/
-# Stray subagent memory: `memory: project` resolves `.claude/` relative to cwd,
-# so an agent run from a subdir writes here instead of the tracked root .claude/.
-# Anchored to depth-1 subdirs so the root .claude/ is never matched.
-/*/.claude/
+# `memory: project` resolves `.claude/agent-memory/` relative to cwd, so an agent
+# run from a package subdir would otherwise write strays there. Each subdir's
+# `.claude/agent-memory` is a committed symlink back to the root one (../../.claude/
+# agent-memory), so subdir-cwd writes land in the tracked root memory. Keep per-subdir
+# local settings out of the tree:
+/*/.claude/settings.local.json
 
 # Ansible
 ansible/build/

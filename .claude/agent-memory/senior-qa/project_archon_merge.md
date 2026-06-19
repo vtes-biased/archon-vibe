@@ -6,8 +6,8 @@ metadata:
 ---
 
 The legacy-archon → new-stack **daily merge** (`backend/scripts/migrate_from_archon.py`
-`--merge` mode) runs during the production parallel run (pst #115; real
-acceptance is a prod-dump rehearsal, pst #91 — unit tests are only high-confidence
+`--merge` mode) runs during the production parallel run (real
+acceptance is a prod-dump rehearsal — unit tests are only high-confidence
 regression guards). Coverage: `backend/tests/test_archon_merge.py`.
 
 **Shipped functions the tests exercise directly** (importable, no mocks):
@@ -22,7 +22,7 @@ member field-ownership respecting `local_modifications`; member vekn-id dedup
 (`members.vekn_copy_tombstoned`).
 
 **The "no sync ever writes roles" invariant (security-relevant, was UNCOVERED
-before #115).** Roles are seeded once from old archon (`build_user`) and
+before the merge work).** Roles are seeded once from old archon (`build_user`) and
 app-managed thereafter. Two sides now enforce it, guarded by one test each:
 - `_map_vekn_to_user` omits the `roles` key entirely (was: princeid→PRINCE,
   coordinatorid→NC, static ADMINS/JUDGES lists; `vekn_roster.py` deleted).
@@ -30,7 +30,7 @@ app-managed thereafter. Two sides now enforce it, guarded by one test each:
   regression here flip-flops IC/NC/PRINCE access control daily.
 - `merge_member` never merges roles (`ARCHON_USER_FIELDS` excludes them).
   Test: `test_member_merge_respects_field_ownership`.
-No pre-#115 test imported `VEKNSyncService`/`_map_vekn_to_user` — `mock_vekn_data.py`
+No earlier test imported `VEKNSyncService`/`_map_vekn_to_user` — `mock_vekn_data.py`
 sets `Role.*` directly on User objects, it does NOT exercise the derivation.
 
 **Self-edit survives sync invariant (write side).** `profile.py` now records

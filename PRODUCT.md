@@ -8,7 +8,7 @@ Archon is an **offline-first Progressive Web App** for managing VTES (Vampire: T
 
 **Core value proposition**: A tournament organizer can run a full VTES event from their phone, even without internet, and results sync automatically when connectivity returns.
 
-**What Archon does NOT do**: Archon does not handle card rulings, provide a rules engine for the card game itself, or replace the VTES rulebook. It manages the tournament logistics layer.
+**What Archon does NOT do**: handle card rulings, provide a rules engine for the card game itself, or replace the VTES rulebook. It manages the tournament logistics layer.
 
 ## 2. User Roles & Personas
 
@@ -18,37 +18,17 @@ Archon is an **offline-first Progressive Web App** for managing VTES (Vampire: T
 
 **In a tournament context, organizers and judges have identical permissions.** An event can have multiple organizers, all equal (no "head organizer" distinction in the app). The creator can add/remove other organizers.
 
-**VEKN Judge Certifications** (profile titles, NOT elevated tournament permissions):
-- **Judge**: Certified VEKN judge
-- **Judgekin**: Junior judge certification
-- **Rulemonger**: Rules specialist
+**VEKN Judge Certifications** (profile titles, NOT elevated tournament permissions): **Judge** (certified VEKN judge), **Judgekin** (junior), **Rulemonger** (rules specialist). They appear on member profiles but grant no extra power in tournament management.
 
-These appear on member profiles but do not grant additional powers in tournament management.
+**Needs**: create/advertise tournaments (venue/date/format); add/remove co-organizers; register players + check-in; generate VEKN-compliant seatings; record + validate results; issue event sanctions; run finals qualification + seating; finish + report.
 
-**Needs**:
-- Create and advertise tournaments with venue/date/format info
-- Add/remove co-organizers
-- Register players, manage check-in
-- Generate round seatings that follow VEKN rules
-- Record and validate table results
-- Issue event-level sanctions (Caution, Warning, Standings Adjustment, DQ)
-- Run finals qualification and seating
-- Finish and report tournament results
-
-**Pain points**: Manual seating calculations, VP validation errors, slow check-in at large events, re-entering data when connectivity drops.
+**Pain points**: manual seating calculations, VP validation errors, slow check-in at large events, re-entering data when connectivity drops.
 
 ### 2.2 Player
 
-**Profile**: VEKN member attending tournaments. Checks standings, views table assignments, reports own table results. Uses a phone.
+**Profile**: VEKN member attending tournaments, on a phone. Checks standings, views table assignments, reports own table results.
 
-**Needs**:
-- Register for upcoming tournaments
-- Check in (including via QR code)
-- View table assignment and seat position each round
-- Report table results (VP scores) — players at a table can set scores; organizer override locks them
-- View standings during and after the event
-- Upload deck list when required
-- View personal rating and history
+**Needs**: register for tournaments; check in (incl. QR); view table assignment + seat each round; report VP scores (players at a table can set scores; organizer override locks them); view standings during/after; upload deck when required; view personal rating + history.
 
 ### 2.3 VEKN Officials (NC, IC/Admin)
 
@@ -56,12 +36,9 @@ These appear on member profiles but do not grant additional powers in tournament
 
 **CRITICAL: ICs (admins) always have full access to everything and all permissions, everywhere in the app.** When any access rule mentions Princes or NCs, ICs implicitly have the same or greater access.
 
-**Needs**:
-- Sponsor new VEKN members
-- Manage Prince/NC appointments
-- View all tournaments and results in their jurisdiction
-- Access player contact information (NC/Prince: same country; IC: all)
-- View and manage sanctions
+**Needs**: sponsor new VEKN members; manage Prince/NC appointments; view all tournaments/results in jurisdiction; access player contact info (NC/Prince: same country; IC: all); view + manage sanctions.
+
+**Implicit organizer access**: NC (and IC) implicitly act as organizers on tournaments in their country; a Prince does **not** — it's a city-level role without that oversight. Judge-call broadcasts reach the explicit tournament organizers only (not IC/NC), since they're the ones physically present.
 
 ## 3. VEKN Tournament Rules (App-Relevant Summary)
 
@@ -100,7 +77,7 @@ Barriers to check-in:
 
 **Table composition** (VEKN rules 3.1.2):
 - Groups of 4 and 5, maximizing tables of 5
-- Impossible player counts: 6, 7, 11 (cannot form valid tables)
+- Impossible player counts: 6, 7, 11 (cannot form valid tables) — engine uses staggered seatings (bye rotation across rounds so everyone plays equally)
 - Seating must be random and impartial
 
 **Seating optimization priorities** (implemented in Rust engine):
@@ -116,7 +93,7 @@ Barriers to check-in:
 
 **Time limit**: Minimum 2 hours per round. Finals may be longer.
 
-**Tournament without final**: Allowed for any tournament (must be announced before the first round). However, tournaments without finals are not ranked in international rankings — they can only count for league standings.
+**Tournament without final**: Allowed for any tournament (must be announced before the first round). Such tournaments are not ranked internationally — they can only count for league standings.
 
 ### 3.4 Scoring System
 
@@ -136,7 +113,7 @@ Barriers to check-in:
 - Ties: Average TP across tied positions
 
 #### VP Validation
-The engine validates that VP combinations match a physically possible oust sequence around the table. This considers seating order (predator-prey). See TOURNAMENTS.md for the algorithm.
+The engine validates that VP combinations match a physically possible oust sequence around the table (considers seating order / predator-prey). See TOURNAMENTS.md for the algorithm.
 
 ### 3.5 Finals Qualification
 
@@ -148,14 +125,14 @@ After preliminary rounds, top 5 players qualify. Ranking order:
 
 Organizers must drop unavailable finalists before launching finals.
 
+Published preliminary standings rank GW > VP > TP using competition ranking with skips (tied players share a place; the next place is skipped). The random toss resolves only a tie straddling the top-5 finals cutoff — it never re-orders tied players elsewhere in the standings.
+
 ### 3.6 Finals Seating Procedure
 
 **Not** algorithm-assigned. Finalists choose seats in a specific order:
 
 1. Each finalist shuffles their crypt; judge draws 3 random cards (public info)
-2. Starting with lowest qualifier (#5), each places their name card:
-   - At either end of a row, OR
-   - In a gap between two already-placed cards
+2. Starting with lowest qualifier (#5), each places their name card at either end of a row, OR in a gap between two already-placed cards
 3. Read left-to-right for final seating positions
 4. Judge randomly determines who plays first
 
@@ -195,7 +172,7 @@ Organizers must drop unavailable finalists before launching finals.
 #### Visibility Rules
 
 - **Caution**: belongs to the tournament where it was issued — shown only in that event's context (the sanction dot next to the player). Hidden on member pages and in other events, except to IC/Ethics.
-- **Warning / SA / DQ**: visible on the member detail page and members list, and in other tournaments' context (the dot shows them to organizers of later events), for **18 months** from issuance.
+- **Warning / SA / DQ**: visible on the member detail page and members list, and in other tournaments' context, for **18 months** from issuance.
 - **Suspension / Probation**: membership-level, always visible; a permanent ban (suspension without expiry) stays visible past 18 months.
 - IC/Ethics see all levels on every surface. The filtering is a display rule — all sanction records sync to all members' clients (member access level).
 
@@ -216,8 +193,6 @@ Single source: `engine/src/permissions.rs` (`can_issue_sanction`, `can_lift_sanc
 - **Probation requires an expiry** (≤ 18 months); suspension expiry is optional — none means permanent ban.
 - **Cleanup job (daily)**: sanctions expired for over 18 months are soft-deleted; soft-deleted records are hard-deleted after 30 days (a mistaken organizer delete stays recoverable by IC in that window).
 - **Active suspension** blocks check-in/registration in any sanctioned event and blocks self-abandoning the VEKN ID; sanctions stay attached to the VEKN record through account merge/detach (see ARCHITECTURE.md).
-
-**App tracking**: Archon tracks all sanction types. Event-level sanctions are issued via the sanction modal on the tournament page (with JG v2 per-infraction escalation hints); the colored dot next to a sanctioned player opens a list where the organizer can review and cancel them. VEKN-wide sanctions (suspension/probation) are managed from the member detail page. Suspended/banned players are blocked from check-in.
 
 ### 3.9 Special Situations
 
@@ -274,232 +249,33 @@ attendee is not expected to crack open IndexedDB to influence standings). Making
 display defaults a real boundary would require a per-player overlay — more complexity than
 the risk warrants. Treat the matrix as UI defaults, not a security guarantee.
 
-## 5. Feature Inventory
+## 5. Feature Map
 
-### 5.1 Implemented
+A compact map of what exists; implementation detail lives in code and the docs in §9. **Outstanding/planned work is tracked in pst tickets, not here** — that previously included the Discord tournament bot, tournament audit logs, Draft/Limited pod support, multi-day events, auto-close, deck statistics, and spectator mode.
 
-**Authentication & Accounts**:
-- Email + password registration and login
-- Magic link authentication (signup, password reset, invite flow — link valid until password is actually set)
-- WebAuthn / Passkeys (registration and login, both for existing and new users)
-- Discord OAuth login and account linking
-- Discord Linked Roles integration — auto-assign VEKN roles (organization, judge, playtest) to Discord server members
-- JWT-based sessions with refresh tokens
-- Auto-focus first input field when modals open
-
-**Member Management**:
-- User accounts with profile (name, country, city, social links, contact info: email, Discord, phone)
-- Avatar upload with client-side cropping and server-side compression
-- VEKN ID claiming (existing members), sponsoring (new members), linking (admin), force-abandon (admin)
-- VEKN ID abandon (self-service: unlink account from VEKN ID, keeps history)
-- Role management: IC, NC, Prince, Judge, Judgekin, Rulemonger, Ethics, PTC, Playtester, DEV
-- User merging (IC/NC/Prince, same-country constraint — merges all associated data)
-- Cooptation tracking (`coopted_by`, `coopted_at` on User, inferred during VEKN sync)
-- Privacy-filtered user directory (contact info hidden at member level)
-- User profile page with ratings history, tournament wins, sanctions
-
-**Tournament Core**:
-- Tournament creation with full configuration: format (Standard/V5/Limited/Draft), rank (Basic/NC/CC), proxies, multideck, online, venue, dates, timezone, country, description, max_rounds
-- State machine: Planned → Registration → Waiting → Playing → Finished (with Reopen options)
-- Player registration, unregistration, add/remove player, drop-out
-- Check-in (single, check-in-all, reset check-in)
-- Round seating via simulated annealing (Rust engine) with 9 optimization priorities
-- Staggered seatings for impossible player counts (6, 7, 11) — bye rotation across rounds
-- VP score entry with oust-order validation (simulates physical oust sequence around table)
-- GW/TP auto-computation per VEKN rules
-- Judge override (forces table to Finished with mandatory comment) / Unoverride
-- Standings calculation (GW > VP > TP ranking)
-- Finals qualification with toss for ties (manual and random toss)
-- Finals seating with AlterSeating (organizer inputs result of physical card-drawing procedure)
-- Cancel round, cancel registration, reopen registration, reopen tournament
-- Tournament finish and deletion (Planned state only)
-- Tournament configuration update (format, rank, settings — some fields immutable after VEKN push)
-- `UpdateConfig` action for timer settings, standings/decklists modes, table rooms
-
-**Seating Editor**:
-- Drag-and-drop seating editor with touch support (`@dragdroptouch`)
-- Per-player issue indicators (sanctions, missing deck, payment status)
-- SwapSeats, SeatPlayer, UnseatPlayer, AddTable, RemoveTable, AlterSeating events
-- AlterSeating for both preliminary rounds and finals table
-
-**Round Timer** (online-only):
-- Global round timer: start/pause/reset, visible to all connected players
-- Per-round and per-finals time configuration
-- Per-table extra time additions (+N minutes, capped at 600s total)
-- Visual countdown with warning state (<5 min) and expired state
-- Timer state synced via normal SSE (no per-second broadcasts — clients compute locally)
-
-**Call for Judge** (online-only):
-- Player button sends ephemeral SSE alert to organizer console and IC users
-- Stacking dismissible banners with audio chime
-- Auto-dismiss after 120s
-- Validates: player seated at specified table, tournament in Playing state, not offline
-
-**Raffle**:
-- Random draw from configurable player pools: AllPlayers, NonFinalists, GameWinners, NoGameWin, NoVictoryPoint
-- Draw/Undo/Clear actions
-- RaffleSection component in tournament organizer view
-
-**Table Rooms**:
-- Organizers assign named rooms to table ranges (e.g., "Lobby: tables 1-5")
-- Room names appear as table labels in seating displays, print views, and player views
-- `TableRoomsEditor.svelte` for configuration
-
-**Deck Management**:
-- VTES card database loaded from JSON into IndexedDB (`cards` store)
-- Deck upload: text paste, deckbuilder URL (VDB, VTESDecks, Amaranth), QR code scanner (camera)
-- Deck parsing in Rust: Lackey, JOL, TWDA formats
-- Deck validation: crypt/library counts, banned cards, group rules, V5 format, multideck rules
-- Deck enrichment: card names, types, disciplines, image URLs from card database
-- Deck attribution: player or named author (autocomplete member search)
-- Decklist requirement enforcement (blocks check-in if deck not uploaded — organizer can override with warning)
-- Multideck support: per-round decks, locked once their round starts
-- Post-tournament deck upload (winner's deck recovery)
-- Deck visibility filtering by `decklists_mode` (Winner/Finalists/All)
-- Card search component with autocomplete (searches crypt + library)
-- Card quantity adjustment buttons in deck editor
-- Collapsible decklists in player view
-- CORS proxy fallback for deck URL fetching
-- TWDA auto-PR: on tournament finish, winner's deck submitted as GitHub PR to TWDA repository
-
-**Result Reporting**:
-- Player self-reporting: any player at a table can set VP scores during the round
-- Organizer override locks player editing for that table (requires comment)
-- VP validation via oust-order algorithm (seating-order-aware simulation)
-- Tournament report download: text and JSON formats (organizer-only)
-
-**Sanctions**:
-- Event-level: Caution, Warning, Standings Adjustment, Disqualification
-- VEKN-wide: Suspension, Probation, Ban (IC/Ethics Committee only)
-- Judges Guide v2 categories and subcategories (Procedural Errors, Tournament Errors, Unsportsmanlike Conduct) with escalation guidance
-- SA penalty: a full -1 VP applied uniformly to the penalized round's GW and TP and to the standings VP total (may go negative); the per-round VP shown stays raw
-- DQ barring: tournament-level, league-wide (DQ in any league tournament bars all others), suspension-wide
-- On-site suspension: 30-day national suspension for gross ethics violations (must be escalated within 5 days)
-- Barring enforced at check-in and finals qualification
-- Visual indicators on player names in registration, seating, and standings
-- Cautions visible only within their tournament; warnings+ visible for 18 months
-- Lifting permissions: IC, Ethics, Rulemonger, NC (same country), league organizers (DQ only)
-- Sanction cleanup: expired sanctions (>18 months) soft-deleted daily, hard-deleted after 30 days
-
-**Leagues**:
-- League and meta-league management (NC/IC only)
-- League fields: name, country, start/end dates, format, online, description, organizers, parent (for meta-leagues), allow_no_finals
-- Three standings modes: RTP (rating points), Score (GW/VP/TP from prelims), GP (Grand Prix F1-style points)
-- Tournament-league association with organizer-filtered selection
-- Auto-updating standings on league detail page
-- Tournaments can finish without finals (meaningful for Score leagues)
-
-**Ratings & Hall of Fame**:
-- Player ratings computed server-side, updated on tournament finish or modification
-- Rating = sum of best 8 tournaments in trailing 18 months
-- RP display in finished tournament standings
-- Rankings page: top 500 global, country filters, date sort, bulk-load pagination
-- Hall of Fame: players with 5+ tournament wins, sorted by wins
-- Suspended players hidden from rankings
-- Daily full recompute of all player ratings and wins
-- Rating cutoff uses exact 18 calendar months
-
-**Payment Tracking**:
-- Payment status per player: Pending, Paid, Refunded, Cancelled
-- `SetPaymentStatus` and `MarkAllPaid` actions
-- Organizers can toggle payment status; visible in registration list
-
-**QR Code Check-in**:
-- Organizer displays tournament-scoped QR code (with print option)
-- Players scan from within the Archon app to self-check-in
-- `checkin_code` on tournament model, `POST /{uid}/qr-checkin` endpoint
-- Camera-based QR scanner component
-
-**Social & Discovery**:
-- Social sharing for finished tournaments: canvas-rendered PNG card + plain text with decklist info
-- iCal calendar feed: personal agenda (via `calendar_token`), country-scoped, global, with online toggle
-- Calendar token generated on demand, stripped from SSE (only visible via `/auth/me`)
-- Agenda matching: organizer/participant events + same country/online/NC/CC on continent
-- Tournament list with "My Agenda" toggle and "Include online" toggle
-- Simplified filters: country, format, search
-
-**Printable Views**:
-- Print-optimized round seating (HTML with `@media print`, page breaks)
-- QR code print
-
-**Help & Reference**:
-- In-app help pages: VTES rulebook, VEKN tournament rules, Judges Guide (v1+v2), Code of Ethics
-- Player guide and organizer guide
-- Paginated help viewer with table of contents
-- Source markdown in `frontend/src/lib/help-content/`
-
-**VEKN Integration (Complete)**:
-- **Outbound push**: Tournament events pushed to VEKN on create (calendar entry), results pushed on finish (archondata format). Batch job catches missed pushes hourly
-- **Inbound member sync**: Pulls/updates VEKN member database periodically (every 6h default). Infers `coopted_by` relationships
-- **Inbound tournament sync**: Imports historical tournaments from VEKN API, seeding venue autocomplete data
-- **Member push**: Locally-coopted members pushed to VEKN registry on sponsor
-- Format → VEKN event type mapping (Standard/Limited/V5 × Basic/NC/CC)
-- `max_rounds` immutable once pushed to VEKN
-- `external_ids["vekn"]` and `vekn_pushed_at` tracking on tournaments
-
-**Archon Import**:
-- Import tournament results from legacy Archon Excel files (`.xlsx`)
-- Template download endpoint (`GET /tournaments/archon-template`)
-- Full round-level data import with player matching
-
-**OAuth2 Provider**:
-- Full PKCE authorization code flow (authorize, consent, token exchange, refresh, revoke)
-- OpenID Connect userinfo endpoint
-- OAuth client management (register, list, get, regenerate secret, deactivate) — DEV role required
-- Developer section in user profile for client management
-- Consent persistence (users don't re-approve same client+scopes)
-- Scopes: `profile:read`, `user:impersonate`
-- Argon2-hashed client secrets, refresh token rotation, revocation chain tracking
-- Scheduled cleanup of expired codes and tokens
-
-**Offline Mode (Full)**:
-- Primary device ownership (organizer takes tournament offline)
-- Other devices see "offline" message — no mutations available
-- Force-takeover by other organizers (with data loss warning)
-- Go-online sends full state to server (primary device is authoritative, no CRUD log needed)
-- IC emergency force-unlock (without syncing offline data)
-- Opportunistic sync when network detected
-- Offline member creation with temp UIDs remapped on sync
-- SSE suppressed for offline tournaments; primary device ignores tournament SSEs until back online
-
-**Infrastructure**:
-- Offline-first PWA with service workers (update detection and application)
-- IndexedDB for all read operations (5 object stores + cards)
-- SSE real-time sync with role-based filtering (3 access levels: public/member/full)
-- Pre-computed access-level JSONB columns (no per-viewer filtering at read time)
-- Personal overlay for own objects and role-based full-access
-- Optimistic updates via WASM engine (tournament actions update IndexedDB immediately)
-- Resync mechanism on role/VEKN ID changes
-- Snapshot endpoint for fast initial sync (gzip, regenerated every 15 minutes)
-- Internationalization: EN, FR, ES, PT-BR, IT (Paraglide JS, browser auto-detection)
-- Locale switcher in sidebar
-- GeoNames-based country/city autocomplete
-- Scheduled background tasks: VEKN sync, sanction cleanup, rating recompute, VEKN push, OAuth cleanup, snapshot generation, deleted objects purge
-
-### 5.2 Not Yet Implemented / Planned
-
-Planned work is tracked in pst tickets.
-
-#### Discord Integration
-
-- **Tournament butler bot**: Full tournament management via Discord slash commands
-
-#### Tournament Features
-
-- **Tournament logs**: Audit trail of organizer actions during an event
-- **Draft/Limited tournament support**: Pod management, product distribution, deck building timer
-- **Limited format constraints**: Mono-vampire, mono-clan, card lists (low priority, manual enforcement for now)
-- **Multi-day tournament support**
-- **Auto-close old tournaments**: Automatically finish stale tournaments after a period
-
-#### Analytics & Data
-
-- **Deck statistics**: Aggregate stats on decks played at events (clan distribution, most-played cards, crypt trends)
-
-#### Other
-
-- **Spectator mode**: Live standings/results for non-participants
-- **Event description with Markdown rendering**
+- **Auth & accounts**: email+password, magic link (signup/reset/invite), passkeys, Discord OAuth + Linked Roles (auto-assign VEKN roles), JWT sessions with refresh.
+- **Members**: profiles (name, country, city, socials, contact), avatar upload (client crop + server compress), VEKN ID claim/sponsor/link/abandon/force-abandon, roles (IC, NC, Prince, Judge, Judgekin, Rulemonger, Ethics, PTC, Playtester, DEV), same-country user merge, cooptation tracking, privacy-filtered directory.
+- **Tournament core**: full config (format/rank/proxies/multideck/online/venue/dates/tz/country/max_rounds), state machine Planned→Registration→Waiting→Playing→Finished (+reopen), registration + check-in (single/all/reset), simulated-annealing seating (9 priorities) incl. staggered seatings for 6/7/11, VP entry with oust-order validation, GW/TP auto-compute, judge override/unoverride, standings (GW>VP>TP), finals qualification + manual/random toss, finals AlterSeating, round/registration/tournament reopen + cancel, delete (Planned only).
+- **Seating editor**: drag-and-drop (touch), per-player issue indicators (sanction/deck/payment), Swap/Seat/Unseat/AddTable/RemoveTable/AlterSeating (prelim + finals).
+- **Round timer** (online): global start/pause/reset, per-round/finals config, per-table extra time (cap 600s), client-side countdown (no per-second broadcasts).
+- **Call for judge** (online): ephemeral SSE alert to organizers + IC, stacking banners + chime, auto-dismiss 120s, validates seated/Playing/online.
+- **Raffle**: random draw from pools (AllPlayers/NonFinalists/GameWinners/NoGameWin/NoVictoryPoint), draw/undo/clear.
+- **Table rooms**: named rooms over table ranges, shown as labels in seating/print/player views.
+- **Decks**: card DB in IndexedDB; upload via paste / deckbuilder URL (VDB/VTESDecks/Amaranth) / QR; Rust parse (Lackey/JOL/TWDA) + validate (counts, banned, group, V5, multideck) + enrich; attribution (self/named author/anonymous); decklist-required enforcement (override w/ warning); multideck per-round locking; post-tournament upload; visibility by decklists_mode (Winner/Finalists/All); CORS proxy fallback; TWDA auto-PR on finish.
+- **Result reporting**: player self-report VP during round; organizer override locks the table (comment required); oust-order validation; text/JSON report download (organizer).
+- **Sanctions**: event-level (Caution/Warning/SA/DQ) + VEKN-wide (Suspension/Probation/Ban, IC/Ethics); JG v2 categories + escalation hints; SA −1 VP; league-wide + suspension barring at check-in/finals; lift permissions per §3.8; daily cleanup of >18mo. (Rules: §3.8.)
+- **Leagues**: league + meta-league (NC/IC); standings modes RTP/Score/GP; organizer-filtered tournament association; auto-updating standings; finish-without-finals support.
+  - *GP (Grand Prix) standings* — app house rule, not a VEKN construct. Points by final placement: Winner 25; 2nd–5th (finalists) 15; 6th 10; 7th 9; 8th 8; 9th 7; 10th 6; 11th+ 3. Ties take best-position points with competition skip (two tied for 6th each get 10; next is 8th) — never averaged. Position is FINAL placement (winner=1, other finalists tie 2nd, non-finalists by prelim GW/VP/TP), not prelim array order.
+- **Ratings & HoF**: server-side rating = best 8 tournaments in trailing 18mo (§8); RP in finished standings; rankings page (top 500, country/date filters, bulk-load); Hall of Fame (5+ wins); suspended hidden; daily recompute.
+- **Payments**: per-player status (Pending/Paid/Refunded/Cancelled), SetPaymentStatus/MarkAllPaid, shown in registration list.
+- **QR check-in**: organizer-displayed tournament QR (printable), in-app camera scan self-check-in (`POST /{uid}/qr-checkin`).
+- **Social & discovery**: shareable finished-tournament PNG + text; iCal feed (personal via calendar_token / country / global, online toggle; token stripped from SSE); agenda matching; tournament list filters (country/format/search, My Agenda, include-online).
+- **Printable views**: round seating, QR (`@media print`, page breaks).
+- **Help**: in-app VTES rulebook, VEKN tournament rules, Judges Guide v1+v2, Code of Ethics, player/organizer guides (source in `frontend/src/lib/help-content/`), paginated viewer with TOC.
+- **VEKN integration**: outbound push (calendar on create, results on finish, hourly catch-up), inbound member sync (~6h, infers coopted_by), inbound tournament sync (venue seeding), member push on sponsor; format→event-type mapping; `external_ids["vekn"]`/`vekn_pushed_at`; `max_rounds` immutable once pushed.
+- **OAuth2 provider**: PKCE auth-code flow, OIDC userinfo, client management (DEV role), consent persistence, scopes `profile:read` / `user:impersonate`, Argon2 secrets + refresh-token rotation + revocation, scheduled token cleanup.
+- **Offline mode**: single primary-device ownership; others read-only "offline"; force-takeover (data-loss warning) + IC force-unlock; go-online pushes full authoritative state (no CRUD log); offline member creation with temp `P-` UIDs remapped on sync; SSE suppressed while offline.
+- **Infrastructure**: PWA + service workers (update detection); IndexedDB for all reads (5 stores + cards); SSE with 3 precomputed access levels (public/member/full); personal/role overlays; optimistic WASM updates; resync on role/VEKN-ID change; 15-min gzip snapshot endpoint; i18n EN/FR/ES/PT-BR/IT (Paraglide, browser auto-detect) + locale switcher; GeoNames autocomplete; scheduled jobs (VEKN sync/push, sanction cleanup, rating recompute, OAuth cleanup, snapshot, deleted-objects purge).
 
 ## 6. Technical Constraints & Design Decisions
 
@@ -528,101 +304,47 @@ Five languages: EN (British), FR, ES, PT-BR, IT. Official VTES game terms must u
 
 ## 7. Key Domain Edge Cases
 
-These are situations that come up in real tournaments and that the app must handle correctly:
+Behaviors the app must get right that go beyond the headline rules in §3.
 
-### Seating & Player Counts
-
-1. **Impossible player counts**: 6, 7, 11 players cannot form valid tables of 4-5. The engine handles these via staggered seatings (bye rotation across rounds so everyone plays equally).
-
-2. **Player drops mid-round**: A 5-player table becomes 4-player. The round continues but the dropped player's seat is marked finished with 0 VP. Their predator does NOT get a VP for this (administrative removal, not an oust).
-
-3. **Late registration**: Players can register even after the first round. They play from the next round onwards. Late players have fewer rounds for standings but can still qualify for finals.
-
-4. **Seating optimization across rounds**: The simulated annealing algorithm considers all previous rounds to avoid repeated predator-prey relationships, equitably distribute available VPs (4 vs 5-player tables), and minimize repeated table sharing.
-
-### Scoring & VP Validation
-
-5. **Oust-order validation**: VP combinations must match a physically possible oust sequence around the table (seating order matters). The engine simulates ousts clockwise to validate. Invalid combinations show as "Invalid" table state.
-
-6. **Intentional draws**: All players agree to accept current scores as if time expired. Legal per VEKN rules 3.6. Each surviving player gets 0.5 VP.
-
-7. **Concession cascade**: Players may concede if all-but-one agree. Remaining player is treated as having ousted them in sequence.
-
-8. **Fractional VPs**: 0.5 VP for surviving to time limit or withdrawing. VP values are always multiples of 0.5. Value `table_size - 0.5` is impossible (e.g., 4.5 on 5-player table).
-
-9. **4-player TP gap**: On 4-player tables, 3rd place TP position is empty ("table bye"). Positions are 1st, 2nd, 4th, 5th with TPs 60, 48, 24, 12.
-
-10. **GW conditions**: Requires VP >= 2.0 AND strictly highest VP at table (no ties). Finals exception: winner gets GW even with < 2 VP.
-
-11. **Standings Adjustment (SA) penalty**: a full -1 VP for the penalized round, applied uniformly wherever VP feeds scoring — GW determination, TP rank (the table re-ranks/re-averages, JG v2 1.1.3 Ex. 2), and the standings VP total used for finals seeding. Standings recompute GW/TP from the adjusted VPs, so an SA issued *after* the round was scored still takes effect (re-decides the GW, re-ranks TP), not just the VP total. The adjusted total may go negative; the per-round VP displayed stays raw. Never carried to another round.
+### Scoring & VP
+- **Player drops mid-round**: a 5-player table becomes 4-player; the dropped seat is marked finished with 0 VP and the predator gets **no** VP (administrative removal, not an oust). Same for a mid-game DQ.
+- **Intentional draw**: all players agree to accept current scores as if time expired (VEKN 3.6); each survivor gets 0.5 VP.
+- **Concession cascade**: when all-but-one concede, the remaining player is treated as ousting them in sequence.
+- **Fractional VPs**: always multiples of 0.5; `table_size − 0.5` is impossible (e.g. 4.5 on a 5-player table).
+- **SA penalty**: a full −1 VP for the penalized round, applied uniformly wherever VP feeds scoring — GW determination, TP rank (the table re-ranks/re-averages, JG v2 1.1.3 Ex. 2), and the standings VP total used for finals seeding. Standings recompute GW/TP from the adjusted VPs, so an SA issued *after* the round was scored still re-decides the GW and re-ranks TP, not just the total. May go negative; the per-round VP displayed stays raw; never carried to another round.
 
 ### Finals
+- **<5 available finalists**: the organizer must drop unavailable qualifiers before launching finals (app-enforced).
+- The physical card-drawing seating procedure (§3.6) is recorded via AlterSeating, not enforced by the app.
 
-12. **Finals qualification**: Top 5 players by GW > VP > TP. Ties for 5th position resolved by random toss (organizer can set manually or randomize).
+### Tournament lifecycle
+- **Event becomes unsanctioned**: if drops create an impossible player count between rounds and staggered seatings don't apply, the event may lose sanctioning but can still distribute prizes and report.
+- **Reopen**: a finished tournament can be reopened to correct scores; ratings recompute on the next finish.
+- **Cancel round**: returns players to Checked-in.
+- **Late registration**: players may register after round 1 and play from the next round; fewer rounds for standings but can still qualify.
 
-13. **Finals with < 5 available players**: Organizer must drop unavailable qualifiers before launching finals. App enforces this.
+### Sanctions
+- **Escalation guidance**: the app suggests an appropriate level by category/subcategory and warns when issuing below an existing level (e.g. two cautions → third should be a warning).
 
-14. **Finals seating**: Not algorithm-assigned. Physical card-drawing procedure (VEKN rules 3.5). Organizer inputs the result via AlterSeating. App does not enforce the procedure — just records the outcome.
-
-15. **Finals scoring**: Highest VP wins. Tie for highest VP broken by preliminary standings. All non-winners tied for 2nd. Winner gets GW even with < 2 VP.
-
-16. **Multideck finals**: Best-Performing Deck method or Free Choice method (announced pre-tournament). Players may use a different deck in finals.
-
-### Sanctions & Barring
-
-17. **Disqualification mid-game**: DQ is administrative, not an oust. No VP awarded to predator. DQ'd player marked as finished, cannot check-in for subsequent rounds or be selected for finals.
-
-18. **League-wide DQ**: DQ in any league tournament bars the player from all other tournaments in that league. Only league organizers can lift this.
-
-19. **Suspension barring**: Suspended players cannot check-in to any tournament. Suspension can be lifted by Ethics Committee member or IC.
-
-20. **Sanction escalation guidance**: The app guides organizers toward appropriate sanction level based on category/subcategory. Warns if issuing lower than existing level. Suggests escalation on third offense (two cautions → third should be a warning).
-
-### Tournament Lifecycle
-
-21. **Event becomes unsanctioned**: If drops create an impossible player count between rounds and staggered seatings don't apply, the event may lose sanctioning but can still distribute prizes and report.
-
-22. **Tournament without finals**: Allowed for any tournament (must be announced before first round). Tournaments without finals are not ranked in international rankings — they count only for league standings.
-
-23. **Reopen tournament**: A finished tournament can be reopened (e.g., to correct scores). Ratings are recomputed on subsequent finish.
-
-24. **Cancel round**: The current round can be cancelled (e.g., if seating errors detected). Players return to "Checked-in" state.
-
-### Offline Mode
-
-25. **Offline device ownership**: Only one device owns an offline tournament. Other organizers see "offline" status with no mutation capability.
-
-26. **Force-takeover**: Another organizer can force the tournament back online (losing offline primary device's unsaved data). IC can force-unlock without syncing.
-
-27. **Offline member creation**: Organizers create members with temp UIDs (`P-` prefix). Server assigns real VEKN IDs on sync. If SSE briefly delivers real UID while still offline, it's updated immediately.
+### Offline
+- **Single ownership**: one device owns an offline tournament; others are read-only. Force-takeover loses the primary's unsynced data; IC force-unlock skips syncing.
+- **Offline member creation**: temp `P-` UIDs, remapped to real VEKN IDs on sync (updated immediately if SSE delivers the real UID while still offline).
 
 ### Decks
+- **Decklist vs check-in**: when decklists are required, players without one are warned at check-in; organizers can override and check in anyway.
+- **Multideck locking**: a round's deck locks once that round starts; the next round's deck can still be uploaded beforehand.
+- **Post-tournament upload**: decklists can be added after finish (winner's-deck recovery, TWDA submission).
+- **Attribution**: self, another member as author, or anonymous — public display respects the choice.
 
-28. **Decklist requirement vs check-in**: If tournament requires decklists, players without a deck are warned at check-in. Organizers can override and check in without a deck (with explicit warning).
+### Visibility
+- **Standings during ongoing events**: organizer-set Private / Cutoff / Top 10 / Public (manages information asymmetry).
+- **Decklists**: organizer-set Winner / Finalists / All, applied only after finish.
+- **Self-reporting window**: players set scores during the round until an organizer override locks the table.
+- Member-level field visibility and its security caveats: see §4.
 
-29. **Multideck locking**: In multideck tournaments, a deck for a round is locked once that round starts. Players can still upload the next round's deck before it begins.
-
-30. **Post-tournament deck upload**: Players and organizers can upload missing decklists after a tournament finishes (important for winner's decklist recovery and TWDA submission).
-
-31. **Deck attribution**: Players choose attribution (themselves or another member as author) or anonymity. Public display respects choice.
-
-### Visibility & Privacy
-
-32. **Standings visibility during ongoing events**: Configurable by organizer: Private (no standings shown), Cutoff, Top 10, Public. Manages information asymmetry.
-
-33. **Decklists visibility**: Configurable by organizer: Winner only, Finalists, All. Only applies after tournament finishes.
-
-34. **Player self-reporting window**: Players at a table can set scores during the round. Once organizer overrides, player editing is locked for that table.
-
-35. **Member-level tournament visibility**: Ongoing tournaments hide rounds, finals, and per-player results from non-organizers. Only own tables visible to participating players.
-
-### VEKN Integration
-
-36. **max_rounds immutability**: Once a tournament is pushed to VEKN (has `external_ids["vekn"]`), `max_rounds` cannot be changed (enforced backend + frontend).
-
-37. **All players need VEKN IDs**: Results cannot be pushed to VEKN until all players have a `vekn_id`. Organizers must sponsor or link players before finishing.
-
-38. **VEKN push is fire-and-forget**: Never blocks user actions. Batch job catches missed pushes hourly.
+### VEKN
+- **VEKN IDs required to push**: results can't be pushed until every player has a `vekn_id`; organizers sponsor/link first.
+- **Fire-and-forget**: pushes never block user actions; an hourly batch catches misses. `max_rounds` is immutable once pushed.
 
 ## 8. VEKN Rating System (Reference)
 

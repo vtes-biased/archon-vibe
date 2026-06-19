@@ -4,7 +4,7 @@
 - `CLAUDE.md` — top-level project guidelines (lean; deep design lives in the docs below)
 - `ARCHITECTURE.md` — full design + per-subsystem mechanics (data model, Rust integration, calendar, leagues, community links, Discord bot + linked roles, TWDA in/out)
 - `SYNC.md` — SSE streaming, IndexedDB, access levels, "adding a new object type"
-- `TOURNAMENTS.md` — single behavioral reference for the tournament domain: state machine, full event catalog (required state + permissions), scoring/oust-order, data model, permissions, SSE privacy. (Former `engine/TOURNAMENT.md` was deleted under pst #16 — it duplicated this doc and went stale; do not recreate an engine-side tournament behavior doc.)
+- `TOURNAMENTS.md` — single behavioral reference for the tournament domain: state machine, full event catalog (required state + permissions), scoring/oust-order, data model, permissions, SSE privacy. (Former `engine/TOURNAMENT.md` was deleted — it duplicated this doc and went stale; do not recreate an engine-side tournament behavior doc.)
 - `engine/README.md` — engine build, bindings, module map + entry-point signatures (the engine *integration* reference, not behavior)
 - `PRODUCT.md` — domain rules, roles, features, constraints
 - `frontend/DESIGN.md` — UI styling guidelines

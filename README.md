@@ -117,35 +117,17 @@ just build        # Production build (Docker images)
 just dev-reset    # Reset dev database
 ```
 
-### Docker Deployment
+### Deployment
 
-Run the entire stack (frontend, backend, and database) with Docker:
+In dev, only the **database** runs in Docker (`localhost:5433`); the backend and frontend run natively (`just dev`). For the full containerized stack, `just build` builds the engine and the production images, then `docker compose up -d` runs all three. Each image self-builds the engine — no host artifacts needed (`frontend/Dockerfile` compiles WASM in a `rust:slim` stage; `backend/Dockerfile` runs `maturin build --release`).
 
-```bash
-# Build Docker images
-just docker-build
+| Service | Host port | |
+|---|---|---|
+| frontend | 3000 → 80 | nginx serving the built PWA |
+| backend | 8000 | FastAPI (`DATABASE_URL` → `db:5432`) |
+| db | 5433 → 5432 | PostgreSQL 17, volume `postgres_data` |
 
-# Start all services
-just docker-up
-
-# View logs
-just docker-logs
-
-# Stop services
-just docker-down
-
-# Full rebuild
-just docker-rebuild
-```
-
-Services:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **PostgreSQL**: localhost:5432
-
-The Dockerfiles automatically build the Rust engine:
-- Python bindings (PyO3) for the backend
-- WebAssembly (WASM) for the frontend
+This compose file is **not** production-hardened (uvicorn reload, default DB password); real production deployment is handled by Ansible under `ansible/`. If a container port (3000/8000/5433) is already in use, change the mapping in `docker-compose.yml`.
 
 ## Configuration
 

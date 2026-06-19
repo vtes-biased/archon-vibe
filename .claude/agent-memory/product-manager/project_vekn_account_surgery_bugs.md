@@ -1,14 +1,14 @@
 ---
 name: vekn-account-surgery-bugs
-description: Regression watch-list for VEKN account-surgery (merge/detach) — the defect classes that #59/#65 fixed and must not return
+description: Regression watch-list for VEKN account-surgery (merge/detach) — the defect classes the merge/detach rework fixed and must not return
 metadata:
   type: project
 ---
 
 # Account-surgery regression watch-list (merge/detach, backend/src/db.py)
 
-The merge/detach rework (#59 collapsed strip+split into `detach_user_from_vekn`;
-#65 + #78 fixed merge) closed a set of subtle defects. They're easy to
+The merge/detach rework (one change collapsed strip+split into `detach_user_from_vekn`;
+a later pair fixed merge) closed a set of subtle defects. They're easy to
 reintroduce, so when touching `merge_users` / `detach_user_from_vekn` /
 `reassign_*`, confirm none of these returns. Policy: [[vekn-id-detach-policy]].
 

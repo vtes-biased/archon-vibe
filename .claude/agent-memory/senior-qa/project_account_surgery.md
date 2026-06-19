@@ -12,9 +12,9 @@ VEKN account-surgery primitives live in `backend/src/db.py`: `merge_users`,
 Design rule: `.pst/details/59-vekn-detach.md` — a uid carrying a vekn_id is
 immovable; only the non-vekn person moves to a fresh uid.
 
-**Why:** these were untested before #59/#65; the invariant is subtle and easy to
+**Why:** these were untested before the merge/detach rework; the invariant is subtle and easy to
 re-break (the merge bug silently reset `resync_after` by rebuilding User from
-scratch; #65 orphaned decks).
+scratch; a later fix addressed orphaned decks).
 
 **How to apply:** when any of those db functions change, run this file. Key
 test-writing facts learned here (not obvious from the code):
@@ -35,7 +35,7 @@ test-writing facts learned here (not obvious from the code):
 - Route side-effects (broadcast_resync, asyncio.create_task discord sync) are
   safe in tests: no SSE connections → no-op; discord sync is detached.
 
-**calendar_token (was a gap, now FIXED in #59):** `detach_user_from_vekn` now
+**calendar_token (was a gap, now FIXED):** `detach_user_from_vekn` now
 carries the feed token to the personal account — it reads `get_calendar_token(old)`
 explicitly (the model field is always None, stripped from "full"), clears it on the
 orphan first, then sets it on the new uid. Matches `merge_users`. Covered by

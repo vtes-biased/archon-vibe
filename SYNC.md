@@ -70,9 +70,9 @@ No per-viewer filtering at read time — projections are pre-computed. After the
 
 **Tournament-scoped stream** — `/stream?tournament=<uid>` opens a scoped connection (used by the Discord bot). The catch-up delivers only that tournament, its sanctions, and its **participant identities** (`_scoped_catchup_frames`); the live phase filters to that tournament's object, its sanctions, and its judge calls via `SSEConnection.tournament_uid` + `_scope_matches`. Access rules are unchanged — `entitled_level()` (see below) applies per object, just restricted to one tournament's scope. The bot opens one scoped stream per watched tournament instead of streaming the whole corpus.
 
-*No access-version handshake (by design, not an omission)*: scoped streams carry no `av` and skip the fingerprint compare. The fingerprint exists to detect a *visibility-only* change a browser's `since`-delta on a stale shared-snapshot corpus would miss — but a scoped stream **replays its full (small) state every connect** (`since` is ignored), so it's never stale, and it **receives no decks** (`_scope_matches` passes only tournament + sanctions), so the private-deck leak the fingerprint/tombstones guard cannot occur. Entitlement shifts reach the bot via the live per-object `entitled_level` re-eval + the next full replay — no resync mechanism needed. (If the bot ever moved to *incremental* scoped catch-up, that — not `av` — would be the reason to revisit; a #197-class efficiency call, separate from entitlement correctness.)
+*No access-version handshake (by design)*: scoped streams carry no `av` and skip the fingerprint compare — they replay full (small) state every connect (so never stale) and receive no decks (so the private-deck leak the fingerprint guards against can't occur). Entitlement shifts reach the bot via the live `entitled_level` re-eval + the next full replay. Only an eventual move to *incremental* scoped catch-up would warrant revisiting this.
 
-*Participant identities*: the bot needs each seated player's name/nickname to render seating (it has no User store), but `_scope_matches` drops generic `user` broadcasts. So identities ride **alongside the tournament**: `_participant_user_frames()` emits the `member`-level User object for every player + organizer (deliberately the `member` column for *all* of them, **not** `entitled_level` — member carries name/nickname but no contact info, so this never leaks participant contacts to the Discord process). Catch-up seeds them; live, a tournament delivery sets `SSEConnection.needs_participant_refresh` and the async stream loop then pushes identities for any participants not yet sent (`sent_participant_uids`), so players who register *after* the bot connects still resolve. The bot caches `uid → {name, nickname}` and falls back to it (after a Discord `@mention`, then the per-tournament `display_name`) in `announcements.player_display`.
+*Participant identities*: the bot has no User store but needs seated players' names, and `_scope_matches` drops generic `user` broadcasts. So `_participant_user_frames()` emits the **`member`-level** User (name/nickname, no contact — deliberately not `entitled_level`, so contacts never leak to the Discord process) for every player + organizer, alongside the tournament. Catch-up seeds them; live, a tournament delivery flags `needs_participant_refresh` and the loop pushes any not-yet-sent identities (`sent_participant_uids`), so late registrants still resolve. The bot caches `uid → {name, nickname}`.
 
 The stream then enters the **live phase**, relaying single-object events from `broadcast_precomputed()`:
 
@@ -258,27 +258,7 @@ The cursor is a `lastTimestamp` high-water mark (mirrored to IndexedDB via `setL
 4. **On success:** SSE delivers authoritative state (tournament + deck objects) → overwrites IndexedDB
 5. **On rejection:** roll back to the pre-action snapshot (see below)
 
-```typescript
-export async function tournamentAction(uid, action, data) {
-  const current = await getTournament(uid);                  // pre-action state
-  const result = await processTournamentEvent(current, event, actor, sanctions, decks);
-  await saveTournament(result.tournament);                   // optimistic
-  // apply deck_ops to IndexedDB
-  enqueueServerAction(uid, async () => {
-    try {
-      await apiRequest(`/api/tournaments/${uid}/action`, ...);
-    } catch (e) {
-      // A rejected action emits NO SSE event and does not advance modified_at,
-      // so the catch-up stream never re-delivers it — nothing self-corrects.
-      // Server actions are transactional, so authoritative == pre-action state:
-      // restore it locally (no GET — reads are offline-first from IndexedDB).
-      await rollbackTournamentAction(uid, current, decks, hadDeckOps);
-      // HTTP errors are toasted by apiRequest; toast network failures too.
-    }
-  });
-  return result.tournament;
-}
-```
+Server actions are serialized per tournament (`enqueueServerAction`); `tournamentAction()` lives in `api.ts`.
 
 **Why rollback, not "SSE will correct":** a rejection produces no SSE event for that object, so deferring to the next sync would leave the bad optimistic state in IndexedDB indefinitely. Rollback also self-heals the one ambiguous case (network error *after* the server committed): there `modified_at` did advance, so the authoritative SSE — live or via the `since` catch-up — overwrites the rollback. This relies on **overwrite** apply semantics (`db.put` by uid, no field-merge); a merge would preserve the stale optimistic fields and never reconcile.
 

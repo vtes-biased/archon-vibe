@@ -8,27 +8,7 @@ The tournament system enables organizing VEKN-sanctioned tournaments with full o
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Tournament Event Flow                       │
-└─────────────────────────────────────────────────────────────────┘
-
-Online Mode:
-┌──────────┐  Event   ┌──────────┐  Rust    ┌──────────┐
-│ Frontend │─────────►│ Backend  │─────────►│ Engine   │
-│ (Svelte) │          │ (FastAPI)│◄─────────│ (PyO3)   │
-│          │◄─────────│          │ Updated  │          │
-│          │   SSE    │          │ State    │          │
-└──────────┘          └──────────┘          └──────────┘
-
-Offline Mode:
-┌──────────┐  Event   ┌──────────┐
-│ Frontend │─────────►│ Engine   │
-│ (Svelte) │◄─────────│ (WASM)   │
-│          │ Updated  │          │
-│          │ State    │          │
-└──────────┘          └──────────┘
-```
+Online: Frontend → Backend (FastAPI) → Rust engine (PyO3) → updated state → SSE → Frontend. Offline: Frontend ↔ Rust engine (WASM), applied directly to IndexedDB. Same engine code both paths — see ARCHITECTURE.md (Mutation Pipeline, Offline Mode).
 
 ## Tournament State Machine
 
@@ -151,35 +131,14 @@ Events are processed by the Rust engine. Each event includes:
 |-------|-----------------|-------------|
 | `UpdateConfig` | `config` | Update tournament settings (timer, standings/decklists modes, table rooms, etc.) |
 
-### Score Format
+### Score / Override
 
-```json
-{
-  "type": "SetScore",
-  "round": 0,
-  "table": 0,
-  "scores": [
-    { "player_uid": "p1", "vp": 3.0 },
-    { "player_uid": "p2", "vp": 1.5 }
-  ]
-}
-```
-
-Only VP is submitted. GW and TP are auto-computed by the engine (see Scoring Rules below).
-
-### Override / Unoverride
-
-```json
-{ "type": "Override", "round": 0, "table": 0, "comment": "Player left early" }
-{ "type": "Unoverride", "round": 0, "table": 0 }
-```
-
-Organizer-only. Override forces a table to "Finished" state regardless of score validity.
-Requires a `comment` explaining the judge decision.
+- `SetScore`: only VP is submitted per seat (`{player_uid, vp}`); GW and TP are auto-computed by the engine (see Scoring Rules below).
+- `Override` (organizer-only): forces a table to **Finished** regardless of score validity; requires a `comment`. `Unoverride` reverts.
 
 ## Scoring Rules (VEKN 3.7.3)
 
-Reference implementation: `archon/src/archon/scoring.py`
+Implemented in `engine/src/tournament/scoring.rs` (oust-order validation in the same module).
 
 ### VP (Victory Points)
 
@@ -237,65 +196,12 @@ Example: On a 5-player table `[2, 1, 0, 0.5, 1.5]` in seating order:
 
 ## Data Model
 
-### Tournament Structure
+Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentConfig`, `Player`, `Table`, `Seat`, `Score`) and `backend/src/models.py`. Non-obvious structure:
 
-```typescript
-interface Tournament {
-  // Base
-  uid: string;
-  modified: string;
-  
-  // Config
-  name: string;
-  format: "Standard" | "V5" | "Limited";
-  rank: "" | "National Championship" | "Continental Championship";
-  online: boolean;
-  start: string | null;
-  finish: string | null;
-  timezone: string;
-  country: string | null;
-  venue: string;
-  description: string;
-  max_rounds: number;
-  
-  // State
-  state: "Planned" | "Registration" | "Waiting" | "Playing" | "Finished";
-  organizers_uids: string[];
-  players: Player[];
-  rounds: Table[][];
-  finals: FinalsTable | null;
-  winner: string;
-  
-  // Privacy
-  standings_mode: "Private" | "Cutoff" | "Top 10" | "Public";
-  decklists_mode: "Winner" | "Finalists" | "All";
-}
-
-interface Player {
-  user_uid: string | null;
-  state: "Registered" | "Checked-in" | "Playing" | "Finished";
-  payment_status: "Pending" | "Paid" | "Refunded" | "Cancelled";
-  toss: number;
-}
-
-interface Table {
-  seating: Seat[];
-  state: "In Progress" | "Finished" | "Invalid";
-  override: ScoreOverride | null;
-}
-
-interface Seat {
-  player_uid: string;
-  result: Score;
-  judge_uid: string;
-}
-
-interface Score {
-  gw: number;   // Game Wins (0 or 1)
-  vp: number;   // Victory Points (0-5)
-  tp: number;   // Table Points (0+)
-}
-```
+- `rounds: Table[][]` — outer index = round, inner = tables in that round; `finals` is a separate field (not a round).
+- `Table` carries `seating: Seat[]`, a derived `state` (`In Progress`/`Finished`/`Invalid`), and an optional `override`.
+- `Score = {gw, vp, tp}` per seat — only `vp` is user-submitted; `gw`/`tp` are engine-computed.
+- Player `state` (`Registered`/`Checked-in`/`Playing`/`Finished`) and `payment_status` (`Pending`/`Paid`/`Refunded`/`Cancelled`); `toss` for finals tie-breaking.
 
 ## API Endpoints
 
@@ -310,20 +216,7 @@ interface Score {
 
 ### Action Endpoint (Rust Engine)
 
-```
-POST /api/tournaments/{uid}/action
-```
-
-Request body:
-```json
-{
-  "type": "StartRound",
-  "player_uid": null,
-  "round": null,
-  "table": null,
-  "scores": null
-}
-```
+`POST /api/tournaments/{uid}/action` — body is `{type, ...payload}` for one of the events catalogued above (unused fields null/omitted).
 
 ### Other Tournament Endpoints
 
@@ -346,15 +239,9 @@ Request body:
 The engine uses simulated annealing to compute optimal seating:
 
 1. **Constraints**: Tables of 4-5 players, impossible counts (6, 7, 11) rejected
-2. **Optimization**: Minimize repeated opponents across rounds
-3. **Previous Rounds**: Algorithm considers history for better distribution
+2. **Optimization**: Minimize repeated opponents across rounds, considering previous-round history
 
-```typescript
-// Frontend usage
-const result = await computeSeating(playerUids, roundCount, previousRounds);
-// result.rounds: string[][][] - player UIDs per table per round
-// result.score: optimization metrics
-```
+Frontend entry point: `computeSeating(playerUids, roundCount, previousRounds)` in `engine.ts` → player UIDs per table per round.
 
 ## Frontend Integration
 
@@ -387,17 +274,7 @@ Actions are validated by the Rust engine:
 
 ## SSE Streaming
 
-Tournament updates are delivered via the unified SSE stream (see SYNC.md). Access-level projections are pre-computed at write time.
-
-### Privacy Filtering
-
-| Viewer Level | Data Received |
-|--------------|--------------|
-| `full` (organizer, IC, NC/Prince same country) | Everything including rounds, finals, checkin_code |
-| `member` (has vekn_id) | Config, players (no per-player results), standings per mode, decks per mode |
-| `public` (no auth) | Minimal tournament fields only |
-
-Personal overlay additionally sends `full`-level data for own tournaments (organizer or participant).
+Tournament updates ride the unified SSE stream with access-level projections pre-computed at write time. The per-level field visibility for tournaments (and the personal `full` overlay for own/organized tournaments) is canonically documented in **SYNC.md** (Data Levels + Tournament Field Visibility).
 
 ## Offline Support
 
@@ -427,11 +304,4 @@ Offline uses a device-lock model (no CRUD log / conflict resolution): the organi
 
 ## Building
 
-```bash
-# Build Rust engine for both targets
-just build-engine
-
-# Or individually:
-just build-engine-wasm    # WASM for frontend
-just build-engine-python  # PyO3 for backend
-```
+`just build-engine` (both targets), or `build-engine-wasm` / `build-engine-python` individually. See ARCHITECTURE.md / engine/README.md.

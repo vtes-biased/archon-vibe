@@ -10,7 +10,7 @@ fails, then restoring), NEVER restore with `git checkout <file>`. Restore from a
 copy you made first (`cp file file.bak` → restore from `.bak`), or apply/revert
 an in-place Edit.
 
-**Why:** During #216 QA the source under test (`migrate_from_archon.py`) held the
+**Why:** During QA of a migration feature, the source under test (`migrate_from_archon.py`) held the
 feature's changes as **uncommitted working-tree state** (the repo looked "clean"
 only because the diff I'd inspected was `HEAD~1` vs working tree, not a committed
 range). A `git checkout` after a mutation test reverted the file to HEAD and wiped

@@ -11,14 +11,15 @@ playwright-report/   # HTML test report - gitignored
 
 ## Backend Tests (pytest)
 
-```bash
-docker compose up -d db
-docker exec archon-vibe-db-1 psql -U archon -c "CREATE DATABASE archon_test;"
-uv sync --dev
-pytest backend/tests/test_users.py -v
-```
+`just test-backend` is canonical: it builds the PyO3 engine into the venv, brings the `db` container up if needed, runs `pytest backend/tests/`, then stops the DB. `conftest.py` points `DATABASE_URL` at a separate `archon_test` DB on `:5433` and **auto-creates it**, so no manual DB setup is needed — just have the `db` container up (`docker compose up -d db`) and the engine built (`uv run maturin develop --manifest-path engine/Cargo.toml`). Override the target with `TEST_DATABASE_URL`.
 
-Or simply `just test-backend` (starts the DB if needed, runs pytest, stops it).
+## Running gates in a fresh git worktree
+
+A fresh worktree has empty venvs / no `node_modules` / no generated artifacts.
+
+- **Backend**: `uv run maturin develop --manifest-path engine/Cargo.toml`, then `uv run python -m pytest backend/tests/` (Postgres on `:5433`). Do **not** use `just test-backend` from a worktree — its compose-project check won't match and it tries to bring up `db` on a clashing port.
+- **Bot**: needs env vars `DISCORD_BOT_TOKEN` / `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` at import; run `uv run --with pytest python -m pytest` from `bot/`.
+- **Frontend**: `npm ci`, `npx svelte-kit sync`, `npx @inlang/paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide` (else ~75 phantom errors). The only expected remaining `svelte-check` errors are the missing generated artifacts (`engine/pkg`, geonames JSON). Prettier is not project tooling.
 
 ## E2E Tests (Playwright)
 
@@ -42,6 +43,14 @@ volume:
 > ⚠️ The seed script opens with `DELETE FROM objects` / `DELETE FROM auth_methods`.
 > Never point it at a DB you care about. It refuses to run against a non-empty DB
 > unless `E2E_FORCE=1` (see the guard in `seed_e2e.py`).
+
+> ⚠️ `docker compose down -v` is **project-scoped, not profile-scoped** — it removes
+> every named volume in the compose file (ignoring `--profile`), so an ad-hoc test
+> teardown can wipe the dev `postgres_data`. `just test-e2e` is safe (its data is
+> tmpfs), but if you run a stack by hand, give it its own project (`docker compose -p
+> archon-vibe-e2e …`) so `down -v` can only touch the test volumes — and stop it with
+> `docker compose -p <proj> down`, never by killing the CLI child (that lets the
+> parent recipe fire its `down -v` EXIT trap).
 
 ### View Test Report
 

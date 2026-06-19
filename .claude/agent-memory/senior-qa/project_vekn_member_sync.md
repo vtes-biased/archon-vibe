@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-`backend/tests/test_vekn_member_sync.py` covers the `#134` role-seed contract for
+`backend/tests/test_vekn_member_sync.py` covers the role-seed contract for
 `vekn_sync.sync_player`: (a) CREATE seeds derived roles (Prince/NC from
 princeid/coordinatorid, IC/judge from the static `data/vekn_roster.py`); (b) UPDATE
 never writes roles (app-granted roles survive a re-sync that would derive a
@@ -27,4 +27,4 @@ update would flip-flop access control daily — this path already swung once.
   which strips princeid/coordinatorid), so it structurally cannot derive roles on
   its own — derivation lives only in `sync_player`'s create branch.
 - This replaced a relic (`test_member_sync_never_maps_roles` in test_archon_merge.py)
-  whose docstring asserted the opposite of post-#134 behavior. See [[archon-merge]].
+  whose docstring asserted the opposite of current behavior. See [[archon-merge]].
