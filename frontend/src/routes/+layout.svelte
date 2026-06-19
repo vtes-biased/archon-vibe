@@ -140,31 +140,36 @@
 {/snippet}
 
 <div class="min-h-screen bg-bone-950 pb-16 sm:pb-0">
-  <!-- Status bar (shows sync/offline status) -->
-  {#if !isOnline || syncError}
-    <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-crimson-900/90 text-crimson-100'}">
-      {#if !isOnline}
-        <span class="inline-flex items-center gap-2">
-          <WifiOff class="w-4 h-4" />
-          {m.status_offline_banner()}
-        </span>
-      {:else if syncError}
-        <span class="inline-flex items-center gap-2">
-          {m.sync_error_disconnected()}
-          <button onclick={reconnectSync} class="underline hover:no-underline font-medium">{m.sync_reconnect()}</button>
-        </span>
+  <!-- Status/update banners: a normal-flow sticky stack so they push content
+       down instead of overlaying the page header; multiple banners stack as
+       block siblings (no hard-coded per-banner top offsets). -->
+  {#if !isOnline || syncError || getUpdateAvailable()}
+    <div class="sticky top-0 z-50">
+      {#if !isOnline || syncError}
+        <div class="px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-crimson-900/90 text-crimson-100'}">
+          {#if !isOnline}
+            <span class="inline-flex items-center gap-2">
+              <WifiOff class="w-4 h-4" />
+              {m.status_offline_banner()}
+            </span>
+          {:else if syncError}
+            <span class="inline-flex items-center gap-2">
+              {m.sync_error_disconnected()}
+              <button onclick={reconnectSync} class="underline hover:no-underline font-medium">{m.sync_reconnect()}</button>
+            </span>
+          {/if}
+        </div>
       {/if}
-    </div>
-  {/if}
 
-  <!-- Update available banner -->
-  {#if getUpdateAvailable()}
-    <div class="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm status-update" class:top-10={!isOnline || syncError}>
-      <span class="inline-flex items-center gap-2">
-        <Download class="w-4 h-4" />
-        {m.update_available()}
-        <button onclick={applyUpdate} class="ml-2 underline hover:no-underline font-medium">{m.update_refresh()}</button>
-      </span>
+      {#if getUpdateAvailable()}
+        <div class="px-4 py-2 text-center text-sm status-update">
+          <span class="inline-flex items-center gap-2">
+            <Download class="w-4 h-4" />
+            {m.update_available()}
+            <button onclick={applyUpdate} class="ml-2 underline hover:no-underline font-medium">{m.update_refresh()}</button>
+          </span>
+        </div>
+      {/if}
     </div>
   {/if}
 
