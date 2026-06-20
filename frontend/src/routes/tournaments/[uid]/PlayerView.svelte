@@ -7,6 +7,7 @@
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
+  import ScoreLegend from "$lib/components/ScoreLegend.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import Button from '$lib/components/Button.svelte';
   import TimerDisplay from "./TimerDisplay.svelte";
@@ -382,6 +383,7 @@
           {m.tournament_standings()}
           <span class="text-xs text-ink-faint font-normal ml-1">({m.tournament_standings_cutoff()})</span>
         </h3>
+        <ScoreLegend />
         <p class="text-sm text-ink">
           {m.tournament_cutoff_threshold()} <span class="text-ink-strong font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
         </p>
@@ -396,6 +398,7 @@
             <span class="text-xs text-ink-faint font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
           {/if}
         </h3>
+        <ScoreLegend />
         <table class="w-full text-sm">
           <thead>
             <tr class="text-ink-faint text-xs">
@@ -526,6 +529,7 @@
     {#if standings.length > 0}
       <div class="bg-surface-muted/50 rounded-lg p-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
+        <ScoreLegend />
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
