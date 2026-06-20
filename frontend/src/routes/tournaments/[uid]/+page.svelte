@@ -233,6 +233,8 @@ import TournamentModals from "./TournamentModals.svelte";
   const checkedInCount = $derived(tournament?.players?.filter(p => p.state === "Checked-in").length ?? 0);
   const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
+  // QR self-check-in is in-person only — online players can't scan a venue code. checkin_code is always set server-side, so gate on !online.
+  const qrCheckin = $derived(!tournament?.online && !!tournament?.checkin_code);
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const finalsReady = $derived(hasFinalsCandidate && !top5HasTiesFn(standings));
   // Find the single in-progress round (for action bar when not parallel)
@@ -761,7 +763,7 @@ import TournamentModals from "./TournamentModals.svelte";
               {:else if tournament.state === "Registration"}
                 <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("CloseRegistration")}>{m.overview_close_registration()}</Button>
                 <ActionMenu label={m.common_more()} items={[
-                  ...(tournament.checkin_code ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
+                  ...(qrCheckin ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
                   { label: m.overview_back_to_planning(), icon: Undo2, onclick: () => doAction("CancelRegistration"), disabled: actionLoading },
                 ]} />
 
@@ -775,11 +777,15 @@ import TournamentModals from "./TournamentModals.svelte";
                     <Button variant="secondary" size="md" disabled={actionLoading || !finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
                   {/if}
                 {/if}
+                <!-- In-person first check-in: surface the QR directly (players self-check-in by scanning) instead of burying it in More -->
+                {#if qrCheckin && !hasRounds}
+                  <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => (showQrCode = !showQrCode)}>{showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code()}</Button>
+                {/if}
                 <ActionMenu label={m.common_more()} items={[
                   { label: m.overview_check_all_in(), icon: CheckCheck, onclick: () => doAction("CheckInAll"), disabled: actionLoading },
                   { label: m.payment_mark_all_paid(), icon: Banknote, onclick: () => doAction("MarkAllPaid"), disabled: actionLoading },
                   ...(hasRounds ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
-                  ...(tournament.checkin_code ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
+                  ...(qrCheckin && hasRounds ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
                   { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
                 ]} />
 
@@ -828,7 +834,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {/if}
 
             <!-- QR Check-in display -->
-            {#if showQrCode && (tournament.state === "Registration" || tournament.state === "Waiting") && tournament.checkin_code}
+            {#if showQrCode && (tournament.state === "Registration" || tournament.state === "Waiting") && qrCheckin}
               <div class="pt-3 border-t border-line">
                 <QrCheckinDisplay code={tournament.checkin_code} tournamentUid={tournament.uid} tournamentName={tournament.name} />
               </div>
