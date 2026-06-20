@@ -9,7 +9,7 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff } from "@lucide/svelte";
+  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff, Trash2 } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import Button from "$lib/components/Button.svelte";
@@ -552,7 +552,7 @@
                 <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
               {/if}
               {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
-                <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}>{m.players_drop()}</Button>
+                <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop()}</Button>
               {:else if puid && !hasRounds}
                 <button onclick={() => removePlayer(puid)} class="p-1.5 text-crimson-400 hover:text-crimson-300 transition-colors" title={m.players_remove_title()}>
                   <X class="w-4 h-4" />
@@ -764,7 +764,7 @@
                     <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
                   {/if}
                   {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
-                    <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}>{m.players_drop()}</Button>
+                    <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop()}</Button>
                   {:else if puid && !hasRounds}
                     <button onclick={() => removePlayer(puid)} class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors" title={m.players_remove_title()}>
                       <X class="w-4 h-4" />

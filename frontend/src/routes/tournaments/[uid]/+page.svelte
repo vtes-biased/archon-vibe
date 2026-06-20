@@ -13,7 +13,7 @@
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2 } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2, Trash2 } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
@@ -545,6 +545,7 @@ import TournamentModals from "./TournamentModals.svelte";
               {/if}
               {#if isIC}
                 <Button variant="danger" size="md" disabled={offlineActionLoading} onclick={() => showForceUnlockConfirm = true}>
+                  <TriangleAlert class="w-4 h-4" aria-hidden="true" />
                   {m.offline_force_unlock()}
                 </Button>
               {/if}
@@ -603,7 +604,7 @@ import TournamentModals from "./TournamentModals.svelte";
             </Button>
           {/if}
           {#if showOrganizerView && tournament.state === "Planned"}
-            <Button variant="danger" size="md" onclick={() => (showDeleteConfirm = true)}>{m.common_delete()}</Button>
+            <Button variant="danger" size="md" onclick={() => (showDeleteConfirm = true)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.common_delete()}</Button>
           {/if}
         </div>
       </div>

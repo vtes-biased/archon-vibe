@@ -2,7 +2,7 @@
   import type { User } from "$lib/types";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2 } from "@lucide/svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -330,6 +330,7 @@
         </p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={processingAction} onclick={handleForceAbandon}>
+            <TriangleAlert class="w-4 h-4" aria-hidden="true" />
             {processingAction ? m.vekn_abandoning() : m.vekn_force_abandon()}
           </Button>
           <Button variant="secondary" size="lg" disabled={processingAction} onclick={() => (showForceAbandonConfirm = false)}>
@@ -431,6 +432,7 @@
         </p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={processingAction} onclick={handleDelete}>
+            <Trash2 class="w-4 h-4" aria-hidden="true" />
             {processingAction ? m.member_deleting() : m.member_delete()}
           </Button>
           <Button variant="secondary" size="lg" disabled={processingAction} onclick={() => (showDeleteConfirm = false)}>

@@ -9,7 +9,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import { toUserMessage } from "$lib/errors";
   import { getCards } from "$lib/cards";
-  import { ChevronDown, ChevronRight, CircleCheck, Lock } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, CircleCheck, Lock, Trash2 } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import Button from '$lib/components/Button.svelte';
@@ -239,7 +239,7 @@
                       variant="danger"
                       size="lg"
                       onclick={() => { deleteDeck(myUid, slotIdx); confirmDeleteSlot = null; }}
-                    >{m.decks_delete_confirm_yes()}</Button>
+                    ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
                     <Button
                       variant="secondary"
                       onclick={() => confirmDeleteSlot = null}
@@ -292,7 +292,7 @@
                         variant="danger"
                         size="lg"
                         onclick={() => { deleteDeck(myUid); confirmDeleteSlot = null; }}
-                      >{m.decks_delete_confirm_yes()}</Button>
+                      ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
                       <Button
                         variant="secondary"
                         onclick={() => confirmDeleteSlot = null}

@@ -4,7 +4,7 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel } from "@lucide/svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2 } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
@@ -175,7 +175,7 @@
         variant="danger"
         onclick={() => doAction("Unregister", { user_uid: userUid })}
         disabled={actionLoading}
-      >{m.tournament_unregister_btn()}</Button>
+      ><Ban class="w-4 h-4" aria-hidden="true" />{m.tournament_unregister_btn()}</Button>
     </div>
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
     <Button
@@ -230,7 +230,7 @@
           variant="danger"
           onclick={() => dropPlayer(userUid)}
           disabled={actionLoading}
-        >{m.tournament_drop_out_btn()}</Button>
+        ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.tournament_drop_out_btn()}</Button>
       {/if}
     </div>
     <!-- Player's current score -->

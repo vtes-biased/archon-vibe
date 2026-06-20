@@ -8,7 +8,7 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
@@ -358,7 +358,7 @@
       <p class="text-crimson-300 text-sm font-medium">{m.rounds_cancel_title()}</p>
       <p class="text-ash-400 text-sm">{m.rounds_cancel_msg()}</p>
       <div class="flex gap-2">
-        <Button variant="danger" size="lg" onclick={cancelRound} disabled={actionLoading}>{m.rounds_cancel_yes()}</Button>
+        <Button variant="danger" size="lg" onclick={cancelRound} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_yes()}</Button>
         <Button variant="secondary" size="lg" onclick={() => showCancelConfirm = false}>{m.rounds_cancel_keep()}</Button>
       </div>
     </div>
@@ -411,7 +411,7 @@
           {/if}
         </div>
         <div class="flex gap-2">
-          <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}>{m.rounds_cancel_round()}</Button>
+          <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
         </div>
       </div>
 
@@ -565,7 +565,7 @@
                   <Button variant="primary" size="lg" onclick={() => doAction("FinishRound", { round: r })} disabled={actionLoading}>{m.rounds_finish_round_n({ n: String(r + 1) })}</Button>
                 {/if}
                 {#if hasParallelRounds && isLast && tournament.state === "Playing" && !tournament.finals}
-                  <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}>{m.rounds_cancel_round()}</Button>
+                  <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
                 {/if}
               </div>
               {#if showCancelConfirm && hasParallelRounds && isLast}

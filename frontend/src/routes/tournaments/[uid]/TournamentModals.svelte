@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from '$lib/paraglide/messages.js';
   import Button from '$lib/components/Button.svelte';
+  import { Trash2, TriangleAlert } from "@lucide/svelte";
 
   let {
     showDeleteConfirm = $bindable(false),
@@ -53,7 +54,7 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.tournament_delete_msg()}</p>
         <div class="flex gap-2">
-          <Button variant="danger" size="lg" class="flex-1" onclick={onDelete}>{m.common_delete()}</Button>
+          <Button variant="danger" size="lg" class="flex-1" onclick={onDelete}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.common_delete()}</Button>
           <Button variant="secondary" size="lg" onclick={() => (showDeleteConfirm = false)}>{m.common_cancel()}</Button>
         </div>
       </div>
@@ -154,6 +155,7 @@
         <p class="text-ash-300 mb-6">{m.offline_force_takeover_msg()}</p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceTakeover}>
+            <TriangleAlert class="w-4 h-4" aria-hidden="true" />
             {offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}
           </Button>
           <Button variant="secondary" size="lg" onclick={() => (showForceTakeoverConfirm = false)}>{m.common_cancel()}</Button>
@@ -188,6 +190,7 @@
         <p class="text-ash-300 mb-6">{m.offline_force_unlock_msg()}</p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceUnlock}>
+            <TriangleAlert class="w-4 h-4" aria-hidden="true" />
             {offlineActionLoading ? m.common_loading() : m.offline_force_unlock_confirm()}
           </Button>
           <Button variant="secondary" size="lg" onclick={() => (showForceUnlockConfirm = false)}>{m.common_cancel()}</Button>

@@ -12,7 +12,7 @@
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
-  import { User } from "@lucide/svelte";
+  import { User, TriangleAlert } from "@lucide/svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -289,6 +289,7 @@
         <p class="text-sm text-ash-400 mb-6">{m.profile_abandon_vekn_hint()}</p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={abandoningVekn} onclick={handleAbandonVekn}>
+            <TriangleAlert class="w-4 h-4" aria-hidden="true" />
             {abandoningVekn ? m.profile_abandoning() : m.profile_abandon_btn()}
           </Button>
           <Button variant="secondary" size="lg" disabled={abandoningVekn} onclick={() => (showAbandonConfirm = false)}>

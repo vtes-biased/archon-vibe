@@ -297,14 +297,14 @@
         <p class="text-ash-400 text-sm mb-4">{m.developer_confirm_regenerate_msg()}</p>
         <div class="flex gap-3">
           <Button variant="secondary" size="md" class="flex-1" onclick={() => (confirmAction = null)}>{m.common_cancel()}</Button>
-          <Button variant="danger" size="md" class="flex-1" onclick={() => handleRegenerate(confirmAction!.clientId)}>{m.developer_regenerate_btn()}</Button>
+          <Button variant="danger" size="md" class="flex-1" onclick={() => handleRegenerate(confirmAction!.clientId)}><TriangleAlert class="w-4 h-4" aria-hidden="true" />{m.developer_regenerate_btn()}</Button>
         </div>
       {:else}
         <h3 class="text-bone-100 font-medium mb-2">{m.developer_confirm_deactivate()}</h3>
         <p class="text-ash-400 text-sm mb-4">{m.developer_confirm_deactivate_msg()}</p>
         <div class="flex gap-3">
           <Button variant="secondary" size="md" class="flex-1" onclick={() => (confirmAction = null)}>{m.common_cancel()}</Button>
-          <Button variant="danger" size="md" class="flex-1" onclick={() => handleDeactivate(confirmAction!.clientId)}>{m.developer_deactivate_btn()}</Button>
+          <Button variant="danger" size="md" class="flex-1" onclick={() => handleDeactivate(confirmAction!.clientId)}><TriangleAlert class="w-4 h-4" aria-hidden="true" />{m.developer_deactivate_btn()}</Button>
         </div>
       {/if}
     </div>
