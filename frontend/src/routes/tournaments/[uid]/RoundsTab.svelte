@@ -401,7 +401,7 @@
               {@const expected = scoreExpectedCount()}
               <button
                 onclick={() => showScoreDetails = !showScoreDetails}
-                class="px-2 py-0.5 text-xs rounded-full {issues === 0 ? 'badge-emerald' : 'badge-amber'}"
+                class="px-2 py-0.5 text-xs rounded-full {issues === 0 ? 'badge-success' : 'badge-pending'}"
               >
                 {#if issues === 0 && expected === 0}{m.rounds_seating_perfect()}
                 {:else if issues === 0}{m.rounds_seating_ok({ count: String(expected) })}
@@ -432,7 +432,7 @@
                 <span class="text-crimson-300 font-medium">{label}:</span>
                 <span class="text-crimson-400">{displayVal}</span>
               {:else if isZero}
-                <span class="text-emerald-400">✓</span>
+                <span class="text-blue-400">✓</span>
                 <span class="text-ash-300">{label}:</span>
                 <span class="text-ash-400">{displayVal}</span>
               {:else if atMinimum && min > 0}
@@ -441,9 +441,9 @@
                 <span class="text-ash-500">{displayVal}</span>
                 <span class="text-ash-600 text-xs">{m.rounds_unavoidable()}</span>
               {:else}
-                <span class="text-amber-400">✗</span>
+                <span class="text-purple-400">✗</span>
                 <span class="text-ash-300">{label}:</span>
-                <span class="text-amber-400">{displayVal}</span>
+                <span class="text-purple-400">{displayVal}</span>
                 {#if min > 0}
                   <span class="text-ash-600 text-xs">(min: {isStddev ? min.toFixed(2) : String(min)})</span>
                 {/if}
@@ -462,7 +462,7 @@
 
     <!-- Not seated players (alter mode, visible in Playing and Finished) -->
     {#if unseatedPlayers.length > 0}
-      <div class="banner-amber border rounded-lg p-3">
+      <div class="banner-warn border rounded-lg p-3">
         <p class="text-xs mb-2">{m.rounds_not_seated()}</p>
         <div class="flex flex-wrap gap-2">
           {#each unseatedPlayers as player}
@@ -507,7 +507,7 @@
               </span>
               {#if tournament.state === "Playing" && isRoundInProgress(r)}
                 {@const prog = roundProgress(r)}
-                <span class="text-xs px-2 py-0.5 rounded badge-amber">{m.rounds_in_progress()}</span>
+                <span class="text-xs px-2 py-0.5 rounded badge-pending">{m.rounds_in_progress()}</span>
                 <span class="text-xs text-ash-500">{prog.done}/{prog.total}</span>
               {/if}
             </div>
@@ -530,7 +530,7 @@
               <!-- In-place alter seating mode -->
               <p class="text-sm text-ash-300">{m.rounds_alter_hint()}</p>
               {#if round.some(t => t.seating.some(s => s.result.vp > 0))}
-                <p class="text-sm text-amber-400">{m.rounds_alter_scores_warning()}</p>
+                <p class="text-sm text-purple-400">{m.rounds_alter_scores_warning()}</p>
               {/if}
               {#if hasR1Issue}
                 <p class="text-sm text-crimson-400">{m.rounds_alter_r1_error()}</p>
@@ -586,11 +586,11 @@
                     {/if}
                     <h3 class="text-sm font-medium text-bone-100 truncate">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
                     {#if table.seating.length < 4 || table.seating.length > 5}
-                      <span class="text-xs text-amber-400 shrink-0">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
+                      <span class="text-xs text-purple-400 shrink-0">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
                     {/if}
                   </button>
                   <div class="flex items-center gap-2 shrink-0">
-                    <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-emerald' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
+                    <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-success' : table.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-pending'}">
                       {translateTableState(table.state)}
                     </span>
                     {#if isEditable && isLast && table.seating.length === 0}
@@ -640,7 +640,7 @@
                           {#if isOrganizer}
                             <button
                               onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
-                              class="p-2 sm:p-0.5 text-ash-500 hover:text-amber-400 transition-colors"
+                              class="p-2 sm:p-0.5 text-ash-500 hover:text-purple-400 transition-colors"
                               title={m.sanction_tournament_issue_title()}
                             >
                               <TriangleAlert class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
@@ -697,7 +697,7 @@
                     <div class="mt-2 flex justify-end">
                       <button
                         onclick={() => { overrideTable_ = i; overrideComment = ""; }}
-                        class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                        class="px-2 py-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
                         title={m.override_title()}
                       >
                         <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
@@ -707,7 +707,7 @@
                 {/if}
                 {#if isOrganizer && table.override}
                   <div class="mt-2 pt-2 border-t border-ash-800 flex items-center justify-between">
-                    <span class="text-xs text-amber-400">
+                    <span class="text-xs text-purple-400">
                       <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />
                       {m.override_overridden({ comment: table.override.comment })}
                     </span>
@@ -727,7 +727,7 @@
                           {@const puid = player.user_uid ?? ""}
                           <button
                             onclick={() => { doAction("SeatPlayer", { player_uid: puid, table: i, seat: table.seating.length }); seatTargetTable = null; }}
-                            class="px-2 py-1 text-xs bg-ash-800 hover:bg-emerald-900/60 text-ash-300 hover:text-emerald-300 rounded transition-colors"
+                            class="px-2 py-1 text-xs bg-ash-800 hover:bg-blue-900/60 text-ash-300 hover:text-blue-300 rounded transition-colors"
                           >{seatDisplay(puid)}</button>
                         {/each}
                         <button onclick={() => seatTargetTable = null} class="px-2 py-1 text-xs text-ash-500 hover:text-ash-300">{m.common_cancel()}</button>
@@ -735,7 +735,7 @@
                     {:else}
                       <button
                         onclick={() => seatTargetTable = i}
-                        class="text-xs text-ash-500 hover:text-emerald-400 transition-colors"
+                        class="text-xs text-ash-500 hover:text-blue-400 transition-colors"
                       >
                         <Plus class="w-3.5 h-3.5 inline mr-1" />{m.rounds_seat_player()}
                       </button>

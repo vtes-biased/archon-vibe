@@ -203,7 +203,7 @@
           <div class="text-sm font-medium text-bone-100 mb-1">{draw.label}</div>
           <div class="flex flex-wrap gap-1.5">
             {#each draw.winners as winner}
-              <span class="px-2 py-0.5 text-xs badge-amber rounded">{seatDisplay(winner)}</span>
+              <span class="px-2 py-0.5 text-xs badge-highlight rounded">{seatDisplay(winner)}</span>
             {/each}
           </div>
         </div>

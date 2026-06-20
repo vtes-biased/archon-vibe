@@ -510,11 +510,11 @@ import TournamentModals from "./TournamentModals.svelte";
     {:else if tournament}
       <!-- Offline mode banner (this device has lock) -->
       {#if tournamentIsOffline}
-        <div class="banner-amber border rounded-lg p-4 mb-4 flex items-center justify-between gap-4">
+        <div class="banner-warn border rounded-lg p-4 mb-4 flex items-center justify-between gap-4">
           <div class="flex items-center gap-2 min-w-0">
             <WifiOff class="w-5 h-5 shrink-0" />
             <div class="min-w-0">
-              <span class="text-amber-200 font-medium text-sm">{m.offline_mode_banner()}</span>
+              <span class="text-purple-200 font-medium text-sm">{m.offline_mode_banner()}</span>
               {#if lastSync}
                 <span class="text-xs text-ash-400 ml-2">{m.offline_last_sync({ time: new Date(lastSync).toLocaleTimeString() })}</span>
               {:else}
@@ -575,7 +575,7 @@ import TournamentModals from "./TournamentModals.svelte";
               </a>
             {/if}
             {#if isOrganizer && veknResultsPending}
-              <span class="px-2 py-0.5 rounded text-xs font-medium banner-amber border inline-flex items-center gap-1"
+              <span class="px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1"
                     title={m.vekn_sync_pending_hint()}>
                 <CloudOff class="w-3 h-3" aria-hidden="true" />
                 {m.vekn_sync_pending_results()}
@@ -717,8 +717,8 @@ import TournamentModals from "./TournamentModals.svelte";
                 {@const isDone = i < currentIdx}
                 {@const isCurrent = i === currentIdx}
                 {#if i > 0}<span class="text-ash-700">—</span>{/if}
-                <span class="whitespace-nowrap {isDone ? 'text-emerald-400' : isCurrent ? 'text-crimson-400 font-medium' : 'text-ash-600'}">
-                  <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-emerald-400' : isCurrent ? 'bg-crimson-400' : 'bg-ash-700'}"></span>
+                <span class="whitespace-nowrap {isDone ? 'text-blue-400' : isCurrent ? 'text-crimson-400 font-medium' : 'text-ash-600'}">
+                  <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-blue-400' : isCurrent ? 'bg-crimson-400' : 'bg-ash-700'}"></span>
                   <span class="hidden sm:inline">{translateTournamentState(step as TournamentState)}</span>
                 </span>
               {/each}
@@ -813,7 +813,7 @@ import TournamentModals from "./TournamentModals.svelte";
                 <p class="text-sm text-sky-300">{m.overview_stagger_info({ count: String(checkedInCount) })}</p>
               {/if}
               {#if hasFinalsCandidate && hasUnequalRounds}
-                <p class="text-sm text-amber-300">{m.overview_stagger_finals_warning()}</p>
+                <p class="text-sm text-purple-300">{m.overview_stagger_finals_warning()}</p>
               {/if}
             {/if}
 

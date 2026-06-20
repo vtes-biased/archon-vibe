@@ -25,24 +25,25 @@ Role badges use distinct colors but remain muted/dusty to fit the gothic aesthet
 
 ### Semantic Color Classes
 
-Standard Tailwind colors (emerald, amber, red, etc.) are **not** covered by the scale inversion. For colored UI elements that must look correct in both modes, use the semantic CSS classes defined in `app.css`:
+Standard Tailwind status colors (green/amber/teal/…) are **off-palette** — the app uses a tight gothic-jewel set instead. Coloured UI elements use the semantic classes in `app.css`, each defined **once** with CSS `light-dark(LIGHT, DARK)` (the theme value is picked from `color-scheme`; **no** parallel `html.light` block — that was the old two-sources-of-truth bug).
 
-| Class | Usage | Dark mode | Light mode |
-|-------|-------|-----------|------------|
-| `badge-{color}` | Status pills, role tags | Dark tinted bg + light text | Light tinted bg + dark text |
-| `btn-{color}` | Action buttons | Saturated bg + white text | Darker bg + white text |
-| `banner-{color}` | Alert/info boxes | Dark bg 20% + border + light text | Light tint bg + soft border + dark text |
-| `toast-{color}` | Toast notifications | Dark bg + light text | Light bg + dark text |
-| `status-offline` | Offline status bar | Amber bg + light text | Dark amber bg + white text |
-| `status-update` | Update available bar | Indigo bg + light text | Dark indigo bg + white text |
+**Hues:** blue (azure) · amethyst (purple) · fuchsia (magenta) · crimson · slate (neutral). **No green/amber/teal/cyan/lime/yellow/orange/indigo/rose.** Violet is reserved for destructive `btn-danger` only. All combos are WCAG-AA in both themes.
 
-Available colors: `emerald`, `amber`, `red`, `yellow`, `orange`, `purple`, `blue`, `indigo`, `cyan`, `teal`, `lime`, `slate`, `rose`.
+Two layers share these hues:
+
+| Layer | Classes | Hue mapping |
+|-------|---------|-------------|
+| **Status** (meaning) | `badge-success`/`-pending`/`-danger`/`-info`/`-highlight` · `banner-info`/`-warn`/`-error`/`-highlight` · `toast-success`/`-warn` · `status-offline`/`-update` · `btn-success`/`-pending` · `dot-pending`/`-highlight`/`-danger` | success/info = blue · pending/warn = amethyst · danger/error = crimson · highlight = fuchsia |
+| **Categorical** (identity) | `badge-blue`/`-amethyst`/`-fuchsia`/`-crimson`/`-slate` | arbitrary distinct tags (roles, link platforms) — pick by family, the hue is just a label |
 
 **When to use what:**
-- `badge-*` — for any small status indicator or tag
-- `btn-*` — underlying solid-button classes. **Action buttons go through the `<Button>` component** (below), which uses `bg-crimson-*` / `btn-danger`, not these. `btn-emerald`/`btn-amber` survive only for status colour (paid/pending filter chips), the help-guide mockups, and a couple of `<a>`-styled list-page CTAs.
-- `banner-*` — for info/warning boxes (add `border rounded-lg p-3` etc.)
-- Crimson palette classes (`bg-crimson-*`, `text-crimson-*`) — already handled by scale inversion, use directly
+- **Status classes** — anything carrying good/bad/attention *meaning*. Pair with an icon + text; colour is reinforcement, never the sole signal (see #225).
+- **Categorical classes** (`badge-blue` etc.) — identity tags where the hue is arbitrary.
+- `btn-*` — solid status chips only (paid/pending filter chips, help-guide mockups). **Action buttons go through `<Button>`** (below), which uses `bg-crimson-*` / `btn-danger`.
+- `banner-*` — info/warning boxes (add `border rounded-lg p-3` etc.).
+- Crimson palette classes (`bg-crimson-*`, `text-crimson-*`) — handled by scale inversion, use directly.
+
+**Adding a semantic colour:** add one `light-dark(LIGHT, DARK)` rule in `app.css` and verify AA in both themes. Do **not** reintroduce green/amber or a parallel `html.light` override block.
 
 ### Buttons — use `<Button>`
 
@@ -57,11 +58,11 @@ All action buttons go through `$lib/components/Button.svelte`. It owns colour, s
 
 - **One primary CTA per surface.** Crimson is the single positive colour, so a screen should show one filled crimson button; collapse the rest into an overflow (`ActionMenu.svelte`). A legitimate second lifecycle choice (e.g. Start Round vs Start Finals) drops to `secondary`, never a second `primary`.
 - **Danger is violet, never red.** Red and crimson are the same hue family and collapse together — even under colourblindness — so destructive actions get their own hue. Meaning must not rest on hue alone: pair `danger` with an icon (`TriangleAlert`/`Trash2`) + a verb.
-- `primary`/`secondary`/`ghost` use crimson/ash, which are scale-inverted (adapt to light mode automatically). `danger` uses `btn-danger`, which carries its own `html.light` override (violet has no scale inversion).
+- `primary`/`secondary`/`ghost` use crimson/ash, which are scale-inverted (adapt to light mode automatically). `danger` uses `btn-danger`, defined with `light-dark()` (violet has no scale inversion).
 - Props: `size` (`sm`/`md`/`lg`), `block` (full width), `loading` (spinner + `aria-busy`, auto-disables), `disabled`; extra layout classes (`flex-1`, margins) via `class`. Focus comes from the global `:focus-visible` ring — never add a bespoke outline.
 - **Do not** route through `<Button>`: icon-only buttons, toggles/tabs/segmented controls, dropdown/menu options (e.g. the items inside `ActionMenu`), row/card-wrapping buttons, `<a>`-styled links, or Discord brand-fill buttons — leave those as raw elements.
 
-**Palette history (supersedes the old #232 plan):** this crimson-primary system replaces the earlier scheme (emerald `primary`, crimson `brand`/`danger`, amber `warning`). Done here: `primary` → crimson (the old `brand` merged in), `danger` → violet `btn-danger`, and `warning`/amber + emerald dropped from `<Button>` (the `btn-emerald`/`btn-amber` classes remain only for status chips and help-guide mockups). **#232 now covers what's left:** migrate the app off numeric scale-inversion to semantic role tokens (surface/text/accent/border), token-ify the remaining bespoke light overrides, and run a WCAG-AA contrast audit across both themes.
+**Palette history:** the crimson-primary system replaced the earlier scheme (emerald `primary`, crimson `brand`/`danger`, amber `warning`): `primary` → crimson, `danger` → violet `btn-danger`, `warning`/emerald dropped from `<Button>` (`btn-success`/`btn-pending` remain only for status chips + help-guide mockups). **#232 (mostly shipped):** the semantic component classes were recoloured to the gothic-jewel set (green/amber out; blue/amethyst/fuchsia/crimson/slate in) and migrated to `light-dark()` — no parallel `html.light` block — with WCAG-AA verified in both themes; raw inline green/amber tints swept to the palette. **Still deferred:** the full numeric-scale token migration (`bg-dusk-950`/`text-ash-400` → `surface`/`text`/`accent`/`border` role tokens across ~80 files); the crimson/bone/dusk/ash scale inversion keeps working until then.
 
 ### Disabled States
 
@@ -77,9 +78,11 @@ Action buttons use `<Button>`, which owns its disabled + loading states — neve
 
 ### Light Theme — Scale Inversion
 
-Light mode is implemented via **CSS variable overrides** under `html.light` in `app.css`. The technique is called *scale inversion*: dark shade numbers (900/950) are reassigned to light color values and vice versa. This means all existing Tailwind classes (`bg-dusk-950`, `text-ash-300`, etc.) automatically resolve to appropriate light-mode colors with zero component changes.
+The crimson/bone/dusk/ash/mist **numeric scales** are theme-switched via **CSS variable overrides** under `html.light` in `app.css` — *scale inversion*: dark shade numbers (900/950) are reassigned to light color values and vice versa, so existing Tailwind classes (`bg-dusk-950`, `text-ash-300`, etc.) resolve to light-mode colors with zero component changes.
 
-**Adding new colors**: If you add a new shade to `@theme`, also add its inverted value under `html.light`.
+**Exception — semantic component classes** (`badge-*`, `banner-*`, `btn-*`, `toast-*`, `status-*`, `dot-*`) do **not** use inversion; each is a single `light-dark()` rule (see *Semantic Color Classes* above).
+
+**Adding new colors**: a new `@theme` scale shade needs its inverted value under `html.light`; a new semantic component class needs a `light-dark()` rule instead.
 
 **Theme toggle**: Users can cycle system / light / dark via the toggle in the sidebar (desktop) or bottom nav (mobile). Preference is stored in `localStorage.theme` and applied before first paint via an inline script in `app.html` to prevent FOUC.
 

@@ -171,7 +171,7 @@
 <div class="space-y-6">
   <!-- Decklist required reminder -->
   {#if tournament.decklist_required && (tournament.state === 'Registration' || tournament.state === 'Waiting')}
-    <div class="banner-amber border rounded-lg p-3 text-sm">
+    <div class="banner-warn border rounded-lg p-3 text-sm">
       {#if isPlayer && myDecks.length === 0}
         {m.decks_required_player_hint()}
       {:else if isPlayer}
@@ -213,7 +213,7 @@
                 <Lock class="w-3 h-3 text-ash-500" />
               {/if}
               {#if deck}
-                <CircleCheck class="w-3.5 h-3.5 text-emerald-400" />
+                <CircleCheck class="w-3.5 h-3.5 text-blue-400" />
               {:else}
                 <span class="text-ash-600 truncate">{m.decks_no_deck()}</span>
               {/if}

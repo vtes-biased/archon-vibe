@@ -101,6 +101,6 @@
     <p class="text-sm text-crimson-400">{error}</p>
   {/if}
   {#if success}
-    <p class="text-sm text-emerald-400">{m.checkin_qr_success()}</p>
+    <p class="text-sm text-blue-400">{m.checkin_qr_success()}</p>
   {/if}
 </div>

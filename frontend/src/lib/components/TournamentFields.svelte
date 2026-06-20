@@ -195,7 +195,7 @@
             handleInput("max_rounds", 0);
           }
         }}
-        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
+        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
       />
       <span class="text-sm text-ash-200">{m.tfield_open_rounds()}</span>
     </label>
@@ -280,7 +280,7 @@
         handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
       }
     }}
-    class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
+    class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
   />
   <span class="text-sm text-ash-200">{m.tfield_online()}</span>
 </label>
@@ -404,7 +404,7 @@
         checked={values.proxies}
         {disabled}
         onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
-        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
+        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
       />
       <span class="text-sm text-ash-200">{m.tfield_allow_proxies()}</span>
     </label>
@@ -415,7 +415,7 @@
       checked={values.multideck}
       {disabled}
       onchange={(e) => handleInput("multideck", (e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
+      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
     />
     <span class="text-sm text-ash-200">{m.tfield_multideck()}</span>
   </label>
@@ -425,7 +425,7 @@
       checked={values.decklist_required}
       {disabled}
       onchange={(e) => handleInput("decklist_required", (e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-emerald-600 focus:ring-emerald-500"
+      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
     />
     <span class="text-sm text-ash-200">{m.tfield_decklist_required()}</span>
   </label>

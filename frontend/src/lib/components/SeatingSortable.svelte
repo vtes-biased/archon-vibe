@@ -85,7 +85,7 @@
 
   function issueColor(level: number): string {
     if (level === 0) return 'text-crimson-400';
-    if (level <= 6) return 'text-amber-400';
+    if (level <= 6) return 'text-purple-400';
     return 'text-sky-400';
   }
 </script>
@@ -96,8 +96,8 @@
 
 {#if selected}
   {@const selName = seatDisplay(tables[selected.table]?.[selected.seat] ?? '')}
-  <div class="sticky top-2 z-10 mb-3 flex items-center justify-between gap-2 bg-ash-800 border border-emerald-700 rounded-lg px-3 py-2 text-sm shadow-lg">
-    <span class="text-emerald-300">
+  <div class="sticky top-2 z-10 mb-3 flex items-center justify-between gap-2 bg-ash-800 border border-blue-700 rounded-lg px-3 py-2 text-sm shadow-lg">
+    <span class="text-blue-300">
       {isFinals ? m.rounds_seating_moving_finals({ name: selName }) : m.rounds_seating_moving({ name: selName })}
     </span>
     <button
@@ -130,7 +130,7 @@
           aria-pressed={isSelected}
           aria-label={m.rounds_seat_n({ n: String(s + 1), name: seatDisplay(uid) })}
           class="w-full min-h-[44px] py-1.5 px-1 -mx-1 flex items-center gap-2 text-sm text-left rounded transition-colors
-            {isSelected ? 'ring-2 ring-emerald-500 bg-emerald-900/30' : isSwapTarget ? 'ring-1 ring-inset ring-emerald-800/50 hover:bg-emerald-900/20' : 'hover:bg-ash-800/60'}"
+            {isSelected ? 'ring-2 ring-blue-500 bg-blue-900/30' : isSwapTarget ? 'ring-1 ring-inset ring-blue-800/50 hover:bg-blue-900/20' : 'hover:bg-ash-800/60'}"
         >
           <span class="w-5 text-center text-xs text-ash-500 tabular-nums">{s + 1}</span>
           <span class="flex-1 text-ash-300">{seatDisplay(uid)}</span>
@@ -140,7 +140,7 @@
               <span class="text-xs">{issue.message}</span>
             </span>
           {:else}
-            <ArrowRightLeft class="w-4 h-4 shrink-0 {isSelected ? 'text-emerald-400' : 'text-ash-600'}" />
+            <ArrowRightLeft class="w-4 h-4 shrink-0 {isSelected ? 'text-blue-400' : 'text-ash-600'}" />
           {/if}
         </button>
       {/each}
@@ -150,7 +150,7 @@
           <button
             type="button"
             onclick={() => tapOpenSeat(t)}
-            class="w-full py-3 min-h-[44px] flex items-center justify-center gap-1.5 text-xs border border-dashed border-emerald-500 text-emerald-300 hover:bg-emerald-900/30 rounded mt-1.5 transition-colors"
+            class="w-full py-3 min-h-[44px] flex items-center justify-center gap-1.5 text-xs border border-dashed border-blue-500 text-blue-300 hover:bg-blue-900/30 rounded mt-1.5 transition-colors"
           >
             <ArrowRightLeft class="w-3.5 h-3.5" />{m.rounds_seating_move_here()}
           </button>

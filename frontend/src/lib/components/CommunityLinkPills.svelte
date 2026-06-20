@@ -26,18 +26,19 @@
     other: "Link",
   };
 
+  // Gothic-jewel categorical palette (blue / amethyst / fuchsia / crimson / slate) — icons carry identity
   const COLORS: Record<CommunityLinkType, string> = {
-    discord: "badge-indigo",
-    telegram: "badge-cyan",
-    whatsapp: "badge-emerald",
-    forum: "badge-amber",
+    discord: "badge-amethyst",
+    telegram: "badge-blue",
+    whatsapp: "badge-blue",
+    forum: "badge-slate",
     facebook: "badge-blue",
     website: "badge-slate",
-    twitch: "badge-purple",
-    youtube: "badge-red",
-    reddit: "badge-orange",
-    instagram: "badge-rose",
-    blog: "badge-teal",
+    twitch: "badge-amethyst",
+    youtube: "badge-crimson",
+    reddit: "badge-fuchsia",
+    instagram: "badge-fuchsia",
+    blog: "badge-slate",
     other: "badge-slate",
   };
 </script>

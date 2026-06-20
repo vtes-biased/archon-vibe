@@ -181,7 +181,7 @@
   <div class="max-w-sm space-y-2">
     <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
       <span class="flex items-center gap-2 text-sm text-ash-200"><KeyRound class="w-4 h-4" /> Passkey</span>
-      <span class="text-xs px-2 py-0.5 rounded badge-emerald">Active</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-success">Active</span>
     </div>
     <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
       <span class="flex items-center gap-2 text-sm text-ash-200"><Mail class="w-4 h-4" /> Email &amp; password</span>
@@ -189,7 +189,7 @@
     </div>
     <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
       <span class="flex items-center gap-2 text-sm text-ash-200"><DiscordIcon class="w-4 h-4" /> Discord</span>
-      <span class="text-xs px-2 py-0.5 rounded badge-emerald">Linked</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-success">Linked</span>
     </div>
     <div class="pt-1 flex gap-2">
       <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded-lg flex items-center gap-1.5">
@@ -294,7 +294,7 @@
 {@html renderGuideSection(m.pg_deck_methods())}
 
 <ExampleBox>
-  <button class="px-3 py-1.5 text-sm text-emerald-400 border border-emerald-800 rounded-lg flex items-center gap-1.5">
+  <button class="px-3 py-1.5 text-sm text-blue-400 border border-blue-800 rounded-lg flex items-center gap-1.5">
     <QrCode class="w-4 h-4" />
     Scan QR to Check In
   </button>
@@ -306,7 +306,7 @@
   <div class="bg-ash-900/50 rounded-lg p-4 max-w-sm">
     <div class="flex items-center justify-between mb-2">
       <h3 class="text-sm font-medium text-bone-100">Table 3</h3>
-      <span class="text-xs px-2 py-0.5 rounded badge-amber">Playing</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-pending">Playing</span>
     </div>
     <div class="divide-y divide-ash-800">
       {#each ["Alice", "Bob", "Charlie", "Diana"] as name, i}
@@ -337,7 +337,7 @@
 {@html renderGuideSection(m.pg_override_judge())}
 
 <ExampleBox>
-  <button class="px-2 py-1 text-xs text-amber-400 border border-amber-800 rounded-lg flex items-center gap-1">
+  <button class="px-2 py-1 text-xs text-purple-400 border border-purple-800 rounded-lg flex items-center gap-1">
     <Gavel class="w-3 h-3" />
     Call Judge
   </button>
@@ -346,9 +346,9 @@
 {@html renderGuideSection(m.pg_standings())}
 
 <ExampleBox>
-  <div class="bg-amber-900/30 border border-amber-800/50 rounded-lg p-3 flex items-center gap-2 max-w-sm">
-    <svg class="w-5 h-5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-    <span class="text-amber-200 font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
+  <div class="bg-purple-900/30 border border-purple-800/50 rounded-lg p-3 flex items-center gap-2 max-w-sm">
+    <svg class="w-5 h-5 text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+    <span class="text-purple-200 font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
   </div>
 </ExampleBox>
 

@@ -679,7 +679,7 @@
         </h2>
       </div>
       <div class="p-6">
-        <p class="banner-amber border rounded-lg p-3 text-sm mb-6">
+        <p class="banner-warn border rounded-lg p-3 text-sm mb-6">
           {m.user_country_change_official_warning()}
         </p>
         <div class="flex gap-2">

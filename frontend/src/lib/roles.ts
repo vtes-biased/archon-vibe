@@ -3,16 +3,17 @@ import type { Role } from '$lib/types';
 // Gothic-inspired muted role colors - see DESIGN.md
 // Uses semantic badge-* classes from app.css for light/dark mode support
 const ROLE_CLASSES: Record<Role, string> = {
-  IC: 'badge-purple',
-  NC: 'badge-blue',
+  // Gothic-jewel families: governance = crimson · judiciary = amethyst · playtest = blue · ethics = fuchsia · dev = slate
+  IC: 'badge-crimson',
+  NC: 'badge-crimson',
   Prince: 'bg-crimson-800/60 text-crimson-200', // crimson uses custom palette
-  Ethics: 'badge-emerald',
-  PTC: 'badge-cyan',
-  PT: 'badge-teal',
-  Rulemonger: 'badge-amber',
-  Judge: 'badge-indigo',
-  Judgekin: 'badge-slate',
-  DEV: 'badge-lime',
+  Ethics: 'badge-fuchsia',
+  PTC: 'badge-blue',
+  PT: 'badge-blue',
+  Rulemonger: 'badge-amethyst',
+  Judge: 'badge-amethyst',
+  Judgekin: 'badge-amethyst',
+  DEV: 'badge-slate',
 };
 
 export function getRoleClasses(role: Role): string {

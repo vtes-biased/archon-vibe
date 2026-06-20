@@ -144,7 +144,7 @@
                 {/if}
               </td>
               <td class="py-2 px-3 text-right font-medium text-ash-100">
-                <Trophy class="w-4 h-4 inline mr-1 text-amber-400" />
+                <Trophy class="w-4 h-4 inline mr-1 text-fuchsia-400" />
                 {winsCount}
               </td>
             </tr>

@@ -58,7 +58,7 @@
           <div class="flex items-center gap-2 text-xs text-ash-400 flex-wrap">
             {#if scope(link)}
               <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium
-                {scope(link) === 'global' ? 'badge-blue' : 'badge-teal'}">
+                {scope(link) === 'global' ? 'badge-blue' : 'badge-amethyst'}">
                 <Pin class="w-3 h-3" />
                 {scope(link) === 'global' ? m.community_scope_global() : m.community_scope_national()}
               </span>

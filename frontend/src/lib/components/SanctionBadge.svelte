@@ -16,14 +16,14 @@
   );
   const isInactive = $derived(isLifted || isExpired());
 
-  // Gothic-inspired muted sanction colors — uses semantic badge-* classes from app.css
+  // Ordinal severity ramp (amethyst → fuchsia → crimson) — semantic badge-* classes from app.css
   const SANCTION_CLASSES: Record<SanctionLevel, string> = {
-    caution: "badge-yellow",
-    warning: "badge-orange",
-    standings_adjustment: "badge-purple",
-    disqualification: "badge-red",
+    caution: "badge-pending",
+    warning: "badge-pending",
+    standings_adjustment: "badge-highlight",
+    disqualification: "badge-danger",
     suspension: "bg-crimson-900/80 text-crimson-200", // crimson uses custom palette
-    probation: "badge-rose",
+    probation: "badge-danger",
   };
 
   const levelLabelFns: Record<SanctionLevel, () => string> = {

@@ -155,7 +155,7 @@
 
   <!-- Winner display -->
   {#if tournament.winner}
-    <div class="banner-emerald border rounded-lg p-4">
+    <div class="banner-highlight border rounded-lg p-4">
       <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
       <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
     </div>
@@ -163,7 +163,7 @@
 
   <!-- Winner deck nudge (organizer, finished, no deck) -->
   {#if isOrganizer && isFinished && tournament.winner && !winnerHasDeck}
-    <div class="banner-amber border rounded-lg p-3 text-sm">
+    <div class="banner-warn border rounded-lg p-3 text-sm">
       {m.decks_winner_nudge_organizer({ name: playerInfo[tournament.winner]?.name ?? 'the winner' })}
     </div>
   {/if}
@@ -249,7 +249,7 @@
             </Button>
           </div>
           {#if archonConfirmOverwrite}
-            <div class="bg-amber-900/30 border border-amber-700 rounded p-3 text-sm text-amber-200">
+            <div class="bg-purple-900/30 border border-purple-700 rounded p-3 text-sm text-purple-200">
               <p>{m.archon_import_confirm_overwrite()}</p>
               <div class="flex gap-2 mt-2">
                 <Button variant="primary" size="md" onclick={handleArchonImport}>
@@ -263,12 +263,12 @@
           {/if}
           {#if archonResult}
             {#if archonResult.success}
-              <div class="bg-emerald-900/30 border border-emerald-700 rounded p-3 text-sm text-emerald-200">
+              <div class="bg-blue-900/30 border border-blue-700 rounded p-3 text-sm text-blue-200">
                 <p>{m.archon_import_success()}</p>
                 <p class="text-xs mt-1">{m.archon_players_matched({ count: archonResult.players_matched })} · {m.archon_rounds_imported({ count: archonResult.rounds_imported })}{archonResult.has_finals ? ` · ${m.archon_finals_label()}` : ""}</p>
               </div>
             {:else}
-              <div class="bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-200">
+              <div class="bg-crimson-900/30 border border-crimson-700 rounded p-3 text-sm text-crimson-200">
                 <p class="font-medium">{m.archon_import_error()}</p>
                 <ul class="mt-1 text-xs space-y-0.5">
                   {#each archonResult.errors as error}

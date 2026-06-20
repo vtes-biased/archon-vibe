@@ -146,7 +146,7 @@
   <div class="bg-ash-900/50 rounded-lg p-4 max-w-sm">
     <div class="flex items-center justify-between mb-2">
       <h3 class="text-sm font-medium text-bone-100">Table 1</h3>
-      <span class="text-xs px-2 py-0.5 rounded badge-amber">Playing</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-pending">Playing</span>
     </div>
     <div class="divide-y divide-ash-800">
       {#each ["Alice", "Bob", "Charlie", "Diana"] as name}
@@ -200,13 +200,13 @@
 
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
-    <button class="px-2 py-1 text-xs text-amber-400 border border-amber-800 rounded-lg flex items-center gap-1">
+    <button class="px-2 py-1 text-xs text-purple-400 border border-purple-800 rounded-lg flex items-center gap-1">
       <Gavel class="w-3 h-3" />
       Call Judge
     </button>
-    <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
+    <div class="banner-warn border rounded-lg p-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Gavel class="w-5 h-5 text-amber-400 shrink-0" />
+        <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
         <div>
           <span class="text-sm font-medium text-bone-100">Judge Call!</span>
           <span class="text-sm text-ash-300 ml-1">Table 3 &mdash; Alice</span>
@@ -216,9 +216,9 @@
         <X class="w-4 h-4" />
       </button>
     </div>
-    <div class="banner-amber border rounded-lg p-3 flex items-center justify-between">
+    <div class="banner-warn border rounded-lg p-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Gavel class="w-5 h-5 text-amber-400 shrink-0" />
+        <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
         <div>
           <span class="text-sm font-medium text-bone-100">Judge Call!</span>
           <span class="text-sm text-ash-300 ml-1">Table 7 &mdash; Bob</span>
@@ -253,15 +253,15 @@
   <div class="space-y-3 max-w-xs">
     <div class="flex gap-4 justify-center">
       <div class="text-center">
-        <span class="text-2xl font-mono text-emerald-400">1:23:45</span>
+        <span class="text-2xl font-mono text-blue-400">1:23:45</span>
         <p class="text-xs text-ash-500 mt-1">Time remaining</p>
       </div>
       <div class="text-center">
-        <span class="text-2xl font-mono text-amber-400">4:30</span>
+        <span class="text-2xl font-mono text-purple-400">4:30</span>
         <p class="text-xs text-ash-500 mt-1">&lt; 5 minutes</p>
       </div>
       <div class="text-center">
-        <span class="text-2xl font-mono text-red-400">0:00</span>
+        <span class="text-2xl font-mono text-crimson-400">0:00</span>
         <p class="text-xs text-ash-500 mt-1">Expired</p>
       </div>
     </div>
@@ -312,9 +312,9 @@
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-2 items-center">
       <span class="text-ash-300 text-sm">Alice</span>
-      <span class="text-xs px-2 py-0.5 rounded badge-amber">Pending</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-pending">Pending</span>
       <span class="text-ash-300 text-sm ml-3">Bob</span>
-      <span class="text-xs px-2 py-0.5 rounded badge-emerald">Paid</span>
+      <span class="text-xs px-2 py-0.5 rounded badge-success">Paid</span>
     </div>
     <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">Mark All Paid</button>
   </div>
@@ -342,7 +342,7 @@
 {@html renderGuideSection(m.og_winner_deck_missing())}
 
 <ExampleBox>
-  <div class="banner-amber border rounded-lg p-3 text-sm max-w-sm">
+  <div class="banner-warn border rounded-lg p-3 text-sm max-w-sm">
     Winner's decklist is missing. Please remind Alice to upload their deck.
   </div>
 </ExampleBox>
@@ -411,7 +411,7 @@
 {@html renderGuideSection(m.og_offline())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm text-amber-300 border border-amber-700 rounded-lg flex items-center gap-2">
+  <button class="px-4 py-2 text-sm text-purple-300 border border-purple-700 rounded-lg flex items-center gap-2">
     <WifiOff class="w-4 h-4" />
     Go Offline
   </button>
@@ -421,9 +421,9 @@
 
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
-    <div class="bg-amber-900/30 border border-amber-800/50 rounded-lg p-3 flex items-center gap-2">
-      <WifiOff class="w-5 h-5 text-amber-400 shrink-0" />
-      <span class="text-amber-200 font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
+    <div class="bg-purple-900/30 border border-purple-800/50 rounded-lg p-3 flex items-center gap-2">
+      <WifiOff class="w-5 h-5 text-purple-400 shrink-0" />
+      <span class="text-purple-200 font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
     </div>
     <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg flex items-center gap-2">
       <Wifi class="w-4 h-4" />

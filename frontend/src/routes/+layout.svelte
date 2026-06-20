@@ -218,7 +218,7 @@
     <!-- Connection status indicator -->
     <div class="mt-auto pt-4">
       <div class="flex flex-col items-center gap-1">
-        <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-crimson-500'}"></div>
+        <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-purple-500 animate-pulse' : 'bg-blue-500') : 'bg-crimson-500'}"></div>
         <span class="text-[10px] text-ash-500">{isOnline ? (isSyncing ? m.status_syncing() : m.status_online()) : m.status_offline()}</span>
       </div>
     </div>

@@ -57,7 +57,7 @@
       <Loader2 class="w-4 h-4 text-ash-400 animate-spin" aria-hidden="true" />
       <span class="sr-only">{m.common_saving()}</span>
     {:else if justSaved}
-      <Check class="w-4 h-4 text-emerald-400" aria-hidden="true" />
+      <Check class="w-4 h-4 text-blue-400" aria-hidden="true" />
       <span class="sr-only">{m.common_saved()}</span>
     {/if}
   </span>

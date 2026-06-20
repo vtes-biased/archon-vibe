@@ -293,7 +293,7 @@
           <div>
             <h1 class="text-3xl font-light text-crimson-500">{league.name}</h1>
             <div class="flex gap-2 mt-1 text-sm text-ash-400">
-              <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-emerald' : 'bg-ash-800 text-ash-400'}">
+              <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-success' : 'bg-ash-800 text-ash-400'}">
                 {isActive() ? m.league_status_active() : m.league_status_finished()}
               </span>
               <span>{standingsModeLabel(league.standings_mode)}</span>
@@ -504,7 +504,7 @@
                         · {t.format}
                       </div>
                     </div>
-                    <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-ash-800 text-ash-400' : 'badge-emerald'}">
+                    <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-ash-800 text-ash-400' : 'badge-success'}">
                       {translateTournamentState(t.state)}
                     </span>
                   </div>

@@ -142,11 +142,11 @@
 
       <!-- Secret display banner -->
       {#if displayedSecret}
-        <div class="p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg">
+        <div class="p-4 bg-purple-900/30 border border-purple-700 rounded-lg">
           <div class="flex items-start gap-3">
-            <TriangleAlert class="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
+            <TriangleAlert class="w-5 h-5 text-purple-400 mt-0.5 shrink-0" />
             <div class="flex-1 min-w-0">
-              <p class="text-yellow-200 text-sm font-medium mb-2">{m.developer_secret_warning()}</p>
+              <p class="text-purple-200 text-sm font-medium mb-2">{m.developer_secret_warning()}</p>
               <div class="flex items-center gap-2">
                 <code class="text-xs bg-dusk-900 px-3 py-2 rounded text-bone-200 break-all flex-1">{displayedSecret}</code>
                 <button
@@ -235,9 +235,9 @@
                   <div class="flex items-center gap-2">
                     <h4 class="text-bone-100 font-medium text-sm">{client.name}</h4>
                     {#if client.active}
-                      <span class="px-1.5 py-0.5 badge-emerald text-xs rounded-full">{m.developer_status_active()}</span>
+                      <span class="px-1.5 py-0.5 badge-success text-xs rounded-full">{m.developer_status_active()}</span>
                     {:else}
-                      <span class="px-1.5 py-0.5 badge-red text-xs rounded-full">{m.developer_status_inactive()}</span>
+                      <span class="px-1.5 py-0.5 badge-danger text-xs rounded-full">{m.developer_status_inactive()}</span>
                     {/if}
                   </div>
                   <div class="mt-1.5 space-y-0.5">
@@ -262,7 +262,7 @@
                       <RefreshCw class="w-4 h-4" />
                     </button>
                     <button onclick={() => (confirmAction = { clientId: client.client_id, action: "deactivate" })}
-                      class="p-1.5 text-red-400 hover:text-red-300 hover:bg-dusk-950 rounded transition-colors" title={m.developer_deactivate_title()}>
+                      class="p-1.5 text-crimson-400 hover:text-crimson-300 hover:bg-dusk-950 rounded transition-colors" title={m.developer_deactivate_title()}>
                       <PowerOff class="w-4 h-4" />
                     </button>
                   </div>

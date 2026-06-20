@@ -211,7 +211,7 @@
     >
       <!-- Escalation hint (per-infraction-type, v2 §1.2.1) -->
       {#if sameInfractionCount > 0}
-        <div class="p-3 rounded banner-amber border text-sm">
+        <div class="p-3 rounded banner-warn border text-sm">
           <div class="flex items-center gap-2">
             <TriangleAlert class="w-4 h-4 shrink-0" />
             {m.sanction_escalation_hint({ count: String(sameInfractionCount), suggested: levelLabel(suggestedLevel) })}

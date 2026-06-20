@@ -360,7 +360,7 @@
       <div class="border-t border-ash-800 pt-2">
         <button
           onclick={() => showOfflinePlayerForm = !showOfflinePlayerForm}
-          class="text-sm text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+          class="text-sm text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
         >
           <UserPlus class="w-4 h-4" />
           {m.offline_add_new_player()}
@@ -457,11 +457,11 @@
               onclick={() => paymentFilter = 'all'}
             >{m.payment_filter_all()}</button>
             <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'btn-amber' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'btn-pending' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
               onclick={() => paymentFilter = 'Pending'}
             >{m.payment_pending()}</button>
             <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'btn-emerald' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'btn-success' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
               onclick={() => paymentFilter = 'Paid'}
             >{m.payment_paid()}</button>
           </div>
@@ -508,7 +508,7 @@
                 {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
                 <span class="text-xs px-2 py-0.5 rounded bg-ash-800 text-ash-500">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
               {:else}
-                <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-emerald' : 'bg-ash-800 text-ash-400'}">{translatePlayerState(player.state)}</span>
+                <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-ash-800 text-ash-400'}">{translatePlayerState(player.state)}</span>
               {/if}
             </div>
           </div>
@@ -534,14 +534,14 @@
             <div class="mt-2 flex items-center gap-2 flex-wrap">
               <button onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
                 disabled={actionLoading}
-                class="px-2 py-1 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-emerald hover:opacity-80' : 'badge-amber hover:opacity-80'}">
+                class="px-2 py-1 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-success hover:opacity-80' : 'badge-pending hover:opacity-80'}">
                 {player.payment_status === 'Paid' ? m.payment_paid() : m.payment_pending()}
               </button>
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
                 <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors hover:bg-ash-800" title={m.players_view_deck()}>
-                  {#if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-emerald-400" /><span class="text-emerald-400">{m.players_view_deck()}</span>
-                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-amber-400" /><span class="text-amber-400">{m.players_view_deck()}</span>
+                  {#if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-blue-400" /><span class="text-blue-400">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-purple-400" /><span class="text-purple-400">{m.players_view_deck()}</span>
                   {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-crimson-400" /><span class="text-crimson-400">{m.players_view_deck()}</span>
                   {:else}<FileX class="w-3.5 h-3.5 text-ash-500" /><span class="text-ash-400">{m.players_no_deck()}</span>{/if}
                 </button>
@@ -560,7 +560,7 @@
               {/if}
               {#if puid && hasRounds && !isOfflineMode}
                 <button onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
-                  class="p-1.5 text-amber-400 hover:text-amber-300 transition-colors" title={m.sanction_tournament_issue_title()}>
+                  class="p-1.5 text-purple-400 hover:text-purple-300 transition-colors" title={m.sanction_tournament_issue_title()}>
                   <TriangleAlert class="w-4 h-4" />
                 </button>
               {/if}
@@ -623,7 +623,7 @@
                 {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                   <div class="space-y-1">
                     {#each errors as err}
-                      <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-amber-400'}">
+                      <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-purple-400'}">
                         {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
                         {err.message}
                       </p>
@@ -729,7 +729,7 @@
                   {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
                   <span class="text-xs px-2 py-0.5 rounded bg-ash-800 text-ash-500">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
                 {:else}
-                  <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-emerald' : 'bg-ash-800 text-ash-400'}">
+                  <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-ash-800 text-ash-400'}">
                     {translatePlayerState(player.state)}
                   </span>
                 {/if}
@@ -739,7 +739,7 @@
                   <button
                     onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
                     disabled={actionLoading}
-                    class="px-2 py-0.5 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-emerald hover:opacity-80' : 'badge-amber hover:opacity-80'}"
+                    class="px-2 py-0.5 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-success hover:opacity-80' : 'badge-pending hover:opacity-80'}"
                     title={player.payment_status === 'Paid' ? m.payment_mark_unpaid() : m.payment_mark_paid()}>
                     {player.payment_status === 'Paid' ? m.payment_paid() : m.payment_pending()}
                   </button>
@@ -749,8 +749,8 @@
                 {@const deckStatus = getDeckStatus(puid)}
                 <td class="text-center py-1.5 px-2">
                   <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-ash-800 rounded transition-colors" title={m.players_view_deck()}>
-                    {#if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-emerald-400" />
-                    {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-amber-400" />
+                    {#if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-blue-400" />
+                    {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-purple-400" />
                     {:else if deckStatus === 'error'}<CircleX class="w-4 h-4 text-crimson-400" />
                     {:else}<FileX class="w-4 h-4 text-ash-500" />{/if}
                   </button>
@@ -772,7 +772,7 @@
                   {/if}
                   {#if puid && hasRounds && !isOfflineMode}
                     <button onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
-                      class="p-1 text-amber-400 hover:text-amber-300 transition-colors" title={m.sanction_tournament_issue_title()}>
+                      class="p-1 text-purple-400 hover:text-purple-300 transition-colors" title={m.sanction_tournament_issue_title()}>
                       <TriangleAlert class="w-4 h-4" />
                     </button>
                   {/if}
@@ -838,7 +838,7 @@
                       {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                         <div class="space-y-1">
                           {#each errors as err}
-                            <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-amber-400'}">
+                            <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-purple-400'}">
                               {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
                               {err.message}
                             </p>

@@ -126,7 +126,7 @@
               <li class="flex items-start gap-2.5 text-xs">
                 <span
                   class="mt-1 w-2 h-2 rounded-full shrink-0 {ok
-                    ? 'bg-green-500'
+                    ? 'bg-blue-500'
                     : err
                       ? 'bg-crimson-500'
                       : 'bg-ash-600'}"

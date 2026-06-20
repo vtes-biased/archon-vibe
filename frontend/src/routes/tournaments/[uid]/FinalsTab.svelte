@@ -114,7 +114,7 @@
             </Button>
           {/if}
         </div>
-        <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-emerald' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
+        <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-success' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-pending'}">
           {translateTableState(tournament.finals.state)}
         </span>
       </div>
@@ -206,7 +206,7 @@
           <div class="mt-2 flex justify-end">
             <button
               onclick={() => { overrideTable_ = -1; overrideComment = ""; }}
-              class="px-2 py-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+              class="px-2 py-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
             >
               <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
             </button>
@@ -215,7 +215,7 @@
       {/if}
       {#if isOrganizer && tournament.finals.override}
         <div class="mt-2 pt-2 border-t border-ash-800 flex items-center justify-between">
-          <span class="text-xs text-amber-400">
+          <span class="text-xs text-purple-400">
             <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />
             {m.override_overridden({ comment: tournament.finals.override.comment })}
           </span>

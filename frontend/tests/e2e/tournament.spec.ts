@@ -198,7 +198,7 @@ test.describe('Tournament lifecycle', () => {
 
     // ── Step 10: Winner banner on Overview ──
     await page.getByRole('button', { name: 'Overview' }).click();
-    const winnerBanner = page.locator('.banner-emerald').filter({ hasText: 'Winner' });
+    const winnerBanner = page.locator('.banner-highlight').filter({ hasText: 'Winner' });
     await expect(winnerBanner).toBeVisible({ timeout: 2_000 });
     // Banner shows "Name (vekn_id)" — strip the id to match plain names
     const winnerName = (await winnerBanner.locator('div').nth(1).innerText())

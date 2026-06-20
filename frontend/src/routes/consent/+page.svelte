@@ -183,10 +183,10 @@
         </div>
       {:else if error}
         <div class="text-center space-y-4">
-          <div class="w-16 h-16 mx-auto banner-red border rounded-full flex items-center justify-center">
+          <div class="w-16 h-16 mx-auto banner-error border rounded-full flex items-center justify-center">
             <CircleAlert class="w-8 h-8" />
           </div>
-          <p class="text-red-300 text-sm">{error}</p>
+          <p class="text-crimson-300 text-sm">{error}</p>
           <button
             onclick={() => goto("/")}
             class="text-sm text-crimson-400 hover:text-crimson-300"
@@ -212,7 +212,7 @@
             <p class="text-sm text-ash-300 font-medium">{m.oauth_allow_application()}</p>
             {#each scopes as scope}
               <div class="flex items-start gap-3 p-3 bg-dusk-900 rounded-lg">
-                <CircleCheck class="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+                <CircleCheck class="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
                 <div>
                   <p class="text-bone-200 text-sm">{scope}</p>
                   {#if scopeDescriptions[scope]}

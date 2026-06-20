@@ -9,13 +9,14 @@
     sanctions.filter(s => !s.lifted_at && !s.deleted_at)
   );
 
+  // Ordinal severity ramp (amethyst → fuchsia → crimson) — dot-* classes from app.css
   const DOT_COLORS: Record<SanctionLevel, string> = {
-    caution: "bg-amber-400",
-    warning: "bg-orange-400",
-    standings_adjustment: "bg-purple-400",
-    disqualification: "bg-red-500",
-    suspension: "bg-crimson-500",
-    probation: "bg-rose-400",
+    caution: "dot-pending",
+    warning: "dot-pending",
+    standings_adjustment: "dot-highlight",
+    disqualification: "dot-danger",
+    suspension: "dot-danger",
+    probation: "dot-danger",
   };
 
   // Highest severity sanction determines dot color
@@ -31,7 +32,7 @@
     return "caution" as SanctionLevel;
   });
 
-  const dotColor = $derived(DOT_COLORS[highestLevel] ?? "bg-amber-400");
+  const dotColor = $derived(DOT_COLORS[highestLevel] ?? "dot-pending");
 
   function levelLabel(lv: SanctionLevel): string {
     const labels: Record<SanctionLevel, () => string> = {

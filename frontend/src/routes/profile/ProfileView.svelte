@@ -212,7 +212,7 @@
       title={m.profile_share()}
     >
       {#if copied}
-        <Check class="w-5 h-5 text-emerald-400" />
+        <Check class="w-5 h-5 text-blue-400" />
       {:else}
         <Share2 class="w-5 h-5" />
       {/if}
@@ -227,7 +227,7 @@
       <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
       <div class="flex items-center gap-2">
         {#if veknSyncPending}
-          <span class="px-2 py-0.5 rounded text-xs font-medium banner-amber border inline-flex items-center gap-1"
+          <span class="px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1"
                 title={m.vekn_sync_pending_hint()}>
             <CloudOff class="w-3 h-3" aria-hidden="true" />
             {m.vekn_sync_pending_member()}
@@ -293,7 +293,7 @@
   <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_contact_info()}</h3>
 
   {#if isOfficial}
-    <div class="p-3 rounded border text-sm banner-blue">
+    <div class="p-3 rounded border text-sm banner-info">
       {#if user.roles?.includes("IC")}
         {m.profile_ic_contact_visibility()}
       {:else}
@@ -330,7 +330,7 @@
     <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide mb-4">{m.profile_community_links()}</h3>
 
     {#if !isOfficial}
-      <div class="p-3 rounded border text-sm banner-blue mb-4">
+      <div class="p-3 rounded border text-sm banner-info mb-4">
         {m.profile_community_links_member()}
       </div>
     {/if}
@@ -403,9 +403,9 @@
 <!-- Sponsorship banner for non-members -->
 {#if !user.vekn_id && user.country}
   <div class="p-6 border-t border-ash-800">
-    <div class="p-3 rounded border text-sm banner-amber">
+    <div class="p-3 rounded border text-sm banner-warn">
       {m.profile_sponsorship_banner()}
-      <a href="/users?tab=community" class="underline hover:text-amber-200 ml-1">{m.profile_find_coordinator()}</a>
+      <a href="/users?tab=community" class="underline hover:text-purple-200 ml-1">{m.profile_find_coordinator()}</a>
     </div>
   </div>
 {/if}

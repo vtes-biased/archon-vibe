@@ -81,7 +81,7 @@
       tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-amber-400">{m.offline_go_offline_title()}</h2>
+        <h2 class="text-xl font-medium text-purple-400">{m.offline_go_offline_title()}</h2>
       </div>
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_go_offline_msg()}</p>
@@ -115,7 +115,7 @@
       tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-emerald-400">{m.offline_go_online_title()}</h2>
+        <h2 class="text-xl font-medium text-blue-400">{m.offline_go_online_title()}</h2>
       </div>
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_go_online_msg()}</p>
@@ -149,7 +149,7 @@
       tabindex="-1"
     >
       <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-amber-400">{m.offline_force_takeover_title()}</h2>
+        <h2 class="text-xl font-medium text-purple-400">{m.offline_force_takeover_title()}</h2>
       </div>
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_force_takeover_msg()}</p>

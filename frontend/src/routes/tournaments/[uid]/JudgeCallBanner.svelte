@@ -49,9 +49,9 @@
 {#if calls.length > 0}
   <div class="space-y-2 mb-4">
     {#each calls as call (call.id)}
-      <div class="banner-amber border rounded-lg p-3 flex items-center justify-between animate-in">
+      <div class="banner-warn border rounded-lg p-3 flex items-center justify-between animate-in">
         <div class="flex items-center gap-2">
-          <Gavel class="w-5 h-5 text-amber-400 shrink-0" />
+          <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
           <div>
             <span class="text-sm font-medium text-bone-100">{m.judge_call_alert()}</span>
             <span class="text-sm text-ash-300 ml-1">

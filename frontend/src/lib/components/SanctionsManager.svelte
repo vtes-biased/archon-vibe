@@ -397,7 +397,7 @@
         <div class="flex items-center justify-between">
           <h2 id="edit-sanction-modal-title" class="text-xl font-medium text-bone-100">{m.sanction_mgr_edit_title()}</h2>
           {#if editingSanction.lifted_at}
-            <span class="text-xs badge-emerald px-2 py-1 rounded">{m.sanction_lifted()}</span>
+            <span class="text-xs badge-success px-2 py-1 rounded">{m.sanction_lifted()}</span>
           {/if}
         </div>
         <p class="mt-1 text-xs text-ash-500">

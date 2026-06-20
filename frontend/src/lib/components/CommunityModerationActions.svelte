@@ -16,9 +16,9 @@
   const isHidden = $derived(link.moderation?.status === "hidden");
   const scope = $derived(link.moderation?.status === "promoted" ? link.moderation.scope : null);
 
-  // Active state = amber; idle = neutral. Same icon always, colour conveys state.
-  const active = "text-amber-400 hover:text-ash-400";
-  const idle = "text-ash-500 hover:text-amber-400";
+  // Active state = amethyst; idle = neutral. Same icon always, colour conveys state.
+  const active = "text-purple-400 hover:text-ash-400";
+  const idle = "text-ash-500 hover:text-purple-400";
 </script>
 
 <div class="flex items-center justify-center gap-2">

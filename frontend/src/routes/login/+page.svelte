@@ -177,7 +177,7 @@
       {/if}
 
       {#if auth.error || oauthError}
-        <div class="mb-4 p-3 banner-red border rounded-lg text-sm">
+        <div class="mb-4 p-3 banner-error border rounded-lg text-sm">
           {auth.error || oauthError}
         </div>
       {/if}
@@ -185,8 +185,8 @@
       {#if magicLinkSent}
         <!-- SIGNUP: MAGIC LINK SENT -->
         <div class="space-y-4 text-center">
-          <div class="w-16 h-16 mx-auto bg-green-900/30 rounded-full flex items-center justify-center">
-            <Mail class="w-8 h-8 text-green-400" />
+          <div class="w-16 h-16 mx-auto bg-blue-900/30 rounded-full flex items-center justify-center">
+            <Mail class="w-8 h-8 text-blue-400" />
           </div>
           <h2 class="text-lg font-medium text-bone-100">{m.login_check_email()}</h2>
           <p class="text-ash-400 text-sm">
@@ -208,8 +208,8 @@
       {:else if resetEmailSent}
         <!-- PASSWORD RESET: EMAIL SENT -->
         <div class="space-y-4 text-center">
-          <div class="w-16 h-16 mx-auto bg-green-900/30 rounded-full flex items-center justify-center">
-            <Mail class="w-8 h-8 text-green-400" />
+          <div class="w-16 h-16 mx-auto bg-blue-900/30 rounded-full flex items-center justify-center">
+            <Mail class="w-8 h-8 text-blue-400" />
           </div>
           <h2 class="text-lg font-medium text-bone-100">{m.login_check_email()}</h2>
           <p class="text-ash-400 text-sm">

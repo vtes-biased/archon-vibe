@@ -156,7 +156,7 @@
     {#if userSuspended}
       <div class="text-sm text-crimson-400">{m.error_suspended_cannot_register()}</div>
     {:else if !userVeknId}
-      <div class="text-sm text-amber-400">{m.tournament_vekn_id_required_to_register()}</div>
+      <div class="text-sm text-purple-400">{m.tournament_vekn_id_required_to_register()}</div>
     {:else}
       <Button
         variant="primary"
@@ -196,7 +196,7 @@
           : translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
       {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && !playerHasValidDeck}
-        <div class="flex items-center gap-2 text-amber-400 text-sm">
+        <div class="flex items-center gap-2 text-purple-400 text-sm">
           <TriangleAlert class="w-4 h-4" />
           {m.tournament_upload_valid_deck()}
         </div>
@@ -211,7 +211,7 @@
         </Button>
       {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
         {#if !playerHasValidDeck}
-          <div class="flex items-center gap-2 text-amber-400 text-sm">
+          <div class="flex items-center gap-2 text-purple-400 text-sm">
             <TriangleAlert class="w-4 h-4" />
             {m.tournament_upload_valid_deck()}
           </div>
@@ -285,7 +285,7 @@
               <h3 class="text-sm font-medium text-bone-100">
                 {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
               </h3>
-              <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-emerald' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-amber'}">
+              <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-success' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-pending'}">
                 {translateTableState(myTable.state)}
               </span>
             </div>
@@ -477,7 +477,7 @@
   {@const hasFinals = standings.some(e => e.finals)}
   <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
     {#if tournament.winner}
-      <div class="banner-emerald border rounded-lg p-4">
+      <div class="banner-highlight border rounded-lg p-4">
         <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
         <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
       </div>

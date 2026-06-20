@@ -163,7 +163,7 @@
         title={m.profile_share()}
       >
         {#if copied}
-          <Check class="w-5 h-5 text-emerald-400" />
+          <Check class="w-5 h-5 text-blue-400" />
         {:else}
           <Share2 class="w-5 h-5" />
         {/if}

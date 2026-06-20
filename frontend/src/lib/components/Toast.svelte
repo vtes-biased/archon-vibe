@@ -21,11 +21,11 @@
   function getStyles(type: Toast['type']): string {
     switch (type) {
       case 'success':
-        return 'toast-emerald';
+        return 'toast-success';
       case 'error':
         return 'bg-crimson-900/90 border-crimson-700 text-crimson-100'; // crimson uses custom palette
       case 'warning':
-        return 'toast-amber';
+        return 'toast-warn';
       case 'info':
         return 'bg-dusk-900/90 border-ash-600 text-bone-100';
     }
@@ -34,11 +34,11 @@
   function getIconColor(type: Toast['type']): string {
     switch (type) {
       case 'success':
-        return 'text-emerald-400';
+        return 'text-blue-400';
       case 'error':
         return 'text-crimson-400';
       case 'warning':
-        return 'text-amber-400';
+        return 'text-purple-400';
       case 'info':
         return 'text-ash-300';
     }
