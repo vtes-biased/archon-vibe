@@ -516,7 +516,7 @@ import TournamentModals from "./TournamentModals.svelte";
           <div class="flex items-center gap-2 min-w-0">
             <WifiOff class="w-5 h-5 shrink-0" />
             <div class="min-w-0">
-              <span class="text-purple-200 font-medium text-sm">{m.offline_mode_banner()}</span>
+              <span class="text-warn font-medium text-sm">{m.offline_mode_banner()}</span>
               {#if lastSync}
                 <span class="text-xs text-ink-muted ml-2">{m.offline_last_sync({ time: new Date(lastSync).toLocaleTimeString() })}</span>
               {:else}
@@ -591,7 +591,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {/if}
             {#if metaLeague}
               <a href="/leagues/{metaLeague.uid}" title={m.league_kind_meta()}
-                 class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300 inline-flex items-center gap-1 hover:opacity-80 transition-opacity max-w-48 truncate">
+                 class="px-2 py-0.5 rounded text-xs font-medium badge-amethyst inline-flex items-center gap-1 hover:opacity-80 transition-opacity max-w-48 truncate">
                 {metaLeague.name}
               </a>
             {/if}
@@ -719,8 +719,8 @@ import TournamentModals from "./TournamentModals.svelte";
                 {@const isDone = i < currentIdx}
                 {@const isCurrent = i === currentIdx}
                 {#if i > 0}<span class="text-ink-faint">—</span>{/if}
-                <span class="whitespace-nowrap {isDone ? 'text-blue-400' : isCurrent ? 'text-link font-medium' : 'text-ink-faint'}">
-                  <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-blue-400' : isCurrent ? 'bg-accent' : 'bg-surface-active'}"></span>
+                <span class="whitespace-nowrap {isDone ? 'text-info' : isCurrent ? 'text-link font-medium' : 'text-ink-faint'}">
+                  <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-info' : isCurrent ? 'bg-accent' : 'bg-surface-active'}"></span>
                   <span class="hidden sm:inline">{translateTournamentState(step as TournamentState)}</span>
                 </span>
               {/each}
@@ -816,10 +816,10 @@ import TournamentModals from "./TournamentModals.svelte";
                 <p class="text-sm text-ink-faint">{m.overview_start_round_hint({ count: String(checkedInCount) })}</p>
               {/if}
               {#if [6, 7, 11].includes(checkedInCount)}
-                <p class="text-sm text-sky-300">{m.overview_stagger_info({ count: String(checkedInCount) })}</p>
+                <p class="text-sm text-info">{m.overview_stagger_info({ count: String(checkedInCount) })}</p>
               {/if}
               {#if hasFinalsCandidate && hasUnequalRounds}
-                <p class="text-sm text-purple-300">{m.overview_stagger_finals_warning()}</p>
+                <p class="text-sm text-warn">{m.overview_stagger_finals_warning()}</p>
               {/if}
             {/if}
 

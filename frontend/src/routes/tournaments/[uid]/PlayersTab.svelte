@@ -360,7 +360,7 @@
       <div class="border-t border-line pt-2">
         <button
           onclick={() => showOfflinePlayerForm = !showOfflinePlayerForm}
-          class="text-sm text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+          class="text-sm text-warn hover:opacity-80 transition-colors flex items-center gap-1"
         >
           <UserPlus class="w-4 h-4" />
           {m.offline_add_new_player()}
@@ -540,8 +540,8 @@
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
                 <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors hover:bg-surface-hover" title={m.players_view_deck()}>
-                  {#if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-blue-400" /><span class="text-blue-400">{m.players_view_deck()}</span>
-                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-purple-400" /><span class="text-purple-400">{m.players_view_deck()}</span>
+                  {#if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-info" /><span class="text-info">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-warn" /><span class="text-warn">{m.players_view_deck()}</span>
                   {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-link" /><span class="text-link">{m.players_view_deck()}</span>
                   {:else}<FileX class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_no_deck()}</span>{/if}
                 </button>
@@ -560,7 +560,7 @@
               {/if}
               {#if puid && hasRounds && !isOfflineMode}
                 <button onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
-                  class="p-1.5 text-purple-400 hover:text-purple-300 transition-colors" title={m.sanction_tournament_issue_title()}>
+                  class="p-1.5 text-warn hover:opacity-80 transition-colors" title={m.sanction_tournament_issue_title()}>
                   <TriangleAlert class="w-4 h-4" />
                 </button>
               {/if}
@@ -623,7 +623,7 @@
                 {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                   <div class="space-y-1">
                     {#each errors as err}
-                      <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-purple-400'}">
+                      <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-warn'}">
                         {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
                         {err.message}
                       </p>
@@ -749,8 +749,8 @@
                 {@const deckStatus = getDeckStatus(puid)}
                 <td class="text-center py-1.5 px-2">
                   <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-surface-hover rounded transition-colors" title={m.players_view_deck()}>
-                    {#if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-blue-400" />
-                    {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-purple-400" />
+                    {#if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-info" />
+                    {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-warn" />
                     {:else if deckStatus === 'error'}<CircleX class="w-4 h-4 text-link" />
                     {:else}<FileX class="w-4 h-4 text-ink-faint" />{/if}
                   </button>
@@ -772,7 +772,7 @@
                   {/if}
                   {#if puid && hasRounds && !isOfflineMode}
                     <button onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
-                      class="p-1 text-purple-400 hover:text-purple-300 transition-colors" title={m.sanction_tournament_issue_title()}>
+                      class="p-1 text-warn hover:opacity-80 transition-colors" title={m.sanction_tournament_issue_title()}>
                       <TriangleAlert class="w-4 h-4" />
                     </button>
                   {/if}
@@ -838,7 +838,7 @@
                       {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                         <div class="space-y-1">
                           {#each errors as err}
-                            <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-purple-400'}">
+                            <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-warn'}">
                               {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
                               {err.message}
                             </p>

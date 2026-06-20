@@ -306,11 +306,11 @@
                 <span>· {m.league_worldwide()}</span>
               {/if}
               {#if league.kind === "Meta-League"}
-                <span class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">{m.league_meta_badge()}</span>
+                <span class="px-2 py-0.5 rounded text-xs font-medium badge-amethyst">{m.league_meta_badge()}</span>
               {/if}
               {#if parentLeague}
                 <a href="/leagues/{parentLeague.uid}" title={m.league_kind_meta()}
-                   class="px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300 hover:opacity-80 transition-opacity">{parentLeague.name}</a>
+                   class="px-2 py-0.5 rounded text-xs font-medium badge-amethyst hover:opacity-80 transition-opacity">{parentLeague.name}</a>
               {/if}
             </div>
           </div>

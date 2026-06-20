@@ -88,7 +88,7 @@
                       </a>
                       <span class="text-xs text-ink-faint ml-1">{entry.date}</span>
                       {#if entry.finalist_position === 1}
-                        <Crown class="w-3 h-3 inline text-purple-400 ml-1" />
+                        <Crown class="w-3 h-3 inline text-highlight ml-1" />
                       {:else if entry.finalist_position === 2}
                         <Medal class="w-3 h-3 inline text-ink-muted ml-1" />
                       {/if}

@@ -352,7 +352,7 @@
 {#if validationErrors.length > 0}
   <div class="mt-3 space-y-1">
     {#each validationErrors as err}
-      <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-purple-400'}">
+      <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-warn'}">
         {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
         {err.message}
       </p>

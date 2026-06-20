@@ -212,7 +212,7 @@
       title={m.profile_share()}
     >
       {#if copied}
-        <Check class="w-5 h-5 text-blue-400" />
+        <Check class="w-5 h-5 text-info" />
       {:else}
         <Share2 class="w-5 h-5" />
       {/if}
@@ -405,7 +405,7 @@
   <div class="p-6 border-t border-line">
     <div class="p-3 rounded border text-sm banner-warn">
       {m.profile_sponsorship_banner()}
-      <a href="/users?tab=community" class="underline hover:text-purple-200 ml-1">{m.profile_find_coordinator()}</a>
+      <a href="/users?tab=community" class="underline hover:text-warn ml-1">{m.profile_find_coordinator()}</a>
     </div>
   </div>
 {/if}

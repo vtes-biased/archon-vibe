@@ -294,7 +294,7 @@
 {@html renderGuideSection(m.pg_deck_methods())}
 
 <ExampleBox>
-  <button class="px-3 py-1.5 text-sm text-blue-400 border border-blue-800 rounded-lg flex items-center gap-1.5">
+  <button class="px-3 py-1.5 text-sm text-info border border-info rounded-lg flex items-center gap-1.5">
     <QrCode class="w-4 h-4" />
     Scan QR to Check In
   </button>
@@ -337,7 +337,7 @@
 {@html renderGuideSection(m.pg_override_judge())}
 
 <ExampleBox>
-  <button class="px-2 py-1 text-xs text-purple-400 border border-purple-800 rounded-lg flex items-center gap-1">
+  <button class="px-2 py-1 text-xs text-warn border border-warn rounded-lg flex items-center gap-1">
     <Gavel class="w-3 h-3" />
     Call Judge
   </button>

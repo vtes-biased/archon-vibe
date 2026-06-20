@@ -73,7 +73,7 @@
       </div>
     </div>
     {#if hasEmail}
-      <span class="px-3 py-1 text-sm text-blue-500 bg-blue-500/10 rounded">{m.profile_passkey_active()}</span>
+      <span class="px-3 py-1 text-sm rounded badge-success">{m.profile_passkey_active()}</span>
     {:else if !showEmailSetup}
       <Button variant="secondary" size="lg" onclick={() => (showEmailSetup = true)}>
         {m.profile_email_setup()}
@@ -83,7 +83,7 @@
   {#if showEmailSetup && !hasEmail}
     {#if emailLinkSent}
       <div class="ml-8 p-3 rounded-lg bg-surface-muted border border-line-strong space-y-1">
-        <p class="text-sm text-blue-400">{m.profile_email_check_inbox()}</p>
+        <p class="text-sm text-info">{m.profile_email_check_inbox()}</p>
         <p class="text-sm text-ink-muted">{m.profile_email_sent_to({ email: emailLinkAddress })}</p>
         <p class="text-xs text-ink-faint">{m.profile_email_verify_hint()}</p>
       </div>
@@ -122,11 +122,11 @@
         {m.profile_link()}
       </button>
     {:else}
-      <span class="px-3 py-1 text-sm text-blue-500 bg-blue-500/10 rounded">{m.profile_linked()}</span>
+      <span class="px-3 py-1 text-sm rounded badge-success">{m.profile_linked()}</span>
     {/if}
   </div>
   {#if discordMessage}
-    <p class="text-sm text-blue-500">{discordMessage}</p>
+    <p class="text-sm text-info">{discordMessage}</p>
   {/if}
   {#if discordError}
     <p class="text-sm text-link">{discordError}</p>
@@ -149,11 +149,11 @@
           {registeringPasskey ? m.profile_passkey_adding() : m.common_add()}
         </Button>
       {:else}
-        <span class="px-3 py-1 text-sm text-blue-500 bg-blue-500/10 rounded">{m.profile_passkey_active()}</span>
+        <span class="px-3 py-1 text-sm rounded badge-success">{m.profile_passkey_active()}</span>
       {/if}
     </div>
     {#if passkeyMessage}
-      <p class="text-sm text-blue-500">{passkeyMessage}</p>
+      <p class="text-sm text-info">{passkeyMessage}</p>
     {/if}
   {/if}
 

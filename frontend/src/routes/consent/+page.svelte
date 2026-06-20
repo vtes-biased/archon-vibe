@@ -212,7 +212,7 @@
             <p class="text-sm text-ink font-medium">{m.oauth_allow_application()}</p>
             {#each scopes as scope}
               <div class="flex items-start gap-3 p-3 bg-surface-muted rounded-lg">
-                <CircleCheck class="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
+                <CircleCheck class="w-5 h-5 text-info mt-0.5 shrink-0" />
                 <div>
                   <p class="text-ink-strong text-sm">{scope}</p>
                   {#if scopeDescriptions[scope]}

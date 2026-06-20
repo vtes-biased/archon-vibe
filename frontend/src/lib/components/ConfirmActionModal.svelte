@@ -89,7 +89,7 @@
     </div>
     <div class="p-6">
       {#if status === 'success'}
-        <div class="flex items-center gap-2 text-blue-400 mb-4">
+        <div class="flex items-center gap-2 text-info mb-4">
           <CircleCheck class="w-5 h-5 shrink-0" />
           <span class="font-medium">{started ? m.admin_op_started() : m.admin_op_success()}</span>
         </div>

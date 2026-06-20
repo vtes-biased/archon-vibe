@@ -317,12 +317,12 @@
   {#if warnings.length > 0}
     <div class="space-y-1">
       {#each warnings as w}
-        <p class="text-sm text-purple-400">{w}</p>
+        <p class="text-sm text-warn">{w}</p>
       {/each}
     </div>
   {/if}
   {#if success}
-    <p class="text-sm text-blue-400">{m.deck_upload_success()}</p>
+    <p class="text-sm text-info">{m.deck_upload_success()}</p>
   {/if}
 
   {#if mode !== 'qr'}

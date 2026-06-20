@@ -403,10 +403,10 @@
                     <span>· {m.tournaments_online()}</span>
                   {/if}
                   {#if tournament.league_uid && leagueNames[tournament.league_uid]}
-                    <span class="text-blue-400/70">· {leagueNames[tournament.league_uid]}</span>
+                    <span class="text-info/70">· {leagueNames[tournament.league_uid]}</span>
                   {/if}
                   {#if tournament.league_uid && metaLeagues[tournament.league_uid]}
-                    <span class="text-violet-300/80" title={m.league_kind_meta()}>· {metaLeagues[tournament.league_uid]?.name}</span>
+                    <span class="text-warn/80" title={m.league_kind_meta()}>· {metaLeagues[tournament.league_uid]?.name}</span>
                   {/if}
                 </div>
               </div>
@@ -417,7 +417,7 @@
                   <div class="font-semibold text-ink-strong">{tournament.name}</div>
                   {#if tournament.rank || (tournament.league_uid && leagueNames[tournament.league_uid])}
                     <div class="text-xs text-ink-faint truncate">
-                      {#if tournament.rank}{tournament.rank}{/if}{#if tournament.rank && tournament.league_uid && leagueNames[tournament.league_uid]} · {/if}{#if tournament.league_uid && leagueNames[tournament.league_uid]}<span class="text-blue-400/70">{leagueNames[tournament.league_uid]}</span>{/if}{#if tournament.league_uid && metaLeagues[tournament.league_uid]} · <span class="text-violet-300/80" title={m.league_kind_meta()}>{metaLeagues[tournament.league_uid]?.name}</span>{/if}
+                      {#if tournament.rank}{tournament.rank}{/if}{#if tournament.rank && tournament.league_uid && leagueNames[tournament.league_uid]} · {/if}{#if tournament.league_uid && leagueNames[tournament.league_uid]}<span class="text-info/70">{leagueNames[tournament.league_uid]}</span>{/if}{#if tournament.league_uid && metaLeagues[tournament.league_uid]} · <span class="text-warn/80" title={m.league_kind_meta()}>{metaLeagues[tournament.league_uid]?.name}</span>{/if}
                     </div>
                   {/if}
                 </div>

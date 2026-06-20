@@ -206,7 +206,7 @@
           <div class="mt-2 flex justify-end">
             <button
               onclick={() => { overrideTable_ = -1; overrideComment = ""; }}
-              class="px-2 py-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+              class="px-2 py-1 text-xs text-warn hover:opacity-80 transition-colors"
             >
               <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
             </button>
@@ -215,7 +215,7 @@
       {/if}
       {#if isOrganizer && tournament.finals.override}
         <div class="mt-2 pt-2 border-t border-line flex items-center justify-between">
-          <span class="text-xs text-purple-400">
+          <span class="text-xs text-warn">
             <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />
             {m.override_overridden({ comment: tournament.finals.override.comment })}
           </span>

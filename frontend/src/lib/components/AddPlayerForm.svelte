@@ -114,7 +114,7 @@
             {#if user.vekn_id}
               <span class="text-ink-faint ml-2">({user.vekn_id})</span>
             {:else}
-              <span class="inline-flex items-center gap-0.5 ml-2 text-xs text-purple-400">
+              <span class="inline-flex items-center gap-0.5 ml-2 text-xs text-warn">
                 <TriangleAlert class="w-3 h-3" />
                 {m.add_player_no_vekn_id()}
               </span>
@@ -134,7 +134,7 @@
       {#if oncreate}
         <button
           onclick={() => oncreate?.()}
-          class="w-full px-3 py-2 text-left text-sm text-purple-400 hover:text-purple-300 hover:bg-surface-hover transition-colors {searchResults.length === 0 ? 'font-medium' : ''}"
+          class="w-full px-3 py-2 text-left text-sm text-warn hover:opacity-80 hover:bg-surface-hover transition-colors {searchResults.length === 0 ? 'font-medium' : ''}"
         >
           {m.add_player_not_on_archon()}
         </button>

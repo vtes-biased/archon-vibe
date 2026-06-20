@@ -251,7 +251,7 @@
   {#if auth.isAuthenticated && !auth.user?.country}
     <div class="p-4 mb-6 rounded-lg border text-sm banner-warn">
       {m.community_set_country_prompt()}
-      <a href="/profile" class="underline hover:text-purple-200 ml-1">{m.community_go_to_profile()}</a>
+      <a href="/profile" class="underline hover:text-warn ml-1">{m.community_go_to_profile()}</a>
     </div>
   {/if}
 

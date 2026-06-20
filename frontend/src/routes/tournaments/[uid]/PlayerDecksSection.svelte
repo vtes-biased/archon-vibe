@@ -213,7 +213,7 @@
                 <Lock class="w-3 h-3 text-ink-faint" />
               {/if}
               {#if deck}
-                <CircleCheck class="w-3.5 h-3.5 text-blue-400" />
+                <CircleCheck class="w-3.5 h-3.5 text-info" />
               {:else}
                 <span class="text-ink-faint truncate">{m.decks_no_deck()}</span>
               {/if}

@@ -126,7 +126,7 @@
               <li class="flex items-start gap-2.5 text-xs">
                 <span
                   class="mt-1 w-2 h-2 rounded-full shrink-0 {ok
-                    ? 'bg-blue-500'
+                    ? 'bg-info'
                     : err
                       ? 'bg-accent'
                       : 'bg-surface-active'}"

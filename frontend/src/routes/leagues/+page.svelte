@@ -213,7 +213,7 @@
                     <span>· {m.league_meta_badge()}</span>
                   {/if}
                   {#if metaLeagueNames[league.uid]}
-                    <span class="text-violet-300/80" title={m.league_kind_meta()}>· {metaLeagueNames[league.uid]}</span>
+                    <span class="text-warn/80" title={m.league_kind_meta()}>· {metaLeagueNames[league.uid]}</span>
                   {/if}
                 </div>
               </div>
@@ -224,10 +224,10 @@
                   <div class="font-semibold text-ink-strong">
                     {league.name}
                     {#if league.kind === "Meta-League"}
-                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">{m.league_meta_badge()}</span>
+                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium badge-amethyst">{m.league_meta_badge()}</span>
                     {/if}
                     {#if metaLeagueNames[league.uid]}
-                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300" title={m.league_kind_meta()}>{metaLeagueNames[league.uid]}</span>
+                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium badge-amethyst" title={m.league_kind_meta()}>{metaLeagueNames[league.uid]}</span>
                     {/if}
                   </div>
                   {#if league.format}

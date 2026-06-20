@@ -34,11 +34,11 @@
   function getIconColor(type: Toast['type']): string {
     switch (type) {
       case 'success':
-        return 'text-blue-400';
+        return 'text-info';
       case 'error':
         return 'text-link';
       case 'warning':
-        return 'text-purple-400';
+        return 'text-warn';
       case 'info':
         return 'text-ink';
     }
