@@ -36,6 +36,12 @@ Colour is expressed as **role tokens** in four families — `surface` (backgroun
 | `accent-soft-border` | `border-accent-soft-border` | `#F9CCD4` | `#880C26` | Accent tint border |
 | `link` | `text-link` | `#DC143C` | `#EC6B84` | Links / accent text |
 | `link-soft` | `text-link-soft` | `#C41235` | `#F4A3B3` | Light accent text on tint |
+| `info` | `text-info` | `#1e40af` | `#60a5fa` | Status text/icon — azure; info / positive (✓, online). Shares hex with `select` today but has a distinct role (may diverge). |
+| `warn` | `text-warn` | `#6b21a8` | `#c084fc` | Status text/icon — amethyst; pending / warning (matches `.dot-pending`) |
+| `highlight` | `text-highlight` | `#86198f` | `#e879f9` | Status text/icon — fuchsia; highlight / mid severity (matches `.dot-highlight`) |
+| `select` | `text-select` / `ring-select` | `#1e40af` | `#60a5fa` | Selection affordance — azure; tap-to-swap seating (moving banner, seat ring). Purpose token, NOT a status meaning. |
+| `select-border` | `border-select-border` | `#bfdbfe` | `#1e3a8a` | Select border |
+| `select-soft` | `bg-select-soft/40` | `#eff6ff` | `#1e3a8a` | Select tint bg (always use with opacity) |
 
 **Adding a colour:** add one `--color-<role>: light-dark(LIGHT, DARK)` line in `@theme` and verify AA in both themes. Never reintroduce a numeric ramp (`*-400`/`*-900`) or an `html.light` override block. Known exception: `ink-faint` (tertiary/disabled) is a single grey for both themes and does not clear the 4.5:1 body floor — keep it to de-emphasised/disabled text, not primary content.
 
@@ -51,11 +57,25 @@ Two layers share these hues:
 
 | Layer | Classes | Hue mapping |
 |-------|---------|-------------|
-| **Status** (meaning) | `badge-success`/`-pending`/`-danger`/`-info`/`-highlight` · `banner-info`/`-warn`/`-error`/`-highlight` · `toast-success`/`-warn` · `status-offline`/`-update` · `btn-success`/`-pending` · `dot-pending`/`-highlight`/`-danger` | success/info = blue · pending/warn = amethyst · danger/error = crimson · highlight = fuchsia |
+| **Status** (meaning) | `badge-success`/`-pending`/`-danger`/`-info`/`-highlight` · `banner-info`/`-warn`/`-error`/`-highlight` · `toast-success`/`-warn` · `status-offline`/`-update` · `btn-success`/`-pending` · `dot-pending`/`-highlight`/`-danger` · `text-info`/`text-warn`/`text-highlight` | success/info = azure · pending/warn = amethyst · danger/error = crimson · highlight = fuchsia |
 | **Categorical** (identity) | `badge-blue`/`-amethyst`/`-fuchsia`/`-crimson`/`-slate` | arbitrary distinct tags (roles, link platforms) — pick by family, the hue is just a label |
 
+**Colourblind-safe severity/status rule:** every severity/status tier = fixed colour token + fixed shape-distinct lucide icon + text label. Colour is reinforcement, never the sole signal. The ordinal severity scale for seating issues:
+
+| Tier | Token | Icon | Used by |
+|------|-------|------|---------|
+| Blocking (rule level 0) | `text-link` (crimson) | `OctagonX` | Hard seating violations |
+| Strong (levels 1–4) | `text-highlight` (fuchsia) | `TriangleAlert` | Soft seating warnings |
+| Soft (levels ≥5) | `text-warn` (amethyst) | `Info` | Seating suggestions |
+
+This mirrors `.dot-danger`→`.dot-highlight`→`.dot-pending` (crimson→fuchsia→amethyst). The connection indicator likewise uses a distinct icon per state: `Wifi` (`text-info`, online), `RefreshCw` spin (`text-warn`, syncing, with `motion-reduce:animate-none`), `WifiOff` (`text-link`, offline).
+
+**Selection hue (azure):** `select`/`select-border`/`select-soft` tokens are a **purpose** family, not a status meaning — they cover the tap-to-swap seating affordance (the moving-player banner, selected-seat ring, swap-target ring, "move here"/seat-assign chips). Azure is also used by `badge-info`/`status-update`/`text-info` (info-status meaning); same hue, distinct role/token names, deliberately separate.
+
 **When to use what:**
-- **Status classes** — anything carrying good/bad/attention *meaning*. Pair with an icon + text; colour is reinforcement, never the sole signal (see #225).
+- **Status text/icon tokens** (`text-info`, `text-warn`, `text-highlight`) — inline status text and standalone icons where a `.badge-*` on a bare span would be too heavy. Always pair with a shape-distinct icon + text label (see colourblind rule above).
+- **Status classes** (`badge-*`, `banner-*`, `dot-*`, etc.) — component-level status (pills, banners, indicator dots). Pair with an icon + text; colour is reinforcement, never the sole signal.
+- **Selection tokens** (`text-select`, `border-select-border`, `bg-select-soft`) — seating tap-to-swap affordance only. Never use for status.
 - **Categorical classes** (`badge-blue` etc.) — identity tags where the hue is arbitrary.
 - `btn-*` — solid status chips only (paid/pending filter chips, help-guide mockups). **Action buttons go through `<Button>`** (below), which uses `bg-crimson-*` / `btn-danger`.
 - `banner-*` — info/warning boxes (add `border rounded-lg p-3` etc.).
@@ -80,7 +100,7 @@ All action buttons go through `$lib/components/Button.svelte`. It owns colour, s
 - Props: `size` (`sm`/`md`/`lg`), `block` (full width), `loading` (spinner + `aria-busy`, auto-disables), `disabled`; extra layout classes (`flex-1`, margins) via `class`. Focus comes from the global `:focus-visible` ring — never add a bespoke outline.
 - **Do not** route through `<Button>`: icon-only buttons, toggles/tabs/segmented controls, dropdown/menu options (e.g. the items inside `ActionMenu`), row/card-wrapping buttons, `<a>`-styled links, or Discord brand-fill buttons — leave those as raw elements.
 
-**Palette history:** the crimson-primary system replaced the earlier scheme (emerald `primary`, crimson `brand`/`danger`, amber `warning`): `primary` → crimson, `danger` → violet `btn-danger`, `warning`/emerald dropped from `<Button>` (`btn-success`/`btn-pending` remain only for status chips + help-guide mockups). **#232 (shipped):** the semantic component classes were recoloured to the gothic-jewel set (green/amber out; blue/amethyst/fuchsia/crimson/slate in) and migrated to `light-dark()` — no parallel `html.light` block — with WCAG-AA verified in both themes; raw inline green/amber tints swept to the palette. **#247 (shipped):** the numeric-scale → role-token migration completed — every `bg-dusk-950`/`text-ash-400`-style utility moved to the `surface`/`ink`/`line`/`accent` role tokens across ~80 files, the `html.light` scale-inversion block was deleted, and the last off-palette inline alert boxes (purple/sky/blue) became `banner-*` (see *Color Palette*).
+**Palette history:** the crimson-primary system replaced the earlier scheme (emerald `primary`, crimson `brand`/`danger`, amber `warning`): `primary` → crimson, `danger` → violet `btn-danger`, `warning`/emerald dropped from `<Button>` (`btn-success`/`btn-pending` remain only for status chips + help-guide mockups). **#232 (shipped):** the semantic component classes were recoloured to the gothic-jewel set (green/amber out; blue/amethyst/fuchsia/crimson/slate in) and migrated to `light-dark()` — no parallel `html.light` block — with WCAG-AA verified in both themes; raw inline green/amber tints swept to the palette. **#247 (shipped):** the numeric-scale → role-token migration completed — every `bg-dusk-950`/`text-ash-400`-style utility moved to the `surface`/`ink`/`line`/`accent` role tokens across ~80 files, the `html.light` scale-inversion block was deleted, and the last off-palette inline alert boxes (purple/sky/blue) became `banner-*` (see *Color Palette*). **#225/#248 (shipped):** severity and connection indicators made colourblind-safe (icon+shape+text alongside colour); `info`/`warn`/`highlight` status TEXT tokens and the `select`/`select-border`/`select-soft` purpose-token family added (azure formalised as the tap-to-swap selection affordance, distinct from `badge-info`/`text-info` at the same hue); inline purple/blue/sky tints in the seating/rounds/player flow and the two help-guide-mirrored components (`JudgeCallBanner`, `TimerDisplay`) migrated to semantic tokens. Follow-up #252 finishes the inline-tint sweep across ~12 remaining files.
 
 ### Disabled States
 

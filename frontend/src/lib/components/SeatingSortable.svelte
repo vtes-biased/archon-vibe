@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CircleAlert, ArrowRightLeft, X } from "@lucide/svelte";
+  import { OctagonX, TriangleAlert, Info, ArrowRightLeft, X } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, resolveTableLabel } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { tick } from 'svelte';
@@ -83,10 +83,14 @@
     focusSeat(movingUid!);
   }
 
-  function issueColor(level: number): string {
-    if (level === 0) return 'text-link';
-    if (level <= 6) return 'text-purple-400';
-    return 'text-sky-400';
+  // Ordinal seating-issue severity → colour + a shape-distinct icon + screen-reader
+  // tier name, so severity reads without relying on colour alone (#225). `level` is
+  // the VEKN rule index: 0 (R1 predator-prey) blocks; lower = more severe.
+  type IssueTier = { color: string; Icon: typeof Info; sr: string };
+  function issueTier(level: number): IssueTier {
+    if (level === 0) return { color: 'text-link', Icon: OctagonX, sr: m.seating_severity_blocking() };
+    if (level <= 4) return { color: 'text-highlight', Icon: TriangleAlert, sr: m.seating_severity_strong() };
+    return { color: 'text-warn', Icon: Info, sr: m.seating_severity_soft() };
   }
 </script>
 
@@ -96,8 +100,8 @@
 
 {#if selected}
   {@const selName = seatDisplay(tables[selected.table]?.[selected.seat] ?? '')}
-  <div class="sticky top-2 z-10 mb-3 flex items-center justify-between gap-2 bg-surface-hover border border-blue-700 rounded-lg px-3 py-2 text-sm shadow-lg">
-    <span class="text-blue-300">
+  <div class="sticky top-2 z-10 mb-3 flex items-center justify-between gap-2 bg-surface-hover border border-select-border rounded-lg px-3 py-2 text-sm shadow-lg">
+    <span class="text-select">
       {isFinals ? m.rounds_seating_moving_finals({ name: selName }) : m.rounds_seating_moving({ name: selName })}
     </span>
     <button
@@ -130,17 +134,20 @@
           aria-pressed={isSelected}
           aria-label={m.rounds_seat_n({ n: String(s + 1), name: seatDisplay(uid) })}
           class="w-full min-h-[44px] py-1.5 px-1 -mx-1 flex items-center gap-2 text-sm text-left rounded transition-colors
-            {isSelected ? 'ring-2 ring-blue-500 bg-blue-900/30' : isSwapTarget ? 'ring-1 ring-inset ring-blue-800/50 hover:bg-blue-900/20' : 'hover:bg-surface-hover/60'}"
+            {isSelected ? 'ring-2 ring-select bg-select-soft/40' : isSwapTarget ? 'ring-1 ring-inset ring-select-border hover:bg-select-soft/20' : 'hover:bg-surface-hover/60'}"
         >
           <span class="w-5 text-center text-xs text-ink-faint tabular-nums">{s + 1}</span>
           <span class="flex-1 text-ink">{seatDisplay(uid)}</span>
           {#if issue}
-            <span class="inline-flex items-center gap-1 {issueColor(issue.level)}" title={issue.message}>
-              <CircleAlert class="w-4 h-4 shrink-0" />
+            {@const tier = issueTier(issue.level)}
+            {@const TierIcon = tier.Icon}
+            <span class="inline-flex items-center gap-1 {tier.color}" title={issue.message}>
+              <TierIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
               <span class="text-xs">{issue.message}</span>
+              <span class="sr-only">{tier.sr}</span>
             </span>
           {:else}
-            <ArrowRightLeft class="w-4 h-4 shrink-0 {isSelected ? 'text-blue-400' : 'text-ink-faint'}" />
+            <ArrowRightLeft class="w-4 h-4 shrink-0 {isSelected ? 'text-select' : 'text-ink-faint'}" />
           {/if}
         </button>
       {/each}
@@ -150,7 +157,7 @@
           <button
             type="button"
             onclick={() => tapOpenSeat(t)}
-            class="w-full py-3 min-h-[44px] flex items-center justify-center gap-1.5 text-xs border border-dashed border-blue-500 text-blue-300 hover:bg-blue-900/30 rounded mt-1.5 transition-colors"
+            class="w-full py-3 min-h-[44px] flex items-center justify-center gap-1.5 text-xs border border-dashed border-select text-select hover:bg-select-soft/30 rounded mt-1.5 transition-colors"
           >
             <ArrowRightLeft class="w-3.5 h-3.5" />{m.rounds_seating_move_here()}
           </button>

@@ -39,6 +39,16 @@
     --color-accent-soft-border:  light-dark(#F9CCD4, #880C26);  /* accent tint border (was crimson-800) */
     --color-link:                light-dark(#DC143C, #EC6B84);  /* accent text / links (was crimson-400) */
     --color-link-soft:           light-dark(#C41235, #F4A3B3);  /* light accent text on tint (was crimson-300) */
+
+    /* Status text/icon (gothic-jewel; pair with icon+text, never colour alone — see #225) */
+    --color-info:      light-dark(#1e40af, #60a5fa);  /* azure — info / positive (✓, online) */
+    --color-warn:      light-dark(#6b21a8, #c084fc);  /* amethyst — pending / warning (matches .dot-pending) */
+    --color-highlight: light-dark(#86198f, #e879f9);  /* fuchsia — highlight / mid severity (matches .dot-highlight) */
+
+    /* Selection (azure) — tap-to-swap seating affordance; a purpose, NOT a status meaning */
+    --color-select:        light-dark(#1e40af, #60a5fa);  /* select text/icon/ring */
+    --color-select-border: light-dark(#bfdbfe, #1e3a8a);  /* select border */
+    --color-select-soft:   light-dark(#eff6ff, #1e3a8a);  /* select tint bg (pair with opacity) */
 }
 
 /* VTES icon fonts from krcg-static */

@@ -200,13 +200,13 @@
 
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
-    <button class="px-2 py-1 text-xs text-purple-400 border border-purple-800 rounded-lg flex items-center gap-1">
+    <button class="px-2 py-1 text-xs text-warn border border-warn rounded-lg flex items-center gap-1">
       <Gavel class="w-3 h-3" />
       Call Judge
     </button>
     <div class="banner-warn border rounded-lg p-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
+        <Gavel class="w-5 h-5 text-warn shrink-0" />
         <div>
           <span class="text-sm font-medium text-ink-strong">Judge Call!</span>
           <span class="text-sm text-ink ml-1">Table 3 &mdash; Alice</span>
@@ -218,7 +218,7 @@
     </div>
     <div class="banner-warn border rounded-lg p-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
+        <Gavel class="w-5 h-5 text-warn shrink-0" />
         <div>
           <span class="text-sm font-medium text-ink-strong">Judge Call!</span>
           <span class="text-sm text-ink ml-1">Table 7 &mdash; Bob</span>
@@ -253,11 +253,11 @@
   <div class="space-y-3 max-w-xs">
     <div class="flex gap-4 justify-center">
       <div class="text-center">
-        <span class="text-2xl font-mono text-blue-400">1:23:45</span>
+        <span class="text-2xl font-mono text-info">1:23:45</span>
         <p class="text-xs text-ink-faint mt-1">Time remaining</p>
       </div>
       <div class="text-center">
-        <span class="text-2xl font-mono text-purple-400">4:30</span>
+        <span class="text-2xl font-mono text-warn">4:30</span>
         <p class="text-xs text-ink-faint mt-1">&lt; 5 minutes</p>
       </div>
       <div class="text-center">
@@ -411,7 +411,7 @@
 {@html renderGuideSection(m.og_offline())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm text-purple-300 border border-purple-700 rounded-lg flex items-center gap-2">
+  <button class="px-4 py-2 text-sm text-warn border border-warn rounded-lg flex items-center gap-2">
     <WifiOff class="w-4 h-4" />
     Go Offline
   </button>

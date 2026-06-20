@@ -198,7 +198,10 @@
     {#if userSuspended}
       <div class="text-sm text-link">{m.error_suspended_cannot_register()}</div>
     {:else if !userVeknId}
-      <div class="text-sm text-purple-400">{m.tournament_vekn_id_required_to_register()}</div>
+      <div class="banner-warn border rounded-lg p-3 flex items-center gap-2 text-sm">
+        <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span>{m.tournament_vekn_id_required_to_register()}</span>
+      </div>
     {:else}
       <Button
         variant="primary"

@@ -9,7 +9,7 @@
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState } from '$lib/stores/offline.svelte';
   import { onMount } from 'svelte';
-  import { WifiOff, Download, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
+  import { Wifi, WifiOff, RefreshCw, Download, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
   import Toast from '$lib/components/Toast.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
@@ -222,7 +222,13 @@
     <!-- Connection status indicator -->
     <div class="mt-auto pt-4">
       <div class="flex flex-col items-center gap-1">
-        <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-purple-500 animate-pulse' : 'bg-blue-500') : 'bg-accent'}"></div>
+        {#if !isOnline}
+          <WifiOff class="w-4 h-4 text-link" aria-hidden="true" />
+        {:else if isSyncing}
+          <RefreshCw class="w-4 h-4 text-warn animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        {:else}
+          <Wifi class="w-4 h-4 text-info" aria-hidden="true" />
+        {/if}
         <span class="text-[10px] text-ink-faint">{isOnline ? (isSyncing ? m.status_syncing() : m.status_online()) : m.status_offline()}</span>
       </div>
     </div>
