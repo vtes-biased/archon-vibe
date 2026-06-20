@@ -28,6 +28,13 @@
     onForceTakeover: () => void;
     onForceUnlock: () => void;
   } = $props();
+
+  // Data-loss acknowledgement gates: the destructive lock actions stay disabled
+  // until the organizer/IC explicitly confirms. Reset whenever the modal closes.
+  let takeoverAck = $state(false);
+  let unlockAck = $state(false);
+  $effect(() => { if (!showForceTakeoverConfirm) takeoverAck = false; });
+  $effect(() => { if (!showForceUnlockConfirm) unlockAck = false; });
 </script>
 
 <!-- Delete Tournament Confirmation Modal -->
@@ -81,10 +88,18 @@
       tabindex="-1"
     >
       <div class="p-6 border-b border-line">
-        <h2 class="text-xl font-medium text-purple-400">{m.offline_go_offline_title()}</h2>
+        <h2 class="text-xl font-medium text-link">{m.offline_go_offline_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ink mb-6">{m.offline_go_offline_msg()}</p>
+        <p class="text-ink mb-4">{m.offline_go_offline_msg()}</p>
+        <div class="rounded-lg border border-line bg-surface-muted p-4 mb-6">
+          <h3 class="text-sm font-semibold text-ink mb-2">{m.offline_explainer_title()}</h3>
+          <ul class="space-y-2 text-sm text-ink list-disc pl-5">
+            <li>{m.offline_explainer_single_device()}</li>
+            <li>{m.offline_explainer_local_save()}</li>
+            <li>{m.offline_explainer_takeover()}</li>
+          </ul>
+        </div>
         <div class="flex gap-2">
           <Button variant="primary" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onGoOffline}>
             {offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}
@@ -115,7 +130,7 @@
       tabindex="-1"
     >
       <div class="p-6 border-b border-line">
-        <h2 class="text-xl font-medium text-blue-400">{m.offline_go_online_title()}</h2>
+        <h2 class="text-xl font-medium text-link">{m.offline_go_online_title()}</h2>
       </div>
       <div class="p-6">
         <p class="text-ink mb-6">{m.offline_go_online_msg()}</p>
@@ -149,12 +164,16 @@
       tabindex="-1"
     >
       <div class="p-6 border-b border-line">
-        <h2 class="text-xl font-medium text-purple-400">{m.offline_force_takeover_title()}</h2>
+        <h2 class="text-xl font-medium text-link">{m.offline_force_takeover_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ink mb-6">{m.offline_force_takeover_msg()}</p>
+        <p class="text-ink mb-4">{m.offline_force_takeover_msg()}</p>
+        <label class="flex items-start gap-3 mb-6 py-2 min-h-11 text-sm text-ink cursor-pointer">
+          <input type="checkbox" bind:checked={takeoverAck} class="w-5 h-5 mt-px shrink-0 rounded border-line-strong bg-surface-card text-accent" />
+          <span>{m.offline_data_loss_ack()}</span>
+        </label>
         <div class="flex gap-2">
-          <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceTakeover}>
+          <Button variant="danger" size="lg" class="flex-1" disabled={!takeoverAck} loading={offlineActionLoading} onclick={onForceTakeover}>
             <TriangleAlert class="w-4 h-4" aria-hidden="true" />
             {offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}
           </Button>
@@ -187,9 +206,13 @@
         <h2 class="text-xl font-medium text-link">{m.offline_force_unlock_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ink mb-6">{m.offline_force_unlock_msg()}</p>
+        <p class="text-ink mb-4">{m.offline_force_unlock_msg()}</p>
+        <label class="flex items-start gap-3 mb-6 py-2 min-h-11 text-sm text-ink cursor-pointer">
+          <input type="checkbox" bind:checked={unlockAck} class="w-5 h-5 mt-px shrink-0 rounded border-line-strong bg-surface-card text-accent" />
+          <span>{m.offline_data_loss_ack()}</span>
+        </label>
         <div class="flex gap-2">
-          <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceUnlock}>
+          <Button variant="danger" size="lg" class="flex-1" disabled={!unlockAck} loading={offlineActionLoading} onclick={onForceUnlock}>
             <TriangleAlert class="w-4 h-4" aria-hidden="true" />
             {offlineActionLoading ? m.common_loading() : m.offline_force_unlock_confirm()}
           </Button>
