@@ -834,7 +834,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {/if}
 
             <!-- QR Check-in display -->
-            {#if showQrCode && (tournament.state === "Registration" || tournament.state === "Waiting") && qrCheckin}
+            {#if showQrCode && (tournament.state === "Registration" || tournament.state === "Waiting") && qrCheckin && tournament.checkin_code}
               <div class="pt-3 border-t border-line">
                 <QrCheckinDisplay code={tournament.checkin_code} tournamentUid={tournament.uid} tournamentName={tournament.name} />
               </div>
