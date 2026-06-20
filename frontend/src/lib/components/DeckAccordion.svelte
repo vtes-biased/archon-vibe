@@ -7,7 +7,7 @@
     expanded,
     ontoggle,
     roundLabel,
-    bgClass = 'bg-ash-900/50',
+    bgClass = 'bg-surface-muted/50',
     headerExtra,
     children,
   }: {
@@ -26,10 +26,10 @@
     onclick={ontoggle}
     aria-expanded={expanded}
   >
-    <span class="text-ash-400 shrink-0">
+    <span class="text-ink-muted shrink-0">
       {#if expanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
     </span>
-    <span class="font-medium text-ash-300">{roundLabel}</span>
+    <span class="font-medium text-ink">{roundLabel}</span>
     {#if headerExtra}
       {@render headerExtra()}
     {/if}

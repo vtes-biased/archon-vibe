@@ -25,14 +25,14 @@
 <!-- Desktop: sticky sidebar -->
 <aside class="hidden lg:block w-64 shrink-0">
   <div class="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
-    <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide mb-3">{m.help_toc_title()}</h3>
+    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide mb-3">{m.help_toc_title()}</h3>
     <nav class="space-y-0.5">
       {#each entries as entry}
         <button
           onclick={() => handleClick(entry.id)}
           class="block w-full text-left text-sm py-1 transition-colors truncate
             {entry.depth === 1 ? 'pl-0 font-medium' : entry.depth === 2 ? 'pl-3' : 'pl-6 text-xs'}
-            {activeHeading === entry.id ? 'text-crimson-400' : 'text-ash-400 hover:text-bone-100'}"
+            {activeHeading === entry.id ? 'text-link' : 'text-ink-muted hover:text-ink-strong'}"
         >
           {entry.text}
         </button>
@@ -46,7 +46,7 @@
   <!-- Floating TOC button -->
   <button
     onclick={() => (mobileOpen = true)}
-    class="fixed bottom-20 right-4 z-30 w-12 h-12 rounded-full bg-crimson-700 text-white shadow-lg flex items-center justify-center hover:bg-crimson-600 transition-colors"
+    class="fixed bottom-20 right-4 z-30 w-12 h-12 rounded-full bg-accent-strong text-white shadow-lg flex items-center justify-center hover:bg-accent-strong-hover transition-colors"
     title={m.help_toc_title()}
   >
     <List class="w-5 h-5" />
@@ -63,16 +63,16 @@
     >
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
-        class="absolute bottom-0 left-0 right-0 max-h-[70vh] bg-dusk-950 border-t border-ash-800 rounded-t-2xl overflow-y-auto"
+        class="absolute bottom-0 left-0 right-0 max-h-[70vh] bg-surface-card border-t border-line rounded-t-2xl overflow-y-auto"
         onclick={(e) => e.stopPropagation()}
         onkeydown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         tabindex="-1"
       >
-        <div class="sticky top-0 bg-dusk-950 px-4 py-3 border-b border-ash-800 flex items-center justify-between">
-          <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.help_toc_title()}</h3>
-          <button onclick={() => (mobileOpen = false)} class="p-1 text-ash-400 hover:text-bone-100">
+        <div class="sticky top-0 bg-surface-card px-4 py-3 border-b border-line flex items-center justify-between">
+          <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.help_toc_title()}</h3>
+          <button onclick={() => (mobileOpen = false)} class="p-1 text-ink-muted hover:text-ink-strong">
             <X class="w-5 h-5" />
           </button>
         </div>
@@ -82,7 +82,7 @@
               onclick={() => handleClick(entry.id)}
               class="block w-full text-left text-sm py-1.5 transition-colors
                 {entry.depth === 1 ? 'pl-0 font-medium' : entry.depth === 2 ? 'pl-4' : 'pl-8 text-xs'}
-                {activeHeading === entry.id ? 'text-crimson-400' : 'text-ash-400 hover:text-bone-100'}"
+                {activeHeading === entry.id ? 'text-link' : 'text-ink-muted hover:text-ink-strong'}"
             >
               {entry.text}
             </button>

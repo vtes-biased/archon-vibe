@@ -79,65 +79,65 @@
 <div class="p-4 sm:p-8">
   <div class="max-w-2xl mx-auto">
     <div class="flex items-center gap-3 mb-6">
-      <a href="/leagues" class="text-ash-400 hover:text-bone-100">
+      <a href="/leagues" class="text-ink-muted hover:text-ink-strong">
         <ArrowLeft class="w-5 h-5" />
       </a>
-      <h1 class="text-3xl font-light text-crimson-500">{m.league_new_title()}</h1>
+      <h1 class="text-3xl font-light text-accent">{m.league_new_title()}</h1>
     </div>
 
     {#if !canCreate}
-      <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4">
-        <p class="text-crimson-300">{m.league_new_no_permission()}</p>
+      <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4">
+        <p class="text-link-soft">{m.league_new_no_permission()}</p>
       </div>
     {:else}
       {#if error}
-        <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4 mb-6">
-          <p class="text-crimson-300">{error}</p>
+        <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6">
+          <p class="text-link-soft">{error}</p>
         </div>
       {/if}
 
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
-        <div class="bg-dusk-950 rounded-lg shadow p-6 border border-ash-800 space-y-4">
+        <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-4">
           <!-- Name -->
           <div>
-            <label for="name" class="block text-sm text-ash-400 mb-1">{m.tfield_name_label()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+            <label for="name" class="block text-sm text-ink-muted mb-1">{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
             <input id="name" type="text" bind:value={name} required
-              class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {name.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
+              class="w-full px-3 py-2 text-sm border rounded-lg bg-surface-card text-ink-bright focus:outline-none {name.trim() ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}" />
           </div>
 
           <!-- Kind -->
           <div>
-            <label for="kind" class="block text-sm text-ash-400 mb-1">{m.league_kind_label()}</label>
+            <label for="kind" class="block text-sm text-ink-muted mb-1">{m.league_kind_label()}</label>
             <select id="kind" bind:value={kind}
-              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+              class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
               <option value="League">{m.league_kind_league()}</option>
               <option value="Meta-League">{m.league_kind_meta()}</option>
             </select>
             {#if kind === "Meta-League"}
-              <p class="text-xs text-ash-500 mt-1">{m.league_kind_meta_hint()}</p>
+              <p class="text-xs text-ink-faint mt-1">{m.league_kind_meta_hint()}</p>
             {/if}
           </div>
 
           <!-- Parent league (only for regular leagues) -->
           {#if kind === "League" && metaLeagues.length > 0}
             <div>
-              <label for="parent" class="block text-sm text-ash-400 mb-1">{m.league_parent_label()}</label>
+              <label for="parent" class="block text-sm text-ink-muted mb-1">{m.league_parent_label()}</label>
               <select id="parent" bind:value={parentUid}
-                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
                 <option value="">{m.common_none()}</option>
                 {#each metaLeagues as ml (ml.uid)}
                   <option value={ml.uid}>{ml.name}</option>
                 {/each}
               </select>
-              <p class="text-xs text-ash-500 mt-1">{m.league_parent_hint()}</p>
+              <p class="text-xs text-ink-faint mt-1">{m.league_parent_hint()}</p>
             </div>
           {/if}
 
           <!-- Standings mode -->
           <div>
-            <label for="standings" class="block text-sm text-ash-400 mb-1">{m.league_standings_mode_label()}</label>
+            <label for="standings" class="block text-sm text-ink-muted mb-1">{m.league_standings_mode_label()}</label>
             <select id="standings" bind:value={standingsMode}
-              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+              class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
               <option value="RTP">{m.league_standings_rtp_opt()}</option>
               <option value="Score">{m.league_standings_score_opt()}</option>
               <option value="GP">{m.league_standings_gp_opt()}</option>
@@ -147,9 +147,9 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Format restriction -->
             <div>
-              <label for="format" class="block text-sm text-ash-400 mb-1">{m.tfield_format()}</label>
+              <label for="format" class="block text-sm text-ink-muted mb-1">{m.tfield_format()}</label>
               <select id="format" bind:value={format}
-                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
                 <option value="">{m.tfield_format_any()}</option>
                 <option value="Standard">Standard</option>
                 <option value="V5">V5</option>
@@ -159,9 +159,9 @@
 
             <!-- Country -->
             <div>
-              <label for="country" class="block text-sm text-ash-400 mb-1">{m.common_country()}</label>
+              <label for="country" class="block text-sm text-ink-muted mb-1">{m.common_country()}</label>
               <select id="country" bind:value={country}
-                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
                 <option value="">{m.league_worldwide()}</option>
                 {#each Object.entries(countries) as [code, c]}
                   <option value={code}>{c.name} {getCountryFlag(code)}</option>
@@ -173,34 +173,34 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Start date -->
             <div>
-              <label for="start" class="block text-sm text-ash-400 mb-1">{m.tfield_start()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+              <label for="start" class="block text-sm text-ink-muted mb-1">{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
               <input id="start" type="date" bind:value={startDate} required
-                class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {startDate ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
+                class="w-full px-3 py-2 text-sm border rounded-lg bg-surface-card text-ink-bright focus:outline-none {startDate ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}" />
             </div>
 
             <!-- End date -->
             <div>
-              <label for="finish" class="block text-sm text-ash-400 mb-1">{m.tfield_finish()}</label>
+              <label for="finish" class="block text-sm text-ink-muted mb-1">{m.tfield_finish()}</label>
               <input id="finish" type="date" bind:value={finishDate}
-                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200" />
-              <p class="text-xs text-ash-500 mt-1">{m.league_finish_hint()}</p>
+                class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright" />
+              <p class="text-xs text-ink-faint mt-1">{m.league_finish_hint()}</p>
             </div>
           </div>
 
           <!-- Description -->
           <div>
-            <label for="desc" class="block text-sm text-ash-400 mb-1">{m.common_description()}</label>
-            <span class="text-xs text-ash-500 mb-1 block">
-              {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
+            <label for="desc" class="block text-sm text-ink-muted mb-1">{m.common_description()}</label>
+            <span class="text-xs text-ink-faint mb-1 block">
+              {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ink-muted hover:text-ink-bright">Markdown</a>' })}
             </span>
             <textarea id="desc" bind:value={description} rows={10}
-              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200 resize-y"></textarea>
+              class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright resize-y"></textarea>
           </div>
 
         </div>
 
         <div class="flex justify-end gap-3">
-          <a href="/leagues" class="px-4 py-2 text-sm font-medium text-ash-400 hover:text-bone-100 transition-colors">
+          <a href="/leagues" class="px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink-strong transition-colors">
             {m.common_cancel()}
           </a>
           <Button

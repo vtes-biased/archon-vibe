@@ -91,36 +91,36 @@
 
 <div class="space-y-4">
   {#if error}
-    <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-3">
-      <p class="text-crimson-300 text-sm">{error}</p>
+    <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+      <p class="text-link-soft text-sm">{error}</p>
     </div>
   {/if}
 
   {#if !hasFinalsCandidate}
-    <p class="text-ash-400">{m.finals_require_rounds()}</p>
+    <p class="text-ink-muted">{m.finals_require_rounds()}</p>
   {:else if !tournament.finals}
-    <p class="text-ash-400">{m.finals_not_started()}</p>
+    <p class="text-ink-muted">{m.finals_not_started()}</p>
   {:else}
-    <h3 class="text-lg font-medium text-bone-100">{m.finals_title()}</h3>
+    <h3 class="text-lg font-medium text-ink-strong">{m.finals_title()}</h3>
 
     <!-- Finals table -->
-    <div class="bg-ash-900/50 rounded-lg p-4">
+    <div class="bg-surface-muted/50 rounded-lg p-4">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2">
-          <h3 class="text-sm font-medium text-bone-100">{m.finals_table()}</h3>
+          <h3 class="text-sm font-medium text-ink-strong">{m.finals_table()}</h3>
           {#if canEditSeating && !alterMode}
             <Button variant="secondary" size="sm" onclick={enterAlterMode}>
               <ArrowRightLeft class="w-3.5 h-3.5" />{m.rounds_alter_seating()}
             </Button>
           {/if}
         </div>
-        <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-success' : tournament.finals.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-pending'}">
+        <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-success' : tournament.finals.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
           {translateTableState(tournament.finals.state)}
         </span>
       </div>
       {#if alterMode}
         <!-- In-place alter seating mode -->
-        <p class="text-sm text-ash-300 mb-2">{m.rounds_alter_hint()}</p>
+        <p class="text-sm text-ink mb-2">{m.rounds_alter_hint()}</p>
         <SeatingSortable
           bind:tables={alterTables}
           {playerInfo}
@@ -133,7 +133,7 @@
           <Button variant="secondary" size="lg" onclick={cancelAlterMode}>{m.common_cancel()}</Button>
         </div>
       {:else}
-      <div class="divide-y divide-ash-800">
+      <div class="divide-y divide-line">
         {#each tournament.finals.seating as seat, j}
           {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
           {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
@@ -143,14 +143,14 @@
           <div class="py-2.5">
             <div class="flex items-center justify-between gap-2 text-sm">
               <div class="min-w-0">
-                <span class="text-ash-300 truncate">{seatDisplay(seat.player_uid)}</span>
-                <div class="text-xs text-ash-500">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+                <span class="text-ink truncate">{seatDisplay(seat.player_uid)}</span>
+                <div class="text-xs text-ink-faint">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
               </div>
-              <span class="text-ash-500 text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
+              <span class="text-ink-faint text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
             </div>
             <div class="mt-1.5">
               {#if !isOrganizer && tournament.finals.seating.some(s => s.judge_uid)}
-                <span class="inline-flex items-center gap-1 text-xs text-ash-400">
+                <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
                   {seat.result.vp}
                   <Lock class="w-3.5 h-3.5" />
                 </span>
@@ -173,17 +173,17 @@
       <!-- Override controls -->
       {#if isOrganizer && (tournament.finals.state === 'Invalid' || tournament.finals.state === 'In Progress')}
         {#if overrideTable_ === -1}
-          <div class="mt-2 pt-2 border-t border-ash-800">
-            <label class="text-xs text-ash-400 block mb-1">{m.override_judge_comment()}
+          <div class="mt-2 pt-2 border-t border-line">
+            <label class="text-xs text-ink-muted block mb-1">{m.override_judge_comment()}
               <textarea
                 bind:value={overrideComment}
-                class="w-full bg-ash-800 text-bone-100 text-xs rounded px-2 py-1 border border-ash-700 resize-none"
+                class="w-full bg-surface-hover text-ink-strong text-xs rounded px-2 py-1 border border-line-strong resize-none"
                 rows="2"
                 placeholder={m.override_placeholder()}
               ></textarea>
             </label>
             <div class="flex gap-2 mt-1 justify-end">
-              <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">{m.common_cancel()}</button>
+              <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ink-muted hover:text-ink-bright">{m.common_cancel()}</button>
               <Button
                 variant="primary"
                 size="sm"
@@ -214,7 +214,7 @@
         {/if}
       {/if}
       {#if isOrganizer && tournament.finals.override}
-        <div class="mt-2 pt-2 border-t border-ash-800 flex items-center justify-between">
+        <div class="mt-2 pt-2 border-t border-line flex items-center justify-between">
           <span class="text-xs text-purple-400">
             <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />
             {m.override_overridden({ comment: tournament.finals.override.comment })}
@@ -228,7 +228,7 @@
               } catch (e) { error = toUserMessage(e, m.override_remove_error()); } finally { overrideSaving = false; }
             }}
             disabled={overrideSaving}
-            class="px-2 py-1 text-xs text-ash-500 hover:text-crimson-400 transition-colors"
+            class="px-2 py-1 text-xs text-ink-faint hover:text-link transition-colors"
           >{m.override_remove()}</button>
         </div>
       {/if}

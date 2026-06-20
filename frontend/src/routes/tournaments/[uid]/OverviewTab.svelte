@@ -142,7 +142,7 @@
     <span class="px-3 py-1.5 rounded text-sm font-medium {getStateBadgeClass(tournament.state)}">
       {translateTournamentState(tournament.state)}
     </span>
-    <span class="text-sm text-ash-400">
+    <span class="text-sm text-ink-muted">
       {m.overview_player_count({ count: tournament.players?.length ?? 0 })}
       {#if hasRounds}
         · {m.overview_round_count({ count: tournament.rounds!.length })}
@@ -156,8 +156,8 @@
   <!-- Winner display -->
   {#if tournament.winner}
     <div class="banner-highlight border rounded-lg p-4">
-      <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
-      <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
+      <div class="text-ink-faint text-sm">{m.tournament_winner()}</div>
+      <div class="text-xl font-medium text-ink-strong">{seatDisplay(tournament.winner)}</div>
     </div>
   {/if}
 
@@ -181,7 +181,7 @@
       </Button>
       {#if isOrganizer}
         <a href="{API_BASE}/api/tournaments/{tournament.uid}/report"
-          class="flex items-center gap-2 px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded-lg transition-colors"
+          class="flex items-center gap-2 px-3 py-1.5 text-sm bg-surface-hover hover:bg-surface-active text-ink-bright rounded-lg transition-colors"
           download>
           <Download class="w-4 h-4" />
           {m.decks_download_report_json()}
@@ -192,9 +192,9 @@
 
   <!-- Organizers -->
   {#if isOrganizer}
-    <div class="bg-ash-900/30 rounded-lg p-4">
+    <div class="bg-surface-muted/30 rounded-lg p-4">
       <button onclick={() => organizersExpanded = !organizersExpanded}
-        class="flex items-center gap-2 text-sm font-medium text-ash-300 w-full text-left">
+        class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
         {#if organizersExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
         {m.organizers_title()}
       </button>
@@ -208,9 +208,9 @@
         </div>
       {/if}
     </div>
-    <div class="bg-ash-900/30 rounded-lg p-4">
+    <div class="bg-surface-muted/30 rounded-lg p-4">
       <button onclick={() => roomsExpanded = !roomsExpanded}
-        class="flex items-center gap-2 text-sm font-medium text-ash-300 w-full text-left">
+        class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
         {#if roomsExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
         {m.rooms_title()}
       </button>
@@ -225,31 +225,31 @@
       {/if}
     </div>
     <!-- Archon Import -->
-    <div class="bg-ash-900/30 rounded-lg p-4">
+    <div class="bg-surface-muted/30 rounded-lg p-4">
       <button onclick={() => archonExpanded = !archonExpanded}
-        class="flex items-center gap-2 text-sm font-medium text-ash-300 w-full text-left">
+        class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
         {#if archonExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
         {m.archon_import_title()}
       </button>
       {#if archonExpanded}
         <div class="mt-3 space-y-3">
-          <p class="text-xs text-ash-400">{m.archon_import_description()}</p>
+          <p class="text-xs text-ink-muted">{m.archon_import_description()}</p>
           <a href="{API_BASE}/api/tournaments/archon-template" download
-            class="inline-flex items-center gap-2 text-sm text-crimson-400 hover:text-crimson-300">
+            class="inline-flex items-center gap-2 text-sm text-link hover:text-link-soft">
             <Download class="w-4 h-4" />
             {m.archon_download_template()}
           </a>
           <div class="flex items-center gap-2">
             <input id="archon-file-input" type="file" accept=".xlsx"
               onchange={(e) => { archonFile = (e.target as HTMLInputElement).files?.[0] ?? null; archonResult = null; archonConfirmOverwrite = false; }}
-              class="text-sm text-ash-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-ash-700 file:text-ash-200 hover:file:bg-ash-600" />
+              class="text-sm text-ink file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-surface-active file:text-ink-bright hover:file:bg-surface-active" />
             <Button variant="primary" size="md" disabled={!archonFile} loading={archonUploading} onclick={handleArchonImport}>
               {#if !archonUploading}<Upload class="w-4 h-4" />{/if}
               {archonUploading ? m.archon_uploading() : m.archon_upload_file()}
             </Button>
           </div>
           {#if archonConfirmOverwrite}
-            <div class="bg-purple-900/30 border border-purple-700 rounded p-3 text-sm text-purple-200">
+            <div class="banner-warn border rounded p-3 text-sm">
               <p>{m.archon_import_confirm_overwrite()}</p>
               <div class="flex gap-2 mt-2">
                 <Button variant="primary" size="md" onclick={handleArchonImport}>
@@ -263,12 +263,12 @@
           {/if}
           {#if archonResult}
             {#if archonResult.success}
-              <div class="bg-blue-900/30 border border-blue-700 rounded p-3 text-sm text-blue-200">
+              <div class="banner-info border rounded p-3 text-sm">
                 <p>{m.archon_import_success()}</p>
                 <p class="text-xs mt-1">{m.archon_players_matched({ count: archonResult.players_matched })} · {m.archon_rounds_imported({ count: archonResult.rounds_imported })}{archonResult.has_finals ? ` · ${m.archon_finals_label()}` : ""}</p>
               </div>
             {:else}
-              <div class="bg-crimson-900/30 border border-crimson-700 rounded p-3 text-sm text-crimson-200">
+              <div class="banner-error border rounded p-3 text-sm">
                 <p class="font-medium">{m.archon_import_error()}</p>
                 <ul class="mt-1 text-xs space-y-0.5">
                   {#each archonResult.errors as error}
@@ -282,11 +282,11 @@
       {/if}
     </div>
   {:else if tournament.organizers_uids?.length}
-    <div class="bg-ash-900/30 rounded-lg p-4">
-      <h4 class="text-sm font-medium text-ash-300 mb-2">{m.organizers_title()}</h4>
+    <div class="bg-surface-muted/30 rounded-lg p-4">
+      <h4 class="text-sm font-medium text-ink mb-2">{m.organizers_title()}</h4>
       <div class="flex flex-wrap gap-2">
         {#each tournament.organizers_uids as uid}
-          <span class="text-sm text-bone-100">{seatDisplay(uid)}</span>
+          <span class="text-sm text-ink-strong">{seatDisplay(uid)}</span>
         {/each}
       </div>
     </div>
@@ -294,11 +294,11 @@
 
   <!-- Summary standings (top 5) -->
   {#if standings.length > 0}
-    <div class="bg-ash-900/30 rounded-lg p-4">
-      <h3 class="text-sm font-medium text-ash-300 mb-2">{m.overview_top_standings()}</h3>
+    <div class="bg-surface-muted/30 rounded-lg p-4">
+      <h3 class="text-sm font-medium text-ink mb-2">{m.overview_top_standings()}</h3>
       <table class="w-full text-sm">
         <thead>
-          <tr class="text-ash-500 text-xs">
+          <tr class="text-ink-faint text-xs">
             <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
             <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
             <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
@@ -312,15 +312,15 @@
         </thead>
         <tbody>
           {#each standings.slice(0, 5) as entry}
-            <tr class="text-bone-100 border-t border-ash-800">
-              <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
+            <tr class="text-ink-strong border-t border-line">
+              <td class="py-1 pr-2 text-ink-faint"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
               <td class="py-1 pr-2">{seatDisplay(entry.user_uid)}</td>
               <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
               {#if hasFinals}
                 <td class="text-right py-1 px-2">{entry.finals ?? ""}</td>
               {/if}
               {#if isFinished}
-                <td class="text-right py-1 px-2 text-ash-400">{getRatingPts(entry)}</td>
+                <td class="text-right py-1 px-2 text-ink-muted">{getRatingPts(entry)}</td>
               {/if}
             </tr>
           {/each}
@@ -331,9 +331,9 @@
 
   <!-- Raffle section (Waiting, Playing, or Finished) -->
   {#if tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished"}
-    <div class="bg-ash-900/30 rounded-lg p-4">
+    <div class="bg-surface-muted/30 rounded-lg p-4">
       <button onclick={() => raffleExpanded = !raffleExpanded}
-        class="flex items-center gap-2 text-sm font-medium text-ash-300 w-full text-left">
+        class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
         {#if raffleExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
         {m.raffle_title()}
       </button>

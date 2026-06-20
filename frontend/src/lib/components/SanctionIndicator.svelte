@@ -60,7 +60,7 @@
 {#snippet dot()}
   <span class="w-2 h-2 rounded-full {dotColor}"></span>
   {#if activeSanctions.length > 1}
-    <span class="text-[10px] text-ash-400">{activeSanctions.length}</span>
+    <span class="text-[10px] text-ink-muted">{activeSanctions.length}</span>
   {/if}
 {/snippet}
 

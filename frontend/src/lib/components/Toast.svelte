@@ -23,11 +23,11 @@
       case 'success':
         return 'toast-success';
       case 'error':
-        return 'bg-crimson-900/90 border-crimson-700 text-crimson-100'; // crimson uses custom palette
+        return 'bg-accent-soft/90 border-accent-strong text-link-soft'; // crimson uses custom palette
       case 'warning':
         return 'toast-warn';
       case 'info':
-        return 'bg-dusk-900/90 border-ash-600 text-bone-100';
+        return 'bg-surface-muted/90 border-line-strong text-ink-strong';
     }
   }
 
@@ -36,11 +36,11 @@
       case 'success':
         return 'text-blue-400';
       case 'error':
-        return 'text-crimson-400';
+        return 'text-link';
       case 'warning':
         return 'text-purple-400';
       case 'info':
-        return 'text-ash-300';
+        return 'text-ink';
     }
   }
 </script>

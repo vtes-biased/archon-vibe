@@ -61,17 +61,17 @@
 </script>
 
 <div class="flex items-center gap-3 text-sm flex-wrap mb-2">
-  <span class="text-ash-400">{m.deck_upload_attribution()}:</span>
-  <label class="flex items-center gap-1 text-ash-200">
-    <input type="radio" bind:group={mode} value="self" class="accent-crimson-500" />
+  <span class="text-ink-muted">{m.deck_upload_attribution()}:</span>
+  <label class="flex items-center gap-1 text-ink-bright">
+    <input type="radio" bind:group={mode} value="self" class="accent-accent" />
     {playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self()}
   </label>
-  <label class="flex items-center gap-1 text-ash-200">
-    <input type="radio" bind:group={mode} value="anonymous" class="accent-crimson-500" />
+  <label class="flex items-center gap-1 text-ink-bright">
+    <input type="radio" bind:group={mode} value="anonymous" class="accent-accent" />
     {m.deck_upload_attr_anonymous()}
   </label>
-  <label class="flex items-center gap-1 text-ash-200">
-    <input type="radio" bind:group={mode} value="other" class="accent-crimson-500" />
+  <label class="flex items-center gap-1 text-ink-bright">
+    <input type="radio" bind:group={mode} value="other" class="accent-accent" />
     {m.deck_upload_attr_other()}
   </label>
 </div>
@@ -87,23 +87,23 @@
       autocorrect="off"
       autocapitalize="off"
       spellcheck="false"
-      class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+      class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
     />
     {#if results.length > 0}
-      <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
+      <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
         {#each results as user, i}
           <button
             onclick={() => selectUser(user)}
-            class="w-full px-3 py-2 text-left text-sm text-ash-200 transition-colors {i === selectedIndex ? 'bg-ash-700' : 'hover:bg-ash-800'}"
+            class="w-full px-3 py-2 text-left text-sm text-ink-bright transition-colors {i === selectedIndex ? 'bg-surface-active' : 'hover:bg-surface-hover'}"
           >
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
             {#if user.vekn_id}
-              <span class="text-ash-500 ml-2">({user.vekn_id})</span>
+              <span class="text-ink-faint ml-2">({user.vekn_id})</span>
             {/if}
           </button>
         {/each}
         {#if total > SEARCH_LIMIT}
-          <div class="px-3 py-2 text-xs text-ash-500 text-center">
+          <div class="px-3 py-2 text-xs text-ink-faint text-center">
             {m.add_player_more_results({ count: (total - SEARCH_LIMIT).toString() })}
           </div>
         {/if}

@@ -2,62 +2,43 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
-    /* VTES Gothic palette - see DESIGN.md */
-    --color-crimson-50: #FDF2F4;
-    --color-crimson-100: #FCE4E8;
-    --color-crimson-200: #F9CCD4;
-    --color-crimson-300: #F4A3B3;
-    --color-crimson-400: #EC6B84;
-    --color-crimson-500: #DC143C;
-    --color-crimson-600: #C41235;
-    --color-crimson-700: #A40F2D;
-    --color-crimson-800: #880C26;
-    --color-crimson-900: #6E0A1F;
-    --color-crimson: #DC143C;
-    --color-crimson-light: #8B0000;
+    /*
+     * VTES Gothic ROLE TOKENS — see DESIGN.md.
+     * Each role is defined ONCE via light-dark(LIGHT, DARK): the value is picked
+     * from the element's color-scheme (dark on :root, light on html.light). No
+     * parallel html.light override block, no numeric scale-inversion to maintain —
+     * a new shade is a new role here, not a hand-inverted ramp entry. The hex
+     * values are exactly the old crimson/bone/dusk/ash scale's resolved colours,
+     * so both themes render identically to the pre-migration numeric scales.
+     *   light-dark(LIGHT, DARK): first arg = light theme, second = dark (default).
+     */
 
-    --color-bone-50: #FDFCFA;
-    --color-bone-100: #FAF8F4;
-    --color-bone-200: #F5F0E6;
-    --color-bone-300: #EBE3D4;
-    --color-bone-400: #DED3BE;
-    --color-bone-500: #CFC0A6;
-    --color-bone-600: #B8A688;
-    --color-bone-700: #9A8A6D;
-    --color-bone-800: #7A6D57;
-    --color-bone-900: #5E5444;
-    --color-bone-950: #2A2520;
-    --color-bone: #F5F0E6;
+    /* Surfaces (bg) — page → card → muted/overlay → hover → solid control */
+    --color-surface:        light-dark(#F5F0E6, #2A2520);  /* page background  (was bone-950) */
+    --color-surface-card:   light-dark(#FFFFFF, #1C1A1E);  /* cards / panels   (was dusk-950) */
+    --color-surface-muted:  light-dark(#E8E6E4, #3D3A37);  /* subtle row/overlay (was ash-900, dusk-900/800) */
+    --color-surface-hover:  light-dark(#D4D0CC, #4A4642);  /* interactive hover (was ash-800) */
+    --color-surface-active: light-dark(#B8B2AC, #5A5550);  /* solid neutral control (was ash-700) */
 
-    --color-dusk-50: #F7F5F2;
-    --color-dusk-100: #EFEBE5;
-    --color-dusk-200: #E8E0D5;
-    --color-dusk-300: #D8CDB9;
-    --color-dusk-400: #C4B69B;
-    --color-dusk-500: #AE9D7D;
-    --color-dusk-600: #968363;
-    --color-dusk-700: #7A6A51;
-    --color-dusk-800: #605343;
-    --color-dusk-900: #4A4035;
-    --color-dusk-950: #1C1A1E;
-    --color-dusk: #E8E0D5;
+    /* Ink (text/fill/stroke) — strong → bright → body → muted → faint */
+    --color-ink-strong:     light-dark(#5E5444, #FAF8F4);  /* headings/emphasis (was bone-100) */
+    --color-ink-bright:     light-dark(#4A4642, #D4D0CC);  /* bright body/labels (was ash-200) */
+    --color-ink:            light-dark(#5A5550, #B8B2AC);  /* default body (was ash-300) */
+    --color-ink-muted:      light-dark(#6B6560, #9A938C);  /* secondary (was ash-400) */
+    --color-ink-faint:      light-dark(#7D756E, #7D756E);  /* tertiary/disabled (was ash-500/600, mist) */
 
-    --color-ash-50: #F5F4F3;
-    --color-ash-100: #E8E6E4;
-    --color-ash-200: #D4D0CC;
-    --color-ash-300: #B8B2AC;
-    --color-ash-400: #9A938C;
-    --color-ash-500: #7D756E;
-    --color-ash-600: #6B6560;
-    --color-ash-700: #5A5550;
-    --color-ash-800: #4A4642;
-    --color-ash-900: #3D3A37;
-    --color-ash-950: #2A2826;
-    --color-ash: #6B6560;
+    /* Borders (border/ring/divide) — same hue as the matching surface, distinct role */
+    --color-line:           light-dark(#D4D0CC, #4A4642);  /* default border (was ash-800) */
+    --color-line-strong:    light-dark(#B8B2AC, #5A5550);  /* stronger border (was ash-700/600/500) */
 
-    --color-mist: #9B9590;
-    --color-mist-light: #9B9590;
-    --color-mist-dark: #605850;
+    /* Accent (crimson) — brand → CTA → tint, plus accent text (link) */
+    --color-accent:              light-dark(#A40F2D, #DC143C);  /* brand accent: bg/border/ring + strong text (was crimson-500) */
+    --color-accent-strong:       light-dark(#880C26, #A40F2D);  /* CTA solid (was crimson-700) */
+    --color-accent-strong-hover: light-dark(#960D29, #C41235);  /* CTA hover (was crimson-600) */
+    --color-accent-soft:         light-dark(#FCE4E8, #6E0A1F);  /* accent tint bg (was crimson-900) */
+    --color-accent-soft-border:  light-dark(#F9CCD4, #880C26);  /* accent tint border (was crimson-800) */
+    --color-link:                light-dark(#DC143C, #EC6B84);  /* accent text / links (was crimson-400) */
+    --color-link-soft:           light-dark(#C41235, #F4A3B3);  /* light accent text on tint (was crimson-300) */
 }
 
 /* VTES icon fonts from krcg-static */
@@ -79,7 +60,7 @@
     }
 
     html {
-        @apply bg-bone-950 text-ash-300;
+        @apply bg-surface text-ink;
     }
 
     button, [role="button"], summary, select { cursor: pointer; }
@@ -94,14 +75,14 @@
      *
      * The hard outline carries 1.4.11/2.4.7 compliance on its own; the soft
      * crimson box-shadow is the gothic glow (cf. .callout / .doc-img) that makes
-     * focus read as designed. color-mix derives it from crimson-500 so it follows
-     * the light-theme scale inversion automatically. The glow may be clipped by
-     * an overflow:hidden ancestor — harmless, the outline is never clipped.
+     * focus read as designed. color-mix derives it from the accent role token so
+     * it follows the theme automatically. The glow may be clipped by an
+     * overflow:hidden ancestor — harmless, the outline is never clipped.
      */
     :focus-visible {
-        outline: 2px solid var(--color-crimson-500);
+        outline: 2px solid var(--color-accent);
         outline-offset: 2px;
-        box-shadow: 0 0 8px color-mix(in srgb, var(--color-crimson-500) 45%, transparent);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 45%, transparent);
     }
 
     /*
@@ -110,84 +91,18 @@
      * onto the visible track instead (outline follows the track's pill radius).
      */
     .sr-only.peer:focus-visible + div {
-        outline: 2px solid var(--color-crimson-500);
+        outline: 2px solid var(--color-accent);
         outline-offset: 2px;
-        box-shadow: 0 0 8px color-mix(in srgb, var(--color-crimson-500) 45%, transparent);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 45%, transparent);
     }
 
     /*
-     * Light theme — scale inversion.
-     * Dark shade numbers (900/950) map to light values and vice versa.
-     * This means all existing component classes (bg-dusk-950, text-ash-300, etc.)
-     * automatically get appropriate light-mode colors without any class changes.
+     * Light theme — role tokens resolve via light-dark() (see @theme above), so
+     * the only thing the light theme needs is to flip color-scheme. No per-shade
+     * override block: each role carries both theme values at its definition.
      */
     html.light {
         color-scheme: light;
-
-        /* Crimson — role-mapped for contrast on light backgrounds.
-         * 500 (primary accent) and 700 (CTA) are darker than their dark-mode
-         * counterparts to ensure readability on white. 800-900 become light
-         * tints for decorative backgrounds. Scale is not a pure inversion. */
-        --color-crimson-50: #6E0A1F;
-        --color-crimson-100: #880C26;
-        --color-crimson-200: #A40F2D;
-        --color-crimson-300: #C41235;
-        --color-crimson-400: #DC143C;
-        --color-crimson-500: #A40F2D;
-        --color-crimson-600: #960D29;
-        --color-crimson-700: #880C26;
-        --color-crimson-800: #F9CCD4;
-        --color-crimson-900: #FCE4E8;
-        --color-crimson: #A40F2D;
-        --color-crimson-light: #DC143C;
-
-        /* Bone — fully inverted like other scales.
-         * For light text on colored buttons (crimson/emerald/amber), use text-white. */
-        --color-bone-50: #2A2520;
-        --color-bone-100: #5E5444;
-        --color-bone-200: #7A6D57;
-        --color-bone-300: #9A8A6D;
-        --color-bone-400: #B8A688;
-        --color-bone-500: #CFC0A6;
-        --color-bone-600: #DED3BE;
-        --color-bone-700: #EBE3D4;
-        --color-bone-800: #FAF8F4;
-        --color-bone-900: #F5F0E6;
-        --color-bone-950: #F5F0E6;
-        --color-bone: #F5F0E6;
-
-        /* Dusk — cards/surfaces become white-ish */
-        --color-dusk-50: #1C1A1E;
-        --color-dusk-100: #4A4035;
-        --color-dusk-200: #605343;
-        --color-dusk-300: #7A6A51;
-        --color-dusk-400: #968363;
-        --color-dusk-500: #AE9D7D;
-        --color-dusk-600: #C4B69B;
-        --color-dusk-700: #D8CDB9;
-        --color-dusk-800: #EFEBE5;
-        --color-dusk-900: #F5F0E6;
-        --color-dusk-950: #FFFFFF;
-        --color-dusk: #E8E0D5;
-
-        /* Ash — text/borders: darker text on light bg */
-        --color-ash-50: #2A2826;
-        --color-ash-100: #3D3A37;
-        --color-ash-200: #4A4642;
-        --color-ash-300: #5A5550;
-        --color-ash-400: #6B6560;
-        --color-ash-500: #7D756E;
-        --color-ash-600: #9A938C;
-        --color-ash-700: #B8B2AC;
-        --color-ash-800: #D4D0CC;
-        --color-ash-900: #E8E6E4;
-        --color-ash-950: #F5F4F3;
-        --color-ash: #6B6560;
-
-        /* Mist */
-        --color-mist: #9B9590;
-        --color-mist-light: #605850;
-        --color-mist-dark: #9B9590;
     }
 }
 
@@ -238,8 +153,8 @@
 .btn-success:disabled,
 .btn-pending:disabled,
 .btn-danger:disabled {
-    background-color: light-dark(var(--color-ash-300), var(--color-ash-800));
-    color: var(--color-ash-500);
+    background-color: var(--color-surface-hover);
+    color: var(--color-ink-faint);
     cursor: not-allowed;
 }
 
@@ -276,7 +191,7 @@
 /* ── Severity dots (SanctionIndicator) — ordinal amethyst → fuchsia → crimson ── */
 .dot-pending   { background-color: light-dark(#9333ea, #c084fc); }
 .dot-highlight { background-color: light-dark(#a21caf, #e879f9); }
-.dot-danger    { background-color: var(--color-crimson-500); }
+.dot-danger    { background-color: var(--color-accent); }
 
 /* Light theme is handled per-class above via light-dark() — no override block. */
 
@@ -284,8 +199,8 @@
 
 /* Callout boxes for rulebook inserts */
 .callout {
-    border-left: 4px solid var(--color-crimson-500);
-    background: rgb(164 15 45 / 0.08);
+    border-left: 4px solid var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
     padding: 1rem 1.25rem;
     margin: 1.5rem 0;
     border-radius: 0 0.5rem 0.5rem 0;
@@ -293,7 +208,7 @@
 .callout-title {
     font-weight: 700;
     text-transform: uppercase;
-    color: var(--color-crimson-400);
+    color: var(--color-link);
     font-size: 0.875rem;
     letter-spacing: 0.05em;
     margin-bottom: 0.25rem;
@@ -311,26 +226,26 @@
     letter-spacing: 0.02em;
     padding: 0.75rem 1rem;
     margin: 1.25rem 0;
-    color: var(--color-bone-200);
+    color: var(--color-ink-strong);
 }
 
 /* Document prose — uses palette variables so it works in both themes */
 .doc-prose {
-    --tw-prose-body: var(--color-ash-300);
-    --tw-prose-headings: var(--color-bone-100);
-    --tw-prose-links: var(--color-crimson-400);
-    --tw-prose-bold: var(--color-bone-200);
-    --tw-prose-counters: var(--color-ash-400);
-    --tw-prose-bullets: var(--color-ash-500);
-    --tw-prose-hr: var(--color-ash-800);
-    --tw-prose-quotes: var(--color-ash-400);
-    --tw-prose-quote-borders: var(--color-ash-700);
-    --tw-prose-code: var(--color-crimson-300);
-    --tw-prose-th-borders: var(--color-ash-700);
-    --tw-prose-td-borders: var(--color-ash-800);
+    --tw-prose-body: var(--color-ink);
+    --tw-prose-headings: var(--color-ink-strong);
+    --tw-prose-links: var(--color-link);
+    --tw-prose-bold: var(--color-ink-strong);
+    --tw-prose-counters: var(--color-ink-muted);
+    --tw-prose-bullets: var(--color-ink-faint);
+    --tw-prose-hr: var(--color-line);
+    --tw-prose-quotes: var(--color-ink-muted);
+    --tw-prose-quote-borders: var(--color-line-strong);
+    --tw-prose-code: var(--color-link-soft);
+    --tw-prose-th-borders: var(--color-line-strong);
+    --tw-prose-td-borders: var(--color-line);
 }
 .doc-prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
-    background: var(--color-ash-900);
+    background: var(--color-surface-muted);
     padding: 0.125rem 0.25rem;
     border-radius: 0.25rem;
 }
@@ -343,7 +258,7 @@
 
 /* Heading anchor links — hover-reveal on desktop, always visible on touch */
 .heading-anchor { position: relative; }
-.heading-anchor .anchor-link, .callout-title .anchor-link { opacity: 0; transition: opacity 0.15s; margin-left: 0.25rem; font-size: 0.8em; text-decoration: none; color: var(--color-ash-500); }
+.heading-anchor .anchor-link, .callout-title .anchor-link { opacity: 0; transition: opacity 0.15s; margin-left: 0.25rem; font-size: 0.8em; text-decoration: none; color: var(--color-ink-faint); }
 @media (hover: hover) {
     .heading-anchor:hover .anchor-link, .callout-title:hover .anchor-link { opacity: 0.5; }
     .heading-anchor .anchor-link:hover, .callout-title .anchor-link:hover { opacity: 1; }

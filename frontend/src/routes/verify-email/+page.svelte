@@ -74,19 +74,19 @@
 <div class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
-      <h1 class="text-4xl font-light text-crimson-500 mb-2">Archon</h1>
-      <p class="text-ash-400">{m.common_tagline()}</p>
+      <h1 class="text-4xl font-light text-accent mb-2">Archon</h1>
+      <p class="text-ink-muted">{m.common_tagline()}</p>
     </div>
 
-    <div class="bg-dusk-950 rounded-lg shadow-lg p-8 border border-ash-800">
+    <div class="bg-surface-card rounded-lg shadow-lg p-8 border border-line">
       {#if verifying}
         <!-- VERIFYING TOKEN -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto flex items-center justify-center">
-            <Loader2 class="w-10 h-10 animate-spin text-crimson-500" />
+            <Loader2 class="w-10 h-10 animate-spin text-accent" />
           </div>
-          <h2 class="text-lg font-medium text-bone-100">{m.auth_verify_verifying()}</h2>
-          <p class="text-ash-400 text-sm">{m.auth_verify_please_wait()}</p>
+          <h2 class="text-lg font-medium text-ink-strong">{m.auth_verify_verifying()}</h2>
+          <p class="text-ink-muted text-sm">{m.auth_verify_please_wait()}</p>
         </div>
 
       {:else if error}
@@ -95,14 +95,14 @@
           <div class="w-16 h-16 mx-auto banner-error border rounded-full flex items-center justify-center">
             <X class="w-8 h-8" />
           </div>
-          <h2 class="text-lg font-medium text-bone-100">{m.auth_verify_link_invalid()}</h2>
-          <p class="text-ash-400 text-sm">{error}</p>
-          <p class="text-ash-500 text-xs">
+          <h2 class="text-lg font-medium text-ink-strong">{m.auth_verify_link_invalid()}</h2>
+          <p class="text-ink-muted text-sm">{error}</p>
+          <p class="text-ink-faint text-xs">
             {m.auth_verify_link_expired_msg()}
           </p>
           <a
             href="/login"
-            class="inline-block mt-4 px-6 py-2 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg font-medium transition-colors"
+            class="inline-block mt-4 px-6 py-2 bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg font-medium transition-colors"
           >
             {m.auth_verify_back_to_login()}
           </a>
@@ -111,7 +111,7 @@
       {:else if verifyResult}
         <!-- PASSWORD FORM -->
         <div class="space-y-4">
-          <h2 class="text-lg font-medium text-bone-100 text-center">{heading}</h2>
+          <h2 class="text-lg font-medium text-ink-strong text-center">{heading}</h2>
             {#if passwordError}
             <div class="p-3 banner-error border rounded-lg text-sm">
               {passwordError}
@@ -120,7 +120,7 @@
 
           <form onsubmit={(e) => { e.preventDefault(); handleSetPassword(); }} class="space-y-4">
             <div>
-              <label for="email" class="block text-sm text-ash-400 mb-1">{m.common_email()}</label>
+              <label for="email" class="block text-sm text-ink-muted mb-1">{m.common_email()}</label>
               <input
                 type="email"
                 id="email"
@@ -128,12 +128,12 @@
                 autocomplete="username"
                 value={verifyResult.email}
                 readonly
-                class="w-full px-4 py-3 bg-dusk-900/50 border border-ash-800 rounded-lg text-ash-300 cursor-not-allowed"
+                class="w-full px-4 py-3 bg-surface-muted/50 border border-line rounded-lg text-ink cursor-not-allowed"
               />
             </div>
 
             <div>
-              <label for="new-password" class="block text-sm text-ash-400 mb-1">{m.common_password()}</label>
+              <label for="new-password" class="block text-sm text-ink-muted mb-1">{m.common_password()}</label>
               <input
                 type="password"
                 id="new-password"
@@ -144,7 +144,7 @@
                 disabled={auth.isLoading}
                 minlength="8"
                 required
-                class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 disabled:opacity-50"
+                class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover disabled:opacity-50"
               />
             </div>
 
@@ -160,7 +160,7 @@
             </Button>
           </form>
 
-          <p class="text-center text-xs text-ash-500 mt-4">
+          <p class="text-center text-xs text-ink-faint mt-4">
             {m.auth_verify_password_hint()}
           </p>
         </div>

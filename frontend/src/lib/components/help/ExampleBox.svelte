@@ -4,9 +4,9 @@
   let { children }: { children: Snippet } = $props();
 </script>
 
-<div class="not-prose my-6 rounded-lg border border-ash-700 bg-dusk-900/50 overflow-hidden">
-  <div class="px-3 py-1.5 bg-dusk-800/50 border-b border-ash-700">
-    <span class="text-xs font-medium text-ash-500 uppercase tracking-wider">{m.example_box_label()}</span>
+<div class="not-prose my-6 rounded-lg border border-line-strong bg-surface-muted/50 overflow-hidden">
+  <div class="px-3 py-1.5 bg-surface-hover/50 border-b border-line-strong">
+    <span class="text-xs font-medium text-ink-faint uppercase tracking-wider">{m.example_box_label()}</span>
   </div>
   <div class="p-4 pointer-events-none select-none" aria-hidden="true">
     {@render children()}

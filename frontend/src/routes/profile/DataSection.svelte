@@ -19,12 +19,12 @@
 </script>
 
 <!-- Data -->
-<div class="p-6 border-t border-ash-800 space-y-4">
-  <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_data()}</h3>
+<div class="p-6 border-t border-line space-y-4">
+  <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_data()}</h3>
   <div class="flex items-center justify-between">
     <div>
-      <p class="text-bone-100">{m.profile_resync_title()}</p>
-      <p class="text-sm text-ash-400">{m.profile_resync_description()}</p>
+      <p class="text-ink-strong">{m.profile_resync_title()}</p>
+      <p class="text-sm text-ink-muted">{m.profile_resync_description()}</p>
     </div>
     <Button variant="primary" size="lg" loading={isSyncing} onclick={handleResync}>
       {#if !isSyncing}<RefreshCw class="w-4 h-4" />{/if}
@@ -34,7 +34,7 @@
 </div>
 
 <!-- Logout -->
-<div class="p-6 border-t border-ash-800">
+<div class="p-6 border-t border-line">
   <Button variant="secondary" size="lg" block onclick={onLogout}>
     {m.profile_sign_out()}
   </Button>

@@ -29,48 +29,48 @@
 {@html renderGuideSection(m.og_intro())}
 
 <div class="not-prose my-4 grid gap-3 sm:grid-cols-2">
-  <div class="rounded-lg border border-ash-700 bg-dusk-900/40 p-4">
-    <h4 class="text-sm font-semibold text-bone-100 mb-2">{m.og_cfg_play_options()}</h4>
+  <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
+    <h4 class="text-sm font-semibold text-ink-strong mb-2">{m.og_cfg_play_options()}</h4>
     <dl class="space-y-1.5 text-sm">
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_allow_proxies()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_allow_proxies_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_multideck()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_multideck_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_decklist_required()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_decklist_required_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_allow_proxies()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_allow_proxies_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_multideck()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_multideck_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_decklist_required()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_decklist_required_desc()}</dd></div>
     </dl>
   </div>
-  <div class="rounded-lg border border-ash-700 bg-dusk-900/40 p-4">
-    <h4 class="text-sm font-semibold text-bone-100 mb-2">{m.og_cfg_standings_visibility()}</h4>
-    <p class="text-xs text-ash-500 mb-1.5">{m.og_cfg_standings_visibility_hint()}</p>
+  <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
+    <h4 class="text-sm font-semibold text-ink-strong mb-2">{m.og_cfg_standings_visibility()}</h4>
+    <p class="text-xs text-ink-faint mb-1.5">{m.og_cfg_standings_visibility_hint()}</p>
     <dl class="space-y-1 text-sm">
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_private()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_private_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_cutoff()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_cutoff_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_top10()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_top10_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_public()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_public_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_private()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_private_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_cutoff()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_cutoff_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_top10()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_top10_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_public()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_public_desc()}</dd></div>
     </dl>
-    <p class="text-xs text-ash-500 mt-1.5">{m.og_cfg_standings_always_public()}</p>
+    <p class="text-xs text-ink-faint mt-1.5">{m.og_cfg_standings_always_public()}</p>
   </div>
-  <div class="rounded-lg border border-ash-700 bg-dusk-900/40 p-4">
-    <h4 class="text-sm font-semibold text-bone-100 mb-2">{m.og_cfg_decklists_mode()}</h4>
-    <p class="text-xs text-ash-500 mb-1.5">{m.og_cfg_decklists_mode_hint()}</p>
+  <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
+    <h4 class="text-sm font-semibold text-ink-strong mb-2">{m.og_cfg_decklists_mode()}</h4>
+    <p class="text-xs text-ink-faint mb-1.5">{m.og_cfg_decklists_mode_hint()}</p>
     <dl class="space-y-1 text-sm">
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_winner()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_winner_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_finalists()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_finalists_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_all()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_all_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_winner()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_winner_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_finalists()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_finalists_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_all()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_all_desc()}</dd></div>
     </dl>
-    <p class="text-xs text-ash-500 mt-1.5">{m.og_cfg_decklists_immediate()}</p>
+    <p class="text-xs text-ink-faint mt-1.5">{m.og_cfg_decklists_immediate()}</p>
   </div>
-  <div class="rounded-lg border border-ash-700 bg-dusk-900/40 p-4">
-    <h4 class="text-sm font-semibold text-bone-100 mb-2">{m.og_cfg_timer()} <span class="text-xs text-ash-500 font-normal">({m.og_cfg_timer_online_only()})</span></h4>
+  <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
+    <h4 class="text-sm font-semibold text-ink-strong mb-2">{m.og_cfg_timer()} <span class="text-xs text-ink-faint font-normal">({m.og_cfg_timer_online_only()})</span></h4>
     <dl class="space-y-1.5 text-sm">
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_round_time()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_round_time_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_finals_time()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_finals_time_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_round_time()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_round_time_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_finals_time()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_finals_time_desc()}</dd></div>
     </dl>
   </div>
-  <div class="rounded-lg border border-ash-700 bg-dusk-900/40 p-4 sm:col-span-2">
-    <h4 class="text-sm font-semibold text-bone-100 mb-2">{m.og_cfg_other_settings()}</h4>
+  <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4 sm:col-span-2">
+    <h4 class="text-sm font-semibold text-ink-strong mb-2">{m.og_cfg_other_settings()}</h4>
     <dl class="space-y-1.5 text-sm">
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_max_rounds()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_max_rounds_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_league()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_league_desc()}</dd></div>
-      <div><dt class="text-ash-300 inline font-medium">{m.og_cfg_table_rooms()}</dt> <dd class="text-ash-400 inline">— {m.og_cfg_table_rooms_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_max_rounds()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_max_rounds_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_league()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_league_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_table_rooms()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_table_rooms_desc()}</dd></div>
     </dl>
   </div>
 </div>
@@ -78,7 +78,7 @@
 {@html renderGuideSection(m.og_co_organizers())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
+  <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
     Open Registration
   </button>
 </ExampleBox>
@@ -87,10 +87,10 @@
 
 <ExampleBox>
   <div class="flex gap-3 items-center">
-    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
+    <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
       Start Check-in
     </button>
-    <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded-lg">
+    <button class="px-3 py-1.5 text-sm text-ink border border-line-strong rounded-lg">
       Back to Planning
     </button>
   </div>
@@ -101,21 +101,21 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-2 items-center">
-      <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded-lg flex items-center gap-1.5">
+      <button class="px-3 py-1.5 text-sm text-ink border border-line-strong rounded-lg flex items-center gap-1.5">
         <QrCode class="w-4 h-4" />
         Show Check-in QR Code
       </button>
     </div>
     <div class="flex gap-2">
-      <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">Check All In</button>
-      <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded">Reset Check-In</button>
+      <button class="px-3 py-1.5 text-sm bg-surface-hover hover:bg-surface-active text-ink-bright rounded">Check All In</button>
+      <button class="px-3 py-1.5 text-sm text-ink border border-line-strong rounded">Reset Check-In</button>
     </div>
-    <div class="bg-dusk-950 border border-ash-800 rounded-lg p-3">
+    <div class="bg-surface-card border border-line rounded-lg p-3">
       <div class="flex justify-between items-center text-sm">
-        <span class="text-ash-300">Alice</span>
+        <span class="text-ink">Alice</span>
         <div class="flex gap-2">
-          <button class="px-2 py-1 text-xs bg-crimson-700 hover:bg-crimson-600 text-white rounded">Check In</button>
-          <button class="px-2 py-1 text-xs text-ash-400 border border-ash-700 rounded">Check Out</button>
+          <button class="px-2 py-1 text-xs bg-accent-strong hover:bg-accent-strong-hover text-white rounded">Check In</button>
+          <button class="px-2 py-1 text-xs text-ink-muted border border-line-strong rounded">Check Out</button>
         </div>
       </div>
     </div>
@@ -125,8 +125,8 @@
 {@html renderGuideSection(m.og_checkin_methods())}
 
 <ExampleBox>
-  <div class="pt-2 border-t border-ash-800">
-    <button class="px-3 py-1.5 text-sm text-ash-500">
+  <div class="pt-2 border-t border-line">
+    <button class="px-3 py-1.5 text-sm text-ink-faint">
       Reopen Registration
     </button>
   </div>
@@ -135,7 +135,7 @@
 {@html renderGuideSection(m.og_deck_management())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
+  <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
     Start Round 1
   </button>
 </ExampleBox>
@@ -143,18 +143,18 @@
 {@html renderGuideSection(m.og_round_start_details())}
 
 <ExampleBox>
-  <div class="bg-ash-900/50 rounded-lg p-4 max-w-sm">
+  <div class="bg-surface-muted/50 rounded-lg p-4 max-w-sm">
     <div class="flex items-center justify-between mb-2">
-      <h3 class="text-sm font-medium text-bone-100">Table 1</h3>
+      <h3 class="text-sm font-medium text-ink-strong">Table 1</h3>
       <span class="text-xs px-2 py-0.5 rounded badge-pending">Playing</span>
     </div>
-    <div class="divide-y divide-ash-800">
+    <div class="divide-y divide-line">
       {#each ["Alice", "Bob", "Charlie", "Diana"] as name}
         <div class="py-1.5 flex items-center justify-between text-sm">
-          <span class="text-ash-300">{name}</span>
+          <span class="text-ink">{name}</span>
           <div class="flex items-center gap-2">
-            <span class="text-ash-400 text-xs">VP:</span>
-            <select class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700" tabindex="-1">
+            <span class="text-ink-muted text-xs">VP:</span>
+            <select class="bg-surface-hover text-ink-strong text-xs rounded px-1.5 py-0.5 border border-line-strong" tabindex="-1">
               <option>0</option>
               <option>0.5</option>
               <option>1</option>
@@ -163,7 +163,7 @@
               <option>2.5</option>
               <option>3</option>
             </select>
-            <span class="text-ash-500 text-xs">0GW 0TP</span>
+            <span class="text-ink-faint text-xs">0GW 0TP</span>
           </div>
         </div>
       {/each}
@@ -176,21 +176,21 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-2 items-center">
-      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white rounded flex items-center gap-1">
         <ShieldCheck class="w-3.5 h-3.5" />
         Override
       </button>
-      <button class="px-3 py-1.5 text-sm text-ash-400 border border-ash-700 rounded">
+      <button class="px-3 py-1.5 text-sm text-ink-muted border border-line-strong rounded">
         Remove override
       </button>
     </div>
     <textarea
-      class="w-full px-3 py-2 text-sm bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500"
+      class="w-full px-3 py-2 text-sm bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint"
       placeholder="Judge comment (required for override)"
       rows="2"
       tabindex="-1"
     ></textarea>
-    <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded">
+    <button class="px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white rounded">
       Override &rarr; Finished
     </button>
   </div>
@@ -208,11 +208,11 @@
       <div class="flex items-center gap-2">
         <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
         <div>
-          <span class="text-sm font-medium text-bone-100">Judge Call!</span>
-          <span class="text-sm text-ash-300 ml-1">Table 3 &mdash; Alice</span>
+          <span class="text-sm font-medium text-ink-strong">Judge Call!</span>
+          <span class="text-sm text-ink ml-1">Table 3 &mdash; Alice</span>
         </div>
       </div>
-      <button class="text-ash-400 p-1">
+      <button class="text-ink-muted p-1">
         <X class="w-4 h-4" />
       </button>
     </div>
@@ -220,11 +220,11 @@
       <div class="flex items-center gap-2">
         <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
         <div>
-          <span class="text-sm font-medium text-bone-100">Judge Call!</span>
-          <span class="text-sm text-ash-300 ml-1">Table 7 &mdash; Bob</span>
+          <span class="text-sm font-medium text-ink-strong">Judge Call!</span>
+          <span class="text-sm text-ink ml-1">Table 7 &mdash; Bob</span>
         </div>
       </div>
-      <button class="text-ash-400 p-1">
+      <button class="text-ink-muted p-1">
         <X class="w-4 h-4" />
       </button>
     </div>
@@ -234,7 +234,7 @@
 {@html renderGuideSection(m.og_finishing_round())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
+  <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
     End Round
   </button>
 </ExampleBox>
@@ -242,7 +242,7 @@
 {@html renderGuideSection(m.og_between_rounds())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium text-crimson-400 border border-crimson-800 rounded-lg">
+  <button class="px-4 py-2 text-sm font-medium text-link border border-accent-soft-border rounded-lg">
     Cancel Round
   </button>
 </ExampleBox>
@@ -254,27 +254,27 @@
     <div class="flex gap-4 justify-center">
       <div class="text-center">
         <span class="text-2xl font-mono text-blue-400">1:23:45</span>
-        <p class="text-xs text-ash-500 mt-1">Time remaining</p>
+        <p class="text-xs text-ink-faint mt-1">Time remaining</p>
       </div>
       <div class="text-center">
         <span class="text-2xl font-mono text-purple-400">4:30</span>
-        <p class="text-xs text-ash-500 mt-1">&lt; 5 minutes</p>
+        <p class="text-xs text-ink-faint mt-1">&lt; 5 minutes</p>
       </div>
       <div class="text-center">
-        <span class="text-2xl font-mono text-crimson-400">0:00</span>
-        <p class="text-xs text-ash-500 mt-1">Expired</p>
+        <span class="text-2xl font-mono text-link">0:00</span>
+        <p class="text-xs text-ink-faint mt-1">Expired</p>
       </div>
     </div>
     <div class="flex gap-2 justify-center">
-      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white rounded flex items-center gap-1">
         <Play class="w-3.5 h-3.5" />
         Start
       </button>
-      <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-surface-hover hover:bg-surface-active text-ink-bright rounded flex items-center gap-1">
         <Pause class="w-3.5 h-3.5" />
         Pause
       </button>
-      <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm text-ink border border-line-strong rounded flex items-center gap-1">
         <RotateCcw class="w-3.5 h-3.5" />
         Reset
       </button>
@@ -287,18 +287,18 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-1">
-      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+1min</button>
-      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+2min</button>
-      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+3min</button>
-      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+5min</button>
-      <span class="text-xs text-ash-400 self-center ml-1">0/10 min extra</span>
+      <button class="px-2 py-1 text-xs bg-surface-hover hover:bg-surface-active text-ink-bright rounded">+1min</button>
+      <button class="px-2 py-1 text-xs bg-surface-hover hover:bg-surface-active text-ink-bright rounded">+2min</button>
+      <button class="px-2 py-1 text-xs bg-surface-hover hover:bg-surface-active text-ink-bright rounded">+3min</button>
+      <button class="px-2 py-1 text-xs bg-surface-hover hover:bg-surface-active text-ink-bright rounded">+5min</button>
+      <span class="text-xs text-ink-muted self-center ml-1">0/10 min extra</span>
     </div>
     <div class="flex gap-2 items-center">
-      <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-surface-hover hover:bg-surface-active text-ink-bright rounded flex items-center gap-1">
         <PauseCircle class="w-3.5 h-3.5" />
         Clock Stop
       </button>
-      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white rounded flex items-center gap-1">
         <PlayCircle class="w-3.5 h-3.5" />
         Resume Clock
       </button>
@@ -311,12 +311,12 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-2 items-center">
-      <span class="text-ash-300 text-sm">Alice</span>
+      <span class="text-ink text-sm">Alice</span>
       <span class="text-xs px-2 py-0.5 rounded badge-pending">Pending</span>
-      <span class="text-ash-300 text-sm ml-3">Bob</span>
+      <span class="text-ink text-sm ml-3">Bob</span>
       <span class="text-xs px-2 py-0.5 rounded badge-success">Paid</span>
     </div>
-    <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">Mark All Paid</button>
+    <button class="px-3 py-1.5 text-sm bg-surface-hover hover:bg-surface-active text-ink-bright rounded">Mark All Paid</button>
   </div>
 </ExampleBox>
 
@@ -324,14 +324,14 @@
 
 <ExampleBox>
   <div class="flex gap-2 items-center">
-    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
+    <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
       Start Finals
     </button>
-    <button class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 rounded-lg">
+    <button class="px-3 py-1.5 text-sm text-ink bg-surface-hover rounded-lg">
       <Dice3 class="w-4 h-4 inline mr-1" />
       Random Toss
     </button>
-    <button class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 rounded-lg">
+    <button class="px-3 py-1.5 text-sm text-ink bg-surface-hover rounded-lg">
       Edit toss
     </button>
   </div>
@@ -350,11 +350,11 @@
 {@html renderGuideSection(m.og_finish_no_finals())}
 
 <ExampleBox>
-  <div class="pt-2 border-t border-ash-800 flex flex-wrap gap-2">
-    <button class="px-3 py-1.5 text-sm text-ash-500">
+  <div class="pt-2 border-t border-line flex flex-wrap gap-2">
+    <button class="px-3 py-1.5 text-sm text-ink-faint">
       Finish Tournament
     </button>
-    <button class="px-3 py-1.5 text-sm text-ash-500">
+    <button class="px-3 py-1.5 text-sm text-ink-faint">
       Reopen Tournament
     </button>
   </div>
@@ -364,15 +364,15 @@
 
 <ExampleBox>
   <div class="flex gap-2 items-center">
-    <button class="px-3 py-1.5 text-sm bg-ash-800 text-ash-200 rounded-lg flex items-center gap-2">
+    <button class="px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg flex items-center gap-2">
       <Share2 class="w-4 h-4" />
       Share Image
     </button>
-    <button class="px-3 py-1.5 text-sm bg-ash-800 text-ash-200 rounded-lg flex items-center gap-2">
+    <button class="px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg flex items-center gap-2">
       <ClipboardCopy class="w-4 h-4" />
       Copy Text
     </button>
-    <span class="px-3 py-1.5 text-sm bg-ash-800 text-ash-200 rounded-lg flex items-center gap-2">
+    <span class="px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg flex items-center gap-2">
       <Download class="w-4 h-4" />
       Download Report (JSON)
     </span>
@@ -384,23 +384,23 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-2 items-center">
-      <select class="bg-ash-800 text-bone-100 text-sm rounded px-2 py-1.5 border border-ash-700" tabindex="-1">
+      <select class="bg-surface-hover text-ink-strong text-sm rounded px-2 py-1.5 border border-line-strong" tabindex="-1">
         <option>All Players</option>
         <option>Non-Finalists</option>
         <option>Game Winners</option>
       </select>
-      <input type="text" placeholder="Prize name" class="flex-1 px-2 py-1.5 text-sm bg-dusk-900 border border-ash-700 rounded text-bone-100 placeholder-ash-500" tabindex="-1" />
+      <input type="text" placeholder="Prize name" class="flex-1 px-2 py-1.5 text-sm bg-surface-muted border border-line-strong rounded text-ink-strong placeholder-ink-faint" tabindex="-1" />
     </div>
     <div class="flex gap-2">
-      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white rounded flex items-center gap-1">
         <Dices class="w-3.5 h-3.5" />
         Draw
       </button>
-      <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm text-ink border border-line-strong rounded flex items-center gap-1">
         <Undo2 class="w-3.5 h-3.5" />
         Undo
       </button>
-      <button class="px-3 py-1.5 text-sm text-crimson-400 border border-crimson-800 rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm text-link border border-accent-soft-border rounded flex items-center gap-1">
         <Trash2 class="w-3.5 h-3.5" />
         Clear all
       </button>
@@ -421,11 +421,11 @@
 
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
-    <div class="bg-purple-900/30 border border-purple-800/50 rounded-lg p-3 flex items-center gap-2">
-      <WifiOff class="w-5 h-5 text-purple-400 shrink-0" />
-      <span class="text-purple-200 font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
+    <div class="banner-warn border rounded-lg p-3 flex items-center gap-2">
+      <WifiOff class="w-5 h-5 shrink-0" />
+      <span class="font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
     </div>
-    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg flex items-center gap-2">
+    <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg flex items-center gap-2">
       <Wifi class="w-4 h-4" />
       Go Back Online
     </button>
@@ -436,20 +436,20 @@
 
 <div class="not-prose my-6 space-y-1">
   {#each faqs as faq, i}
-    <div class="border border-ash-700 rounded-lg overflow-hidden">
+    <div class="border border-line-strong rounded-lg overflow-hidden">
       <button
-        class="w-full px-4 py-3 flex items-center gap-2 text-left text-sm font-medium text-bone-100 hover:bg-dusk-800/50 transition-colors"
+        class="w-full px-4 py-3 flex items-center gap-2 text-left text-sm font-medium text-ink-strong hover:bg-surface-muted/50 transition-colors"
         onclick={() => openFaq = openFaq === i ? null : i}
       >
         {#if openFaq === i}
-          <ChevronDown class="w-4 h-4 text-ash-400 shrink-0" />
+          <ChevronDown class="w-4 h-4 text-ink-muted shrink-0" />
         {:else}
-          <ChevronRight class="w-4 h-4 text-ash-400 shrink-0" />
+          <ChevronRight class="w-4 h-4 text-ink-muted shrink-0" />
         {/if}
         {faq.q}
       </button>
       {#if openFaq === i}
-        <div class="px-4 pb-3 text-sm text-ash-300 doc-prose prose max-w-none">
+        <div class="px-4 pb-3 text-sm text-ink doc-prose prose max-w-none">
           {@html renderGuideSection(faq.a)}
         </div>
       {/if}

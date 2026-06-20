@@ -92,7 +92,7 @@
 
 <div class="max-w-4xl mx-auto p-4 sm:p-8">
   <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl font-bold text-ash-100">{m.rankings_page_title()}</h1>
+    <h1 class="text-2xl font-bold text-ink-strong">{m.rankings_page_title()}</h1>
     <a href="/halloffame" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg badge-highlight hover:opacity-80 transition-colors text-sm font-medium">
       <Trophy class="w-4 h-4" />
       {m.rankings_hall_of_fame_link()}
@@ -105,8 +105,8 @@
       <button
         class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
           {selectedCategory === cat.value
-            ? 'bg-crimson-900/60 text-crimson-300'
-            : 'bg-dusk-950 text-ash-400 hover:text-ash-200 hover:bg-ash-800/50'}"
+            ? 'bg-accent-soft/60 text-link-soft'
+            : 'bg-surface-card text-ink-muted hover:text-ink-bright hover:bg-surface-hover/50'}"
         onclick={() => { selectedCategory = cat.value; }}
       >
         {cat.labelFn()}
@@ -120,7 +120,7 @@
     <select
       id="ranking-country"
       bind:value={selectedCountry}
-      class="bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2 text-sm text-ash-200 w-full sm:w-64"
+      class="bg-surface-card border border-line rounded-lg px-3 py-2 text-sm text-ink-bright w-full sm:w-64"
     >
       <option value="all">{m.rankings_all_countries()}</option>
       {#each countryList as c}
@@ -131,17 +131,17 @@
 
   <!-- Table -->
   {#if isSyncing && users.length === 0}
-    <div class="text-center text-ash-400 py-8">
+    <div class="text-center text-ink-muted py-8">
       <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.rankings_loading()}</span>
     </div>
   {:else if filtered().length === 0}
-    <div class="text-center text-ash-500 py-8">{m.rankings_no_results()}</div>
+    <div class="text-center text-ink-faint py-8">{m.rankings_no_results()}</div>
   {:else}
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
-          <tr class="border-b border-ash-800 text-ash-400">
+          <tr class="border-b border-line text-ink-muted">
             <th class="py-2 px-3 text-left w-12">{m.rankings_col_rank()}</th>
             <th class="py-2 px-3 text-left">{m.rankings_col_player()}</th>
             <th class="py-2 px-3 text-left">{m.common_country()}</th>
@@ -152,20 +152,20 @@
           {#each paged as user, i}
             {@const rank = page * PAGE_SIZE + i + 1}
             {@const total = user[selectedCategory]?.total ?? 0}
-            <tr class="border-b border-ash-800/50 hover:bg-ash-800/20">
-              <td class="py-2 px-3 text-ash-400">{rank}</td>
+            <tr class="border-b border-line/50 hover:bg-surface-hover/20">
+              <td class="py-2 px-3 text-ink-muted">{rank}</td>
               <td class="py-2 px-3">
-                <a href="/users/{user.uid}" class="text-ash-100 hover:text-crimson-400">
+                <a href="/users/{user.uid}" class="text-ink-strong hover:text-link">
                   <DeceasedIcon deceased={user.deceased_at} />{user.name}
                 </a>
               </td>
-              <td class="py-2 px-3 text-ash-300">
+              <td class="py-2 px-3 text-ink">
                 {#if user.country}
                   {getCountryFlag(user.country)}
                   {countries[user.country]?.name ?? user.country}
                 {/if}
               </td>
-              <td class="py-2 px-3 text-right font-medium text-ash-100">{total}</td>
+              <td class="py-2 px-3 text-right font-medium text-ink-strong">{total}</td>
             </tr>
           {/each}
         </tbody>
@@ -176,17 +176,17 @@
     {#if totalPages > 1}
       <div class="flex items-center justify-center gap-2 mt-4">
         <button
-          class="px-3 py-1 rounded text-sm {page > 0 ? 'text-ash-200 hover:bg-ash-800/50' : 'text-ash-600 cursor-default'}"
+          class="px-3 py-1 rounded text-sm {page > 0 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint cursor-default'}"
           disabled={page === 0}
           onclick={() => { page = Math.max(0, page - 1); }}
         >
           <ChevronLeft class="w-4 h-4 inline" />
         </button>
-        <span class="text-sm text-ash-400">
+        <span class="text-sm text-ink-muted">
           {m.rankings_page_info({ current: String(page + 1), total: String(totalPages) })}
         </span>
         <button
-          class="px-3 py-1 rounded text-sm {page < totalPages - 1 ? 'text-ash-200 hover:bg-ash-800/50' : 'text-ash-600 cursor-default'}"
+          class="px-3 py-1 rounded text-sm {page < totalPages - 1 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint cursor-default'}"
           disabled={page >= totalPages - 1}
           onclick={() => { page = Math.min(totalPages - 1, page + 1); }}
         >

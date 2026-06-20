@@ -105,22 +105,22 @@
 <div class="p-4 sm:p-8">
   <div class="max-w-2xl mx-auto">
     <div class="flex items-center gap-4 mb-6">
-      <a href="/tournaments" class="text-ash-400 hover:text-ash-200">
+      <a href="/tournaments" class="text-ink-muted hover:text-ink-bright">
         <ArrowLeft class="w-5 h-5" />
       </a>
-      <h1 class="text-3xl font-light text-crimson-500">{m.tournament_new_title()}</h1>
+      <h1 class="text-3xl font-light text-accent">{m.tournament_new_title()}</h1>
     </div>
 
     {#if !canCreate}
-      <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4">
-        <p class="text-crimson-300">{m.tournament_new_no_permission()}</p>
+      <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4">
+        <p class="text-link-soft">{m.tournament_new_no_permission()}</p>
       </div>
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
-        <div class="bg-dusk-950 rounded-lg shadow p-6 border border-ash-800 space-y-4">
+        <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-4">
           {#if error}
-            <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-3">
-              <p class="text-crimson-300 text-sm">{error}</p>
+            <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+              <p class="text-link-soft text-sm">{error}</p>
             </div>
           {/if}
 
@@ -129,7 +129,7 @@
 
         <!-- Actions -->
         <div class="flex gap-3 justify-end">
-          <a href="/tournaments" class="px-4 py-2 text-sm font-medium text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors">
+          <a href="/tournaments" class="px-4 py-2 text-sm font-medium text-ink bg-surface-hover hover:bg-surface-active rounded-lg transition-colors">
             {m.common_cancel()}
           </a>
           <Button

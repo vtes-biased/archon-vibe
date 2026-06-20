@@ -51,20 +51,20 @@
     oninput={onInput}
     onkeydown={handleKeydown}
     placeholder={m.card_search_placeholder()}
-    class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+    class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
   />
 
   {#if results.length > 0}
-    <div class="absolute z-40 top-full mt-1 w-full bg-ash-900 border border-ash-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+    <div class="absolute z-40 top-full mt-1 w-full bg-surface-muted border border-line-strong rounded-lg shadow-xl max-h-60 overflow-y-auto">
       {#each results as card, i}
         <button
-          class="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors {i === selectedIndex ? 'bg-ash-700 text-bone-100' : 'text-ash-200 hover:bg-ash-800'}"
+          class="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors {i === selectedIndex ? 'bg-surface-active text-ink-strong' : 'text-ink-bright hover:bg-surface-hover'}"
           onclick={() => select(card)}
         >
           <span class="flex-1 truncate">{card.name}</span>
-          <span class="text-xs text-ash-500">{card.types.join('/')}</span>
+          <span class="text-xs text-ink-faint">{card.types.join('/')}</span>
           {#if card.kind === 'crypt' && card.capacity}
-            <span class="text-xs text-ash-500">{card.capacity}</span>
+            <span class="text-xs text-ink-faint">{card.capacity}</span>
           {/if}
         </button>
       {/each}

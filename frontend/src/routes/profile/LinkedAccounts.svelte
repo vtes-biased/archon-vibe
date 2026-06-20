@@ -56,19 +56,19 @@
   }
 </script>
 
-<div class="p-6 border-t border-ash-800 space-y-4">
-  <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_linked_accounts()}</h3>
+<div class="p-6 border-t border-line space-y-4">
+  <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_linked_accounts()}</h3>
 
   <!-- Email & Password -->
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <Mail class="w-5 h-5 text-ash-400" />
+      <Mail class="w-5 h-5 text-ink-muted" />
       <div>
-        <p class="text-bone-100">{m.profile_email_password()}</p>
+        <p class="text-ink-strong">{m.profile_email_password()}</p>
         {#if hasEmail && emailIdentifier}
-          <p class="text-sm text-ash-400">{emailIdentifier}</p>
+          <p class="text-sm text-ink-muted">{emailIdentifier}</p>
         {:else}
-          <p class="text-sm text-ash-400">{m.profile_passkey_not_setup()}</p>
+          <p class="text-sm text-ink-muted">{m.profile_passkey_not_setup()}</p>
         {/if}
       </div>
     </div>
@@ -82,24 +82,24 @@
   </div>
   {#if showEmailSetup && !hasEmail}
     {#if emailLinkSent}
-      <div class="ml-8 p-3 rounded-lg bg-dusk-900 border border-ash-700 space-y-1">
+      <div class="ml-8 p-3 rounded-lg bg-surface-muted border border-line-strong space-y-1">
         <p class="text-sm text-blue-400">{m.profile_email_check_inbox()}</p>
-        <p class="text-sm text-ash-400">{m.profile_email_sent_to({ email: emailLinkAddress })}</p>
-        <p class="text-xs text-ash-500">{m.profile_email_verify_hint()}</p>
+        <p class="text-sm text-ink-muted">{m.profile_email_sent_to({ email: emailLinkAddress })}</p>
+        <p class="text-xs text-ink-faint">{m.profile_email_verify_hint()}</p>
       </div>
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleSendEmailLink(); }}
         class="ml-8 flex gap-2">
         <input type="email" bind:value={emailInput} required
           placeholder={m.login_placeholder_email()}
-          class="flex-1 px-3 py-2 bg-dusk-900 border border-ash-700 rounded text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 text-sm" />
+          class="flex-1 px-3 py-2 bg-surface-muted border border-line-strong rounded text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover text-sm" />
         <Button type="submit" variant="primary" size="lg" class="whitespace-nowrap" loading={sendingEmailLink} disabled={!emailInput.trim()}>
           {sendingEmailLink ? m.profile_email_sending() : m.profile_email_send_link()}
         </Button>
       </form>
     {/if}
     {#if emailError}
-      <p class="ml-8 text-sm text-crimson-400">{emailError}</p>
+      <p class="ml-8 text-sm text-link">{emailError}</p>
     {/if}
   {/if}
 
@@ -108,11 +108,11 @@
     <div class="flex items-center gap-3">
       <DiscordIcon class="w-5 h-5 text-[#5865F2]" />
       <div>
-        <p class="text-bone-100">Discord</p>
+        <p class="text-ink-strong">Discord</p>
         {#if hasDiscord && discordUsername}
-          <p class="text-sm text-ash-400">{discordUsername}</p>
+          <p class="text-sm text-ink-muted">{discordUsername}</p>
         {:else}
-          <p class="text-sm text-ash-400">{m.profile_not_linked()}</p>
+          <p class="text-sm text-ink-muted">{m.profile_not_linked()}</p>
         {/if}
       </div>
     </div>
@@ -129,17 +129,17 @@
     <p class="text-sm text-blue-500">{discordMessage}</p>
   {/if}
   {#if discordError}
-    <p class="text-sm text-crimson-400">{discordError}</p>
+    <p class="text-sm text-link">{discordError}</p>
   {/if}
 
   <!-- Passkey -->
   {#if isPasskeySupported()}
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <KeyRound class="w-5 h-5 text-ash-400" />
+        <KeyRound class="w-5 h-5 text-ink-muted" />
         <div>
-          <p class="text-bone-100">Passkey</p>
-          <p class="text-sm text-ash-400">
+          <p class="text-ink-strong">Passkey</p>
+          <p class="text-sm text-ink-muted">
             {hasPasskey ? m.profile_passkey_configured() : m.profile_passkey_not_setup()}
           </p>
         </div>
@@ -158,6 +158,6 @@
   {/if}
 
   {#if error}
-    <p class="text-sm text-crimson-400">{error}</p>
+    <p class="text-sm text-link">{error}</p>
   {/if}
 </div>

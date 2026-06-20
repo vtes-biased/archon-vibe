@@ -303,7 +303,7 @@
     <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center justify-between mb-4">
-        <h1 class="text-3xl font-light text-crimson-500">{m.nav_users()}</h1>
+        <h1 class="text-3xl font-light text-accent">{m.nav_users()}</h1>
 
         <div class="flex items-center gap-3">
           <Button
@@ -323,14 +323,14 @@
       <div class="mb-4">
         <!-- Filters -->
         <div
-          class="bg-dusk-950 rounded-lg shadow p-4 mb-4 border border-ash-800"
+          class="bg-surface-card rounded-lg shadow p-4 mb-4 border border-line"
         >
           <div class="flex flex-wrap gap-4">
             <!-- Name Search -->
             <div class="flex-1 min-w-[200px]">
               <label
                 for="name-search"
-                class="block text-sm font-medium text-ash-400 mb-1"
+                class="block text-sm font-medium text-ink-muted mb-1"
               >
                 {m.common_search()}
               </label>
@@ -340,14 +340,14 @@
                 bind:value={searchQuery}
                 oninput={handleSearchInput}
                 placeholder={m.user_list_search_placeholder()}
-                class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 placeholder:text-ash-600"
+                class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright placeholder:text-ink-faint"
               />
             </div>
             <!-- Country Filter -->
             <div class="flex-1 min-w-[200px]">
               <label
                 for="country-filter"
-                class="block text-sm font-medium text-ash-400 mb-1"
+                class="block text-sm font-medium text-ink-muted mb-1"
               >
                 {m.common_country()}
               </label>
@@ -355,7 +355,7 @@
                 id="country-filter"
                 onchange={handleCountryChange}
                 value={selectedCountry}
-                class="w-full pl-3 pr-9 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
+                class="w-full pl-3 pr-9 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
               >
                 <option value="all">{m.user_list_all_countries()}</option>
                 {#each Object.entries(countries) as [code, country]}
@@ -369,7 +369,7 @@
 
           <!-- Role Filters -->
           <div class="mt-4">
-            <div class="block text-sm font-medium text-ash-400 mb-2">{m.common_roles()}</div>
+            <div class="block text-sm font-medium text-ink-muted mb-2">{m.common_roles()}</div>
             <div class="flex flex-wrap gap-2">
               {#each availableRoles as role}
                 <button
@@ -378,7 +378,7 @@
                     role,
                   )
                     ? getRoleClasses(role)
-                    : 'bg-ash-800 text-ash-400 hover:bg-ash-700'}"
+                    : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
                 >
                   {role}
                 </button>
@@ -388,21 +388,21 @@
 
           <!-- Sanction Filters -->
           <div class="mt-4">
-            <div class="block text-sm font-medium text-ash-400 mb-2">{m.sanction_mgr_title()}</div>
+            <div class="block text-sm font-medium text-ink-muted mb-2">{m.sanction_mgr_title()}</div>
             <div class="flex flex-wrap gap-2">
               <button
                 onclick={() => toggleSanctionFilter("past")}
                 class="px-3 py-1 rounded text-sm font-medium transition-colors {filterHasPastSanctions
-                  ? 'bg-crimson-800/60 text-crimson-200'
-                  : 'bg-ash-800 text-ash-400 hover:bg-ash-700'}"
+                  ? 'bg-accent-soft/60 text-link-soft'
+                  : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
               >
                 {m.user_list_filter_sanctioned()}
               </button>
               <button
                 onclick={() => toggleSanctionFilter("current")}
                 class="px-3 py-1 rounded text-sm font-medium transition-colors {filterCurrentlySanctioned
-                  ? 'bg-crimson-900/80 text-crimson-200'
-                  : 'bg-ash-800 text-ash-400 hover:bg-ash-700'}"
+                  ? 'bg-accent-soft/80 text-link-soft'
+                  : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
               >
                 {m.user_list_filter_active_sanction()}
               </button>
@@ -426,9 +426,9 @@
     <!-- Error State -->
     {#if error}
       <div
-        class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4 mb-6"
+        class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6"
       >
-        <p class="text-crimson-300">{error}</p>
+        <p class="text-link-soft">{error}</p>
       </div>
     {/if}
 
@@ -436,12 +436,12 @@
     {#if filteredUsers.length > 0}
       <div
         id="users-list-container"
-        class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800"
+        class="bg-surface-card rounded-lg shadow overflow-hidden border border-line"
       >
         <!-- Table Header (hidden on mobile) -->
         <div
           id="users-table-header"
-          class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-ash-900 text-sm font-medium text-ash-300 border-b border-ash-700"
+          class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong"
         >
           <div id="header-name" class="col-span-3">{m.common_name()}</div>
           <div id="header-vekn-id" class="col-span-2">{m.add_player_vekn_id_label()}</div>
@@ -450,10 +450,10 @@
         </div>
 
         <!-- User Rows -->
-        <div id="users-rows-container" class="divide-y divide-ash-800">
+        <div id="users-rows-container" class="divide-y divide-line">
           {#each paginatedUsers() as user (user.uid)}
               <div
-                class="user-row px-6 py-4 hover:bg-ash-900/50 transition-colors cursor-pointer"
+                class="user-row px-6 py-4 hover:bg-surface-muted/50 transition-colors cursor-pointer"
                 onclick={() => goto(`/users/${user.uid}`)}
                 onkeydown={(e) =>
                   e.key === "Enter" && goto(`/users/${user.uid}`)}
@@ -464,20 +464,20 @@
                 <div class="sm:hidden space-y-2">
                   <div class="flex items-start justify-between">
                     <div>
-                      <div class="user-name font-semibold text-bone-100">
+                      <div class="user-name font-semibold text-ink-strong">
                         <DeceasedIcon deceased={user.deceased_at} />{user.name}
                         {#if user.nickname}
-                          <span class="text-sm text-ash-500"
+                          <span class="text-sm text-ink-faint"
                             >({user.nickname})</span
                           >
                         {/if}
                       </div>
                       {#if user.vekn_id}
-                        <div class="text-sm text-ash-400 mt-1">
+                        <div class="text-sm text-ink-muted mt-1">
                           VEKN: {user.vekn_id}
                         </div>
                       {/if}
-                      <div class="text-sm text-ash-400">
+                      <div class="text-sm text-ink-muted">
                         {user.country
                           ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
                           : m.common_na()}
@@ -502,19 +502,19 @@
                 <!-- Desktop Table Layout -->
                 <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                   <div class="col-span-3">
-                    <div class="user-name font-semibold text-bone-100">
+                    <div class="user-name font-semibold text-ink-strong">
                       <DeceasedIcon deceased={user.deceased_at} />{user.name}
                     </div>
                     {#if user.nickname}
-                      <div class="text-sm text-ash-500">
+                      <div class="text-sm text-ink-faint">
                         {user.nickname}
                       </div>
                     {/if}
                   </div>
-                  <div class="col-span-2 text-sm text-ash-400">
+                  <div class="col-span-2 text-sm text-ink-muted">
                     {user.vekn_id || "—"}
                   </div>
-                  <div class="col-span-2 text-sm text-ash-400">
+                  <div class="col-span-2 text-sm text-ink-muted">
                     {user.country
                       ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
                       : m.common_na()}
@@ -533,7 +533,7 @@
                         {/each}
                       </div>
                     {:else}
-                      <span class="text-sm text-ash-600">—</span>
+                      <span class="text-sm text-ink-faint">—</span>
                     {/if}
                   </div>
                 </div>
@@ -545,31 +545,31 @@
       <!-- Pagination Controls -->
       {#if totalPages > 1}
         <div class="mt-6 flex items-center justify-between">
-          <div class="text-sm text-ash-400">
+          <div class="text-sm text-ink-muted">
             {m.user_list_showing_range({ from: ((currentPage - 1) * pageSize + 1).toString(), to: Math.min(currentPage * pageSize, filteredUsers.length).toString(), total: filteredUsers.length.toString() })}
           </div>
           <div class="flex items-center gap-2">
             <button
               onclick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50"
+              class="px-3 py-1 text-sm font-medium text-ink bg-surface-card border border-line-strong rounded hover:bg-surface-hover disabled:opacity-50"
             >
               {m.common_previous()}
             </button>
-            <span class="text-sm text-ash-400">
+            <span class="text-sm text-ink-muted">
               {m.user_list_page_info({ current: currentPage.toString(), total: totalPages.toString() })}
             </span>
             <button
               onclick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              class="px-3 py-1 text-sm font-medium text-ash-300 bg-dusk-950 border border-ash-600 rounded hover:bg-ash-800 disabled:opacity-50"
+              class="px-3 py-1 text-sm font-medium text-ink bg-surface-card border border-line-strong rounded hover:bg-surface-hover disabled:opacity-50"
             >
               {m.common_next()}
             </button>
           </div>
         </div>
       {:else}
-        <div class="mt-6 text-center text-sm text-ash-400">
+        <div class="mt-6 text-center text-sm text-ink-muted">
           {m.user_list_showing_total({ count: filteredUsers.length.toString() })}
         </div>
       {/if}
@@ -580,18 +580,18 @@
       <div class="text-center py-12">
         {#if showSyncing}
           <!-- Syncing state -->
-          <div class="text-ash-500 mb-4">
+          <div class="text-ink-faint mb-4">
             <RefreshCw class="mx-auto h-12 w-12 animate-spin" />
           </div>
-          <h3 class="text-lg font-medium text-bone-100 mb-2">{m.status_syncing()}...</h3>
-          <p class="text-ash-400">{m.user_list_loading_from_server()}</p>
+          <h3 class="text-lg font-medium text-ink-strong mb-2">{m.status_syncing()}...</h3>
+          <p class="text-ink-muted">{m.user_list_loading_from_server()}</p>
         {:else}
           <!-- Truly empty state -->
-          <div class="text-ash-600 mb-4">
+          <div class="text-ink-faint mb-4">
             <Users class="mx-auto h-12 w-12" />
           </div>
-          <h3 class="text-lg font-medium text-bone-100 mb-2">{m.user_list_no_users()}</h3>
-          <p class="text-ash-400">
+          <h3 class="text-lg font-medium text-ink-strong mb-2">{m.user_list_no_users()}</h3>
+          <p class="text-ink-muted">
             {#if searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0 || filterHasPastSanctions || filterCurrentlySanctioned}
               {m.user_list_adjust_filters()}
             {:else}

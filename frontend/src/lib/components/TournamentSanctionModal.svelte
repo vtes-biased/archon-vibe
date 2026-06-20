@@ -194,13 +194,13 @@
     tabindex="-1"
     use:focusOnMount
     onkeydown={(e) => e.key === 'Escape' && onClose()}
-    class="bg-dusk-950 rounded-lg shadow-xl border border-crimson-800/50 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
+    class="bg-surface-card rounded-lg shadow-xl border border-accent-soft-border/50 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
   >
-    <div class="p-6 border-b border-ash-800">
-      <h2 id="tournament-sanction-title" class="text-xl font-medium text-crimson-400">
+    <div class="p-6 border-b border-line">
+      <h2 id="tournament-sanction-title" class="text-xl font-medium text-link">
         {m.sanction_tournament_issue_title()}
       </h2>
-      <p class="mt-2 text-sm text-ash-400">
+      <p class="mt-2 text-sm text-ink-muted">
         {m.sanction_mgr_issue_to({ name: playerName })}
       </p>
     </div>
@@ -225,8 +225,8 @@
       {/if}
       <!-- Downgrade warning -->
       {#if isDowngrade && highestExisting}
-        <div class="p-3 rounded bg-crimson-900/30 border border-crimson-800/50 text-sm">
-          <div class="flex items-center gap-2 text-crimson-300">
+        <div class="p-3 rounded bg-accent-soft/30 border border-accent-soft-border/50 text-sm">
+          <div class="flex items-center gap-2 text-link-soft">
             <CircleArrowDown class="w-4 h-4 shrink-0" />
             {m.sanction_downgrade_warning({ existing: levelLabel(highestExisting) })}
           </div>
@@ -235,13 +235,13 @@
 
       <!-- Level -->
       <div>
-        <label for="ts-level" class="block text-sm font-medium text-ash-400 mb-1">
+        <label for="ts-level" class="block text-sm font-medium text-ink-muted mb-1">
           {m.common_level()} *
         </label>
         <select
           id="ts-level"
           bind:value={level}
-          class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
         >
           <option value="caution">{m.sanction_level_caution()}</option>
           <option value="warning">{m.sanction_level_warning()}</option>
@@ -252,13 +252,13 @@
 
       <!-- Category -->
       <div>
-        <label for="ts-category" class="block text-sm font-medium text-ash-400 mb-1">
+        <label for="ts-category" class="block text-sm font-medium text-ink-muted mb-1">
           {m.common_category()} *
         </label>
         <select
           id="ts-category"
           bind:value={category}
-          class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
         >
           <option value="procedural_error">{m.sanction_cat_procedural_error()}</option>
           <option value="tournament_error">{m.sanction_cat_tournament_error()}</option>
@@ -268,13 +268,13 @@
 
       <!-- Subcategory -->
       <div>
-        <label for="ts-subcategory" class="block text-sm font-medium text-ash-400 mb-1">
+        <label for="ts-subcategory" class="block text-sm font-medium text-ink-muted mb-1">
           {m.sanction_subcategory()}
         </label>
         <select
           id="ts-subcategory"
           bind:value={subcategory}
-          class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
         >
           <option value={null}>—</option>
           {#each availableSubcategories as sub}
@@ -282,7 +282,7 @@
           {/each}
         </select>
         {#if baselinePenalty}
-          <p class="mt-1 text-xs text-ash-500">
+          <p class="mt-1 text-xs text-ink-faint">
             {m.sanction_baseline_hint({ level: levelLabel(baselinePenalty) })}
           </p>
         {/if}
@@ -291,14 +291,14 @@
       <!-- Round -->
       {#if roundOptions.length > 0}
         <div>
-          <label for="ts-round" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="ts-round" class="block text-sm font-medium text-ink-muted mb-1">
             {m.sanction_round()} {roundRequired ? "*" : ""}
           </label>
           <select
             id="ts-round"
             bind:value={roundNumber}
             required={roundRequired}
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
           >
             <option value={null}>—</option>
             {#each roundOptions as opt}
@@ -310,7 +310,7 @@
 
       <!-- Description -->
       <div>
-        <label for="ts-description" class="block text-sm font-medium text-ash-400 mb-1">
+        <label for="ts-description" class="block text-sm font-medium text-ink-muted mb-1">
           {m.common_description()} *
         </label>
         <textarea
@@ -319,7 +319,7 @@
           rows="3"
           placeholder={m.sanction_mgr_description_placeholder()}
           required
-          class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent resize-none"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
         ></textarea>
       </div>
 

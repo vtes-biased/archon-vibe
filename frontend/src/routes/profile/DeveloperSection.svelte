@@ -121,19 +121,19 @@
   }
 </script>
 
-<div class="p-6 border-t border-ash-800">
+<div class="p-6 border-t border-line">
   <button
     onclick={toggle}
     class="flex items-center justify-between w-full text-left"
   >
-    <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_developer_section()}</h3>
-    <ChevronDown class="w-4 h-4 text-ash-400 transition-transform {expanded ? 'rotate-180' : ''}" />
+    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_developer_section()}</h3>
+    <ChevronDown class="w-4 h-4 text-ink-muted transition-transform {expanded ? 'rotate-180' : ''}" />
   </button>
   {#if expanded}
     <div class="mt-4 space-y-4">
       <!-- Header with register button -->
       <div class="flex items-center justify-between">
-        <p class="text-ash-400 text-sm">{m.developer_subtitle()}</p>
+        <p class="text-ink-muted text-sm">{m.developer_subtitle()}</p>
         <Button variant="primary" size="lg" onclick={() => (showRegister = !showRegister)}>
           <Plus class="w-3.5 h-3.5" />
           {m.developer_register_btn()}
@@ -142,27 +142,27 @@
 
       <!-- Secret display banner -->
       {#if displayedSecret}
-        <div class="p-4 bg-purple-900/30 border border-purple-700 rounded-lg">
+        <div class="p-4 banner-warn border rounded-lg">
           <div class="flex items-start gap-3">
-            <TriangleAlert class="w-5 h-5 text-purple-400 mt-0.5 shrink-0" />
+            <TriangleAlert class="w-5 h-5 mt-0.5 shrink-0" />
             <div class="flex-1 min-w-0">
-              <p class="text-purple-200 text-sm font-medium mb-2">{m.developer_secret_warning()}</p>
+              <p class="text-sm font-medium mb-2">{m.developer_secret_warning()}</p>
               <div class="flex items-center gap-2">
-                <code class="text-xs bg-dusk-900 px-3 py-2 rounded text-bone-200 break-all flex-1">{displayedSecret}</code>
+                <code class="text-xs bg-surface-muted px-3 py-2 rounded text-ink-strong break-all flex-1">{displayedSecret}</code>
                 <button
                   onclick={() => copyToClipboard(displayedSecret!)}
-                  class="p-2 bg-dusk-900 hover:bg-dusk-800 rounded transition-colors shrink-0"
+                  class="p-2 bg-surface-muted hover:bg-surface-muted rounded transition-colors shrink-0"
                   title={m.developer_copy_secret()}
                 >
-                  <Copy class="w-4 h-4 text-ash-300" />
+                  <Copy class="w-4 h-4 text-ink" />
                 </button>
               </div>
               {#if displayedClientId}
-                <p class="text-ash-400 text-xs mt-2">{m.developer_client_id_label({ id: displayedClientId })}</p>
+                <p class="text-ink-muted text-xs mt-2">{m.developer_client_id_label({ id: displayedClientId })}</p>
               {/if}
               <button
                 onclick={() => { displayedSecret = null; displayedClientId = null; }}
-                class="text-xs text-ash-400 hover:text-ash-200 mt-2"
+                class="text-xs text-ink-muted hover:text-ink-bright mt-2"
               >{m.toast_dismiss()}</button>
             </div>
           </div>
@@ -171,36 +171,36 @@
 
       <!-- Register form -->
       {#if showRegister}
-        <div class="bg-dusk-900 rounded-lg border border-ash-700 p-4">
-          <h4 class="text-sm font-medium text-bone-100 mb-3">{m.developer_register_title()}</h4>
+        <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
+          <h4 class="text-sm font-medium text-ink-strong mb-3">{m.developer_register_title()}</h4>
           <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }} class="space-y-3">
             <div>
-              <label for="app-name" class="block text-xs text-ash-400 mb-1">{m.developer_app_name()}</label>
+              <label for="app-name" class="block text-xs text-ink-muted mb-1">{m.developer_app_name()}</label>
               <input type="text" id="app-name" bind:value={newName} placeholder="My App"
-                class="w-full px-3 py-2 bg-dusk-950 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600" />
+                class="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover" />
             </div>
             <div>
-              <label for="redirect-uris" class="block text-xs text-ash-400 mb-1">{m.developer_redirect_uris()}</label>
+              <label for="redirect-uris" class="block text-xs text-ink-muted mb-1">{m.developer_redirect_uris()}</label>
               <textarea id="redirect-uris" bind:value={newRedirectUris} placeholder="https://myapp.com/callback" rows="2"
-                class="w-full px-3 py-2 bg-dusk-950 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 font-mono"></textarea>
+                class="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover font-mono"></textarea>
             </div>
             <div>
-              <span class="block text-xs text-ash-400 mb-1">{m.developer_scopes()}</span>
+              <span class="block text-xs text-ink-muted mb-1">{m.developer_scopes()}</span>
               <div class="space-y-1.5">
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={newScopes.includes("profile:read")} onchange={() => toggleScope("profile:read")}
-                    class="w-3.5 h-3.5 rounded border-ash-600 bg-dusk-900 text-crimson-600 focus:ring-crimson-600" />
+                    class="w-3.5 h-3.5 rounded border-line-strong bg-surface-muted text-accent focus:ring-accent-strong-hover" />
                   <div>
-                    <span class="text-bone-200 text-xs">profile:read</span>
-                    <span class="text-ash-500 text-xs ml-1">— {m.developer_scope_profile_read_desc()}</span>
+                    <span class="text-ink-strong text-xs">profile:read</span>
+                    <span class="text-ink-faint text-xs ml-1">— {m.developer_scope_profile_read_desc()}</span>
                   </div>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={newScopes.includes("user:impersonate")} onchange={() => toggleScope("user:impersonate")}
-                    class="w-3.5 h-3.5 rounded border-ash-600 bg-dusk-900 text-crimson-600 focus:ring-crimson-600" />
+                    class="w-3.5 h-3.5 rounded border-line-strong bg-surface-muted text-accent focus:ring-accent-strong-hover" />
                   <div>
-                    <span class="text-bone-200 text-xs">user:impersonate</span>
-                    <span class="text-ash-500 text-xs ml-1">— {m.developer_scope_impersonate_desc()}</span>
+                    <span class="text-ink-strong text-xs">user:impersonate</span>
+                    <span class="text-ink-faint text-xs ml-1">— {m.developer_scope_impersonate_desc()}</span>
                   </div>
                 </label>
               </div>
@@ -218,22 +218,22 @@
       <!-- Client list -->
       {#if loading}
         <div class="flex items-center justify-center py-8">
-          <Loader2 class="w-6 h-6 animate-spin text-ash-400" />
+          <Loader2 class="w-6 h-6 animate-spin text-ink-muted" />
         </div>
       {:else if clients.length === 0}
         <div class="text-center py-6">
-          <Code2 class="w-10 h-10 text-ash-600 mx-auto mb-3" />
-          <p class="text-ash-400 text-sm">{m.developer_no_clients()}</p>
-          <p class="text-ash-500 text-xs mt-1">{m.developer_no_clients_hint()}</p>
+          <Code2 class="w-10 h-10 text-ink-faint mx-auto mb-3" />
+          <p class="text-ink-muted text-sm">{m.developer_no_clients()}</p>
+          <p class="text-ink-faint text-xs mt-1">{m.developer_no_clients_hint()}</p>
         </div>
       {:else}
         <div class="space-y-3">
           {#each clients as client}
-            <div class="bg-dusk-900 rounded-lg border border-ash-700 p-4">
+            <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
               <div class="flex items-start justify-between">
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <h4 class="text-bone-100 font-medium text-sm">{client.name}</h4>
+                    <h4 class="text-ink-strong font-medium text-sm">{client.name}</h4>
                     {#if client.active}
                       <span class="px-1.5 py-0.5 badge-success text-xs rounded-full">{m.developer_status_active()}</span>
                     {:else}
@@ -242,27 +242,27 @@
                   </div>
                   <div class="mt-1.5 space-y-0.5">
                     <div class="flex items-center gap-2">
-                      <span class="text-ash-500 text-xs">{m.developer_client_id()}</span>
-                      <code class="text-xs text-ash-300 bg-dusk-950 px-1.5 py-0.5 rounded">{client.client_id}</code>
-                      <button onclick={() => copyToClipboard(client.client_id)} class="text-ash-500 hover:text-ash-300" title={m.developer_copy()}>
+                      <span class="text-ink-faint text-xs">{m.developer_client_id()}</span>
+                      <code class="text-xs text-ink bg-surface-card px-1.5 py-0.5 rounded">{client.client_id}</code>
+                      <button onclick={() => copyToClipboard(client.client_id)} class="text-ink-faint hover:text-ink" title={m.developer_copy()}>
                         <Copy class="w-3 h-3" />
                       </button>
                     </div>
                     <div class="flex items-center gap-2">
-                      <span class="text-ash-500 text-xs">{m.developer_scopes_label()}</span>
-                      <span class="text-xs text-ash-300">{client.scopes.join(", ")}</span>
+                      <span class="text-ink-faint text-xs">{m.developer_scopes_label()}</span>
+                      <span class="text-xs text-ink">{client.scopes.join(", ")}</span>
                     </div>
-                    <div class="text-xs text-ash-500">{m.developer_redirect_uris_label({ uris: client.redirect_uris.join(", ") })}</div>
+                    <div class="text-xs text-ink-faint">{m.developer_redirect_uris_label({ uris: client.redirect_uris.join(", ") })}</div>
                   </div>
                 </div>
                 {#if client.active}
                   <div class="flex gap-1.5 shrink-0">
                     <button onclick={() => (confirmAction = { clientId: client.client_id, action: "regenerate" })}
-                      class="p-1.5 text-ash-400 hover:text-ash-200 hover:bg-dusk-950 rounded transition-colors" title={m.developer_regenerate_title()}>
+                      class="p-1.5 text-ink-muted hover:text-ink-bright hover:bg-surface-card rounded transition-colors" title={m.developer_regenerate_title()}>
                       <RefreshCw class="w-4 h-4" />
                     </button>
                     <button onclick={() => (confirmAction = { clientId: client.client_id, action: "deactivate" })}
-                      class="p-1.5 text-crimson-400 hover:text-crimson-300 hover:bg-dusk-950 rounded transition-colors" title={m.developer_deactivate_title()}>
+                      class="p-1.5 text-link hover:text-link-soft hover:bg-surface-card rounded transition-colors" title={m.developer_deactivate_title()}>
                       <PowerOff class="w-4 h-4" />
                     </button>
                   </div>
@@ -287,21 +287,21 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg border border-ash-800 p-6 w-full max-w-sm"
+      class="bg-surface-card rounded-lg border border-line p-6 w-full max-w-sm"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog" aria-modal="true" tabindex="-1"
     >
       {#if confirmAction.action === "regenerate"}
-        <h3 class="text-bone-100 font-medium mb-2">{m.developer_confirm_regenerate()}</h3>
-        <p class="text-ash-400 text-sm mb-4">{m.developer_confirm_regenerate_msg()}</p>
+        <h3 class="text-ink-strong font-medium mb-2">{m.developer_confirm_regenerate()}</h3>
+        <p class="text-ink-muted text-sm mb-4">{m.developer_confirm_regenerate_msg()}</p>
         <div class="flex gap-3">
           <Button variant="secondary" size="md" class="flex-1" onclick={() => (confirmAction = null)}>{m.common_cancel()}</Button>
           <Button variant="danger" size="md" class="flex-1" onclick={() => handleRegenerate(confirmAction!.clientId)}><TriangleAlert class="w-4 h-4" aria-hidden="true" />{m.developer_regenerate_btn()}</Button>
         </div>
       {:else}
-        <h3 class="text-bone-100 font-medium mb-2">{m.developer_confirm_deactivate()}</h3>
-        <p class="text-ash-400 text-sm mb-4">{m.developer_confirm_deactivate_msg()}</p>
+        <h3 class="text-ink-strong font-medium mb-2">{m.developer_confirm_deactivate()}</h3>
+        <p class="text-ink-muted text-sm mb-4">{m.developer_confirm_deactivate_msg()}</p>
         <div class="flex gap-3">
           <Button variant="secondary" size="md" class="flex-1" onclick={() => (confirmAction = null)}>{m.common_cancel()}</Button>
           <Button variant="danger" size="md" class="flex-1" onclick={() => handleDeactivate(confirmAction!.clientId)}><TriangleAlert class="w-4 h-4" aria-hidden="true" />{m.developer_deactivate_btn()}</Button>

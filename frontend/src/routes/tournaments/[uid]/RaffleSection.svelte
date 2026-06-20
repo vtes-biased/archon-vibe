@@ -136,31 +136,31 @@
         type="text"
         bind:value={label}
         placeholder={m.raffle_label_placeholder()}
-        class="w-full px-3 py-2 text-sm bg-ash-800 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500 focus:outline-none focus:border-ash-500"
+        class="w-full px-3 py-2 text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint focus:outline-none focus:border-line-strong"
       />
       <div class="flex flex-wrap gap-2 items-center">
         <select
           bind:value={pool}
-          class="px-2 py-1.5 text-sm bg-ash-800 border border-ash-700 rounded-lg text-bone-100"
+          class="px-2 py-1.5 text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong"
         >
           {#each poolOptions as opt}
             <option value={opt.value}>{opt.labelFn()} ({eligibleForPool(opt.value)})</option>
           {/each}
         </select>
-        <label class="flex items-center gap-1.5 text-sm text-ash-300">
-          <input type="checkbox" bind:checked={excludeDrawn} class="rounded border-ash-600" />
+        <label class="flex items-center gap-1.5 text-sm text-ink">
+          <input type="checkbox" bind:checked={excludeDrawn} class="rounded border-line-strong" />
           {m.raffle_exclude_drawn()}
         </label>
       </div>
       <div class="flex items-center gap-2">
-        <label class="text-sm text-ash-400">
+        <label class="text-sm text-ink-muted">
           {m.raffle_winners()}:
           <input
             type="number"
             bind:value={count}
             min="1"
             max={Math.max(currentEligible, 1)}
-            class="ml-1 w-16 px-2 py-1 text-sm bg-ash-800 border border-ash-700 rounded text-bone-100"
+            class="ml-1 w-16 px-2 py-1 text-sm bg-surface-hover border border-line-strong rounded text-ink-strong"
           />
         </label>
         <Button
@@ -199,8 +199,8 @@
   {#if hasRaffles}
     <div class="space-y-2">
       {#each [...raffles].reverse() as draw}
-        <div class="bg-ash-900/50 rounded-lg p-3">
-          <div class="text-sm font-medium text-bone-100 mb-1">{draw.label}</div>
+        <div class="bg-surface-muted/50 rounded-lg p-3">
+          <div class="text-sm font-medium text-ink-strong mb-1">{draw.label}</div>
           <div class="flex flex-wrap gap-1.5">
             {#each draw.winners as winner}
               <span class="px-2 py-0.5 text-xs badge-highlight rounded">{seatDisplay(winner)}</span>

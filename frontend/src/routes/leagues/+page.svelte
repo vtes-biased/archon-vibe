@@ -116,7 +116,7 @@
   <div class="max-w-6xl mx-auto">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-light text-crimson-500">{m.leagues_title()}</h1>
+      <h1 class="text-3xl font-light text-accent">{m.leagues_title()}</h1>
 
       {#if canCreate}
         <a
@@ -129,27 +129,27 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-dusk-950 rounded-lg shadow p-4 mb-6 border border-ash-800">
+    <div class="bg-surface-card rounded-lg shadow p-4 mb-6 border border-line">
       <div class="flex flex-wrap gap-4 items-end">
         <!-- Search -->
         <div class="flex-1 min-w-[200px]">
-          <label for="search" class="block text-sm font-medium text-ash-400 mb-1">{m.common_search()}</label>
+          <label for="search" class="block text-sm font-medium text-ink-muted mb-1">{m.common_search()}</label>
           <input
             id="search"
             type="text"
             bind:value={searchQuery}
             placeholder={m.league_search_placeholder()}
-            class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 placeholder:text-ash-600"
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright placeholder:text-ink-faint"
           />
         </div>
 
         <!-- Country -->
         <div class="min-w-[180px]">
-          <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
+          <label for="country-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
           <select
             id="country-filter"
             bind:value={selectedCountry}
-            class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
           >
             <option value="all">{m.league_all_countries()}</option>
             {#each Object.entries(countries) as [code, country]}
@@ -162,10 +162,10 @@
         <div class="flex items-center gap-3 pb-1">
           <label class="inline-flex items-center gap-2 cursor-pointer">
             <input type="checkbox" bind:checked={showPast} class="sr-only peer" />
-            <div class="relative w-11 h-6 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
+            <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
               <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={showPast}></div>
             </div>
-            <span class="text-sm text-ash-300">{m.league_show_past()}</span>
+            <span class="text-sm text-ink">{m.league_show_past()}</span>
           </label>
         </div>
       </div>
@@ -173,35 +173,35 @@
 
     <!-- League List -->
     {#if leagues.length > 0}
-      <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
+      <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
         <!-- Header (desktop) -->
-        <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-ash-900 text-sm font-medium text-ash-300 border-b border-ash-700">
+        <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong">
           <div class="col-span-5">{m.common_name()}</div>
           <div class="col-span-3">{m.league_col_dates()}</div>
           <div class="col-span-2">{m.common_country()}</div>
           <div class="col-span-2">{m.league_col_standings()}</div>
         </div>
 
-        <div class="divide-y divide-ash-800">
+        <div class="divide-y divide-line">
           {#each leagues as league (league.uid)}
             <a
               href="/leagues/{league.uid}"
-              class="block px-6 py-4 hover:bg-ash-900/50 transition-colors"
+              class="block px-6 py-4 hover:bg-surface-muted/50 transition-colors"
             >
               <!-- Mobile -->
               <div class="sm:hidden space-y-2">
                 <div class="flex items-start justify-between">
                   <div>
-                    <div class="font-semibold text-bone-100">{league.name}</div>
-                    <div class="text-sm text-ash-400 mt-1">
+                    <div class="font-semibold text-ink-strong">{league.name}</div>
+                    <div class="text-sm text-ink-muted mt-1">
                       {formatDateRange(league)}
                     </div>
                   </div>
-                  <span class="px-2 py-1 rounded text-xs font-medium {isActive(league) ? 'badge-success' : 'bg-ash-800 text-ash-400'}">
+                  <span class="px-2 py-1 rounded text-xs font-medium {isActive(league) ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">
                     {isActive(league) ? m.league_status_active() : m.league_status_finished()}
                   </span>
                 </div>
-                <div class="flex gap-2 text-xs text-ash-500">
+                <div class="flex gap-2 text-xs text-ink-faint">
                   <span>{standingsModeLabel(league.standings_mode)}</span>
                   {#if league.format}
                     <span>· {league.format}</span>
@@ -221,7 +221,7 @@
               <!-- Desktop -->
               <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                 <div class="col-span-5">
-                  <div class="font-semibold text-bone-100">
+                  <div class="font-semibold text-ink-strong">
                     {league.name}
                     {#if league.kind === "Meta-League"}
                       <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-violet-900/50 text-violet-300">{m.league_meta_badge()}</span>
@@ -231,20 +231,20 @@
                     {/if}
                   </div>
                   {#if league.format}
-                    <div class="text-xs text-ash-500">{league.format}</div>
+                    <div class="text-xs text-ink-faint">{league.format}</div>
                   {/if}
                 </div>
-                <div class="col-span-3 text-sm text-ash-400">
+                <div class="col-span-3 text-sm text-ink-muted">
                   {formatDateRange(league)}
                 </div>
-                <div class="col-span-2 text-sm text-ash-400">
+                <div class="col-span-2 text-sm text-ink-muted">
                   {#if league.country}
                     {getCountryFlag(league.country)} {countries[league.country]?.name || league.country}
                   {:else}
                     {m.league_worldwide()}
                   {/if}
                 </div>
-                <div class="col-span-2 text-sm text-ash-400">
+                <div class="col-span-2 text-sm text-ink-muted">
                   {standingsModeLabel(league.standings_mode)}
                 </div>
               </div>
@@ -253,24 +253,24 @@
         </div>
       </div>
 
-      <div class="mt-4 text-sm text-ash-400">
+      <div class="mt-4 text-sm text-ink-muted">
         {m.league_total_count({ count: String(leagues.length) })}
       </div>
     {:else if !loaded}
       <div class="text-center py-12">
-        <div class="text-ash-500 mb-4">
+        <div class="text-ink-faint mb-4">
           <Loader2 class="mx-auto h-12 w-12 animate-spin" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.common_loading()}</h3>
-        <p class="text-ash-400">{m.league_loading_hint()}</p>
+        <h3 class="text-lg font-medium text-ink-strong mb-2">{m.common_loading()}</h3>
+        <p class="text-ink-muted">{m.league_loading_hint()}</p>
       </div>
     {:else}
       <div class="text-center py-12">
-        <div class="text-ash-600 mb-4">
+        <div class="text-ink-faint mb-4">
           <BarChart3 class="mx-auto h-12 w-12" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.league_no_results()}</h3>
-        <p class="text-ash-400">
+        <h3 class="text-lg font-medium text-ink-strong mb-2">{m.league_no_results()}</h3>
+        <p class="text-ink-muted">
           {#if searchQuery.trim() || selectedCountry !== "all"}
             {m.league_adjust_filters()}
           {:else if !showPast}

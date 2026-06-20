@@ -105,7 +105,7 @@
   <div class="flex flex-wrap gap-2">
     {#each organizerUids as uid (uid)}
       {@const user = organizers[uid]}
-      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ash-800 rounded-lg text-sm text-bone-100">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-hover rounded-lg text-sm text-ink-strong">
         {#if user?.country}
           <span>{getCountryFlag(user.country)}</span>
         {/if}
@@ -114,7 +114,7 @@
           <button
             onclick={() => handleRemove(uid)}
             disabled={loading}
-            class="ml-1 text-ash-500 hover:text-crimson-400 transition-colors"
+            class="ml-1 text-ink-faint hover:text-link transition-colors"
             title={m.common_delete()}
           >
             <X class="w-3.5 h-3.5" />
@@ -132,33 +132,33 @@
       oninput={() => doSearch()}
       onkeydown={handleKeydown}
       placeholder={m.organizers_search_placeholder()}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
     />
     {#if searchResults.length > 0}
-      <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
+      <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
         {#each searchResults as user, i}
           <button
             onclick={() => handleAdd(user)}
             disabled={loading}
-            class="w-full px-3 py-2 text-left text-sm text-ash-200 transition-colors {i === selectedIndex ? 'bg-ash-700' : 'hover:bg-ash-800'}"
+            class="w-full px-3 py-2 text-left text-sm text-ink-bright transition-colors {i === selectedIndex ? 'bg-surface-active' : 'hover:bg-surface-hover'}"
           >
             {#if user.country}
               <span class="mr-1">{getCountryFlag(user.country)}</span>
             {/if}
             {user.name}
             {#if user.vekn_id}
-              <span class="text-ash-500 ml-2">#{user.vekn_id}</span>
+              <span class="text-ink-faint ml-2">#{user.vekn_id}</span>
             {/if}
           </button>
         {/each}
         {#if searchTotal > SEARCH_LIMIT}
-          <div class="px-3 py-2 text-xs text-ash-500 text-center">
+          <div class="px-3 py-2 text-xs text-ink-faint text-center">
             {m.add_player_more_results({ count: (searchTotal - SEARCH_LIMIT).toString() })}
           </div>
         {/if}
       </div>
     {:else if search.trim().length >= 2 && searchResults.length === 0}
-      <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg p-3 text-center text-sm text-ash-500 shadow-lg">
+      <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg p-3 text-center text-sm text-ink-faint shadow-lg">
         {m.organizers_no_results()}
       </div>
     {/if}

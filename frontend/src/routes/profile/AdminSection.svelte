@@ -92,31 +92,31 @@
   let activeOp = $state<Op | null>(null);
 </script>
 
-<div class="p-6 border-t border-ash-800">
+<div class="p-6 border-t border-line">
   <button onclick={toggle} class="flex items-center justify-between w-full text-left">
-    <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_admin_section()}</h3>
-    <ChevronDown class="w-4 h-4 text-ash-400 transition-transform {expanded ? 'rotate-180' : ''}" />
+    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_admin_section()}</h3>
+    <ChevronDown class="w-4 h-4 text-ink-muted transition-transform {expanded ? 'rotate-180' : ''}" />
   </button>
   {#if expanded}
     <div class="mt-4 space-y-3">
       <!-- Sync-job health -->
-      <div class="bg-dusk-900 rounded-lg border border-ash-700 p-4">
+      <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
-            <h4 class="text-bone-100 font-medium text-sm">{m.admin_sync_status_title()}</h4>
-            <p class="text-ash-500 text-xs mt-0.5">{m.admin_sync_status_subtitle()}</p>
+            <h4 class="text-ink-strong font-medium text-sm">{m.admin_sync_status_title()}</h4>
+            <p class="text-ink-faint text-xs mt-0.5">{m.admin_sync_status_subtitle()}</p>
           </div>
           <button
             onclick={loadStatus}
             disabled={statusLoading}
-            class="p-1.5 text-ash-400 hover:text-bone-100 disabled:opacity-50 transition-colors shrink-0"
+            class="p-1.5 text-ink-muted hover:text-ink-strong disabled:opacity-50 transition-colors shrink-0"
             aria-label={m.admin_status_refresh()}
           >
             <RefreshCw class="w-3.5 h-3.5 {statusLoading ? 'animate-spin' : ''}" />
           </button>
         </div>
         {#if statusFailed}
-          <p class="text-crimson-400 text-xs mt-3">{m.admin_status_load_error()}</p>
+          <p class="text-link text-xs mt-3">{m.admin_status_load_error()}</p>
         {:else}
           <ul class="mt-3 space-y-2">
             {#each statusJobs as job}
@@ -128,19 +128,19 @@
                   class="mt-1 w-2 h-2 rounded-full shrink-0 {ok
                     ? 'bg-blue-500'
                     : err
-                      ? 'bg-crimson-500'
-                      : 'bg-ash-600'}"
+                      ? 'bg-accent'
+                      : 'bg-surface-active'}"
                 ></span>
                 <div class="min-w-0">
-                  <span class="text-bone-100 font-medium">{job.label()}</span>
+                  <span class="text-ink-strong font-medium">{job.label()}</span>
                   {#if !j}
-                    <span class="text-ash-500"> — {m.admin_status_never()}</span>
+                    <span class="text-ink-faint"> — {m.admin_status_never()}</span>
                   {:else}
                     {#if j.last_success_at}
-                      <div class="text-ash-400">{m.admin_status_last_success()}: {fmt(j.last_success_at)}</div>
+                      <div class="text-ink-muted">{m.admin_status_last_success()}: {fmt(j.last_success_at)}</div>
                     {/if}
                     {#if err && j.last_error}
-                      <div class="text-crimson-400">
+                      <div class="text-link">
                         {m.admin_status_last_error()}: {fmt(j.last_error_at)} — {j.last_error}
                       </div>
                     {/if}
@@ -152,12 +152,12 @@
         {/if}
       </div>
 
-      <p class="text-ash-400 text-sm">{m.admin_subtitle()}</p>
+      <p class="text-ink-muted text-sm">{m.admin_subtitle()}</p>
       {#each ops as op}
-        <div class="bg-dusk-900 rounded-lg border border-ash-700 p-4 flex items-start justify-between gap-3">
+        <div class="bg-surface-muted rounded-lg border border-line-strong p-4 flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <h4 class="text-bone-100 font-medium text-sm">{op.label}</h4>
-            <p class="text-ash-500 text-xs mt-0.5">{op.desc}</p>
+            <h4 class="text-ink-strong font-medium text-sm">{op.label}</h4>
+            <p class="text-ink-faint text-xs mt-0.5">{op.desc}</p>
           </div>
           <Button variant="primary" size="lg" class="shrink-0" onclick={() => (activeOp = op)}>
             <RefreshCw class="w-3.5 h-3.5" />

@@ -233,7 +233,7 @@
     type="text"
     bind:value={editedName}
     placeholder={m.deck_upload_name_placeholder()}
-    class="w-full px-3 py-2 mb-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+    class="w-full px-3 py-2 mb-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
   />
 
   <!-- Attribution -->
@@ -248,14 +248,14 @@
 
   <div class="mb-3">
     <CardSearch onselect={addCard} />
-    <p class="text-xs text-ash-500 mt-1">{m.deck_edit_search_hint()}</p>
+    <p class="text-xs text-ink-faint mt-1">{m.deck_edit_search_hint()}</p>
   </div>
 {:else}
   {#if deck.name}
-    <h4 class="text-sm font-semibold text-bone-200 mb-1">{deck.name}</h4>
+    <h4 class="text-sm font-semibold text-ink-strong mb-1">{deck.name}</h4>
   {/if}
   {#if deck.author && deck.attribution !== null}
-    <p class="text-xs text-ash-400 mb-2">{m.deck_by_author({ author: deck.author })}</p>
+    <p class="text-xs text-ink-muted mb-2">{m.deck_by_author({ author: deck.author })}</p>
   {/if}
 
   {#if editable || onreplace || ondelete}
@@ -276,33 +276,33 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
   <!-- Crypt -->
   <div>
-    <h5 class="font-semibold text-ash-200 mb-1">{m.deck_crypt_count({ count: cryptCount.toString() })}</h5>
+    <h5 class="font-semibold text-ink-bright mb-1">{m.deck_crypt_count({ count: cryptCount.toString() })}</h5>
     <div class="space-y-0.5">
       {#each cryptEntries as entry}
-        <div class="flex gap-2 items-center hover:bg-ash-800/50 px-1 rounded min-h-[28px]">
+        <div class="flex gap-2 items-center hover:bg-surface-hover/50 px-1 rounded min-h-[28px]">
           {#if editing}
             <button
               onclick={() => adjustCount(entry.id.toString(), -1)}
-              class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
+              class="w-8 h-8 flex items-center justify-center rounded bg-surface-active text-ink hover:bg-surface-active text-sm shrink-0"
             >-</button>
           {/if}
           <button
             class="flex-1 text-left flex gap-2 items-baseline min-w-0"
             onclick={() => showCard(entry.card)}
           >
-            <span class="text-ash-400 w-4 text-right shrink-0">{entry.count}x</span>
-            <span class="text-ash-200 flex-1 truncate">{entry.card?.name ?? `#${entry.id}`}</span>
+            <span class="text-ink-muted w-4 text-right shrink-0">{entry.count}x</span>
+            <span class="text-ink-bright flex-1 truncate">{entry.card?.name ?? `#${entry.id}`}</span>
             {#if entry.card?.capacity}
-              <span class="text-ash-500 text-xs">{entry.card.capacity}</span>
+              <span class="text-ink-faint text-xs">{entry.card.capacity}</span>
             {/if}
             {#if entry.card?.disciplines.length}
-              <span class="text-ash-400 text-sm" style="font-family: 'Ankha VTES'">{#each entry.card.disciplines as disc}{disciplineIcon(disc) ?? ''}{/each}</span>
+              <span class="text-ink-muted text-sm" style="font-family: 'Ankha VTES'">{#each entry.card.disciplines as disc}{disciplineIcon(disc) ?? ''}{/each}</span>
             {/if}
           </button>
           {#if editing}
             <button
               onclick={() => adjustCount(entry.id.toString(), 1)}
-              class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
+              class="w-8 h-8 flex items-center justify-center rounded bg-surface-active text-ink hover:bg-surface-active text-sm shrink-0"
             >+</button>
           {/if}
         </div>
@@ -312,33 +312,33 @@
 
   <!-- Library -->
   <div>
-    <h5 class="font-semibold text-ash-200 mb-1">{m.deck_library_count({ count: libraryCount.toString() })}</h5>
+    <h5 class="font-semibold text-ink-bright mb-1">{m.deck_library_count({ count: libraryCount.toString() })}</h5>
     {#each libraryByType as [type, entries]}
       <div class="mb-2">
-        <p class="text-xs text-ash-500 font-medium">
-          {#if typeIcon(type)}<span class="text-sm text-ash-400" style="font-family: 'Ankha VTES'">{typeIcon(type)}</span>{/if}
+        <p class="text-xs text-ink-faint font-medium">
+          {#if typeIcon(type)}<span class="text-sm text-ink-muted" style="font-family: 'Ankha VTES'">{typeIcon(type)}</span>{/if}
           {type} ({entries.reduce((s, e) => s + e.count, 0)})
         </p>
         <div class="space-y-0.5">
           {#each entries as entry}
-            <div class="flex gap-2 items-center hover:bg-ash-800/50 px-1 rounded min-h-[28px]">
+            <div class="flex gap-2 items-center hover:bg-surface-hover/50 px-1 rounded min-h-[28px]">
               {#if editing}
                 <button
                   onclick={() => adjustCount(entry.id.toString(), -1)}
-                  class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
+                  class="w-8 h-8 flex items-center justify-center rounded bg-surface-active text-ink hover:bg-surface-active text-sm shrink-0"
                 >-</button>
               {/if}
               <button
                 class="flex-1 text-left flex gap-2 items-baseline min-w-0"
                 onclick={() => showCard(entry.card)}
               >
-                <span class="text-ash-400 w-4 text-right shrink-0">{entry.count}x</span>
-                <span class="text-ash-200 flex-1 truncate">{entry.card?.name ?? `#${entry.id}`}</span>
+                <span class="text-ink-muted w-4 text-right shrink-0">{entry.count}x</span>
+                <span class="text-ink-bright flex-1 truncate">{entry.card?.name ?? `#${entry.id}`}</span>
               </button>
               {#if editing}
                 <button
                   onclick={() => adjustCount(entry.id.toString(), 1)}
-                  class="w-8 h-8 flex items-center justify-center rounded bg-ash-700 text-ash-300 hover:bg-ash-600 text-sm shrink-0"
+                  class="w-8 h-8 flex items-center justify-center rounded bg-surface-active text-ink hover:bg-surface-active text-sm shrink-0"
                 >+</button>
               {/if}
             </div>
@@ -352,7 +352,7 @@
 {#if validationErrors.length > 0}
   <div class="mt-3 space-y-1">
     {#each validationErrors as err}
-      <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-purple-400'}">
+      <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-purple-400'}">
         {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
         {err.message}
       </p>
@@ -362,7 +362,7 @@
 
 {#if editing}
   {#if saveError}
-    <p class="text-sm text-crimson-400 mt-2">{saveError}</p>
+    <p class="text-sm text-link mt-2">{saveError}</p>
   {/if}
   <div class="flex gap-2 mt-3">
     <Button variant="primary" size="lg" loading={saving} onclick={saveDeck}>{saving ? m.common_saving() : m.deck_save_changes()}</Button>

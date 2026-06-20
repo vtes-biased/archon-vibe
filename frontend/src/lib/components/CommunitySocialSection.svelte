@@ -31,38 +31,38 @@
     {#each groups as group}
       {@const isExpanded = expandedCountries.has(group.code)}
       {@const isMyCountry = userCountry === group.code}
-      <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 overflow-hidden">
+      <div class="bg-surface-card rounded-lg shadow border border-line overflow-hidden">
         <button
           onclick={() => onToggleCountry(group.code)}
-          class="w-full flex items-center justify-between p-4 hover:bg-ash-900/50 transition-colors text-left"
+          class="w-full flex items-center justify-between p-4 hover:bg-surface-muted/50 transition-colors text-left"
         >
           <div class="flex items-center gap-2">
             <span class="text-lg">{getCountryFlag(group.code)}</span>
-            <span class="font-medium text-bone-100">{group.name}</span>
+            <span class="font-medium text-ink-strong">{group.name}</span>
             {#if isMyCountry}
-              <span class="px-2 py-0.5 text-xs rounded bg-crimson-900/40 text-crimson-400">{m.community_your_country()}</span>
+              <span class="px-2 py-0.5 text-xs rounded bg-accent-soft/40 text-link">{m.community_your_country()}</span>
             {/if}
-            <span class="text-xs text-ash-500">({group.users.reduce((n, u) => n + u.links.length, 0)})</span>
+            <span class="text-xs text-ink-faint">({group.users.reduce((n, u) => n + u.links.length, 0)})</span>
           </div>
           {#if isExpanded}
-            <ChevronDown class="w-5 h-5 text-ash-500" />
+            <ChevronDown class="w-5 h-5 text-ink-faint" />
           {:else}
-            <ChevronRight class="w-5 h-5 text-ash-500" />
+            <ChevronRight class="w-5 h-5 text-ink-faint" />
           {/if}
         </button>
 
         {#if isExpanded}
-          <div class="border-t border-ash-800 divide-y divide-ash-800/50">
+          <div class="border-t border-line divide-y divide-line/50">
             {#each group.users as { user, links }}
               <div class="p-4">
                 {#if user.name}
                   <div class="flex items-center gap-2 mb-2 flex-wrap">
-                    <a href="/users/{user.uid}" class="font-medium text-bone-100 hover:text-crimson-400 transition-colors">{user.name}</a>
+                    <a href="/users/{user.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{user.name}</a>
                     {#each user.roles.filter(r => r === "NC" || r === "Prince" || r === "IC") as role}
                       <span class="px-2 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{role}</span>
                     {/each}
                     {#if user.city}
-                      <span class="text-sm text-ash-400">{user.city}</span>
+                      <span class="text-sm text-ink-muted">{user.city}</span>
                     {/if}
                   </div>
                 {/if}

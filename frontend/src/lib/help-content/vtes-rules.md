@@ -380,33 +380,33 @@ A reaction card does not lock the minion playing it.
 
 Seating order can be determined by whatever method the Methuselahs choose.
 Randomly determine a Methuselah to act as first Methuselah.
-For each Methuselah, the Methuselah to your left is your prey <span class="text-crimson-400">❶</span>.
+For each Methuselah, the Methuselah to your left is your prey <span class="text-link">❶</span>.
 They are the Methuselah you hope to oust from the game.
-The Methuselah to your right is your predator <span class="text-crimson-400">❷</span>.
+The Methuselah to your right is your predator <span class="text-link">❷</span>.
 They are the Methuselah who hopes to oust you from the game.
 When your prey is ousted, the next Methuselah to your left becomes your new prey.
 
 **Blood Bank**
 
-Each Methuselah takes 30 blood counters to form their starting pool <span class="text-crimson-400">❸</span>.
-The remaining blood counters are placed in the central area to form the blood bank <span class="text-crimson-400">❹</span>.
+Each Methuselah takes 30 blood counters to form their starting pool <span class="text-link">❸</span>.
+The remaining blood counters are placed in the central area to form the blood bank <span class="text-link">❹</span>.
 The number of blood counters in the blood bank can never run out, just use additional counters, coins, stones etc as needed.
 
 **The Edge**
 
-The Edge <span class="text-crimson-400">❺</span> begins the game uncontrolled and is placed in the central area as well.
+The Edge <span class="text-link">❺</span> begins the game uncontrolled and is placed in the central area as well.
 
 **Play Area**
 
-The area in front of each Methuselah is divided into two regions: the uncontrolled region <span class="text-crimson-400">❻</span>, and the controlled region <span class="text-crimson-400">❼</span>.
-The controlled region is further divided into two areas: the ready region <span class="text-crimson-400">❽</span> and the torpor region <span class="text-crimson-400">❾</span>.
+The area in front of each Methuselah is divided into two regions: the uncontrolled region <span class="text-link">❻</span>, and the controlled region <span class="text-link">❼</span>.
+The controlled region is further divided into two areas: the ready region <span class="text-link">❽</span> and the torpor region <span class="text-link">❾</span>.
 Torpor is a special area for wounded vampires.
 As the game progresses, you will gain control of some of your minions, moving them to the ready region, face up.
 
-To begin, separate your crypt cards <span class="text-crimson-400">❿</span> from your library cards <span class="text-crimson-400">⓫</span>.
+To begin, separate your crypt cards <span class="text-link">❿</span> from your library cards <span class="text-link">⓫</span>.
 Shuffle both decks and allow your predator to cut both.
 Place both decks in front of you.
-Draw the top seven library cards to form your hand <span class="text-crimson-400">⓬</span> and deal the top four crypt cards face down into your uncontrolled region <span class="text-crimson-400">❻</span>.
+Draw the top seven library cards to form your hand <span class="text-link">⓬</span> and deal the top four crypt cards face down into your uncontrolled region <span class="text-link">❻</span>.
 You can look at the cards in your hand and in your uncontrolled region at any time during the game.
 
 ![](/help/rules/image30.png)
@@ -2058,7 +2058,7 @@ These Traditions are laws that protect the vampires from mortals and from one an
 <span class="vtes-ref"><span class="vtes-d">|</span> Advanced</span>
 <span class="vtes-ref"><span class="vtes-d">-</span> Blood Cost</span>
 <span class="vtes-ref"><span class="vtes-d">~</span> Burn Option</span>
-<span class="vtes-ref"><span class="text-crimson-400">&#x2B24;</span> Capacity</span>
+<span class="vtes-ref"><span class="text-link">&#x2B24;</span> Capacity</span>
 <span class="vtes-ref"><span class="vtes-d">}</span> Directed Action</span>
 <span class="vtes-ref"><span class="vtes-d">_</span> Pool Cost</span>
 </div>

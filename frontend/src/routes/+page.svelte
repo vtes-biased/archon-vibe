@@ -11,7 +11,7 @@
 
 <div class="flex items-center justify-center min-h-screen">
   <div class="text-center">
-    <h1 class="text-4xl font-light text-crimson-500 mb-4">Archon</h1>
-    <p class="text-ash-400">{m.common_loading()}</p>
+    <h1 class="text-4xl font-light text-accent mb-4">Archon</h1>
+    <p class="text-ink-muted">{m.common_loading()}</p>
   </div>
 </div>

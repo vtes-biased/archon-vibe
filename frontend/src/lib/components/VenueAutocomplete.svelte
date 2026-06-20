@@ -97,20 +97,20 @@
         onfocus={() => inputValue && handleInput()}
         {disabled}
         placeholder={m.tfield_venue_placeholder()}
-        class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
     />
 
     {#if showSuggestions && filtered.length > 0}
-        <div class="absolute z-10 w-full mt-1 bg-dusk-950 border border-ash-600 rounded shadow-lg max-h-60 overflow-auto">
+        <div class="absolute z-10 w-full mt-1 bg-surface-card border border-line-strong rounded shadow-lg max-h-60 overflow-auto">
             {#each filtered as venue, i}
                 <button
                     type="button"
                     onclick={() => selectVenue(venue)}
-                    class="w-full text-left px-3 py-2 hover:bg-ash-800 {i === selectedIndex ? 'bg-ash-800' : ''}"
+                    class="w-full text-left px-3 py-2 hover:bg-surface-hover {i === selectedIndex ? 'bg-surface-hover' : ''}"
                 >
-                    <div class="font-medium text-ash-200">{venue.venue}</div>
+                    <div class="font-medium text-ink-bright">{venue.venue}</div>
                     {#if venue.address}
-                        <div class="text-xs text-mist-dark">{venue.address}</div>
+                        <div class="text-xs text-ink-faint">{venue.address}</div>
                     {/if}
                 </button>
             {/each}

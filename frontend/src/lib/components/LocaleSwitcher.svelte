@@ -27,7 +27,7 @@
   name="locale"
   value={getLocale()}
   onchange={handleChange}
-  class="bg-dusk-950 text-ash-400 text-xs border border-ash-800 rounded px-1.5 py-1 cursor-pointer hover:text-ash-200 hover:border-ash-600 focus:outline-none focus:border-crimson-500"
+  class="bg-surface-card text-ink-muted text-xs border border-line rounded px-1.5 py-1 cursor-pointer hover:text-ink-bright hover:border-line-strong focus:outline-none focus:border-accent"
   aria-label="Select language"
 >
   {#each locales as locale}

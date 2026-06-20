@@ -494,18 +494,18 @@ import TournamentModals from "./TournamentModals.svelte";
 <div class="p-4 sm:p-8">
   <div class="max-w-4xl mx-auto">
     <!-- Back link -->
-    <a href="/tournaments" class="inline-flex items-center gap-2 text-ash-400 hover:text-ash-200 mb-4">
+    <a href="/tournaments" class="inline-flex items-center gap-2 text-ink-muted hover:text-ink-bright mb-4">
       <ArrowLeft class="w-4 h-4" />
       {m.nav_tournaments()}
     </a>
 
     {#if loading}
       <div class="text-center py-12">
-        <Loader2 class="mx-auto h-12 w-12 text-ash-500 animate-spin" />
+        <Loader2 class="mx-auto h-12 w-12 text-ink-faint animate-spin" />
       </div>
     {:else if error && !tournament}
-      <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4">
-        <p class="text-crimson-300">{error}</p>
+      <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4">
+        <p class="text-link-soft">{error}</p>
       </div>
     {:else if tournament}
       <!-- Offline mode banner (this device has lock) -->
@@ -516,9 +516,9 @@ import TournamentModals from "./TournamentModals.svelte";
             <div class="min-w-0">
               <span class="text-purple-200 font-medium text-sm">{m.offline_mode_banner()}</span>
               {#if lastSync}
-                <span class="text-xs text-ash-400 ml-2">{m.offline_last_sync({ time: new Date(lastSync).toLocaleTimeString() })}</span>
+                <span class="text-xs text-ink-muted ml-2">{m.offline_last_sync({ time: new Date(lastSync).toLocaleTimeString() })}</span>
               {:else}
-                <span class="text-xs text-ash-500 ml-2">{m.offline_not_synced()}</span>
+                <span class="text-xs text-ink-faint ml-2">{m.offline_not_synced()}</span>
               {/if}
             </div>
           </div>
@@ -531,11 +531,11 @@ import TournamentModals from "./TournamentModals.svelte";
 
       <!-- Locked by another device banner -->
       {#if isLockedByOtherDevice}
-        <div class="bg-ash-900/50 border border-ash-700 rounded-lg p-4 mb-4">
+        <div class="bg-surface-muted/50 border border-line-strong rounded-lg p-4 mb-4">
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-2 min-w-0">
-              <Lock class="w-5 h-5 text-ash-400 shrink-0" />
-              <span class="text-ash-300 text-sm">{m.offline_locked_banner()}</span>
+              <Lock class="w-5 h-5 text-ink-muted shrink-0" />
+              <span class="text-ink text-sm">{m.offline_locked_banner()}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               {#if isOrganizer}
@@ -557,19 +557,19 @@ import TournamentModals from "./TournamentModals.svelte";
       <!-- Header -->
       <div class="flex items-start justify-between mb-6">
         <div>
-          <h1 class="text-3xl font-light text-bone-100">{tournament.name}</h1>
+          <h1 class="text-3xl font-light text-ink-strong">{tournament.name}</h1>
           <div class="flex flex-wrap items-center gap-3 mt-2">
             <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
               {translateTournamentState(tournament.state)}
             </span>
-            <span class="text-sm text-ash-400">{tournament.format}</span>
+            <span class="text-sm text-ink-muted">{tournament.format}</span>
             {#if tournament.rank}
-              <span class="text-sm text-ash-400">· {tournament.rank}</span>
+              <span class="text-sm text-ink-muted">· {tournament.rank}</span>
             {/if}
             {#if tournament.external_ids?.vekn}
               <a href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
                  target="_blank" rel="noopener noreferrer"
-                 class="px-2 py-0.5 rounded text-xs font-medium bg-dusk-800 text-ash-300 hover:text-ash-100 inline-flex items-center gap-1"
+                 class="px-2 py-0.5 rounded text-xs font-medium bg-surface-muted text-ink hover:text-ink-strong inline-flex items-center gap-1"
                  title={m.tournament_vekn_link_title()}>
                 VEKN <ExternalLink class="w-3 h-3" />
               </a>
@@ -610,24 +610,24 @@ import TournamentModals from "./TournamentModals.svelte";
       </div>
 
       {#if error}
-        <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-3 mb-4">
-          <p class="text-crimson-300 text-sm">{error}</p>
+        <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3 mb-4">
+          <p class="text-link-soft text-sm">{error}</p>
         </div>
       {/if}
 
       <!-- Info Card -->
-      <div class="bg-dusk-950 rounded-lg shadow p-6 border border-ash-800 mb-6">
+      <div class="bg-surface-card rounded-lg shadow p-6 border border-line mb-6">
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
           <div>
-            <div class="text-ash-500">{m.tournament_info_date()}</div>
-            <div class="text-ash-200">{formatDate(tournament.start)}</div>
+            <div class="text-ink-faint">{m.tournament_info_date()}</div>
+            <div class="text-ink-bright">{formatDate(tournament.start)}</div>
             {#if formatDateLocal(tournament.start)}
-              <div class="text-xs text-ash-500">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
+              <div class="text-xs text-ink-faint">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
             {/if}
           </div>
           <div>
-            <div class="text-ash-500">{m.tournament_info_location()}</div>
-            <div class="text-ash-200">
+            <div class="text-ink-faint">{m.tournament_info_location()}</div>
+            <div class="text-ink-bright">
               {#if tournament.online}
                 {m.tournaments_online()}
               {:else if tournament.country}
@@ -635,17 +635,17 @@ import TournamentModals from "./TournamentModals.svelte";
                 {#if tournament.venue}
                   <br />
                   {#if tournament.venue_url}
-                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-ash-400 hover:text-ember-400 inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" /></a>
+                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-ink-muted hover:text-ember-400 inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" /></a>
                   {:else}
-                    <span class="text-ash-400">{tournament.venue}</span>
+                    <span class="text-ink-muted">{tournament.venue}</span>
                   {/if}
                 {/if}
                 {#if tournament.address}
                   <br />
                   {#if tournament.map_url}
-                    <a href={tournament.map_url} target="_blank" rel="noopener" class="text-ash-500 hover:text-ember-400 text-xs inline-flex items-center gap-1"><MapPin class="w-3 h-3" /> {tournament.address}</a>
+                    <a href={tournament.map_url} target="_blank" rel="noopener" class="text-ink-faint hover:text-ember-400 text-xs inline-flex items-center gap-1"><MapPin class="w-3 h-3" /> {tournament.address}</a>
                   {:else}
-                    <span class="text-ash-500 text-xs"><MapPin class="w-3 h-3 inline" /> {tournament.address}</span>
+                    <span class="text-ink-faint text-xs"><MapPin class="w-3 h-3 inline" /> {tournament.address}</span>
                   {/if}
                 {/if}
               {:else}
@@ -655,8 +655,8 @@ import TournamentModals from "./TournamentModals.svelte";
           </div>
           {#if tournament.players}
           <div>
-            <div class="text-ash-500">{m.tournament_info_players()}</div>
-            <div class="text-ash-200">{m.tournament_registered_count({ count: String(tournament.players.length) })}</div>
+            <div class="text-ink-faint">{m.tournament_info_players()}</div>
+            <div class="text-ink-bright">{m.tournament_registered_count({ count: String(tournament.players.length) })}</div>
           </div>
           {/if}
         </div>
@@ -668,8 +668,8 @@ import TournamentModals from "./TournamentModals.svelte";
       {/if}
 
       {#if isMinimalView}
-        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 p-6 text-center">
-          <p class="text-ash-400">{m.tournament_sign_in_details()}</p>
+        <div class="bg-surface-card rounded-lg shadow border border-line p-6 text-center">
+          <p class="text-ink-muted">{m.tournament_sign_in_details()}</p>
         </div>
       {:else}
       <!-- View toggle for organizers -->
@@ -677,7 +677,7 @@ import TournamentModals from "./TournamentModals.svelte";
         <div class="flex justify-end mb-4">
           <button
             onclick={() => viewAsPlayer = !viewAsPlayer}
-            class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors"
+            class="px-3 py-1.5 text-sm text-ink bg-surface-hover hover:bg-surface-active rounded-lg transition-colors"
           >
             {#if viewAsPlayer}<Shield class="w-4 h-4 inline mr-1" />{:else}<UserIcon class="w-4 h-4 inline mr-1" />{/if}
             {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
@@ -692,14 +692,14 @@ import TournamentModals from "./TournamentModals.svelte";
 
       <!-- Organizer Console with Tabs -->
       {#if showOrganizerView}
-        <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6">
+        <div class="bg-surface-card rounded-lg shadow border border-line mb-6">
           <!-- Tab bar -->
-          <div class="flex border-b border-ash-800 overflow-x-auto">
+          <div class="flex border-b border-line overflow-x-auto">
             {#each tabs as tab}
               {@const TabIcon = tab.icon}
               <button
                 onclick={() => activeTab = tab.id}
-                class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 {activeTab === tab.id ? 'border-crimson-500 text-bone-100' : 'border-transparent text-ash-400 hover:text-ash-200 hover:border-ash-600'}"
+                class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 {activeTab === tab.id ? 'border-accent text-ink-strong' : 'border-transparent text-ink-muted hover:text-ink-bright hover:border-line-strong'}"
               >
                 <TabIcon class="w-4 h-4" />
                 {tab.label}
@@ -708,7 +708,7 @@ import TournamentModals from "./TournamentModals.svelte";
           </div>
 
           <!-- Action Bar -->
-          <div class="border-b border-ash-800 px-3 sm:px-6 py-3 space-y-3">
+          <div class="border-b border-line px-3 sm:px-6 py-3 space-y-3">
             <!-- Step indicator -->
             <div class="flex items-center gap-1 sm:gap-2 text-xs overflow-x-auto">
               {#each ["Planned", "Registration", "Waiting", "Playing", "Finished"] as step, i}
@@ -716,16 +716,16 @@ import TournamentModals from "./TournamentModals.svelte";
                 {@const currentIdx = states.indexOf(tournament.state)}
                 {@const isDone = i < currentIdx}
                 {@const isCurrent = i === currentIdx}
-                {#if i > 0}<span class="text-ash-700">—</span>{/if}
-                <span class="whitespace-nowrap {isDone ? 'text-blue-400' : isCurrent ? 'text-crimson-400 font-medium' : 'text-ash-600'}">
-                  <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-blue-400' : isCurrent ? 'bg-crimson-400' : 'bg-ash-700'}"></span>
+                {#if i > 0}<span class="text-ink-faint">—</span>{/if}
+                <span class="whitespace-nowrap {isDone ? 'text-blue-400' : isCurrent ? 'text-link font-medium' : 'text-ink-faint'}">
+                  <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-blue-400' : isCurrent ? 'bg-accent' : 'bg-surface-active'}"></span>
                   <span class="hidden sm:inline">{translateTournamentState(step as TournamentState)}</span>
                 </span>
               {/each}
             </div>
 
             <!-- Guidance message -->
-            <p class="text-sm text-ash-400">
+            <p class="text-sm text-ink-muted">
               {#if tournament.state === "Planned"}
                 {m.action_bar_planned()}
               {:else if tournament.state === "Registration"}
@@ -807,7 +807,7 @@ import TournamentModals from "./TournamentModals.svelte";
             <!-- Check-in hints (Waiting state) -->
             {#if tournament.state === "Waiting"}
               {#if checkedInCount < 4}
-                <p class="text-sm text-ash-500">{m.overview_start_round_hint({ count: String(checkedInCount) })}</p>
+                <p class="text-sm text-ink-faint">{m.overview_start_round_hint({ count: String(checkedInCount) })}</p>
               {/if}
               {#if [6, 7, 11].includes(checkedInCount)}
                 <p class="text-sm text-sky-300">{m.overview_stagger_info({ count: String(checkedInCount) })}</p>
@@ -819,7 +819,7 @@ import TournamentModals from "./TournamentModals.svelte";
 
             <!-- Danger action (Waiting state): destructive, set apart with its own hue + icon -->
             {#if tournament.state === "Waiting"}
-              <div class="pt-2 border-t border-ash-800">
+              <div class="pt-2 border-t border-line">
                 <Button variant="danger" size="md" disabled={actionLoading} onclick={() => doAction("FinishTournament")}>
                   <TriangleAlert class="w-4 h-4" aria-hidden="true" />
                   {m.overview_finish_tournament()}
@@ -829,7 +829,7 @@ import TournamentModals from "./TournamentModals.svelte";
 
             <!-- QR Check-in display -->
             {#if showQrCode && (tournament.state === "Registration" || tournament.state === "Waiting") && tournament.checkin_code}
-              <div class="pt-3 border-t border-ash-800">
+              <div class="pt-3 border-t border-line">
                 <QrCheckinDisplay code={tournament.checkin_code} tournamentUid={tournament.uid} tournamentName={tournament.name} />
               </div>
             {/if}

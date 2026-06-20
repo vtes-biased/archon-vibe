@@ -76,7 +76,7 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     use:focusOnMount
-    class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+    class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.stopPropagation()}
     role="dialog"
@@ -84,8 +84,8 @@
     aria-labelledby="confirm-action-title"
     tabindex="-1"
   >
-    <div class="p-6 border-b border-ash-800">
-      <h2 id="confirm-action-title" class="text-xl font-medium text-bone-100">{title}</h2>
+    <div class="p-6 border-b border-line">
+      <h2 id="confirm-action-title" class="text-xl font-medium text-ink-strong">{title}</h2>
     </div>
     <div class="p-6">
       {#if status === 'success'}
@@ -94,20 +94,20 @@
           <span class="font-medium">{started ? m.admin_op_started() : m.admin_op_success()}</span>
         </div>
         {#if started}
-          <p class="text-ash-400 text-sm mb-6">{m.admin_op_started_hint()}</p>
+          <p class="text-ink-muted text-sm mb-6">{m.admin_op_started_hint()}</p>
         {:else if stats.length > 0}
-          <dl class="text-sm bg-dusk-900 border border-ash-700 rounded-lg p-3 space-y-1 mb-6 max-h-60 overflow-auto">
+          <dl class="text-sm bg-surface-muted border border-line-strong rounded-lg p-3 space-y-1 mb-6 max-h-60 overflow-auto">
             {#each stats as [key, value]}
               <div class="flex justify-between gap-4">
-                <dt class="text-ash-400 font-mono">{key}</dt>
-                <dd class="text-bone-200 font-mono text-right break-all">{flatten(value)}</dd>
+                <dt class="text-ink-muted font-mono">{key}</dt>
+                <dd class="text-ink-strong font-mono text-right break-all">{flatten(value)}</dd>
               </div>
             {/each}
           </dl>
         {/if}
         <Button variant="secondary" size="lg" block onclick={onClose}>{m.common_close()}</Button>
       {:else if status === 'error'}
-        <div class="flex items-start gap-2 text-crimson-400 mb-4">
+        <div class="flex items-start gap-2 text-link mb-4">
           <TriangleAlert class="w-5 h-5 shrink-0 mt-0.5" />
           <span class="text-sm break-words">{errorMsg || m.admin_op_error()}</span>
         </div>
@@ -116,7 +116,7 @@
           <Button variant="secondary" size="lg" onclick={onClose}>{m.common_close()}</Button>
         </div>
       {:else}
-        <p class="text-ash-300 mb-6">{body}</p>
+        <p class="text-ink mb-6">{body}</p>
         <div class="flex gap-2">
           <Button variant="primary" size="lg" class="flex-1" loading={status === 'loading'} onclick={run}>
             {#if status === 'loading'}{m.admin_op_running()}{:else}{confirmLabel}{/if}

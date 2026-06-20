@@ -12,7 +12,7 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-3xl mx-auto">
-    <h1 class="text-3xl font-light text-crimson-500 mb-6">{m.legal_privacy_title()}</h1>
+    <h1 class="text-3xl font-light text-accent mb-6">{m.legal_privacy_title()}</h1>
     <article class="doc-prose prose max-w-none">
       {@html html}
     </article>

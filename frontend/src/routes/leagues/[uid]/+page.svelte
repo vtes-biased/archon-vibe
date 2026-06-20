@@ -275,25 +275,25 @@
   <div class="max-w-6xl mx-auto">
     {#if !loaded}
       <div class="text-center py-12">
-        <Loader2 class="mx-auto h-12 w-12 animate-spin text-ash-500" />
+        <Loader2 class="mx-auto h-12 w-12 animate-spin text-ink-faint" />
       </div>
     {:else if !league}
       <div class="text-center py-12">
-        <CircleAlert class="mx-auto h-12 w-12 text-ash-600 mb-4" />
-        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.league_not_found()}</h3>
-        <a href="/leagues" class="text-crimson-400 hover:text-crimson-300">{m.league_back_to_list()}</a>
+        <CircleAlert class="mx-auto h-12 w-12 text-ink-faint mb-4" />
+        <h3 class="text-lg font-medium text-ink-strong mb-2">{m.league_not_found()}</h3>
+        <a href="/leagues" class="text-link hover:text-link-soft">{m.league_back_to_list()}</a>
       </div>
     {:else}
       <!-- Header -->
       <div class="flex items-start justify-between mb-6">
         <div class="flex items-center gap-3">
-          <a href="/leagues" class="text-ash-400 hover:text-bone-100">
+          <a href="/leagues" class="text-ink-muted hover:text-ink-strong">
             <ArrowLeft class="w-5 h-5" />
           </a>
           <div>
-            <h1 class="text-3xl font-light text-crimson-500">{league.name}</h1>
-            <div class="flex gap-2 mt-1 text-sm text-ash-400">
-              <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-success' : 'bg-ash-800 text-ash-400'}">
+            <h1 class="text-3xl font-light text-accent">{league.name}</h1>
+            <div class="flex gap-2 mt-1 text-sm text-ink-muted">
+              <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">
                 {isActive() ? m.league_status_active() : m.league_status_finished()}
               </span>
               <span>{standingsModeLabel(league.standings_mode)}</span>
@@ -328,36 +328,36 @@
       </div>
 
       {#if error}
-        <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4 mb-6">
-          <p class="text-crimson-300">{error}</p>
+        <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6">
+          <p class="text-link-soft">{error}</p>
         </div>
       {/if}
 
       <!-- Edit form -->
       {#if editing}
-        <div class="bg-dusk-950 rounded-lg shadow p-6 border border-ash-800 mb-6 space-y-4">
+        <div class="bg-surface-card rounded-lg shadow p-6 border border-line mb-6 space-y-4">
           <!-- Name -->
           <div>
-            <label for="edit-name" class="block text-sm text-ash-400 mb-1">{m.tfield_name_label()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+            <label for="edit-name" class="block text-sm text-ink-muted mb-1">{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
             <input id="edit-name" type="text" bind:value={editName} required
-              class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {editName.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
+              class="w-full px-3 py-2 text-sm border rounded-lg bg-surface-card text-ink-bright focus:outline-none {editName.trim() ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}" />
           </div>
 
           <!-- Standings Mode & Format -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label for="edit-mode" class="block text-sm text-ash-400 mb-1">{m.league_standings_mode_label()}</label>
+              <label for="edit-mode" class="block text-sm text-ink-muted mb-1">{m.league_standings_mode_label()}</label>
               <select id="edit-mode" bind:value={editStandingsMode}
-                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
                 <option value="RTP">{m.league_standings_rtp_opt()}</option>
                 <option value="Score">{m.league_standings_score_opt()}</option>
                 <option value="GP">{m.league_standings_gp()}</option>
               </select>
             </div>
             <div>
-              <label for="edit-format" class="block text-sm text-ash-400 mb-1">{m.tfield_format()}</label>
+              <label for="edit-format" class="block text-sm text-ink-muted mb-1">{m.tfield_format()}</label>
               <select id="edit-format" bind:value={editFormat}
-                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+                class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
                 <option value="">{m.tfield_format_any()}</option>
                 <option value="Standard">Standard</option>
                 <option value="V5">V5</option>
@@ -369,23 +369,23 @@
           <!-- Dates -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label for="edit-start" class="block text-sm text-ash-400 mb-1">{m.tfield_start()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+              <label for="edit-start" class="block text-sm text-ink-muted mb-1">{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
               <input id="edit-start" type="date" bind:value={editStart} required
-                class="w-full px-3 py-2 text-sm border rounded-lg bg-dusk-950 text-ash-200 focus:outline-none {editStart ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}" />
+                class="w-full px-3 py-2 text-sm border rounded-lg bg-surface-card text-ink-bright focus:outline-none {editStart ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}" />
             </div>
             <div>
-              <label for="edit-finish" class="block text-sm text-ash-400 mb-1">{m.tfield_finish()}</label>
+              <label for="edit-finish" class="block text-sm text-ink-muted mb-1">{m.tfield_finish()}</label>
               <input id="edit-finish" type="date" bind:value={editFinish}
-                class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200 focus:border-ash-500 focus:outline-none" />
-              <p class="text-xs text-ash-500 mt-1">{m.league_finish_hint()}</p>
+                class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright focus:border-line-strong focus:outline-none" />
+              <p class="text-xs text-ink-faint mt-1">{m.league_finish_hint()}</p>
             </div>
           </div>
 
           <!-- Country -->
           <div>
-            <label for="edit-country" class="block text-sm text-ash-400 mb-1">{m.common_country()}</label>
+            <label for="edit-country" class="block text-sm text-ink-muted mb-1">{m.common_country()}</label>
             <select id="edit-country" bind:value={editCountry}
-              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200">
+              class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
               <option value="">{m.league_worldwide()}</option>
               {#each Object.entries(countries) as [code, c]}
                 <option value={code}>{c.name} {getCountryFlag(code)}</option>
@@ -396,13 +396,13 @@
 
           <!-- Description -->
           <div>
-            <label for="edit-desc" class="block text-sm text-ash-400 mb-1">{m.common_description()}</label>
+            <label for="edit-desc" class="block text-sm text-ink-muted mb-1">{m.common_description()}</label>
             <textarea id="edit-desc" bind:value={editDescription} rows={10}
-              class="w-full px-3 py-2 text-sm border border-ash-700 rounded-lg bg-dusk-950 text-ash-200 focus:border-ash-500 focus:outline-none resize-y"></textarea>
+              class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright focus:border-line-strong focus:outline-none resize-y"></textarea>
           </div>
 
           <div class="flex gap-3 justify-end">
-            <button onclick={() => editing = false} class="px-4 py-2 text-sm text-ash-400 hover:text-bone-100">{m.common_cancel()}</button>
+            <button onclick={() => editing = false} class="px-4 py-2 text-sm text-ink-muted hover:text-ink-strong">{m.common_cancel()}</button>
             <Button variant="primary" size="lg" onclick={saveEdit} disabled={!editName.trim() || !editStart}>{m.common_save()}</Button>
           </div>
         </div>
@@ -410,12 +410,12 @@
 
       <!-- Info cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
-          <div class="text-sm text-ash-400">{m.league_col_dates()}</div>
-          <div class="text-bone-100 mt-1">{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : m.league_ongoing()}</div>
+        <div class="bg-surface-card rounded-lg shadow p-4 border border-line">
+          <div class="text-sm text-ink-muted">{m.league_col_dates()}</div>
+          <div class="text-ink-strong mt-1">{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : m.league_ongoing()}</div>
         </div>
-        <div class="bg-dusk-950 rounded-lg shadow p-4 border border-ash-800">
-          <div class="text-sm text-ash-400 mb-1">{m.league_organizers_label()}</div>
+        <div class="bg-surface-card rounded-lg shadow p-4 border border-line">
+          <div class="text-sm text-ink-muted mb-1">{m.league_organizers_label()}</div>
           {#if isOrganizer}
             <OrganizerManager
               organizerUids={league.organizers_uids}
@@ -423,7 +423,7 @@
               onremove={async (userUid) => { await removeLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
             />
           {:else}
-            <div class="text-bone-100">
+            <div class="text-ink-strong">
               {#each league.organizers_uids as ouid}
                 <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
               {/each}
@@ -439,11 +439,11 @@
       <!-- Child leagues (meta-league) -->
       {#if league.kind === "Meta-League"}
         <div class="mb-6">
-          <h2 class="text-xl font-medium text-bone-100 mb-3">{m.league_child_leagues()}</h2>
+          <h2 class="text-xl font-medium text-ink-strong mb-3">{m.league_child_leagues()}</h2>
           {#if isOrganizer && orphanLeagues.length > 0}
             <div class="flex gap-2 mb-3">
               <select bind:value={addChildUid}
-                class="flex-1 px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 text-sm">
+                class="flex-1 px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright text-sm">
                 <option value="">{m.league_add_child_placeholder()}</option>
                 {#each orphanLeagues as ol (ol.uid)}
                   <option value={ol.uid}>{ol.name}</option>
@@ -455,19 +455,19 @@
             </div>
           {/if}
           {#if childLeagues.length > 0}
-            <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
-              <div class="divide-y divide-ash-800">
+            <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
+              <div class="divide-y divide-line">
                 {#each childLeagues as child (child.uid)}
-                  <div class="flex items-center justify-between px-6 py-3 hover:bg-ash-900/50 transition-colors">
+                  <div class="flex items-center justify-between px-6 py-3 hover:bg-surface-muted/50 transition-colors">
                     <a href="/leagues/{child.uid}" class="flex-1">
-                      <div class="font-semibold text-bone-100">{child.name}</div>
+                      <div class="font-semibold text-ink-strong">{child.name}</div>
                       {#if child.country}
-                        <div class="text-sm text-ash-400">{getCountryFlag(child.country)} {countries[child.country]?.name}</div>
+                        <div class="text-sm text-ink-muted">{getCountryFlag(child.country)} {countries[child.country]?.name}</div>
                       {/if}
                     </a>
                     {#if isOrganizer}
                       <button onclick={() => removeChildLeague(child.uid)}
-                        class="ml-2 p-1 text-ash-500 hover:text-crimson-400 transition-colors" title={m.league_remove_child_title()}>
+                        class="ml-2 p-1 text-ink-faint hover:text-link transition-colors" title={m.league_remove_child_title()}>
                         <X class="w-4 h-4" />
                       </button>
                     {/if}
@@ -476,8 +476,8 @@
               </div>
             </div>
           {:else}
-            <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-              <p class="text-ash-400">{m.league_no_children()}</p>
+            <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
+              <p class="text-ink-muted">{m.league_no_children()}</p>
             </div>
           {/if}
         </div>
@@ -485,18 +485,18 @@
 
       <!-- Tournaments -->
       <div class="mb-6">
-        <h2 class="text-xl font-medium text-bone-100 mb-3">
+        <h2 class="text-xl font-medium text-ink-strong mb-3">
           {m.league_tournaments_heading({ count: leagueTournaments.length })}
         </h2>
         {#if leagueTournaments.length > 0}
-          <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
-            <div class="divide-y divide-ash-800">
+          <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
+            <div class="divide-y divide-line">
               {#each leagueTournaments as t (t.uid)}
-                <a href="/tournaments/{t.uid}" class="block px-6 py-3 hover:bg-ash-900/50 transition-colors">
+                <a href="/tournaments/{t.uid}" class="block px-6 py-3 hover:bg-surface-muted/50 transition-colors">
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="font-semibold text-bone-100">{t.name}</div>
-                      <div class="text-sm text-ash-400">
+                      <div class="font-semibold text-ink-strong">{t.name}</div>
+                      <div class="text-sm text-ink-muted">
                         {formatDate(t.start)}
                         {#if t.country}
                           · {getCountryFlag(t.country)}
@@ -504,7 +504,7 @@
                         · {t.format}
                       </div>
                     </div>
-                    <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-ash-800 text-ash-400' : 'badge-success'}">
+                    <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-surface-hover text-ink-muted' : 'badge-success'}">
                       {translateTournamentState(t.state)}
                     </span>
                   </div>
@@ -513,32 +513,32 @@
             </div>
           </div>
         {:else}
-          <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-            <p class="text-ash-400">{m.league_no_tournaments()}</p>
+          <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
+            <p class="text-ink-muted">{m.league_no_tournaments()}</p>
           </div>
         {/if}
       </div>
 
       <!-- Standings -->
       <div>
-        <h2 class="text-xl font-medium text-bone-100 mb-3">{m.league_col_standings()}</h2>
+        <h2 class="text-xl font-medium text-ink-strong mb-3">{m.league_col_standings()}</h2>
         {#if standings.length > 0}
           <!-- Mobile card layout -->
-          <div class="sm:hidden bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800 divide-y divide-ash-800">
+          <div class="sm:hidden bg-surface-card rounded-lg shadow overflow-hidden border border-line divide-y divide-line">
             {#each standings as entry (entry.user_uid)}
               <div class="flex items-center gap-3 px-4 py-3">
-                <span class="w-6 shrink-0 text-right text-sm font-medium text-ash-400">{entry.rank}</span>
+                <span class="w-6 shrink-0 text-right text-sm font-medium text-ink-muted">{entry.rank}</span>
                 <div class="min-w-0 flex-1">
-                  <a href="/users/{entry.user_uid}" class="block truncate text-sm text-bone-100 hover:text-crimson-400">{entry.name}</a>
-                  <div class="mt-0.5 flex items-center gap-3 text-xs text-ash-500">
+                  <a href="/users/{entry.user_uid}" class="block truncate text-sm text-ink-strong hover:text-link">{entry.name}</a>
+                  <div class="mt-0.5 flex items-center gap-3 text-xs text-ink-faint">
                     <span class="whitespace-nowrap">{formatScore(entry.gw, entry.vp, entry.tp)}</span>
                     <span class="inline-flex items-center gap-1"><Trophy class="w-3 h-3" />{entry.tournaments_count}</span>
                   </div>
                 </div>
                 {#if league?.standings_mode !== "Score"}
                   <div class="shrink-0 text-right">
-                    <div class="text-sm font-semibold text-bone-100 leading-tight">{entry.points}</div>
-                    <div class="text-[10px] uppercase tracking-wide text-ash-500">{m.rankings_col_points()}</div>
+                    <div class="text-sm font-semibold text-ink-strong leading-tight">{entry.points}</div>
+                    <div class="text-[10px] uppercase tracking-wide text-ink-faint">{m.rankings_col_points()}</div>
                   </div>
                 {/if}
               </div>
@@ -546,11 +546,11 @@
           </div>
 
           <!-- Desktop table -->
-          <div class="hidden sm:block bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
+          <div class="hidden sm:block bg-surface-card rounded-lg shadow overflow-hidden border border-line">
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
-                  <tr class="bg-ash-900 text-ash-300 border-b border-ash-700">
+                  <tr class="bg-surface-muted text-ink border-b border-line-strong">
                     <th class="px-4 py-2 text-left w-12">{m.tournament_col_rank()}</th>
                     <th class="px-4 py-2 text-left">{m.tournament_col_player()}</th>
                     {#if league?.standings_mode !== "Score"}
@@ -560,18 +560,18 @@
                     <th class="px-4 py-2 text-right">{m.league_standings_events()}</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-ash-800">
+                <tbody class="divide-y divide-line">
                   {#each standings as entry (entry.user_uid)}
-                    <tr class="hover:bg-ash-900/50">
-                      <td class="px-4 py-2 text-ash-400 font-medium">{entry.rank}</td>
-                      <td class="px-4 py-2 text-bone-100">
-                        <a href="/users/{entry.user_uid}" class="hover:text-crimson-400">{entry.name}</a>
+                    <tr class="hover:bg-surface-muted/50">
+                      <td class="px-4 py-2 text-ink-muted font-medium">{entry.rank}</td>
+                      <td class="px-4 py-2 text-ink-strong">
+                        <a href="/users/{entry.user_uid}" class="hover:text-link">{entry.name}</a>
                       </td>
                       {#if league?.standings_mode !== "Score"}
-                        <td class="px-4 py-2 text-right text-bone-100 font-medium">{entry.points}</td>
+                        <td class="px-4 py-2 text-right text-ink-strong font-medium">{entry.points}</td>
                       {/if}
-                      <td class="px-4 py-2 text-right text-ash-300 whitespace-nowrap">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
-                      <td class="px-4 py-2 text-right text-ash-400">{entry.tournaments_count}</td>
+                      <td class="px-4 py-2 text-right text-ink whitespace-nowrap">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
+                      <td class="px-4 py-2 text-right text-ink-muted">{entry.tournaments_count}</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -579,13 +579,13 @@
             </div>
           </div>
         {:else if standingsError}
-          <div class="bg-dusk-950 rounded-lg shadow p-8 border border-crimson-800/50 text-center">
-            <p class="text-crimson-300 mb-3">{m.league_standings_error()}</p>
+          <div class="bg-surface-card rounded-lg shadow p-8 border border-accent-soft-border/50 text-center">
+            <p class="text-link-soft mb-3">{m.league_standings_error()}</p>
             <Button variant="secondary" size="lg" onclick={loadLeague}>{m.common_retry()}</Button>
           </div>
         {:else}
-          <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-            <p class="text-ash-400">{m.league_standings_empty()}</p>
+          <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
+            <p class="text-ink-muted">{m.league_standings_empty()}</p>
           </div>
         {/if}
       </div>

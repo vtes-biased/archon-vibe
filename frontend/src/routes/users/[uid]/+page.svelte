@@ -150,7 +150,7 @@
 
 <div class="max-w-3xl mx-auto px-4 py-6">
   {#if !user}
-    <div class="text-center text-ash-400 py-8">
+    <div class="text-center text-ink-muted py-8">
       <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.common_loading()}</span>
     </div>
@@ -159,7 +159,7 @@
       <div></div>
       <button
         onclick={shareProfile}
-        class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
+        class="p-2 text-ink-faint hover:text-link transition-colors"
         title={m.profile_share()}
       >
         {#if copied}
@@ -178,7 +178,7 @@
 
     {#if user.coopted_by}
       {@const date = user.coopted_at ? new Date(user.coopted_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
-      <p class="mt-2 px-4 text-xs text-mist-dark">
+      <p class="mt-2 px-4 text-xs text-ink-faint">
         {#if sponsorName}
           {m.user_sponsored_by({ name: sponsorName, date })}
         {:else}

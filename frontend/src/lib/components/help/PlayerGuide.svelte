@@ -9,11 +9,11 @@
 {@html renderGuideSection(m.pg_intro())}
 
 <ExampleBox>
-  <div class="flex bg-dusk-900 rounded-lg p-1 max-w-xs">
-    <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium text-ash-400 hover:text-ash-200">
+  <div class="flex bg-surface-muted rounded-lg p-1 max-w-xs">
+    <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium text-ink-muted hover:text-ink-bright">
       Login
     </button>
-    <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium bg-crimson-700 text-white">
+    <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium bg-accent-strong text-white">
       Sign Up
     </button>
   </div>
@@ -22,7 +22,7 @@
 {@html renderGuideSection(m.pg_signup_passkey())}
 
 <ExampleBox>
-  <button class="w-full max-w-xs py-3 bg-crimson-700 text-white rounded-lg font-medium flex items-center justify-center gap-2">
+  <button class="w-full max-w-xs py-3 bg-accent-strong text-white rounded-lg font-medium flex items-center justify-center gap-2">
     <KeyRound class="w-5 h-5" />
     Create Account with Passkey
   </button>
@@ -44,10 +44,10 @@
     <input
       type="email"
       placeholder="Enter your email"
-      class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500"
+      class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint"
       tabindex="-1"
     />
-    <button class="w-full py-3 bg-ash-800 text-bone-100 rounded-lg font-medium flex items-center justify-center gap-2">
+    <button class="w-full py-3 bg-surface-hover text-ink-strong rounded-lg font-medium flex items-center justify-center gap-2">
       <Mail class="w-5 h-5" />
       Continue with Email
     </button>
@@ -60,23 +60,23 @@
   <div class="max-w-xs space-y-4">
     <div class="space-y-3">
       <div>
-        <label for="ex-email" class="block text-sm text-ash-400 mb-1">Email</label>
-        <input id="ex-email" type="email" placeholder="you@example.com" class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500" tabindex="-1" />
+        <label for="ex-email" class="block text-sm text-ink-muted mb-1">Email</label>
+        <input id="ex-email" type="email" placeholder="you@example.com" class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint" tabindex="-1" />
       </div>
       <div>
-        <label for="ex-password" class="block text-sm text-ash-400 mb-1">Password</label>
-        <input id="ex-password" type="password" placeholder="Enter your password" class="w-full px-4 py-3 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500" tabindex="-1" />
+        <label for="ex-password" class="block text-sm text-ink-muted mb-1">Password</label>
+        <input id="ex-password" type="password" placeholder="Enter your password" class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint" tabindex="-1" />
       </div>
-      <button class="w-full py-3 bg-crimson-700 text-white rounded-lg font-medium">
+      <button class="w-full py-3 bg-accent-strong text-white rounded-lg font-medium">
         Sign In
       </button>
     </div>
-    <div class="text-center text-sm text-ash-400">Forgot password?</div>
+    <div class="text-center text-sm text-ink-muted">Forgot password?</div>
     <div class="relative my-2">
-      <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-ash-700"></div></div>
-      <div class="relative flex justify-center text-sm"><span class="px-2 bg-dusk-950 text-ash-500">or</span></div>
+      <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-line-strong"></div></div>
+      <div class="relative flex justify-center text-sm"><span class="px-2 bg-surface-card text-ink-faint">or</span></div>
     </div>
-    <button class="w-full py-3 bg-ash-800 text-bone-100 rounded-lg font-medium flex items-center justify-center gap-2">
+    <button class="w-full py-3 bg-surface-hover text-ink-strong rounded-lg font-medium flex items-center justify-center gap-2">
       <KeyRound class="w-5 h-5" />
       Sign in with Passkey
     </button>
@@ -90,14 +90,14 @@
 {@html renderGuideSection(m.pg_login_reset())}
 
 <ExampleBox>
-  <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4 max-w-sm">
-    <p class="text-sm text-ash-300 mb-3">No VEKN ID</p>
+  <div class="bg-surface-card border border-line rounded-lg p-4 max-w-sm">
+    <p class="text-sm text-ink mb-3">No VEKN ID</p>
     <div class="flex flex-wrap gap-2">
-      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white rounded flex items-center gap-1">
         <UserPlus class="w-3.5 h-3.5" />
         Sponsor
       </button>
-      <button class="px-3 py-1.5 text-sm bg-ash-700 text-bone-100 rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-surface-active text-ink-strong rounded flex items-center gap-1">
         <Link class="w-3.5 h-3.5" />
         Link VEKN
       </button>
@@ -109,8 +109,8 @@
 
 <ExampleBox>
   <div class="flex justify-between items-center max-w-sm">
-    <span class="text-ash-400">VEKN ID</span>
-    <button class="px-3 py-1 text-sm bg-crimson-700 text-white rounded">
+    <span class="text-ink-muted">VEKN ID</span>
+    <button class="px-3 py-1 text-sm bg-accent-strong text-white rounded">
       Claim VEKN ID
     </button>
   </div>
@@ -119,19 +119,19 @@
 {@html renderGuideSection(m.pg_vekn_claim_modal())}
 
 <ExampleBox>
-  <div class="bg-dusk-950 border border-ash-800 rounded-lg max-w-sm">
-    <div class="p-4 border-b border-ash-800">
-      <h3 class="text-lg font-medium text-bone-100">Claim VEKN ID</h3>
-      <p class="mt-1 text-sm text-ash-400">Enter your VEKN ID to link it to your account. The ID must exist and not be claimed by another user.</p>
+  <div class="bg-surface-card border border-line rounded-lg max-w-sm">
+    <div class="p-4 border-b border-line">
+      <h3 class="text-lg font-medium text-ink-strong">Claim VEKN ID</h3>
+      <p class="mt-1 text-sm text-ink-muted">Enter your VEKN ID to link it to your account. The ID must exist and not be claimed by another user.</p>
     </div>
     <div class="p-4 space-y-3">
       <div>
-        <label for="ex-vekn-id" class="block text-sm font-medium text-ash-400 mb-1">VEKN ID</label>
-        <input id="ex-vekn-id" type="text" placeholder="1234567" class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200" tabindex="-1" />
+        <label for="ex-vekn-id" class="block text-sm font-medium text-ink-muted mb-1">VEKN ID</label>
+        <input id="ex-vekn-id" type="text" placeholder="1234567" class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright" tabindex="-1" />
       </div>
       <div class="flex gap-2">
-        <button class="flex-1 px-4 py-2 bg-crimson-700 text-white rounded font-medium">Claim</button>
-        <button class="px-4 py-2 bg-ash-700 text-ash-200 rounded font-medium">Cancel</button>
+        <button class="flex-1 px-4 py-2 bg-accent-strong text-white rounded font-medium">Claim</button>
+        <button class="px-4 py-2 bg-surface-active text-ink-bright rounded font-medium">Cancel</button>
       </div>
     </div>
   </div>
@@ -141,10 +141,10 @@
 
 <ExampleBox>
   <div class="flex justify-between items-center max-w-sm">
-    <span class="text-ash-400">VEKN ID</span>
+    <span class="text-ink-muted">VEKN ID</span>
     <div class="flex items-center gap-2">
-      <span class="text-bone-100 font-mono">1234567</span>
-      <span class="p-1 text-ash-500">
+      <span class="text-ink-strong font-mono">1234567</span>
+      <span class="p-1 text-ink-faint">
         <Unlink class="w-4 h-4" />
       </span>
     </div>
@@ -156,20 +156,20 @@
 <ExampleBox>
   <div class="max-w-xs space-y-4">
     <div>
-      <label for="ex-language" class="block text-sm text-ash-400 mb-1 flex items-center gap-1.5">
+      <label for="ex-language" class="block text-sm text-ink-muted mb-1 flex items-center gap-1.5">
         <Languages class="w-4 h-4" />
         Language
       </label>
-      <select id="ex-language" class="w-full px-3 py-2 bg-dusk-900 border border-ash-700 rounded-lg text-bone-100" tabindex="-1">
+      <select id="ex-language" class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-strong" tabindex="-1">
         <option>English</option>
       </select>
     </div>
     <div>
-      <span class="block text-sm text-ash-400 mb-1">Theme</span>
-      <div class="flex bg-dusk-900 rounded-lg p-1">
-        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium bg-crimson-700 text-white">Dark</button>
-        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-ash-400">Light</button>
-        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-ash-400">System</button>
+      <span class="block text-sm text-ink-muted mb-1">Theme</span>
+      <div class="flex bg-surface-muted rounded-lg p-1">
+        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium bg-accent-strong text-white">Dark</button>
+        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-ink-muted">Light</button>
+        <button class="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-ink-muted">System</button>
       </div>
     </div>
   </div>
@@ -179,20 +179,20 @@
 
 <ExampleBox>
   <div class="max-w-sm space-y-2">
-    <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
-      <span class="flex items-center gap-2 text-sm text-ash-200"><KeyRound class="w-4 h-4" /> Passkey</span>
+    <div class="flex items-center justify-between bg-surface-card border border-line rounded-lg px-3 py-2">
+      <span class="flex items-center gap-2 text-sm text-ink-bright"><KeyRound class="w-4 h-4" /> Passkey</span>
       <span class="text-xs px-2 py-0.5 rounded badge-success">Active</span>
     </div>
-    <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
-      <span class="flex items-center gap-2 text-sm text-ash-200"><Mail class="w-4 h-4" /> Email &amp; password</span>
-      <button class="text-xs px-2 py-0.5 bg-ash-700 text-bone-100 rounded">Set up</button>
+    <div class="flex items-center justify-between bg-surface-card border border-line rounded-lg px-3 py-2">
+      <span class="flex items-center gap-2 text-sm text-ink-bright"><Mail class="w-4 h-4" /> Email &amp; password</span>
+      <button class="text-xs px-2 py-0.5 bg-surface-active text-ink-strong rounded">Set up</button>
     </div>
-    <div class="flex items-center justify-between bg-dusk-950 border border-ash-800 rounded-lg px-3 py-2">
-      <span class="flex items-center gap-2 text-sm text-ash-200"><DiscordIcon class="w-4 h-4" /> Discord</span>
+    <div class="flex items-center justify-between bg-surface-card border border-line rounded-lg px-3 py-2">
+      <span class="flex items-center gap-2 text-sm text-ink-bright"><DiscordIcon class="w-4 h-4" /> Discord</span>
       <span class="text-xs px-2 py-0.5 rounded badge-success">Linked</span>
     </div>
     <div class="pt-1 flex gap-2">
-      <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded-lg flex items-center gap-1.5">
+      <button class="px-3 py-1.5 text-sm text-ink border border-line-strong rounded-lg flex items-center gap-1.5">
         <RefreshCw class="w-3.5 h-3.5" />
         Resync
       </button>
@@ -205,10 +205,10 @@
 {@html renderGuideSection(m.pg_community())}
 
 <ExampleBox>
-  <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4 max-w-sm">
-    <p class="text-xs text-ash-500 mb-2">Officials — France</p>
+  <div class="bg-surface-card border border-line rounded-lg p-4 max-w-sm">
+    <p class="text-xs text-ink-faint mb-2">Officials — France</p>
     <div class="flex items-center justify-between">
-      <span class="text-sm text-ash-200">Jane Doe</span>
+      <span class="text-sm text-ink-bright">Jane Doe</span>
       <span class="text-xs px-2 py-0.5 rounded badge-crimson">National Coordinator</span>
     </div>
   </div>
@@ -217,15 +217,15 @@
 {@html renderGuideSection(m.pg_leagues())}
 
 <ExampleBox>
-  <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4 max-w-sm">
+  <div class="bg-surface-card border border-line rounded-lg p-4 max-w-sm">
     <div class="flex items-center gap-2 mb-2">
-      <Trophy class="w-4 h-4 text-crimson-400" />
-      <span class="text-sm font-medium text-bone-100">Spring Circuit 2026</span>
+      <Trophy class="w-4 h-4 text-link" />
+      <span class="text-sm font-medium text-ink-strong">Spring Circuit 2026</span>
     </div>
-    <div class="divide-y divide-ash-800 text-sm">
-      <div class="py-1.5 flex justify-between"><span class="text-ash-300">1. Alice</span><span class="text-ash-400">75</span></div>
-      <div class="py-1.5 flex justify-between"><span class="text-ash-300">2. Bob</span><span class="text-ash-400">60</span></div>
-      <div class="py-1.5 flex justify-between"><span class="text-ash-300">3. Charlie</span><span class="text-ash-400">48</span></div>
+    <div class="divide-y divide-line text-sm">
+      <div class="py-1.5 flex justify-between"><span class="text-ink">1. Alice</span><span class="text-ink-muted">75</span></div>
+      <div class="py-1.5 flex justify-between"><span class="text-ink">2. Bob</span><span class="text-ink-muted">60</span></div>
+      <div class="py-1.5 flex justify-between"><span class="text-ink">3. Charlie</span><span class="text-ink-muted">48</span></div>
     </div>
   </div>
 </ExampleBox>
@@ -234,18 +234,18 @@
 
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
-    <div class="flex bg-dusk-900 rounded-lg p-1">
-      <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium bg-crimson-700 text-white">
+    <div class="flex bg-surface-muted rounded-lg p-1">
+      <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium bg-accent-strong text-white">
         Your Agenda
       </button>
-      <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium text-ash-400 hover:text-ash-200">
+      <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium text-ink-muted hover:text-ink-bright">
         All Tournaments
       </button>
     </div>
     <div class="flex items-center gap-2">
-      <Calendar class="h-4 w-4 text-ash-500 shrink-0" />
-      <span class="text-xs text-ash-500">Subscribe:</span>
-      <input type="text" readonly value="https://archon.vekn.net/api/calendar/..." class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-ash-700 rounded bg-dusk-950 text-ash-400" tabindex="-1" />
+      <Calendar class="h-4 w-4 text-ink-faint shrink-0" />
+      <span class="text-xs text-ink-faint">Subscribe:</span>
+      <input type="text" readonly value="https://archon.vekn.net/api/calendar/..." class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-line-strong rounded bg-surface-card text-ink-muted" tabindex="-1" />
     </div>
   </div>
 </ExampleBox>
@@ -254,11 +254,11 @@
 
 <ExampleBox>
   <div class="flex gap-3 items-center">
-    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
+    <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
       Register
     </button>
-    <span class="text-xs text-ash-500">or, if you want out:</span>
-    <button class="px-3 py-1.5 text-sm text-crimson-400 border border-crimson-800 rounded-lg">
+    <span class="text-xs text-ink-faint">or, if you want out:</span>
+    <button class="px-3 py-1.5 text-sm text-link border border-accent-soft-border rounded-lg">
       Unregister
     </button>
   </div>
@@ -269,23 +269,23 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-1">
-      <button class="px-3 py-1.5 text-sm rounded-lg bg-crimson-600 text-white">
+      <button class="px-3 py-1.5 text-sm rounded-lg bg-accent-strong-hover text-white">
         Paste Deck
       </button>
-      <button class="px-3 py-1.5 text-sm rounded-lg bg-ash-800 text-ash-300">
+      <button class="px-3 py-1.5 text-sm rounded-lg bg-surface-hover text-ink">
         From URL
       </button>
-      <button class="px-3 py-1.5 text-sm rounded-lg bg-ash-800 text-ash-300">
+      <button class="px-3 py-1.5 text-sm rounded-lg bg-surface-hover text-ink">
         Scan QR
       </button>
     </div>
     <input
       type="url"
       placeholder="VDB, VTESDecks, or Amaranth URL"
-      class="w-full px-3 py-2 text-sm bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500"
+      class="w-full px-3 py-2 text-sm bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint"
       tabindex="-1"
     />
-    <button class="w-full py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
+    <button class="w-full py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
       Upload Deck
     </button>
   </div>
@@ -303,19 +303,19 @@
 {@html renderGuideSection(m.pg_checkin_details())}
 
 <ExampleBox>
-  <div class="bg-ash-900/50 rounded-lg p-4 max-w-sm">
+  <div class="bg-surface-muted/50 rounded-lg p-4 max-w-sm">
     <div class="flex items-center justify-between mb-2">
-      <h3 class="text-sm font-medium text-bone-100">Table 3</h3>
+      <h3 class="text-sm font-medium text-ink-strong">Table 3</h3>
       <span class="text-xs px-2 py-0.5 rounded badge-pending">Playing</span>
     </div>
-    <div class="divide-y divide-ash-800">
+    <div class="divide-y divide-line">
       {#each ["Alice", "Bob", "Charlie", "Diana"] as name, i}
         <div class="py-1.5 flex items-center justify-between text-sm">
-          <span class="text-ash-300">{name}</span>
+          <span class="text-ink">{name}</span>
           <div class="flex items-center gap-2">
-            <span class="text-ash-400 text-xs">VP:</span>
+            <span class="text-ink-muted text-xs">VP:</span>
             <select
-              class="bg-ash-800 text-bone-100 text-xs rounded px-1.5 py-0.5 border border-ash-700"
+              class="bg-surface-hover text-ink-strong text-xs rounded px-1.5 py-0.5 border border-line-strong"
               tabindex="-1"
             >
               <option>0</option>
@@ -326,7 +326,7 @@
               <option>2.5</option>
               <option>3</option>
             </select>
-            <span class="text-ash-500 text-xs">0GW 0TP</span>
+            <span class="text-ink-faint text-xs">0GW 0TP</span>
           </div>
         </div>
       {/each}
@@ -346,9 +346,9 @@
 {@html renderGuideSection(m.pg_standings())}
 
 <ExampleBox>
-  <div class="bg-purple-900/30 border border-purple-800/50 rounded-lg p-3 flex items-center gap-2 max-w-sm">
-    <svg class="w-5 h-5 text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-    <span class="text-purple-200 font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
+  <div class="banner-warn border rounded-lg p-3 flex items-center gap-2 max-w-sm">
+    <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+    <span class="font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
   </div>
 </ExampleBox>
 

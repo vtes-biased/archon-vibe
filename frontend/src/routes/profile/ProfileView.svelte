@@ -166,11 +166,11 @@
     } catch { /* noop */ }
   }
 
-  const inputClass = "w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent";
+  const inputClass = "w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent";
 </script>
 
 <!-- Header -->
-<div class="p-6 border-b border-ash-800">
+<div class="p-6 border-b border-line">
   <div class="flex items-center gap-4">
     <div class="flex flex-col items-center gap-1">
       <button
@@ -185,8 +185,8 @@
             class="w-16 h-16 rounded-full object-cover"
           />
         {:else}
-          <div class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center">
-            <User class="h-8 w-8 text-ash-500" />
+          <div class="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center">
+            <User class="h-8 w-8 text-ink-faint" />
           </div>
         {/if}
         <div class="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -195,7 +195,7 @@
       </button>
       <button
         onclick={onAvatarClick}
-        class="text-xs text-ash-400 hover:text-crimson-400 sm:hidden"
+        class="text-xs text-ink-muted hover:text-link sm:hidden"
       >{m.user_change_photo()}</button>
     </div>
     <div class="flex-1 space-y-2">
@@ -208,7 +208,7 @@
     </div>
     <button
       onclick={shareProfile}
-      class="p-2 text-ash-500 hover:text-crimson-400 transition-colors self-start"
+      class="p-2 text-ink-faint hover:text-link transition-colors self-start"
       title={m.profile_share()}
     >
       {#if copied}
@@ -224,7 +224,7 @@
 <div class="p-6 space-y-4">
   {#if user.vekn_id}
     <div class="flex justify-between items-center">
-      <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
+      <span class="text-ink-muted">{m.add_player_vekn_id_label()}</span>
       <div class="flex items-center gap-2">
         {#if veknSyncPending}
           <span class="px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1"
@@ -233,10 +233,10 @@
             {m.vekn_sync_pending_member()}
           </span>
         {/if}
-        <span class="text-bone-100 font-mono">{user.vekn_id}</span>
+        <span class="text-ink-strong font-mono">{user.vekn_id}</span>
         <button
           onclick={onAbandonVekn}
-          class="p-1 text-ash-500 hover:text-crimson-400 transition-colors"
+          class="p-1 text-ink-faint hover:text-link transition-colors"
           title={m.profile_abandon_vekn_tooltip()}
         >
           <Unlink class="w-4 h-4" />
@@ -245,7 +245,7 @@
     </div>
   {:else}
     <div class="flex justify-between items-center">
-      <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
+      <span class="text-ink-muted">{m.add_player_vekn_id_label()}</span>
       <Button variant="primary" size="md" onclick={onClaimVekn}>
         {m.profile_claim_vekn_title()}
       </Button>
@@ -253,7 +253,7 @@
   {/if}
 
   <div>
-    <label for="edit-country" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
+    <label for="edit-country" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
     <select id="edit-country" bind:value={editCountry} onchange={handleCountryChange}
       disabled={isCountryLocked}
       aria-describedby={isCountryLocked ? "edit-country-help" : undefined}
@@ -264,24 +264,24 @@
       {/each}
     </select>
     {#if isCountryLocked}
-      <p id="edit-country-help" class="mt-1 text-xs text-mist-500">{m.profile_country_locked_help()}</p>
+      <p id="edit-country-help" class="mt-1 text-xs text-ink-faint">{m.profile_country_locked_help()}</p>
     {/if}
   </div>
 
   <div>
-    <label for="edit-city" class="block text-sm font-medium text-ash-400 mb-1">{m.common_city()}</label>
+    <label for="edit-city" class="block text-sm font-medium text-ink-muted mb-1">{m.common_city()}</label>
     <CityAutocomplete bind:value={editCity} bind:geonameId={editCityGeonameId} countryCode={editCountry} disabled={!editCountry} onselect={handleCitySelect} />
     {#if !editCountry}
-      <p class="mt-1 text-xs text-mist-500">{m.city_select_country_first()}</p>
+      <p class="mt-1 text-xs text-ink-faint">{m.city_select_country_first()}</p>
     {/if}
   </div>
 
   {#if user.roles.length > 0}
     <div class="flex justify-between items-start">
-      <span class="text-ash-400">{m.common_roles()}</span>
+      <span class="text-ink-muted">{m.common_roles()}</span>
       <div class="flex flex-wrap gap-2 justify-end">
         {#each user.roles as role}
-          <span class="px-2 py-1 text-xs rounded bg-ash-800 text-bone-100">{role}</span>
+          <span class="px-2 py-1 text-xs rounded bg-surface-hover text-ink-strong">{role}</span>
         {/each}
       </div>
     </div>
@@ -289,8 +289,8 @@
 </div>
 
 <!-- Contact Info -->
-<div class="p-6 border-t border-ash-800 space-y-4">
-  <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide">{m.profile_contact_info()}</h3>
+<div class="p-6 border-t border-line space-y-4">
+  <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_contact_info()}</h3>
 
   {#if isOfficial}
     <div class="p-3 rounded border text-sm banner-info">
@@ -304,20 +304,20 @@
 
   <div class="space-y-4">
     <div>
-      <label for="edit-contact-email" class="block text-sm font-medium text-ash-400 mb-1">{m.profile_contact_email()}</label>
+      <label for="edit-contact-email" class="block text-sm font-medium text-ink-muted mb-1">{m.profile_contact_email()}</label>
       <input id="edit-contact-email" type="email" bind:value={editContactEmail}
         onblur={() => saveField("contact_email", editContactEmail || undefined)}
         class={inputClass} />
     </div>
     <div>
-      <label for="edit-contact-phone" class="block text-sm font-medium text-ash-400 mb-1">{m.profile_phone()}</label>
+      <label for="edit-contact-phone" class="block text-sm font-medium text-ink-muted mb-1">{m.profile_phone()}</label>
       <input id="edit-contact-phone" type="tel" bind:value={editContactPhone}
         onblur={() => saveField("contact_phone", editContactPhone || undefined)}
         class={inputClass} />
-      <label class="flex items-center gap-2 mt-2 text-sm text-ash-400 cursor-pointer">
+      <label class="flex items-center gap-2 mt-2 text-sm text-ink-muted cursor-pointer">
         <input type="checkbox" bind:checked={editPhoneIsWhatsapp}
           onchange={() => saveField("phone_is_whatsapp", editPhoneIsWhatsapp)}
-          class="rounded border-ash-600 bg-dusk-950 text-crimson-500 focus:ring-crimson-500" />
+          class="rounded border-line-strong bg-surface-card text-accent focus:ring-accent" />
         {m.profile_phone_is_whatsapp()}
       </label>
     </div>
@@ -326,8 +326,8 @@
 
 <!-- Community Links -->
 {#if user.vekn_id}
-  <div class="p-6 border-t border-ash-800">
-    <h3 class="text-sm font-medium text-ash-400 uppercase tracking-wide mb-4">{m.profile_community_links()}</h3>
+  <div class="p-6 border-t border-line">
+    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide mb-4">{m.profile_community_links()}</h3>
 
     {#if !isOfficial}
       <div class="p-3 rounded border text-sm banner-info mb-4">
@@ -337,16 +337,16 @@
 
     <div class="space-y-3">
       {#each editLinks as link, i}
-        <div class="border border-ash-700 rounded-lg p-3 space-y-2">
+        <div class="border border-line-strong rounded-lg p-3 space-y-2">
           <div class="flex items-center gap-2">
             <select bind:value={link.type} onchange={saveLinks}
-              class="flex-1 px-2 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 text-sm">
+              class="flex-1 px-2 py-2 border border-line-strong rounded bg-surface-card text-ink-bright text-sm">
               {#each LINK_TYPES as lt}
                 <option value={lt.value}>{lt.label}</option>
               {/each}
             </select>
             <button type="button" onclick={() => removeLink(i)}
-              class="p-2 text-ash-500 hover:text-crimson-400 transition-colors shrink-0">
+              class="p-2 text-ink-faint hover:text-link transition-colors shrink-0">
               <Trash2 class="w-4 h-4" />
             </button>
           </div>
@@ -359,17 +359,17 @@
           {#if CONTENT_TYPES.has(link.type)}
             <div class="flex flex-wrap items-center gap-1.5">
               {#each link.languages as code (code)}
-                <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-ash-800 text-ash-200 text-xs">
+                <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-surface-hover text-ink-bright text-xs">
                   {LANGUAGE_NAMES[code] ?? code}
                   <button type="button" aria-label={m.profile_remove_language({ lang: LANGUAGE_NAMES[code] ?? code })}
                     onclick={() => { link.languages = link.languages.filter(c => c !== code); saveLinks(); }}
-                    class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ash-500 hover:text-crimson-400 cursor-pointer">
+                    class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ink-faint hover:text-link cursor-pointer">
                     <X class="w-3.5 h-3.5" />
                   </button>
                 </span>
               {/each}
               {#if link.languages.length === 0}
-                <span class="text-xs text-ash-500">{m.profile_link_all_languages()}</span>
+                <span class="text-xs text-ink-faint">{m.profile_link_all_languages()}</span>
               {/if}
               {#if link.languages.length < MAX_LANGUAGES}
                 <select value="" aria-label={m.profile_add_language()}
@@ -377,7 +377,7 @@
                     const c = e.currentTarget.value; e.currentTarget.value = "";
                     if (c && !link.languages.includes(c)) { link.languages = [...link.languages, c]; saveLinks(); }
                   }}
-                  class="px-2 py-1.5 border border-ash-600 rounded bg-dusk-950 text-ash-400 text-xs">
+                  class="px-2 py-1.5 border border-line-strong rounded bg-surface-card text-ink-muted text-xs">
                   <option value="" disabled selected>+ {m.profile_add_language()}</option>
                   {#each LANGUAGES.filter(l => !link.languages.includes(l.value)) as lang}
                     <option value={lang.value}>{lang.label}</option>
@@ -392,7 +392,7 @@
 
     {#if editLinks.length < maxLinks}
       <button type="button" onclick={addLink}
-        class="mt-3 flex items-center gap-1 text-sm text-crimson-500 hover:text-crimson-400 transition-colors">
+        class="mt-3 flex items-center gap-1 text-sm text-link hover:text-link-soft transition-colors">
         <Plus class="w-4 h-4" />
         {m.profile_add_link()}
       </button>
@@ -402,7 +402,7 @@
 
 <!-- Sponsorship banner for non-members -->
 {#if !user.vekn_id && user.country}
-  <div class="p-6 border-t border-ash-800">
+  <div class="p-6 border-t border-line">
     <div class="p-3 rounded border text-sm banner-warn">
       {m.profile_sponsorship_banner()}
       <a href="/users?tab=community" class="underline hover:text-purple-200 ml-1">{m.profile_find_coordinator()}</a>

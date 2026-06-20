@@ -41,18 +41,18 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-crimson-400">{m.tournament_delete_title()}</h2>
+      <div class="p-6 border-b border-line">
+        <h2 class="text-xl font-medium text-link">{m.tournament_delete_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.tournament_delete_msg()}</p>
+        <p class="text-ink mb-6">{m.tournament_delete_msg()}</p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" onclick={onDelete}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.common_delete()}</Button>
           <Button variant="secondary" size="lg" onclick={() => (showDeleteConfirm = false)}>{m.common_cancel()}</Button>
@@ -73,18 +73,18 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
-      <div class="p-6 border-b border-ash-800">
+      <div class="p-6 border-b border-line">
         <h2 class="text-xl font-medium text-purple-400">{m.offline_go_offline_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.offline_go_offline_msg()}</p>
+        <p class="text-ink mb-6">{m.offline_go_offline_msg()}</p>
         <div class="flex gap-2">
           <Button variant="primary" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onGoOffline}>
             {offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}
@@ -107,18 +107,18 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
-      <div class="p-6 border-b border-ash-800">
+      <div class="p-6 border-b border-line">
         <h2 class="text-xl font-medium text-blue-400">{m.offline_go_online_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.offline_go_online_msg()}</p>
+        <p class="text-ink mb-6">{m.offline_go_online_msg()}</p>
         <div class="flex gap-2">
           <Button variant="primary" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onGoOnline}>
             {offlineActionLoading ? m.common_loading() : m.offline_go_online_confirm()}
@@ -141,18 +141,18 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
-      <div class="p-6 border-b border-ash-800">
+      <div class="p-6 border-b border-line">
         <h2 class="text-xl font-medium text-purple-400">{m.offline_force_takeover_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.offline_force_takeover_msg()}</p>
+        <p class="text-ink mb-6">{m.offline_force_takeover_msg()}</p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceTakeover}>
             <TriangleAlert class="w-4 h-4" aria-hidden="true" />
@@ -176,18 +176,18 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-crimson-400">{m.offline_force_unlock_title()}</h2>
+      <div class="p-6 border-b border-line">
+        <h2 class="text-xl font-medium text-link">{m.offline_force_unlock_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-6">{m.offline_force_unlock_msg()}</p>
+        <p class="text-ink mb-6">{m.offline_force_unlock_msg()}</p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceUnlock}>
             <TriangleAlert class="w-4 h-4" aria-hidden="true" />

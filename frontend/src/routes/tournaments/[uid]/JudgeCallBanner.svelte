@@ -53,13 +53,13 @@
         <div class="flex items-center gap-2">
           <Gavel class="w-5 h-5 text-purple-400 shrink-0" />
           <div>
-            <span class="text-sm font-medium text-bone-100">{m.judge_call_alert()}</span>
-            <span class="text-sm text-ash-300 ml-1">
+            <span class="text-sm font-medium text-ink-strong">{m.judge_call_alert()}</span>
+            <span class="text-sm text-ink ml-1">
               {call.table_label} &mdash; {call.player_name}
             </span>
           </div>
         </div>
-        <button onclick={() => dismiss(call.id)} class="text-ash-400 hover:text-ash-200 transition-colors p-1" title={m.judge_call_dismiss()}>
+        <button onclick={() => dismiss(call.id)} class="text-ink-muted hover:text-ink-bright transition-colors p-1" title={m.judge_call_dismiss()}>
           <X class="w-4 h-4" />
         </button>
       </div>

@@ -135,9 +135,9 @@
 
 <!-- VEKN Management Section -->
 <div>
-  <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.vekn_title()}</h2>
-  <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4">
-    <p class="text-sm text-ash-300 mb-3">
+  <h2 class="text-lg font-semibold text-ink-bright mb-3">{m.vekn_title()}</h2>
+  <div class="bg-surface-card border border-line rounded-lg p-4">
+    <p class="text-sm text-ink mb-3">
       {#if user.vekn_id}
         {m.vekn_id_display({ id: user.vekn_id })}
         {#if veknSyncPending}
@@ -151,7 +151,7 @@
       {/if}
     </p>
     {#if veknSyncPending}
-      <p class="text-xs text-ash-500 -mt-2 mb-3">{m.vekn_sync_pending_hint()}</p>
+      <p class="text-xs text-ink-faint -mt-2 mb-3">{m.vekn_sync_pending_hint()}</p>
     {/if}
     <div class="flex flex-wrap gap-2">
       {#if !user.vekn_id}
@@ -184,10 +184,10 @@
     <!-- Deceased status: VEKN members only (symmetric with delete for VEKN-less);
          still shown if already set on a VEKN-less member so it can be cleared. -->
     {#if isDeceased || (user.vekn_id && canMarkDeceased)}
-      <div class="mt-3 pt-3 border-t border-ash-800 flex items-center justify-between gap-2">
+      <div class="mt-3 pt-3 border-t border-line flex items-center justify-between gap-2">
         {#if isDeceased}
-          <span class="text-sm text-ash-300 inline-flex items-center gap-1.5">
-            <Flower2 class="w-4 h-4 text-ash-400" aria-hidden="true" />
+          <span class="text-sm text-ink inline-flex items-center gap-1.5">
+            <Flower2 class="w-4 h-4 text-ink-muted" aria-hidden="true" />
             {m.deceased_status_set()}
           </span>
         {:else}
@@ -218,13 +218,13 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showSponsorConfirm = false)}
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="sponsor-modal-title" class="text-xl font-medium text-bone-100">{m.vekn_sponsor_title()}</h2>
+      <div class="p-6 border-b border-line">
+        <h2 id="sponsor-modal-title" class="text-xl font-medium text-ink-strong">{m.vekn_sponsor_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-4">
+        <p class="text-ink mb-4">
           {m.vekn_sponsor_confirm({ name: user.name })}
         </p>
         <div class="flex gap-2">
@@ -254,11 +254,11 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showLinkModal = false)}
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="link-modal-title" class="text-xl font-medium text-bone-100">{m.vekn_link_modal_title()}</h2>
-        <p class="mt-2 text-sm text-ash-400">
+      <div class="p-6 border-b border-line">
+        <h2 id="link-modal-title" class="text-xl font-medium text-ink-strong">{m.vekn_link_modal_title()}</h2>
+        <p class="mt-2 text-sm text-ink-muted">
           {m.vekn_link_description({ name: user.name })}
         </p>
       </div>
@@ -270,7 +270,7 @@
         class="p-6 space-y-4"
       >
         <div>
-          <label for="link-vekn-id" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="link-vekn-id" class="block text-sm font-medium text-ink-muted mb-1">
             {m.add_player_vekn_id_label()}
           </label>
           <input
@@ -278,7 +278,7 @@
             type="text"
             bind:value={linkVeknIdInput}
             placeholder="1234567"
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
           />
         </div>
         <div class="flex gap-2">
@@ -316,16 +316,16 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showForceAbandonConfirm = false)}
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="force-abandon-modal-title" class="text-xl font-medium text-crimson-400">{m.vekn_abandon_title()}</h2>
+      <div class="p-6 border-b border-line">
+        <h2 id="force-abandon-modal-title" class="text-xl font-medium text-link">{m.vekn_abandon_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-4">
+        <p class="text-ink mb-4">
           {m.vekn_abandon_confirm({ id: user.vekn_id!, name: user.name })}
         </p>
-        <p class="text-sm text-crimson-400 mb-6">
+        <p class="text-sm text-link mb-6">
           {m.vekn_abandon_warning()}
         </p>
         <div class="flex gap-2">
@@ -356,11 +356,11 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showMergeModal = false)}
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="merge-modal-title" class="text-xl font-medium text-bone-100">{m.vekn_merge_modal_title()}</h2>
-        <p class="mt-2 text-sm text-ash-400">
+      <div class="p-6 border-b border-line">
+        <h2 id="merge-modal-title" class="text-xl font-medium text-ink-strong">{m.vekn_merge_modal_title()}</h2>
+        <p class="mt-2 text-sm text-ink-muted">
           {m.vekn_merge_description({ name: user.name })}
         </p>
       </div>
@@ -372,7 +372,7 @@
         class="p-6 space-y-4"
       >
         <div>
-          <label for="merge-target-uid" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="merge-target-uid" class="block text-sm font-medium text-ink-muted mb-1">
             {m.vekn_merge_uid_label()}
           </label>
           <input
@@ -380,7 +380,7 @@
             type="text"
             bind:value={mergeTargetUid}
             placeholder={m.vekn_merge_uid_placeholder()}
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent font-mono text-sm"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent font-mono text-sm"
           />
         </div>
         <div class="flex gap-2">
@@ -418,16 +418,16 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showDeleteConfirm = false)}
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="delete-modal-title" class="text-xl font-medium text-crimson-400">{m.member_delete_modal_title()}</h2>
+      <div class="p-6 border-b border-line">
+        <h2 id="delete-modal-title" class="text-xl font-medium text-link">{m.member_delete_modal_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-4">
+        <p class="text-ink mb-4">
           {m.member_delete_confirm({ name: user.name })}
         </p>
-        <p class="text-sm text-crimson-400 mb-6">
+        <p class="text-sm text-link mb-6">
           {m.member_delete_warning()}
         </p>
         <div class="flex gap-2">

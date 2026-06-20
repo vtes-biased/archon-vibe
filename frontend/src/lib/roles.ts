@@ -6,7 +6,7 @@ const ROLE_CLASSES: Record<Role, string> = {
   // Gothic-jewel families: governance = crimson · judiciary = amethyst · playtest = blue · ethics = fuchsia · dev = slate
   IC: 'badge-crimson',
   NC: 'badge-crimson',
-  Prince: 'bg-crimson-800/60 text-crimson-200', // crimson uses custom palette
+  Prince: 'bg-accent-soft/60 text-link-soft', // crimson uses custom palette
   Ethics: 'badge-fuchsia',
   PTC: 'badge-blue',
   PT: 'badge-blue',

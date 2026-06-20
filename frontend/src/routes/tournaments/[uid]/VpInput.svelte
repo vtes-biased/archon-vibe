@@ -48,13 +48,13 @@
       aria-pressed={opt === value}
       class="h-11 min-w-11 px-2 rounded-lg border text-sm font-semibold tabular-nums transition-colors disabled:opacity-40
         {opt === value
-          ? 'bg-crimson-700 text-white border-crimson-600 ring-2 ring-crimson-400'
-          : 'bg-ash-800 text-bone-100 border-ash-700 hover:border-ash-600'}"
+          ? 'bg-accent-strong text-white border-accent-strong-hover ring-2 ring-accent'
+          : 'bg-surface-hover text-ink-strong border-line-strong hover:border-line-strong'}"
     >{opt}</button>
   {/each}
   <span class="w-5 h-5 ml-0.5 flex items-center justify-center" aria-live="polite">
     {#if saving}
-      <Loader2 class="w-4 h-4 text-ash-400 animate-spin" aria-hidden="true" />
+      <Loader2 class="w-4 h-4 text-ink-muted animate-spin" aria-hidden="true" />
       <span class="sr-only">{m.common_saving()}</span>
     {:else if justSaved}
       <Check class="w-4 h-4 text-blue-400" aria-hidden="true" />

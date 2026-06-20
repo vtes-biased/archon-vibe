@@ -13,7 +13,7 @@
 ### Design System (authoritative: `frontend/DESIGN.md`)
 - Dark-first gothic palette: crimson, bone, dusk, ash, mist. Custom fonts "Ankha VTES" / "VTES Clans" served from `/fonts/`.
 - Mobile-first; **44px minimum touch targets**; auto-save pattern (no explicit save buttons).
-- Country display: flag + name. Consistent form styling: `bg-dusk-950 border-ash-600/700 rounded-lg`.
+- Country display: flag + name. Consistent form styling: `bg-surface-card border-line rounded-lg` (post-#247 role tokens; old `bg-dusk-950 border-ash-600/700` removed).
 - Tab content padding should scale (`p-3 sm:p-6`) — don't use desktop padding on mobile.
 
 ### Architecture Patterns
@@ -39,10 +39,11 @@
 ### Gotchas
 - [No line-clamp on markdown](feedback_no_lineclamp_on_markdown.md) — never `line-clamp-N` over `{@html renderMarkdown(...)}`; derive a plain-text excerpt from source for folded previews.
 - Focus-ring floor: global `:focus-visible` crimson ring; opt out only with a self-provided crimson indicator — see DESIGN.md (Mobile First).
-- [Stock Tailwind color tokens skip light inversion](feedback_emerald_amber_tokens_no_light_inversion.md) — `bg-emerald/amber-*` don't follow `html.light`; only the `.btn-*`/`.badge-*` CSS classes hand-roll light contrast.
+- [Stock Tailwind color tokens skip theming](feedback_emerald_amber_tokens_no_light_inversion.md) — raw `bg-emerald/amber/blue/red-*` tints don't adapt to theme; use role utilities (`bg-surface-*`, `text-ink-*`, `border-line-*`) or semantic classes (`.btn-*`/`.badge-*`/`.banner-*`).
 
 ### Components
 - [Shared <Button> component](project_shared_button_component.md) — app-wide action button (variant primary|secondary|warning|ghost|danger); don't migrate icon-only/stepper/list buttons to it.
 
 ### Design direction
-- [Crimson is brand, not primary CTA](feedback_crimson_is_brand_not_primary_cta.md) — push back on "brand=primary button"; crimson→chrome only, emerald=primary(go), btn-red=danger, amber=warning; palette rework belongs in #232 not the button migration.
+- [Role-token palette (#247)](project_role_token_palette.md) — surface/ink/line/accent via light-dark(); `text-accent` fails AA at body size (use `text-link`); dusk→ash surface consolidation is intended.
+- [Crimson = primary CTA (RESOLVED)](feedback_crimson_is_brand_not_primary_cta.md) — owner decided: crimson=primary CTA, danger=amethyst (violet, CVD-safe), warning/amber tier dropped. Role tokens (#247) encode this; see `frontend/DESIGN.md`.

@@ -80,7 +80,7 @@
 <div>
   {#if rooms.length > 0}
     <div class="flex items-center justify-end mb-2">
-      <span class="text-xs text-ash-500">{m.rooms_total({ count: String(totalCount) })}</span>
+      <span class="text-xs text-ink-faint">{m.rooms_total({ count: String(totalCount) })}</span>
     </div>
   {/if}
 
@@ -92,13 +92,13 @@
             <button
               onclick={() => moveUp(i)}
               disabled={i === 0 || saving}
-              class="p-0.5 text-ash-500 hover:text-bone-100 disabled:opacity-40 transition-colors"
+              class="p-0.5 text-ink-faint hover:text-ink-strong disabled:opacity-40 transition-colors"
               aria-label="Move up"
             ><ChevronUp class="w-3.5 h-3.5" /></button>
             <button
               onclick={() => moveDown(i)}
               disabled={i === rooms.length - 1 || saving}
-              class="p-0.5 text-ash-500 hover:text-bone-100 disabled:opacity-40 transition-colors"
+              class="p-0.5 text-ink-faint hover:text-ink-strong disabled:opacity-40 transition-colors"
               aria-label="Move down"
             ><ChevronDown class="w-3.5 h-3.5" /></button>
           </div>
@@ -108,7 +108,7 @@
             onblur={() => handleNameBlur(i)}
             placeholder={m.rooms_name()}
             maxlength={50}
-            class="flex-1 min-w-0 px-2 py-1 text-sm bg-ash-900 border border-ash-700 rounded text-bone-100 placeholder-ash-600 focus:border-crimson-600 focus:outline-none"
+            class="flex-1 min-w-0 px-2 py-1 text-sm bg-surface-muted border border-line-strong rounded text-ink-strong placeholder-ink-faint focus:border-accent-strong-hover focus:outline-none"
           />
           <input
             type="number"
@@ -116,24 +116,24 @@
             onchange={handleCountChange}
             min={1}
             max={99}
-            class="w-16 px-2 py-1 text-sm bg-ash-900 border border-ash-700 rounded text-bone-100 text-center focus:border-crimson-600 focus:outline-none"
+            class="w-16 px-2 py-1 text-sm bg-surface-muted border border-line-strong rounded text-ink-strong text-center focus:border-accent-strong-hover focus:outline-none"
           />
           <button
             onclick={() => removeRoom(i)}
             disabled={saving}
-            class="p-1 text-ash-500 hover:text-crimson-400 transition-colors"
+            class="p-1 text-ink-faint hover:text-link transition-colors"
             aria-label="Remove room"
           ><X class="w-4 h-4" /></button>
         </div>
       {/each}
     </div>
-    <p class="text-xs text-ash-500 mb-2">{m.rooms_hint()}</p>
+    <p class="text-xs text-ink-faint mb-2">{m.rooms_hint()}</p>
   {/if}
 
   <button
     onclick={addRoom}
     disabled={saving}
-    class="flex items-center gap-1 text-sm text-ash-400 hover:text-bone-100 transition-colors"
+    class="flex items-center gap-1 text-sm text-ink-muted hover:text-ink-strong transition-colors"
   >
     <Plus class="w-4 h-4" />
     {m.rooms_add()}

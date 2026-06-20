@@ -163,28 +163,28 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-2xl mx-auto">
-    <h1 class="text-3xl font-light text-crimson-500 mb-6">{m.nav_profile()}</h1>
+    <h1 class="text-3xl font-light text-accent mb-6">{m.nav_profile()}</h1>
 
     {#if auth.isLoading}
-      <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-        <div class="text-ash-400">{m.common_loading()}</div>
+      <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
+        <div class="text-ink-muted">{m.common_loading()}</div>
       </div>
     {:else if !auth.isAuthenticated || !auth.user}
-      <div class="bg-dusk-950 rounded-lg shadow p-8 border border-ash-800 text-center">
-        <div class="text-ash-500 mb-4">
+      <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
+        <div class="text-ink-faint mb-4">
           <User class="mx-auto h-16 w-16" />
         </div>
-        <h2 class="text-xl font-medium text-bone-100 mb-2">{m.profile_sign_in_required()}</h2>
-        <p class="text-ash-400 mb-6">{m.profile_sign_in_msg()}</p>
+        <h2 class="text-xl font-medium text-ink-strong mb-2">{m.profile_sign_in_required()}</h2>
+        <p class="text-ink-muted mb-6">{m.profile_sign_in_msg()}</p>
         <a href="/login"
-          class="inline-block px-6 py-3 bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg font-medium transition-colors">
+          class="inline-block px-6 py-3 bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg font-medium transition-colors">
           {m.login_sign_in()}
         </a>
       </div>
     {:else}
       {@const user = auth.user}
 
-      <div class="bg-dusk-950 rounded-lg shadow border border-ash-800">
+      <div class="bg-surface-card rounded-lg shadow border border-line">
         {#key user.uid}
         <ProfileView
           {user}
@@ -232,20 +232,20 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog" aria-modal="true" tabindex="-1"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-bone-100">{m.profile_claim_vekn_title()}</h2>
-        <p class="mt-2 text-sm text-ash-400">{m.profile_claim_vekn_description()}</p>
+      <div class="p-6 border-b border-line">
+        <h2 class="text-xl font-medium text-ink-strong">{m.profile_claim_vekn_title()}</h2>
+        <p class="mt-2 text-sm text-ink-muted">{m.profile_claim_vekn_description()}</p>
       </div>
       <form onsubmit={(e) => { e.preventDefault(); handleClaimVekn(); }} class="p-6 space-y-4">
         <div>
-          <label for="claim-vekn-id" class="block text-sm font-medium text-ash-400 mb-1">{m.add_player_vekn_id_label()}</label>
+          <label for="claim-vekn-id" class="block text-sm font-medium text-ink-muted mb-1">{m.add_player_vekn_id_label()}</label>
           <input id="claim-vekn-id" type="text" bind:value={claimVeknIdInput} placeholder="1234567"
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent" />
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent" />
         </div>
         <div class="flex gap-2">
           <Button type="submit" variant="primary" size="lg" class="flex-1" loading={claimingVekn} disabled={!claimVeknIdInput.trim()}>
@@ -276,17 +276,17 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       role="dialog" aria-modal="true" tabindex="-1"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 class="text-xl font-medium text-crimson-400">{m.profile_abandon_vekn_title()}</h2>
+      <div class="p-6 border-b border-line">
+        <h2 class="text-xl font-medium text-link">{m.profile_abandon_vekn_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-4">{m.profile_abandon_vekn_description()}</p>
-        <p class="text-sm text-ash-400 mb-6">{m.profile_abandon_vekn_hint()}</p>
+        <p class="text-ink mb-4">{m.profile_abandon_vekn_description()}</p>
+        <p class="text-sm text-ink-muted mb-6">{m.profile_abandon_vekn_hint()}</p>
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" loading={abandoningVekn} onclick={handleAbandonVekn}>
             <TriangleAlert class="w-4 h-4" aria-hidden="true" />

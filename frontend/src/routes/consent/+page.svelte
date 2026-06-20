@@ -172,24 +172,24 @@
 <div class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-6">
-      <h1 class="text-2xl font-light text-crimson-500">Archon</h1>
-      <p class="text-ash-400 text-sm">{m.oauth_subtitle()}</p>
+      <h1 class="text-2xl font-light text-accent">Archon</h1>
+      <p class="text-ink-muted text-sm">{m.oauth_subtitle()}</p>
     </div>
 
-    <div class="bg-dusk-950 rounded-lg shadow-lg p-8 border border-ash-800">
+    <div class="bg-surface-card rounded-lg shadow-lg p-8 border border-line">
       {#if loading}
         <div class="flex items-center justify-center py-8">
-          <Loader2 class="w-8 h-8 animate-spin text-ash-400" />
+          <Loader2 class="w-8 h-8 animate-spin text-ink-muted" />
         </div>
       {:else if error}
         <div class="text-center space-y-4">
           <div class="w-16 h-16 mx-auto banner-error border rounded-full flex items-center justify-center">
             <CircleAlert class="w-8 h-8" />
           </div>
-          <p class="text-crimson-300 text-sm">{error}</p>
+          <p class="text-link-soft text-sm">{error}</p>
           <button
             onclick={() => goto("/")}
-            class="text-sm text-crimson-400 hover:text-crimson-300"
+            class="text-sm text-link hover:text-link-soft"
           >
             {m.oauth_return_to_archon()}
           </button>
@@ -197,26 +197,26 @@
       {:else}
         <div class="space-y-6">
           <div class="text-center">
-            <div class="w-16 h-16 mx-auto bg-dusk-900 rounded-full flex items-center justify-center mb-4">
-              <ShieldCheck class="w-8 h-8 text-crimson-400" />
+            <div class="w-16 h-16 mx-auto bg-surface-muted rounded-full flex items-center justify-center mb-4">
+              <ShieldCheck class="w-8 h-8 text-link" />
             </div>
-            <h2 class="text-lg font-medium text-bone-100">
+            <h2 class="text-lg font-medium text-ink-strong">
               {clientName}
             </h2>
-            <p class="text-ash-400 text-sm mt-1">
+            <p class="text-ink-muted text-sm mt-1">
               {m.oauth_wants_access()}
             </p>
           </div>
 
           <div class="space-y-3">
-            <p class="text-sm text-ash-300 font-medium">{m.oauth_allow_application()}</p>
+            <p class="text-sm text-ink font-medium">{m.oauth_allow_application()}</p>
             {#each scopes as scope}
-              <div class="flex items-start gap-3 p-3 bg-dusk-900 rounded-lg">
+              <div class="flex items-start gap-3 p-3 bg-surface-muted rounded-lg">
                 <CircleCheck class="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
                 <div>
-                  <p class="text-bone-200 text-sm">{scope}</p>
+                  <p class="text-ink-strong text-sm">{scope}</p>
                   {#if scopeDescriptions[scope]}
-                    <p class="text-ash-400 text-xs mt-0.5">{scopeDescriptions[scope]}</p>
+                    <p class="text-ink-muted text-xs mt-0.5">{scopeDescriptions[scope]}</p>
                   {/if}
                 </div>
               </div>
@@ -244,7 +244,7 @@
             </Button>
           </div>
 
-          <p class="text-center text-xs text-ash-500">
+          <p class="text-center text-xs text-ink-faint">
             {m.oauth_logged_in_as({ name: auth.user?.name ?? '' })}
           </p>
         </div>

@@ -89,13 +89,13 @@
   <div class="p-4 sm:p-8">
     <div class="max-w-6xl mx-auto">
       <!-- Back link -->
-      <a href="/help" class="inline-flex items-center gap-1 text-sm text-ash-400 hover:text-crimson-400 mb-4 transition-colors">
+      <a href="/help" class="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-link mb-4 transition-colors">
         <ArrowLeft class="w-4 h-4" />
         {m.help_back_to_list()}
       </a>
 
       <!-- Title -->
-      <h1 class="text-3xl font-light text-crimson-500 mb-6">{doc.title}</h1>
+      <h1 class="text-3xl font-light text-accent mb-6">{doc.title}</h1>
 
       <!-- Layout: TOC sidebar + content -->
       <div class="flex gap-8">

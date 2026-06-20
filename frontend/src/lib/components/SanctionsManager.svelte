@@ -200,8 +200,8 @@
   <!-- Standalone section card -->
   {#if canIssueSanctions || shownSanctions.length > 0}
     <div class="mt-6">
-      <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.sanction_mgr_title()}</h2>
-      <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4">
+      <h2 class="text-lg font-semibold text-ink-bright mb-3">{m.sanction_mgr_title()}</h2>
+      <div class="bg-surface-card border border-line rounded-lg p-4">
         {#if shownSanctions.length > 0}
           <div class="space-y-2 {canIssueSanctions ? 'mb-4' : ''}">
             {#each shownSanctions as sanction (sanction.uid)}
@@ -209,29 +209,29 @@
                 <button
                   type="button"
                   onclick={() => openEditSanctionModal(sanction)}
-                  class="w-full flex items-center justify-between gap-2 p-3 bg-dusk-900 rounded border border-ash-700 hover:border-ash-600 transition-colors text-left"
+                  class="w-full flex items-center justify-between gap-2 p-3 bg-surface-muted rounded border border-line-strong hover:border-line-strong transition-colors text-left"
                 >
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                       <SanctionBadge {sanction} />
-                      <span class="text-sm text-ash-300 truncate">{sanction.description}</span>
+                      <span class="text-sm text-ink truncate">{sanction.description}</span>
                     </div>
-                    <div class="text-xs text-ash-500 mt-1">
+                    <div class="text-xs text-ink-faint mt-1">
                       {formatDate(sanction.issued_at)}
                       {#if sanction.expires_at}
                         → {formatDate(sanction.expires_at)}
                       {/if}
                     </div>
                   </div>
-                  <Pencil class="w-4 h-4 text-ash-500 flex-shrink-0" />
+                  <Pencil class="w-4 h-4 text-ink-faint flex-shrink-0" />
                 </button>
               {:else}
-                <div class="p-3 bg-dusk-900 rounded border border-ash-700">
+                <div class="p-3 bg-surface-muted rounded border border-line-strong">
                   <div class="flex items-center gap-2">
                     <SanctionBadge {sanction} />
-                    <span class="text-sm text-ash-300">{sanction.description}</span>
+                    <span class="text-sm text-ink">{sanction.description}</span>
                   </div>
-                  <div class="text-xs text-ash-500 mt-1">
+                  <div class="text-xs text-ink-faint mt-1">
                     {formatDate(sanction.issued_at)}
                     {#if sanction.expires_at}
                       → {formatDate(sanction.expires_at)}
@@ -270,11 +270,11 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showSanctionModal = false)}
-      class="bg-dusk-950 rounded-lg shadow-xl border border-crimson-800/50 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-accent-soft-border/50 w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="sanction-modal-title" class="text-xl font-medium text-crimson-400">{m.sanction_mgr_issue_btn()}</h2>
-        <p class="mt-2 text-sm text-ash-400">
+      <div class="p-6 border-b border-line">
+        <h2 id="sanction-modal-title" class="text-xl font-medium text-link">{m.sanction_mgr_issue_btn()}</h2>
+        <p class="mt-2 text-sm text-ink-muted">
           {m.sanction_mgr_issue_to({ name: sanctionTargetUser.name })}
         </p>
       </div>
@@ -286,32 +286,32 @@
         class="p-6 space-y-4"
       >
         <div>
-          <label for="sanction-level" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="sanction-level" class="block text-sm font-medium text-ink-muted mb-1">
             {m.common_level()} *
           </label>
           <select
             id="sanction-level"
             bind:value={sanctionLevel}
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
           >
             <option value="probation">{m.sanction_level_probation()}</option>
             <option value="suspension">{m.sanction_level_suspension()}</option>
           </select>
           {#if sanctionLevel === "suspension"}
-            <p class="mt-1 text-xs text-ash-500">
+            <p class="mt-1 text-xs text-ink-faint">
               {m.sanction_mgr_permanent_hint()}
             </p>
           {/if}
         </div>
 
         <div>
-          <label for="sanction-category" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="sanction-category" class="block text-sm font-medium text-ink-muted mb-1">
             {m.common_category()} *
           </label>
           <select
             id="sanction-category"
             bind:value={sanctionCategory}
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
           >
             <option value="procedural_error">{m.sanction_cat_procedural_error()}</option>
             <option value="tournament_error">{m.sanction_cat_tournament_error()}</option>
@@ -320,7 +320,7 @@
         </div>
 
         <div>
-          <label for="sanction-description" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="sanction-description" class="block text-sm font-medium text-ink-muted mb-1">
             {m.common_description()} *
           </label>
           <textarea
@@ -329,13 +329,13 @@
             rows="3"
             placeholder={m.sanction_mgr_description_placeholder()}
             required
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent resize-none"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
           ></textarea>
         </div>
 
         {#if expiryAllowed}
           <div>
-            <label for="sanction-expires" class="block text-sm font-medium text-ash-400 mb-1">
+            <label for="sanction-expires" class="block text-sm font-medium text-ink-muted mb-1">
               {m.sanction_mgr_expires_at()} {expiryRequired ? "*" : ""}
             </label>
             <input
@@ -344,9 +344,9 @@
               bind:value={sanctionExpiresAt}
               required={expiryRequired}
               min={new Date().toISOString().split("T")[0]}
-              class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+              class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <p class="mt-1 text-xs text-ash-500">
+            <p class="mt-1 text-xs text-ink-faint">
               {m.sanction_mgr_max_expiry()}
             </p>
           </div>
@@ -391,29 +391,29 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && closeEditSanctionModal()}
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
+      <div class="p-6 border-b border-line">
         <div class="flex items-center justify-between">
-          <h2 id="edit-sanction-modal-title" class="text-xl font-medium text-bone-100">{m.sanction_mgr_edit_title()}</h2>
+          <h2 id="edit-sanction-modal-title" class="text-xl font-medium text-ink-strong">{m.sanction_mgr_edit_title()}</h2>
           {#if editingSanction.lifted_at}
             <span class="text-xs badge-success px-2 py-1 rounded">{m.sanction_lifted()}</span>
           {/if}
         </div>
-        <p class="mt-1 text-xs text-ash-500">
+        <p class="mt-1 text-xs text-ink-faint">
           {m.sanction_issued({ date: new Date(editingSanction.issued_at).toLocaleDateString() })}
         </p>
       </div>
       <div class="p-6 space-y-4">
         <div>
-          <label for="edit-sanction-level" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="edit-sanction-level" class="block text-sm font-medium text-ink-muted mb-1">
             {m.common_level()}
           </label>
           <select
             id="edit-sanction-level"
             bind:value={editSanctionLevel}
             disabled={!!editingSanction.lifted_at}
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:opacity-50"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
           >
             <option value="caution">{m.sanction_level_caution()}</option>
             <option value="warning">{m.sanction_level_warning()}</option>
@@ -425,14 +425,14 @@
         </div>
 
         <div>
-          <label for="edit-sanction-category" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="edit-sanction-category" class="block text-sm font-medium text-ink-muted mb-1">
             {m.common_category()}
           </label>
           <select
             id="edit-sanction-category"
             bind:value={editSanctionCategory}
             disabled={!!editingSanction.lifted_at}
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:opacity-50"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
           >
             <option value="procedural_error">{m.sanction_cat_procedural_error()}</option>
             <option value="tournament_error">{m.sanction_cat_tournament_error()}</option>
@@ -441,7 +441,7 @@
         </div>
 
         <div>
-          <label for="edit-sanction-description" class="block text-sm font-medium text-ash-400 mb-1">
+          <label for="edit-sanction-description" class="block text-sm font-medium text-ink-muted mb-1">
             {m.common_description()}
           </label>
           <textarea
@@ -449,13 +449,13 @@
             bind:value={editSanctionDescription}
             disabled={!!editingSanction.lifted_at}
             rows="3"
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent resize-none disabled:opacity-50"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent resize-none disabled:opacity-50"
           ></textarea>
         </div>
 
         {#if editExpiryAllowed}
           <div>
-            <label for="edit-sanction-expires" class="block text-sm font-medium text-ash-400 mb-1">
+            <label for="edit-sanction-expires" class="block text-sm font-medium text-ink-muted mb-1">
               {m.sanction_mgr_expires_at()} {editExpiryRequired ? "*" : ""}
             </label>
             <input
@@ -465,15 +465,15 @@
               disabled={!!editingSanction.lifted_at}
               required={editExpiryRequired}
               min={new Date().toISOString().split("T")[0]}
-              class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:opacity-50"
+              class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
             />
             {#if editSanctionLevel === "suspension"}
-              <p class="mt-1 text-xs text-ash-500">{m.sanction_mgr_permanent_hint()}</p>
+              <p class="mt-1 text-xs text-ink-faint">{m.sanction_mgr_permanent_hint()}</p>
             {/if}
           </div>
         {/if}
 
-        <div class="flex flex-col gap-2 pt-4 border-t border-ash-800">
+        <div class="flex flex-col gap-2 pt-4 border-t border-line">
           {#if !editingSanction.lifted_at && editSanctionHasChanges()}
             <Button
               variant="primary"

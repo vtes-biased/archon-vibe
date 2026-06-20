@@ -42,21 +42,21 @@
 </script>
 
 {#if availableCategories.length > 0}
-  <h2 class="text-lg font-semibold text-ash-200 mb-3">{m.user_detail_ratings()}</h2>
+  <h2 class="text-lg font-semibold text-ink-bright mb-3">{m.user_detail_ratings()}</h2>
   <div class="space-y-2">
     {#each availableCategories as cat}
       {@const catRating = user?.[cat] as CategoryRating}
       {@const isExpanded = expandedCategories.has(cat)}
-      <div class="bg-dusk-950 border border-ash-800 rounded-lg overflow-hidden">
+      <div class="bg-surface-card border border-line rounded-lg overflow-hidden">
         <button
-          class="w-full flex items-center justify-between px-4 py-3 hover:bg-ash-800/30 transition-colors"
+          class="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-hover/30 transition-colors"
           onclick={() => toggleCategory(cat)}
         >
-          <span class="font-medium text-ash-200">{categoryLabelFns[cat]()}</span>
+          <span class="font-medium text-ink-bright">{categoryLabelFns[cat]()}</span>
           <div class="flex items-center gap-3">
-            <span class="text-lg font-bold text-crimson-400">{catRating.total}</span>
+            <span class="text-lg font-bold text-link">{catRating.total}</span>
             <ChevronDown
-              class="w-4 h-4 text-ash-500 transition-transform {isExpanded ? 'rotate-180' : ''}"
+              class="w-4 h-4 text-ink-faint transition-transform {isExpanded ? 'rotate-180' : ''}"
             />
           </div>
         </button>
@@ -64,10 +64,10 @@
         {#if isExpanded}
           {@const sorted = sortedByDate(catRating.tournaments)}
           {@const topUids = top8Uids(catRating.tournaments)}
-          <div class="border-t border-ash-800 px-4 py-2">
+          <div class="border-t border-line px-4 py-2">
             <table class="w-full text-sm">
               <thead>
-                <tr class="text-ash-500 text-xs">
+                <tr class="text-ink-faint text-xs">
                   <th class="py-1 text-left">{m.user_detail_col_tournament()}</th>
                   <th class="py-1 pl-3 text-right">{m.user_detail_col_vp()}</th>
                   <th class="py-1 pl-3 text-right">{m.user_detail_col_gw()}</th>
@@ -77,20 +77,20 @@
               <tbody>
                 {#each sorted as entry}
                   {@const isTop8 = topUids.has(entry.tournament_uid)}
-                  <tr class="{isTop8 ? 'text-ash-200' : 'text-ash-500'}">
+                  <tr class="{isTop8 ? 'text-ink-bright' : 'text-ink-faint'}">
                     <td class="py-1">
-                      <a href="/tournaments/{entry.tournament_uid}" class="hover:text-crimson-400">
+                      <a href="/tournaments/{entry.tournament_uid}" class="hover:text-link">
                         {#if isTop8}
                           <span class="font-medium">{entry.tournament_name}</span>
                         {:else}
                           {entry.tournament_name}
                         {/if}
                       </a>
-                      <span class="text-xs text-ash-500 ml-1">{entry.date}</span>
+                      <span class="text-xs text-ink-faint ml-1">{entry.date}</span>
                       {#if entry.finalist_position === 1}
                         <Crown class="w-3 h-3 inline text-purple-400 ml-1" />
                       {:else if entry.finalist_position === 2}
-                        <Medal class="w-3 h-3 inline text-ash-400 ml-1" />
+                        <Medal class="w-3 h-3 inline text-ink-muted ml-1" />
                       {/if}
                     </td>
                     <td class="py-1 pl-3 text-right">{entry.vp}</td>
@@ -108,5 +108,5 @@
 {:else if user === undefined}
   <!-- Still loading -->
 {:else}
-  <p class="text-ash-500 text-sm">{m.user_detail_no_rating()}</p>
+  <p class="text-ink-faint text-sm">{m.user_detail_no_rating()}</p>
 {/if}

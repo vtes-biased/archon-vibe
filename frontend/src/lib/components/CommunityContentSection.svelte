@@ -35,13 +35,13 @@
   <button
     onclick={() => onSelectLanguage("")}
     class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
-      {selectedLanguage === '' ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+      {selectedLanguage === '' ? 'bg-accent-strong text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
   >{m.community_filter_all()}</button>
   {#each languages as lang}
     <button
       onclick={() => onSelectLanguage(lang)}
       class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
-        {selectedLanguage === lang ? 'bg-crimson-700 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+        {selectedLanguage === lang ? 'bg-accent-strong text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
     >{LANGUAGE_NAMES[lang] || lang}</button>
   {/each}
 </div>
@@ -50,12 +50,12 @@
 {#if items.length > 0}
   <div class="space-y-2">
     {#each items as { user, link }}
-      <div class="bg-dusk-950 rounded-lg border border-ash-800 p-3 flex items-center gap-3">
+      <div class="bg-surface-card rounded-lg border border-line p-3 flex items-center gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap mb-1">
             <CommunityLinkPills links={[link]} />
           </div>
-          <div class="flex items-center gap-2 text-xs text-ash-400 flex-wrap">
+          <div class="flex items-center gap-2 text-xs text-ink-muted flex-wrap">
             {#if scope(link)}
               <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium
                 {scope(link) === 'global' ? 'badge-blue' : 'badge-amethyst'}">
@@ -64,7 +64,7 @@
               </span>
             {/if}
             {#if user.name}
-              <a href="/users/{user.uid}" class="hover:text-crimson-400 transition-colors">{user.name}</a>
+              <a href="/users/{user.uid}" class="hover:text-link transition-colors">{user.name}</a>
             {/if}
             {#if user.country}
               <span>{getCountryFlag(user.country)}</span>
@@ -73,7 +73,7 @@
               <span class="px-1.5 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{role}</span>
             {/each}
             {#if (link.languages?.length ?? 0) > 1}
-              <span class="text-ash-500 tracking-wide">{link.languages!.map(c => c.toUpperCase()).join(" · ")}</span>
+              <span class="text-ink-faint tracking-wide">{link.languages!.map(c => c.toUpperCase()).join(" · ")}</span>
             {/if}
           </div>
         </div>
@@ -90,5 +90,5 @@
     {/each}
   </div>
 {:else}
-  <div class="text-center py-6 text-ash-400 text-sm">{m.community_no_content()}</div>
+  <div class="text-center py-6 text-ink-muted text-sm">{m.community_no_content()}</div>
 {/if}

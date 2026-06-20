@@ -226,14 +226,14 @@
 </script>
 
 {#if !loaded}
-  <div class="text-center py-8 text-ash-400">{m.common_loading()}</div>
+  <div class="text-center py-8 text-ink-muted">{m.common_loading()}</div>
 {:else}
   <!-- Global Resources: links pinned globally by a moderator -->
   {#if globalLinks.length > 0}
-    <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 p-5 mb-6">
+    <div class="bg-surface-card rounded-lg shadow border border-line p-5 mb-6">
       <div class="flex items-center gap-2 mb-3">
-        <Globe class="w-5 h-5 text-crimson-500" />
-        <h2 class="text-lg font-medium text-bone-100">{m.community_global_resources()}</h2>
+        <Globe class="w-5 h-5 text-accent" />
+        <h2 class="text-lg font-medium text-ink-strong">{m.community_global_resources()}</h2>
       </div>
       <CommunityLinkPills links={globalLinks} />
     </div>
@@ -241,9 +241,9 @@
 
   <!-- Add links prompt -->
   {#if auth.isAuthenticated && auth.user?.vekn_id}
-    <a href="/profile" class="flex items-center gap-2 rounded-lg bg-dusk-900 border border-ash-700 px-4 py-3 mb-6 text-sm text-bone-300 hover:bg-dusk-800 transition-colors">
-      <Pencil class="w-4 h-4 text-crimson-400 shrink-0" />
-      <span>{m.community_add_links_prompt()} <span class="text-crimson-400 font-medium">{m.community_go_to_profile()}</span></span>
+    <a href="/profile" class="flex items-center gap-2 rounded-lg bg-surface-muted border border-line-strong px-4 py-3 mb-6 text-sm text-ink-strong hover:bg-surface-muted transition-colors">
+      <Pencil class="w-4 h-4 text-link shrink-0" />
+      <span>{m.community_add_links_prompt()} <span class="text-link font-medium">{m.community_go_to_profile()}</span></span>
     </a>
   {/if}
 
@@ -257,9 +257,9 @@
 
   <!-- Not logged in prompt -->
   {#if !auth.isAuthenticated}
-    <div class="p-4 mb-6 rounded-lg bg-ash-900 border border-ash-700 text-sm text-ash-300">
+    <div class="p-4 mb-6 rounded-lg bg-surface-muted border border-line-strong text-sm text-ink">
       {m.community_login_prompt()}
-      <a href="/login" class="underline text-crimson-500 hover:text-crimson-400 ml-1">{m.community_sign_in()}</a>
+      <a href="/login" class="underline text-link hover:text-link-soft ml-1">{m.community_sign_in()}</a>
     </div>
   {/if}
 
@@ -267,18 +267,18 @@
   {#if socialGroups.length > 0}
     <div class="mb-8">
       <div class="flex items-center gap-2 mb-3">
-        <Hash class="w-5 h-5 text-crimson-500" />
-        <h2 class="text-lg font-medium text-bone-100">{m.community_section_communities()}</h2>
+        <Hash class="w-5 h-5 text-accent" />
+        <h2 class="text-lg font-medium text-ink-strong">{m.community_section_communities()}</h2>
       </div>
 
       <!-- Country search -->
       <div class="relative mb-3">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash-500" />
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
         <input
           type="text"
           bind:value={searchQuery}
           placeholder={m.community_search_countries()}
-          class="w-full pl-9 pr-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 text-sm focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          class="w-full pl-9 pr-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright text-sm focus:ring-2 focus:ring-accent focus:border-transparent"
         />
       </div>
 
@@ -299,8 +299,8 @@
   {#if contentItems.length > 0 || contentLanguages.length > 0}
     <div class="mb-8">
       <div class="flex items-center gap-2 mb-3">
-        <Video class="w-5 h-5 text-crimson-500" />
-        <h2 class="text-lg font-medium text-bone-100">{m.community_section_content()}</h2>
+        <Video class="w-5 h-5 text-accent" />
+        <h2 class="text-lg font-medium text-ink-strong">{m.community_section_content()}</h2>
       </div>
 
       <CommunityContentSection
@@ -321,61 +321,61 @@
   {#if officialGroups.length > 0}
     <div>
       <div class="flex items-center gap-2 mb-3">
-        <Users class="w-5 h-5 text-crimson-500" />
-        <h2 class="text-lg font-medium text-bone-100">{m.community_section_officials()}</h2>
+        <Users class="w-5 h-5 text-accent" />
+        <h2 class="text-lg font-medium text-ink-strong">{m.community_section_officials()}</h2>
       </div>
 
       <div class="space-y-2">
         {#each officialGroups as group}
           {@const isExpanded = expandedOfficialCountries.has(group.code)}
-          <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 overflow-hidden">
+          <div class="bg-surface-card rounded-lg shadow border border-line overflow-hidden">
             <button
               onclick={() => toggleOfficialCountry(group.code)}
-              class="w-full flex items-center justify-between p-4 hover:bg-ash-900/50 transition-colors text-left"
+              class="w-full flex items-center justify-between p-4 hover:bg-surface-muted/50 transition-colors text-left"
             >
               <div class="flex items-center gap-2">
                 <span class="text-lg">{getCountryFlag(group.code)}</span>
-                <span class="font-medium text-bone-100">{group.name}</span>
+                <span class="font-medium text-ink-strong">{group.name}</span>
                 {#if auth.user?.country === group.code}
-                  <span class="px-2 py-0.5 text-xs rounded bg-crimson-900/40 text-crimson-400">{m.community_your_country()}</span>
+                  <span class="px-2 py-0.5 text-xs rounded bg-accent-soft/40 text-link">{m.community_your_country()}</span>
                 {/if}
-                <span class="text-xs text-ash-500">({group.officials.length})</span>
+                <span class="text-xs text-ink-faint">({group.officials.length})</span>
               </div>
               {#if isExpanded}
-                <ChevronDown class="w-5 h-5 text-ash-500" />
+                <ChevronDown class="w-5 h-5 text-ink-faint" />
               {:else}
-                <ChevronRight class="w-5 h-5 text-ash-500" />
+                <ChevronRight class="w-5 h-5 text-ink-faint" />
               {/if}
             </button>
 
             {#if isExpanded}
-              <div class="border-t border-ash-800 divide-y divide-ash-800/50">
+              <div class="border-t border-line divide-y divide-line/50">
                 {#each group.officials as official}
                   <div class="p-4">
                     <div class="flex items-start justify-between gap-4">
                       <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2 flex-wrap">
-                          <a href="/users/{official.uid}" class="font-medium text-bone-100 hover:text-crimson-400 transition-colors">{official.name}</a>
+                          <a href="/users/{official.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{official.name}</a>
                           {#each official.roles.filter(r => r === "NC" || r === "Prince") as role}
                             <span class="px-2 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{role}</span>
                           {/each}
                         </div>
                         {#if official.city}
-                          <div class="text-sm text-ash-400 mt-0.5">{official.city}</div>
+                          <div class="text-sm text-ink-muted mt-0.5">{official.city}</div>
                         {/if}
                         {#if official.contact_email || official.discord_id || official.contact_phone}
                           {@const email = deobfuscateContact(official.contact_email)}
                           {@const phone = deobfuscateContact(official.contact_phone)}
-                          <div class="flex flex-wrap gap-3 mt-2 text-xs text-ash-400">
+                          <div class="flex flex-wrap gap-3 mt-2 text-xs text-ink-muted">
                             {#if email}
-                              <a href="mailto:{email}" class="text-crimson-500 hover:text-crimson-400">{email}</a>
+                              <a href="mailto:{email}" class="text-link hover:text-link-soft">{email}</a>
                             {/if}
                             {#if official.discord_id}
                               <a
                                 href="https://discord.com/users/{official.discord_id}"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1 text-crimson-500 hover:text-crimson-400"
+                                class="inline-flex items-center gap-1 text-link hover:text-link-soft"
                               >
                                 <DiscordIcon class="w-3.5 h-3.5" />
                                 <span>{official.contact_discord || "Discord"}</span>
@@ -383,7 +383,7 @@
                             {/if}
                             {#if phone}
                               {#if official.phone_is_whatsapp}
-                                <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-crimson-500 hover:text-crimson-400">WhatsApp: {phone}</a>
+                                <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-link hover:text-link-soft">WhatsApp: {phone}</a>
                               {:else}
                                 <span>{phone}</span>
                               {/if}
@@ -405,9 +405,9 @@
   <!-- Empty state -->
   {#if socialGroups.length === 0 && contentItems.length === 0 && officialGroups.length === 0 && globalLinks.length === 0}
     <div class="text-center py-12">
-      <Users class="mx-auto h-12 w-12 text-ash-600 mb-4" />
-      <h3 class="text-lg font-medium text-bone-100 mb-2">{m.community_no_officials()}</h3>
-      <p class="text-ash-400">{m.community_no_officials_hint()}</p>
+      <Users class="mx-auto h-12 w-12 text-ink-faint mb-4" />
+      <h3 class="text-lg font-medium text-ink-strong mb-2">{m.community_no_officials()}</h3>
+      <p class="text-ink-muted">{m.community_no_officials_hint()}</p>
     </div>
   {/if}
 {/if}

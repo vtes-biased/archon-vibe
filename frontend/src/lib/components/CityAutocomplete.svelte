@@ -127,32 +127,32 @@
         placeholder={disabled
             ? m.city_select_country_first()
             : m.city_search_placeholder()}
-        class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 placeholder:text-mist-dark focus:ring-2 focus:ring-crimson-500 focus:border-transparent disabled:bg-ash-900 disabled:text-mist-dark"
+        class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright placeholder:text-ink-faint focus:ring-2 focus:ring-accent focus:border-transparent disabled:bg-surface-muted disabled:text-ink-faint"
     />
 
     {#if searching}
         <div class="absolute right-3 top-1/2 -translate-y-1/2">
-            <Loader2 class="animate-spin h-4 w-4 text-mist-dark" />
+            <Loader2 class="animate-spin h-4 w-4 text-ink-faint" />
         </div>
     {/if}
 
     {#if showSuggestions && suggestions.length > 0}
         <div
-            class="absolute z-10 w-full mt-1 bg-dusk-950 border border-ash-600 rounded shadow-lg max-h-60 overflow-auto"
+            class="absolute z-10 w-full mt-1 bg-surface-card border border-line-strong rounded shadow-lg max-h-60 overflow-auto"
         >
             {#each suggestions as city, i}
                 <button
                     type="button"
                     onclick={() => selectCity(city)}
-                    class="w-full text-left px-3 py-2 hover:bg-ash-800 {i ===
+                    class="w-full text-left px-3 py-2 hover:bg-surface-hover {i ===
                     selectedIndex
-                        ? 'bg-ash-800'
+                        ? 'bg-surface-hover'
                         : ''}"
                 >
-                    <div class="font-medium text-ash-200">
+                    <div class="font-medium text-ink-bright">
                         {city.name}
                     </div>
-                    <div class="text-xs text-mist-dark">
+                    <div class="text-xs text-ink-faint">
                         {m.city_population({ population: city.population.toLocaleString() })}
                     </div>
                 </button>

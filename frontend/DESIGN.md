@@ -13,13 +13,31 @@ When in doubt, consistency with this system beats novelty.
 
 VTES / Vampire: the Masquerade inspired. Gothic horror, pale and muted, with dark mode as primary.
 
-| Name      | Light Mode        | Dark Mode         | Usage                        |
-|-----------|-------------------|-------------------|------------------------------|
-| `crimson` | `#8B0000`         | `#DC143C`         | Primary accent, CTAs         |
-| `bone`    | `#F5F0E6`         | `#2A2520`         | Backgrounds                  |
-| `dusk`    | `#E8E0D5`         | `#1C1A1E`         | Cards, surfaces              |
-| `ash`     | `#6B6560`         | `#A09890`         | Text, borders                |
-| `mist`    | `#9B9590`         | `#605850`         | Muted text, disabled states  |
+Colour is expressed as **role tokens** in four families — `surface` (backgrounds), `ink` (text), `line` (borders), `accent` (crimson). Each token is defined **once** in `app.css` `@theme` via CSS `light-dark(LIGHT, DARK)`, so its value follows the element's `color-scheme` automatically — there is **no** per-shade `html.light` override block and **no** numeric scale to hand-invert. Use them as ordinary Tailwind utilities (`bg-surface-card`, `text-ink-muted`, `border-line`, `text-link`), opacity modifiers included (`bg-surface-hover/50`).
+
+| Token | Utility e.g. | Light | Dark | Role |
+|-------|--------------|-------|------|------|
+| `surface` | `bg-surface` | `#F5F0E6` | `#2A2520` | Page background |
+| `surface-card` | `bg-surface-card` | `#FFFFFF` | `#1C1A1E` | Cards / panels |
+| `surface-muted` | `bg-surface-muted` | `#E8E6E4` | `#3D3A37` | Subtle row / overlay bg |
+| `surface-hover` | `bg-surface-hover` | `#D4D0CC` | `#4A4642` | Interactive hover |
+| `surface-active` | `bg-surface-active` | `#B8B2AC` | `#5A5550` | Solid neutral control |
+| `ink-strong` | `text-ink-strong` | `#5E5444` | `#FAF8F4` | Headings / emphasis |
+| `ink-bright` | `text-ink-bright` | `#4A4642` | `#D4D0CC` | Bright body / labels |
+| `ink` | `text-ink` | `#5A5550` | `#B8B2AC` | Default body text |
+| `ink-muted` | `text-ink-muted` | `#6B6560` | `#9A938C` | Secondary text |
+| `ink-faint` | `text-ink-faint` | `#7D756E` | `#7D756E` | Tertiary / disabled |
+| `line` | `border-line` | `#D4D0CC` | `#4A4642` | Default border / divider |
+| `line-strong` | `border-line-strong` | `#B8B2AC` | `#5A5550` | Stronger border |
+| `accent` | `bg/border/ring-accent` | `#A40F2D` | `#DC143C` | Brand crimson — fills / borders / rings / large display headings. For body-size accent text use `link` (`accent` is ~3.5:1 on cards — AA-ok for large text only). |
+| `accent-strong` | `bg-accent-strong` | `#880C26` | `#A40F2D` | CTA button solid |
+| `accent-strong-hover` | `hover:bg-accent-strong-hover` | `#960D29` | `#C41235` | CTA hover |
+| `accent-soft` | `bg-accent-soft/20` | `#FCE4E8` | `#6E0A1F` | Accent tint background |
+| `accent-soft-border` | `border-accent-soft-border` | `#F9CCD4` | `#880C26` | Accent tint border |
+| `link` | `text-link` | `#DC143C` | `#EC6B84` | Links / accent text |
+| `link-soft` | `text-link-soft` | `#C41235` | `#F4A3B3` | Light accent text on tint |
+
+**Adding a colour:** add one `--color-<role>: light-dark(LIGHT, DARK)` line in `@theme` and verify AA in both themes. Never reintroduce a numeric ramp (`*-400`/`*-900`) or an `html.light` override block. Known exception: `ink-faint` (tertiary/disabled) is a single grey for both themes and does not clear the 4.5:1 body floor — keep it to de-emphasised/disabled text, not primary content.
 
 Role badges use distinct colors but remain muted/dusty to fit the gothic aesthetic.
 
@@ -41,7 +59,7 @@ Two layers share these hues:
 - **Categorical classes** (`badge-blue` etc.) — identity tags where the hue is arbitrary.
 - `btn-*` — solid status chips only (paid/pending filter chips, help-guide mockups). **Action buttons go through `<Button>`** (below), which uses `bg-crimson-*` / `btn-danger`.
 - `banner-*` — info/warning boxes (add `border rounded-lg p-3` etc.).
-- Crimson palette classes (`bg-crimson-*`, `text-crimson-*`) — handled by scale inversion, use directly.
+- Accent role tokens (`bg-accent*`, `text-link*`, `border-accent`, `ring-accent`) — crimson, theme-switched via `light-dark()`; use directly.
 
 **Adding a semantic colour:** add one `light-dark(LIGHT, DARK)` rule in `app.css` and verify AA in both themes. Do **not** reintroduce green/amber or a parallel `html.light` override block.
 
@@ -58,11 +76,11 @@ All action buttons go through `$lib/components/Button.svelte`. It owns colour, s
 
 - **One primary CTA per surface.** Crimson is the single positive colour, so a screen should show one filled crimson button; collapse the rest into an overflow (`ActionMenu.svelte`). A legitimate second lifecycle choice (e.g. Start Round vs Start Finals) drops to `secondary`, never a second `primary`.
 - **Danger is violet, never red.** Red and crimson are the same hue family and collapse together — even under colourblindness — so destructive actions get their own hue. Meaning must not rest on hue alone: pair `danger` with an icon (`TriangleAlert`/`Trash2`) + a verb.
-- `primary`/`secondary`/`ghost` use crimson/ash, which are scale-inverted (adapt to light mode automatically). `danger` uses `btn-danger`, defined with `light-dark()` (violet has no scale inversion).
+- `primary`/`secondary`/`ghost` use the `accent`/`surface`/`ink`/`line` role tokens (each carries both themes via `light-dark()`). `danger` uses `btn-danger`, its own `light-dark()` class (violet is off-palette).
 - Props: `size` (`sm`/`md`/`lg`), `block` (full width), `loading` (spinner + `aria-busy`, auto-disables), `disabled`; extra layout classes (`flex-1`, margins) via `class`. Focus comes from the global `:focus-visible` ring — never add a bespoke outline.
 - **Do not** route through `<Button>`: icon-only buttons, toggles/tabs/segmented controls, dropdown/menu options (e.g. the items inside `ActionMenu`), row/card-wrapping buttons, `<a>`-styled links, or Discord brand-fill buttons — leave those as raw elements.
 
-**Palette history:** the crimson-primary system replaced the earlier scheme (emerald `primary`, crimson `brand`/`danger`, amber `warning`): `primary` → crimson, `danger` → violet `btn-danger`, `warning`/emerald dropped from `<Button>` (`btn-success`/`btn-pending` remain only for status chips + help-guide mockups). **#232 (mostly shipped):** the semantic component classes were recoloured to the gothic-jewel set (green/amber out; blue/amethyst/fuchsia/crimson/slate in) and migrated to `light-dark()` — no parallel `html.light` block — with WCAG-AA verified in both themes; raw inline green/amber tints swept to the palette. **Still deferred:** the full numeric-scale token migration (`bg-dusk-950`/`text-ash-400` → `surface`/`text`/`accent`/`border` role tokens across ~80 files); the crimson/bone/dusk/ash scale inversion keeps working until then.
+**Palette history:** the crimson-primary system replaced the earlier scheme (emerald `primary`, crimson `brand`/`danger`, amber `warning`): `primary` → crimson, `danger` → violet `btn-danger`, `warning`/emerald dropped from `<Button>` (`btn-success`/`btn-pending` remain only for status chips + help-guide mockups). **#232 (shipped):** the semantic component classes were recoloured to the gothic-jewel set (green/amber out; blue/amethyst/fuchsia/crimson/slate in) and migrated to `light-dark()` — no parallel `html.light` block — with WCAG-AA verified in both themes; raw inline green/amber tints swept to the palette. **#247 (shipped):** the numeric-scale → role-token migration completed — every `bg-dusk-950`/`text-ash-400`-style utility moved to the `surface`/`ink`/`line`/`accent` role tokens across ~80 files, the `html.light` scale-inversion block was deleted, and the last off-palette inline alert boxes (purple/sky/blue) became `banner-*` (see *Color Palette*).
 
 ### Disabled States
 
@@ -76,13 +94,13 @@ Action buttons use `<Button>`, which owns its disabled + loading states — neve
 
 `button:disabled { cursor: not-allowed }` is global in `app.css` — never add `disabled:cursor-not-allowed` inline.
 
-### Light Theme — Scale Inversion
+### Light Theme — Role Tokens
 
-The crimson/bone/dusk/ash/mist **numeric scales** are theme-switched via **CSS variable overrides** under `html.light` in `app.css` — *scale inversion*: dark shade numbers (900/950) are reassigned to light color values and vice versa, so existing Tailwind classes (`bg-dusk-950`, `text-ash-300`, etc.) resolve to light-mode colors with zero component changes.
+Every colour role is a single `--color-<role>: light-dark(LIGHT, DARK)` entry in `@theme` (see *Color Palette* above). `light-dark()` resolves from the element's `color-scheme`, so the only thing the light theme does is flip it: `html.light { color-scheme: light }`. No per-shade override block, no numeric scale-inversion to keep in sync — both theme values live at the token's definition.
 
-**Exception — semantic component classes** (`badge-*`, `banner-*`, `btn-*`, `toast-*`, `status-*`, `dot-*`) do **not** use inversion; each is a single `light-dark()` rule (see *Semantic Color Classes* above).
+**Semantic component classes** (`badge-*`, `banner-*`, `btn-*`, `toast-*`, `status-*`, `dot-*`) follow the same `light-dark()` pattern with their own (often jewel-tinted) values.
 
-**Adding new colors**: a new `@theme` scale shade needs its inverted value under `html.light`; a new semantic component class needs a `light-dark()` rule instead.
+**Adding new colors**: add one `light-dark()` rule — a role token in `@theme` or a semantic component class — and verify AA in both themes. Do not add a numeric ramp or an `html.light` override block.
 
 **Theme toggle**: Users can cycle system / light / dark via the toggle in the sidebar (desktop) or bottom nav (mobile). Preference is stored in `localStorage.theme` and applied before first paint via an inline script in `app.html` to prevent FOUC.
 

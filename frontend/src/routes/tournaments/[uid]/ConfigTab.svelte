@@ -187,13 +187,13 @@
 
 <div class="space-y-6">
   {#if error}
-    <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-3">
-      <p class="text-crimson-300 text-sm">{error}</p>
+    <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+      <p class="text-link-soft text-sm">{error}</p>
     </div>
   {/if}
 
   {#if !isOrganizer}
-    <p class="text-ash-400">{m.config_no_permission()}</p>
+    <p class="text-ink-muted">{m.config_no_permission()}</p>
   {:else}
     <div class="space-y-4">
       <TournamentFields
@@ -206,7 +206,7 @@
     </div>
 
     {#if saving}
-      <div class="text-xs text-ash-500 flex items-center gap-1">
+      <div class="text-xs text-ink-faint flex items-center gap-1">
         <RefreshCw class="w-3 h-3 animate-spin" />
         {m.config_saving()}
       </div>

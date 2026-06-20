@@ -151,10 +151,10 @@
 </script>
 
 <!-- Player interaction section -->
-<div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
+<div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
   {#if tournament.state === "Registration" && !currentPlayerEntry}
     {#if userSuspended}
-      <div class="text-sm text-crimson-400">{m.error_suspended_cannot_register()}</div>
+      <div class="text-sm text-link">{m.error_suspended_cannot_register()}</div>
     {:else if !userVeknId}
       <div class="text-sm text-purple-400">{m.tournament_vekn_id_required_to_register()}</div>
     {:else}
@@ -168,8 +168,8 @@
   {:else if tournament.state === "Registration" && currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
-        <span class="text-ash-500">{m.tournament_your_status()}</span>
-        <span class="ml-2 text-ash-200">{translatePlayerState(currentPlayerEntry.state)}</span>
+        <span class="text-ink-faint">{m.tournament_your_status()}</span>
+        <span class="ml-2 text-ink-bright">{translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
       <Button
         variant="danger"
@@ -190,8 +190,8 @@
   {:else if currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
-        <span class="text-ash-500">{m.tournament_your_status()}</span>
-        <span class="ml-2 text-ash-200">{currentPlayerEntry.state === "Finished"
+        <span class="text-ink-faint">{m.tournament_your_status()}</span>
+        <span class="ml-2 text-ink-bright">{currentPlayerEntry.state === "Finished"
           ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
           : translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
@@ -236,15 +236,15 @@
     <!-- Player's current score -->
     {#if myStanding && (tournament.state === "Playing" || tournament.state === "Waiting") && (tournament.rounds?.length ?? 0) > 0}
       <div class="text-sm">
-        <span class="text-ash-500">{m.tournament_your_score()}</span>
-        <span class="ml-2 text-bone-100 font-medium">{formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}</span>
+        <span class="text-ink-faint">{m.tournament_your_score()}</span>
+        <span class="ml-2 text-ink-strong font-medium">{formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}</span>
       </div>
     {/if}
     <!-- Your table + seat — the primary card during play; standings/cutoff/history follow below -->
     {#if isFinals && !isFinished && tournament.finals}
-      <div class="bg-ash-900/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_heading()}</h3>
-        <div class="divide-y divide-ash-800">
+      <div class="bg-surface-muted/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_finals_heading()}</h3>
+        <div class="divide-y divide-line">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
             {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
@@ -254,8 +254,8 @@
             <div class="py-2.5">
               <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
                 <div class="min-w-0">
-                  <span class="text-ash-300 truncate">{seatDisplay(seat.player_uid)}</span>
-                  <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if} · {tGws[j]}GW {tTps[j]}TP</div>
+                  <span class="text-ink truncate">{seatDisplay(seat.player_uid)}</span>
+                  <div class="text-xs text-ink-faint">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if} · {tGws[j]}GW {tTps[j]}TP</div>
                 </div>
               </div>
               <VpInput
@@ -272,20 +272,20 @@
       </div>
     {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0}
       {#if myActiveRounds.length === 0 && currentPlayerEntry?.state === "Checked-in"}
-        <div class="bg-sky-900/20 border border-sky-800/40 rounded-lg p-4">
-          <p class="text-sm text-sky-300">{m.player_sitting_out()}</p>
+        <div class="banner-info border rounded-lg p-4">
+          <p class="text-sm">{m.player_sitting_out()}</p>
         </div>
       {:else}
         {#each myActiveRounds as active}
           {@const myTable = active.table}
           {@const myTableIdx = active.tableIdx}
           {@const roundIdx = active.roundIdx}
-          <div class="bg-ash-900/50 rounded-lg p-4">
+          <div class="bg-surface-muted/50 rounded-lg p-4">
             <div class="flex items-center justify-between mb-2">
-              <h3 class="text-sm font-medium text-bone-100">
+              <h3 class="text-sm font-medium text-ink-strong">
                 {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
               </h3>
-              <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-success' : myTable.state === 'Invalid' ? 'bg-crimson-900/60 text-crimson-300' : 'badge-pending'}">
+              <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-success' : myTable.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
                 {translateTableState(myTable.state)}
               </span>
             </div>
@@ -295,15 +295,15 @@
                 <TimerDisplay {tournament} tableIndex={myTableIdx} />
               </div>
             {/if}
-            <div class="divide-y divide-ash-800">
+            <div class="divide-y divide-line">
               {#each myTable.seating as seat, j}
                 {@const tVps = myTable.seating.map(s => s.result.vp)}
                 {@const tGws = computeGwLocal(tVps)}
                 {@const tTps = computeTpLocal(myTable.seating.length, tVps)}
                 <div class="py-2.5">
                   <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
-                    <span class="text-ash-300 truncate">{seatDisplay(seat.player_uid)}</span>
-                    <span class="text-ash-500 text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
+                    <span class="text-ink truncate">{seatDisplay(seat.player_uid)}</span>
+                    <span class="text-ink-faint text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
                   </div>
                   <VpInput
                     value={seat.result.vp}
@@ -336,28 +336,28 @@
     {/if}
     <!-- Cutoff score threshold for players -->
     {#if cutoffScore}
-      <div class="bg-ash-900/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-2">
+      <div class="bg-surface-muted/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-ink-strong mb-2">
           {m.tournament_standings()}
-          <span class="text-xs text-ash-500 font-normal ml-1">({m.tournament_standings_cutoff()})</span>
+          <span class="text-xs text-ink-faint font-normal ml-1">({m.tournament_standings_cutoff()})</span>
         </h3>
-        <p class="text-sm text-ash-300">
-          {m.tournament_cutoff_threshold()} <span class="text-bone-100 font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
+        <p class="text-sm text-ink">
+          {m.tournament_cutoff_threshold()} <span class="text-ink-strong font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
         </p>
       </div>
     {/if}
     <!-- Standings for players -->
     {#if tournament.state !== "Finished" && playerStandings.length > 0}
-      <div class="bg-ash-900/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-2">
+      <div class="bg-surface-muted/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-ink-strong mb-2">
           {m.tournament_standings()}
           {#if tournament.standings_mode !== "Public"}
-            <span class="text-xs text-ash-500 font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
+            <span class="text-xs text-ink-faint font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
           {/if}
         </h3>
         <table class="w-full text-sm">
           <thead>
-            <tr class="text-ash-500 text-xs">
+            <tr class="text-ink-faint text-xs">
               <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
               <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
               <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
@@ -365,13 +365,13 @@
           </thead>
           <tbody>
             {#each playerStandings as entry, idx}
-              <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
-                <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
+              <tr class="{idx < 5 ? 'text-ink-strong' : 'text-ink-muted'} border-t border-line">
+                <td class="py-1 pr-2 text-ink-faint"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
                 <td class="py-1 pr-2">
                   <span class="inline-flex items-center gap-1">
                     {seatDisplay(entry.user_uid)}
                     <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
-                    {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
+                    {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
                   </span>
                 </td>
                 <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
@@ -386,7 +386,7 @@
       <div>
         <button
           onclick={() => showPreviousRounds = !showPreviousRounds}
-          class="text-sm text-ash-400 hover:text-ash-200 transition-colors flex items-center gap-1"
+          class="text-sm text-ink-muted hover:text-ink-bright transition-colors flex items-center gap-1"
         >
           {#if showPreviousRounds}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
           {m.tournament_previous_rounds()}
@@ -394,14 +394,14 @@
         {#if showPreviousRounds}
           <div class="mt-2 space-y-3">
             {#each previousRounds as prev}
-              <div class="bg-ash-900/50 rounded-lg p-3">
-                <h4 class="text-xs font-medium text-ash-400 mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
-                <div class="divide-y divide-ash-800">
+              <div class="bg-surface-muted/50 rounded-lg p-3">
+                <h4 class="text-xs font-medium text-ink-muted mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
+                <div class="divide-y divide-line">
                   {#each prev.table.seating as seat, j}
                     {@const tVps = prev.table.seating.map(s => s.result.vp)}
                     {@const tGws = computeGwLocal(tVps)}
                     {@const tTps = computeTpLocal(prev.table.seating.length, tVps)}
-                    <div class="py-1 flex items-center justify-between text-sm {seat.player_uid === userUid ? 'text-bone-100' : 'text-ash-400'}">
+                    <div class="py-1 flex items-center justify-between text-sm {seat.player_uid === userUid ? 'text-ink-strong' : 'text-ink-muted'}">
                       <span>{seatDisplay(seat.player_uid)}</span>
                       <span class="text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
                     </div>
@@ -414,7 +414,7 @@
       </div>
     {/if}
   {:else}
-    <p class="text-ash-400 text-sm">{m.tournament_registration_not_open()}</p>
+    <p class="text-ink-muted text-sm">{m.tournament_registration_not_open()}</p>
   {/if}
 
   <!-- QR Check-in scanner -->
@@ -429,7 +429,7 @@
       <div class="mt-4">
         <button
           onclick={() => showRegisteredPlayers = !showRegisteredPlayers}
-          class="text-sm text-ash-400 hover:text-ash-200 transition-colors flex items-center gap-1"
+          class="text-sm text-ink-muted hover:text-ink-bright transition-colors flex items-center gap-1"
         >
           {#if showRegisteredPlayers}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
           {m.tournament_registered_players({ count: String(registered.length) })}
@@ -438,7 +438,7 @@
           <div class="mt-2 flex flex-wrap gap-2">
             {#each registered as player}
               {@const puid = player.user_uid ?? ""}
-              <span class="px-2 py-1 text-sm bg-ash-800 rounded text-ash-200">
+              <span class="px-2 py-1 text-sm bg-surface-hover rounded text-ink-bright">
                 {seatDisplay(puid)}
               </span>
             {/each}
@@ -462,8 +462,8 @@
 
 <!-- Raffle results (visible to all players) -->
 {#if (tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished") && (tournament.raffles?.length ?? 0) > 0}
-  <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6">
-    <h3 class="text-sm font-medium text-ash-300 mb-3">{m.raffle_title()}</h3>
+  <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6">
+    <h3 class="text-sm font-medium text-ink mb-3">{m.raffle_title()}</h3>
     <RaffleSection
       {tournament}
       {playerInfo}
@@ -475,20 +475,20 @@
 <!-- Finished tournament results (VEKN members only) -->
 {#if tournament.state === "Finished" && userVeknId}
   {@const hasFinals = standings.some(e => e.finals)}
-  <div class="bg-dusk-950 rounded-lg shadow border border-ash-800 mb-6 p-6 space-y-4">
+  <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
     {#if tournament.winner}
       <div class="banner-highlight border rounded-lg p-4">
-        <div class="text-ash-500 text-sm">{m.tournament_winner()}</div>
-        <div class="text-xl font-medium text-bone-100">{seatDisplay(tournament.winner)}</div>
+        <div class="text-ink-faint text-sm">{m.tournament_winner()}</div>
+        <div class="text-xl font-medium text-ink-strong">{seatDisplay(tournament.winner)}</div>
       </div>
     {/if}
     {#if standings.length > 0}
-      <div class="bg-ash-900/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_standings()}</h3>
+      <div class="bg-surface-muted/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-ash-500 text-xs">
+              <tr class="text-ink-faint text-xs">
                 <th class="text-left py-1 pr-2">{m.tournament_col_rank()}</th>
                 <th class="text-left py-1 pr-2">{m.tournament_col_player()}</th>
                 <th class="text-right py-1 px-2">{m.tournament_col_score()}</th>
@@ -502,13 +502,13 @@
             </thead>
             <tbody>
               {#each standings as entry, idx}
-                <tr class="{idx < 5 ? 'text-bone-100' : 'text-ash-400'} border-t border-ash-800">
-                  <td class="py-1 pr-2 text-ash-500"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
+                <tr class="{idx < 5 ? 'text-ink-strong' : 'text-ink-muted'} border-t border-line">
+                  <td class="py-1 pr-2 text-ink-faint"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
                   <td class="py-1 pr-2">
                     <span class="inline-flex items-center gap-1">
                       {seatDisplay(entry.user_uid)}
                       <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
-                      {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-crimson-400">{m.tournament_disqualified()}</span>{/if}
+                      {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
                     </span>
                   </td>
                   <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
@@ -516,7 +516,7 @@
                     <td class="text-right py-1 px-2">{entry.finals ?? ""}</td>
                   {/if}
                   {#if isFinished}
-                    <td class="text-right py-1 px-2 text-ash-400">{getRatingPts(entry)}</td>
+                    <td class="text-right py-1 px-2 text-ink-muted">{getRatingPts(entry)}</td>
                   {/if}
                 </tr>
               {/each}
@@ -526,9 +526,9 @@
       </div>
     {/if}
     {#if tournament.finals}
-      <div class="bg-ash-900/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-bone-100 mb-2">{m.tournament_finals_table()}</h3>
-        <div class="divide-y divide-ash-800">
+      <div class="bg-surface-muted/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_finals_table()}</h3>
+        <div class="divide-y divide-line">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
             {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
@@ -537,10 +537,10 @@
             {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
             <div class="py-1.5 flex items-center justify-between text-sm">
               <div>
-                <span class="text-ash-300">{seatDisplay(seat.player_uid)}</span>
-                <div class="text-xs text-ash-500">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
+                <span class="text-ink">{seatDisplay(seat.player_uid)}</span>
+                <div class="text-xs text-ink-faint">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
               </div>
-              <span class="text-ash-500 text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
+              <span class="text-ink-faint text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
             </div>
           {/each}
         </div>

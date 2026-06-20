@@ -16,6 +16,8 @@
         var light = t === 'light' || (t !== 'dark' && matchMedia('(prefers-color-scheme: light)').matches);
         if (light) document.documentElement.classList.add('light');
         var meta = document.querySelector('meta[name="theme-color"]');
+        // These two hex values are the light/dark arms of --color-accent (app.css);
+        // not reachable from CSS here, so keep them in sync if the brand hue changes.
         if (meta) meta.setAttribute('content', light ? '#A40F2D' : '#DC143C');
       })();
     </script>

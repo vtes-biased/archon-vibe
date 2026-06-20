@@ -20,19 +20,19 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-light text-crimson-500 mb-6">{m.nav_community()}</h1>
+    <h1 class="text-3xl font-light text-accent mb-6">{m.nav_community()}</h1>
 
     <!-- Tab Toggle -->
-    <div class="flex mb-6 bg-dusk-950 rounded-lg border border-ash-800 p-1 w-fit">
+    <div class="flex mb-6 bg-surface-card rounded-lg border border-line p-1 w-fit">
       <button
         onclick={() => activeTab = 'community'}
-        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'community' ? 'bg-crimson-700 text-white' : 'text-ash-400 hover:text-ash-200'}"
+        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'community' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
       >
         {m.community_tab_community()}
       </button>
       <button
         onclick={() => activeTab = 'members'}
-        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'members' ? 'bg-crimson-700 text-white' : 'text-ash-400 hover:text-ash-200'}"
+        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'members' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
       >
         {m.community_tab_members()}
       </button>

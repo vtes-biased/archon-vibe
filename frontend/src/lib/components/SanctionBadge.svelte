@@ -22,7 +22,7 @@
     warning: "badge-pending",
     standings_adjustment: "badge-highlight",
     disqualification: "badge-danger",
-    suspension: "bg-crimson-900/80 text-crimson-200", // crimson uses custom palette
+    suspension: "bg-accent-soft/80 text-link-soft", // crimson uses custom palette
     probation: "badge-danger",
   };
 

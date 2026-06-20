@@ -5,9 +5,9 @@ metadata:
   type: project
 ---
 
-A single shared action-button component lives at `frontend/src/lib/components/Button.svelte`, replacing three legacy patterns: the `.btn-emerald/.btn-amber/.btn-red` semantic CSS classes (app.css ~217–229), inline `bg-crimson-*`, and border ghost buttons. ConfirmActionModal.svelte was the first consumer.
+A single shared action-button component lives at `frontend/src/lib/components/Button.svelte`. It replaced the legacy `.btn-emerald/.btn-amber/.btn-red` CSS classes, inline numeric-scale tints (`bg-crimson-700`, etc.), and border ghost buttons. ConfirmActionModal.svelte was the first consumer.
 
-Variant set is fixed: `primary|secondary|warning|ghost|danger` (warning = the legacy amber action colour, kept deliberately — do not rename or drop it). Sizes: sm=text-xs, md=text-sm, lg=text-sm+font-medium. Props: variant/size/block/loading/disabled/type + `class` passthrough + `...rest`.
+Variant set is fixed: `primary|secondary|ghost|danger`. (`warning` and `brand` were dropped — all former warning/forward sites merged into `primary`.) Sizes: sm=text-xs, md=text-sm, lg=text-sm+font-medium. Props: variant/size/block/loading/disabled/type + `class` passthrough + `...rest`.
 
 **Why:** owner mass-migrated ~130–150 action-button call-sites to it in one pass; the API was blessed before fan-out so it's expensive to change now.
 

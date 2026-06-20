@@ -299,7 +299,7 @@
   }
 </script>
 
-<div class={inline ? "p-4" : "bg-dusk-950 rounded-lg shadow p-4 hover:shadow-md transition-shadow border border-ash-800"}>
+<div class={inline ? "p-4" : "bg-surface-card rounded-lg shadow p-4 hover:shadow-md transition-shadow border border-line"}>
   {#if isEditing}
     <!-- Edit/Create Mode -->
     <div role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
@@ -314,7 +314,7 @@
         <!-- Close button + saving indicator for edit mode -->
         <div class="flex justify-end items-center gap-2 -mt-1 -mr-1">
           {#if saving}
-            <span class="text-xs text-ash-400 flex items-center gap-1">
+            <span class="text-xs text-ink-muted flex items-center gap-1">
               <Loader2 class="w-3 h-3 animate-spin" />
               {m.user_saving()}
             </span>
@@ -322,7 +322,7 @@
           <button
             type="button"
             onclick={cancelEdit}
-            class="p-2 text-ash-500 hover:text-crimson-400 transition-colors"
+            class="p-2 text-ink-faint hover:text-link transition-colors"
             title={m.common_close()}
           >
             <X class="w-5 h-5" />
@@ -332,7 +332,7 @@
       <div>
         <label
           for="edit-name"
-          class="block text-sm font-medium text-ash-400 mb-1"
+          class="block text-sm font-medium text-ink-muted mb-1"
         >
           {m.common_name()} *
         </label>
@@ -342,7 +342,7 @@
           bind:value={editName}
           oninput={() => mode !== "create" && debouncedAutoSave()}
           required
-          class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
         />
       </div>
 
@@ -351,7 +351,7 @@
         <div>
           <label
             for="edit-email"
-            class="block text-sm font-medium text-ash-400 mb-1"
+            class="block text-sm font-medium text-ink-muted mb-1"
           >
             {m.user_email_label()}
           </label>
@@ -360,24 +360,24 @@
             type="email"
             bind:value={editEmail}
             placeholder={m.user_email_placeholder()}
-            class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
           />
-          <p class="mt-1 text-xs text-ash-500">
+          <p class="mt-1 text-xs text-ink-faint">
             {m.user_email_hint()}
           </p>
         </div>
       {:else}
         <!-- VEKN ID (read-only, managed via standalone VEKN Management section) -->
         <div>
-          <span class="block text-sm font-medium text-ash-400 mb-1">{m.add_player_vekn_id_label()}</span>
-          <span class="block px-3 py-2 text-ash-300">{user?.vekn_id || '—'}</span>
+          <span class="block text-sm font-medium text-ink-muted mb-1">{m.add_player_vekn_id_label()}</span>
+          <span class="block px-3 py-2 text-ink">{user?.vekn_id || '—'}</span>
         </div>
       {/if}
 
       <div>
         <label
           for="edit-country"
-          class="block text-sm font-medium text-ash-400 mb-1"
+          class="block text-sm font-medium text-ink-muted mb-1"
         >
           {m.common_country()} *
         </label>
@@ -386,7 +386,7 @@
           bind:value={editCountry}
           required
           onchange={handleCountryChange}
-          class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
         >
           <option value="">{m.user_country_placeholder()}</option>
           {#each sortedCountries as country}
@@ -400,7 +400,7 @@
       <div>
         <label
           for="edit-city"
-          class="block text-sm font-medium text-ash-400 mb-1"
+          class="block text-sm font-medium text-ink-muted mb-1"
         >
           {m.common_city()}
         </label>
@@ -412,7 +412,7 @@
           onselect={() => mode !== "create" && immediateAutoSave()}
         />
         {#if !editCountry}
-          <p class="mt-1 text-xs text-mist-dark">
+          <p class="mt-1 text-xs text-ink-faint">
             {m.user_city_hint()}
           </p>
         {/if}
@@ -421,7 +421,7 @@
       <div>
         <label
           for="edit-nickname"
-          class="block text-sm font-medium text-ash-400 mb-1"
+          class="block text-sm font-medium text-ink-muted mb-1"
         >
           {m.common_nickname()}
         </label>
@@ -430,12 +430,12 @@
           type="text"
           bind:value={editNickname}
           oninput={() => mode !== "create" && debouncedAutoSave()}
-          class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
         />
       </div>
 
       <fieldset>
-        <legend class="block text-sm font-medium text-ash-400 mb-2">
+        <legend class="block text-sm font-medium text-ink-muted mb-2">
           {m.common_roles()}
         </legend>
         <div class="flex flex-wrap gap-2">
@@ -448,21 +448,21 @@
               title={allowed ? m.user_toggle_role({ role }) : m.user_cannot_change_role({ role })}
               class="px-3 py-1 rounded text-sm font-medium transition-colors {editRoles.includes(role)
                 ? getRoleClasses(role)
-                : 'bg-ash-800 text-ash-400'} {allowed ? 'hover:opacity-80 cursor-pointer' : 'opacity-50 cursor-not-allowed'}"
+                : 'bg-surface-hover text-ink-muted'} {allowed ? 'hover:opacity-80 cursor-pointer' : 'opacity-50 cursor-not-allowed'}"
             >
               {role}
             </button>
           {/each}
         </div>
         {#if mode !== "create" && user && !user.vekn_id}
-          <p class="mt-2 text-xs text-crimson-400">
+          <p class="mt-2 text-xs text-link">
             {m.user_vekn_required_for_roles()}
           </p>
         {/if}
       </fieldset>
 
       {#if error}
-        <div class="text-sm text-crimson-400">
+        <div class="text-sm text-link">
           {error}
         </div>
       {/if}
@@ -507,11 +507,11 @@
                 <img
                   src={user.avatar_path}
                   alt="{user.name}'s avatar"
-                  class="w-16 h-16 rounded-full object-cover ring-2 ring-ash-700 group-hover:ring-crimson-500 transition-all"
+                  class="w-16 h-16 rounded-full object-cover ring-2 ring-line-strong group-hover:ring-accent transition-all"
                 />
               {:else}
-                <div class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center ring-2 ring-ash-700 group-hover:ring-crimson-500 transition-all">
-                  <UserIcon class="w-8 h-8 text-ash-500" />
+                <div class="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center ring-2 ring-line-strong group-hover:ring-accent transition-all">
+                  <UserIcon class="w-8 h-8 text-ink-faint" />
                 </div>
               {/if}
               <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -520,28 +520,28 @@
             </button>
             <button
               onclick={(e) => { e.stopPropagation(); showAvatarCropper = true; }}
-              class="text-xs text-ash-400 hover:text-crimson-400 sm:hidden"
+              class="text-xs text-ink-muted hover:text-link sm:hidden"
             >{m.user_change_photo()}</button>
           </div>
         {:else if user.avatar_path}
           <img
             src={user.avatar_path}
             alt="{user.name}'s avatar"
-            class="w-16 h-16 rounded-full object-cover ring-2 ring-ash-700"
+            class="w-16 h-16 rounded-full object-cover ring-2 ring-line-strong"
           />
         {:else}
-          <div class="w-16 h-16 rounded-full bg-ash-800 flex items-center justify-center ring-2 ring-ash-700">
-            <UserIcon class="w-8 h-8 text-ash-500" />
+          <div class="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center ring-2 ring-line-strong">
+            <UserIcon class="w-8 h-8 text-ink-faint" />
           </div>
         {/if}
       </div>
 
       <div class="flex-1">
-        <h3 class="text-lg font-semibold text-bone-100">
+        <h3 class="text-lg font-semibold text-ink-strong">
           {user.name}
         </h3>
 
-        <div class="mt-2 space-y-1 text-sm text-ash-400">
+        <div class="mt-2 space-y-1 text-sm text-ink-muted">
           {#if user.vekn_id}
             <div class="flex items-center gap-2">
               <span class="font-medium">{m.add_player_vekn_id_label()}:</span>
@@ -592,21 +592,21 @@
           {#if user.contact_email || user.discord_id || user.contact_phone}
             {@const email = deobfuscateContact(user.contact_email)}
             {@const phone = deobfuscateContact(user.contact_phone)}
-            <div class="mt-3 pt-3 border-t border-ash-700 space-y-1">
-              <span class="font-medium text-ash-400">{m.profile_contact()}:</span>
+            <div class="mt-3 pt-3 border-t border-line-strong space-y-1">
+              <span class="font-medium text-ink-muted">{m.profile_contact()}:</span>
               {#if email}
                 <div class="flex items-center gap-2">
-                  <a href="mailto:{email}" class="text-crimson-500 hover:text-crimson-400 text-sm">{email}</a>
+                  <a href="mailto:{email}" class="text-link hover:text-link-soft text-sm">{email}</a>
                 </div>
               {/if}
               {#if user.discord_id}
                 <div class="text-sm">
-                  <a href="https://discord.com/users/{user.discord_id}" target="_blank" rel="noopener noreferrer" class="text-crimson-500 hover:text-crimson-400">{m.profile_contact_discord()}: {user.contact_discord || "Discord"}</a>
+                  <a href="https://discord.com/users/{user.discord_id}" target="_blank" rel="noopener noreferrer" class="text-link hover:text-link-soft">{m.profile_contact_discord()}: {user.contact_discord || "Discord"}</a>
                 </div>
               {/if}
               {#if phone}
                 {#if user.phone_is_whatsapp}
-                  <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-sm text-crimson-500 hover:text-crimson-400">WhatsApp: {phone}</a>
+                  <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-sm text-link hover:text-link-soft">WhatsApp: {phone}</a>
                 {:else}
                   <div class="text-sm">{phone}</div>
                 {/if}
@@ -615,7 +615,7 @@
           {/if}
 
           {#if user.community_links?.length}
-            <div class="mt-3 pt-3 border-t border-ash-700">
+            <div class="mt-3 pt-3 border-t border-line-strong">
               <CommunityLinkPills links={user.community_links} />
             </div>
           {/if}
@@ -625,7 +625,7 @@
       {#if editable}
         <button
           onclick={(e) => { e.stopPropagation(); startEdit(); }}
-          class="ml-2 p-2 text-ash-500 hover:text-crimson-400 transition-colors"
+          class="ml-2 p-2 text-ink-faint hover:text-link transition-colors"
           title={m.user_edit()}
         >
           <SquarePen class="w-5 h-5" />
@@ -633,15 +633,15 @@
       {/if}
     </div>
 
-    <div class="mt-3 pt-3 border-t border-ash-700">
-      <p class="text-xs text-mist-dark">
+    <div class="mt-3 pt-3 border-t border-line-strong">
+      <p class="text-xs text-ink-faint">
         {m.user_last_modified({ date: new Date(user.modified).toLocaleString() })}
       </p>
     </div>
 
   {:else}
     <!-- Invalid state -->
-    <div class="text-crimson-400">
+    <div class="text-link">
       {m.user_invalid_state()}
     </div>
   {/if}
@@ -665,7 +665,7 @@
     onkeydown={(e) => { e.stopPropagation(); if (e.key === "Escape") cancelCountryChange(); }}
   >
     <div
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="country-confirm-title"
@@ -673,8 +673,8 @@
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="country-confirm-title" class="text-xl font-medium text-bone-100">
+      <div class="p-6 border-b border-line">
+        <h2 id="country-confirm-title" class="text-xl font-medium text-ink-strong">
           {m.user_country_change_official_title()}
         </h2>
       </div>

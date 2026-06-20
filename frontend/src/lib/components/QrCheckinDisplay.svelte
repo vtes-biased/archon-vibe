@@ -49,9 +49,9 @@
   <div class="flex items-center justify-center">
     <canvas bind:this={canvasEl} class="rounded-lg"></canvas>
   </div>
-  <p class="text-xs text-ash-500 text-center">{m.checkin_qr_organizer_hint()}</p>
+  <p class="text-xs text-ink-faint text-center">{m.checkin_qr_organizer_hint()}</p>
   <div class="flex justify-center">
-    <button onclick={printQr} class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors flex items-center gap-1.5">
+    <button onclick={printQr} class="px-3 py-1.5 text-sm text-ink bg-surface-hover hover:bg-surface-active rounded-lg transition-colors flex items-center gap-1.5">
       <Printer class="w-4 h-4" />
       {m.checkin_qr_print()}
     </button>

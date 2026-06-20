@@ -351,13 +351,13 @@
   <!-- Header + Add Player -->
   <div class="space-y-2">
     <div class="flex items-center gap-3">
-      <p class="text-ash-400 shrink-0">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
+      <p class="text-ink-muted shrink-0">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
       {#if isOrganizer}
         <AddPlayerForm {tournament} onadd={addPlayerByUser} oncreate={() => { createCountry = tournament.country ?? ''; showCreateModal = true; }} />
       {/if}
     </div>
     {#if isOrganizer && isOfflineMode}
-      <div class="border-t border-ash-800 pt-2">
+      <div class="border-t border-line pt-2">
         <button
           onclick={() => showOfflinePlayerForm = !showOfflinePlayerForm}
           class="text-sm text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
@@ -366,24 +366,24 @@
           {m.offline_add_new_player()}
         </button>
         {#if showOfflinePlayerForm}
-          <div class="mt-2 space-y-2 bg-ash-900/50 rounded-lg p-3">
+          <div class="mt-2 space-y-2 bg-surface-muted/50 rounded-lg p-3">
             <input
               type="text"
               bind:value={offlinePlayerName}
               placeholder={m.offline_player_name()}
-              class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+              class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
             />
             <input
               type="text"
               bind:value={offlinePlayerVeknId}
               placeholder={m.offline_player_vekn_id()}
-              class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+              class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
             />
             <input
               type="email"
               bind:value={offlinePlayerEmail}
               placeholder={m.offline_player_email()}
-              class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+              class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
             />
             <Button
               variant="primary"
@@ -424,7 +424,7 @@
           onclick={enterTossEdit}
         >{m.players_edit_toss()}</Button>
         {#if top5HasTiesFn(standings)}
-          <span class="text-xs text-ash-500">{m.players_toss_hint()}</span>
+          <span class="text-xs text-ink-faint">{m.players_toss_hint()}</span>
         {/if}
       {/if}
     </div>
@@ -436,16 +436,16 @@
       <div class="flex gap-1">
         {#if standings.length > 0}
           <button
-            class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'standings' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+            class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'standings' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
             onclick={() => playerSort = 'standings'}
           >{m.players_sort_standings()}</button>
         {/if}
         <button
-          class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'name' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+          class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'name' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
           onclick={() => playerSort = 'name'}
         >{m.players_sort_name()}</button>
         <button
-          class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'vekn' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+          class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'vekn' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
           onclick={() => playerSort = 'vekn'}
         >{m.players_sort_vekn()}</button>
       </div>
@@ -453,19 +453,19 @@
         <div class="flex items-center gap-2">
           <div class="flex gap-1">
             <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'all' ? 'bg-ash-700 text-bone-100' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'all' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
               onclick={() => paymentFilter = 'all'}
             >{m.payment_filter_all()}</button>
             <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'btn-pending' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'btn-pending' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
               onclick={() => paymentFilter = 'Pending'}
             >{m.payment_pending()}</button>
             <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'btn-success' : 'bg-ash-800/50 text-ash-400 hover:text-ash-200'}"
+              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'btn-success' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
               onclick={() => paymentFilter = 'Paid'}
             >{m.payment_paid()}</button>
           </div>
-          <span class="text-xs text-ash-500">{m.payment_summary({ paid: String(paidCount), total: String(totalPlayers) })}</span>
+          <span class="text-xs text-ink-faint">{m.payment_summary({ paid: String(paidCount), total: String(totalPlayers) })}</span>
         </div>
       {/if}
     </div>
@@ -478,15 +478,15 @@
         {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
         {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
         {@const isTied = entry ? standings.some((s, j) => j !== standingsIdx && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5)) : false}
-        <div class="bg-ash-900/50 rounded-lg p-3 {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-crimson-800' : ''}">
+        <div class="bg-surface-muted/50 rounded-lg p-3 {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-accent-soft-border' : ''}">
           <!-- Top row: rank + name + sanctions + status -->
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5">
                 {#if playerSort === 'standings' && entry}
-                  <span class="text-ash-500 text-xs font-medium shrink-0"><RankCell rank={entry.rank} finalist={entry.finalist} hash /></span>
+                  <span class="text-ink-faint text-xs font-medium shrink-0"><RankCell rank={entry.rank} finalist={entry.finalist} hash /></span>
                 {/if}
-                <span class="truncate {isTop5 && playerSort === 'standings' ? 'text-bone-100 font-medium' : 'text-ash-300'} text-sm">
+                <span class="truncate {isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink'} text-sm">
                   {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
                 </span>
                 {#if playerSanctionsMap[puid]?.length}
@@ -497,34 +497,34 @@
                 {/if}
               </div>
               {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
-                <div class="text-xs text-ash-500 truncate">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</div>
+                <div class="text-xs text-ink-faint truncate">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</div>
               {/if}
             </div>
             <div class="shrink-0">
               {#if player.state === "Disqualified"}
-                <span class="text-xs px-2 py-0.5 rounded bg-crimson-900/60 text-crimson-300">{m.player_state_disqualified()}</span>
+                <span class="text-xs px-2 py-0.5 rounded bg-accent-soft/60 text-link-soft">{m.player_state_disqualified()}</span>
               {:else if player.state === "Finished"}
                 {@const played = standingsMap.has(puid)}
                 {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
-                <span class="text-xs px-2 py-0.5 rounded bg-ash-800 text-ash-500">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
+                <span class="text-xs px-2 py-0.5 rounded bg-surface-hover text-ink-faint">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
               {:else}
-                <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-ash-800 text-ash-400'}">{translatePlayerState(player.state)}</span>
+                <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">{translatePlayerState(player.state)}</span>
               {/if}
             </div>
           </div>
           <!-- Score row -->
           {#if entry}
-            <div class="mt-1 flex items-center gap-3 text-xs text-ash-400">
+            <div class="mt-1 flex items-center gap-3 text-xs text-ink-muted">
               <span>{formatScore(entry.gw, entry.vp, entry.tp)}</span>
               {#if hasFinals && entry.finals}<span>{entry.finals}</span>{/if}
-              {#if isFinished && playerSort === 'standings'}<span class="text-ash-500">{getRatingPts(entry)} RP</span>{/if}
+              {#if isFinished && playerSort === 'standings'}<span class="text-ink-faint">{getRatingPts(entry)} RP</span>{/if}
               {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
                 {#if editingToss && isOrganizer}
-                  <span class="text-ash-500">{m.tournament_toss_label()}</span>
-                  <input type="number" min="1" class="w-12 min-h-[44px] bg-ash-800 text-bone-100 text-xs rounded px-1 py-1.5 border border-ash-700"
+                  <span class="text-ink-faint">{m.tournament_toss_label()}</span>
+                  <input type="number" min="1" class="w-12 min-h-[44px] bg-surface-hover text-ink-strong text-xs rounded px-1 py-1.5 border border-line-strong"
                     value={tossEdits[puid] ?? ""} oninput={(e) => tossEdits[puid] = (e.target as HTMLInputElement).value} />
                 {:else}
-                  <span class="text-ash-500">{m.tournament_toss_label()} {entry.toss || "—"}</span>
+                  <span class="text-ink-faint">{m.tournament_toss_label()} {entry.toss || "—"}</span>
                 {/if}
               {/if}
             </div>
@@ -539,11 +539,11 @@
               </button>
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
-                <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors hover:bg-ash-800" title={m.players_view_deck()}>
+                <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors hover:bg-surface-hover" title={m.players_view_deck()}>
                   {#if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-blue-400" /><span class="text-blue-400">{m.players_view_deck()}</span>
                   {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-purple-400" /><span class="text-purple-400">{m.players_view_deck()}</span>
-                  {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-crimson-400" /><span class="text-crimson-400">{m.players_view_deck()}</span>
-                  {:else}<FileX class="w-3.5 h-3.5 text-ash-500" /><span class="text-ash-400">{m.players_no_deck()}</span>{/if}
+                  {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-link" /><span class="text-link">{m.players_view_deck()}</span>
+                  {:else}<FileX class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_no_deck()}</span>{/if}
                 </button>
               {/if}
               {#if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
@@ -554,7 +554,7 @@
               {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
                 <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop()}</Button>
               {:else if puid && !hasRounds}
-                <button onclick={() => removePlayer(puid)} class="p-1.5 text-crimson-400 hover:text-crimson-300 transition-colors" title={m.players_remove_title()}>
+                <button onclick={() => removePlayer(puid)} class="p-1.5 text-link hover:text-link-soft transition-colors" title={m.players_remove_title()}>
                   <X class="w-4 h-4" />
                 </button>
               {/if}
@@ -570,7 +570,7 @@
           {#if expandedPlayer === puid}
             {@const playerDecks = getPlayerDecks(puid)}
             {@const errors = validationCache[puid] ?? []}
-            <div class="mt-2 pt-2 border-t border-ash-800 space-y-2">
+            <div class="mt-2 pt-2 border-t border-line space-y-2">
               {#if isOrganizer && uploadingFor === puid}
                 <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} onuploaded={onUploaded} />
               {:else if playerDecks.length > 0}
@@ -582,10 +582,10 @@
                       roundLabel={m.decks_round_label({ n: String(slot.round + 1) })}
                     >
                       {#snippet headerExtra()}
-                        <span class="text-ash-500 truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
+                        <span class="text-ink-faint truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
                       {/snippet}
                       {#if slot.deck && isDeckHiddenFromOrganizer(slot.round)}
-                        <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                        <p class="text-sm text-ink-muted flex items-center gap-1.5">
                           <EyeOff class="w-4 h-4 shrink-0" />
                           {m.decks_hidden_until_round()}
                         </p>
@@ -599,13 +599,13 @@
                       {:else if isOrganizer}
                         <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round} onuploaded={onUploaded} />
                       {:else}
-                        <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
+                        <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
                       {/if}
                     </DeckAccordion>
                   {/each}
                 {:else if playerDecks[0]}
                   {#if isDeckHiddenFromOrganizer(null)}
-                    <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                    <p class="text-sm text-ink-muted flex items-center gap-1.5">
                       <EyeOff class="w-4 h-4 shrink-0" />
                       {m.decks_hidden_until_round()}
                     </p>
@@ -623,7 +623,7 @@
                 {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                   <div class="space-y-1">
                     {#each errors as err}
-                      <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-purple-400'}">
+                      <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-purple-400'}">
                         {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
                         {err.message}
                       </p>
@@ -631,7 +631,7 @@
                   </div>
                 {/if}
               {:else}
-                <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
+                <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
               {/if}
               {#if isOrganizer && playerDecks.length === 0 && (!isMultideck || roundCount === 0) && uploadingFor !== puid}
                 <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
@@ -643,10 +643,10 @@
     </div>
 
     <!-- Desktop table -->
-    <div class="hidden sm:block bg-ash-900/50 rounded-lg p-4 overflow-x-auto">
+    <div class="hidden sm:block bg-surface-muted/50 rounded-lg p-4 overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
-          <tr class="text-ash-400 text-xs border-b border-ash-700">
+          <tr class="text-ink-muted text-xs border-b border-line-strong">
             {#if playerSort === 'standings' && standings.length > 0}
               <th class="text-left py-1.5 pr-2">{m.tournament_col_rank()}</th>
             {/if}
@@ -680,9 +680,9 @@
             {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
             {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
             {@const isTied = entry ? standings.some((s, j) => j !== standingsIdx && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5)) : false}
-            <tr class="{isTop5 && playerSort === 'standings' ? 'text-bone-100 font-medium' : 'text-ash-300'} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-crimson-900/10' : ''} border-t border-ash-700">
+            <tr class="{isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink'} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-accent-soft/10' : ''} border-t border-line-strong">
               {#if playerSort === 'standings' && standings.length > 0}
-                <td class="py-1.5 pr-2 text-ash-500">{entry?.rank ?? "—"}</td>
+                <td class="py-1.5 pr-2 text-ink-faint">{entry?.rank ?? "—"}</td>
               {/if}
               <td class="py-1.5 pr-2">
                 <span class="truncate flex items-center gap-1">
@@ -695,7 +695,7 @@
                   {/if}
                 </span>
                 {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
-                  <span class="text-xs text-ash-500 truncate block">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</span>
+                  <span class="text-xs text-ink-faint truncate block">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</span>
                 {/if}
               </td>
               {#if standings.length > 0}
@@ -704,7 +704,7 @@
                   <td class="text-right py-1.5 px-2">{entry?.finals ?? ""}</td>
                 {/if}
                 {#if isFinished && playerSort === 'standings'}
-                  <td class="text-right py-1.5 px-2 text-ash-400">{entry ? getRatingPts(entry) : "—"}</td>
+                  <td class="text-right py-1.5 px-2 text-ink-muted">{entry ? getRatingPts(entry) : "—"}</td>
                 {/if}
               {/if}
               {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
@@ -712,7 +712,7 @@
                   {#if isTied}
                     {#if editingToss && isOrganizer}
                       <input type="number" min="1"
-                        class="w-14 bg-ash-800 text-bone-100 text-xs rounded px-1 py-0.5 border border-ash-700"
+                        class="w-14 bg-surface-hover text-ink-strong text-xs rounded px-1 py-0.5 border border-line-strong"
                         value={tossEdits[puid] ?? ""}
                         oninput={(e) => tossEdits[puid] = (e.target as HTMLInputElement).value} />
                     {:else}
@@ -723,13 +723,13 @@
               {/if}
               <td class="py-1.5 px-2">
                 {#if player.state === "Disqualified"}
-                  <span class="text-xs px-2 py-0.5 rounded bg-crimson-900/60 text-crimson-300">{m.player_state_disqualified()}</span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-accent-soft/60 text-link-soft">{m.player_state_disqualified()}</span>
                 {:else if player.state === "Finished"}
                   {@const played = standingsMap.has(puid)}
                   {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
-                  <span class="text-xs px-2 py-0.5 rounded bg-ash-800 text-ash-500">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-surface-hover text-ink-faint">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
                 {:else}
-                  <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-ash-800 text-ash-400'}">
+                  <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">
                     {translatePlayerState(player.state)}
                   </span>
                 {/if}
@@ -748,11 +748,11 @@
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
                 <td class="text-center py-1.5 px-2">
-                  <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-ash-800 rounded transition-colors" title={m.players_view_deck()}>
+                  <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-surface-hover rounded transition-colors" title={m.players_view_deck()}>
                     {#if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-blue-400" />
                     {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-purple-400" />
-                    {:else if deckStatus === 'error'}<CircleX class="w-4 h-4 text-crimson-400" />
-                    {:else}<FileX class="w-4 h-4 text-ash-500" />{/if}
+                    {:else if deckStatus === 'error'}<CircleX class="w-4 h-4 text-link" />
+                    {:else}<FileX class="w-4 h-4 text-ink-faint" />{/if}
                   </button>
                 </td>
               {/if}
@@ -766,7 +766,7 @@
                   {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
                     <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop()}</Button>
                   {:else if puid && !hasRounds}
-                    <button onclick={() => removePlayer(puid)} class="p-1 text-crimson-400 hover:text-crimson-300 transition-colors" title={m.players_remove_title()}>
+                    <button onclick={() => removePlayer(puid)} class="p-1 text-link hover:text-link-soft transition-colors" title={m.players_remove_title()}>
                       <X class="w-4 h-4" />
                     </button>
                   {/if}
@@ -783,7 +783,7 @@
             {#if expandedPlayer === puid}
               {@const playerDecks = getPlayerDecks(puid)}
               {@const errors = validationCache[puid] ?? []}
-              <tr class="bg-ash-900/50">
+              <tr class="bg-surface-muted/50">
                 <td colspan="99" class="p-4">
                   <div class="space-y-2">
                     {#if isOrganizer && uploadingFor === puid}
@@ -797,10 +797,10 @@
                             roundLabel={m.decks_round_label({ n: String(slot.round + 1) })}
                           >
                             {#snippet headerExtra()}
-                              <span class="text-ash-500 truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
+                              <span class="text-ink-faint truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
                             {/snippet}
                             {#if slot.deck && isDeckHiddenFromOrganizer(slot.round)}
-                              <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                              <p class="text-sm text-ink-muted flex items-center gap-1.5">
                                 <EyeOff class="w-4 h-4 shrink-0" />
                                 {m.decks_hidden_until_round()}
                               </p>
@@ -814,13 +814,13 @@
                             {:else if isOrganizer}
                               <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round} onuploaded={onUploaded} />
                             {:else}
-                              <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
+                              <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
                             {/if}
                           </DeckAccordion>
                         {/each}
                       {:else if playerDecks[0]}
                         {#if isDeckHiddenFromOrganizer(null)}
-                          <p class="text-sm text-ash-400 flex items-center gap-1.5">
+                          <p class="text-sm text-ink-muted flex items-center gap-1.5">
                             <EyeOff class="w-4 h-4 shrink-0" />
                             {m.decks_hidden_until_round()}
                           </p>
@@ -838,7 +838,7 @@
                       {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
                         <div class="space-y-1">
                           {#each errors as err}
-                            <p class="text-sm {err.severity === 'error' ? 'text-crimson-400' : 'text-purple-400'}">
+                            <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-purple-400'}">
                               {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" />{/if}
                               {err.message}
                             </p>
@@ -846,7 +846,7 @@
                         </div>
                       {/if}
                     {:else}
-                      <p class="text-sm text-ash-400">{m.players_no_deck()}</p>
+                      <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
                     {/if}
                     {#if isOrganizer && playerDecks.length === 0 && (!isMultideck || roundCount === 0) && uploadingFor !== puid}
                       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
@@ -887,9 +887,9 @@
 <!-- Sponsor & Register Modal -->
 {#if sponsorTarget}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="bg-dusk-950 border border-ash-700 rounded-lg p-6 max-w-sm w-full mx-4 space-y-4">
-      <h3 class="text-lg font-medium text-bone-100">{m.vekn_sponsor_to_register_title()}</h3>
-      <p class="text-sm text-ash-300">{m.vekn_sponsor_to_register_message({ name: sponsorTarget.name })}</p>
+    <div class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4">
+      <h3 class="text-lg font-medium text-ink-strong">{m.vekn_sponsor_to_register_title()}</h3>
+      <p class="text-sm text-ink">{m.vekn_sponsor_to_register_message({ name: sponsorTarget.name })}</p>
       <div class="flex gap-2 justify-end">
         <Button
           variant="ghost"
@@ -910,21 +910,21 @@
 <!-- Create & Register Modal -->
 {#if showCreateModal}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="bg-dusk-950 border border-ash-700 rounded-lg p-6 max-w-sm w-full mx-4 space-y-4">
-      <h3 class="text-lg font-medium text-bone-100">{m.create_and_register_title()}</h3>
-      <p class="text-sm text-ash-300">{m.create_and_register_message()}</p>
+    <div class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4">
+      <h3 class="text-lg font-medium text-ink-strong">{m.create_and_register_title()}</h3>
+      <p class="text-sm text-ink">{m.create_and_register_message()}</p>
       <div class="space-y-2">
         <input
           type="text"
           bind:value={createName}
           placeholder={m.offline_player_name()}
-          class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+          class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
         />
         <input
           type="email"
           bind:value={createEmail}
           placeholder={m.common_email()}
-          class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
+          class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
         />
       </div>
       <div class="flex gap-2 justify-end">

@@ -190,20 +190,20 @@
     tabindex="-1"
     use:focusOnMount
     onkeydown={(e) => e.key === 'Escape' && onCancel()}
-    class="bg-dusk-950 rounded-lg p-6 max-w-sm w-full"
+    class="bg-surface-card rounded-lg p-6 max-w-sm w-full"
   >
-    <h2 id="avatar-modal-title" class="text-lg font-semibold text-bone-200 mb-4">{m.avatar_title()}</h2>
+    <h2 id="avatar-modal-title" class="text-lg font-semibold text-ink-strong mb-4">{m.avatar_title()}</h2>
 
     {#if !image}
       <!-- File selection -->
       <div class="flex flex-col items-center gap-4">
         <button
           onclick={() => fileInput?.click()}
-          class="w-32 h-32 rounded-full border-2 border-dashed border-ash-600 flex items-center justify-center hover:border-crimson-500 transition-colors"
+          class="w-32 h-32 rounded-full border-2 border-dashed border-line-strong flex items-center justify-center hover:border-accent transition-colors"
         >
-          <ImagePlus class="w-12 h-12 text-ash-500" />
+          <ImagePlus class="w-12 h-12 text-ink-faint" />
         </button>
-        <p class="text-sm text-ash-400">{m.avatar_select_image()}</p>
+        <p class="text-sm text-ink-muted">{m.avatar_select_image()}</p>
         <input
           bind:this={fileInput}
           type="file"
@@ -240,13 +240,13 @@
           ></canvas>
           <!-- Circular overlay to show crop area -->
           <div
-            class="absolute inset-0 rounded-full ring-4 ring-crimson-500/50 pointer-events-none"
+            class="absolute inset-0 rounded-full ring-4 ring-accent/50 pointer-events-none"
           ></div>
         </div>
 
         <!-- Zoom control -->
         <div class="w-full flex items-center gap-3">
-          <ZoomOut class="w-5 h-5 text-ash-400" />
+          <ZoomOut class="w-5 h-5 text-ink-muted" />
           <input
             type="range"
             min={minScale}
@@ -254,12 +254,12 @@
             step={Math.max(0.01, (maxScale - minScale) / 100)}
             value={scale}
             oninput={handleZoom}
-            class="flex-1 accent-crimson-500"
+            class="flex-1 accent-accent"
           />
-          <ZoomIn class="w-5 h-5 text-ash-400" />
+          <ZoomIn class="w-5 h-5 text-ink-muted" />
         </div>
 
-        <p class="text-xs text-ash-500">{m.avatar_drag_reposition()}</p>
+        <p class="text-xs text-ink-faint">{m.avatar_drag_reposition()}</p>
       </div>
     {/if}
 

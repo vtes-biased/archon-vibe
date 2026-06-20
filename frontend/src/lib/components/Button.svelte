@@ -32,15 +32,16 @@
   // affirmative action (lifecycle CTA + form/auth submit) is `primary`.
   // Danger is a distinct VIOLET, never red — red and crimson are the same hue
   // family and collapse together (even under colourblindness), so destructive
-  // actions get their own hue plus an icon/verb at the call-site. The crimson
-  // and ash variants are scale-inverted (adapt to light mode directly); btn-danger
-  // carries its own html.light override (violet has no inversion) and an inert
-  // :disabled (a tier below the enabled bg, so disabled never reads as active).
+  // actions get their own hue plus an icon/verb at the call-site. The accent and
+  // neutral variants use role tokens (accent/surface/ink/line — each carries both
+  // theme values via light-dark()); btn-danger is its own light-dark() class
+  // (violet is off-palette) with an inert :disabled (a tier below the enabled bg,
+  // so disabled never reads as active).
   const VARIANT: Record<string, string> = {
-    primary:   'bg-crimson-700 enabled:hover:bg-crimson-600 text-white disabled:bg-ash-900 disabled:text-ash-500',
+    primary:   'bg-accent-strong enabled:hover:bg-accent-strong-hover text-white disabled:bg-surface-muted disabled:text-ink-faint',
     danger:    'btn-danger',
-    secondary: 'bg-ash-800 enabled:hover:bg-ash-700 text-ash-200 disabled:bg-ash-900 disabled:text-ash-500',
-    ghost:     'border border-ash-700 text-ash-300 enabled:hover:bg-ash-800/50 enabled:hover:text-ash-100 disabled:bg-ash-900 disabled:text-ash-500 disabled:border-transparent',
+    secondary: 'bg-surface-hover enabled:hover:bg-surface-active text-ink-bright disabled:bg-surface-muted disabled:text-ink-faint',
+    ghost:     'border border-line-strong text-ink enabled:hover:bg-surface-hover/50 enabled:hover:text-ink-strong disabled:bg-surface-muted disabled:text-ink-faint disabled:border-transparent',
   };
   const SIZE: Record<string, string> = {
     sm: 'px-2 py-1 text-xs gap-1',

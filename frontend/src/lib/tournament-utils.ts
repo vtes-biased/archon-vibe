@@ -22,12 +22,12 @@ export type PlayerInfoMap = Record<
 
 export function getStateBadgeClass(state: TournamentState): string {
   switch (state) {
-    case "Planned": return "bg-ash-800 text-ash-300";
+    case "Planned": return "bg-surface-hover text-ink";
     case "Registration": return "badge-success";
     case "Waiting": return "badge-pending";
-    case "Playing": return "bg-crimson-900/60 text-crimson-300";
-    case "Finished": return "bg-ash-700 text-ash-400";
-    default: return "bg-ash-800 text-ash-300";
+    case "Playing": return "bg-accent-soft/60 text-link-soft";
+    case "Finished": return "bg-surface-active text-ink-muted";
+    default: return "bg-surface-hover text-ink";
   }
 }
 

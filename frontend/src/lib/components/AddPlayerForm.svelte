@@ -95,24 +95,24 @@
     autocorrect="off"
     autocapitalize="off"
     spellcheck="false"
-    class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+    class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
   />
   {#if searchResults.length > 0 || playerSearch.trim().length >= 2}
-    <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
+    <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
       {#each searchResults as user, i}
         {@const isSuspended = suspendedUids.has(user.uid)}
         <button
           onclick={() => !isSuspended && chooseUser(user)}
           disabled={isSuspended}
-          class="w-full px-3 py-2 text-left text-sm transition-colors {isSuspended ? 'text-ash-500 cursor-not-allowed' : 'text-ash-200'} {i === selectedIndex && !isSuspended ? 'bg-ash-700' : isSuspended ? '' : 'hover:bg-ash-800'}"
+          class="w-full px-3 py-2 text-left text-sm transition-colors {isSuspended ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright'} {i === selectedIndex && !isSuspended ? 'bg-surface-active' : isSuspended ? '' : 'hover:bg-surface-hover'}"
         >
           <span class="inline-flex items-center gap-1">
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
             {#if user.deceased_at}
-              <Flower2 class="w-3.5 h-3.5 text-ash-400 ml-1" />
+              <Flower2 class="w-3.5 h-3.5 text-ink-muted ml-1" />
             {/if}
             {#if user.vekn_id}
-              <span class="text-ash-500 ml-2">({user.vekn_id})</span>
+              <span class="text-ink-faint ml-2">({user.vekn_id})</span>
             {:else}
               <span class="inline-flex items-center gap-0.5 ml-2 text-xs text-purple-400">
                 <TriangleAlert class="w-3 h-3" />
@@ -120,21 +120,21 @@
               </span>
             {/if}
             {#if isSuspended}
-              <Ban class="w-3.5 h-3.5 text-crimson-400 ml-1" />
-              <span class="text-xs text-crimson-400">{m.error_suspended_cannot_register()}</span>
+              <Ban class="w-3.5 h-3.5 text-link ml-1" />
+              <span class="text-xs text-link">{m.error_suspended_cannot_register()}</span>
             {/if}
           </span>
         </button>
       {/each}
       {#if searchTotal > SEARCH_LIMIT}
-        <div class="px-3 py-2 text-xs text-ash-500 text-center">
+        <div class="px-3 py-2 text-xs text-ink-faint text-center">
           {m.add_player_more_results({ count: (searchTotal - SEARCH_LIMIT).toString() })}
         </div>
       {/if}
       {#if oncreate}
         <button
           onclick={() => oncreate?.()}
-          class="w-full px-3 py-2 text-left text-sm text-purple-400 hover:text-purple-300 hover:bg-ash-800 transition-colors {searchResults.length === 0 ? 'font-medium' : ''}"
+          class="w-full px-3 py-2 text-left text-sm text-purple-400 hover:text-purple-300 hover:bg-surface-hover transition-colors {searchResults.length === 0 ? 'font-medium' : ''}"
         >
           {m.add_player_not_on_archon()}
         </button>
@@ -153,28 +153,28 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="deceased-warn-title"
-      class="bg-dusk-950 rounded-lg shadow-xl border border-ash-800 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
-      <div class="p-6 border-b border-ash-800">
-        <h2 id="deceased-warn-title" class="text-xl font-medium text-bone-100 inline-flex items-center gap-2">
-          <Flower2 class="w-5 h-5 text-ash-400" aria-hidden="true" />
+      <div class="p-6 border-b border-line">
+        <h2 id="deceased-warn-title" class="text-xl font-medium text-ink-strong inline-flex items-center gap-2">
+          <Flower2 class="w-5 h-5 text-ink-muted" aria-hidden="true" />
           {m.deceased_badge()}
         </h2>
       </div>
       <div class="p-6">
-        <p class="text-ash-300 mb-4">
+        <p class="text-ink mb-4">
           {m.add_player_deceased_warn({ name: pendingDeceased.name })}
         </p>
         <div class="flex gap-2">
           <button
             onclick={confirmDeceased}
-            class="flex-1 px-4 py-2 bg-ash-700 hover:bg-ash-600 text-bone-100 rounded font-medium transition-colors"
+            class="flex-1 px-4 py-2 bg-surface-active hover:bg-surface-active text-ink-strong rounded font-medium transition-colors"
           >
             {m.add_player_deceased_confirm()}
           </button>
           <button
             onclick={() => (pendingDeceased = null)}
-            class="px-4 py-2 bg-ash-700 hover:bg-ash-600 text-ash-200 rounded font-medium transition-colors"
+            class="px-4 py-2 bg-surface-active hover:bg-surface-active text-ink-bright rounded font-medium transition-colors"
           >
             {m.common_cancel()}
           </button>

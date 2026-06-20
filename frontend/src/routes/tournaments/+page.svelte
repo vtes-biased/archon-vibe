@@ -223,7 +223,7 @@
   <div class="max-w-6xl mx-auto">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-light text-crimson-500">{m.nav_tournaments()}</h1>
+      <h1 class="text-3xl font-light text-accent">{m.nav_tournaments()}</h1>
 
       {#if canCreate}
         <a
@@ -237,16 +237,16 @@
 
     <!-- View Mode Toggle -->
     {#if canUseAgenda}
-      <div class="flex mb-4 bg-dusk-950 rounded-lg border border-ash-800 p-1 w-fit">
+      <div class="flex mb-4 bg-surface-card rounded-lg border border-line p-1 w-fit">
         <button
           onclick={() => viewMode = "agenda"}
-          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'agenda' ? 'bg-crimson-700 text-white' : 'text-ash-400 hover:text-ash-200'}"
+          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'agenda' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
         >
           {m.tournaments_view_agenda()}
         </button>
         <button
           onclick={() => viewMode = "all"}
-          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'all' ? 'bg-crimson-700 text-white' : 'text-ash-400 hover:text-ash-200'}"
+          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'all' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
         >
           {m.tournaments_view_all()}
         </button>
@@ -254,27 +254,27 @@
     {/if}
 
     <!-- Filters -->
-    <div class="bg-dusk-950 rounded-lg shadow p-4 mb-4 border border-ash-800">
+    <div class="bg-surface-card rounded-lg shadow p-4 mb-4 border border-line">
       <div class="flex flex-wrap gap-4 items-end">
         <!-- Search -->
         <div class="flex-1 min-w-[200px]">
-          <label for="search" class="block text-sm font-medium text-ash-400 mb-1">{m.common_search()}</label>
+          <label for="search" class="block text-sm font-medium text-ink-muted mb-1">{m.common_search()}</label>
           <input
             id="search"
             type="text"
             bind:value={searchQuery}
             placeholder={m.tournaments_search_placeholder()}
-            class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200 placeholder:text-ash-600"
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright placeholder:text-ink-faint"
           />
         </div>
 
         <!-- Format -->
         <div class="min-w-[130px]">
-          <label for="format-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.tournaments_format()}</label>
+          <label for="format-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_format()}</label>
           <select
             id="format-filter"
             bind:value={selectedFormat}
-            class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
           >
             <option value="all">{m.tournaments_all_formats()}</option>
             {#each formats as f}
@@ -286,11 +286,11 @@
         <!-- Country (hidden in agenda mode) -->
         {#if viewMode !== "agenda"}
           <div class="min-w-[180px]">
-            <label for="country-filter" class="block text-sm font-medium text-ash-400 mb-1">{m.common_country()}</label>
+            <label for="country-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
             <select
               id="country-filter"
               bind:value={selectedCountry}
-              class="w-full px-3 py-2 border border-ash-600 rounded-lg bg-dusk-950 text-ash-200"
+              class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
             >
               <option value="all">{m.tournaments_all_countries()}</option>
               {#each Object.entries(countries) as [code, country]}
@@ -304,10 +304,10 @@
         <div class="flex items-center gap-3 pb-1">
           <label class="inline-flex items-center gap-2 cursor-pointer">
             <input type="checkbox" bind:checked={ongoing} class="sr-only peer" />
-            <div class="relative w-11 h-6 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
+            <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
               <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={ongoing}></div>
             </div>
-            <span class="text-sm text-ash-300">{m.tournaments_ongoing()}</span>
+            <span class="text-sm text-ink">{m.tournaments_ongoing()}</span>
           </label>
         </div>
 
@@ -315,10 +315,10 @@
         <div class="flex items-center gap-3 pb-1">
           <label class="inline-flex items-center gap-2 cursor-pointer">
             <input type="checkbox" bind:checked={includeOnline} class="sr-only peer" />
-            <div class="relative w-11 h-6 bg-ash-700 rounded-full peer-checked:bg-crimson-700 transition-colors">
+            <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
               <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={includeOnline}></div>
             </div>
-            <span class="text-sm text-ash-300">{m.tournaments_include_online()}</span>
+            <span class="text-sm text-ink">{m.tournaments_include_online()}</span>
           </label>
         </div>
       </div>
@@ -327,8 +327,8 @@
     <!-- Calendar Subscribe -->
     {#if auth.isAuthenticated}
       <div class="flex items-center gap-2 flex-wrap mb-6 px-1">
-        <Calendar class="h-4 w-4 text-ash-500 shrink-0" />
-        <span class="text-xs text-ash-500">{m.tournaments_calendar_subscribe()}:</span>
+        <Calendar class="h-4 w-4 text-ink-faint shrink-0" />
+        <span class="text-xs text-ink-faint">{m.tournaments_calendar_subscribe()}:</span>
         {#if viewMode === "agenda" && !auth.user?.calendar_token}
           <Button variant="primary" size="sm" loading={calendarLoading} onclick={handleGenerateCalendarToken}>
             {m.tournaments_calendar_generate()}
@@ -338,7 +338,7 @@
             type="text"
             readonly
             value={calendarUrl}
-            class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-ash-700 rounded bg-dusk-950 text-ash-400 select-all"
+            class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-line-strong rounded bg-surface-card text-ink-muted select-all"
           />
           <Button variant="secondary" size="sm" class="shrink-0" onclick={() => copyToClipboard(calendarUrl)}>
             {#if copied}
@@ -355,16 +355,16 @@
 
     <!-- Error -->
     {#if error}
-      <div class="bg-crimson-900/20 border border-crimson-800 rounded-lg p-4 mb-6">
-        <p class="text-crimson-300">{error}</p>
+      <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6">
+        <p class="text-link-soft">{error}</p>
       </div>
     {/if}
 
     <!-- Tournament List -->
     {#if tournaments.length > 0}
-      <div class="bg-dusk-950 rounded-lg shadow overflow-hidden border border-ash-800">
+      <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
         <!-- Header (desktop) -->
-        <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-ash-900 text-sm font-medium text-ash-300 border-b border-ash-700">
+        <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong">
           <div class="col-span-4">{m.tournaments_col_name()}</div>
           <div class="col-span-2">{m.tournaments_col_date()}</div>
           <div class="col-span-2">{m.tournaments_col_country()}</div>
@@ -372,18 +372,18 @@
           <div class="col-span-2">{m.tournaments_col_state()}</div>
         </div>
 
-        <div class="divide-y divide-ash-800">
+        <div class="divide-y divide-line">
           {#each tournaments as tournament (tournament.uid)}
             <a
               href="/tournaments/{tournament.uid}"
-              class="block px-6 py-4 hover:bg-ash-900/50 transition-colors"
+              class="block px-6 py-4 hover:bg-surface-muted/50 transition-colors"
             >
               <!-- Mobile -->
               <div class="sm:hidden space-y-2">
                 <div class="flex items-start justify-between">
                   <div>
-                    <div class="font-semibold text-bone-100">{tournament.name}</div>
-                    <div class="text-sm text-ash-400 mt-1">
+                    <div class="font-semibold text-ink-strong">{tournament.name}</div>
+                    <div class="text-sm text-ink-muted mt-1">
                       {formatDate(tournament)}
                       {#if tournament.country}
                         · {getCountryFlag(tournament.country)} {countries[tournament.country]?.name || tournament.country}
@@ -394,7 +394,7 @@
                     {translateTournamentState(tournament.state)}
                   </span>
                 </div>
-                <div class="flex gap-2 text-xs text-ash-500 flex-wrap">
+                <div class="flex gap-2 text-xs text-ink-faint flex-wrap">
                   <span>{tournament.format}</span>
                   {#if tournament.rank}
                     <span>· {tournament.rank}</span>
@@ -414,17 +414,17 @@
               <!-- Desktop -->
               <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                 <div class="col-span-4">
-                  <div class="font-semibold text-bone-100">{tournament.name}</div>
+                  <div class="font-semibold text-ink-strong">{tournament.name}</div>
                   {#if tournament.rank || (tournament.league_uid && leagueNames[tournament.league_uid])}
-                    <div class="text-xs text-ash-500 truncate">
+                    <div class="text-xs text-ink-faint truncate">
                       {#if tournament.rank}{tournament.rank}{/if}{#if tournament.rank && tournament.league_uid && leagueNames[tournament.league_uid]} · {/if}{#if tournament.league_uid && leagueNames[tournament.league_uid]}<span class="text-blue-400/70">{leagueNames[tournament.league_uid]}</span>{/if}{#if tournament.league_uid && metaLeagues[tournament.league_uid]} · <span class="text-violet-300/80" title={m.league_kind_meta()}>{metaLeagues[tournament.league_uid]?.name}</span>{/if}
                     </div>
                   {/if}
                 </div>
-                <div class="col-span-2 text-sm text-ash-400">
+                <div class="col-span-2 text-sm text-ink-muted">
                   {formatDate(tournament)}
                 </div>
-                <div class="col-span-2 text-sm text-ash-400">
+                <div class="col-span-2 text-sm text-ink-muted">
                   {#if tournament.country}
                     {getCountryFlag(tournament.country)} {countries[tournament.country]?.name || tournament.country}
                   {:else if tournament.online}
@@ -433,7 +433,7 @@
                     —
                   {/if}
                 </div>
-                <div class="col-span-2 text-sm text-ash-400">
+                <div class="col-span-2 text-sm text-ink-muted">
                   {tournament.format}
                 </div>
                 <div class="col-span-2">
@@ -447,7 +447,7 @@
         </div>
       </div>
 
-      <div class="mt-4 flex items-center justify-between text-sm text-ash-400">
+      <div class="mt-4 flex items-center justify-between text-sm text-ink-muted">
         <span>{m.tournaments_total_count({ count: totalCount.toString() })}</span>
         {#if totalPages > 1}
           <div class="flex items-center gap-2">
@@ -460,28 +460,28 @@
     {:else if !loaded}
       {#if showLoading}
         <div class="text-center py-12">
-          <div class="text-ash-500 mb-4">
+          <div class="text-ink-faint mb-4">
             <Loader2 class="mx-auto h-12 w-12 animate-spin" />
           </div>
-          <h3 class="text-lg font-medium text-bone-100 mb-2">{m.common_loading()}</h3>
-          <p class="text-ash-400">{m.tournaments_loading_from_storage()}</p>
+          <h3 class="text-lg font-medium text-ink-strong mb-2">{m.common_loading()}</h3>
+          <p class="text-ink-muted">{m.tournaments_loading_from_storage()}</p>
         </div>
       {/if}
     {:else if showSyncing}
       <div class="text-center py-12">
-        <div class="text-ash-500 mb-4">
+        <div class="text-ink-faint mb-4">
           <Loader2 class="mx-auto h-12 w-12 animate-spin" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.status_syncing()}</h3>
-        <p class="text-ash-400">{m.tournaments_loading_from_storage()}</p>
+        <h3 class="text-lg font-medium text-ink-strong mb-2">{m.status_syncing()}</h3>
+        <p class="text-ink-muted">{m.tournaments_loading_from_storage()}</p>
       </div>
     {:else}
       <div class="text-center py-12">
-        <div class="text-ash-600 mb-4">
+        <div class="text-ink-faint mb-4">
           <Trophy class="mx-auto h-12 w-12" />
         </div>
-        <h3 class="text-lg font-medium text-bone-100 mb-2">{m.tournaments_no_results()}</h3>
-        <p class="text-ash-400">
+        <h3 class="text-lg font-medium text-ink-strong mb-2">{m.tournaments_no_results()}</h3>
+        <p class="text-ink-muted">
           {#if searchQuery.trim() || selectedCountry !== "all" || selectedFormat !== "all"}
             {m.tournaments_adjust_filters()}
           {:else}

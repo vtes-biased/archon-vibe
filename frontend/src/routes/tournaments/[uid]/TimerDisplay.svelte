@@ -90,8 +90,8 @@
   <div class="flex flex-col items-center gap-2">
     <!-- Timer display -->
     <div class="flex items-center gap-2">
-      <Clock class="w-4 h-4 {expired ? 'text-crimson-400' : warning ? 'text-purple-400' : 'text-blue-400'}" />
-      <span class="font-mono text-2xl font-bold tabular-nums {expired ? 'text-crimson-400 animate-pulse' : warning ? 'text-purple-400' : 'text-blue-400'}">
+      <Clock class="w-4 h-4 {expired ? 'text-link' : warning ? 'text-purple-400' : 'text-blue-400'}" />
+      <span class="font-mono text-2xl font-bold tabular-nums {expired ? 'text-link animate-pulse' : warning ? 'text-purple-400' : 'text-blue-400'}">
         {#if expired}
           -{formatTime(baseElapsed - roundTime - (tableIndex != null ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0))}
         {:else}
@@ -105,7 +105,7 @@
 
     <!-- Table extensions info -->
     {#if tableIndex != null && tableExtraTime > 0}
-      <div class="text-xs text-ash-400 flex items-center gap-2">
+      <div class="text-xs text-ink-muted flex items-center gap-2">
         <span>+{Math.floor(tableExtraTime / 60)}:{(tableExtraTime % 60).toString().padStart(2, '0')} {m.timer_extra_time()}</span>
       </div>
     {/if}

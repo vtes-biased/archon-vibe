@@ -80,8 +80,8 @@
 
 <div class="space-y-3">
   <div class="flex items-center justify-between">
-    <p class="text-sm text-ash-400">{m.checkin_qr_hint()}</p>
-    <button onclick={onclose} class="p-1 text-ash-400 hover:text-ash-200 transition-colors">
+    <p class="text-sm text-ink-muted">{m.checkin_qr_hint()}</p>
+    <button onclick={onclose} class="p-1 text-ink-muted hover:text-ink-bright transition-colors">
       <X class="w-5 h-5" />
     </button>
   </div>
@@ -90,15 +90,15 @@
     <!-- svelte-ignore element_invalid_self_closing_tag -->
     <video bind:this={videoEl} class="w-full max-h-64 object-cover" />
     {#if !scanning && !error}
-      <p class="absolute inset-0 flex items-center justify-center text-ash-400 text-sm">{m.common_loading()}</p>
+      <p class="absolute inset-0 flex items-center justify-center text-ink-muted text-sm">{m.common_loading()}</p>
     {/if}
   </div>
 
   {#if loading}
-    <p class="text-sm text-ash-400">{m.common_loading()}</p>
+    <p class="text-sm text-ink-muted">{m.common_loading()}</p>
   {/if}
   {#if error}
-    <p class="text-sm text-crimson-400">{error}</p>
+    <p class="text-sm text-link">{error}</p>
   {/if}
   {#if success}
     <p class="text-sm text-blue-400">{m.checkin_qr_success()}</p>

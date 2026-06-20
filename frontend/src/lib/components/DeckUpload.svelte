@@ -215,15 +215,15 @@
   <div class="flex gap-2 flex-wrap">
     <button
       onclick={() => mode = 'text'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'text' ? 'bg-crimson-600 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'text' ? 'bg-accent-strong-hover text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
     >{m.deck_upload_paste()}</button>
     <button
       onclick={() => mode = 'url'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-crimson-600 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-accent-strong-hover text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
     >{m.deck_upload_from_url()}</button>
     <button
       onclick={() => mode = 'qr'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-crimson-600 text-white' : 'bg-ash-800 text-ash-300 hover:bg-ash-700'}"
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-accent-strong-hover text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
     >{m.deck_upload_scan_qr()}</button>
   </div>
 
@@ -232,16 +232,16 @@
       <!-- svelte-ignore element_invalid_self_closing_tag -->
       <video bind:this={videoEl} class="w-full max-h-64 object-cover" />
       {#if !qrScanning}
-        <p class="absolute inset-0 flex items-center justify-center text-ash-400 text-sm">{m.deck_upload_qr_starting()}</p>
+        <p class="absolute inset-0 flex items-center justify-center text-ink-muted text-sm">{m.deck_upload_qr_starting()}</p>
       {/if}
     </div>
-    <p class="text-xs text-ash-500">{m.deck_upload_qr_hint()}</p>
+    <p class="text-xs text-ink-faint">{m.deck_upload_qr_hint()}</p>
   {:else}
     <input
       type="text"
       bind:value={deckName}
       placeholder={m.deck_upload_name_placeholder()}
-      class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+      class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
     />
 
     {#if mode === 'text'}
@@ -249,31 +249,31 @@
         bind:value={deckText}
         placeholder={m.deck_upload_text_placeholder()}
         rows="12"
-        class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm font-mono resize-y"
+        class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm font-mono resize-y"
       ></textarea>
     {:else}
       <input
         type="url"
         bind:value={deckUrl}
         placeholder={m.deck_upload_url_placeholder()}
-        class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+        class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
       />
-      <p class="text-xs text-ash-500">{m.deck_upload_supported_sites()}</p>
+      <p class="text-xs text-ink-faint">{m.deck_upload_supported_sites()}</p>
     {/if}
 
     <!-- Attribution -->
     <div class="flex items-center gap-3 text-sm flex-wrap">
-      <span class="text-ash-400">{m.deck_upload_attribution()}:</span>
-      <label class="flex items-center gap-1 text-ash-200">
-        <input type="radio" bind:group={attribution} value="self" class="accent-crimson-500" />
+      <span class="text-ink-muted">{m.deck_upload_attribution()}:</span>
+      <label class="flex items-center gap-1 text-ink-bright">
+        <input type="radio" bind:group={attribution} value="self" class="accent-accent" />
         {playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self()}
       </label>
-      <label class="flex items-center gap-1 text-ash-200">
-        <input type="radio" bind:group={attribution} value="anonymous" class="accent-crimson-500" />
+      <label class="flex items-center gap-1 text-ink-bright">
+        <input type="radio" bind:group={attribution} value="anonymous" class="accent-accent" />
         {m.deck_upload_attr_anonymous()}
       </label>
-      <label class="flex items-center gap-1 text-ash-200">
-        <input type="radio" bind:group={attribution} value="other" class="accent-crimson-500" />
+      <label class="flex items-center gap-1 text-ink-bright">
+        <input type="radio" bind:group={attribution} value="other" class="accent-accent" />
         {m.deck_upload_attr_other()}
       </label>
     </div>
@@ -285,23 +285,23 @@
           oninput={() => { attributionVekn = attributionSearch; attributionName = ''; searchAttribution(); }}
           onkeydown={handleAttrKeydown}
           placeholder={m.deck_upload_attr_other_placeholder()}
-          class="w-full px-3 py-2 bg-ash-900 border border-ash-700 rounded-lg text-ash-200 placeholder-ash-500 text-sm"
+          class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
         />
         {#if attrResults.length > 0}
-          <div class="absolute z-10 mt-1 w-full bg-dusk-950 border border-ash-700 rounded-lg divide-y divide-ash-800 max-h-48 overflow-y-auto shadow-lg">
+          <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
             {#each attrResults as user, i}
               <button
                 onclick={() => selectAttrUser(user)}
-                class="w-full px-3 py-2 text-left text-sm text-ash-200 transition-colors {i === attrSelectedIndex ? 'bg-ash-700' : 'hover:bg-ash-800'}"
+                class="w-full px-3 py-2 text-left text-sm text-ink-bright transition-colors {i === attrSelectedIndex ? 'bg-surface-active' : 'hover:bg-surface-hover'}"
               >
                 {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
                 {#if user.vekn_id}
-                  <span class="text-ash-500 ml-2">({user.vekn_id})</span>
+                  <span class="text-ink-faint ml-2">({user.vekn_id})</span>
                 {/if}
               </button>
             {/each}
             {#if attrTotal > ATTR_SEARCH_LIMIT}
-              <div class="px-3 py-2 text-xs text-ash-500 text-center">
+              <div class="px-3 py-2 text-xs text-ink-faint text-center">
                 {m.add_player_more_results({ count: (attrTotal - ATTR_SEARCH_LIMIT).toString() })}
               </div>
             {/if}
@@ -312,7 +312,7 @@
   {/if}
 
   {#if error}
-    <p class="text-sm text-crimson-400">{error}</p>
+    <p class="text-sm text-link">{error}</p>
   {/if}
   {#if warnings.length > 0}
     <div class="space-y-1">

@@ -139,14 +139,14 @@
   {/if}
 {/snippet}
 
-<div class="min-h-screen bg-bone-950 pb-16 sm:pb-0">
+<div class="min-h-screen bg-surface pb-16 sm:pb-0">
   <!-- Status/update banners: a normal-flow sticky stack so they push content
        down instead of overlaying the page header; multiple banners stack as
        block siblings (no hard-coded per-banner top offsets). -->
   {#if !isOnline || syncError || getUpdateAvailable()}
     <div class="sticky top-0 z-50">
       {#if !isOnline || syncError}
-        <div class="px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-crimson-900/90 text-crimson-100'}">
+        <div class="px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-accent-soft/90 text-link-soft'}">
           {#if !isOnline}
             <span class="inline-flex items-center gap-2">
               <WifiOff class="w-4 h-4" />
@@ -179,13 +179,13 @@
   </main>
 
   <!-- Bottom navigation (mobile) -->
-  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-dusk-950 border-t border-ash-800 sm:hidden">
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-surface-card border-t border-line sm:hidden">
     <div class="flex justify-around">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
           href={item.href}
-          class="flex flex-col items-center py-2 px-1 min-w-0 flex-1 {active ? 'text-crimson-500' : 'text-ash-400 hover:text-ash-200'}"
+          class="flex flex-col items-center py-2 px-1 min-w-0 flex-1 {active ? 'text-link' : 'text-ink-muted hover:text-ink-bright'}"
         >
           {@render navIcon(item.icon, 'w-5 h-5')}
           <span class="text-[10px] mt-0.5 truncate">{item.labelFn()}</span>
@@ -195,9 +195,9 @@
   </nav>
 
   <!-- Side navigation (desktop) -->
-  <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-20 bg-dusk-950 border-r border-ash-800 flex-col items-center py-4 z-40">
+  <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-20 bg-surface-card border-r border-line flex-col items-center py-4 z-40">
     <!-- Logo -->
-    <a href="/tournaments" class="mb-6 text-crimson-500 hover:text-crimson-400" title={m.nav_home()}>
+    <a href="/tournaments" class="mb-6 text-link hover:text-link-soft" title={m.nav_home()}>
       <img src="/favicon.svg" alt="Archon" class="w-16 h-16" />
     </a>
 
@@ -206,7 +206,7 @@
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
           href={item.href}
-          class="flex flex-col items-center py-3 px-2 rounded-lg transition-colors {active ? 'bg-crimson-900/50 text-crimson-400' : 'text-ash-400 hover:text-ash-200 hover:bg-ash-800/50'}"
+          class="flex flex-col items-center py-3 px-2 rounded-lg transition-colors {active ? 'bg-accent-soft/50 text-link' : 'text-ink-muted hover:text-ink-bright hover:bg-surface-hover/50'}"
           title={item.labelFn()}
         >
           {@render navIcon(item.icon, 'w-6 h-6')}
@@ -218,8 +218,8 @@
     <!-- Connection status indicator -->
     <div class="mt-auto pt-4">
       <div class="flex flex-col items-center gap-1">
-        <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-purple-500 animate-pulse' : 'bg-blue-500') : 'bg-crimson-500'}"></div>
-        <span class="text-[10px] text-ash-500">{isOnline ? (isSyncing ? m.status_syncing() : m.status_online()) : m.status_offline()}</span>
+        <div class="w-3 h-3 rounded-full {isOnline ? (isSyncing ? 'bg-purple-500 animate-pulse' : 'bg-blue-500') : 'bg-accent'}"></div>
+        <span class="text-[10px] text-ink-faint">{isOnline ? (isSyncing ? m.status_syncing() : m.status_online()) : m.status_offline()}</span>
       </div>
     </div>
   </nav>

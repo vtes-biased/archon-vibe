@@ -97,7 +97,7 @@
 
 <!-- Name -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("name")}>{m.tfield_name_label()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+  <label class="block text-sm text-ink-muted mb-1" for={id("name")}>{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
   <input
     id={id("name")}
     type="text"
@@ -105,7 +105,7 @@
     value={values.name}
     {disabled}
     oninput={(e) => handleInput("name", (e.target as HTMLInputElement).value)}
-    class="w-full px-3 py-2 text-sm bg-dusk-950 border rounded-lg text-ash-200 focus:outline-none {values.name.trim() ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}"
+    class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.name.trim() ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
     placeholder={m.tfield_name_placeholder()}
   />
 </div>
@@ -113,13 +113,13 @@
 <!-- Format & Rank -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("format")}>{m.tfield_format()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("format")}>{m.tfield_format()}</label>
     <select
       id={id("format")}
       value={values.format}
       {disabled}
       onchange={(e) => handleInput("format", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="Standard">Standard</option>
       <option value="V5">V5</option>
@@ -127,13 +127,13 @@
     </select>
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("rank")}>{m.tfield_rank()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("rank")}>{m.tfield_rank()}</label>
     <select
       id={id("rank")}
       value={values.rank}
       {disabled}
       onchange={(e) => handleInput("rank", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="">{m.tfield_rank_basic()}</option>
       <option value="National Championship">National Championship</option>
@@ -145,13 +145,13 @@
 <!-- League -->
 {#if allActiveLeagues.length > 0}
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("league")}>{m.tfield_league()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("league")}>{m.tfield_league()}</label>
     <select
       id={id("league")}
       value={values.league_uid}
       {disabled}
       onchange={(e) => handleInput("league_uid", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="">{m.common_none()}</option>
       {#each myLeagues as league}
@@ -168,13 +168,13 @@
 {#if veknPush}
   <!-- VEKN push mode: max_rounds is always visible and required (2-4) -->
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
     <select
       id={id("max-rounds")}
       value={String(values.max_rounds)}
       disabled={disabled || disabledFields.has("max_rounds")}
       onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="2">2</option>
       <option value="3">3</option>
@@ -195,20 +195,20 @@
             handleInput("max_rounds", 0);
           }
         }}
-        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
+        class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
       />
-      <span class="text-sm text-ash-200">{m.tfield_open_rounds()}</span>
+      <span class="text-sm text-ink-bright">{m.tfield_open_rounds()}</span>
     </label>
-    <p class="text-xs text-ash-500 mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
+    <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
     {#if values.open_rounds}
       <div class="mt-2 ml-8">
-        <label class="block text-sm text-ash-400 mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
+        <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
         <select
           id={id("max-rounds")}
           value={String(values.max_rounds)}
           disabled={disabled || disabledFields.has("max_rounds")}
           onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
-          class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+          class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
         >
           <option value="0">{m.tfield_max_rounds_no_limit()}</option>
           <option value="1">1</option>
@@ -225,7 +225,7 @@
 <!-- Dates & Timezone -->
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("start")}>{m.tfield_start()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("start")}>{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
     <input
       id={id("start")}
       type="datetime-local"
@@ -233,28 +233,28 @@
       value={values.start}
       {disabled}
       onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border rounded-lg text-ash-200 focus:outline-none {values.start ? 'border-ash-700 focus:border-ash-500' : 'border-crimson-700/50 focus:border-crimson-500'}"
+      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.start ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
     />
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("finish")}>{m.tfield_finish()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("finish")}>{m.tfield_finish()}</label>
     <input
       id={id("finish")}
       type="datetime-local"
       value={values.finish}
       {disabled}
       onchange={(e) => handleInput("finish", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
     />
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("timezone")}>{m.tfield_timezone()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("timezone")}>{m.tfield_timezone()}</label>
     <select
       id={id("timezone")}
       value={values.timezone}
       {disabled}
       onchange={(e) => handleInput("timezone", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       {#each timezones as tz}
         <option value={tz}>{tz.replace(/_/g, " ")}</option>
@@ -280,22 +280,22 @@
         handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
       }
     }}
-    class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
+    class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
   />
-  <span class="text-sm text-ash-200">{m.tfield_online()}</span>
+  <span class="text-sm text-ink-bright">{m.tfield_online()}</span>
 </label>
 
 <!-- Location fields (hidden when online) -->
 {#if !values.online}
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("country")}>{m.common_country()} <span class="text-crimson-400 text-xs">({m.common_required()})</span></label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("country")}>{m.common_country()} <span class="text-link text-xs">({m.common_required()})</span></label>
     <select
       id={id("country")}
       required
       value={values.country}
       {disabled}
       onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border rounded-lg text-ash-200 {values.country ? 'border-ash-700' : 'border-crimson-700/50'}"
+      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright {values.country ? 'border-line-strong' : 'border-accent-strong/50'}"
     >
       <option value="">{m.tfield_select_country()}</option>
       {#each Object.entries(countries) as [code, c]}
@@ -307,7 +307,7 @@
 
 <!-- Venue (always shown) -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("venue")}>{m.tfield_venue()}</label>
+  <label class="block text-sm text-ink-muted mb-1" for={id("venue")}>{m.tfield_venue()}</label>
   <VenueAutocomplete
     id={id("venue")}
     bind:value={values.venue}
@@ -320,14 +320,14 @@
 
 <!-- Venue URL (always shown) -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
+  <label class="block text-sm text-ink-muted mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
   <input
     id={id("venue-url")}
     type="url"
     value={values.venue_url}
     {disabled}
     oninput={(e) => handleInput("venue_url", (e.target as HTMLInputElement).value)}
-    class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+    class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
     placeholder="https://..."
   />
 </div>
@@ -335,28 +335,28 @@
 {#if !values.online}
   <!-- Address -->
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("address")}>{m.tfield_address()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("address")}>{m.tfield_address()}</label>
     <input
       id={id("address")}
       type="text"
       value={values.address}
       {disabled}
       oninput={(e) => handleInput("address", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
       placeholder={m.tfield_address_placeholder()}
     />
   </div>
 
   <!-- Map URL -->
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
     <input
       id={id("map-url")}
       type="url"
       value={values.map_url}
       {disabled}
       oninput={(e) => handleInput("map_url", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
       placeholder="https://..."
     />
   </div>
@@ -365,13 +365,13 @@
 <!-- Standings & Decklists -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("standings")}>{m.tfield_standings_visibility()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("standings")}>{m.tfield_standings_visibility()}</label>
     <select
       id={id("standings")}
       value={values.standings_mode}
       {disabled}
       onchange={(e) => handleInput("standings_mode", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="Private">{m.tournament_standings_private()}</option>
       <option value="Cutoff">{m.tfield_standings_cutoff()}</option>
@@ -380,13 +380,13 @@
     </select>
   </div>
   <div>
-    <label class="block text-sm text-ash-400 mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
     <select
       id={id("decklists")}
       value={values.decklists_mode}
       {disabled}
       onchange={(e) => handleInput("decklists_mode", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="Winner">{m.tfield_decklists_winner()}</option>
       <option value="Finalists">{m.tfield_decklists_finalists()}</option>
@@ -404,9 +404,9 @@
         checked={values.proxies}
         {disabled}
         onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
-        class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
+        class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
       />
-      <span class="text-sm text-ash-200">{m.tfield_allow_proxies()}</span>
+      <span class="text-sm text-ink-bright">{m.tfield_allow_proxies()}</span>
     </label>
   {/if}
   <label class="flex items-center gap-3 cursor-pointer">
@@ -415,9 +415,9 @@
       checked={values.multideck}
       {disabled}
       onchange={(e) => handleInput("multideck", (e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
+      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
     />
-    <span class="text-sm text-ash-200">{m.tfield_multideck()}</span>
+    <span class="text-sm text-ink-bright">{m.tfield_multideck()}</span>
   </label>
   <label class="flex items-center gap-3 cursor-pointer">
     <input
@@ -425,24 +425,24 @@
       checked={values.decklist_required}
       {disabled}
       onchange={(e) => handleInput("decklist_required", (e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-ash-700 bg-dusk-950 text-crimson-600 focus:ring-crimson-500"
+      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
     />
-    <span class="text-sm text-ash-200">{m.tfield_decklist_required()}</span>
+    <span class="text-sm text-ink-bright">{m.tfield_decklist_required()}</span>
   </label>
 </div>
 
 <!-- Timer Configuration -->
-<div class="border-t border-ash-800 pt-4">
-  <h3 class="text-sm font-medium text-bone-100 mb-3">{m.timer_config_heading()}</h3>
+<div class="border-t border-line pt-4">
+  <h3 class="text-sm font-medium text-ink-strong mb-3">{m.timer_config_heading()}</h3>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div>
-      <label class="block text-sm text-ash-400 mb-1" for={id("round-time")}>{m.timer_round_time()}</label>
+      <label class="block text-sm text-ink-muted mb-1" for={id("round-time")}>{m.timer_round_time()}</label>
       <select
         id={id("round-time")}
         value={String(values.round_time ?? 0)}
         {disabled}
         onchange={(e) => handleInput("round_time", parseInt((e.target as HTMLSelectElement).value))}
-        class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
       >
         <option value="0">{m.timer_no_timer()}</option>
         <option value="7200">2h</option>
@@ -453,13 +453,13 @@
       </select>
     </div>
     <div>
-      <label class="block text-sm text-ash-400 mb-1" for={id("finals-time")}>{m.timer_finals_time()}</label>
+      <label class="block text-sm text-ink-muted mb-1" for={id("finals-time")}>{m.timer_finals_time()}</label>
       <select
         id={id("finals-time")}
         value={String(values.finals_time ?? 0)}
         {disabled}
         onchange={(e) => handleInput("finals_time", parseInt((e.target as HTMLSelectElement).value))}
-        class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200"
+        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
       >
         <option value="0">{m.timer_same_as_round()}</option>
         <option value="7200">2h</option>
@@ -474,9 +474,9 @@
 
 <!-- Description -->
 <div>
-  <label class="block text-sm text-ash-400 mb-1" for={id("description")}>{m.common_description()}</label>
-  <span class="text-xs text-ash-500 mb-1 block">
-    {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ash-400 hover:text-ash-200">Markdown</a>' })}
+  <label class="block text-sm text-ink-muted mb-1" for={id("description")}>{m.common_description()}</label>
+  <span class="text-xs text-ink-faint mb-1 block">
+    {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ink-muted hover:text-ink-bright">Markdown</a>' })}
   </span>
   <textarea
     id={id("description")}
@@ -484,7 +484,7 @@
     {disabled}
     oninput={(e) => handleInput("description", (e.target as HTMLTextAreaElement).value)}
     rows="10"
-    class="w-full px-3 py-2 text-sm bg-dusk-950 border border-ash-700 rounded-lg text-ash-200 focus:border-ash-500 focus:outline-none resize-y"
+    class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none resize-y"
     placeholder={m.tfield_description_placeholder()}
   ></textarea>
 </div>

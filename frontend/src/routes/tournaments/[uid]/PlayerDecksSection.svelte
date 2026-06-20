@@ -185,7 +185,7 @@
   <!-- Winner's deck nudge (post-tournament) -->
   {#if tournament.state === 'Finished' && winnerUid && !winnerHasDeck}
     {#if isWinner}
-      <div class="bg-crimson-900/30 border border-crimson-700/50 rounded-lg p-3 text-sm text-crimson-200">
+      <div class="bg-accent-soft/30 border border-accent-strong/50 rounded-lg p-3 text-sm text-link-soft">
         {m.decks_winner_nudge_self()}
       </div>
     {/if}
@@ -195,8 +195,8 @@
   {#if isPlayer}
     {#if isMultideck}
       <!-- Multideck: per-round slots (accordion) -->
-      <div class="bg-ash-900/50 rounded-lg p-3 sm:p-4 space-y-2">
-        <h3 class="text-sm font-semibold text-bone-200">{m.decks_my_decks()}</h3>
+      <div class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
+        <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_decks()}</h3>
         {#each Array(deckSlotCount) as _, slotIdx}
           {@const deck = myDecksByRound.get(slotIdx) ?? null}
           {@const locked = isDeckLocked(slotIdx)}
@@ -206,16 +206,16 @@
             expanded={isExpanded}
             ontoggle={() => expandedRoundIdx = isExpanded ? null : slotIdx}
             roundLabel={m.decks_round_label({ n: String(slotIdx + 1) })}
-            bgClass="bg-ash-900/30"
+            bgClass="bg-surface-muted/30"
           >
             {#snippet headerExtra()}
               {#if locked}
-                <Lock class="w-3 h-3 text-ash-500" />
+                <Lock class="w-3 h-3 text-ink-faint" />
               {/if}
               {#if deck}
                 <CircleCheck class="w-3.5 h-3.5 text-blue-400" />
               {:else}
-                <span class="text-ash-600 truncate">{m.decks_no_deck()}</span>
+                <span class="text-ink-faint truncate">{m.decks_no_deck()}</span>
               {/if}
             {/snippet}
             {#if uploadingFor === myUid && uploadingSlot === slotIdx}
@@ -231,9 +231,9 @@
                 ondelete={canModify ? () => { confirmDeleteSlot = slotIdx; } : undefined}
               />
               {#if confirmDeleteSlot === slotIdx}
-                <div class="mt-2 bg-crimson-900/20 border border-crimson-800/50 rounded-lg p-3 space-y-2">
-                  <p class="text-sm text-crimson-200 font-medium">{m.decks_delete_confirm_title()}</p>
-                  <p class="text-xs text-ash-400">{m.decks_delete_confirm_msg()}</p>
+                <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
+                  <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>
+                  <p class="text-xs text-ink-muted">{m.decks_delete_confirm_msg()}</p>
                   <div class="flex gap-2">
                     <Button
                       variant="danger"
@@ -248,7 +248,7 @@
                 </div>
               {/if}
               {#if !canModify}
-                <p class="text-sm text-ash-500">{m.decks_locked()}</p>
+                <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
               {/if}
             {:else if canModify}
               <Button
@@ -257,14 +257,14 @@
                 onclick={() => { uploadingFor = myUid; uploadingSlot = slotIdx; }}
               >{m.decks_upload()}</Button>
             {:else}
-              <p class="text-sm text-ash-500">{m.decks_no_deck()}</p>
+              <p class="text-sm text-ink-faint">{m.decks_no_deck()}</p>
             {/if}
           </DeckAccordion>
         {/each}
       </div>
     {:else}
       <!-- Single-deck -->
-      <div class="bg-ash-900/50 rounded-lg">
+      <div class="bg-surface-muted/50 rounded-lg">
         {#if myDecks.length > 0 && myDecks[0]}
           <!-- Always foldable when deck exists -->
           <button
@@ -272,10 +272,10 @@
             onclick={() => { const next = new Set(expandedDecks); if (next.has('my')) next.delete('my'); else next.add('my'); expandedDecks = next; }}
             aria-expanded={expandedDecks.has('my')}
           >
-            <span class="text-ash-400 shrink-0">
+            <span class="text-ink-muted shrink-0">
               {#if expandedDecks.has('my')}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
             </span>
-            <span class="text-sm font-semibold text-bone-200">{m.decks_my_deck()}</span>
+            <span class="text-sm font-semibold text-ink-strong">{m.decks_my_deck()}</span>
           </button>
           {#if expandedDecks.has('my')}
             <div class="px-3 pb-3 sm:px-4 sm:pb-4" transition:slide={{ duration: 150 }}>
@@ -284,9 +284,9 @@
               {:else}
                 <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeleteSlot = -1; } : undefined} />
                 {#if confirmDeleteSlot === -1}
-                  <div class="mt-2 bg-crimson-900/20 border border-crimson-800/50 rounded-lg p-3 space-y-2">
-                    <p class="text-sm text-crimson-200 font-medium">{m.decks_delete_confirm_title()}</p>
-                    <p class="text-xs text-ash-400">{m.decks_delete_confirm_msg()}</p>
+                  <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
+                    <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>
+                    <p class="text-xs text-ink-muted">{m.decks_delete_confirm_msg()}</p>
                     <div class="flex gap-2">
                       <Button
                         variant="danger"
@@ -305,11 +305,11 @@
           {/if}
         {:else}
           <div class="p-3 sm:p-4">
-            <h3 class="text-sm font-semibold text-bone-200 mb-3">{m.decks_my_deck()}</h3>
+            <h3 class="text-sm font-semibold text-ink-strong mb-3">{m.decks_my_deck()}</h3>
             {#if singleDeckEditable && (uploadingFor === myUid || myDecks.length === 0)}
               <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
             {:else}
-              <p class="text-sm text-ash-400">{m.decks_no_deck_yet()}</p>
+              <p class="text-sm text-ink-muted">{m.decks_no_deck_yet()}</p>
             {/if}
           </div>
         {/if}
@@ -321,10 +321,10 @@
   {#if deckEntries.length > 0}
     <div class="space-y-2">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-bone-200">{m.decks_visible_heading()}</h3>
+        <h3 class="text-sm font-semibold text-ink-strong">{m.decks_visible_heading()}</h3>
         {#if totalVisibleDecks >= 5}
           <button
-            class="text-xs text-ash-400 hover:text-ash-200 transition-colors"
+            class="text-xs text-ink-muted hover:text-ink-bright transition-colors"
             onclick={() => {
               if (expandedDecks.size >= totalVisibleDecks) {
                 expandedDecks = new Set();
@@ -350,25 +350,25 @@
               {@const expanded = expandedDecks.has(key)}
               {@const counts = deckCounts(deck)}
               {@const showIdentity = tournament.decklists_mode !== 'All'}
-              <div class="bg-ash-900/50 rounded-lg">
+              <div class="bg-surface-muted/50 rounded-lg">
                 <button
                   class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
                   onclick={() => toggleDeck(key)}
                   aria-expanded={expanded}
                 >
-                  <span class="text-ash-400 shrink-0">
+                  <span class="text-ink-muted shrink-0">
                     {#if expanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
                   </span>
                   <div class="flex-1 min-w-0">
                     {#if showIdentity}
-                      <span class="text-sm text-ash-200 truncate block">{playerInfo[uid]?.name ?? uid}</span>
+                      <span class="text-sm text-ink-bright truncate block">{playerInfo[uid]?.name ?? uid}</span>
                     {/if}
-                    <span class="text-ash-400 truncate block {showIdentity ? 'text-xs' : 'text-sm'}">
-                      {#if isMultideck}<span class="text-ash-500">{m.decks_round_label({ n: String(i + 1) })}</span> — {/if}
+                    <span class="text-ink-muted truncate block {showIdentity ? 'text-xs' : 'text-sm'}">
+                      {#if isMultideck}<span class="text-ink-faint">{m.decks_round_label({ n: String(i + 1) })}</span> — {/if}
                       {deck.name || m.decks_unnamed()}
                     </span>
                   </div>
-                  <span class="text-xs text-ash-500 shrink-0 whitespace-nowrap">
+                  <span class="text-xs text-ink-faint shrink-0 whitespace-nowrap">
                     {counts.crypt}/{counts.library}
                   </span>
                 </button>

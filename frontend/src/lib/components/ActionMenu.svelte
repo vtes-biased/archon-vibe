@@ -44,7 +44,7 @@
     onclick={() => (open = !open)}
     aria-haspopup="true"
     aria-expanded={open}
-    class="inline-flex items-center gap-1.5 rounded-lg bg-ash-800 enabled:hover:bg-ash-700 text-ash-200 px-3 py-1.5 text-sm transition-colors disabled:bg-ash-900 disabled:text-ash-500"
+    class="inline-flex items-center gap-1.5 rounded-lg bg-surface-hover enabled:hover:bg-surface-active text-ink-bright px-3 py-1.5 text-sm transition-colors disabled:bg-surface-muted disabled:text-ink-faint"
   >
     <MoreHorizontal class="w-4 h-4" aria-hidden="true" />
     {label}
@@ -54,7 +54,7 @@
     <!-- Plain disclosure of buttons (Tab-navigable). Deliberately NOT role=menu:
          we don't implement arrow-key/type-ahead, so we don't advertise it. -->
     <div
-      class="absolute z-30 mt-1 min-w-[12rem] {align === 'right' ? 'right-0' : 'left-0'} rounded-lg border border-ash-700 bg-dusk-900 py-1 shadow-lg"
+      class="absolute z-30 mt-1 min-w-[12rem] {align === 'right' ? 'right-0' : 'left-0'} rounded-lg border border-line-strong bg-surface-muted py-1 shadow-lg"
     >
       {#each items as item}
         {@const Icon = item.icon}
@@ -62,7 +62,7 @@
           type="button"
           disabled={item.disabled}
           onclick={() => pick(item)}
-          class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ash-200 transition-colors enabled:hover:bg-ash-800 disabled:text-ash-500"
+          class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-bright transition-colors enabled:hover:bg-surface-hover disabled:text-ink-faint"
         >
           {#if Icon}<Icon class="w-4 h-4 shrink-0" aria-hidden="true" />{/if}
           {item.label}
