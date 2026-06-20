@@ -5,11 +5,10 @@
   import { initAuth } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine';
   import { engineLoadFailed } from '$lib/stores/engine-ready.svelte';
-  import { showToast } from '$lib/stores/toast.svelte';
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState } from '$lib/stores/offline.svelte';
   import { onMount } from 'svelte';
-  import { Wifi, WifiOff, RefreshCw, Download, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
+  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
   import Toast from '$lib/components/Toast.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
@@ -48,21 +47,6 @@
   // Keep <html lang> in sync with locale
   $effect(() => {
     document.documentElement.lang = getLocale();
-  });
-
-  // Surface a WASM engine load failure once. Without this the app silently
-  // degrades (permissions vanish, optimistic writes disabled, empty standings).
-  let engineErrorShown = false;
-  $effect(() => {
-    if (engineLoadFailed() && !engineErrorShown) {
-      engineErrorShown = true;
-      showToast({
-        type: 'error',
-        duration: 0, // persistent — this is a degraded-app state, not a transient blip
-        message: m.engine_load_error(),
-        action: { label: m.update_refresh(), onClick: () => location.reload() },
-      });
-    }
   });
 
   onMount(() => {
@@ -143,8 +127,20 @@
   <!-- Status/update banners: a normal-flow sticky stack so they push content
        down instead of overlaying the page header; multiple banners stack as
        block siblings (no hard-coded per-banner top offsets). -->
-  {#if !isOnline || syncError || getUpdateAvailable()}
+  {#if engineLoadFailed() || !isOnline || syncError || getUpdateAvailable()}
     <div class="sticky top-0 z-50">
+      <!-- A WASM engine load failure degrades the app (permission checks,
+           optimistic writes and standings stop working): a durable banner, not
+           a transient toast, since the state persists until reload. -->
+      {#if engineLoadFailed()}
+        <div role="alert" class="px-4 py-2 text-center text-sm bg-accent-strong text-white">
+          <span class="inline-flex items-center gap-2 flex-wrap justify-center">
+            <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
+            {m.engine_load_error()}
+            <button onclick={() => location.reload()} class="underline hover:no-underline font-medium">{m.update_refresh()}</button>
+          </span>
+        </div>
+      {/if}
       {#if !isOnline || syncError}
         <div class="px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-accent-soft/90 text-link-soft'}">
           {#if !isOnline}
