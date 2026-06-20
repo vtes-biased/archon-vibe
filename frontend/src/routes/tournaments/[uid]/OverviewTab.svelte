@@ -235,7 +235,7 @@
         <div class="mt-3 space-y-3">
           <p class="text-xs text-ash-400">{m.archon_import_description()}</p>
           <a href="{API_BASE}/api/tournaments/archon-template" download
-            class="inline-flex items-center gap-2 text-sm text-blood-400 hover:text-blood-300">
+            class="inline-flex items-center gap-2 text-sm text-crimson-400 hover:text-crimson-300">
             <Download class="w-4 h-4" />
             {m.archon_download_template()}
           </a>
@@ -243,11 +243,10 @@
             <input id="archon-file-input" type="file" accept=".xlsx"
               onchange={(e) => { archonFile = (e.target as HTMLInputElement).files?.[0] ?? null; archonResult = null; archonConfirmOverwrite = false; }}
               class="text-sm text-ash-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-ash-700 file:text-ash-200 hover:file:bg-ash-600" />
-            <button onclick={handleArchonImport} disabled={!archonFile || archonUploading}
-              class="flex items-center gap-2 px-3 py-1.5 text-sm bg-blood-600 hover:bg-blood-500 text-bone-100 rounded transition-colors disabled:opacity-40">
-              <Upload class="w-4 h-4" />
+            <Button variant="brand" size="md" disabled={!archonFile} loading={archonUploading} onclick={handleArchonImport}>
+              {#if !archonUploading}<Upload class="w-4 h-4" />{/if}
               {archonUploading ? m.archon_uploading() : m.archon_upload_file()}
-            </button>
+            </Button>
           </div>
           {#if archonConfirmOverwrite}
             <div class="bg-amber-900/30 border border-amber-700 rounded p-3 text-sm text-amber-200">
