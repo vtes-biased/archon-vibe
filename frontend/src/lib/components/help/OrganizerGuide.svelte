@@ -78,7 +78,7 @@
 {@html renderGuideSection(m.og_co_organizers())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">
+  <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
     Open Registration
   </button>
 </ExampleBox>
@@ -87,7 +87,7 @@
 
 <ExampleBox>
   <div class="flex gap-3 items-center">
-    <button class="px-4 py-2 text-sm font-medium btn-amber rounded-lg">
+    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
       Start Check-in
     </button>
     <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded-lg">
@@ -107,14 +107,14 @@
       </button>
     </div>
     <div class="flex gap-2">
-      <button class="px-3 py-1.5 text-sm btn-emerald rounded">Check All In</button>
+      <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">Check All In</button>
       <button class="px-3 py-1.5 text-sm text-ash-300 border border-ash-600 rounded">Reset Check-In</button>
     </div>
     <div class="bg-dusk-950 border border-ash-800 rounded-lg p-3">
       <div class="flex justify-between items-center text-sm">
         <span class="text-ash-300">Alice</span>
         <div class="flex gap-2">
-          <button class="px-2 py-1 text-xs btn-emerald rounded">Check In</button>
+          <button class="px-2 py-1 text-xs bg-crimson-700 hover:bg-crimson-600 text-white rounded">Check In</button>
           <button class="px-2 py-1 text-xs text-ash-400 border border-ash-700 rounded">Check Out</button>
         </div>
       </div>
@@ -135,7 +135,7 @@
 {@html renderGuideSection(m.og_deck_management())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">
+  <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
     Start Round 1
   </button>
 </ExampleBox>
@@ -176,7 +176,7 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-2 items-center">
-      <button class="px-3 py-1.5 text-sm btn-amber rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
         <ShieldCheck class="w-3.5 h-3.5" />
         Override
       </button>
@@ -190,7 +190,7 @@
       rows="2"
       tabindex="-1"
     ></textarea>
-    <button class="px-3 py-1.5 text-sm btn-amber rounded">
+    <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded">
       Override &rarr; Finished
     </button>
   </div>
@@ -234,7 +234,7 @@
 {@html renderGuideSection(m.og_finishing_round())}
 
 <ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium btn-amber rounded-lg">
+  <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
     End Round
   </button>
 </ExampleBox>
@@ -266,11 +266,11 @@
       </div>
     </div>
     <div class="flex gap-2 justify-center">
-      <button class="px-3 py-1.5 text-sm btn-emerald rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
         <Play class="w-3.5 h-3.5" />
         Start
       </button>
-      <button class="px-3 py-1.5 text-sm btn-amber rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded flex items-center gap-1">
         <Pause class="w-3.5 h-3.5" />
         Pause
       </button>
@@ -287,18 +287,18 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-1">
-      <button class="px-2 py-1 text-xs btn-emerald rounded">+1min</button>
-      <button class="px-2 py-1 text-xs btn-emerald rounded">+2min</button>
-      <button class="px-2 py-1 text-xs btn-emerald rounded">+3min</button>
-      <button class="px-2 py-1 text-xs btn-emerald rounded">+5min</button>
+      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+1min</button>
+      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+2min</button>
+      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+3min</button>
+      <button class="px-2 py-1 text-xs bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">+5min</button>
       <span class="text-xs text-ash-400 self-center ml-1">0/10 min extra</span>
     </div>
     <div class="flex gap-2 items-center">
-      <button class="px-3 py-1.5 text-sm btn-amber rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded flex items-center gap-1">
         <PauseCircle class="w-3.5 h-3.5" />
         Clock Stop
       </button>
-      <button class="px-3 py-1.5 text-sm btn-emerald rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
         <PlayCircle class="w-3.5 h-3.5" />
         Resume Clock
       </button>
@@ -316,7 +316,7 @@
       <span class="text-ash-300 text-sm ml-3">Bob</span>
       <span class="text-xs px-2 py-0.5 rounded badge-emerald">Paid</span>
     </div>
-    <button class="px-3 py-1.5 text-sm btn-emerald rounded">Mark All Paid</button>
+    <button class="px-3 py-1.5 text-sm bg-ash-800 hover:bg-ash-700 text-ash-200 rounded">Mark All Paid</button>
   </div>
 </ExampleBox>
 
@@ -324,7 +324,7 @@
 
 <ExampleBox>
   <div class="flex gap-2 items-center">
-    <button class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">
+    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
       Start Finals
     </button>
     <button class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 rounded-lg">
@@ -392,7 +392,7 @@
       <input type="text" placeholder="Prize name" class="flex-1 px-2 py-1.5 text-sm bg-dusk-900 border border-ash-700 rounded text-bone-100 placeholder-ash-500" tabindex="-1" />
     </div>
     <div class="flex gap-2">
-      <button class="px-3 py-1.5 text-sm btn-emerald rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
         <Dices class="w-3.5 h-3.5" />
         Draw
       </button>
@@ -425,7 +425,7 @@
       <WifiOff class="w-5 h-5 text-amber-400 shrink-0" />
       <span class="text-amber-200 font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
     </div>
-    <button class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg flex items-center gap-2">
+    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg flex items-center gap-2">
       <Wifi class="w-4 h-4" />
       Go Back Online
     </button>

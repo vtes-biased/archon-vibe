@@ -93,7 +93,7 @@
   <div class="bg-dusk-950 border border-ash-800 rounded-lg p-4 max-w-sm">
     <p class="text-sm text-ash-300 mb-3">No VEKN ID</p>
     <div class="flex flex-wrap gap-2">
-      <button class="px-3 py-1.5 text-sm btn-emerald rounded flex items-center gap-1">
+      <button class="px-3 py-1.5 text-sm bg-crimson-700 hover:bg-crimson-600 text-white rounded flex items-center gap-1">
         <UserPlus class="w-3.5 h-3.5" />
         Sponsor
       </button>
@@ -254,7 +254,7 @@
 
 <ExampleBox>
   <div class="flex gap-3 items-center">
-    <button class="px-4 py-2 text-sm font-medium btn-emerald rounded-lg">
+    <button class="px-4 py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
       Register
     </button>
     <span class="text-xs text-ash-500">or, if you want out:</span>
@@ -285,7 +285,7 @@
       class="w-full px-3 py-2 text-sm bg-dusk-900 border border-ash-700 rounded-lg text-bone-100 placeholder-ash-500"
       tabindex="-1"
     />
-    <button class="w-full py-2 text-sm font-medium btn-emerald rounded-lg">
+    <button class="w-full py-2 text-sm font-medium bg-crimson-700 hover:bg-crimson-600 text-white rounded-lg">
       Upload Deck
     </button>
   </div>
