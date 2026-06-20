@@ -55,6 +55,9 @@
 - [Resync branch zero-delay loop](sync-resync-branch-zero-delay-loop.md) — sync.ts resync onmessage branch reconnects with NO delay; cold-start trigger fixed, branch unguarded for any other persistent resync cause; route resync reconnects through backoff.
 - [go-online self-echo + 409 gap](go-online-self-echo-409-gap.md) — FIXED: broadcast_precomputed exclude_device_id self-excludes the initiating device + goingOnlineUids guard (HTTP response is sole authority in-flight) + 409→clearOfflineState. Residual: bounded in-flight reconciliation window.
 
+## Deck Parsing
+- [Deck parser prefix-match trap](deck-parser-prefix-match-trap.md) — try_name_first count-strip + by_name prefix match miscount count-less lines (Channel 10/AK-47/Kpist m/45); group-from-tail (Annabelle G3 vs G6) untested bug; fix = exact-key gating, not krcg regex.
+
 ## Scoring & Standings
 - compute_final_standings = shared VEKN placement (winner=1, finalists tie 2nd) — see ARCHITECTURE.md (engine modules / League System).
 - [SA penalty single-sourced in Rust](sa-penalty-duplicated-in-python.md) — SA scoring lives only in `engine.compute_rating_vp_gw`; never re-derive in Python.

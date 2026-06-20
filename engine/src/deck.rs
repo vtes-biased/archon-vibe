@@ -205,13 +205,25 @@ fn try_count_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         return Some((card.id, count));
     }
 
-    // Strip crypt tail (capacity, disciplines, group info after the name)
-    // e.g., "Aabbt Kindred   4  for pre ser  Ministry:2"
-    if let Some(card) = try_strip_crypt_tail(name, card_map) {
+    // Strip crypt tail (capacity, disciplines, group info after the name),
+    // e.g. "Annabelle Triabell  9  aus cel pre dom for  primogen  Toreador:6".
+    // The trailing "Clan:Group" token disambiguates multi-group vampires.
+    let group = parse_crypt_tail_group(name);
+    if let Some(card) = try_strip_crypt_tail(name, group, card_map) {
         return Some((card.id, count));
     }
 
     None
+}
+
+/// Group hint from a krcg-style crypt tail: the N in a trailing "Clan:N" or "gN"
+/// token (e.g. "Toreador:6" → 6, "g6" → 6). None when the last token carries no
+/// group. Parses the whole number, so two-digit groups resolve correctly.
+fn parse_crypt_tail_group(line: &str) -> Option<u32> {
+    let last = line.split_whitespace().next_back()?;
+    let digits = last.rsplit(':').next().unwrap_or(last);
+    let digits = digits.strip_prefix(['g', 'G']).unwrap_or(digits);
+    digits.parse::<u32>().ok().filter(|g| (1..=99).contains(g))
 }
 
 /// Parse "name [marker] count" format.
@@ -226,14 +238,14 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         // Could be "count\tname" or "name\tcount"
         if let Ok(count) = first.parse::<u32>() {
             if count > 0 && count <= 99 {
-                if let Some(card) = card_map.by_name(second) {
+                if let Some(card) = card_map.by_name_exact(second) {
                     return Some((card.id, count));
                 }
             }
         }
         if let Ok(count) = second.parse::<u32>() {
             if count > 0 && count <= 99 {
-                if let Some(card) = card_map.by_name(first) {
+                if let Some(card) = card_map.by_name_exact(first) {
                     return Some((card.id, count));
                 }
             }
@@ -255,7 +267,7 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
             if let Ok(count) = inside.parse::<u32>() {
                 if count > 0 && count <= 99 {
                     let name = trimmed[..paren_start].trim();
-                    if let Some(card) = card_map.by_name(name) {
+                    if let Some(card) = card_map.by_name_exact(name) {
                         return Some((card.id, count));
                     }
                 }
@@ -285,7 +297,7 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
                     }
                     let name = trimmed[..name_end].trim();
                     if !name.is_empty() {
-                        if let Some(card) = card_map.by_name(name) {
+                        if let Some(card) = card_map.by_name_exact(name) {
                             return Some((card.id, count));
                         }
                     }
@@ -298,12 +310,26 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
 }
 
 /// Try to strip JOL/TWDA crypt tail info to find the card name.
-fn try_strip_crypt_tail<'a>(name: &str, card_map: &'a CardMap) -> Option<&'a Card> {
+///
+/// Matches each trimmed candidate by EXACT name (a lenient prefix match would let
+/// a half-trimmed stem resolve back to a longer card). When `group` is known,
+/// prefer the group-qualified printing so a multi-group vampire whose name omits
+/// "(GN)" resolves to the group named in its "Clan:N" tail, not the earliest.
+fn try_strip_crypt_tail<'a>(
+    name: &str,
+    group: Option<u32>,
+    card_map: &'a CardMap,
+) -> Option<&'a Card> {
     // Progressively trim from the right, trying to match after each trim
     let words: Vec<&str> = name.split_whitespace().collect();
     for take in (1..words.len()).rev() {
         let candidate = words[..take].join(" ");
-        if let Some(card) = card_map.by_name(&candidate) {
+        // Don't override an explicit qualifier already in the name (e.g. "(ADV)").
+        let match_ = match group {
+            Some(g) if !candidate.ends_with(')') => card_map.by_name_in_group(&candidate, g),
+            _ => card_map.by_name_exact(&candidate),
+        };
+        if let Some(card) = match_ {
             return Some(card);
         }
     }
@@ -779,6 +805,12 @@ mod tests {
                 "clan": "", "group": "", "capacity": 0, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": ["Delaying"]
             },
+            "100010": {
+                "id": 100010, "name": "Channel 10", "printed_name": "Channel 10",
+                "kind": "library", "types": ["Master"], "disciplines": [],
+                "clan": "", "group": "", "capacity": 0, "adv": false,
+                "banned": "", "sets": ["Jyhad"], "name_variants": []
+            },
             "200001": {
                 "id": 200001, "name": "Aabbt Kindred (G2)", "printed_name": "Aabbt Kindred",
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["for", "pre", "ser"],
@@ -790,6 +822,18 @@ mod tests {
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["dom"],
                 "clan": "Ventrue", "group": "3", "capacity": 7, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": ["Test Vampire"]
+            },
+            "200103": {
+                "id": 200103, "name": "Annabelle Triabell (G3)", "printed_name": "Annabelle Triabell",
+                "kind": "crypt", "types": ["Vampire"], "disciplines": ["aus", "cel", "pre"],
+                "clan": "Toreador", "group": "3", "capacity": 9, "adv": false,
+                "banned": "", "sets": ["Camarilla Edition"], "name_variants": ["Annabelle Triabell"]
+            },
+            "201693": {
+                "id": 201693, "name": "Annabelle Triabell (G6)", "printed_name": "Annabelle Triabell",
+                "kind": "crypt", "types": ["Vampire"], "disciplines": ["aus", "cel", "pre"],
+                "clan": "Toreador", "group": "6", "capacity": 9, "adv": false,
+                "banned": "", "sets": ["Fall of London"], "name_variants": []
             }
         }"#
     }
@@ -824,6 +868,37 @@ mod tests {
         let cm = CardMap::load(test_cards_json()).unwrap();
         // Lackey format
         assert_eq!(parse_card_line("4\t.44 Magnum", &cm), Some((100001, 4)));
+    }
+
+    #[test]
+    fn test_crypt_tail_group_disambiguates_multigroup_vampire() {
+        // Modern TWDA/krcg crypt lines carry the group only in the "Clan:N" tail,
+        // not as a "(GN)" name suffix. Annabelle exists in G3 (200103) and G6
+        // (201693); the bare name defaults to G3, so the tail group must win.
+        let cm = CardMap::load(test_cards_json()).unwrap();
+        assert_eq!(
+            parse_card_line(
+                "1x Annabelle Triabell    9 AUS CEL PRE dom for   primogen   Toreador:6",
+                &cm
+            ),
+            Some((201693, 1)),
+            "Toreador:6 tail must resolve to the G6 printing"
+        );
+        // No tail group => unchanged default to the earliest printing (G3).
+        assert_eq!(
+            parse_card_line("1x Annabelle Triabell  9  aus cel pre", &cm),
+            Some((200103, 1))
+        );
+    }
+
+    #[test]
+    fn test_countless_number_name_not_miscounted() {
+        // A count-less line ending in a number must not have the number stripped
+        // as a count: "Channel 10" is the card, count 1 — not 10x "Channel".
+        let cm = CardMap::load(test_cards_json()).unwrap();
+        assert_eq!(parse_card_line("Channel 10", &cm), Some((100010, 1)));
+        // A real post-count still parses.
+        assert_eq!(parse_card_line("Channel 10 x2", &cm), Some((100010, 2)));
     }
 
     #[test]

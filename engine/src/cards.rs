@@ -112,6 +112,36 @@ impl CardMap {
         self.cards.get(&id)
     }
 
+    /// Exact normalized-name lookup only — no prefix fallback. Use where a lenient
+    /// prefix match would misfire: a truncated stem like "channel" (from
+    /// mis-stripping "Channel 10") must NOT resolve back to "Channel 10".
+    pub fn by_name_exact(&self, name: &str) -> Option<&Card> {
+        let normalized = normalize_name(name);
+        if normalized.is_empty() {
+            return None;
+        }
+        self.name_index
+            .get(&normalized)
+            .and_then(|id| self.cards.get(id))
+    }
+
+    /// Look up a crypt card by name, disambiguating a multi-group vampire by an
+    /// explicit group hint from the crypt tail (e.g. the "6" in "Toreador:6").
+    /// Tries the group-qualified key first ("annabelle triabell g6", the
+    /// normalized form of the card name "Annabelle Triabell (G6)"), then falls
+    /// back to an exact bare-name match.
+    pub fn by_name_in_group(&self, name: &str, group: u32) -> Option<&Card> {
+        let normalized = normalize_name(name);
+        if normalized.is_empty() {
+            return None;
+        }
+        let keyed = format!("{normalized} g{group}");
+        if let Some(id) = self.name_index.get(&keyed) {
+            return self.cards.get(id);
+        }
+        self.by_name_exact(name)
+    }
+
     /// Look up a card by name. Tries exact normalized match, then prefix match.
     pub fn by_name(&self, name: &str) -> Option<&Card> {
         let normalized = normalize_name(name);
