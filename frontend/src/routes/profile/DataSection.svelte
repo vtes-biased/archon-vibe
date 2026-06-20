@@ -26,7 +26,7 @@
       <p class="text-bone-100">{m.profile_resync_title()}</p>
       <p class="text-sm text-ash-400">{m.profile_resync_description()}</p>
     </div>
-    <Button variant="brand" size="lg" loading={isSyncing} onclick={handleResync}>
+    <Button variant="primary" size="lg" loading={isSyncing} onclick={handleResync}>
       {#if !isSyncing}<RefreshCw class="w-4 h-4" />{/if}
       {isSyncing ? m.profile_resyncing() : m.profile_resync_btn()}
     </Button>

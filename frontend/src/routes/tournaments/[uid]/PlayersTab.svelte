@@ -386,7 +386,7 @@
               class="w-full px-3 py-2 bg-ash-800 border border-ash-700 rounded text-sm text-bone-100 placeholder-ash-500"
             />
             <Button
-              variant="warning"
+              variant="primary"
               size="lg"
               onclick={addOfflinePlayerAction}
               disabled={!offlinePlayerName.trim() || actionLoading}

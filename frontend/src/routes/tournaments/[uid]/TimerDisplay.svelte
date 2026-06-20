@@ -118,7 +118,7 @@
             <Play class="w-3 h-3" /> {m.timer_start()}
           </Button>
         {:else}
-          <Button variant="warning" size="sm" onclick={doPause} disabled={loading} title={m.timer_pause()}>
+          <Button variant="secondary" size="sm" onclick={doPause} disabled={loading} title={m.timer_pause()}>
             <Pause class="w-3 h-3" /> {m.timer_pause()}
           </Button>
         {/if}

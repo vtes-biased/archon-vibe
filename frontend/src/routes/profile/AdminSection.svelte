@@ -159,7 +159,7 @@
             <h4 class="text-bone-100 font-medium text-sm">{op.label}</h4>
             <p class="text-ash-500 text-xs mt-0.5">{op.desc}</p>
           </div>
-          <Button variant="brand" size="lg" class="shrink-0" onclick={() => (activeOp = op)}>
+          <Button variant="primary" size="lg" class="shrink-0" onclick={() => (activeOp = op)}>
             <RefreshCw class="w-3.5 h-3.5" />
             {m.admin_run_now()}
           </Button>

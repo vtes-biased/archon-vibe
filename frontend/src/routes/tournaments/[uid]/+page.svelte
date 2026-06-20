@@ -13,9 +13,10 @@
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2 } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
+  import ActionMenu from "$lib/components/ActionMenu.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -751,55 +752,50 @@ import TournamentModals from "./TournamentModals.svelte";
               {/if}
             </p>
 
-            <!-- Primary actions -->
-            <div class="flex flex-wrap gap-2">
+            <!-- Actions: ONE primary CTA per state; secondaries collapse into a More overflow -->
+            <div class="flex flex-wrap items-center gap-2">
               {#if tournament.state === "Planned"}
                 <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("OpenRegistration")}>{m.overview_open_registration()}</Button>
 
               {:else if tournament.state === "Registration"}
-                <Button variant="warning" size="lg" disabled={actionLoading} onclick={() => doAction("CloseRegistration")}>{m.overview_close_registration()}</Button>
-                <Button variant="ghost" size="md" disabled={actionLoading} onclick={() => doAction("CancelRegistration")}>{m.overview_back_to_planning()}</Button>
-                {#if tournament.checkin_code}
-                  <button onclick={() => showQrCode = !showQrCode}
-                    class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors flex items-center gap-1.5"
-                  >
-                    <QrCode class="w-4 h-4" />
-                    {showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code()}
-                  </button>
-                {/if}
+                <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("CloseRegistration")}>{m.overview_close_registration()}</Button>
+                <ActionMenu label={m.common_more()} items={[
+                  ...(tournament.checkin_code ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
+                  { label: m.overview_back_to_planning(), icon: Undo2, onclick: () => doAction("CancelRegistration"), disabled: actionLoading },
+                ]} />
 
               {:else if tournament.state === "Waiting"}
-                <Button variant="primary" size="lg" disabled={actionLoading || checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
-                {#if hasFinalsCandidate}
-                  <Button variant="primary" size="lg" disabled={actionLoading || !finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
+                {#if finalsReady}
+                  <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
+                  <Button variant="secondary" size="md" disabled={actionLoading || checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+                {:else}
+                  <Button variant="primary" size="lg" disabled={actionLoading || checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+                  {#if hasFinalsCandidate}
+                    <Button variant="secondary" size="md" disabled={actionLoading || !finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
+                  {/if}
                 {/if}
-                <!-- Secondary actions -->
-                <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => doAction("CheckInAll")}>{m.overview_check_all_in()}</Button>
-                <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => doAction("MarkAllPaid")}>{m.payment_mark_all_paid()}</Button>
-                {#if hasRounds}
-                  <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => doAction("ResetCheckIn")}>{m.overview_reset_checkin()}</Button>
-                {/if}
-                {#if tournament.checkin_code}
-                  <button onclick={() => showQrCode = !showQrCode}
-                    class="px-3 py-1.5 text-sm text-ash-300 bg-ash-800 hover:bg-ash-700 rounded-lg transition-colors flex items-center gap-1.5"
-                  >
-                    <QrCode class="w-4 h-4" />
-                    {showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code()}
-                  </button>
-                {/if}
+                <ActionMenu label={m.common_more()} items={[
+                  { label: m.overview_check_all_in(), icon: CheckCheck, onclick: () => doAction("CheckInAll"), disabled: actionLoading },
+                  { label: m.payment_mark_all_paid(), icon: Banknote, onclick: () => doAction("MarkAllPaid"), disabled: actionLoading },
+                  ...(hasRounds ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
+                  ...(tournament.checkin_code ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
+                  { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
+                ]} />
 
               {:else if tournament.state === "Playing"}
                 {#if isFinals}
-                  <Button variant="warning" size="lg" disabled={actionLoading || !finalsTableFinished} onclick={() => doAction("FinishFinals")}>{m.finals_finish()}</Button>
-                {:else}
-                  {#if !hasParallelRounds}
-                    <Button variant="warning" size="lg" disabled={actionLoading || !allTablesFinished} onclick={() => doAction("FinishRound", { round: activeRoundIdx })}>{m.rounds_end_round()}</Button>
-                  {/if}
+                  <Button variant="primary" size="lg" disabled={actionLoading || !finalsTableFinished} onclick={() => doAction("FinishFinals")}>{m.finals_finish()}</Button>
+                {:else if !hasParallelRounds}
+                  <Button variant="primary" size="lg" disabled={actionLoading || !allTablesFinished} onclick={() => doAction("FinishRound", { round: activeRoundIdx })}>{m.rounds_end_round()}</Button>
                   {#if tournament.online}
                     {@const maxRounds = tournament.max_rounds ?? 0}
                     {@const canStartNext = (checkedInCount + playingCount) >= 4 && (maxRounds === 0 || (tournament.rounds?.length ?? 0) < maxRounds)}
-                    <Button variant="primary" size="lg" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+                    <Button variant="secondary" size="md" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
                   {/if}
+                {:else if tournament.online}
+                  {@const maxRounds = tournament.max_rounds ?? 0}
+                  {@const canStartNext = (checkedInCount + playingCount) >= 4 && (maxRounds === 0 || (tournament.rounds?.length ?? 0) < maxRounds)}
+                  <Button variant="primary" size="lg" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
                 {/if}
 
               {:else if tournament.state === "Finished"}
@@ -820,15 +816,13 @@ import TournamentModals from "./TournamentModals.svelte";
               {/if}
             {/if}
 
-            <!-- Danger actions (Waiting state) -->
+            <!-- Danger action (Waiting state): destructive, set apart with its own hue + icon -->
             {#if tournament.state === "Waiting"}
-              <div class="pt-2 border-t border-ash-800 flex flex-wrap gap-2">
-                <button onclick={() => doAction("FinishTournament")} disabled={actionLoading}
-                  class="px-3 py-1.5 text-sm text-ash-500 hover:text-crimson-400 transition-colors"
-                >{m.overview_finish_tournament()}</button>
-                <button onclick={() => doAction("ReopenRegistration")} disabled={actionLoading}
-                  class="px-3 py-1.5 text-sm text-ash-500 hover:text-ash-300 transition-colors"
-                >{m.overview_reopen_registration()}</button>
+              <div class="pt-2 border-t border-ash-800">
+                <Button variant="danger" size="md" disabled={actionLoading} onclick={() => doAction("FinishTournament")}>
+                  <TriangleAlert class="w-4 h-4" aria-hidden="true" />
+                  {m.overview_finish_tournament()}
+                </Button>
               </div>
             {/if}
 

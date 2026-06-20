@@ -164,7 +164,7 @@
           />
         </label>
         <Button
-          variant="warning"
+          variant="primary"
           onclick={handleDraw}
           disabled={actionLoading || !label.trim() || currentEligible === 0}
         >

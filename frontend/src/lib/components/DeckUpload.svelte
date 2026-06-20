@@ -327,7 +327,7 @@
 
   {#if mode !== 'qr'}
     <Button
-      variant="brand"
+      variant="primary"
       size="lg"
       loading={loading}
       disabled={mode === 'text' ? !deckText.trim() : !deckUrl.trim()}

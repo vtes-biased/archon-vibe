@@ -562,7 +562,7 @@
                   </Button>
                 {/if}
                 {#if hasParallelRounds && isRoundAllFinished(r)}
-                  <Button variant="warning" size="lg" onclick={() => doAction("FinishRound", { round: r })} disabled={actionLoading}>{m.rounds_finish_round_n({ n: String(r + 1) })}</Button>
+                  <Button variant="primary" size="lg" onclick={() => doAction("FinishRound", { round: r })} disabled={actionLoading}>{m.rounds_finish_round_n({ n: String(r + 1) })}</Button>
                 {/if}
                 {#if hasParallelRounds && isLast && tournament.state === "Playing" && !tournament.finals}
                   <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}>{m.rounds_cancel_round()}</Button>
@@ -685,7 +685,7 @@
                       <div class="flex gap-2 mt-1 justify-end">
                         <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">{m.common_cancel()}</button>
                         <Button
-                          variant="warning"
+                          variant="primary"
                           size="sm"
                           loading={overrideSaving}
                           disabled={overrideSaving || !overrideComment.trim()}

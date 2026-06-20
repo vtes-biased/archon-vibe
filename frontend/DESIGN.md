@@ -40,7 +40,7 @@ Available colors: `emerald`, `amber`, `red`, `yellow`, `orange`, `purple`, `blue
 
 **When to use what:**
 - `badge-*` — for any small status indicator or tag
-- `btn-*` — underlying solid-button classes. **Prefer the `<Button>` component** (below) for action buttons; `btn-emerald`/`btn-amber` are reused internally by it and by the few `<a>`-styled-as-button links.
+- `btn-*` — underlying solid-button classes. **Action buttons go through the `<Button>` component** (below), which uses `bg-crimson-*` / `btn-danger`, not these. `btn-emerald`/`btn-amber` survive only for status colour (paid/pending filter chips), the help-guide mockups, and a couple of `<a>`-styled list-page CTAs.
 - `banner-*` — for info/warning boxes (add `border rounded-lg p-3` etc.)
 - Crimson palette classes (`bg-crimson-*`, `text-crimson-*`) — already handled by scale inversion, use directly
 
@@ -48,20 +48,20 @@ Available colors: `emerald`, `amber`, `red`, `yellow`, `orange`, `purple`, `blue
 
 All action buttons go through `$lib/components/Button.svelte`. It owns colour, size, and the disabled/loading states, so call-sites pass intent, not classes.
 
-| Variant | Today's colour | Intent |
-|---------|---------------|--------|
-| `primary` | emerald | Positive lifecycle CTA (Start Round, Register, Create tournament) |
-| `brand` | crimson | Primary form/auth submit (Sign in, Create, Upload, Save, Approve) |
-| `danger` | crimson | Destructive (Delete, Drop, Force unlock, Cancel round, Abandon) |
-| `warning` | amber | Caution (Close Registration, Finish Round, Go Offline) |
-| `secondary` | neutral ash (solid) | Neutral secondary action |
-| `ghost` | neutral ash (outline) | Tertiary / de-emphasised |
+| Variant | Colour | Intent |
+|---------|--------|--------|
+| `primary` | crimson | **Every** affirmative action — lifecycle CTAs (Start Round, Close Registration, Finish Round/Finals) *and* form/auth submits (Sign in, Create, Upload, Save, Approve) |
+| `danger` | **violet** (`btn-danger`) | Destructive (Delete, Drop, Force-takeover, Cancel round, Finish tournament). Always pair with an icon + verb. |
+| `secondary` | neutral ash (solid) | Neutral secondary action; bulk utilities; the **More** overflow trigger |
+| `ghost` | neutral ash (outline) | Tertiary / de-emphasised (Reopen tournament, Go-offline trigger) |
 
-- **Tag by intent, not colour.** `brand` and `danger` are both crimson *today* but kept separate so the planned palette rework (#232) can recolour them centrally — see below.
+- **One primary CTA per surface.** Crimson is the single positive colour, so a screen should show one filled crimson button; collapse the rest into an overflow (`ActionMenu.svelte`). A legitimate second lifecycle choice (e.g. Start Round vs Start Finals) drops to `secondary`, never a second `primary`.
+- **Danger is violet, never red.** Red and crimson are the same hue family and collapse together — even under colourblindness — so destructive actions get their own hue. Meaning must not rest on hue alone: pair `danger` with an icon (`TriangleAlert`/`Trash2`) + a verb.
+- `primary`/`secondary`/`ghost` use crimson/ash, which are scale-inverted (adapt to light mode automatically). `danger` uses `btn-danger`, which carries its own `html.light` override (violet has no scale inversion).
 - Props: `size` (`sm`/`md`/`lg`), `block` (full width), `loading` (spinner + `aria-busy`, auto-disables), `disabled`; extra layout classes (`flex-1`, margins) via `class`. Focus comes from the global `:focus-visible` ring — never add a bespoke outline.
-- **Do not** route through `<Button>`: icon-only buttons, toggles/tabs/segmented controls, dropdown options, row/card-wrapping buttons, `<a>`-styled links, or Discord brand-fill buttons — leave those as raw elements.
+- **Do not** route through `<Button>`: icon-only buttons, toggles/tabs/segmented controls, dropdown/menu options (e.g. the items inside `ActionMenu`), row/card-wrapping buttons, `<a>`-styled links, or Discord brand-fill buttons — leave those as raw elements.
 
-**Planned palette (#232 — semantic role tokens):** crimson reverts to brand/chrome only; `danger` moves to a distinct red (`btn-red`, already defined) paired with an icon + verb (#225, colourblind-safe); `brand` submits fold into emerald `primary`; emerald/amber get token-ified (dropping their bespoke light overrides). Because every action button now goes through `<Button>`, this is a central change to its `VARIANT` map, not a call-site sweep.
+**Palette history (supersedes the old #232 plan):** this crimson-primary system replaces the earlier scheme (emerald `primary`, crimson `brand`/`danger`, amber `warning`). Done here: `primary` → crimson (the old `brand` merged in), `danger` → violet `btn-danger`, and `warning`/amber + emerald dropped from `<Button>` (the `btn-emerald`/`btn-amber` classes remain only for status chips and help-guide mockups). **#232 now covers what's left:** migrate the app off numeric scale-inversion to semantic role tokens (surface/text/accent/border), token-ify the remaining bespoke light overrides, and run a WCAG-AA contrast audit across both themes.
 
 ### Disabled States
 

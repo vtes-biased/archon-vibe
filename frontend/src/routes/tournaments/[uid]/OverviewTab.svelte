@@ -243,7 +243,7 @@
             <input id="archon-file-input" type="file" accept=".xlsx"
               onchange={(e) => { archonFile = (e.target as HTMLInputElement).files?.[0] ?? null; archonResult = null; archonConfirmOverwrite = false; }}
               class="text-sm text-ash-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-ash-700 file:text-ash-200 hover:file:bg-ash-600" />
-            <Button variant="brand" size="md" disabled={!archonFile} loading={archonUploading} onclick={handleArchonImport}>
+            <Button variant="primary" size="md" disabled={!archonFile} loading={archonUploading} onclick={handleArchonImport}>
               {#if !archonUploading}<Upload class="w-4 h-4" />{/if}
               {archonUploading ? m.archon_uploading() : m.archon_upload_file()}
             </Button>
@@ -252,7 +252,7 @@
             <div class="bg-amber-900/30 border border-amber-700 rounded p-3 text-sm text-amber-200">
               <p>{m.archon_import_confirm_overwrite()}</p>
               <div class="flex gap-2 mt-2">
-                <Button variant="warning" size="md" onclick={handleArchonImport}>
+                <Button variant="primary" size="md" onclick={handleArchonImport}>
                   {m.common_confirm()}
                 </Button>
                 <Button variant="secondary" size="md" onclick={() => archonConfirmOverwrite = false}>

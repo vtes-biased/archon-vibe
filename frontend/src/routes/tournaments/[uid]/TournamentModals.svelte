@@ -85,7 +85,7 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_go_offline_msg()}</p>
         <div class="flex gap-2">
-          <Button variant="warning" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onGoOffline}>
+          <Button variant="primary" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onGoOffline}>
             {offlineActionLoading ? m.common_loading() : m.offline_go_offline_confirm()}
           </Button>
           <Button variant="secondary" size="lg" onclick={() => (showGoOfflineConfirm = false)}>{m.common_cancel()}</Button>
@@ -153,7 +153,7 @@
       <div class="p-6">
         <p class="text-ash-300 mb-6">{m.offline_force_takeover_msg()}</p>
         <div class="flex gap-2">
-          <Button variant="warning" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceTakeover}>
+          <Button variant="danger" size="lg" class="flex-1" loading={offlineActionLoading} onclick={onForceTakeover}>
             {offlineActionLoading ? m.common_loading() : m.offline_force_takeover_confirm()}
           </Button>
           <Button variant="secondary" size="lg" onclick={() => (showForceTakeoverConfirm = false)}>{m.common_cancel()}</Button>

@@ -248,7 +248,7 @@
             class="w-full px-3 py-2 border border-ash-600 rounded bg-dusk-950 text-ash-200 focus:ring-2 focus:ring-crimson-500 focus:border-transparent" />
         </div>
         <div class="flex gap-2">
-          <Button type="submit" variant="brand" size="lg" class="flex-1" loading={claimingVekn} disabled={!claimVeknIdInput.trim()}>
+          <Button type="submit" variant="primary" size="lg" class="flex-1" loading={claimingVekn} disabled={!claimVeknIdInput.trim()}>
             {claimingVekn ? m.profile_claiming() : m.profile_claim_btn()}
           </Button>
           <Button variant="secondary" size="lg" disabled={claimingVekn} onclick={() => { showClaimModal = false; claimVeknIdInput = ""; }}>

@@ -150,7 +150,7 @@
 
             <Button
               type="submit"
-              variant="brand"
+              variant="primary"
               size="lg"
               block
               loading={auth.isLoading}

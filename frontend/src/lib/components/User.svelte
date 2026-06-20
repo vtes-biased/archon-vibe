@@ -472,7 +472,7 @@
         <div class="flex gap-2 pt-2">
           <Button
             type="submit"
-            variant="brand"
+            variant="primary"
             size="lg"
             class="flex-1"
             loading={saving}
@@ -683,7 +683,7 @@
           {m.user_country_change_official_warning()}
         </p>
         <div class="flex gap-2">
-          <Button variant="brand" size="lg" class="flex-1" onclick={confirmCountryChange}>{m.common_confirm()}</Button>
+          <Button variant="primary" size="lg" class="flex-1" onclick={confirmCountryChange}>{m.common_confirm()}</Button>
           <Button variant="secondary" size="lg" onclick={cancelCountryChange}>{m.common_cancel()}</Button>
         </div>
       </div>

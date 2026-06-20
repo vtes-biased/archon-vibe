@@ -185,7 +185,7 @@
             <div class="flex gap-2 mt-1 justify-end">
               <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ash-400 hover:text-ash-200">{m.common_cancel()}</button>
               <Button
-                variant="warning"
+                variant="primary"
                 size="sm"
                 loading={overrideSaving}
                 disabled={overrideSaving || !overrideComment.trim()}

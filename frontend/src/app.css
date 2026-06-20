@@ -220,9 +220,14 @@
 .btn-amber:hover:not(:disabled)     { background-color: #d97706; }
 .btn-red                            { background-color: #b91c1c; color: white; }
 .btn-red:hover:not(:disabled)       { background-color: #dc2626; }
+/* danger = violet (NOT red): keeps destructive distinct from crimson primary,
+   incl. under colourblindness. No scale inversion → explicit light override below. */
+.btn-danger                         { background-color: #6D28D9; color: white; }
+.btn-danger:hover:not(:disabled)    { background-color: #7C3AED; }
 .btn-emerald:disabled,
 .btn-amber:disabled,
-.btn-red:disabled {
+.btn-red:disabled,
+.btn-danger:disabled {
     background-color: var(--color-ash-800);
     color: var(--color-ash-500);
     cursor: not-allowed;
@@ -265,9 +270,12 @@ html.light {
     .btn-amber:hover:not(:disabled)     { background-color: #b45309; }
     .btn-red                            { background-color: #991b1b; }
     .btn-red:hover:not(:disabled)       { background-color: #b91c1c; }
+    .btn-danger                         { background-color: #5B21B6; }
+    .btn-danger:hover:not(:disabled)    { background-color: #6D28D9; }
     .btn-emerald:disabled,
     .btn-amber:disabled,
-    .btn-red:disabled {
+    .btn-red:disabled,
+    .btn-danger:disabled {
         background-color: var(--color-ash-300);
         color: var(--color-ash-500);
     }

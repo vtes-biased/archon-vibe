@@ -134,7 +134,7 @@
       <!-- Header with register button -->
       <div class="flex items-center justify-between">
         <p class="text-ash-400 text-sm">{m.developer_subtitle()}</p>
-        <Button variant="brand" size="lg" onclick={() => (showRegister = !showRegister)}>
+        <Button variant="primary" size="lg" onclick={() => (showRegister = !showRegister)}>
           <Plus class="w-3.5 h-3.5" />
           {m.developer_register_btn()}
         </Button>
@@ -207,7 +207,7 @@
             </div>
             <div class="flex gap-2">
               <Button type="button" variant="secondary" size="lg" class="flex-1" onclick={() => (showRegister = false)}>{m.common_cancel()}</Button>
-              <Button type="submit" variant="brand" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || !newRedirectUris.trim() || newScopes.length === 0}>
+              <Button type="submit" variant="primary" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || !newRedirectUris.trim() || newScopes.length === 0}>
                 {m.developer_register_submit()}
               </Button>
             </div>

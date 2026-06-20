@@ -246,7 +246,7 @@
   {:else}
     <div class="flex justify-between items-center">
       <span class="text-ash-400">{m.add_player_vekn_id_label()}</span>
-      <Button variant="brand" size="md" onclick={onClaimVekn}>
+      <Button variant="primary" size="md" onclick={onClaimVekn}>
         {m.profile_claim_vekn_title()}
       </Button>
     </div>

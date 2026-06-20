@@ -93,7 +93,7 @@
         <input type="email" bind:value={emailInput} required
           placeholder={m.login_placeholder_email()}
           class="flex-1 px-3 py-2 bg-dusk-900 border border-ash-700 rounded text-bone-100 placeholder-ash-500 focus:outline-none focus:border-crimson-600 text-sm" />
-        <Button type="submit" variant="brand" size="lg" class="whitespace-nowrap" loading={sendingEmailLink} disabled={!emailInput.trim()}>
+        <Button type="submit" variant="primary" size="lg" class="whitespace-nowrap" loading={sendingEmailLink} disabled={!emailInput.trim()}>
           {sendingEmailLink ? m.profile_email_sending() : m.profile_email_send_link()}
         </Button>
       </form>

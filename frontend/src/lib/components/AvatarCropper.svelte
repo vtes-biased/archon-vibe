@@ -269,7 +269,7 @@
         {m.common_cancel()}
       </Button>
       {#if image}
-        <Button variant="brand" size="lg" class="flex-1" loading={saving} onclick={handleSave}>
+        <Button variant="primary" size="lg" class="flex-1" loading={saving} onclick={handleSave}>
           {saving ? m.common_saving() : m.common_save()}
         </Button>
       {/if}

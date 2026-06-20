@@ -17,7 +17,7 @@
     children,
     ...rest
   }: {
-    variant?: 'primary' | 'brand' | 'secondary' | 'warning' | 'ghost' | 'danger';
+    variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
     size?: 'sm' | 'md' | 'lg';
     block?: boolean;
     loading?: boolean;
@@ -28,19 +28,17 @@
     [key: string]: unknown;
   } = $props();
 
-  // primary/warning reuse the .btn-* classes — those carry the html.light
-  // overrides that stock Tailwind emerald/amber tokens lack (no scale inversion),
-  // plus their own :disabled. The crimson/ash variants are CSS-var-based so they
-  // adapt to light mode directly; they carry an explicit inert disabled (bg a
-  // tier below the enabled bg so a disabled button doesn't read as active).
+  // Crimson is the brand colour AND the single positive-CTA colour: every
+  // affirmative action (lifecycle CTA + form/auth submit) is `primary`.
+  // Danger is a distinct VIOLET, never red — red and crimson are the same hue
+  // family and collapse together (even under colourblindness), so destructive
+  // actions get their own hue plus an icon/verb at the call-site. The crimson
+  // and ash variants are scale-inverted (adapt to light mode directly); btn-danger
+  // carries its own html.light override (violet has no inversion) and an inert
+  // :disabled (a tier below the enabled bg, so disabled never reads as active).
   const VARIANT: Record<string, string> = {
-    primary:   'btn-emerald',
-    warning:   'btn-amber',
-    // brand and danger are both crimson today (crimson is the brand *and* the
-    // danger colour); kept as distinct variants so a future palette pass can
-    // diverge danger (e.g. icon-forward / different red) without touching submits.
-    brand:     'bg-crimson-700 enabled:hover:bg-crimson-600 text-white disabled:bg-ash-900 disabled:text-ash-500',
-    danger:    'bg-crimson-700 enabled:hover:bg-crimson-600 text-white disabled:bg-ash-900 disabled:text-ash-500',
+    primary:   'bg-crimson-700 enabled:hover:bg-crimson-600 text-white disabled:bg-ash-900 disabled:text-ash-500',
+    danger:    'btn-danger',
     secondary: 'bg-ash-800 enabled:hover:bg-ash-700 text-ash-200 disabled:bg-ash-900 disabled:text-ash-500',
     ghost:     'border border-ash-700 text-ash-300 enabled:hover:bg-ash-800/50 enabled:hover:text-ash-100 disabled:bg-ash-900 disabled:text-ash-500 disabled:border-transparent',
   };

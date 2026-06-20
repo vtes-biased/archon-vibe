@@ -234,7 +234,7 @@
               {m.oauth_deny()}
             </Button>
             <Button
-              variant="brand"
+              variant="primary"
               size="lg"
               class="flex-1"
               loading={submitting}

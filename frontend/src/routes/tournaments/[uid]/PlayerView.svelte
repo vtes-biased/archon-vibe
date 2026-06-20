@@ -319,7 +319,7 @@
             <!-- Call Judge: prominent emergency action for the player at this table -->
             {#if !tournament.offline_mode && isOnline()}
               <Button
-                variant="warning"
+                variant="primary"
                 size="lg"
                 block
                 disabled={judgeCallCooldown}

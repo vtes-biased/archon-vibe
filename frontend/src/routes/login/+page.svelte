@@ -252,7 +252,7 @@
             </div>
             <Button
               type="submit"
-              variant="brand"
+              variant="primary"
               size="lg"
               block
               loading={auth.isLoading}
@@ -307,7 +307,7 @@
             </div>
             <Button
               type="submit"
-              variant="brand"
+              variant="primary"
               size="lg"
               block
               loading={auth.isLoading}
@@ -384,7 +384,7 @@
 
           {#if passkeySupported}
             <Button
-              variant="brand"
+              variant="primary"
               size="lg"
               block
               loading={auth.isLoading}
