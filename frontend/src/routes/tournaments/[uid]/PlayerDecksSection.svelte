@@ -266,7 +266,10 @@
       <!-- Single-deck -->
       <div class="bg-surface-muted/50 rounded-lg">
         {#if myDecks.length > 0 && myDecks[0]}
-          <!-- Always foldable when deck exists -->
+          <!-- Folded by default and never auto-expanded: keeps a nearby opponent
+               from inadvertently glancing at the player's own decklist. The
+               check-in "Fix your deck" CTA scrolls here but deliberately leaves
+               it collapsed. -->
           <button
             class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
             onclick={() => { const next = new Set(expandedDecks); if (next.has('my')) next.delete('my'); else next.add('my'); expandedDecks = next; }}

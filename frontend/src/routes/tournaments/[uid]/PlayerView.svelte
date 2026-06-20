@@ -3,8 +3,8 @@
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
-  import { computeRatingPoints } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2 } from "@lucide/svelte";
+  import { computeRatingPoints, type ValidationError } from "$lib/engine";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
@@ -28,6 +28,7 @@
     isFinals,
     isFinished,
     playerHasValidDeck,
+    myDeckErrors,
     userUid,
     userVeknId,
     actionLoading,
@@ -49,6 +50,7 @@
     isFinals: boolean;
     isFinished: boolean;
     playerHasValidDeck: boolean;
+    myDeckErrors?: ValidationError[];
     userUid: string;
     userVeknId: string | null;
     actionLoading: boolean;
@@ -76,6 +78,23 @@
   });
 
   const myStanding = $derived(standings.find(s => s.user_uid === userUid));
+
+  // Deck check-in CTA: distinguish "no deck" from "deck present but invalid",
+  // and surface the blocking validation errors inline so the player can act
+  // at the door instead of hunting for the deck section.
+  const hasDeck = $derived(!!decksByUser?.[userUid]?.[0]);
+  const deckErrorMessages = $derived((myDeckErrors ?? []).filter(e => e.severity === 'error').map(e => e.message));
+  // Show the deck CTA (instead of the check-in/drop buttons) when a not-yet-checked-in
+  // player is missing a valid deck in the check-in window.
+  const needsDeckCta = $derived(
+    !!currentPlayerEntry &&
+    (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished") &&
+    tournament.state === "Waiting" &&
+    !playerHasValidDeck
+  );
+  function scrollToDeck() {
+    document.getElementById('player-deck-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
   const previousRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.rounds.length < 1) return [];
     const result: { round: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
@@ -150,6 +169,29 @@
   }
 </script>
 
+<!-- Actionable deck reminder: a player blocked at check-in by a missing/invalid
+     deck gets the specific errors + a button straight to the deck section,
+     rather than passive warning text. -->
+{#snippet deckCta()}
+  <div class="banner-warn border rounded-lg p-3 space-y-3">
+    <div class="flex items-start gap-2 text-sm">
+      <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+      <div class="min-w-0">
+        <p class="font-medium">{m.tournament_upload_valid_deck()}</p>
+        {#if deckErrorMessages.length > 0}
+          <ul class="mt-1 list-disc list-inside text-xs space-y-0.5">
+            {#each deckErrorMessages as msg}<li>{msg}</li>{/each}
+          </ul>
+        {/if}
+      </div>
+    </div>
+    <Button variant="primary" size="lg" block class="min-h-[44px]" onclick={scrollToDeck}>
+      <Upload class="w-4 h-4" aria-hidden="true" />
+      {hasDeck ? m.tournament_fix_deck_btn() : m.decks_upload()}
+    </Button>
+  </div>
+{/snippet}
+
 <!-- Player interaction section -->
 <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
   {#if tournament.state === "Registration" && !currentPlayerEntry}
@@ -195,12 +237,7 @@
           ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
           : translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
-      {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && !playerHasValidDeck}
-        <div class="flex items-center gap-2 text-purple-400 text-sm">
-          <TriangleAlert class="w-4 h-4" />
-          {m.tournament_upload_valid_deck()}
-        </div>
-      {:else if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
+      {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = !showQrScanner}
@@ -209,23 +246,16 @@
           <QrCode class="w-4 h-4" />
           {m.checkin_qr_scan_btn()}
         </Button>
-      {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
-        {#if !playerHasValidDeck}
-          <div class="flex items-center gap-2 text-purple-400 text-sm">
-            <TriangleAlert class="w-4 h-4" />
-            {m.tournament_upload_valid_deck()}
-          </div>
-        {:else}
-          <Button
-            variant="ghost"
-            onclick={() => showQrScanner = true}
-            disabled={actionLoading}
-          >
-            <QrCode class="w-4 h-4" />
-            {m.tournament_check_in_btn()}
-          </Button>
-        {/if}
-      {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
+      {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting" && playerHasValidDeck}
+        <Button
+          variant="ghost"
+          onclick={() => showQrScanner = true}
+          disabled={actionLoading}
+        >
+          <QrCode class="w-4 h-4" />
+          {m.tournament_check_in_btn()}
+        </Button>
+      {:else if !needsDeckCta && currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
         <Button
           variant="danger"
           onclick={() => dropPlayer(userUid)}
@@ -233,6 +263,9 @@
         ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.tournament_drop_out_btn()}</Button>
       {/if}
     </div>
+    {#if needsDeckCta}
+      <div class="mb-3">{@render deckCta()}</div>
+    {/if}
     <!-- Player's current score -->
     {#if myStanding && (tournament.state === "Playing" || tournament.state === "Waiting") && (tournament.rounds?.length ?? 0) > 0}
       <div class="text-sm">
@@ -450,7 +483,7 @@
 
   <!-- Player deck section -->
   {#if currentPlayerEntry || (tournament.state === 'Finished' && tournament.decklists_mode)}
-    <div class="mt-4">
+    <div id="player-deck-section" class="mt-4 scroll-mt-4">
       <PlayerDecksSection
         {tournament}
         {playerInfo}

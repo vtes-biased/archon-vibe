@@ -178,17 +178,21 @@
     {@render children()}
   </main>
 
-  <!-- Bottom navigation (mobile) -->
+  <!-- Bottom navigation (mobile) — icon-only: visible labels truncated to
+       ambiguity in longer locales (es/pt), so the destination name lives in
+       aria-label/title (announced by AT, shown on hover) instead. -->
   <nav class="fixed bottom-0 left-0 right-0 z-40 bg-surface-card border-t border-line sm:hidden">
     <div class="flex justify-around">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
           href={item.href}
-          class="flex flex-col items-center py-2 px-1 min-w-0 flex-1 {active ? 'text-link' : 'text-ink-muted hover:text-ink-bright'}"
+          aria-label={item.labelFn()}
+          aria-current={active ? 'page' : undefined}
+          title={item.labelFn()}
+          class="flex items-center justify-center py-3 px-1 flex-1 border-t-2 {active ? 'border-link text-link' : 'border-transparent text-ink-muted hover:text-ink-bright'}"
         >
-          {@render navIcon(item.icon, 'w-5 h-5')}
-          <span class="text-[10px] mt-0.5 truncate">{item.labelFn()}</span>
+          {@render navIcon(item.icon, 'w-6 h-6')}
         </a>
       {/each}
     </div>

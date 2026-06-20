@@ -907,6 +907,7 @@ import TournamentModals from "./TournamentModals.svelte";
           {isFinals}
           {isFinished}
           {playerHasValidDeck}
+          {myDeckErrors}
           userUid={auth.user?.uid ?? ""}
           userVeknId={auth.user?.vekn_id ?? null}
           {actionLoading}

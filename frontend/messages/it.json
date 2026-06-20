@@ -518,6 +518,7 @@
   "tournament_check_in_btn": "Check In",
   "tournament_drop_out_btn": "Abbandona",
   "tournament_upload_valid_deck": "Carica un deck valido per fare check in",
+  "tournament_fix_deck_btn": "Correggi il tuo deck",
   "tournament_standings": "Classifiche",
   "tournament_disqualified": "Squalificato",
   "tournament_standings_cutoff": "Soglia",

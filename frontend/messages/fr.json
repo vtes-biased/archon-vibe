@@ -518,6 +518,7 @@
   "tournament_check_in_btn": "Pointer",
   "tournament_drop_out_btn": "Abandonner",
   "tournament_upload_valid_deck": "Téléchargez un deck valide pour pointer",
+  "tournament_fix_deck_btn": "Corriger votre deck",
   "tournament_standings": "Classement",
   "tournament_disqualified": "Disqualifié",
   "tournament_standings_cutoff": "Seuil",
