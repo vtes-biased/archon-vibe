@@ -279,7 +279,12 @@
     <!-- Your table + seat — the primary card during play; standings/cutoff/history follow below -->
     {#if isFinals && !isFinished && tournament.finals}
       <div class="bg-surface-muted/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_finals_heading()}</h3>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-medium text-ink-strong">{m.tournament_finals_heading()}</h3>
+          <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-success' : tournament.finals.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
+            {translateTableState(tournament.finals.state)}
+          </span>
+        </div>
         <div class="divide-y divide-line">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
