@@ -279,6 +279,8 @@
     {/if}
     <!-- Your table + seat — the primary card during play; standings/cutoff/history follow below -->
     {#if isFinals && !isFinished && tournament.finals}
+      {@const finalsSeatIdx = tournament.finals.seating.findIndex(s => s.player_uid === userUid)}
+      {@const finalsSize = tournament.finals.seating.length}
       <div class="bg-surface-muted/50 rounded-lg p-4">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-sm font-medium text-ink-strong">{m.tournament_finals_heading()}</h3>
@@ -286,17 +288,26 @@
             {translateTableState(tournament.finals.state)}
           </span>
         </div>
-        <div class="divide-y divide-line">
+        <div class="space-y-1.5">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
             {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
             {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
             {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
             {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
-            <div class="py-2.5">
+            {@const isMe = seat.player_uid === userUid}
+            {@const isPrey = finalsSeatIdx >= 0 && j === (finalsSeatIdx + 1) % finalsSize}
+            {@const isPredator = finalsSeatIdx >= 0 && j === (finalsSeatIdx - 1 + finalsSize) % finalsSize}
+            <div class="px-2.5 -mx-2.5 py-2 rounded-md {isMe ? 'ring-1 ring-inset ring-accent/40 bg-accent-soft/10' : ''}">
               <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
                 <div class="min-w-0">
-                  <span class="text-ink truncate">{seatDisplay(seat.player_uid)}</span>
+                  <span class="min-w-0 inline-flex items-center gap-1.5">
+                    <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: String(j + 1) })}</span>
+                    <span class="text-ink truncate min-w-0">{seatDisplay(seat.player_uid)}</span>
+                    {#if isMe}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_you()}</span>
+                    {:else if isPrey}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
+                    {:else if isPredator}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>{/if}
+                  </span>
                   <div class="text-xs text-ink-faint">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if} · {tGws[j]}GW {tTps[j]}TP</div>
                 </div>
               </div>
@@ -322,6 +333,8 @@
           {@const myTable = active.table}
           {@const myTableIdx = active.tableIdx}
           {@const roundIdx = active.roundIdx}
+          {@const mySeatIdx = myTable.seating.findIndex(s => s.player_uid === userUid)}
+          {@const tableSize = myTable.seating.length}
           <div class="bg-surface-muted/50 rounded-lg p-4">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-sm font-medium text-ink-strong">
@@ -337,14 +350,23 @@
                 <TimerDisplay {tournament} tableIndex={myTableIdx} />
               </div>
             {/if}
-            <div class="divide-y divide-line">
+            <div class="space-y-1.5">
               {#each myTable.seating as seat, j}
                 {@const tVps = myTable.seating.map(s => s.result.vp)}
                 {@const tGws = computeGwLocal(tVps)}
                 {@const tTps = computeTpLocal(myTable.seating.length, tVps)}
-                <div class="py-2.5">
+                {@const isMe = seat.player_uid === userUid}
+                {@const isPrey = mySeatIdx >= 0 && j === (mySeatIdx + 1) % tableSize}
+                {@const isPredator = mySeatIdx >= 0 && j === (mySeatIdx - 1 + tableSize) % tableSize}
+                <div class="px-2.5 -mx-2.5 py-2 rounded-md {isMe ? 'ring-1 ring-inset ring-accent/40 bg-accent-soft/10' : ''}">
                   <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
-                    <span class="text-ink truncate">{seatDisplay(seat.player_uid)}</span>
+                    <span class="min-w-0 inline-flex items-center gap-1.5">
+                      <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: String(j + 1) })}</span>
+                      <span class="text-ink truncate min-w-0">{seatDisplay(seat.player_uid)}</span>
+                      {#if isMe}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_you()}</span>
+                      {:else if isPrey}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
+                      {:else if isPredator}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>{/if}
+                    </span>
                     <span class="text-ink-faint text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
                   </div>
                   <VpInput
