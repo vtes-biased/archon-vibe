@@ -69,7 +69,7 @@ async function globalSetup() {
   const page = await browser.newPage();
   try {
     await page.goto(BASE_URL, { timeout: 30_000 });
-    await page.waitForSelector('.bg-emerald-500, .bg-amber-500', { timeout: 15_000 });
+    await page.waitForSelector('[data-sync-state="synced"], [data-sync-state="syncing"]', { timeout: 15_000 });
   } catch {
     // Non-fatal: tests may still pass with slightly slower first load
   }

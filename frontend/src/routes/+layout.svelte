@@ -217,7 +217,12 @@
 
     <!-- Connection status indicator -->
     <div class="mt-auto pt-4">
-      <div class="flex flex-col items-center gap-1">
+      <!-- data-sync-state is a stable, color-independent hook for E2E (the visual
+           cue is icon + semantic color, which a design refactor can freely change). -->
+      <div
+        class="flex flex-col items-center gap-1"
+        data-sync-state={!isOnline ? 'offline' : isSyncing ? 'syncing' : 'synced'}
+      >
         {#if !isOnline}
           <WifiOff class="w-4 h-4 text-link" aria-hidden="true" />
         {:else if isSyncing}

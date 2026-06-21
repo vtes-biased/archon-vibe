@@ -37,9 +37,9 @@ export function getE2EState(): E2EState {
  * fresh snapshot at the full access level (not the stale public-level data).
  */
 export async function loginAsOrganizer(page: Page) {
-  // Wait for anonymous sync to complete (green dot = IDB stores created + data loaded)
+  // Wait for anonymous sync to complete (synced state = IDB stores created + data loaded)
   await expect(
-    page.locator('.bg-emerald-500').first(),
+    page.locator('[data-sync-state="synced"]').first(),
   ).toBeVisible({ timeout: 8_000 });
 
   const state = getE2EState();

@@ -30,9 +30,19 @@ function actionResponse(page: Page, action: string) {
  */
 async function sweepTable(page: Page, heading: string, vp: number) {
   const card = page
-    .locator('div.bg-ash-900\\/50')
+    .locator('div.bg-surface-muted\\/50')
     .filter({ has: page.getByRole('heading', { name: heading, exact: true }) });
-  await card.locator('select').first().selectOption(String(vp));
+  // Prelim tables fold their scores behind "Enter scores"; the finals table shows
+  // them directly. Expand only when the trigger is present.
+  const enter = card.getByRole('button', { name: 'Enter scores' });
+  if (await enter.count()) await enter.click();
+  // Give the first seat all VPs (a sweep is a valid oust order). VP is now a
+  // button group (VpInput), not a <select>.
+  await card
+    .locator('[role="group"]')
+    .first()
+    .getByRole('button', { name: String(vp), exact: true })
+    .click();
   await expect(card.getByText('Finished', { exact: true })).toBeVisible({ timeout: 5_000 });
 }
 
@@ -106,6 +116,8 @@ test.describe('Tournament lifecycle', () => {
 
     // ── Step 5: Close Registration & Check In All (optimistic) ──
     await page.getByRole('button', { name: 'Start Check-in' }).click();
+    // Bulk check-in lives in the "More" overflow menu (one primary CTA per state).
+    await page.getByRole('button', { name: 'More' }).click();
     await expect(page.getByRole('button', { name: 'Check All In' })).toBeVisible({ timeout: 2_000 });
     await page.getByRole('button', { name: 'Check All In' }).click();
     await expect(
@@ -151,7 +163,7 @@ test.describe('Tournament lifecycle', () => {
 
       if (round === 1) {
         const table1 = page
-          .locator('div.bg-ash-900\\/50')
+          .locator('div.bg-surface-muted\\/50')
           .filter({ has: page.getByRole('heading', { name: 'Table 1', exact: true }) });
         const seatRows = table1.locator('.divide-y > div');
 
@@ -196,8 +208,8 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByText('Finished').first()).toBeVisible({ timeout: 2_000 });
     await expect(page.getByText('Tournament complete.')).toBeVisible({ timeout: 2_000 });
 
-    // ── Step 10: Winner banner on Overview ──
-    await page.getByRole('button', { name: 'Overview' }).click();
+    // ── Step 10: Winner banner ── (shown directly in the Finished view; the
+    // former Overview tab was removed and its contents re-homed here)
     const winnerBanner = page.locator('.banner-highlight').filter({ hasText: 'Winner' });
     await expect(winnerBanner).toBeVisible({ timeout: 2_000 });
     // Banner shows "Name (vekn_id)" — strip the id to match plain names

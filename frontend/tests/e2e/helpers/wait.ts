@@ -9,11 +9,11 @@ import { expect, type Page } from '@playwright/test';
 const DEFAULT_SYNC_TIMEOUT = 8_000;
 
 /**
- * Wait for SSE sync to complete (emerald dot in sidebar).
+ * Wait for SSE sync to complete (synced state on the sidebar indicator).
  */
 export async function waitForSync(page: Page, timeout = DEFAULT_SYNC_TIMEOUT) {
   await expect(
-    page.locator('.bg-emerald-500').first(),
+    page.locator('[data-sync-state="synced"]').first(),
   ).toBeVisible({ timeout });
 }
 
