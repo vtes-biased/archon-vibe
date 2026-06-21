@@ -4,7 +4,7 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints, type ValidationError } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload } from "@lucide/svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload, ExternalLink } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import ScoreLegend from "$lib/components/ScoreLegend.svelte";
@@ -193,6 +193,20 @@
   </div>
 {/snippet}
 
+<!-- Online events have no on-site QR to scan: check-in happens in the server
+     (self-serve via the Discord bot, or organizer-driven). Point the player at
+     the join link instead of a dead camera scanner. Button has no href, so this
+     mirrors its primary/lg/block styling on an <a>. -->
+{#snippet onlineJoin()}
+  {#if tournament.venue_url}
+    <a href={tournament.venue_url} target="_blank" rel="noopener"
+       class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+      <ExternalLink class="w-4 h-4" aria-hidden="true" />
+      {m.tournament_join_online_btn({ venue: tournament.venue ?? "" })}
+    </a>
+  {/if}
+{/snippet}
+
 <!-- Player interaction section -->
 <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
   {#if tournament.state === "Registration" && !currentPlayerEntry}
@@ -224,15 +238,20 @@
       ><Ban class="w-4 h-4" aria-hidden="true" />{m.tournament_unregister_btn()}</Button>
     </div>
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
-    <Button
-      variant="primary"
-      size="lg"
-      onclick={() => showQrScanner = true}
-      disabled={actionLoading}
-    >
-      <QrCode class="w-4 h-4" />
-      {m.tournament_register_checkin_btn()}
-    </Button>
+    {#if tournament.online}
+      {@render onlineJoin()}
+      <p class="text-sm text-ink-muted">{m.tournament_online_checkin_unregistered()}</p>
+    {:else}
+      <Button
+        variant="primary"
+        size="lg"
+        onclick={() => showQrScanner = true}
+        disabled={actionLoading}
+      >
+        <QrCode class="w-4 h-4" />
+        {m.tournament_register_checkin_btn()}
+      </Button>
+    {/if}
   {:else if currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
@@ -241,7 +260,7 @@
           ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
           : translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
-      {#if currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
+      {#if !tournament.online && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = !showQrScanner}
@@ -250,7 +269,7 @@
           <QrCode class="w-4 h-4" />
           {m.checkin_qr_scan_btn()}
         </Button>
-      {:else if currentPlayerEntry.state === "Finished" && tournament.state === "Waiting" && playerHasValidDeck}
+      {:else if !tournament.online && currentPlayerEntry.state === "Finished" && tournament.state === "Waiting" && playerHasValidDeck}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = true}
@@ -267,6 +286,16 @@
         ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.tournament_drop_out_btn()}</Button>
       {/if}
     </div>
+    <!-- Online check-in is server-side (bot self-serve or organizer): give the
+         player the join link + a status line in place of the dead QR scanner. -->
+    {#if tournament.online && tournament.state === "Waiting" && playerHasValidDeck && (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished")}
+      <div class="mb-3 space-y-2">
+        {@render onlineJoin()}
+        <p class="text-sm text-ink-muted">
+          {currentPlayerEntry.state === "Finished" ? m.tournament_online_recheckin() : m.tournament_online_checkin_status()}
+        </p>
+      </div>
+    {/if}
     {#if needsDeckCta}
       <div class="mb-3">{@render deckCta()}</div>
     {/if}

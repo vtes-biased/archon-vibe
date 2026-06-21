@@ -182,6 +182,13 @@
     </div>
   {/if}
 
+  <!-- Proxy policy: a deck-building constraint the player must know before showing up -->
+  {#if isPlayer && (tournament.state === 'Registration' || tournament.state === 'Waiting')}
+    <p class="text-xs text-ink-muted">
+      {tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}
+    </p>
+  {/if}
+
   <!-- Winner's deck nudge (post-tournament) -->
   {#if tournament.state === 'Finished' && winnerUid && !winnerHasDeck}
     {#if isWinner}

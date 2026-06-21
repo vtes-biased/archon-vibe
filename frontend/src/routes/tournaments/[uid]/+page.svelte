@@ -632,12 +632,20 @@ import TournamentModals from "./TournamentModals.svelte";
             <div class="text-ink-bright">
               {#if tournament.online}
                 {m.tournaments_online()}
+                {#if tournament.venue}
+                  <br />
+                  {#if tournament.venue_url}
+                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-link hover:text-link-soft inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" aria-hidden="true" /></a>
+                  {:else}
+                    <span class="text-ink-muted">{tournament.venue}</span>
+                  {/if}
+                {/if}
               {:else if tournament.country}
                 {getCountryFlag(tournament.country)} {countries[tournament.country]?.name ?? tournament.country}
                 {#if tournament.venue}
                   <br />
                   {#if tournament.venue_url}
-                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-ink-muted hover:text-ember-400 inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" /></a>
+                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-link hover:text-link-soft inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" aria-hidden="true" /></a>
                   {:else}
                     <span class="text-ink-muted">{tournament.venue}</span>
                   {/if}
@@ -645,9 +653,9 @@ import TournamentModals from "./TournamentModals.svelte";
                 {#if tournament.address}
                   <br />
                   {#if tournament.map_url}
-                    <a href={tournament.map_url} target="_blank" rel="noopener" class="text-ink-faint hover:text-ember-400 text-xs inline-flex items-center gap-1"><MapPin class="w-3 h-3" /> {tournament.address}</a>
+                    <a href={tournament.map_url} target="_blank" rel="noopener" class="text-ink-faint hover:text-link-soft text-xs inline-flex items-center gap-1"><MapPin class="w-3 h-3" aria-hidden="true" /> {tournament.address}</a>
                   {:else}
-                    <span class="text-ink-faint text-xs"><MapPin class="w-3 h-3 inline" /> {tournament.address}</span>
+                    <span class="text-ink-faint text-xs"><MapPin class="w-3 h-3 inline" aria-hidden="true" /> {tournament.address}</span>
                   {/if}
                 {/if}
               {:else}
@@ -781,10 +789,15 @@ import TournamentModals from "./TournamentModals.svelte";
                 {#if qrCheckin && !hasRounds}
                   <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => (showQrCode = !showQrCode)}>{showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code()}</Button>
                 {/if}
+                <!-- Online between rounds: surface Reset Check-in (out of More) — online players
+                     silently drop out far more than IRL, and stale check-ins corrupt seating. -->
+                {#if tournament.online && hasRounds}
+                  <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => doAction("ResetCheckIn")}><RotateCcw class="w-4 h-4" aria-hidden="true" />{m.overview_reset_checkin()}</Button>
+                {/if}
                 <ActionMenu label={m.common_more()} items={[
                   { label: m.overview_check_all_in(), icon: CheckCheck, onclick: () => doAction("CheckInAll"), disabled: actionLoading },
                   { label: m.payment_mark_all_paid(), icon: Banknote, onclick: () => doAction("MarkAllPaid"), disabled: actionLoading },
-                  ...(hasRounds ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
+                  ...(hasRounds && !tournament.online ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
                   ...(qrCheckin && hasRounds ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
                   { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
                 ]} />
