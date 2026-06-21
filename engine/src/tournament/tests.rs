@@ -1000,7 +1000,7 @@ fn test_reopen_tournament_preserves_dq() {
         updated["players"][1]["state"].as_str(),
         Some("Disqualified")
     ); // preserved
-    // winner cleared to "" (not null): backend types it `str`, a null 500s the action
+       // winner cleared to "" (not null): backend types it `str`, a null 500s the action
     assert_eq!(updated["winner"].as_str(), Some(""));
 }
 

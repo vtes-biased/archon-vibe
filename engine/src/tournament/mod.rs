@@ -230,9 +230,11 @@ fn apply_event(
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
             tournament["state"] = "Waiting".into();
-            // Clear finals and winner so organizer can redo finals
+            // Clear finals and winner so organizer can redo finals. winner is "" (not
+            // null): the backend Tournament model types it `str` (""=no winner), so a
+            // null fails msgspec validation and 500s the action.
             tournament["finals"] = json::Null;
-            tournament["winner"] = json::Null;
+            tournament["winner"] = "".into();
             // Reset Finished players back to Checked-in (DQ'd stay DQ'd)
             // Also clear finalist flag so new finals can be started cleanly
             let players = &mut tournament["players"];
