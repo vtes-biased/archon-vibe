@@ -52,3 +52,4 @@ Core features have shipped; `PRODUCT.md` + pst tickets are the source of truth �
 - TWDA designer-credit convention (Created by:, anonymity=omit, names-only) — see ARCHITECTURE.md (TWDA Outbound).
 - [Sponsor (coopted_by) visibility](project_vekn_sponsor_visibility.md) — full-projection-only, but the SSE personal overlay already delivers it to IC/NC/Prince/self, so surfacing is frontend-only (presence = permission); detail-view + own-profile, never a list column; p3.
 - [Seating alteration validation](project_seating_alteration_validation.md) — hard-block <4/>5/empty tables on save, warn-only on pred-prey repeats, add-table belongs in the edit-seating draft.
+- [Self-organized rounds](project_self_organized_rounds.md) — exploratory P3 for open-rounds events; bot-first, online-only, pod=4-or-5, engine-assigned seating, all-participant confirm; collusion is accepted tradeoff (non-VEKN).
