@@ -610,8 +610,8 @@
                     {/if}
                   </div>
                 </div>
-                <!-- Per-table timer (folded-only: on unfold the scoring grid owns the surface; the global round timer above stays visible, and table extensions are granted during play, not scoring) -->
-                {#if !isScoring && !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
+                <!-- Per-table timer + extension controls (unfold-only: the unfold is this table's org-action surface; the folded list stays compact, and the global round timer above keeps time visible at all times) -->
+                {#if isScoring && !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
                   <div class="mb-2">
                     <TimerDisplay {tournament} {isOrganizer} tableIndex={i} />
                   </div>
