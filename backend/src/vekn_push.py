@@ -139,10 +139,10 @@ async def push_tournament_event(
     # Map to VEKN event type
     event_type = tournament_to_vekn_type(tournament.format, tournament.rank)
 
-    # Determine rounds
-    rounds = (
-        tournament.max_rounds if tournament.max_rounds >= 2 else len(tournament.rounds)
-    )
+    # Determine rounds. Open rounds: max_rounds is a per-player cap, so the event can run
+    # more (or fewer) total rounds than it — report the actual rounds run, falling back to
+    # the cap before any round exists (calendar push at creation).
+    rounds = len(tournament.rounds) or tournament.max_rounds
     if rounds < 2:
         rounds = 2  # VEKN minimum
 
@@ -172,7 +172,8 @@ async def push_tournament_event(
     if not end_date:
         end_date = start_date  # Same day
 
-    has_finals = 1 if tournament.finals or tournament.max_rounds > 0 else 0
+    # Base on an actual finals (max_rounds is a per-player cap now, not a finals signal).
+    has_finals = 1 if tournament.finals else 0
 
     try:
         event_id = await client.create_event(

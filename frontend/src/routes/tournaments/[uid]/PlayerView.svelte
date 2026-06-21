@@ -353,7 +353,11 @@
         </div>
       </div>
     {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0}
-      {#if myActiveRounds.length === 0 && currentPlayerEntry?.state === "Checked-in"}
+      {#if currentPlayerEntry?.state === "Completed"}
+        <div class="banner-info border rounded-lg p-4">
+          <p class="text-sm">{m.player_completed_awaiting_finals()}</p>
+        </div>
+      {:else if myActiveRounds.length === 0 && currentPlayerEntry?.state === "Checked-in"}
         <div class="banner-info border rounded-lg p-4">
           <p class="text-sm">{m.player_sitting_out()}</p>
         </div>

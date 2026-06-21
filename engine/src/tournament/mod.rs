@@ -30,7 +30,7 @@ use types::VpError;
 // Import everything needed for apply_event from submodules
 use crate::error::EngineError;
 use helpers::{
-    all_rounds_finished, count_completed_rounds, find_player_index, is_deck_locked, player_exists,
+    all_rounds_finished, count_player_rounds_played, find_player_index, is_deck_locked, player_exists,
     players_in_other_active_rounds, require_can_edit_results, require_organizer, require_state,
     require_state_or_finished, validate_enum,
 };
@@ -503,6 +503,12 @@ fn apply_event(
                 return Err(EngineError::PlayerSuspended);
             }
 
+            // Open rounds: refuse check-in once the player reached their per-player round cap.
+            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            if max_rounds > 0 && count_player_rounds_played(tournament, player_uid) >= max_rounds {
+                return Err(EngineError::PlayerReachedMaxRounds);
+            }
+
             // Check for missing decklist when required (uses decks parameter)
             let missing_decklist = tournament["decklist_required"].as_bool().unwrap_or(false) && {
                 let pk = player_uid.as_str();
@@ -629,14 +635,13 @@ fn apply_event(
                 return Err(EngineError::PrelimAfterFinals);
             }
 
-            // Check max rounds
+            // Open rounds: max_rounds is a PER-PLAYER cap, not a tournament-wide total.
+            // The tournament may run more rounds than max_rounds (different player subsets each
+            // round); players who reached their cap are simply not seated again.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
-            let current_rounds = tournament["rounds"].len();
-            if max_rounds > 0 && current_rounds >= max_rounds {
-                return Err(EngineError::MaxRoundsReached);
-            }
 
-            // Get available players: Checked-in, plus Playing for online parallel rounds
+            // Get available players: Checked-in, plus Playing for online parallel rounds —
+            // excluding any who already reached their per-player round cap.
             let checked_in: Vec<String> = tournament["players"]
                 .members()
                 .filter(|p| {
@@ -644,6 +649,9 @@ fn apply_event(
                     s == Some("Checked-in") || (is_online && s == Some("Playing"))
                 })
                 .filter_map(|p| p["user_uid"].as_str().map(|s| s.to_string()))
+                .filter(|uid| {
+                    max_rounds == 0 || count_player_rounds_played(tournament, uid) < max_rounds
+                })
                 .collect();
 
             let n = checked_in.len();
@@ -802,12 +810,30 @@ fn apply_event(
                 "Checked-in"
             };
             let still_playing = players_in_other_active_rounds(tournament, target_round_idx);
+            // Open rounds: a player who just reached their per-player cap retires to Completed
+            // (done with prelims, still finals-eligible) instead of being re-armed as Checked-in.
+            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let maxed: std::collections::HashSet<String> =
+                if max_rounds > 0 && state != TournamentState::Finished {
+                    tournament["players"]
+                        .members()
+                        .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                        .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
+                        .collect()
+                } else {
+                    std::collections::HashSet::new()
+                };
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Playing") {
                     if let Some(uid) = players[i]["user_uid"].as_str() {
                         if !still_playing.contains(uid) {
-                            players[i]["state"] = target_state.into();
+                            players[i]["state"] = if maxed.contains(uid) {
+                                "Completed"
+                            } else {
+                                target_state
+                            }
+                            .into();
                         }
                     }
                 }
@@ -850,11 +876,33 @@ fn apply_event(
                 "Checked-in"
             };
             let still_playing = players_in_other_active_rounds(tournament, len - 1);
+            // Cancelling a round lowers per-player counts; re-arm any Completed (capped) player
+            // now back under their cap so they aren't stranded out of the remaining rounds.
+            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let rearm: std::collections::HashSet<String> =
+                if max_rounds > 0 && state != TournamentState::Finished {
+                    tournament["players"]
+                        .members()
+                        .filter(|p| p["state"].as_str() == Some("Completed"))
+                        .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                        .filter(|uid| count_player_rounds_played(tournament, uid) < max_rounds)
+                        .collect()
+                } else {
+                    std::collections::HashSet::new()
+                };
             let players = &mut tournament["players"];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() == Some("Playing") {
-                    if let Some(uid) = players[i]["user_uid"].as_str() {
-                        if !still_playing.contains(uid) {
+                let st = players[i]["state"].as_str();
+                let uid = players[i]["user_uid"].as_str().map(String::from);
+                if st == Some("Playing") {
+                    if let Some(uid) = uid {
+                        if !still_playing.contains(&uid) {
+                            players[i]["state"] = target_state.into();
+                        }
+                    }
+                } else if st == Some("Completed") {
+                    if let Some(uid) = uid {
+                        if rearm.contains(&uid) {
                             players[i]["state"] = target_state.into();
                         }
                     }
@@ -1589,7 +1637,9 @@ fn apply_event(
 
             let standings = compute_preliminary_standings(tournament, sanctions);
 
-            // Filter out DQ'd players from finals consideration
+            // Finals consideration excludes the disqualified and the withdrawn/dropped (Finished).
+            // Players who reached their per-player cap rest in Completed and stay eligible; a
+            // withdrawn finalist is dropped here so the next-ranked qualifier is promoted.
             let eligible: Vec<&standings::Standing> = standings
                 .iter()
                 .filter(|s| {
@@ -1597,14 +1647,14 @@ fn apply_event(
                         .members()
                         .find(|p| p["user_uid"].as_str() == Some(&s.user_uid));
                     let ps = player.and_then(|p| p["state"].as_str()).unwrap_or("");
-                    ps != "Disqualified"
+                    ps != "Disqualified" && ps != "Finished"
                 })
                 .collect();
 
             if eligible.len() < 5 {
                 return Err(EngineError::FinalsNotEnoughPlayers);
             }
-            if top5_has_ties(&standings) {
+            if top5_has_ties(&eligible) {
                 return Err(EngineError::FinalsUnresolvedTies);
             }
 
@@ -1766,7 +1816,7 @@ fn apply_event(
                         if *multideck {
                             // Multideck: new deck goes at index == existing_count
                             // Block if that round has already been played
-                            if is_deck_locked(tournament, existing_count) {
+                            if is_deck_locked(tournament, player_uid, existing_count) {
                                 return Err(EngineError::DeckLockedRound);
                             }
                         } else if existing_count > 0 {
@@ -1810,7 +1860,7 @@ fn apply_event(
                     TournamentState::Playing => {
                         if *multideck {
                             if let Some(idx) = deck_index {
-                                if is_deck_locked(tournament, *idx) {
+                                if is_deck_locked(tournament, player_uid, *idx) {
                                     return Err(EngineError::DeckLockedRound);
                                 }
                             } else {
@@ -1910,7 +1960,13 @@ fn apply_event(
 
             if let Some(mr) = config["max_rounds"].as_usize() {
                 if mr != 0 {
-                    let completed = count_completed_rounds(tournament);
+                    // Per-player cap: can't drop below what any single player has already played.
+                    let completed = tournament["players"]
+                        .members()
+                        .filter_map(|p| p["user_uid"].as_str())
+                        .map(|uid| count_player_rounds_played(tournament, uid))
+                        .max()
+                        .unwrap_or(0);
                     if mr < completed {
                         return Err(EngineError::MaxRoundsBelowCompleted { max: mr, completed });
                     }

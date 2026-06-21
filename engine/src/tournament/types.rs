@@ -41,6 +41,9 @@ pub enum PlayerState {
     Registered,
     CheckedIn,
     Playing,
+    /// Open rounds: player reached their per-player round cap. Done with prelims, still present
+    /// and finals-eligible (distinct from Finished, which means withdrew/dropped/tournament-over).
+    Completed,
     Finished,
     Disqualified,
 }
@@ -52,6 +55,7 @@ impl PlayerState {
             "Registered" => Some(Self::Registered),
             "Checked-in" => Some(Self::CheckedIn),
             "Playing" => Some(Self::Playing),
+            "Completed" => Some(Self::Completed),
             "Finished" => Some(Self::Finished),
             "Disqualified" => Some(Self::Disqualified),
             _ => None,
@@ -63,6 +67,7 @@ impl PlayerState {
             Self::Registered => "Registered",
             Self::CheckedIn => "Checked-in",
             Self::Playing => "Playing",
+            Self::Completed => "Completed",
             Self::Finished => "Finished",
             Self::Disqualified => "Disqualified",
         }

@@ -251,8 +251,10 @@ import TournamentModals from "./TournamentModals.svelte";
     return round.length > 0 && round.every(t => t.state === "Finished");
   });
   const finalsTableFinished = $derived(tournament?.finals?.state === "Finished");
-  // Detect unequal rounds played (stagger sit-outs)
+  // Detect unequal rounds played (stagger sit-outs). Open rounds (per-player cap) expect
+  // unequal counts by design, so the stagger-finals warning would only be noise there.
   const hasUnequalRounds = $derived.by(() => {
+    if ((tournament?.max_rounds ?? 0) > 0) return false;
     if (!tournament?.rounds?.length || !tournament?.players) return false;
     const counts = new Map<string, number>();
     const active = new Set(tournament.players.filter(p => p.state !== "Finished" && p.state !== "Disqualified").map(p => p.user_uid));
@@ -816,13 +818,11 @@ import TournamentModals from "./TournamentModals.svelte";
                 {:else if !hasParallelRounds}
                   <Button variant="primary" size="lg" disabled={actionLoading || !allTablesFinished} onclick={() => doAction("FinishRound", { round: activeRoundIdx })}>{m.rounds_end_round()}</Button>
                   {#if tournament.online}
-                    {@const maxRounds = tournament.max_rounds ?? 0}
-                    {@const canStartNext = (checkedInCount + playingCount) >= 4 && (maxRounds === 0 || (tournament.rounds?.length ?? 0) < maxRounds)}
+                    {@const canStartNext = (checkedInCount + playingCount) >= 4}
                     <Button variant="secondary" size="md" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
                   {/if}
                 {:else if tournament.online}
-                  {@const maxRounds = tournament.max_rounds ?? 0}
-                  {@const canStartNext = (checkedInCount + playingCount) >= 4 && (maxRounds === 0 || (tournament.rounds?.length ?? 0) < maxRounds)}
+                  {@const canStartNext = (checkedInCount + playingCount) >= 4}
                   <Button variant="primary" size="lg" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
                 {/if}
                 <ActionMenu label={m.common_more()} items={[archonImportItem]} />

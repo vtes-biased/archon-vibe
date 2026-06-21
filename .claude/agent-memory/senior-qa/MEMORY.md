@@ -30,6 +30,7 @@
 - `_remap_uids_in_tournament` (tournaments.py) uses naive JSON string-replace for UID mapping — substring-collision risk mitigated only by UUID v7 length.
 - `_is_organizer`, `_build_actor_context` (tournaments.py) and `_map_vekn_to_tournament` (vekn_tournament_sync.py) are importable pure functions — unit-test directly.
 - Multi-role users (IC+NC): the NC/Prince branch comes first in the if/elif chain — correct semantics, no separate test needed.
+- **`StartFinals` finalist-selection coverage**: the `test_gw_finals_*` tests target `compute_gw_finals` (winner-of-finals scoring) and `test_rating_*` the rating path — NONE drove the `StartFinals` event handler's top-5-eligible selection until `test_start_finals_includes_completed_excludes_withdrawn` (added 2026-06). That test pins #272: `Completed` (capped) players ARE finalists, `Finished`/`Disqualified` are excluded and the next-ranked promoted. Engine-valid setup: 6 players, 2 single-table `[2,1,1,1,0]` rounds, distinct toss to avoid cutoff ties. `StartFinals`/`compute_preliminary_standings` read stored `result.vp` and never call `check_table_vps`, but keep tables oust-valid per convention.
 
 ## Authorization (for test design)
 - Authz checks run at TWO layers: backend REST endpoint AND the Rust engine. Decisions are single-sourced in `engine/src/permissions.rs` (PyO3 + WASM); the backend still enforces server-side.

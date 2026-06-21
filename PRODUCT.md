@@ -65,10 +65,16 @@ Not registered
         -> Finished (round complete)
           -> Back to Checked-in or Dropped
 
+Player states (terminal/near-terminal):
+- Completed  — reached per-player max_rounds cap; done with prelims, still finals-eligible
+- Finished   — withdrew / dropped / tournament over (not finals-eligible)
+- Disqualified — DQ sanction active
+
 Barriers to check-in:
 - Decklist required but not uploaded
 - Player banned by VEKN
 - Player disqualified from this event
+- Player reached their per-player max_rounds cap (Open Rounds only)
 ```
 
 ### 3.3 Round Structure
@@ -123,7 +129,7 @@ After preliminary rounds, top 5 players qualify. Ranking order:
 3. Tournament Points (TP) — second tiebreaker
 4. Random (toss) — for remaining ties in top 5
 
-Organizers must drop unavailable finalists before launching finals.
+Organizers must drop unavailable finalists before launching finals. If a top-5 qualifier withdraws (state `Finished`), `StartFinals` excludes them and auto-promotes the next-ranked qualifier. `Completed` (capped) players remain finals-eligible and are not excluded.
 
 Published preliminary standings rank GW > VP > TP using competition ranking with skips (tied players share a place; the next place is skipped). The random toss resolves only a tie straddling the top-5 finals cutoff — it never re-orders tied players elsewhere in the standings.
 
@@ -255,7 +261,7 @@ A compact map of what exists; implementation detail lives in code and the docs i
 
 - **Auth & accounts**: email+password, magic link (signup/reset/invite), passkeys, Discord OAuth + Linked Roles (auto-assign VEKN roles), JWT sessions with refresh.
 - **Members**: profiles (name, country, city, socials, contact), avatar upload (client crop + server compress), VEKN ID claim/sponsor/link/abandon/force-abandon, roles (IC, NC, Prince, Judge, Judgekin, Rulemonger, Ethics, PTC, Playtester, DEV), same-country user merge, cooptation tracking, privacy-filtered directory.
-- **Tournament core**: full config (format/rank/proxies/multideck/online/venue/dates/tz/country/max_rounds), state machine Planned→Registration→Waiting→Playing→Finished (+reopen), registration + check-in (single/all/reset), simulated-annealing seating (9 priorities) incl. staggered seatings for 6/7/11, VP entry with oust-order validation, GW/TP auto-compute, judge override/unoverride, standings (GW>VP>TP), finals qualification + manual/random toss, finals AlterSeating, round/registration/tournament reopen + cancel, delete (Planned only).
+- **Tournament core**: full config (format/rank/proxies/multideck/online/venue/dates/tz/country/max_rounds), state machine Planned→Registration→Waiting→Playing→Finished (+reopen), registration + check-in (single/all/reset), simulated-annealing seating (9 priorities) incl. staggered seatings for 6/7/11, VP entry with oust-order validation, GW/TP auto-compute, judge override/unoverride, standings (GW>VP>TP), finals qualification + manual/random toss, finals AlterSeating, round/registration/tournament reopen + cancel, delete (Planned only). **Open Rounds** (`max_rounds > 0`): per-player cap — each player plays up to `max_rounds` rounds of a continuously-run pool; the tournament MAY run more total rounds than `max_rounds`; players hit their cap individually and move to state `Completed` (finals-eligible). Non-VEKN format gaining traction online. `max_rounds = 0` = no cap.
 - **Seating editor**: tap-to-swap/move (tap player then tap target seat; same table = reorder, cross-table = swap, open seat = move), per-player issue indicators (sanction/deck/payment), Swap/Seat/Unseat/AddTable/RemoveTable/AlterSeating (prelim + finals).
 - **Round timer** (online): global start/pause/reset, per-round/finals config, per-table extra time (cap 600s), client-side countdown (no per-second broadcasts).
 - **Call for judge** (online): ephemeral SSE alert to organizers + IC, stacking banners + chime, auto-dismiss 120s, validates seated/Playing/online.
@@ -272,7 +278,7 @@ A compact map of what exists; implementation detail lives in code and the docs i
 - **Social & discovery**: shareable finished-tournament PNG + text; iCal feed (personal via calendar_token / country / global, online toggle; token stripped from SSE); agenda matching; tournament list filters (country/format/search, My Agenda, include-online).
 - **Printable views**: round seating, QR (`@media print`, page breaks).
 - **Help**: in-app VTES rulebook, VEKN tournament rules, Judges Guide v1+v2, Code of Ethics, player/organizer guides (source in `frontend/src/lib/help-content/`), paginated viewer with TOC.
-- **VEKN integration**: outbound push (calendar on create, results on finish, hourly catch-up), inbound member sync (~6h, infers coopted_by), inbound tournament sync (venue seeding), member push on sponsor; format→event-type mapping; `external_ids["vekn"]`/`vekn_pushed_at`; `max_rounds` immutable once pushed.
+- **VEKN integration**: outbound push (calendar on create, results on finish, hourly catch-up), inbound member sync (~6h, infers coopted_by), inbound tournament sync (venue seeding), member push on sponsor; format→event-type mapping; `external_ids["vekn"]`/`vekn_pushed_at`; `max_rounds` immutable once pushed (Open Rounds is non-VEKN and not pushed to VEKN).
 - **OAuth2 provider**: PKCE auth-code flow, OIDC userinfo, client management (DEV role), consent persistence, scopes `profile:read` / `user:impersonate`, Argon2 secrets + refresh-token rotation + revocation, scheduled token cleanup.
 - **Offline mode**: single primary-device ownership; others read-only "offline"; force-takeover (data-loss warning) + IC force-unlock; go-online pushes full authoritative state (no CRUD log); offline member creation with temp `P-` UIDs remapped on sync; SSE suppressed while offline.
 - **Infrastructure**: PWA + service workers (update detection); IndexedDB for all reads (5 stores + cards); SSE with 3 precomputed access levels (public/member/full); personal/role overlays; optimistic WASM updates; resync on role/VEKN-ID change; 15-min gzip snapshot endpoint; i18n EN/FR/ES/PT-BR/IT (Paraglide, browser auto-detect) + locale switcher; GeoNames autocomplete; scheduled jobs (VEKN sync/push, sanction cleanup, rating recompute, OAuth cleanup, snapshot, deleted-objects purge).
@@ -344,7 +350,7 @@ Behaviors the app must get right that go beyond the headline rules in §3.
 
 ### VEKN
 - **VEKN IDs required to push**: results can't be pushed until every player has a `vekn_id`; organizers sponsor/link first.
-- **Fire-and-forget**: pushes never block user actions; an hourly batch catches misses. `max_rounds` is immutable once pushed.
+- **Fire-and-forget**: pushes never block user actions; an hourly batch catches misses. `max_rounds` is immutable once pushed (Open Rounds tournaments are non-VEKN and not pushed).
 
 ## 8. VEKN Rating System (Reference)
 

@@ -1047,6 +1047,101 @@ fn tournament_with_round() -> JsonValue {
     t
 }
 
+// Open rounds: max_rounds is a PER-PLAYER cap. After a player plays that many rounds they
+// retire to `Completed` (still finals-eligible) and may no longer check in for another round.
+#[test]
+fn test_open_rounds_caps_player_and_blocks_recheckin() {
+    let mut t = tournament_with_round();
+    t["max_rounds"] = 1.into(); // one round per player
+    // Keep a single finished table so FinishRound can complete the round.
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Playing", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![[t["rounds"][0][0].clone()]];
+
+    let org = make_organizer();
+    let finished =
+        json::parse(&run_event(&t, &json::object! { type: "FinishRound" }, &org).unwrap()).unwrap();
+    assert_eq!(finished["state"].as_str(), Some("Waiting"));
+    // Every player has now played their cap → Completed, not re-armed as Checked-in.
+    for i in 0..4 {
+        assert_eq!(finished["players"][i]["state"].as_str(), Some("Completed"));
+    }
+    // Re-checking in a capped player is refused with the per-player-cap error.
+    let err = run_event(
+        &finished,
+        &json::object! { type: "CheckIn", player_uid: "p1" },
+        &org,
+    )
+    .unwrap_err();
+    assert!(matches!(err, EngineError::PlayerReachedMaxRounds));
+}
+
+// #272 / open rounds: StartFinals selects the top-5 *eligible* players. A capped player
+// resting in `Completed` is still a finalist; a withdrawn player in `Finished` is excluded
+// from the cutoff and the next-ranked qualifier is promoted into the finals. Asserting the
+// wrong set here means the wrong person plays the final (a result pushed to VEKN/league).
+#[test]
+fn test_start_finals_includes_completed_excludes_withdrawn() {
+    let mut t = make_tournament();
+    t["state"] = "Waiting".into();
+    // Two single-table rounds (>=2 rounds gate). Each table is [2,1,1,1,0] in seating
+    // (predator-prey) order — a valid oust sequence summing to the 5-seat table size.
+    // Distinct toss values keep the cutoff free of unbroken ties.
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Completed",  payment_status: "Pending", toss: 5 },
+        { user_uid: "p2", state: "Playing",    payment_status: "Pending", toss: 4 },
+        { user_uid: "p3", state: "Playing",    payment_status: "Pending", toss: 3 },
+        { user_uid: "p4", state: "Finished",   payment_status: "Pending", toss: 2 },
+        { user_uid: "p5", state: "Playing",    payment_status: "Pending", toss: 1 },
+        { user_uid: "p6", state: "Playing",    payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+        [ { seating: [
+            { player_uid: "p2", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p6", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+    ];
+
+    let updated = json::parse(
+        &run_event(&t, &json::object! { type: "StartFinals" }, &make_organizer()).unwrap(),
+    )
+    .unwrap();
+
+    // By score the natural top 5 would be {p2, p1, p3, p4, p6}. p4 withdrew (Finished) so it
+    // is excluded and p5 is promoted; p1 is capped (Completed) but still a finalist.
+    let finalists: std::collections::HashSet<&str> = updated["players"]
+        .members()
+        .filter(|p| p["finalist"].as_bool() == Some(true))
+        .filter_map(|p| p["user_uid"].as_str())
+        .collect();
+    assert_eq!(
+        finalists,
+        ["p1", "p2", "p3", "p5", "p6"].into_iter().collect(),
+        "Completed player p1 included; withdrawn p4 excluded and p5 promoted"
+    );
+    // The withdrawn player must not be flagged or pulled into the finals seating.
+    let seated: std::collections::HashSet<&str> = updated["finals"]["seating"]
+        .members()
+        .filter_map(|s| s["player_uid"].as_str())
+        .collect();
+    assert!(!seated.contains("p4"), "withdrawn p4 must not be seated in finals");
+    assert_eq!(seated.len(), 5);
+}
+
 #[test]
 fn test_alter_seating_swap_within_same_table_preserves_results() {
     let tournament = tournament_with_round();

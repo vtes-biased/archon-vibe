@@ -170,6 +170,19 @@
 
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
   const standingsMap = $derived(new Map(standings.map(s => [s.user_uid, s])));
+  const openRounds = $derived((tournament?.max_rounds ?? 0) > 0);
+  // Per-player rounds-played, computed once per render (open rounds: each player has their own count).
+  const roundsPlayedMap = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const round of tournament?.rounds ?? []) {
+      for (const table of round) {
+        for (const seat of table.seating ?? []) {
+          counts.set(seat.player_uid, (counts.get(seat.player_uid) ?? 0) + 1);
+        }
+      }
+    }
+    return counts;
+  });
 
   const sortedPlayers = $derived.by(() => {
     const players = [...(tournament.players ?? [])];
@@ -532,8 +545,18 @@
                 {@const played = standingsMap.has(puid)}
                 {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
                 <span class="text-xs px-2 py-0.5 rounded bg-surface-hover text-ink-faint">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
+              {:else if player.state === "Completed"}
+                <!-- Open rounds: reached per-player cap — done with prelims, awaiting finals. -->
+                <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted" title={m.player_completed_hint()}>{m.player_state_completed()}</span>
               {:else}
                 <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">{translatePlayerState(player.state)}</span>
+              {/if}
+              <!-- Open rounds: show progress toward the per-player cap while in-flight; the badge carries the capped/done state. -->
+              {#if openRounds}
+                {@const rp = roundsPlayedMap.get(puid) ?? 0}
+                {#if rp > 0 && rp < (tournament.max_rounds ?? 0)}
+                  <span class="text-xs text-ink-faint ml-1">{rp}/{tournament.max_rounds} {m.player_rounds_unit()}</span>
+                {/if}
               {/if}
             </div>
           </div>
@@ -753,10 +776,18 @@
                   {@const played = standingsMap.has(puid)}
                   {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
                   <span class="text-xs px-2 py-0.5 rounded bg-surface-hover text-ink-faint">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
+                {:else if player.state === "Completed"}
+                  <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted" title={m.player_completed_hint()}>{m.player_state_completed()}</span>
                 {:else}
                   <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">
                     {translatePlayerState(player.state)}
                   </span>
+                {/if}
+                {#if openRounds}
+                  {@const rp = roundsPlayedMap.get(puid) ?? 0}
+                  {#if rp > 0 && rp < (tournament.max_rounds ?? 0)}
+                    <span class="text-xs text-ink-faint ml-1">{rp}/{tournament.max_rounds} {m.player_rounds_unit()}</span>
+                  {/if}
                 {/if}
               </td>
               {#if isOrganizer}

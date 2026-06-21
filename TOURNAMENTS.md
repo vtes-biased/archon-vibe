@@ -194,6 +194,18 @@ Example: On a 5-player table `[2, 1, 0, 0.5, 1.5]` in seating order:
 - Seat 1 (VP=0, after -1) is ousted → predator (seat 5) gets -1: seat 5 becomes 0.5
 - Remaining: seat 4 (0.5), seat 5 (0.5) — valid timeout
 
+## Open Rounds (per-player cap)
+
+Non-VEKN format, enabled by setting `max_rounds > 0` in config. Not pushed to VEKN.
+
+- **Per-player cap**: each player plays up to `max_rounds` rounds from a shared pool. The tournament continues running new rounds for players who haven't hit their cap. Total rounds started MAY exceed `max_rounds`.
+- **`max_rounds = 0`**: no cap (standard behaviour).
+- **`Completed` state**: when a player reaches their cap, the engine retires them to `Completed` — finals-eligible, done with prelims.
+- **Check-in**: `CheckIn` is refused once a player hits their cap (`err_tournament_player_reached_max_rounds`). `CheckInAll` skips `Completed` players.
+- **Deck locking**: per-player (each player's deck locks when they hit their cap or their last round starts), not tournament-wide.
+- **`StartFinals`**: excludes `Disqualified` and `Finished` (withdrawn) players; promotes the next-ranked qualifier automatically if a top-5 qualifier is in either of those states. `Completed` players are **not** excluded.
+- **Standings**: cumulative GW > VP > TP across all rounds played, same as standard.
+
 ## Sanctions and Standings
 
 Sanctions are a separate object type (see SYNC.md). The tournament-relevant sanction type is `standings_adjustment` (SA).
@@ -220,7 +232,10 @@ Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentC
 - `rounds: Table[][]` — outer index = round, inner = tables in that round; `finals` is a separate field (not a round).
 - `Table` carries `seating: Seat[]`, a derived `state` (`In Progress`/`Finished`/`Invalid`), and an optional `override`.
 - `Score = {gw, vp, tp}` per seat — only `vp` is user-submitted; `gw`/`tp` are engine-computed.
-- Player `state` (`Registered`/`Checked-in`/`Playing`/`Finished`) and `payment_status` (`Pending`/`Paid`/`Refunded`/`Cancelled`); `toss` for finals tie-breaking.
+- Player `state` (`Registered`/`Checked-in`/`Playing`/`Finished`/`Completed`/`Disqualified`) and `payment_status` (`Pending`/`Paid`/`Refunded`/`Cancelled`); `toss` for finals tie-breaking.
+  - `Completed` — reached per-player `max_rounds` cap (Open Rounds only); done with prelims, **finals-eligible**; check-in is refused.
+  - `Finished` — withdrew/dropped/tournament-over; **not** finals-eligible.
+  - `Disqualified` — DQ sanction active; not finals-eligible.
 
 ## API Endpoints
 

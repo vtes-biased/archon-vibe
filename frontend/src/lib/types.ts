@@ -260,7 +260,7 @@ export interface TimerState {
   elapsed_before_pause: number;  // seconds
   paused: boolean;
 }
-export type PlayerState = "Registered" | "Checked-in" | "Playing" | "Finished" | "Disqualified";
+export type PlayerState = "Registered" | "Checked-in" | "Playing" | "Completed" | "Finished" | "Disqualified";
 export type PaymentStatus = "Pending" | "Paid" | "Refunded" | "Cancelled";
 export type TableState = "Finished" | "In Progress" | "Invalid";
 

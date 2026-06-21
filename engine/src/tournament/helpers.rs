@@ -5,10 +5,25 @@ use json::JsonValue;
 use super::types::{ActorContext, TournamentState};
 use crate::error::EngineError;
 
-/// Returns true if a deck at the given index is locked (its round has already started).
-pub(super) fn is_deck_locked(tournament: &JsonValue, deck_index: usize) -> bool {
-    let rounds_played = tournament["rounds"].len();
-    deck_index < rounds_played
+/// Number of rounds in which `user_uid` is seated. Per-player (not tournament-wide):
+/// under open rounds players play different subsets, so this is the player's own round count.
+pub(super) fn count_player_rounds_played(tournament: &JsonValue, user_uid: &str) -> usize {
+    tournament["rounds"]
+        .members()
+        .filter(|round| {
+            round.members().any(|table| {
+                table["seating"]
+                    .members()
+                    .any(|seat| seat["player_uid"].as_str() == Some(user_uid))
+            })
+        })
+        .count()
+}
+
+/// Returns true if a player's deck slot is locked (its round has already started for them).
+/// Indexed per-player: deck slot `i` is the deck for the player's `i`-th round.
+pub(super) fn is_deck_locked(tournament: &JsonValue, user_uid: &str, deck_index: usize) -> bool {
+    deck_index < count_player_rounds_played(tournament, user_uid)
 }
 
 pub(super) fn require_organizer(actor: &ActorContext) -> Result<(), EngineError> {
@@ -86,17 +101,6 @@ pub(super) fn validate_enum(value: &str, valid: &[&str], field: &str) -> Result<
         )));
     }
     Ok(())
-}
-
-pub(super) fn count_completed_rounds(tournament: &JsonValue) -> usize {
-    tournament["rounds"]
-        .members()
-        .filter(|round| {
-            round
-                .members()
-                .all(|t| t["state"].as_str() == Some("Finished"))
-        })
-        .count()
 }
 
 pub(super) fn all_rounds_finished(tournament: &JsonValue) -> bool {

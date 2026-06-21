@@ -58,6 +58,10 @@
 ## Deck Parsing
 - [Deck parser prefix-match trap](deck-parser-prefix-match-trap.md) — try_name_first count-strip + by_name prefix match miscount count-less lines (Channel 10/AK-47/Kpist m/45); group-from-tail (Annabelle G3 vs G6) untested bug; fix = exact-key gating, not krcg regex.
 
+## Formats
+- [Open rounds per-player cap](open-rounds-per-player-cap.md) — max_rounds as per-player cap (computed rounds-played gate); resting-state hazard; UpdateConfig/multideck/is_deck_locked/vekn_push ripple sites.
+- [Completed PlayerState (finalist withdrawal)](completed-player-state-finalist-withdrawal.md) — open-rounds + finalist-withdrawal forces a 6th `Completed` state (cap-done, finals-eligible) vs `Finished` (withdrew, ineligible); StartFinals excludes {Disqualified, Finished}; top5_has_ties must realign to eligible set; full cross-stack ripple.
+
 ## Scoring & Standings
 - compute_final_standings = shared VEKN placement (winner=1, finalists tie 2nd) — see ARCHITECTURE.md (engine modules / League System).
 - [SA penalty single-sourced in Rust](sa-penalty-duplicated-in-python.md) — SA scoring lives only in `engine.compute_rating_vp_gw`; never re-derive in Python.

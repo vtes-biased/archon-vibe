@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Tournament, DeckObject, VtesCard } from "$lib/types";
   import type { PlayerInfoMap } from "$lib/tournament-utils";
+  import { roundsPlayed } from "$lib/tournament-utils";
   import { getDecksByTournamentGrouped } from "$lib/db";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -45,13 +46,14 @@
   const myDecksByRound = $derived(new Map(myDecks.map(d => [d.round ?? 0, d])));
   const isPlayer = $derived(tournament.players?.some(p => p.user_uid === myUid) ?? false);
   const isMultideck = $derived(!!tournament.multideck);
-  const roundCount = $derived(tournament.rounds?.length ?? 0);
   const maxRounds = $derived(tournament.max_rounds ?? 0);
+  // Per-player rounds played (open rounds: each player progresses through the pool independently).
+  const myRoundsPlayed = $derived(roundsPlayed(tournament, myUid));
 
-  // For multideck: how many slots to show (rounds played + 1 for upcoming, capped by max_rounds)
+  // For multideck: how many slots to show (this player's rounds played + 1 upcoming, capped by max_rounds)
   const deckSlotCount = $derived.by(() => {
     if (!isMultideck) return 1;
-    const slots = roundCount + 1;
+    const slots = myRoundsPlayed + 1;
     return maxRounds > 0 ? Math.min(slots, maxRounds) : slots;
   });
 
@@ -89,7 +91,8 @@
   }
 
   function isDeckLocked(index: number): boolean {
-    return index < roundCount;
+    // Per-player (mirrors engine is_deck_locked): slot i locks once this player has played round i.
+    return index < myRoundsPlayed;
   }
 
   function canModifySlot(index: number): boolean {
@@ -118,8 +121,8 @@
     return false;
   });
 
-  // Single-deck: player can edit before first round or after tournament ends
-  const singleDeckEditable = $derived(roundCount === 0 || tournament.state === 'Finished');
+  // Single-deck: player can edit before they've played any round or after the tournament ends
+  const singleDeckEditable = $derived(myRoundsPlayed === 0 || tournament.state === 'Finished');
 
   async function deleteDeck(playerUid: string, deckIndex?: number) {
     try {

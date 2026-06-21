@@ -277,15 +277,17 @@ pub fn compute_rating_vp_gw(
 }
 
 /// Check if top 5 has unbroken ties (players at the cutoff boundary with same scores and no toss differentiation)
-pub(super) fn top5_has_ties(standings: &[Standing]) -> bool {
+/// Takes the *eligible* standings (DQ'd/withdrawn already filtered) so the cutoff tie check
+/// matches the players who actually form the finals — not the raw standings.
+pub(super) fn top5_has_ties(standings: &[&Standing]) -> bool {
     if standings.len() < 5 {
         return false;
     }
     // Check all pairs in top 5 for ties not broken by toss
     for i in 0..5 {
         for j in (i + 1)..5 {
-            let a = &standings[i];
-            let b = &standings[j];
+            let a = standings[i];
+            let b = standings[j];
             if a.gw == b.gw && a.vp == b.vp && a.tp == b.tp && a.toss == b.toss {
                 return true;
             }
@@ -293,8 +295,8 @@ pub(super) fn top5_has_ties(standings: &[Standing]) -> bool {
     }
     // Also check if #5 ties with #6+
     if standings.len() > 5 {
-        let fifth = &standings[4];
-        for s in &standings[5..] {
+        let fifth = standings[4];
+        for &s in &standings[5..] {
             if s.gw == fifth.gw && s.vp == fifth.vp && s.tp == fifth.tp && s.toss == fifth.toss {
                 return true;
             }

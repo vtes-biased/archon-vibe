@@ -76,7 +76,7 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.only_last_round_cancellable': () => m.err_tournament_only_last_round_cancellable(),
   'tournament.tables_not_finished': (p) => m.err_tournament_tables_not_finished({ tables: p.tables ?? '' }),
   'tournament.prelim_after_finals': () => m.err_tournament_prelim_after_finals(),
-  'tournament.max_rounds_reached': () => m.err_tournament_max_rounds_reached(),
+  'tournament.player_reached_max_rounds': () => m.err_tournament_player_reached_max_rounds(),
   'tournament.not_enough_players': () => m.err_tournament_not_enough_players(),
   'tournament.invalid_table_size': (p) => m.err_tournament_invalid_table_size({ size: p.size ?? '' }),
   'tournament.player_not_in_subset': (p) => m.err_tournament_player_not_in_subset({ player: p.player ?? '' }),

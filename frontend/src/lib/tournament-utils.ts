@@ -247,9 +247,18 @@ export function translatePlayerState(state: string): string {
     case "Registered": return m.player_state_registered();
     case "Checked-in": return m.player_state_checked_in();
     case "Playing": return m.state_playing();
+    case "Completed": return m.player_state_completed();
     case "Finished": return m.state_finished();
     default: return state;
   }
+}
+
+/** Number of rounds in which a player is seated — the per-player count for open-rounds caps.
+ *  Mirrors the engine's count_player_rounds_played (seating is the single source of truth). */
+export function roundsPlayed(tournament: Tournament, uid: string): number {
+  return (tournament.rounds ?? []).filter(
+    (round) => round.some((table) => table.seating?.some((seat) => seat.player_uid === uid)),
+  ).length;
 }
 
 export function translateStandingsMode(mode: string | undefined): string {

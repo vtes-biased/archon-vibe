@@ -472,6 +472,7 @@ class PlayerState(StrEnum):
     REGISTERED = "Registered"
     CHECKED_IN = "Checked-in"
     PLAYING = "Playing"
+    COMPLETED = "Completed"  # open rounds: reached per-player cap; done with prelims, finals-eligible
     FINISHED = "Finished"
     DISQUALIFIED = "Disqualified"
 
