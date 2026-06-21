@@ -12,6 +12,7 @@
   import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff, Trash2 } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
+  import RaffleSection from "./RaffleSection.svelte";
   import Button from "$lib/components/Button.svelte";
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import { sponsorVeknMember, createUser, isOnline } from "$lib/api";
@@ -65,6 +66,7 @@
 
   let editingToss = $state(false);
   let tossEdits = $state<Record<string, string>>({});
+  let raffleExpanded = $state(false);
   // svelte-ignore state_referenced_locally — intentionally captures initial value
   let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
   let standingsInitialized = false;
@@ -426,6 +428,28 @@
         {#if top5HasTiesFn(standings)}
           <span class="text-xs text-ink-faint">{m.players_toss_hint()}</span>
         {/if}
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Raffle (re-homed from the former Overview tab) -->
+  {#if isOrganizer && (tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished")}
+    <div class="bg-surface-muted/30 rounded-lg p-4">
+      <button onclick={() => raffleExpanded = !raffleExpanded}
+        class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
+        {#if raffleExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+        {m.raffle_title()}
+      </button>
+      {#if raffleExpanded}
+        <div class="mt-3">
+          <RaffleSection
+            {tournament}
+            {playerInfo}
+            isOrganizer={true}
+            {doAction}
+            {actionLoading}
+          />
+        </div>
       {/if}
     </div>
   {/if}

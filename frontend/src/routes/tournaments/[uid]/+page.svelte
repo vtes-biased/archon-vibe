@@ -13,7 +13,7 @@
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, LayoutDashboard, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2, Trash2 } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2, Trash2, Upload } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
@@ -23,7 +23,8 @@
   // Deck validation state for player's own deck
   let myDeckErrors = $state<ValidationError[]>([]);
 
-  import OverviewTab from "./OverviewTab.svelte";
+  import FinishedResults from "./FinishedResults.svelte";
+  import ArchonImportModal from "./ArchonImportModal.svelte";
   import PlayersTab from "./PlayersTab.svelte";
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
@@ -127,12 +128,13 @@ import TournamentModals from "./TournamentModals.svelte";
   });
 
   // Tab state
-  type TabId = 'overview' | 'players' | 'rounds' | 'finals' | 'config';
-  let activeTab = $state<TabId>('overview');
+  type TabId = 'players' | 'rounds' | 'finals' | 'config';
+  let activeTab = $state<TabId>('players');
+  // Archon import modal (organizer; opened from the action-bar More menu)
+  let showArchonImport = $state(false);
 
   const tabs = $derived.by(() => {
-    const t: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
-      { id: 'overview', label: m.tournament_tab_overview(), icon: LayoutDashboard },
+    const t: { id: TabId; label: string; icon: typeof Users }[] = [
       { id: 'players', label: m.tournament_tab_players(), icon: Users },
       { id: 'rounds', label: m.tournament_tab_rounds(), icon: Swords },
     ];
@@ -277,6 +279,9 @@ import TournamentModals from "./TournamentModals.svelte";
   );
   const hasParallelRounds = $derived(inProgressRoundCount > 1);
   const playingCount = $derived(tournament?.players?.filter(p => p.state === "Playing").length ?? 0);
+
+  // Archon import lives in the action-bar More menu across every organizer state.
+  const archonImportItem = $derived({ label: m.archon_import_title(), icon: Upload, onclick: () => (showArchonImport = true) });
 
   // Player DQ state and sanctions helpers for standings display
   function isPlayerDQ(userUid: string): boolean {
@@ -767,12 +772,14 @@ import TournamentModals from "./TournamentModals.svelte";
             <div class="flex flex-wrap items-center gap-2">
               {#if tournament.state === "Planned"}
                 <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("OpenRegistration")}>{m.overview_open_registration()}</Button>
+                <ActionMenu label={m.common_more()} items={[archonImportItem]} />
 
               {:else if tournament.state === "Registration"}
                 <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("CloseRegistration")}>{m.overview_close_registration()}</Button>
                 <ActionMenu label={m.common_more()} items={[
                   ...(qrCheckin ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
                   { label: m.overview_back_to_planning(), icon: Undo2, onclick: () => doAction("CancelRegistration"), disabled: actionLoading },
+                  archonImportItem,
                 ]} />
 
               {:else if tournament.state === "Waiting"}
@@ -800,6 +807,7 @@ import TournamentModals from "./TournamentModals.svelte";
                   ...(hasRounds && !tournament.online ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
                   ...(qrCheckin && hasRounds ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
                   { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
+                  archonImportItem,
                 ]} />
 
               {:else if tournament.state === "Playing"}
@@ -817,11 +825,23 @@ import TournamentModals from "./TournamentModals.svelte";
                   {@const canStartNext = (checkedInCount + playingCount) >= 4 && (maxRounds === 0 || (tournament.rounds?.length ?? 0) < maxRounds)}
                   <Button variant="primary" size="lg" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
                 {/if}
-
-              {:else if tournament.state === "Finished"}
-                <Button variant="ghost" size="md" disabled={actionLoading} onclick={() => doAction("ReopenTournament")}>{m.overview_reopen_tournament()}</Button>
+                <ActionMenu label={m.common_more()} items={[archonImportItem]} />
               {/if}
             </div>
+
+            <!-- Finished results: winner + share/export + reopen (re-homed from the former Overview tab).
+                 Archon import only when there are no standings (an empty finished shell to migrate into). -->
+            {#if tournament.state === "Finished"}
+              <FinishedResults
+                {tournament}
+                {playerInfo}
+                {standings}
+                winnerHasDeck={!!(tournament.winner && decksByUser[tournament.winner]?.length)}
+                {doAction}
+                {actionLoading}
+                onImportArchon={() => (showArchonImport = true)}
+              />
+            {/if}
 
             <!-- Check-in hints (Waiting state) -->
             {#if tournament.state === "Waiting"}
@@ -856,17 +876,7 @@ import TournamentModals from "./TournamentModals.svelte";
 
           <!-- Tab content -->
           <div class="p-3 sm:p-6">
-            {#if activeTab === 'overview'}
-              <OverviewTab
-                bind:tournament={tournament}
-                {playerInfo}
-                {standings}
-                isOrganizer={true}
-                winnerHasDeck={!!(tournament.winner && decksByUser[tournament.winner]?.length)}
-                {doAction}
-                {actionLoading}
-              />
-            {:else if activeTab === 'players'}
+            {#if activeTab === 'players'}
               <PlayersTab
                 {tournament}
                 {playerInfo}
@@ -952,3 +962,5 @@ import TournamentModals from "./TournamentModals.svelte";
   onForceTakeover={handleForceTakeover}
   onForceUnlock={handleForceUnlock}
 />
+
+<ArchonImportModal bind:show={showArchonImport} tournamentUid={uid} {hasRounds} />

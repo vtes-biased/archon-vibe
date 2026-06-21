@@ -2,8 +2,11 @@
   import { toUserMessage } from '$lib/errors';
   import type { Tournament } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
+  import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
-  import { RefreshCw } from "@lucide/svelte";
+  import OrganizerManager from "$lib/components/OrganizerManager.svelte";
+  import TableRoomsEditor from "./TableRoomsEditor.svelte";
+  import { RefreshCw, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const DISCORD_VENUE = "Official Discord";
@@ -19,6 +22,10 @@
 
   let saving = $state(false);
   let error = $state<string | null>(null);
+
+  // Re-homed setup sections (foldable, collapsed by default)
+  let organizersExpanded = $state(false);
+  let roomsExpanded = $state(false);
 
   // Stash location fields when toggling online mode, so we can restore on toggle-back
   let stashedPhysical = $state<{ country: string; venue: string; venue_url: string; address: string; map_url: string } | null>(null);
@@ -211,5 +218,41 @@
         {m.config_saving()}
       </div>
     {/if}
+
+    <!-- Setup: organizers + table rooms (re-homed from the former Overview tab) -->
+    <div class="pt-4 border-t border-line space-y-3">
+      <div class="bg-surface-muted/30 rounded-lg p-4">
+        <button onclick={() => organizersExpanded = !organizersExpanded}
+          class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
+          {#if organizersExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+          {m.organizers_title()}
+        </button>
+        {#if organizersExpanded}
+          <div class="mt-3">
+            <OrganizerManager
+              organizerUids={tournament.organizers_uids ?? []}
+              onadd={async (userUid) => { await addTournamentOrganizer(tournament.uid, userUid); }}
+              onremove={async (userUid) => { await removeTournamentOrganizer(tournament.uid, userUid); }}
+            />
+          </div>
+        {/if}
+      </div>
+      <div class="bg-surface-muted/30 rounded-lg p-4">
+        <button onclick={() => roomsExpanded = !roomsExpanded}
+          class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
+          {#if roomsExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+          {m.rooms_title()}
+        </button>
+        {#if roomsExpanded}
+          <div class="mt-3">
+            <TableRoomsEditor
+              tournamentUid={tournament.uid}
+              tableRooms={tournament.table_rooms ?? []}
+              onupdate={(t) => { tournament = t; }}
+            />
+          </div>
+        {/if}
+      </div>
+    </div>
   {/if}
 </div>

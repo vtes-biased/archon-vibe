@@ -262,7 +262,7 @@ Import legacy Archon Excel results: `GET /api/tournaments/archon-template` (blan
 ## Tournament Reports & Social Sharing
 
 - **Reports**: `GET /api/tournaments/{uid}/report` (organizer-only) — Text (standings + results) or JSON (full data).
-- **Social sharing**: canvas-rendered PNG (`social-card.ts`) + plain text with deck info (`social-text.ts`); Share button on `OverviewTab.svelte` for finished tournaments.
+- **Social sharing**: canvas-rendered PNG (`social-card.ts`) + plain text with deck info (`social-text.ts`); Share buttons on `FinishedResults.svelte` (organizer action bar) for finished tournaments.
 
 ## User Account Surgery
 
