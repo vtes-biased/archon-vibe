@@ -491,6 +491,33 @@ if os.getenv("ENVIRONMENT", "development") == "development":
         expose_headers=["X-Access-Version"],
     )
 
+    @app.exception_handler(Exception)
+    async def cors_aware_500_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Dev-only: Starlette forces ServerErrorMiddleware outermost — *outside*
+        CORSMiddleware — so an unhandled 500 ships without Access-Control-Allow-Origin.
+        The cross-origin dev frontend (:5173→:8000) then sees a blocked response /
+        fetch TypeError and mislabels the real server error as a network failure.
+        An Exception handler is installed *on* ServerErrorMiddleware, so it runs
+        outermost: re-attach CORS headers here. ServerErrorMiddleware still re-raises
+        after we respond, so uvicorn's traceback logging is preserved. Prod is
+        same-origin via nginx and never enters this block."""
+        origin = request.headers.get("origin")
+        headers = (
+            {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Vary": "Origin",
+            }
+            if origin
+            else {}
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error"},
+            headers=headers,
+        )
+
+
 # Include routers
 app.include_router(auth.router)
 app.include_router(users.router)
