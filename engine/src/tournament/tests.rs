@@ -1080,6 +1080,84 @@ fn test_open_rounds_caps_player_and_blocks_recheckin() {
     assert!(matches!(err, EngineError::PlayerReachedMaxRounds));
 }
 
+// Open rounds: CheckInAll must not re-arm a player who already reached their cap, even when they
+// sit in a re-armable state (e.g. Registered after a reopen) rather than Completed.
+#[test]
+fn test_check_in_all_skips_capped_players() {
+    let mut t = make_tournament();
+    t["max_rounds"] = 1.into();
+    t["state"] = "Waiting".into();
+    // p1 already played its one allowed round (seated in round 0) but sits in Registered; p2 has
+    // played nothing. CheckInAll must re-arm p2 but leave the capped p1 alone.
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Registered", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+    ];
+
+    let updated = json::parse(
+        &run_event(&t, &json::object! { type: "CheckInAll" }, &make_organizer()).unwrap(),
+    )
+    .unwrap();
+    let state_of = |uid: &str| {
+        updated["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .and_then(|p| p["state"].as_str())
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(state_of("p1"), "Registered", "capped player not re-armed by CheckInAll");
+    assert_eq!(state_of("p2"), "Checked-in", "uncapped player checked in");
+}
+
+// Open rounds: CheckIn reinstates a drop-out (Finished) to the right active state by cap — under
+// cap → Checked-in (can still play), at cap → Completed (finals-eligible, not a new round).
+#[test]
+fn test_check_in_reinstates_dropout_by_cap() {
+    let mut t = make_tournament();
+    t["max_rounds"] = 2.into();
+    t["state"] = "Waiting".into();
+    // p1 played both rounds (at cap), p2 played one (under cap); both then dropped out (Finished).
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Finished", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+    ];
+
+    let org = make_organizer();
+    let r1 = json::parse(
+        &run_event(&t, &json::object! { type: "CheckIn", player_uid: "p1" }, &org).unwrap(),
+    )
+    .unwrap();
+    let r2 = json::parse(
+        &run_event(&r1, &json::object! { type: "CheckIn", player_uid: "p2" }, &org).unwrap(),
+    )
+    .unwrap();
+    let state_of = |t: &JsonValue, uid: &str| {
+        t["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .and_then(|p| p["state"].as_str())
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(state_of(&r2, "p1"), "Completed", "capped drop-out reinstated to Completed");
+    assert_eq!(state_of(&r2, "p2"), "Checked-in", "under-cap drop-out reinstated to Checked-in");
+}
+
 // #272 / open rounds: StartFinals selects the top-5 *eligible* players. A capped player
 // resting in `Completed` is still a finalist; a withdrawn player in `Finished` is excluded
 // from the cutoff and the next-ranked qualifier is promoted into the finals. Asserting the

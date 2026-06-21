@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints, type ValidationError } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload, ExternalLink } from "@lucide/svelte";
@@ -79,6 +79,12 @@
   });
 
   const myStanding = $derived(standings.find(s => s.user_uid === userUid));
+  // Open rounds: this player has reached their per-player round cap. Gate self-check-in on the
+  // rounds-played count (not the player state), so a capped player can't self-check-in regardless
+  // of whether they rest in Completed, Finished, or Registered.
+  const atCap = $derived(
+    (tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, userUid) >= (tournament.max_rounds ?? 0),
+  );
 
   // Deck check-in CTA: distinguish "no deck" from "deck present but invalid",
   // and surface the blocking validation errors inline so the player can act
@@ -91,6 +97,7 @@
     !!currentPlayerEntry &&
     (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished") &&
     tournament.state === "Waiting" &&
+    !atCap &&
     !playerHasValidDeck
   );
   function scrollToDeck() {
@@ -260,7 +267,7 @@
           ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
           : translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
-      {#if !tournament.online && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
+      {#if !tournament.online && !atCap && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = !showQrScanner}
@@ -269,7 +276,7 @@
           <QrCode class="w-4 h-4" />
           {m.checkin_qr_scan_btn()}
         </Button>
-      {:else if !tournament.online && currentPlayerEntry.state === "Finished" && tournament.state === "Waiting" && playerHasValidDeck}
+      {:else if !tournament.online && !atCap && currentPlayerEntry.state === "Finished" && tournament.state === "Waiting" && playerHasValidDeck}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = true}
@@ -288,13 +295,17 @@
     </div>
     <!-- Online check-in is server-side (bot self-serve or organizer): give the
          player the join link + a status line in place of the dead QR scanner. -->
-    {#if tournament.online && tournament.state === "Waiting" && playerHasValidDeck && (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished")}
+    {#if tournament.online && !atCap && tournament.state === "Waiting" && playerHasValidDeck && (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished")}
       <div class="mb-3 space-y-2">
         {@render onlineJoin()}
         <p class="text-sm text-ink-muted">
           {currentPlayerEntry.state === "Finished" ? m.tournament_online_recheckin() : m.tournament_online_checkin_status()}
         </p>
       </div>
+    {/if}
+    <!-- Open rounds: capped player gets no check-in CTA — tell them they're done and finals-eligible. -->
+    {#if atCap && tournament.state === "Waiting"}
+      <p class="text-sm text-ink-muted mb-3">{m.player_completed_awaiting_finals()}</p>
     {/if}
     {#if needsDeckCta}
       <div class="mb-3">{@render deckCta()}</div>

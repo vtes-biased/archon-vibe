@@ -594,7 +594,11 @@
                   {:else}<FileX class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_no_deck()}</span>{/if}
                 </button>
               {/if}
-              {#if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
+              {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
+                <!-- Open rounds: at cap and not dropped — no check-in, show their played count. -->
+                <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+              {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
+                <!-- Finished = dropped out: CheckIn reinstates (Checked-in under cap, Completed at cap). -->
                 <Button variant="ghost" size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
               {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
                 <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
@@ -814,7 +818,9 @@
               {/if}
               {#if isOrganizer}
                 <td class="py-1.5 text-right whitespace-nowrap">
-                  {#if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
+                  {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
+                    <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+                  {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
                     <Button variant="ghost" size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
                   {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
                     <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>

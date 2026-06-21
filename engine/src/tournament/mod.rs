@@ -503,10 +503,19 @@ fn apply_event(
                 return Err(EngineError::PlayerSuspended);
             }
 
-            // Open rounds: refuse check-in once the player reached their per-player round cap.
+            // Open rounds: a player at their per-player cap can't check in for a new round — but a
+            // capped DROP-OUT being reinstated returns to Completed (finals-eligible), not rejected.
+            let was_finished = tournament["players"][idx]["state"].as_str() == Some("Finished");
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
-            if max_rounds > 0 && count_player_rounds_played(tournament, player_uid) >= max_rounds {
+            let at_cap =
+                max_rounds > 0 && count_player_rounds_played(tournament, player_uid) >= max_rounds;
+            if at_cap && !was_finished {
                 return Err(EngineError::PlayerReachedMaxRounds);
+            }
+            if at_cap {
+                // Reinstating a capped drop-out: done with prelims, finals-eligible, no new round.
+                tournament["players"][idx]["state"] = "Completed".into();
+                return Ok(());
             }
 
             // Check for missing decklist when required (uses decks parameter)
@@ -547,6 +556,19 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
 
+            // Open rounds: never re-arm a player who already reached their per-player cap
+            // (they normally rest in Completed, but Registered/Finished-at-cap can arise after
+            // a reopen or a post-cap drop-out). Compute the capped set before the mutable borrow.
+            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let capped: std::collections::HashSet<String> = if max_rounds > 0 {
+                tournament["players"]
+                    .members()
+                    .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                    .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
+                    .collect()
+            } else {
+                std::collections::HashSet::new()
+            };
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 let ps = players[i]["state"].as_str().unwrap_or("");
@@ -555,6 +577,9 @@ fn apply_event(
                 }
                 let uid = players[i]["user_uid"].as_str().unwrap_or("");
                 if has_dq_sanction(sanctions, uid) || has_active_suspension(sanctions, uid) {
+                    continue;
+                }
+                if capped.contains(uid) {
                     continue;
                 }
                 if ps == "Registered" || (state == TournamentState::Finished && ps == "Finished") {
