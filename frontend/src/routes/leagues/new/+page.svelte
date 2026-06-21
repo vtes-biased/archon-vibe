@@ -82,7 +82,7 @@
       <a href="/leagues" class="text-ink-muted hover:text-ink-strong">
         <ArrowLeft class="w-5 h-5" />
       </a>
-      <h1 class="text-3xl font-light text-accent">{m.league_new_title()}</h1>
+      <h1 class="text-3xl font-semibold text-accent">{m.league_new_title()}</h1>
     </div>
 
     {#if !canCreate}

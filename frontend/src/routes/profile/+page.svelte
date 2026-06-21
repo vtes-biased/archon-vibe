@@ -163,7 +163,7 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-2xl mx-auto">
-    <h1 class="text-3xl font-light text-accent mb-6">{m.nav_profile()}</h1>
+    <h1 class="text-3xl font-semibold text-accent mb-6">{m.nav_profile()}</h1>
 
     {#if auth.isLoading}
       <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">

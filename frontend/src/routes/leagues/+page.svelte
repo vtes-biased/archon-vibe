@@ -116,7 +116,7 @@
   <div class="max-w-6xl mx-auto">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-light text-accent">{m.leagues_title()}</h1>
+      <h1 class="text-3xl font-semibold text-accent">{m.leagues_title()}</h1>
 
       {#if canCreate}
         <a

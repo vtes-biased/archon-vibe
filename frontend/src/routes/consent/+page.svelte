@@ -172,7 +172,7 @@
 <div class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-6">
-      <h1 class="text-2xl font-light text-accent">Archon</h1>
+      <h1 class="text-2xl font-semibold text-accent">Archon</h1>
       <p class="text-ink-muted text-sm">{m.oauth_subtitle()}</p>
     </div>
 

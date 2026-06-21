@@ -126,6 +126,32 @@ Every colour role is a single `--color-<role>: light-dark(LIGHT, DARK)` entry in
 
 **Store**: `$lib/stores/theme.svelte.ts` — `cycleTheme()`, `getTheme()`, `initTheme()`.
 
+## Typography
+
+Hierarchy is carried by **weight contrast**, not just size — the venue is a phone in
+low light or bright sun on a dark theme, where thin strokes are fatiguing. Titles are
+**semibold**; the lightest weight is reserved for **large display only** (the `text-4xl`
+"Archon" wordmark). A semibold `text-3xl` title sits clearly above a `font-medium` section
+head; a thin one did not (size said "title", weight said "caption").
+
+| Role | Size | Weight | Colour |
+|------|------|--------|--------|
+| Display / wordmark | `text-4xl` | `font-light` | `text-accent` — the **only** sanctioned `font-light`; ≥`text-4xl` only |
+| Page title (`h1`) | `text-3xl` (`text-2xl` on tight cards) | `font-semibold` | `text-accent` (or `text-ink-strong` on a coloured surface) |
+| Section (`h2`) | `text-xl` | `font-medium` | `text-ink-strong` / `text-link` |
+| Subsection (`h3`) | `text-lg` / `text-sm` | `font-medium`–`font-semibold` | `text-ink-strong` |
+| Eyebrow / label | `text-sm` | `font-medium uppercase tracking-wide` | `text-ink-muted` |
+| Body | `text-base` / `text-sm` | `font-normal` | `text-ink` |
+| Secondary / meta | `text-sm` / `text-xs` | `font-normal` | `text-ink-muted` |
+
+**Rules:**
+- Never `font-light` below `text-4xl` (display only). Page titles are `font-semibold`, so
+  they outrank the `font-medium` heads beneath them by weight as well as size.
+- `text-accent` (crimson) as **text** is AA only at large sizes (`text-xl`+). The ladder
+  uses it for the display wordmark and `text-3xl` titles only; for `text-sm`/`text-xs`
+  headings use `text-ink-strong`, or `text-link` (`#EC6B84` dark) for accent text — never
+  `text-accent`.
+
 ## Country Display
 
 Show country flag emoji with country name. Use `getCountryFlag(isoCode)` from `lib/geonames.ts`.

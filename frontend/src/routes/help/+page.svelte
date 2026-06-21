@@ -25,7 +25,7 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-4xl mx-auto">
-    <h1 class="text-3xl font-light text-accent mb-8">{m.help_page_title()}</h1>
+    <h1 class="text-3xl font-semibold text-accent mb-8">{m.help_page_title()}</h1>
 
     <!-- Reference Documents -->
     <section class="mb-8">

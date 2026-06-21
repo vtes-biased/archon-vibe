@@ -291,7 +291,7 @@
             <ArrowLeft class="w-5 h-5" />
           </a>
           <div>
-            <h1 class="text-3xl font-light text-accent">{league.name}</h1>
+            <h1 class="text-3xl font-semibold text-accent">{league.name}</h1>
             <div class="flex gap-2 mt-1 text-sm text-ink-muted">
               <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">
                 {isActive() ? m.league_status_active() : m.league_status_finished()}

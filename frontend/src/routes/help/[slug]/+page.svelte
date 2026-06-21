@@ -95,7 +95,7 @@
       </a>
 
       <!-- Title -->
-      <h1 class="text-3xl font-light text-accent mb-6">{doc.title}</h1>
+      <h1 class="text-3xl font-semibold text-accent mb-6">{doc.title}</h1>
 
       <!-- Layout: TOC sidebar + content -->
       <div class="flex gap-8">

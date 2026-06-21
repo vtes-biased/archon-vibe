@@ -303,7 +303,7 @@
     <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center justify-between mb-4">
-        <h1 class="text-3xl font-light text-accent">{m.nav_users()}</h1>
+        <h1 class="text-3xl font-semibold text-accent">{m.nav_users()}</h1>
 
         <div class="flex items-center gap-3">
           <Button

@@ -108,7 +108,7 @@
       <a href="/tournaments" class="text-ink-muted hover:text-ink-bright">
         <ArrowLeft class="w-5 h-5" />
       </a>
-      <h1 class="text-3xl font-light text-accent">{m.tournament_new_title()}</h1>
+      <h1 class="text-3xl font-semibold text-accent">{m.tournament_new_title()}</h1>
     </div>
 
     {#if !canCreate}

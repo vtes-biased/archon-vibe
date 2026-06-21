@@ -20,7 +20,7 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-light text-accent mb-6">{m.nav_community()}</h1>
+    <h1 class="text-3xl font-semibold text-accent mb-6">{m.nav_community()}</h1>
 
     <!-- Tab Toggle -->
     <div class="flex mb-6 bg-surface-card rounded-lg border border-line p-1 w-fit">
