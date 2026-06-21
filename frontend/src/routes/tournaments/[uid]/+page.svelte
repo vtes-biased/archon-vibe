@@ -815,6 +815,8 @@ import TournamentModals from "./TournamentModals.svelte";
               {:else if tournament.state === "Playing"}
                 {#if isFinals}
                   <Button variant="primary" size="lg" disabled={actionLoading || !finalsTableFinished} onclick={() => doAction("FinishFinals")}>{m.finals_finish()}</Button>
+                  <!-- Revert finals seating (e.g. a finalist no-showed): back to Waiting to drop them and re-seat. -->
+                  <Button variant="ghost" size="md" disabled={actionLoading} onclick={() => doAction("CancelFinals")}><Undo2 class="w-4 h-4" aria-hidden="true" />{m.finals_cancel()}</Button>
                 {:else if !hasParallelRounds}
                   <Button variant="primary" size="lg" disabled={actionLoading || !allTablesFinished} onclick={() => doAction("FinishRound", { round: activeRoundIdx })}>{m.rounds_end_round()}</Button>
                   {#if tournament.online}

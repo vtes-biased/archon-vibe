@@ -697,6 +697,7 @@
   "finals_not_started": "Las finales no han comenzado todavía. Inicie las finales desde la pestaña Resumen.",
   "finals_title": "Finales",
   "finals_finish": "Finalizar finales",
+  "finals_cancel": "Cancelar finales",
   "finals_finish_hint_not_ready": "La mesa de finales debe estar finalizada primero",
   "finals_finish_hint_ready": "Finalizar finales y determinar ganador",
   "finals_table": "Mesa de finales",

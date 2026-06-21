@@ -125,6 +125,7 @@ export type TournamentEventType =
   | 'RandomToss'
   | 'StartFinals'
   | 'FinishFinals'
+  | 'CancelFinals'
   | 'RaffleDraw'
   | 'RaffleUndo'
   | 'RaffleClear'

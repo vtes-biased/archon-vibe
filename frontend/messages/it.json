@@ -697,6 +697,7 @@
   "finals_not_started": "Le finali non sono ancora iniziate. Inizia le finali dalla scheda Panoramica.",
   "finals_title": "Finali",
   "finals_finish": "Concludi Finali",
+  "finals_cancel": "Annulla Finali",
   "finals_finish_hint_not_ready": "Il tavolo finale deve essere prima Concluso",
   "finals_finish_hint_ready": "Concludi le finali e determina il vincitore",
   "finals_table": "Tavolo Finale",

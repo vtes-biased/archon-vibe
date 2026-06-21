@@ -201,6 +201,7 @@ pub enum TournamentEvent {
     RandomToss,
     StartFinals,
     FinishFinals,
+    CancelFinals,
 
     // Seating alteration (batch)
     AlterSeating {

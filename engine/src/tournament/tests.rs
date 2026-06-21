@@ -1142,6 +1142,77 @@ fn test_start_finals_includes_completed_excludes_withdrawn() {
     assert_eq!(seated.len(), 5);
 }
 
+// Open rounds: CancelFinals reverts a seated finals back to Waiting so a no-show finalist can be
+// dropped and the field re-seated. Capped finalists must return to Completed (not Checked-in) so
+// they aren't re-armed for another preliminary round.
+#[test]
+fn test_cancel_finals_reverts_finalists_by_cap() {
+    let mut t = make_tournament();
+    t["max_rounds"] = 2.into(); // p1..p4 play both rounds (at cap); p5/p6 play one (under cap)
+    t["state"] = "Waiting".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Completed",  payment_status: "Pending", toss: 5, finalist: false },
+        { user_uid: "p2", state: "Completed",  payment_status: "Pending", toss: 4, finalist: false },
+        { user_uid: "p3", state: "Completed",  payment_status: "Pending", toss: 3, finalist: false },
+        { user_uid: "p4", state: "Finished",   payment_status: "Pending", toss: 2, finalist: false },
+        { user_uid: "p5", state: "Checked-in", payment_status: "Pending", toss: 1, finalist: false },
+        { user_uid: "p6", state: "Checked-in", payment_status: "Pending", toss: 0, finalist: false },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+        [ { seating: [
+            { player_uid: "p2", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p6", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+    ];
+
+    let org = make_organizer();
+    let seated =
+        json::parse(&run_event(&t, &json::object! { type: "StartFinals" }, &org).unwrap()).unwrap();
+    assert_eq!(seated["state"].as_str(), Some("Playing"));
+    assert!(!seated["finals"].is_null());
+
+    let reverted =
+        json::parse(&run_event(&seated, &json::object! { type: "CancelFinals" }, &org).unwrap())
+            .unwrap();
+    assert_eq!(reverted["state"].as_str(), Some("Waiting"));
+    assert!(reverted["finals"].is_null(), "finals object cleared");
+
+    let state_of = |uid: &str| {
+        reverted["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .and_then(|p| p["state"].as_str())
+            .unwrap()
+            .to_string()
+    };
+    let finalist_of = |uid: &str| {
+        reverted["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .map(|p| p["finalist"].as_bool().unwrap_or(false))
+            .unwrap()
+    };
+    for uid in ["p1", "p2", "p3", "p5", "p6"] {
+        assert!(!finalist_of(uid), "{uid} finalist flag cleared");
+    }
+    // Capped finalists (played both rounds) → Completed; under-cap (one round) → Checked-in.
+    assert_eq!(state_of("p1"), "Completed");
+    assert_eq!(state_of("p2"), "Completed");
+    assert_eq!(state_of("p3"), "Completed");
+    assert_eq!(state_of("p5"), "Checked-in");
+    assert_eq!(state_of("p6"), "Checked-in");
+}
+
 #[test]
 fn test_alter_seating_swap_within_same_table_preserves_results() {
     let tournament = tournament_with_round();

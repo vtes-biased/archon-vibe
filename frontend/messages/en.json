@@ -709,6 +709,7 @@
   "finals_not_started": "Finals have not started yet. Start finals from the Overview tab.",
   "finals_title": "Finals",
   "finals_finish": "Finish Finals",
+  "finals_cancel": "Cancel finals",
   "finals_finish_hint_not_ready": "Finals table must be Finished first",
   "finals_finish_hint_ready": "Finish finals and determine winner",
   "finals_table": "Finals Table",

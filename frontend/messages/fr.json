@@ -697,6 +697,7 @@
   "finals_not_started": "La finale n'a pas encore commencé. Démarrez la finale depuis l'onglet Aperçu.",
   "finals_title": "Finale",
   "finals_finish": "Terminer la finale",
+  "finals_cancel": "Annuler la finale",
   "finals_finish_hint_not_ready": "La table de finale doit être terminée d'abord",
   "finals_finish_hint_ready": "Terminer la finale et déterminer le vainqueur",
   "finals_table": "Table de finale",

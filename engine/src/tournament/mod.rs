@@ -1749,6 +1749,49 @@ fn apply_event(
             Ok(())
         }
 
+        TournamentEvent::CancelFinals => {
+            // Revert a seated (not-yet-finalized) finals back to Waiting so the organizer can
+            // drop a no-show finalist and re-run StartFinals (which then promotes the next
+            // qualifier). Only valid while finals are in progress, not after FinishFinals.
+            require_organizer(actor)?;
+            require_state(state, TournamentState::Playing)?;
+            if tournament["finals"].is_null() {
+                return Err(EngineError::NoFinalsInProgress);
+            }
+
+            // Capped (open-rounds) finalists return to Completed; the rest to Checked-in. Compute
+            // the capped set before the mutable borrow.
+            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let capped: std::collections::HashSet<String> = if max_rounds > 0 {
+                tournament["players"]
+                    .members()
+                    .filter(|p| p["finalist"].as_bool().unwrap_or(false))
+                    .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                    .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
+                    .collect()
+            } else {
+                std::collections::HashSet::new()
+            };
+            let players = &mut tournament["players"];
+            for i in 0..players.len() {
+                if players[i]["finalist"].as_bool().unwrap_or(false) {
+                    let uid = players[i]["user_uid"].as_str().unwrap_or("").to_string();
+                    players[i]["finalist"] = false.into();
+                    players[i]["state"] = if capped.contains(&uid) {
+                        "Completed"
+                    } else {
+                        "Checked-in"
+                    }
+                    .into();
+                }
+            }
+
+            tournament["finals"] = json::Null;
+            tournament["state"] = "Waiting".into();
+            update_standings(tournament, sanctions);
+            Ok(())
+        }
+
         TournamentEvent::FinishTournament => {
             require_organizer(actor)?;
             if state != TournamentState::Waiting

@@ -1019,7 +1019,7 @@ async def tournament_action(
             if in_progress <= 1:
                 updated.timer = TimerState()  # Fresh paused timer
                 updated.table_extra_time = {}
-        elif request.type in ("FinishRound", "CancelRound", "FinishTournament"):
+        elif request.type in ("FinishRound", "CancelRound", "FinishTournament", "CancelFinals"):
             # Only reset timer if tournament left Playing state (all rounds done)
             if updated.state != "Playing":
                 if not updated.timer.paused and updated.timer.started_at:

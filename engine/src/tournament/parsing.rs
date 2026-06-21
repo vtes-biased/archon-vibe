@@ -189,6 +189,7 @@ impl TournamentEvent {
             "RandomToss" => Ok(Self::RandomToss),
             "StartFinals" => Ok(Self::StartFinals),
             "FinishFinals" => Ok(Self::FinishFinals),
+            "CancelFinals" => Ok(Self::CancelFinals),
             "AlterSeating" => {
                 let round = value["round"].as_usize().ok_or("round required")?;
                 let seating: Vec<Vec<String>> = value["seating"]
