@@ -103,6 +103,22 @@ class SyncManager {
   private reconnectDelay = 1000;
   private maxReconnectDelay = 120_000; // 2 minutes ceiling
 
+  // Consecutive `resync` messages with no intervening `sync_complete`. A single
+  // resync reconnects immediately (stay responsive); a persistent cause (server
+  // av bug, staleness storm) would otherwise be a full-speed clear+reconnect
+  // loop, so the 2nd+ resync routes through exponential backoff. Reset on
+  // sync_complete (a clean full sync landed) — load-bearing: assumes the server
+  // always closes a catch-up stream with sync_complete, else a healthy client
+  // could accrue a false streak and self-throttle.
+  private resyncStreak = 0;
+  // Consecutive non-warm-up snapshot failures (broken: non-503 HTTP, corrupt
+  // gzip, parse error). 503 is the expected first-sync warm-up and never counts.
+  // We keep retrying either way, but surface a console signal once a genuinely
+  // broken snapshot has failed this many times so it isn't silent forever.
+  private snapshotFailStreak = 0;
+  private static readonly SNAPSHOT_FAIL_WARN = 5;
+  private static readonly RESYNC_BACKOFF_AFTER = 1;
+
   // Monotonic connect generation. Bumped at the top of every connect(); a
   // cycle whose epoch is stale aborts at its next await instead of mutating
   // shared state. Guards against overlapping refresh()/connect() cycles
@@ -155,7 +171,10 @@ class SyncManager {
         }
       }
       if (!response.ok) {
-        console.error(`Snapshot fetch failed: ${response.status}`);
+        // 503 = first-sync warm-up (snapshot generator hasn't run yet): expected,
+        // self-heals, retried indefinitely by connect(). Anything else is a
+        // genuinely broken snapshot that would otherwise retry forever silently.
+        this.noteSnapshotFailure(response.status === 503 ? null : `status ${response.status}`);
         return null;
       }
 
@@ -239,10 +258,28 @@ class SyncManager {
         await setLastSyncAccessVersion(accessVersion);
       }
 
+      this.snapshotFailStreak = 0;
       return timestamp;
     } catch (e) {
-      console.error('Snapshot fetch/load failed:', e);
+      // Corrupt gzip / JSON parse / network throw: broken, not warm-up.
+      this.noteSnapshotFailure(String(e));
       return null;
+    }
+  }
+
+  /**
+   * Record a snapshot fetch outcome. `detail === null` is the expected warm-up
+   * 503 — not counted. A string is a genuinely broken snapshot: we keep retrying
+   * (non-terminal) but surface a console signal once it's failed repeatedly, so
+   * a broken snapshot doesn't loop forever with nothing surfaced. Deliberately
+   * console-only (not emit({type:'error'}), which +layout treats as a terminal
+   * sync failure and shows a Reconnect banner — wrong for an active auto-retry).
+   */
+  private noteSnapshotFailure(detail: string | null): void {
+    if (detail === null) return;
+    this.snapshotFailStreak++;
+    if (this.snapshotFailStreak >= SyncManager.SNAPSHOT_FAIL_WARN) {
+      console.error(`Snapshot broken (${detail}) after ${this.snapshotFailStreak} attempts; still retrying — check the server`);
     }
   }
 
@@ -338,16 +375,32 @@ class SyncManager {
 
         // Handle resync: server says data is too stale — reconnect with full stream
         if (message.type === 'resync') {
+          // Clear buffers before disconnect(): its flushAllBuffers() would
+          // otherwise re-populate the stores we just wiped.
           this.buffers.clear();
           await this.clearAllStores();
           await this.disconnect();
-          void this.connect();
           this.emit({ type: 'resync' });
+          // First resync reconnects immediately; if resyncs keep coming with no
+          // sync_complete between them, back off so a persistent cause can't spin
+          // a full-speed clear+reconnect loop against the server.
+          this.resyncStreak++;
+          if (this.resyncStreak <= SyncManager.RESYNC_BACKOFF_AFTER) {
+            void this.connect();
+          } else {
+            const delay = Math.min(
+              this.reconnectDelay * Math.pow(2, this.resyncStreak - 1),
+              this.maxReconnectDelay,
+            );
+            console.error(`SSE resync loop: ${this.resyncStreak} resyncs without sync_complete, backing off ${delay}ms`);
+            setTimeout(() => { void this.connect(); }, delay);
+          }
           return;
         }
 
         // Handle sync_complete
         if (message.type === 'sync_complete') {
+          this.resyncStreak = 0;
           try { await this.flushAllBuffers(); } catch (e) { console.error('Flush failed:', e); }
           try { if (message.timestamp) { this.lastTimestamp = message.timestamp; await setLastSyncTimestamp(message.timestamp); } } catch (e) { console.error('Save timestamp failed:', e); }
           this.isSynced = true;

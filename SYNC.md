@@ -145,6 +145,7 @@ fp = hash( DATA_SCHEMA_VERSION,                  # global wire-shape lever (repl
 **Frontend**:
 - On `resync` event: clear all IndexedDB stores + cursor keys (`last_sync_timestamp`, `last_sync_generated_at`, `last_sync_access_version`); the new snapshot re-seeds the fingerprint from its header.
 - Full data follows automatically (re-snapshot → catch-up).
+- **Resync backoff** (`sync.ts`): the first resync reconnects immediately, but consecutive resyncs with no intervening `sync_complete` route through exponential backoff so a persistent cause (server `av` bug, staleness storm) can't spin a full-speed clear+reconnect loop. The streak resets on `sync_complete` — **load-bearing invariant**: the server must always close a catch-up stream with `sync_complete` (even an empty since-delta), else a healthy client could accrue a false streak and self-throttle.
 
 #### Targeted overlay invalidation (no resync)
 
