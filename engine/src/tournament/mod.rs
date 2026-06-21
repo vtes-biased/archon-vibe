@@ -30,9 +30,9 @@ use types::VpError;
 // Import everything needed for apply_event from submodules
 use crate::error::EngineError;
 use helpers::{
-    all_rounds_finished, count_player_rounds_played, find_player_index, is_deck_locked, player_exists,
-    players_in_other_active_rounds, require_can_edit_results, require_organizer, require_state,
-    require_state_or_finished, validate_enum,
+    all_rounds_finished, count_player_rounds_played, find_player_index, is_deck_locked,
+    player_exists, players_in_other_active_rounds, require_can_edit_results, require_organizer,
+    require_state, require_state_or_finished, validate_enum,
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};

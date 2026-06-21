@@ -1052,8 +1052,8 @@ fn tournament_with_round() -> JsonValue {
 #[test]
 fn test_open_rounds_caps_player_and_blocks_recheckin() {
     let mut t = tournament_with_round();
-    t["max_rounds"] = 1.into(); // one round per player
-    // Keep a single finished table so FinishRound can complete the round.
+    t["max_rounds"] = 1.into();
+    // One round per player; a single finished table lets FinishRound complete the round.
     t["players"] = json::array![
         { user_uid: "p1", state: "Playing", payment_status: "Pending", toss: 0 },
         { user_uid: "p2", state: "Playing", payment_status: "Pending", toss: 0 },
@@ -1111,7 +1111,11 @@ fn test_check_in_all_skips_capped_players() {
             .unwrap()
             .to_string()
     };
-    assert_eq!(state_of("p1"), "Registered", "capped player not re-armed by CheckInAll");
+    assert_eq!(
+        state_of("p1"),
+        "Registered",
+        "capped player not re-armed by CheckInAll"
+    );
     assert_eq!(state_of("p2"), "Checked-in", "uncapped player checked in");
 }
 
@@ -1139,11 +1143,21 @@ fn test_check_in_reinstates_dropout_by_cap() {
 
     let org = make_organizer();
     let r1 = json::parse(
-        &run_event(&t, &json::object! { type: "CheckIn", player_uid: "p1" }, &org).unwrap(),
+        &run_event(
+            &t,
+            &json::object! { type: "CheckIn", player_uid: "p1" },
+            &org,
+        )
+        .unwrap(),
     )
     .unwrap();
     let r2 = json::parse(
-        &run_event(&r1, &json::object! { type: "CheckIn", player_uid: "p2" }, &org).unwrap(),
+        &run_event(
+            &r1,
+            &json::object! { type: "CheckIn", player_uid: "p2" },
+            &org,
+        )
+        .unwrap(),
     )
     .unwrap();
     let state_of = |t: &JsonValue, uid: &str| {
@@ -1154,8 +1168,16 @@ fn test_check_in_reinstates_dropout_by_cap() {
             .unwrap()
             .to_string()
     };
-    assert_eq!(state_of(&r2, "p1"), "Completed", "capped drop-out reinstated to Completed");
-    assert_eq!(state_of(&r2, "p2"), "Checked-in", "under-cap drop-out reinstated to Checked-in");
+    assert_eq!(
+        state_of(&r2, "p1"),
+        "Completed",
+        "capped drop-out reinstated to Completed"
+    );
+    assert_eq!(
+        state_of(&r2, "p2"),
+        "Checked-in",
+        "under-cap drop-out reinstated to Checked-in"
+    );
 }
 
 // #272 / open rounds: StartFinals selects the top-5 *eligible* players. A capped player
@@ -1195,7 +1217,12 @@ fn test_start_finals_includes_completed_excludes_withdrawn() {
     ];
 
     let updated = json::parse(
-        &run_event(&t, &json::object! { type: "StartFinals" }, &make_organizer()).unwrap(),
+        &run_event(
+            &t,
+            &json::object! { type: "StartFinals" },
+            &make_organizer(),
+        )
+        .unwrap(),
     )
     .unwrap();
 
@@ -1216,7 +1243,10 @@ fn test_start_finals_includes_completed_excludes_withdrawn() {
         .members()
         .filter_map(|s| s["player_uid"].as_str())
         .collect();
-    assert!(!seated.contains("p4"), "withdrawn p4 must not be seated in finals");
+    assert!(
+        !seated.contains("p4"),
+        "withdrawn p4 must not be seated in finals"
+    );
     assert_eq!(seated.len(), 5);
 }
 
