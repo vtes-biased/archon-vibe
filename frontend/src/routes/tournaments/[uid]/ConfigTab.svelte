@@ -202,25 +202,9 @@
   {#if !isOrganizer}
     <p class="text-ink-muted">{m.config_no_permission()}</p>
   {:else}
-    <div class="space-y-4">
-      <TournamentFields
-        bind:values={fieldValues}
-        onchange={handleFieldChange}
-        onvenueselect={(fields) => saveMultiple(fields)}
-        {disabledFields}
-        idPrefix="cfg"
-      />
-    </div>
-
-    {#if saving}
-      <div class="text-xs text-ink-faint flex items-center gap-1">
-        <RefreshCw class="w-3 h-3 animate-spin" />
-        {m.config_saving()}
-      </div>
-    {/if}
-
-    <!-- Setup: organizers + table rooms (re-homed from the former Overview tab) -->
-    <div class="pt-4 border-t border-line space-y-3">
+    <!-- Organizers + table rooms first: operational levers, most needed as the
+         event nears or starts (re-homed from the former Overview tab). -->
+    <div class="space-y-3">
       <div class="bg-surface-muted/30 rounded-lg p-4">
         <button onclick={() => organizersExpanded = !organizersExpanded}
           aria-expanded={organizersExpanded}
@@ -256,5 +240,23 @@
         {/if}
       </div>
     </div>
+
+    <!-- Tournament settings -->
+    <div class="space-y-4 pt-4 border-t border-line">
+      <TournamentFields
+        bind:values={fieldValues}
+        onchange={handleFieldChange}
+        onvenueselect={(fields) => saveMultiple(fields)}
+        {disabledFields}
+        idPrefix="cfg"
+      />
+    </div>
+
+    {#if saving}
+      <div class="text-xs text-ink-faint flex items-center gap-1">
+        <RefreshCw class="w-3 h-3 animate-spin" />
+        {m.config_saving()}
+      </div>
+    {/if}
   {/if}
 </div>
