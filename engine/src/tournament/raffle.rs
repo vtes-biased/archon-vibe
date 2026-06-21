@@ -4,21 +4,35 @@ use super::standings::compute_preliminary_standings;
 use crate::error::EngineError;
 use json::JsonValue;
 
-/// Get the set of player UIDs who appeared in any round seating (sorted for determinism).
-fn get_played_uids(tournament: &JsonValue) -> Vec<String> {
-    let mut played = std::collections::HashSet::new();
+/// Players eligible for a raffle: anyone seated in a round so far, plus anyone
+/// currently present (state Checked-in or Playing) who hasn't been seated yet — so
+/// a raffle held at check-in, before the first round exists, still draws from the
+/// checked-in players (and a checked-in player sitting out a round stays raffleable).
+/// Sorted for determinism.
+fn get_raffle_base_uids(tournament: &JsonValue) -> Vec<String> {
+    let mut base = std::collections::HashSet::new();
     for round in tournament["rounds"].members() {
         for table in round.members() {
             for seat in table["seating"].members() {
                 if let Some(uid) = seat["player_uid"].as_str() {
                     if !uid.is_empty() {
-                        played.insert(uid.to_string());
+                        base.insert(uid.to_string());
                     }
                 }
             }
         }
     }
-    let mut result: Vec<String> = played.into_iter().collect();
+    for p in tournament["players"].members() {
+        let s = p["state"].as_str();
+        if s == Some("Checked-in") || s == Some("Playing") {
+            if let Some(uid) = p["user_uid"].as_str() {
+                if !uid.is_empty() {
+                    base.insert(uid.to_string());
+                }
+            }
+        }
+    }
+    let mut result: Vec<String> = base.into_iter().collect();
     result.sort();
     result
 }
@@ -31,8 +45,8 @@ pub(super) fn get_raffle_pool(
     pool: &str,
     exclude_drawn: bool,
 ) -> Result<Vec<String>, EngineError> {
-    let played = get_played_uids(tournament);
-    if played.is_empty() {
+    let base = get_raffle_base_uids(tournament);
+    if base.is_empty() {
         return Err(EngineError::RaffleNonePlayed);
     }
 
@@ -56,23 +70,23 @@ pub(super) fn get_raffle_pool(
     };
 
     let mut eligible: Vec<String> = match pool {
-        "AllPlayers" => played.clone(),
-        "NonFinalists" => played
+        "AllPlayers" => base.clone(),
+        "NonFinalists" => base
             .iter()
             .filter(|uid| !finalists.contains(*uid))
             .cloned()
             .collect(),
-        "GameWinners" => played
+        "GameWinners" => base
             .iter()
             .filter(|uid| standings_map.get(*uid).is_some_and(|(gw, _)| *gw > 0.0))
             .cloned()
             .collect(),
-        "NoGameWin" => played
+        "NoGameWin" => base
             .iter()
             .filter(|uid| standings_map.get(*uid).is_none_or(|(gw, _)| *gw == 0.0))
             .cloned()
             .collect(),
-        "NoVictoryPoint" => played
+        "NoVictoryPoint" => base
             .iter()
             .filter(|uid| standings_map.get(*uid).is_none_or(|(_, vp)| *vp == 0.0))
             .cloned()

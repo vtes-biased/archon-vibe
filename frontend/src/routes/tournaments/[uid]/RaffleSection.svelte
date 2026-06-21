@@ -28,14 +28,22 @@
     return seatDisplayUtil(uid, playerInfo);
   }
 
-  // Collect UIDs of players who appeared in any round seating
-  const playedUids = $derived.by(() => {
+  // Raffle base: players seated in any round, plus players currently present
+  // (Checked-in/Playing) not yet seated — so a raffle at check-in, before the
+  // first round, still draws from the checked-in players. Mirrors engine
+  // raffle.rs get_raffle_base_uids().
+  const baseUids = $derived.by(() => {
     const set = new Set<string>();
     for (const round of tournament.rounds ?? []) {
       for (const table of round) {
         for (const seat of table.seating) {
           if (seat.player_uid) set.add(seat.player_uid);
         }
+      }
+    }
+    for (const p of tournament.players ?? []) {
+      if ((p.state === "Checked-in" || p.state === "Playing") && p.user_uid) {
+        set.add(p.user_uid);
       }
     }
     return set;
@@ -81,17 +89,17 @@
   });
 
   // Compute eligible count per pool
-  // NOTE: Pool filtering logic must match engine/src/tournament.rs get_raffle_pool()
+  // NOTE: Pool filtering logic must match engine raffle.rs get_raffle_pool()
   function eligibleForPool(p: RafflePool): number {
     let uids: string[];
-    const played = [...playedUids];
+    const base = [...baseUids];
     switch (p) {
-      case "AllPlayers": uids = played; break;
-      case "NonFinalists": uids = played.filter(u => !finalistUids.has(u)); break;
-      case "GameWinners": uids = played.filter(u => (standingsMap.get(u)?.gw ?? 0) > 0); break;
-      case "NoGameWin": uids = played.filter(u => (standingsMap.get(u)?.gw ?? 0) === 0); break;
-      case "NoVictoryPoint": uids = played.filter(u => (standingsMap.get(u)?.vp ?? 0) === 0); break;
-      default: uids = played;
+      case "AllPlayers": uids = base; break;
+      case "NonFinalists": uids = base.filter(u => !finalistUids.has(u)); break;
+      case "GameWinners": uids = base.filter(u => (standingsMap.get(u)?.gw ?? 0) > 0); break;
+      case "NoGameWin": uids = base.filter(u => (standingsMap.get(u)?.gw ?? 0) === 0); break;
+      case "NoVictoryPoint": uids = base.filter(u => (standingsMap.get(u)?.vp ?? 0) === 0); break;
+      default: uids = base;
     }
     if (excludeDrawn) {
       uids = uids.filter(u => !drawnUids.has(u));

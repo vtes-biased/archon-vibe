@@ -1000,6 +1000,8 @@ fn test_reopen_tournament_preserves_dq() {
         updated["players"][1]["state"].as_str(),
         Some("Disqualified")
     ); // preserved
+    // winner cleared to "" (not null): backend types it `str`, a null 500s the action
+    assert_eq!(updated["winner"].as_str(), Some(""));
 }
 
 // --- AlterSeating tests ---
@@ -1925,6 +1927,35 @@ fn test_organizer_corrects_earlier_round_during_parallel_round_refreshes_standin
 }
 
 // --- Raffle pool tests ---
+
+#[test]
+fn test_raffle_before_first_round_draws_checked_in_players() {
+    // Pre-round-1 (Waiting / check-in): no rounds exist yet, but the raffle base
+    // must still be the checked-in players — registered-but-not-checked-in are out.
+    let mut t = make_tournament();
+    t["state"] = "Waiting".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Registered", payment_status: "Pending", toss: 0 },
+    ];
+    let event = json::object! {
+        type: "RaffleDraw",
+        label: "door prize",
+        pool: "AllPlayers",
+        exclude_drawn: false,
+        count: 4,
+        seed: 7,
+    };
+    let updated = json::parse(&run_event(&t, &event, &make_organizer()).unwrap()).unwrap();
+    let mut winners: Vec<&str> = updated["raffles"][0]["winners"]
+        .members()
+        .filter_map(|w| w.as_str())
+        .collect();
+    winners.sort();
+    assert_eq!(winners, vec!["p1", "p2", "p3"]);
+}
 
 #[test]
 fn test_raffle_pools_count_scores_from_round_in_progress() {

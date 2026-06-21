@@ -322,7 +322,7 @@ impl fmt::Display for EngineError {
             RaffleCountMin => write!(f, "Raffle count must be at least 1"),
             RaffleNoPlayers => write!(f, "No eligible players in pool"),
             RaffleNoDraws => write!(f, "No raffle draws to undo"),
-            RaffleNonePlayed => write!(f, "No players have played yet"),
+            RaffleNonePlayed => write!(f, "No players available to raffle yet"),
             RaffleWrongState => write!(
                 f,
                 "Raffle requires tournament in Waiting, Playing, or Finished state"

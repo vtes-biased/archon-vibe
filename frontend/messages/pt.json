@@ -1152,7 +1152,7 @@
   "err_tournament_raffle_count_min": "O número de sorteios deve ser pelo menos 1",
   "err_tournament_raffle_no_players": "Nenhum jogador elegível no pool",
   "err_tournament_raffle_no_draws": "Nenhum sorteio para desfazer",
-  "err_tournament_raffle_none_played": "Nenhum jogador jogou ainda",
+  "err_tournament_raffle_none_played": "Nenhum jogador disponível para o sorteio ainda",
   "err_tournament_raffle_wrong_state": "O sorteio requer o torneio no estado Aguardando, Em jogo ou Finalizado",
   "err_tournament_name_required": "O nome do torneio não pode estar vazio",
   "err_tournament_max_rounds_below_completed": "max_rounds ({max}) não pode ser inferior às rodadas concluídas ({completed})",
