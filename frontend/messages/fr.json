@@ -644,6 +644,8 @@
   "rounds_table_count": "{count} tables",
   "rounds_table_n": "Table {n}",
   "rounds_n_players": "({count} joueurs)",
+  "rounds_enter_scores": "Saisir les scores",
+  "rounds_modify_scores": "Modifier les scores",
   "rounds_unseat_title": "Retirer le joueur de la table",
   "rounds_seat_player": "Placer un joueur",
   "rounds_remove_empty_table": "Retirer la table vide",

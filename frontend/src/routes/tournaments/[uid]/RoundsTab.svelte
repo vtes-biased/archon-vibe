@@ -578,11 +578,11 @@
                 <div class="flex items-center justify-between mb-2 gap-2">
                   <button
                     onclick={() => toggleScoring(r, i)}
-                    class="flex items-center gap-2 text-left min-w-0 flex-1"
+                    class="group flex items-center gap-2 text-left min-w-0 flex-1 min-h-[44px]"
                     aria-expanded={isScoring}
                   >
                     {#if table.seating.length > 0}
-                      {#if isScoring}<ChevronDown class="w-4 h-4 text-ink-faint shrink-0" />{:else}<ChevronRight class="w-4 h-4 text-ink-faint shrink-0" />{/if}
+                      {#if isScoring}<ChevronDown class="w-4 h-4 text-ink-muted group-hover:text-ink-strong shrink-0" />{:else}<ChevronRight class="w-4 h-4 text-ink-muted group-hover:text-ink-strong shrink-0" />{/if}
                     {/if}
                     <h3 class="text-sm font-medium text-ink-strong truncate">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
                     {#if table.seating.length < 4 || table.seating.length > 5}
@@ -590,6 +590,12 @@
                     {/if}
                   </button>
                   <div class="flex items-center gap-2 shrink-0">
+                    {#if isOrganizer && !isScoring && table.seating.length > 0}
+                      <button
+                        onclick={() => toggleScoring(r, i)}
+                        class="text-xs font-medium text-select hover:opacity-80 transition-opacity px-2 py-2 -my-1"
+                      >{table.state === 'In Progress' ? m.rounds_enter_scores() : m.rounds_modify_scores()}</button>
+                    {/if}
                     <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-success' : table.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
                       {translateTableState(table.state)}
                     </span>
@@ -604,8 +610,8 @@
                     {/if}
                   </div>
                 </div>
-                <!-- Per-table timer (organizer controls, hidden with parallel rounds) -->
-                {#if !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
+                <!-- Per-table timer (folded-only: on unfold the scoring grid owns the surface; the global round timer above stays visible, and table extensions are granted during play, not scoring) -->
+                {#if !isScoring && !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
                   <div class="mb-2">
                     <TimerDisplay {tournament} {isOrganizer} tableIndex={i} />
                   </div>
@@ -670,8 +676,8 @@
                     </div>
                   {/each}
                 </div>
-                <!-- Override controls -->
-                {#if isOrganizer && (table.state === 'Invalid' || table.state === 'In Progress')}
+                <!-- Override trigger (unfolded-only: you reach for it from inside the scoring view, once the VPs won't validate) -->
+                {#if isScoring && isOrganizer && (table.state === 'Invalid' || table.state === 'In Progress')}
                   {#if overrideTable_ === i}
                     <div class="mt-2 pt-2 border-t border-line">
                       <label class="text-xs text-ink-muted block mb-1">{m.override_judge_comment()}
