@@ -61,6 +61,7 @@
 ## Scoring & Standings
 - compute_final_standings = shared VEKN placement (winner=1, finalists tie 2nd) — see ARCHITECTURE.md (engine modules / League System).
 - [SA penalty single-sourced in Rust](sa-penalty-duplicated-in-python.md) — SA scoring lives only in `engine.compute_rating_vp_gw`; never re-derive in Python.
+- [SA standings recompute on sanction mutation](sa-standings-recompute-on-sanction-mutation.md) — sanctions.py `_recompute_tournament_standings` refreshes tournament.standings on SA create/lift/delete via the python-only `update_standings_json` engine entrypoint; frontend reads standings (not raw seats). Don't reintroduce the "sanction writes skip the tournament recompute" assumption.
 - [Standings are prelim-only](standings-prelim-only-contract.md) — `tournament.standings` = SA-adjusted prelim, finals excluded; the Python archon importer violates this (stores finals-inclusive) → league double-counts finals.
 - [Rounds⇔standings coupling](rounds-standings-coupling-engine.md) — engine invariant: standings non-empty iff rounds non-empty; makes the VEKN `batch_push` `rounds>0` guard safe (excludes imports, keeps in-app tournaments).
 

@@ -782,6 +782,22 @@ mod python {
             ))
         }
 
+        /// Recompute a tournament's standings from its rounds + current sanctions,
+        /// returning the updated tournament JSON. For sanction mutations (issuing,
+        /// lifting, or deleting a standings_adjustment), which are not
+        /// TournamentEvents and so can't refresh standings via
+        /// process_tournament_event.
+        fn update_standings(
+            &self,
+            tournament_json: &str,
+            sanctions_json: &str,
+        ) -> PyResult<String> {
+            py_str(super::tournament::update_standings_json(
+                tournament_json,
+                sanctions_json,
+            ))
+        }
+
         fn parse_deck(&self, text: &str, cards_json: &str) -> PyResult<String> {
             py_str(parse_deck_json(text, cards_json))
         }

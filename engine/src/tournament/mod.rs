@@ -179,6 +179,26 @@ pub fn process_tournament_event(
     Ok(result.dump())
 }
 
+/// Recompute `standings` from the tournament's rounds + current `sanctions` and
+/// return the updated tournament JSON.
+///
+/// Issuing, lifting, or deleting a standings_adjustment is NOT a `TournamentEvent`
+/// (sanctions are their own object type), so those paths can't recompute standings
+/// through `process_tournament_event`. This is the recompute they call instead —
+/// the same `update_standings` that every event ends with — so the SA VP penalty
+/// and per-table GW/TP refresh live, not only on the next tournament action.
+/// No-op when rounds are empty (guarded in `update_standings` to preserve
+/// VEKN-synced standings). Returns the bare tournament object (no `deck_ops`).
+pub fn update_standings_json(
+    tournament_json: &str,
+    sanctions_json: &str,
+) -> Result<String, EngineError> {
+    let mut tournament = json::parse(tournament_json)?;
+    let sanctions = json::parse(sanctions_json)?;
+    update_standings(&mut tournament, &sanctions);
+    Ok(tournament.dump())
+}
+
 fn apply_event(
     tournament: &mut JsonValue,
     event: &TournamentEvent,

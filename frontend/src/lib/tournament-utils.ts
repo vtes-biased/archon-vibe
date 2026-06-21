@@ -167,17 +167,28 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
             toss: p.toss ?? 0, finalist: finalistUids.has(p.user_uid!),
           }));
   } else {
-    // Aggregate the preliminary rounds.
+    // Preliminary totals come from the engine-computed standings, which apply the
+    // standings_adjustment (SA) penalty to VP and re-decide GW/TP per table. Do NOT
+    // re-sum raw seat results here: the SA penalty lives only on the standings total
+    // (the per-seat result.vp stays raw so the game state stays valid), so summing
+    // seats would silently drop every SA. Fall back to raw aggregation only if the
+    // engine hasn't populated standings yet (e.g. before the first score).
     const map = new Map<string, { gw: number; vp: number; tp: number }>();
-    for (const round of tournament.rounds) {
-      for (const table of round) {
-        for (const seat of table.seating) {
-          if (!seat.player_uid) continue;
-          const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0, tp: 0 };
-          e.gw += seat.result.gw ?? 0;
-          e.vp += seat.result.vp ?? 0;
-          e.tp += seat.result.tp ?? 0;
-          map.set(seat.player_uid, e);
+    if (tournament.standings?.length) {
+      for (const s of tournament.standings) {
+        map.set(s.user_uid, { gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0 });
+      }
+    } else {
+      for (const round of tournament.rounds) {
+        for (const table of round) {
+          for (const seat of table.seating) {
+            if (!seat.player_uid) continue;
+            const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0, tp: 0 };
+            e.gw += seat.result.gw ?? 0;
+            e.vp += seat.result.vp ?? 0;
+            e.tp += seat.result.tp ?? 0;
+            map.set(seat.player_uid, e);
+          }
         }
       }
     }

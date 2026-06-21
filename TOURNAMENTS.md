@@ -194,6 +194,25 @@ Example: On a 5-player table `[2, 1, 0, 0.5, 1.5]` in seating order:
 - Seat 1 (VP=0, after -1) is ousted → predator (seat 5) gets -1: seat 5 becomes 0.5
 - Remaining: seat 4 (0.5), seat 5 (0.5) — valid timeout
 
+## Sanctions and Standings
+
+Sanctions are a separate object type (see SYNC.md). The tournament-relevant sanction type is `standings_adjustment` (SA).
+
+### Standings Adjustment (SA)
+
+- **Penalty**: −1 VP applied to the target player's standings total for a specific round (Judges' Guide v2 §1.1.3).
+- **Per-seat VP is untouched**: raw `seat.result.vp` stays valid (VP sum = table size, oust order preserved). The penalty lives only on the standings total.
+- **GW and TP cascade**: because GW requires strictly highest VP at the table, −1 VP can flip a GW to a different player; TP re-ranks accordingly.
+- **Round targeting** (per §1.1.3):
+  - SA issued *during a game* → applies to that round.
+  - SA issued *between rounds* or before finals → applies to the next round the player plays.
+  - SA issued *after the last prelim round* → applies to the previous round they played.
+  - SA issued *before round 1 pairings* → applies to round 1.
+  - SA on a not-yet-scored round → deferred (penalty applies when that round is scored).
+- **Engine is the single source of truth**: `compute_preliminary_standings` / `sa_vp_penalty` in `engine/src/tournament/standings.rs` applies the SA when computing standings. Both backend and frontend consume `tournament.standings` rather than re-deriving SA from raw seat results.
+- **Mutation side-effect**: issuing, lifting, editing, or deleting an SA sanction tied to a tournament immediately triggers a standings recompute (`_recompute_tournament_standings()` in `backend/src/routes/sanctions.py`: load tournament → `PyEngine.update_standings` → save → broadcast). The updated tournament object is broadcast via SSE to all clients.
+- **`PyEngine.update_standings`** is Python-only (like `compute_rating_vp_gw`); it is NOT exposed to WASM because sanctions have no offline-creation path.
+
 ## Data Model
 
 Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentConfig`, `Player`, `Table`, `Seat`, `Score`) and `backend/src/models.py`. Non-obvious structure:

@@ -1,10 +1,12 @@
 """Sanctions API endpoints."""
 
+import json
 import logging
 from datetime import UTC, date, datetime, timedelta
 from uuid import uuid7
 
 import msgspec
+from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
@@ -13,6 +15,7 @@ from ..broadcast import broadcast_precomputed
 from ..db import (
     get_league_by_uid,
     get_sanction_by_uid,
+    get_sanctions_for_tournament,
     get_tournament_by_uid,
     get_user_by_uid,
     save_sanction,
@@ -27,11 +30,13 @@ from ..models import (
     SanctionCategory,
     SanctionLevel,
     SanctionSubcategory,
+    Tournament,
 )
 
 router = APIRouter(prefix="/sanctions", tags=["sanctions"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
+_engine = PyEngine()
 
 # Maximum expiry for probation/suspension (18 months)
 MAX_EXPIRY_MONTHS = 18
@@ -125,6 +130,39 @@ async def _set_player_dq_state(
 
     tournament.modified = datetime.now(UTC)
     bd = await save_tournament(tournament)
+    broadcast_precomputed(bd)
+
+
+async def _recompute_tournament_standings(tournament_uid: str) -> None:
+    """Refresh a tournament's standings after a standings_adjustment (SA) changes.
+
+    Issuing/lifting/deleting an SA is not a TournamentEvent, so standings would
+    otherwise only pick up the -1 VP penalty on the next tournament action. The
+    engine recompute (same update_standings every event ends with) is the single
+    source of truth, so we don't re-implement SA scoring here. No-op when the
+    tournament has no rounds (the engine guards that too). Call AFTER the sanction
+    mutation is saved, so the refetched sanctions reflect it.
+    """
+    tournament = await get_tournament_by_uid(tournament_uid)
+    if not tournament or not tournament.rounds:
+        return
+    sanctions = await get_sanctions_for_tournament(tournament_uid)
+    sanctions_data = [
+        {
+            "user_uid": s.user_uid,
+            "level": s.level.value,
+            "round_number": s.round_number,
+            "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
+            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+        }
+        for s in sanctions
+    ]
+    tournament_json = encoder.encode(tournament).decode("utf-8")
+    sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+    result_json = _engine.update_standings(tournament_json, sanctions_json)
+    updated = msgspec.convert(json.loads(result_json), Tournament)
+    updated.modified = datetime.now(UTC)
+    bd = await save_tournament(updated)
     broadcast_precomputed(bd)
 
 
@@ -270,6 +308,9 @@ async def create_sanction(
         await _set_player_dq_state(
             request.tournament_uid, request.user_uid, PlayerState.DISQUALIFIED
         )
+    # SA sanction: refresh standings so the -1 VP penalty shows immediately
+    elif level == SanctionLevel.STANDINGS_ADJUSTMENT and request.tournament_uid:
+        await _recompute_tournament_standings(request.tournament_uid)
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
@@ -437,6 +478,14 @@ async def update_sanction_endpoint(
             sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
         )
 
+    # SA touched (lifted, round changed, or level changed to/from SA): refresh
+    # standings so the -1 VP penalty appears/clears immediately.
+    if sanction.tournament_uid and (
+        updated.level == SanctionLevel.STANDINGS_ADJUSTMENT
+        or sanction.level == SanctionLevel.STANDINGS_ADJUSTMENT
+    ):
+        await _recompute_tournament_standings(sanction.tournament_uid)
+
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
 
@@ -495,6 +544,14 @@ async def delete_sanction_endpoint(
         await _set_player_dq_state(
             sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
         )
+
+    # Deleting an active SA drops its -1 VP penalty: refresh standings
+    if (
+        sanction.level == SanctionLevel.STANDINGS_ADJUSTMENT
+        and sanction.lifted_at is None
+        and sanction.tournament_uid
+    ):
+        await _recompute_tournament_standings(sanction.tournament_uid)
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
