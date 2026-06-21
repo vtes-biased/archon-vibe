@@ -559,7 +559,7 @@ import TournamentModals from "./TournamentModals.svelte";
       <!-- Header -->
       <div class="flex items-start justify-between mb-6">
         <div>
-          <h1 class="text-3xl font-semibold text-ink-strong">{tournament.name}</h1>
+          <h1 class="text-3xl font-semibold text-accent">{tournament.name}</h1>
           <div class="flex flex-wrap items-center gap-3 mt-2">
             <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
               {translateTournamentState(tournament.state)}
