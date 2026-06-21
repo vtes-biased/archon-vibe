@@ -45,14 +45,6 @@
     a.remove();
   }
 
-  // With standings: results exist → offer the JSON report. Without: an empty
-  // finished shell → offer Archon import (migrate a legacy result in), per #256.
-  const moreItems = $derived(
-    hasStandings
-      ? [{ label: m.decks_download_report_json(), icon: Download, onclick: downloadReport }]
-      : [{ label: m.archon_import_title(), icon: Upload, onclick: () => onImportArchon?.() }]
-  );
-
   let sharingImage = $state(false);
 
   async function shareImage() {
@@ -107,8 +99,8 @@
     </div>
   {/if}
 
-  <!-- Results actions: share + copy + More (JSON report), all one line.
-       Without standings, only the More menu shows (Archon import). -->
+  <!-- Results actions. With standings: share + copy + More (JSON report) on one
+       line. Without (empty finished shell): a direct Archon-import button, per #256. -->
   <div class="flex flex-wrap items-center gap-2">
     {#if hasStandings}
       <Button variant="secondary" size="md" loading={sharingImage} onclick={shareImage}>
@@ -119,8 +111,13 @@
         <ClipboardCopy class="w-4 h-4" />
         {m.share_results_text()}
       </Button>
+      <ActionMenu label={m.common_more()} items={[{ label: m.decks_download_report_json(), icon: Download, onclick: downloadReport }]} />
+    {:else}
+      <Button variant="secondary" size="md" onclick={() => onImportArchon?.()}>
+        <Upload class="w-4 h-4" />
+        {m.archon_import_title()}
+      </Button>
     {/if}
-    <ActionMenu label={m.common_more()} items={moreItems} />
   </div>
 
   <!-- Reopen: rare, semi-destructive rollback — set apart below the results -->

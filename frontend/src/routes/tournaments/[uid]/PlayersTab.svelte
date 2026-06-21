@@ -436,7 +436,8 @@
   {#if isOrganizer && (tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished")}
     <div class="bg-surface-muted/30 rounded-lg p-4">
       <button onclick={() => raffleExpanded = !raffleExpanded}
-        class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
+        aria-expanded={raffleExpanded}
+        class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
         {#if raffleExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
         {m.raffle_title()}
       </button>

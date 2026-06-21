@@ -223,7 +223,8 @@
     <div class="pt-4 border-t border-line space-y-3">
       <div class="bg-surface-muted/30 rounded-lg p-4">
         <button onclick={() => organizersExpanded = !organizersExpanded}
-          class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
+          aria-expanded={organizersExpanded}
+          class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
           {#if organizersExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
           {m.organizers_title()}
         </button>
@@ -239,7 +240,8 @@
       </div>
       <div class="bg-surface-muted/30 rounded-lg p-4">
         <button onclick={() => roomsExpanded = !roomsExpanded}
-          class="flex items-center gap-2 text-sm font-medium text-ink w-full text-left">
+          aria-expanded={roomsExpanded}
+          class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
           {#if roomsExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
           {m.rooms_title()}
         </button>

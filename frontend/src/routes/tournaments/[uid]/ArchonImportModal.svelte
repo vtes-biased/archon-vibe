@@ -18,6 +18,10 @@
     hasRounds?: boolean;
   } = $props();
 
+  function focusOnMount(node: HTMLElement) {
+    node.focus();
+  }
+
   let archonFile = $state<File | null>(null);
   let archonUploading = $state(false);
   let archonResult = $state<ArchonImportResult | null>(null);
@@ -81,10 +85,12 @@
       onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="archon-import-title"
       tabindex="-1"
+      use:focusOnMount
     >
       <div class="p-6 border-b border-line flex items-center justify-between gap-2">
-        <h2 class="text-xl font-medium text-link">{m.archon_import_title()}</h2>
+        <h2 id="archon-import-title" class="text-xl font-medium text-link">{m.archon_import_title()}</h2>
         <button onclick={() => (show = false)} class="text-ink-faint hover:text-ink-strong transition-colors" aria-label={m.common_cancel()}>
           <X class="w-5 h-5" />
         </button>
