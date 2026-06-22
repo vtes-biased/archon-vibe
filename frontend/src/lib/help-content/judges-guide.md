@@ -25,7 +25,7 @@ Judges are not exempt from error. Mistakes should be acknowledged and corrected 
 
 ### 1.1. Definition of Penalties
 
-Every formally tracked penalty (Warning and above) must be clearly communicated to the player, explained, reported to the Head Judge, and submitted to the V:EKN Penalty Database. If resolution takes more than a minute, a time extension may be granted (see [1.2.4. Guidelines for Applying Time Extensions](#124-guidelines-for-applying-time-extensions)).
+Every formally tracked penalty (Warning and above) must be clearly communicated to the player, explained, reported to the Head Judge, and submitted to the VEKN Penalty Database. If resolution takes more than a minute, a time extension may be granted (see [1.2.4. Guidelines for Applying Time Extensions](#124-guidelines-for-applying-time-extensions)).
 
 #### 1.1.1. Caution
 
@@ -33,7 +33,7 @@ A **Caution** is a verbal-only penalty for very minor, immediately fixable infra
 
 #### 1.1.2. Warning
 
-A **Warning** is a formally tracked penalty for incorrect play or a procedural problem requiring time to fix (e.g., a single riffle shuffle after a library search), or when a minor issue has escalated to affect the game state. It notifies the players and judges, enters the permanent V:EKN record, and discourages repeat offenses.
+A **Warning** is a formally tracked penalty for incorrect play or a procedural problem requiring time to fix (e.g., a single riffle shuffle after a library search), or when a minor issue has escalated to affect the game state. It notifies the players and judges, enters the permanent VEKN record, and discourages repeat offenses.
 
 #### 1.1.3. Standings Adjustment
 
@@ -45,9 +45,9 @@ The –1 VP always applies to the player's **current game** if one is in progres
 
 ##### Impact on GW and TP
 
-A Standings Adjustment does not directly change GWs or TPs. But because a GW goes to the player with the strictly highest VP at the table, the –1 VP may shift who receives the GW, and TPs re-rank accordingly per the Tournament Rules.
+A Standings Adjustment does not directly change GWs or TPs. But because a GW goes to the player with the strictly highest VP of at least 2, the –1 VP may shift or remove the GW, and TPs re-rank accordingly per the Tournament Rules.
 
-> **Example 1:** A player wins 3–2 and receives –1 VP → final VP is 2. If this ties for highest VP, the result becomes 2–2 (no GW), and TPs follow the Tournament Rules for a 2–2 tie.
+> **Example 1:** A player finishes with 3 VP (the next player has 2) and receives –1 VP → final VP is 2. The two are now tied at 2 VP, so neither is strictly highest — no GW; TPs follow the Tournament Rules for that tie.
 
 > **Example 2:** Player A sweeps a 5-player table (5 VP + GW). Player E (0 VP) receives a Standings Adjustment → –1 VP. Player A still gets 60 TP. The three players tied for 2nd–4th get (48 + 36 + 24) / 3 = 36 TP each. The penalized player, now solely 5th, gets 12 TP.
 
@@ -57,8 +57,8 @@ A **Disqualification (DQ)** is the most serious penalty; it always includes a Wa
 
 ##### Key Details
 
-* The player loses their current round and is dropped. Unawarded prizes pass to the next eligible player; already-awarded prizes may be reclaimed where appropriate (trophies, finalist prizes), but participation items distributed to everyone (e.g., promo cards) are not reclaimed.
-* The disqualified player is removed from standings entirely; remaining players move up and receive any prizes or qualifications tied to their new placement.
+* The player loses their current round and is dropped, is **placed last in the standings**, and **earns no rating points for the event**. Remaining players move up, and any prizes or qualifications follow the resulting order.
+* **Prizes already claimed may be kept**; any not-yet-awarded prize passes to the next eligible player.
 * DQs may also apply to non-players (spectators, staff) compromising the event.
 * The Head Judge need only conclude the player acted knowingly and intentionally — definitive proof is not required. Once that determination is made, the DQ is mandatory.
 * DQs from intentional acts compromising integrity or safety must be reported to the **VEKN Ethics Committee**. DQs used purely as tournament control (accumulated unintentional infractions, non-malicious safety concerns) do not require escalation.
@@ -82,12 +82,12 @@ This guide applies to all sanctioned VTES events, though not every infraction ap
 
 Each infraction has a baseline penalty; repeated offenses of the **same** infraction escalate, each level applied twice before the next:
 
-**… → Warning → Warning → Standings Adjustment → Standings Adjustment → Disqualification**
+**Warning → Warning → Standings Adjustment → Standings Adjustment → Disqualification**
 
-Escalation starts at the infraction's baseline and resets each event:
+Escalation starts at the infraction's baseline and resets each event (some infractions specify they never escalate):
 
-* **Caution baseline:** Caution, Caution, Warning, Warning, Standings Adjustment, …
-* **Warning baseline:** Warning, Warning, Standings Adjustment, Standings Adjustment, Disqualification. (A player DQ'd purely by accumulation keeps prizes already earned and stays eligible for further prizes earned the same event.)
+* **Caution baseline:** stays a Caution; Cautions do not escalate.
+* **Warning baseline:** Warning, Warning, Standings Adjustment, Standings Adjustment, Disqualification.
 * **Standings Adjustment baseline:** Standings Adjustment, Standings Adjustment, Disqualification.
 
 Prior events do not advance the current event's sequence. Previously recorded Warnings for the same infraction stay visible as context: any number of them count collectively as a single pre-existing Warning that does **not** add a step to the current escalation, but may inform judgments of intent, credibility, or recurring patterns. A consistent cross-event pattern may warrant reclassification under Unsportsmanlike Conduct. Accumulation-based DQs must rest on same-event infractions only.
@@ -197,7 +197,7 @@ This category covers mistakes from incorrect execution of game procedures or rul
 6. A player draws a card before fully announcing its effects.
 7. A player replaces a card after an opponent asked them not to, before the opponent could consider cancelling it.
 
-**Philosophy:** VTES relies on controlled access to hidden information; access errors can distort strategy and bluffing. Most are unintentional — the goal is to restore fairness while keeping multiplayer play fluid — but repeated carelessness harms integrity and must be tracked.
+**Philosophy:** VTES relies on controlled access to hidden information; access errors can distort strategy and bluffing. Most are unintentional — the goal is to restore fairness while keeping multiplayer play fluid — but repeated carelessness harms integrity and must be noted.
 
 **Penalty:** **Caution.** Intentional misuse of hidden information is upgraded to Unsportsmanlike Conduct — Cheating (Disqualification).
 
@@ -255,7 +255,7 @@ Leave the game state as-is if correction would be too disruptive. If an opponent
 
 ### 3.1. Tournament Errors — Deck Problems
 
-Covers deck construction and integrity at Constructed and Limited events. Deck checks and decklists keep decks legal and unaltered throughout.
+Covers deck construction and integrity at Constructed and Limited events. Deck checks and decklists keep decks legal and unaltered throughout. (The crypt-grouping requirement — 1 or 2 consecutive groups — applies to Constructed play; Limited formats impose no group restriction.)
 
 #### 3.1.1. Deck Problem — Illegal Decklist
 
@@ -269,7 +269,7 @@ Covers deck construction and integrity at Constructed and Limited events. Deck c
 4. A player lists Arika (group 2) and Lutz von Hohenzollern (group 4).
 5. A player loses cards mid-event and cannot produce legitimate replacements.
 
-**Philosophy:** The decklist is the authoritative reference for what the player intends to play; illegal, unclear, or mismatching lists invite abuse. A Standings Adjustment is appropriate only when the error harms integrity or cannot be corrected without disadvantaging opponents. If a shorthand name unambiguously identifies one card, the Head Judge may reduce the penalty. Errors found outside a game are normally applied at the start of the next round, unless the actual deck was itself illegal.
+**Philosophy:** The decklist is the authoritative reference for what the player intends to play; illegal, unclear, or mismatching lists invite abuse. A Standings Adjustment is appropriate only when the error harms integrity or cannot be corrected without disadvantaging opponents. If a shorthand name unambiguously identifies one card, the Head Judge may reduce the penalty. A decklist error found between games is corrected before the player's next round; any –1 VP follows §1.1.3 (it lands on the most-recently-played game).
 
 **Penalty:** **Warning**, unless main deck and decklist are both illegal and cannot be reconciled without substantially altering the deck — in which case **Standings Adjustment**, and the player gets five minutes to adjust the decklist so the physical deck becomes legal.
 
@@ -358,9 +358,9 @@ It **does include** strategic/tactical advice from or to anyone not seated in th
 4. A player leaves the table without judge approval, making the table wait.
 5. A player consistently delays announcing targets or repeatedly asks for clarifications they don't act on.
 
-**Philosophy:** Slow decisions disrupt pacing for the whole table. Players must act within a reasonable timeframe. Begin with a verbal reminder; this penalizes unreasonable delay, not thoughtful decisions.
+**Philosophy:** Slow decisions disrupt pacing for the whole table. Players must act within a reasonable timeframe. This penalizes unreasonable delay, not thoughtful decisions.
 
-**Penalty:** **Caution.** Avoid the word "stalling" in reminders — say "Please play faster" or "you're playing a little slow, please pick up the pace."
+**Penalty:** **Caution.** Avoid the word "stalling" — say "please play faster" or "you're playing a little slow, please pick up the pace."
 
 **Additional Remedy:** If Slow Play consumed significant round time, the judge may issue a time extension (see 1.2.4).
 
@@ -699,7 +699,7 @@ This section covers the practical functions of running a tournament.
 **Resolution:**
 
 * Drop during seating for a 5-player table: convert it to a 4-player table.
-* Drop during seating for a 4-player table: re-seat players to form legal table sizes (4 or 5) per V:EKN Tournament Rules §3.1.2.
+* Drop during seating for a 4-player table: re-seat players to form legal table sizes (4 or 5) per VEKN Tournament Rules §3.1.2.
 * At large events not using the multi-judge system, if a player drops at a 4-player table after other tables have begun, a tournament official takes the seat as a proxy player (see 5.1.1) with a randomly selected staff deck.
 * If no legal tables can be formed, the event immediately becomes unsanctioned; between rounds, adjustments (e.g., a judge joining as a player) may restore sanctioning.
 * Drop before round 1 with no legal tables possible: the event is unsanctioned and no official prize support is distributed.
