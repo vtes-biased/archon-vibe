@@ -218,6 +218,8 @@
         <DataSection onResync={handleResync} onLogout={handleLogout} />
       </div>
     {/if}
+
+    <p class="mt-6 text-center text-xs text-ink-faint">Archon v{__APP_VERSION__}</p>
   </div>
 </div>
 

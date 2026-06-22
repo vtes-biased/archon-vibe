@@ -108,6 +108,15 @@ def build_client(
 
 
 def main() -> None:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _dist_version
+
+    try:
+        ver = _dist_version("archon-discord-bot")
+    except PackageNotFoundError:
+        ver = "0.0.0+unknown"
+    logger.info(f"Archon Discord bot starting (version {ver})")
+
     bot = hikari.GatewayBot(
         config.DISCORD_BOT_TOKEN,
         intents=hikari.Intents.GUILDS | hikari.Intents.GUILD_VOICE_STATES,

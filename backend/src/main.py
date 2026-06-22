@@ -56,6 +56,7 @@ from .routes import (
     vekn,
 )
 from .vekn_sync import VEKNSyncService
+from .version import __version__
 
 # Load environment variables
 load_dotenv()
@@ -312,6 +313,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
     global _scheduler, _sync_service, _shutdown_event
 
+    logger.info(f"Archon backend starting (version {__version__})")
+
     # Startup — check JWT secret safety
     from .jwt_config import JWT_DEFAULT_SECRET, JWT_SECRET
 
@@ -534,7 +537,7 @@ app.include_router(calendar.router)
 @app.get("/")
 async def root() -> dict[str, str]:
     """Health check endpoint."""
-    return {"status": "ok"}
+    return {"status": "ok", "version": __version__}
 
 
 # ---------------------------------------------------------------------------

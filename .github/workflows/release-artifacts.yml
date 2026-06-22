@@ -65,6 +65,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # hatch-vcs needs full history + tags to stamp the version
 
       - uses: actions/setup-python@v6
         with:
@@ -103,6 +105,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # hatch-vcs needs full history + tags to stamp the version
 
       - uses: actions/setup-python@v6
         with:
@@ -162,7 +166,12 @@ jobs:
 
       - name: Build frontend (paraglide + vite, adapter-static → build/)
         working-directory: frontend
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
+          # Same version source as the wheels: the git tag (v0.2.2 -> 0.2.2).
+          # Empty on workflow_dispatch -> vite falls back to 'dev'.
+          export PUBLIC_APP_VERSION="${RELEASE_TAG#v}"
           npm ci
           npm run build
 

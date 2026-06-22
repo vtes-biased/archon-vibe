@@ -4,6 +4,12 @@ import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	// Build-time app version. CI (release-artifacts.yml) sets PUBLIC_APP_VERSION
+	// from the git tag — the same single source as the backend/bot wheels; dev and
+	// Docker builds (no env) show 'dev'.
+	define: {
+		__APP_VERSION__: JSON.stringify(process.env.PUBLIC_APP_VERSION ?? 'dev')
+	},
 	plugins: [
 		tailwindcss(),
 		paraglideVitePlugin({

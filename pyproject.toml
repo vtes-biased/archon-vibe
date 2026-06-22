@@ -1,6 +1,6 @@
 [project]
 name = "archon"
-version = "0.1.0"
+dynamic = ["version"]   # derived from the git tag by hatch-vcs (see [tool.hatch.version])
 description = "VEKN community and tournament management system"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -23,8 +23,17 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+# Single source of truth for the version: the git tag (e.g. v0.2.1 -> 0.2.1).
+# `just release` pushes the tag; CI (release-artifacts.yml, fetch-depth: 0) builds
+# the wheel so its metadata carries the real version. fallback_version covers
+# no-.git build contexts (the dev/test Docker image, sdist-from-tarball) so they
+# don't error — release wheels never hit it because CI fetches full history.
+[tool.hatch.version]
+source = "vcs"
+raw-options = { fallback_version = "0.0.0" }
 
 [tool.hatch.build.targets.wheel]
 # only-include (not `packages`, which would collapse to a generic top-level `src`)

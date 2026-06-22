@@ -1,6 +1,6 @@
 [project]
 name = "archon-discord-bot"
-version = "0.1.0"
+dynamic = ["version"]   # derived from the git tag by hatch-vcs (see [tool.hatch.version])
 description = "Discord bot for Archon VTES tournament management"
 requires-python = ">=3.11"
 dependencies = [
@@ -16,8 +16,15 @@ dependencies = [
 archon-bot = "archon_bot.main:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+# Version from the monorepo git tag. root = ".." points hatch-vcs at the repo
+# root (this pyproject lives in bot/); bot + backend share one tag. CI builds
+# this wheel with fetch-depth: 0; fallback_version covers no-.git build contexts.
+[tool.hatch.version]
+source = "vcs"
+raw-options = { root = "..", fallback_version = "0.0.0" }
 
 # src-layout: the importable package lives at bot/src/archon_bot/.
 [tool.hatch.build.targets.wheel]
