@@ -509,9 +509,9 @@ export async function computeLeagueStandings(
  * "did a final happen?" is read from the `finalist` flags.
  */
 export function computeFinalStandings(
-  standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean }>,
+  standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean; disqualified?: boolean }>,
   winner: string
-): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number }> {
+): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number; disqualified?: boolean }> {
   const engine = getEngineReactive();
   if (!engine) return [];
   const resultJson = callEngine(() => engine.computeFinalStandings(JSON.stringify({ standings, winner })));

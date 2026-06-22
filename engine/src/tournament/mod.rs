@@ -1677,7 +1677,10 @@ fn apply_event(
                         .members()
                         .find(|p| p["user_uid"].as_str() == Some(&s.user_uid));
                     let ps = player.and_then(|p| p["state"].as_str()).unwrap_or("");
-                    ps != "Disqualified" && ps != "Finished"
+                    // `disqualified` carries the dual DQ signal (state OR active DQ
+                    // sanction) the standings already resolved — use it so finals
+                    // eligibility can't diverge from who got zeroed.
+                    !s.disqualified && ps != "Finished"
                 })
                 .collect();
 

@@ -195,7 +195,8 @@ Single source: `engine/src/permissions.rs` (`can_issue_sanction`, `can_lift_sanc
 
 #### Lifecycle Effects
 
-- **DQ ↔ player state**: issuing a DQ sets the player to Disqualified on the tournament; lifting or deleting an active DQ restores them (Finished).
+- **DQ ↔ player state**: issuing a DQ sets the player to Disqualified on the tournament; lifting or deleting an active DQ restores them (Finished). Standings recompute immediately on DQ create (and on lift/delete).
+- **DQ standings effect**: DQ'd players appear last in standings with VP/GW/TP zeroed (forfeited) and no numeric rank. Opponents keep all scores earned at their table. DQ'd players earn no rating points (no participation base, no finalist bonus, no rating-history entry). Player count for the rating coefficient stays inclusive of DQ'd players (tournament-rules A.2).
 - **Probation requires an expiry** (≤ 18 months); suspension expiry is optional — none means permanent ban.
 - **Cleanup job (daily)**: sanctions expired for over 18 months are soft-deleted; soft-deleted records are hard-deleted after 30 days (a mistaken organizer delete stays recoverable by IC in that window).
 - **Active suspension** blocks check-in/registration in any sanctioned event and blocks self-abandoning the VEKN ID; sanctions stay attached to the VEKN record through account merge/detach (see ARCHITECTURE.md).
@@ -356,13 +357,13 @@ Behaviors the app must get right that go beyond the headline rules in §3.
 
 Rating = sum of best 8 tournaments in trailing 18 months.
 
-Per tournament:
+Per tournament (DQ'd players earn zero — no entry created):
 - 5 RtP for attendance
 - 4 RtP per VP scored
 - 8 RtP per GW (including final round victory)
 - Finalist bonus: `Points * Coefficient`
   - Winner: 90 points, Finalist: 30 points
-  - Coefficient: `log15(NumPlayers^2) - 1`
+  - Coefficient: `log15(NumPlayers^2) - 1` — NumPlayers includes DQ'd players (tournament-rules A.2)
   - +0.25 for National Championship
   - +1.0 for Continental Championship
 

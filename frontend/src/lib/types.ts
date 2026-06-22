@@ -287,6 +287,7 @@ export interface Standing {
   tp: number;
   toss: number;
   finalist: boolean;
+  disqualified?: boolean;
 }
 
 export type RafflePool = "AllPlayers" | "NonFinalists" | "GameWinners" | "NoGameWin" | "NoVictoryPoint";

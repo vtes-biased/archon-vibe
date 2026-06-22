@@ -2,10 +2,10 @@
 
 use json::JsonValue;
 
-use super::sanctions::{resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments};
+use super::sanctions::{has_dq_sanction, resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments};
 use super::scoring::{compute_gw, compute_tp};
 
-/// Player standing: (user_uid, gw, vp, tp, toss, finalist)
+/// Player standing: (user_uid, gw, vp, tp, toss, finalist, disqualified)
 pub(super) struct Standing {
     pub user_uid: String,
     pub gw: f64,
@@ -13,6 +13,9 @@ pub(super) struct Standing {
     pub tp: f64,
     pub toss: u32,
     pub finalist: bool,
+    /// DQ'd players forfeit their own score (gw/vp/tp zeroed) and sort last, but
+    /// stay in standings flagged — opponents keep the VPs they earned vs them.
+    pub disqualified: bool,
 }
 
 /// Compute standings from all rounds. Sorted by GW desc, VP desc, TP desc, toss desc.
@@ -80,6 +83,13 @@ pub(super) fn compute_preliminary_standings(
             let finalist = player
                 .and_then(|p| p["finalist"].as_bool())
                 .unwrap_or(false);
+            // DQ (state set by the backend on a DQ sanction, or an active DQ
+            // sanction — same dual signal the check-in skip uses): forfeit the
+            // player's own score. Their seat is left intact above, so the per-table
+            // GW/TP the opponents earned already stand.
+            let disqualified = player.and_then(|p| p["state"].as_str()) == Some("Disqualified")
+                || has_dq_sanction(sanctions, &uid);
+            let (gw, vp, tp) = if disqualified { (0.0, 0.0, 0.0) } else { (gw, vp, tp) };
             Standing {
                 user_uid: uid,
                 gw,
@@ -87,6 +97,7 @@ pub(super) fn compute_preliminary_standings(
                 tp,
                 toss,
                 finalist,
+                disqualified,
             }
         })
         .collect();
@@ -97,8 +108,10 @@ pub(super) fn compute_preliminary_standings(
     // league points. Note: toss decides the finals cutoff only; it does NOT split
     // ranks for GP points (that key is gw/vp/tp — see league.rs).
     standings.sort_by(|a, b| {
-        b.gw.partial_cmp(&a.gw)
-            .unwrap()
+        // DQ'd players sort last (false < true), then by score within each group.
+        a.disqualified
+            .cmp(&b.disqualified)
+            .then(b.gw.partial_cmp(&a.gw).unwrap())
             .then(b.vp.partial_cmp(&a.vp).unwrap())
             .then(b.tp.partial_cmp(&a.tp).unwrap())
             .then(b.toss.cmp(&a.toss))
@@ -125,6 +138,7 @@ pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue
                 "tp" => s.tp,
                 "toss" => s.toss,
                 "finalist" => s.finalist,
+                "disqualified" => s.disqualified,
             }
         })
         .collect();
@@ -150,6 +164,8 @@ fn with_rank(standing: &JsonValue, rank: usize) -> JsonValue {
 /// - Non-finalists keep preliminary order and use standard competition ranking
 ///   (shared rank on equal gw/vp/tp, skipping after ties), numbered from
 ///   `finalist_count + 1`.
+/// - Disqualified players (the `disqualified` flag) are held out of the ranked
+///   buckets entirely and appended last with no competitive place (JG v2 §1.1.4).
 ///
 /// **Whether a final happened is read from the `finalist` flags**, not from any
 /// separate finals data — that flag is the one signal every writer sets (engine
@@ -173,8 +189,14 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     let mut winner_entry: Option<&JsonValue> = None;
     let mut finalists: Vec<&JsonValue> = Vec::new(); // flagged, non-winner
     let mut non_finalists: Vec<&JsonValue> = Vec::new();
+    let mut disqualified: Vec<&JsonValue> = Vec::new();
     for s in standings.members() {
-        if winner_present && s["user_uid"].as_str() == Some(winner) {
+        if s["disqualified"].as_bool().unwrap_or(false) {
+            // DQ'd: never a placed competitor — held out of the ranked buckets so
+            // they don't tie with (or displace) a non-DQ player, then appended
+            // last (below). The UI renders DQ rows as "—" off the flag, not the rank.
+            disqualified.push(s);
+        } else if winner_present && s["user_uid"].as_str() == Some(winner) {
             winner_entry = Some(s);
         } else if s["finalist"].as_bool().unwrap_or(false) {
             finalists.push(s);
@@ -213,6 +235,15 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
         }
         out.push(with_rank(s, rank));
     }
+
+    // DQ'd players have no competitive place: append them last with ranks that
+    // continue past every non-DQ rank, so any rank-keyed sort keeps them at the
+    // bottom. The number is never shown — the UI renders DQ rows as "—" + badge.
+    let mut dq_rank = finalist_count + non_finalists.len() + 1;
+    for s in &disqualified {
+        out.push(with_rank(s, dq_rank));
+        dq_rank += 1;
+    }
     out
 }
 
@@ -232,6 +263,16 @@ pub fn compute_rating_vp_gw(
     sanctions: &JsonValue,
     user_uid: &str,
 ) -> (f64, f64) {
+    // DQ'd players earn no rating: forfeit their rating VP/GW too (the participation
+    // base + finalist bonus are suppressed upstream in the rating-entry builder).
+    let disqualified = tournament["players"]
+        .members()
+        .any(|p| p["user_uid"].as_str() == Some(user_uid) && p["state"].as_str() == Some("Disqualified"))
+        || has_dq_sanction(sanctions, user_uid);
+    if disqualified {
+        return (0.0, 0.0);
+    }
+
     let has_play = !tournament["rounds"].is_empty() || !tournament["finals"].is_null();
     if !has_play {
         // VEKN-synced or rounds-less: standings already carry the authoritative totals.
@@ -415,6 +456,33 @@ mod tests {
             "non-finalists start at finalist_count + 1"
         );
         assert_eq!(rank_of(&r, "p5"), 5);
+    }
+
+    #[test]
+    fn final_standings_dq_appended_last_without_displacing_ranks() {
+        // p2 is disqualified (zeroed by compute_preliminary_standings). The non-DQ
+        // players must rank 1..N contiguously as if p2 weren't there, and p2 lands
+        // last with a rank past every non-DQ rank (UI renders it as "—"/DQ).
+        let standings = json::parse(
+            r#"[
+            {"user_uid":"p1","gw":2.0,"vp":5.0,"tp":120,"finalist":false,"disqualified":false},
+            {"user_uid":"p3","gw":1.0,"vp":3.0,"tp":80,"finalist":false,"disqualified":false},
+            {"user_uid":"p2","gw":0.0,"vp":0.0,"tp":0,"finalist":false,"disqualified":true}
+        ]"#,
+        )
+        .unwrap();
+        let r = compute_final_standings(&standings, "");
+        assert_eq!(rank_of(&r, "p1"), 1);
+        assert_eq!(rank_of(&r, "p3"), 2, "non-DQ players rank contiguously");
+        assert!(
+            rank_of(&r, "p2") > rank_of(&r, "p3"),
+            "DQ'd player sorts strictly below every non-DQ player"
+        );
+        assert_eq!(
+            r.last().unwrap()["user_uid"].as_str(),
+            Some("p2"),
+            "DQ'd player is emitted last"
+        );
     }
 
     #[test]

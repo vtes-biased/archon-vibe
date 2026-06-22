@@ -12,6 +12,8 @@ export interface StandingEntry {
   rank: number;
   finals?: string;
   finalist?: boolean;
+  /** DQ'd: score forfeited (zeroed), sorted last, no competitive rank / RTP. */
+  disqualified?: boolean;
 }
 
 /** Player display info keyed by user uid (built from User records + per-tournament display_name). */
@@ -110,7 +112,8 @@ export function top5HasTies(standings: StandingEntry[]): boolean {
   const fifth = standings[4]!;
   for (let k = 5; k < standings.length; k++) {
     const s = standings[k]!;
-    if (s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp && s.toss === fifth.toss) return true;
+    // DQ'd rows are zeroed and parked last; they never tie for the finals cutoff.
+    if (!s.disqualified && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp && s.toss === fifth.toss) return true;
   }
   return false;
 }
@@ -127,7 +130,7 @@ export function top5HasScoreTies(standings: StandingEntry[]): boolean {
   const fifth = standings[4]!;
   for (let k = 5; k < standings.length; k++) {
     const s = standings[k]!;
-    if (s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp) return true;
+    if (!s.disqualified && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp) return true;
   }
   return false;
 }
@@ -213,17 +216,35 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
     }));
   }
 
-  // The engine assumes input pre-sorted descending by preliminary score.
-  prelim.sort((a, b) => b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss || a.user_uid.localeCompare(b.user_uid));
-  const ranked = computeFinalStandings(prelim, winnerUid);
+  // DQ'd players forfeit their own score (zeroed) and sort last; the engine
+  // mirrors this on the stored standings, but we re-derive here so the seat-sum
+  // fallback path is consistent too. Opponents' scores are untouched.
+  // DQ from live player state OR the engine-persisted standings flag (the latter
+  // covers VEKN-synced/imported tournaments that carry no live player.state).
+  const dqUids = new Set<string>(
+    tournament.players.filter(p => p.state === "Disqualified" && p.user_uid).map(p => p.user_uid!)
+  );
+  for (const s of tournament.standings ?? []) {
+    if (s.disqualified) dqUids.add(s.user_uid);
+  }
+  const prelimDq = prelim.map(e => {
+    const disqualified = dqUids.has(e.user_uid);
+    return disqualified ? { ...e, gw: 0, vp: 0, tp: 0, disqualified } : { ...e, disqualified };
+  });
+
+  // The engine assumes input pre-sorted descending by preliminary score, DQ last.
+  prelimDq.sort((a, b) =>
+    (a.disqualified === b.disqualified ? 0 : a.disqualified ? 1 : -1)
+    || b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss || a.user_uid.localeCompare(b.user_uid));
+  const ranked = computeFinalStandings(prelimDq, winnerUid);
   if (!ranked.length) {
     // Engine not ready (load() awaits initEngine, so this is a safety net):
     // degrade to preliminary order so the table is never blank.
-    return prelim.map((e, i) => ({ ...e, rank: i + 1 }));
+    return prelimDq.map((e, i) => ({ ...e, rank: i + 1 }));
   }
   return ranked.map(e => {
     const entry: StandingEntry = {
-      user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank, finalist: e.finalist,
+      user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank, finalist: e.finalist, disqualified: e.disqualified,
     };
     const fr = finalsResults?.get(e.user_uid);
     if (fr) entry.finals = formatScore(fr.gw, fr.vp, fr.tp);

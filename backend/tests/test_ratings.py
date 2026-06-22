@@ -3,9 +3,15 @@
 import msgspec
 from archon_engine import PyEngine
 from src.models import (
+    Sanction,
     Tournament,
 )
-from src.ratings import _finalist_position
+from src.ratings import (
+    _compute_entry_sync,
+    _finalist_position,
+    _is_disqualified,
+    _player_count,
+)
 
 _engine = PyEngine()
 
@@ -176,6 +182,72 @@ class TestRatingVpGw:
         vp, gw = _rating_vp_gw(t, "p1")
         assert vp == 4.0
         assert gw == 1
+
+
+# ---------------------------------------------------------------------------
+# Disqualified player earns no RTP (the backend guard, not just engine zeroing)
+# ---------------------------------------------------------------------------
+
+
+def _sanction(user_uid: str, **overrides) -> Sanction:
+    d = {
+        "uid": "s-001",
+        "modified": "2026-01-01T00:00:00",
+        "user_uid": user_uid,
+        "issued_by_uid": "judge",
+        "level": "disqualification",
+        "category": "unsportsmanlike_conduct",
+        "description": "",
+        "issued_at": "2026-01-01T00:00:00",
+    }
+    d.update(overrides)
+    return msgspec.convert(d, Sanction)
+
+
+def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
+    """A DQ'd player who played earns NO rating points — not even the 5-point
+    participation base (spec #284). The engine zeroes their VP/GW to (0,0), so an
+    entry would still score base=5; the backend guard that prevents any entry is
+    `_is_disqualified`. This pins that guard (both DQ signals), proves the co-player
+    is untouched, and that `_player_count` stays inclusive of the DQ'd head."""
+    t = _make_tournament(
+        players=[
+            {"user_uid": "dq_state", "state": "Disqualified"},
+            {"user_uid": "dq_sanction", "state": "Finished"},
+            {"user_uid": "clean", "state": "Finished"},
+        ],
+        rounds=[
+            [
+                {
+                    "seating": [
+                        _seat("dq_state", 1.0, 0),
+                        _seat("dq_sanction", 1.0, 0),
+                        _seat("clean", 2.0, 1),
+                    ]
+                }
+            ],
+        ],
+    )
+    sanctions = [_sanction("dq_sanction")]
+
+    # Both DQ signals trip the guard; the clean co-player does not.
+    assert _is_disqualified(t, sanctions, "dq_state")
+    assert _is_disqualified(t, sanctions, "dq_sanction")
+    assert not _is_disqualified(t, sanctions, "clean")
+
+    # Were a DQ'd player NOT skipped, their entry would still bank the 5-pt base
+    # (VP/GW zeroed by the engine, not the points) — which is exactly the RTP the
+    # spec forbids, and why the guard must skip the entry entirely.
+    dq_entry = _compute_entry_sync(t, "dq_state", sanctions)
+    assert (dq_entry.vp, dq_entry.gw) == (0.0, 0)
+    assert dq_entry.points == 5
+
+    # The co-player's entry is unaffected.
+    clean_entry = _compute_entry_sync(t, "clean", sanctions)
+    assert clean_entry.vp == 2.0 and clean_entry.gw == 1
+
+    # Head-count stays inclusive of DQ'd players (finalist-coefficient base).
+    assert _player_count(t) == 3
 
 
 # ---------------------------------------------------------------------------

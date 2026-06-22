@@ -25,7 +25,9 @@ from .db import (
 )
 from .models import (
     CategoryRating,
+    PlayerState,
     RatingCategory,
+    SanctionLevel,
     Tournament,
     TournamentRatingEntry,
     User,
@@ -69,8 +71,28 @@ def _players_with_rounds(t: Tournament) -> set[str]:
 
 
 def _player_count(t: Tournament) -> int:
-    """Count of players with ≥1 round played."""
+    """Count of players with ≥1 round played.
+
+    Stays inclusive of disqualified players (tournament-rules A.2): a DQ'd player
+    still inflates the head-count feeding everyone else's finalist coefficient.
+    """
     return len(_players_with_rounds(t))
+
+
+def _is_disqualified(t: Tournament, sanctions: list | None, user_uid: str) -> bool:
+    """A DQ'd player earns no rating from this tournament — not even the
+    participation base. Mirrors the engine's dual signal (player state set by the
+    DQ-sanction route, or an active disqualification sanction)."""
+    for p in t.players:
+        if p.user_uid == user_uid and p.state == PlayerState.DISQUALIFIED:
+            return True
+    return any(
+        s.user_uid == user_uid
+        and s.level == SanctionLevel.DISQUALIFICATION
+        and s.lifted_at is None
+        and s.deleted_at is None
+        for s in (sanctions or [])
+    )
 
 
 def _finalist_position(t: Tournament, user_uid: str) -> int:
@@ -176,6 +198,8 @@ async def recompute_ratings_for_players(
             if user_uid in played:
                 if t.uid not in sanctions_cache:
                     sanctions_cache[t.uid] = await get_sanctions_for_tournament(t.uid)
+                if _is_disqualified(t, sanctions_cache[t.uid], user_uid):
+                    continue  # DQ'd: no rating entry, no participation base
                 entries.append(_compute_entry_sync(t, user_uid, sanctions_cache[t.uid]))
 
         entries.sort(key=lambda e: e.points, reverse=True)

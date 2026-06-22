@@ -645,6 +645,46 @@ fn test_standings_vp_under_sa_goes_negative() {
 }
 
 #[test]
+fn test_dq_player_zeroed_and_sorted_last_opponents_unaffected() {
+    // p2 is disqualified. Their own gw/vp/tp are zeroed and they sort last, but
+    // their seat is left intact so p1 still earns the table GW and keeps its VP.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+        ],
+    }]];
+    tournament["players"] = json::array![
+        { user_uid: "p1", toss: 0 },
+        { user_uid: "p2", toss: 0, state: "Disqualified" },
+        { user_uid: "p3", toss: 0 },
+        { user_uid: "p4", toss: 0 },
+    ];
+    let empty = json::array![];
+    let standings = super::standings::compute_preliminary_standings(&tournament, &empty);
+    let p2 = standings.iter().find(|s| s.user_uid == "p2").unwrap();
+    assert_eq!((p2.gw, p2.vp, p2.tp), (0.0, 0.0, 0.0), "DQ'd player forfeits score");
+    assert!(p2.disqualified);
+    assert_eq!(standings.last().unwrap().user_uid, "p2", "DQ'd player sorts last");
+
+    let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
+    assert_eq!((p1.gw, p1.vp), (1.0, 2.0), "opponent keeps GW + VP earned vs the DQ'd seat");
+
+    // Rating VP/GW: zero for the DQ'd player, unchanged for the opponent.
+    assert_eq!(super::compute_rating_vp_gw(&tournament, &empty, "p2"), (0.0, 0.0));
+    assert_eq!(super::compute_rating_vp_gw(&tournament, &empty, "p1"), (2.0, 1.0));
+
+    // An active DQ *sanction* alone (no player state) is also honored.
+    let sanctions = json::array![
+        { user_uid: "p1", level: "disqualification", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    assert_eq!(super::compute_rating_vp_gw(&tournament, &sanctions, "p1"), (0.0, 0.0));
+}
+
+#[test]
 fn test_rating_vp_gw_includes_finals_and_full_sa() {
     // Rating recomputes prelim GW from raw VPs + sanctions and adds the stored
     // finals GW. p1: round0 2.5VP (table-high -> GW), round1 0VP with an SA (-1, so

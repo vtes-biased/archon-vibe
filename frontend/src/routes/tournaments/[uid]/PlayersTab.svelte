@@ -291,7 +291,7 @@
     for (const entry of standings) {
       const idx = standings.indexOf(entry);
       const isTop5 = idx >= 0 && idx < 5;
-      const isTied = standings.some((s, j) => j !== idx && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5));
+      const isTied = !entry.disqualified && standings.some((s, j) => j !== idx && !s.disqualified && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5));
       if (isTied) {
         edits[entry.user_uid] = String(entry.toss ?? "");
       }
@@ -325,7 +325,7 @@
   const isFinished = $derived(tournament.state === "Finished");
 
   function getRatingPts(entry: StandingEntry): number {
-    if (!isFinished) return 0;
+    if (!isFinished || entry.disqualified) return 0; // DQ'd earn no RTP, not even the base
     const isWinner = entry.user_uid === tournament.winner;
     const finalistPos = isWinner ? 1
       : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
@@ -515,16 +515,16 @@
         {@const entry = standingsMap.get(puid)}
         {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
         {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
-        {@const isTied = entry ? standings.some((s, j) => j !== standingsIdx && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5)) : false}
+        {@const isTied = entry && !entry.disqualified ? standings.some((s, j) => j !== standingsIdx && !s.disqualified && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5)) : false}
         <div class="bg-surface-muted/50 rounded-lg p-3 {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-accent-soft-border' : ''}">
           <!-- Top row: rank + name + sanctions + status -->
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5">
                 {#if playerSort === 'standings' && entry}
-                  <span class="text-ink-faint text-xs font-medium shrink-0"><RankCell rank={entry.rank} finalist={entry.finalist} hash /></span>
+                  <span class="text-ink-faint text-xs font-medium shrink-0">{#if entry.disqualified}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} hash />{/if}</span>
                 {/if}
-                <span class="truncate {isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink'} text-sm">
+                <span class="truncate {entry?.disqualified ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} text-sm">
                   {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
                 </span>
                 {#if playerSanctionsMap[puid]?.length}
@@ -731,10 +731,10 @@
             {@const entry = standingsMap.get(puid)}
             {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
             {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
-            {@const isTied = entry ? standings.some((s, j) => j !== standingsIdx && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5)) : false}
-            <tr class="{isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink'} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-accent-soft/10' : ''} border-t border-line-strong">
+            {@const isTied = entry && !entry.disqualified ? standings.some((s, j) => j !== standingsIdx && !s.disqualified && s.gw === entry.gw && s.vp === entry.vp && s.tp === entry.tp && (isTop5 || j < 5)) : false}
+            <tr class="{entry?.disqualified ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-accent-soft/10' : ''} border-t border-line-strong">
               {#if playerSort === 'standings' && standings.length > 0}
-                <td class="py-1.5 pr-2 text-ink-faint">{entry?.rank ?? "—"}</td>
+                <td class="py-1.5 pr-2 text-ink-faint">{entry?.disqualified ? "—" : (entry?.rank ?? "—")}</td>
               {/if}
               <td class="py-1.5 pr-2">
                 <span class="truncate flex items-center gap-1">

@@ -303,11 +303,14 @@ async def create_sanction(
         f"by {current_user.uid}"
     )
 
-    # DQ sanction: set player state to Disqualified on the tournament
+    # DQ sanction: set player state to Disqualified on the tournament, then refresh
+    # standings so the DQ'd player is zeroed + sorted last immediately (the lift/delete
+    # paths below recompute too; a sanction is not a TournamentEvent on its own).
     if level == SanctionLevel.DISQUALIFICATION and request.tournament_uid:
         await _set_player_dq_state(
             request.tournament_uid, request.user_uid, PlayerState.DISQUALIFIED
         )
+        await _recompute_tournament_standings(request.tournament_uid)
     # SA sanction: refresh standings so the -1 VP penalty shows immediately
     elif level == SanctionLevel.STANDINGS_ADJUSTMENT and request.tournament_uid:
         await _recompute_tournament_standings(request.tournament_uid)
@@ -477,6 +480,9 @@ async def update_sanction_endpoint(
         await _set_player_dq_state(
             sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
         )
+        # Restore the un-zeroed scores: the player is no longer DQ'd, so standings
+        # must recompute (the stored standings carry the zeroed totals otherwise).
+        await _recompute_tournament_standings(sanction.tournament_uid)
 
     # SA touched (lifted, round changed, or level changed to/from SA): refresh
     # standings so the -1 VP penalty appears/clears immediately.
@@ -544,6 +550,8 @@ async def delete_sanction_endpoint(
         await _set_player_dq_state(
             sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
         )
+        # Restore the un-zeroed scores (mirrors the lift path above).
+        await _recompute_tournament_standings(sanction.tournament_uid)
 
     # Deleting an active SA drops its -1 VP penalty: refresh standings
     if (
