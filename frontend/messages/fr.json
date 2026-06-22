@@ -233,6 +233,8 @@
   "sanction_sub_failure_to_play_to_win": "Échec de Jouer pour Gagner",
   "sanction_round": "Ronde",
   "sanction_round_label": "Ronde {round}",
+  "sanction_sa_applies_to": "S'applique à la partie en cours/la plus récente du joueur : Ronde {round}",
+  "sanction_sa_no_round": "Ce joueur n'a pas encore joué de ronde, il est donc impossible d'appliquer un Ajustement de Classement.",
   "sanction_baseline_hint": "Pénalité de base : {level}",
   "sanction_escalation_hint": "{count} infraction(s) antérieure(s) de ce type — niveau suggéré : {suggested}",
   "sanction_other_infractions": "{count} autre(s) sanction(s) pour d'autres infractions dans cet événement",

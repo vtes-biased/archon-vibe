@@ -1347,6 +1347,11 @@ fn apply_event(
             let rounds_len = tournament["rounds"].len();
             let is_finals = *round == rounds_len && !tournament["finals"].is_null() && *table == 0;
 
+            // Resolve SA effective rounds from the whole tournament BEFORE taking the
+            // mutable borrow of `t` below (scores don't move seats, so resolving here
+            // is equivalent and avoids a borrow conflict).
+            let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
+
             let t = if is_finals {
                 &mut tournament["finals"]
             } else {
@@ -1424,7 +1429,7 @@ fn apply_event(
             // Per-seat SA adjustments (-1.0 VP per SA on this round). Same helper the
             // standings/rating recompute uses, so GW/TP stay consistent everywhere.
             let current_round = if is_finals { rounds_len } else { *round };
-            let adjustments = table_sa_adjustments(&t["seating"], current_round, sanctions);
+            let adjustments = table_sa_adjustments(&t["seating"], current_round, &effective_sas);
 
             let gws = if is_finals {
                 let seating_uids: Vec<&str> = (0..table_size)

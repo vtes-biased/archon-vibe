@@ -68,6 +68,7 @@
 - [SA standings recompute on sanction mutation](sa-standings-recompute-on-sanction-mutation.md) — sanctions.py `_recompute_tournament_standings` refreshes tournament.standings on SA create/lift/delete via the python-only `update_standings_json` engine entrypoint; frontend reads standings (not raw seats). Don't reintroduce the "sanction writes skip the tournament recompute" assumption.
 - [Standings are prelim-only](standings-prelim-only-contract.md) — `tournament.standings` = SA-adjusted prelim, finals excluded; the Python archon importer violates this (stores finals-inclusive) → league double-counts finals.
 - [Rounds⇔standings coupling](rounds-standings-coupling-engine.md) — engine invariant: standings non-empty iff rounds non-empty; makes the VEKN `batch_push` `rounds>0` guard safe (excludes imports, keeps in-app tournaments).
+- [SA round-targeting two consumers](sa-round-targeting-two-consumers.md) — SA −1 VP has two engine consumers keyed differently (per-table GW/TP by round_index vs VP total by rounds_len); must share one effective-round resolution or VP/GW/TP silently diverge (JG v2 §1.1.3 redirect, no deferral).
 
 ## Authorization (cross-stack)
 - Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).

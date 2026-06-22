@@ -703,9 +703,11 @@ fn test_rating_vp_gw_reads_standings_when_no_rounds() {
 }
 
 #[test]
-fn test_standings_vp_sa_ignores_lifted_and_future_rounds() {
-    // A lifted SA must not penalize; an SA on a round that hasn't been played yet
-    // (index >= rounds played) is deferred. p1's VP stays its raw total.
+fn test_standings_vp_sa_ignores_lifted_redirects_unplayed_round() {
+    // A lifted SA must not penalize. An active SA whose stored round p1 never
+    // played (round 1 here — only round 0 exists) is NOT deferred (JG v2 §1.1.3:
+    // never a future round): it redirects to p1's most-recently-seated round
+    // (round 0) and applies. Net: -1 (the lifted one is ignored), so 1.5 -> 0.5.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -730,9 +732,91 @@ fn test_standings_vp_sa_ignores_lifted_and_future_rounds() {
     let standings = super::standings::compute_preliminary_standings(&tournament, &sanctions);
     let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
     assert_eq!(
-        p1.vp, 1.5,
-        "lifted SA and future-round SA leave VP unchanged"
+        p1.vp, 0.5,
+        "lifted SA ignored; unplayed-round SA redirects to round 0 (-1)"
     );
+}
+
+#[test]
+fn test_standings_sa_redirects_to_most_recent_seated_round() {
+    // p1 plays round 0 only (not seated in round 1). An SA stored on round 1 — a
+    // round p1 never played — must redirect to p1's most-recently-seated round
+    // (round 0), and BOTH consumers must agree there. Round 0: p1's raw 2.5 VP
+    // would take the GW (>=2, strictly highest); the redirected -1 drops adjusted
+    // VP to 1.5, removing the GW. If the SA had instead deferred or landed on the
+    // unplayed round 1, p1 would keep 2.5 VP and the GW.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![
+        json::array![json::object! {
+            seating: [
+                { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
+                { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+                { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 } },
+                { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+                { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 } },
+            ],
+        }],
+        json::array![json::object! {
+            seating: [
+                { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 24 } },
+                { player_uid: "p3", result: { gw: 1, vp: 2.0, tp: 60 } },
+                { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 24 } },
+                { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 } },
+            ],
+        }],
+    ];
+    tournament["players"] = json::array![
+        { user_uid: "p1", toss: 0 },
+        { user_uid: "p2", toss: 0 },
+        { user_uid: "p3", toss: 0 },
+        { user_uid: "p4", toss: 0 },
+        { user_uid: "p5", toss: 0 },
+    ];
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let standings = super::standings::compute_preliminary_standings(&tournament, &sanctions);
+    let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
+    assert_eq!(p1.vp, 1.5, "raw 2.5 - SA redirected onto round 0");
+    assert_eq!(
+        p1.gw, 0.0,
+        "redirected -1 lands on round 0: adjusted 1.5 (<2) removes the GW"
+    );
+}
+
+#[test]
+fn test_rating_vp_gw_sa_never_lands_on_finals() {
+    // An SA can never penalize the finals table. p1 plays one prelim round and the
+    // finals; the SA's stored round_number points at the finals slot (index 1 ==
+    // rounds_len), but the resolver only scans prelim rounds, so it redirects to
+    // p1's last prelim round (round 0). Finals VP/GW are read from the stored seat,
+    // untouched. VP = prelim 2.0 + finals 3.0 - 1.0 SA = 4.0; GW = 0 (round 0
+    // recomputed: adjusted 1.0 < 2) + 1 (finals, stored) = 1.0.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+        ],
+    }]];
+    tournament["finals"] = json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 3.0, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 24 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 } },
+        ],
+    };
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let (vp, gw) = super::compute_rating_vp_gw(&tournament, &sanctions, "p1");
+    assert_eq!(vp, 4.0, "prelim 2.0 + finals 3.0 - 1.0 SA (redirected to prelim)");
+    assert_eq!(gw, 1.0, "round 0 GW removed by SA; finals GW (stored) intact");
 }
 
 #[test]

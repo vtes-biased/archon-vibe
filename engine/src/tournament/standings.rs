@@ -2,7 +2,7 @@
 
 use json::JsonValue;
 
-use super::sanctions::{sa_vp_penalty, table_sa_adjustments};
+use super::sanctions::{resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments};
 use super::scoring::{compute_gw, compute_tp};
 
 /// Player standing: (user_uid, gw, vp, tp, toss, finalist)
@@ -30,6 +30,7 @@ pub(super) fn compute_preliminary_standings(
 ) -> Vec<Standing> {
     let mut map: std::collections::HashMap<String, (f64, f64, f64)> =
         std::collections::HashMap::new();
+    let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
 
     // Recompute GW/TP per table from raw VPs + current sanctions; sum raw VP.
     for (round_index, round) in tournament["rounds"].members().enumerate() {
@@ -39,7 +40,7 @@ pub(super) fn compute_preliminary_standings(
                 .members()
                 .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
                 .collect();
-            let adjustments = table_sa_adjustments(seating, round_index, sanctions);
+            let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
             let gws = compute_gw(&vps, &adjustments);
             let tps = compute_tp(vps.len(), &vps, &adjustments);
             for (i, seat) in seating.members().enumerate() {
@@ -55,13 +56,12 @@ pub(super) fn compute_preliminary_standings(
         }
     }
 
-    // Apply the full SA penalty (-1.0 per played-round SA; may go negative) to each
+    // Apply the full SA penalty (-1.0 per resolved SA; may go negative) to each
     // penalized player, per JG v2 1.1.3. The per-round result.vp stays raw; the
-    // penalty lives only in the standings total. Same rule as the rating path —
-    // both go through sanctions::sa_vp_penalty.
-    let rounds_len = tournament["rounds"].len();
+    // penalty lives only in the standings total. Same resolved-SA list the GW/TP
+    // cascade above used, so VP and GW/TP agree on every effective round.
     for uid in map.keys().cloned().collect::<Vec<_>>() {
-        let penalty = sa_vp_penalty(sanctions, &uid, rounds_len);
+        let penalty = sa_vp_penalty(&effective_sas, &uid);
         if penalty != 0.0 {
             if let Some(entry) = map.get_mut(&uid) {
                 entry.1 -= penalty;
@@ -246,6 +246,7 @@ pub fn compute_rating_vp_gw(
         return (0.0, 0.0);
     }
 
+    let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
     let mut vp = 0.0;
     let mut gw = 0.0;
     for (round_index, round) in tournament["rounds"].members().enumerate() {
@@ -261,7 +262,7 @@ pub fn compute_rating_vp_gw(
                 .members()
                 .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
                 .collect();
-            let adjustments = table_sa_adjustments(seating, round_index, sanctions);
+            let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
             vp += vps[i];
             gw += compute_gw(&vps, &adjustments)[i];
         }
@@ -272,7 +273,7 @@ pub fn compute_rating_vp_gw(
             gw += seat["result"]["gw"].as_f64().unwrap_or(0.0);
         }
     }
-    vp -= sa_vp_penalty(sanctions, user_uid, tournament["rounds"].len());
+    vp -= sa_vp_penalty(&effective_sas, user_uid);
     (vp, gw)
 }
 

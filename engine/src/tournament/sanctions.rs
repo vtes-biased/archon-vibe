@@ -26,22 +26,59 @@ pub(super) fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
     result
 }
 
+/// Resolve each active SA to the round its `-1` VP actually lands on, per JG v2
+/// §1.1.3: the player's current game if one is in progress, else their most
+/// recently played game — never a future round. The stored `round_number` is the
+/// fixed issue-time record of the game the judge ruled on; we honor it when the
+/// player was seated in that round, otherwise we redirect to the player's
+/// most-recently-*seated* round (highest round index with a seat). An SA whose
+/// player was never seated in any round contributes nothing and is dropped (a
+/// player who has yet to play has no game to penalize).
+///
+/// One entry per active SA — two SAs on one player stack to `-2`; do not dedup.
+/// This is the SINGLE source both consumers read (`table_sa_adjustments` for the
+/// per-table GW/TP cascade and `sa_vp_penalty` for the VP total), so they always
+/// agree on the effective round. Finals is never scanned, so SA never lands there.
+pub(super) fn resolve_sa_effective_rounds(
+    tournament: &JsonValue,
+    sanctions: &JsonValue,
+) -> Vec<(String, usize)> {
+    let rounds = &tournament["rounds"];
+    let nrounds = rounds.len();
+    let seated_in = |uid: &str, r: usize| -> bool {
+        rounds[r]
+            .members()
+            .any(|table| table["seating"].members().any(|s| s["player_uid"].as_str() == Some(uid)))
+    };
+    let mut out = Vec::new();
+    for (uid, stored) in get_sa_sanctions(sanctions) {
+        let effective = if stored < nrounds && seated_in(&uid, stored) {
+            Some(stored)
+        } else {
+            (0..nrounds).rev().find(|&r| seated_in(&uid, r))
+        };
+        if let Some(r) = effective {
+            out.push((uid, r));
+        }
+    }
+    out
+}
+
 /// Per-seat SA VP adjustments for a `seating` array in round `round_index`:
-/// `-1.0` for each active standings_adjustment sanction targeting that seat's
-/// player on that round. Length matches `seating`. Single source for the
-/// per-table adjustment vector — shared by score-time scoring (SetScore) and the
-/// standings/rating recompute, so every path applies SA to GW/TP identically.
+/// `-1.0` for each resolved SA whose effective round is `round_index` (see
+/// [`resolve_sa_effective_rounds`]). Length matches `seating`. Shared by
+/// score-time scoring (SetScore) and the standings/rating recompute, so every
+/// path applies SA to GW/TP identically.
 pub(super) fn table_sa_adjustments(
     seating: &JsonValue,
     round_index: usize,
-    sanctions: &JsonValue,
+    effective_sas: &[(String, usize)],
 ) -> Vec<f64> {
-    let sa = get_sa_sanctions(sanctions);
     seating
         .members()
         .map(|seat| {
             let uid = seat["player_uid"].as_str().unwrap_or("");
-            let count = sa
+            let count = effective_sas
                 .iter()
                 .filter(|(sa_uid, sa_round)| sa_uid == uid && *sa_round == round_index)
                 .count();
@@ -50,15 +87,14 @@ pub(super) fn table_sa_adjustments(
         .collect()
 }
 
-/// VP penalty magnitude for `user_uid` from active SA sanctions on already-played
-/// rounds: a full 1.0 per applicable sanction (JG v2 1.1.3). An SA targeting a
-/// not-yet-played round (index >= `rounds_len`) is deferred and contributes 0.
-/// Callers subtract this from the player's VP total, which may go negative.
-/// Single source for the SA-on-VP rule shared by standings and rating computation.
-pub(super) fn sa_vp_penalty(sanctions: &JsonValue, user_uid: &str, rounds_len: usize) -> f64 {
-    get_sa_sanctions(sanctions)
-        .into_iter()
-        .filter(|(uid, round)| uid == user_uid && *round < rounds_len)
+/// VP penalty magnitude for `user_uid`: a full 1.0 per resolved SA (JG v2 §1.1.3).
+/// Every entry in `effective_sas` already landed on a real played round, so there
+/// is no deferral here. Callers subtract this from the player's VP total, which
+/// may go negative. Shares [`resolve_sa_effective_rounds`] with the GW/TP cascade.
+pub(super) fn sa_vp_penalty(effective_sas: &[(String, usize)], user_uid: &str) -> f64 {
+    effective_sas
+        .iter()
+        .filter(|(uid, _)| uid == user_uid)
         .count() as f64
 }
 

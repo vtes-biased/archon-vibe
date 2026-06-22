@@ -108,6 +108,18 @@
   // SA requires round_number
   const roundRequired = $derived(level === "standings_adjustment");
 
+  // SA round is determined by tournament state, not chosen (JG v2 §1.1.3): the −1 VP
+  // lands on the player's current game if one is in progress, else their most-recently
+  // played game — i.e. the highest round index in which they are seated. Frozen at issue
+  // time onto the sanction; null when the player has not been seated in any round yet.
+  const saTargetRound = $derived.by(() => {
+    const rounds = tournament.rounds ?? [];
+    for (let i = rounds.length - 1; i >= 0; i--) {
+      if (rounds[i]?.some(t => t.seating?.some(s => s.player_uid === playerUid))) return i;
+    }
+    return null;
+  });
+
   // Level label helper
   function levelLabel(lv: SanctionLevel): string {
     const labels: Record<SanctionLevel, () => string> = {
@@ -160,7 +172,9 @@
 
   async function handleSubmit() {
     if (!description.trim()) return;
-    if (roundRequired && roundNumber === null) return;
+    // SA round is auto-computed (saTargetRound); other levels use the informational picker.
+    const targetRound = roundRequired ? saTargetRound : roundNumber;
+    if (roundRequired && saTargetRound === null) return;
     creating = true;
     try {
       await createSanction({
@@ -168,7 +182,7 @@
         level,
         category,
         subcategory: subcategory ?? undefined,
-        round_number: roundNumber,
+        round_number: targetRound,
         description: description.trim(),
         tournament_uid: tournament.uid,
       });
@@ -289,15 +303,28 @@
       </div>
 
       <!-- Round -->
-      {#if roundOptions.length > 0}
+      {#if roundRequired}
+        <!-- SA target round is determined by state, not chosen (JG v2 §1.1.3). -->
+        <div>
+          <span class="block text-sm font-medium text-ink-muted mb-1">{m.sanction_round()}</span>
+          {#if saTargetRound !== null}
+            <p class="px-3 py-2 rounded bg-accent-soft/30 border border-accent-soft-border/50 text-sm text-ink-bright">
+              {m.sanction_sa_applies_to({ round: String(saTargetRound + 1) })}
+            </p>
+          {:else}
+            <p class="px-3 py-2 rounded banner-warn border text-sm">
+              {m.sanction_sa_no_round()}
+            </p>
+          {/if}
+        </div>
+      {:else if roundOptions.length > 0}
         <div>
           <label for="ts-round" class="block text-sm font-medium text-ink-muted mb-1">
-            {m.sanction_round()} {roundRequired ? "*" : ""}
+            {m.sanction_round()}
           </label>
           <select
             id="ts-round"
             bind:value={roundNumber}
-            required={roundRequired}
             class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
           >
             <option value={null}>—</option>
@@ -331,7 +358,7 @@
           size="lg"
           class="flex-1"
           loading={creating}
-          disabled={!description.trim() || (roundRequired && roundNumber === null)}
+          disabled={!description.trim() || (roundRequired && saTargetRound === null)}
         >
           {creating ? m.sanction_mgr_issuing() : m.sanction_mgr_issue_btn()}
         </Button>

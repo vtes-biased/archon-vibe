@@ -215,13 +215,9 @@ Sanctions are a separate object type (see SYNC.md). The tournament-relevant sanc
 - **Penalty**: −1 VP applied to the target player's standings total for a specific round (Judges' Guide v2 §1.1.3).
 - **Per-seat VP is untouched**: raw `seat.result.vp` stays valid (VP sum = table size, oust order preserved). The penalty lives only on the standings total.
 - **GW and TP cascade**: because GW requires strictly highest VP at the table, −1 VP can flip a GW to a different player; TP re-ranks accordingly.
-- **Round targeting** (per §1.1.3):
-  - SA issued *during a game* → applies to that round.
-  - SA issued *between rounds* or before finals → applies to the next round the player plays.
-  - SA issued *after the last prelim round* → applies to the previous round they played.
-  - SA issued *before round 1 pairings* → applies to round 1.
-  - SA on a not-yet-scored round → deferred (penalty applies when that round is scored).
-- **Engine is the single source of truth**: `compute_preliminary_standings` / `sa_vp_penalty` in `engine/src/tournament/standings.rs` applies the SA when computing standings. Both backend and frontend consume `tournament.standings` rather than re-deriving SA from raw seat results.
+- **Round targeting** (per §1.1.3): the −1 VP lands on the player's **current game if one is in progress, otherwise their most recently played game — never a future round.** Concretely, the effective round is the highest round index in which the player is seated. The SA's stored `round_number` is the *fixed issue-time record* of the game the judge ruled on; the engine honors it when the player was seated in that round and otherwise **redirects** to the player's most-recently-seated round (so an SA referencing a round the player sat out lands on a game they actually played, not nowhere). A player who has not yet played any round has no game to penalize, so the SA contributes nothing until they do. (Issuing an SA *before round 1 pairings* is not supported — the backend requires an existing round.)
+- **No deferral**: the penalty is applied immediately to a played round; it is never parked on a future round to materialize later. The round is frozen onto the sanction at issue time (the UI auto-computes it — there is no free round picker for SA), so a later round starting cannot migrate an existing SA.
+- **Engine is the single source of truth**: `resolve_sa_effective_rounds` in `engine/src/tournament/sanctions.rs` resolves each active SA to its effective round once per compute, feeding both `table_sa_adjustments` (per-table GW/TP cascade) and `sa_vp_penalty` (VP total) so they always agree. `compute_preliminary_standings` / `compute_rating_vp_gw` in `standings.rs` consume it. Both backend and frontend read `tournament.standings` rather than re-deriving SA from raw seat results.
 - **Mutation side-effect**: issuing, lifting, editing, or deleting an SA sanction tied to a tournament immediately triggers a standings recompute (`_recompute_tournament_standings()` in `backend/src/routes/sanctions.py`: load tournament → `PyEngine.update_standings` → save → broadcast). The updated tournament object is broadcast via SSE to all clients.
 - **`PyEngine.update_standings`** is Python-only (like `compute_rating_vp_gw`); it is NOT exposed to WASM because sanctions have no offline-creation path.
 
