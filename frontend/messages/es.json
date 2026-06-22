@@ -279,6 +279,7 @@
   "user_cannot_change_role": "No puede cambiar {role}",
   "user_list_new_user": "+ Nuevo usuario",
   "user_list_search_placeholder": "Buscar por nombre o ID VEKN...",
+  "user_list_search_placeholder_contacts": "Buscar por nombre, ID VEKN, correo o Discord...",
   "user_list_all_countries": "Todos los países",
   "user_list_filter_sanctioned": "Sancionados",
   "user_list_filter_active_sanction": "Sanción activa",

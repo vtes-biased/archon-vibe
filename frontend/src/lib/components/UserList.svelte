@@ -8,6 +8,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses } from "$lib/roles";
   import { syncManager } from "$lib/sync";
+  import { hasAnyRole } from "$lib/stores/auth.svelte";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
   import Button from '$lib/components/Button.svelte';
@@ -42,6 +43,10 @@
   // Display refresh scheduling - simple debounce
   let displayRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   let isLoadingUsers = false; // Prevent concurrent loadUsers() calls
+
+  // Officials receive members' contact info (full projection), so only they can
+  // search by email/Discord — advertise it in the placeholder for them alone.
+  const isOfficial = hasAnyRole("IC", "NC", "Prince");
 
   const countries = getCountries();
   const availableRoles: Role[] = [
@@ -339,7 +344,7 @@
                 type="text"
                 bind:value={searchQuery}
                 oninput={handleSearchInput}
-                placeholder={m.user_list_search_placeholder()}
+                placeholder={isOfficial ? m.user_list_search_placeholder_contacts() : m.user_list_search_placeholder()}
                 class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright placeholder:text-ink-faint"
               />
             </div>

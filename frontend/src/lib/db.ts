@@ -308,18 +308,27 @@ export async function getUsersByCountry(country: string): Promise<User[]> {
 }
 
 /**
- * Check if a user's name matches a search query.
+ * Check if a user matches a search query.
  * Supports multiple search terms: "vin rip" matches "Vincent Ripoll".
- * Each search term must match the start of at least one name word.
+ * Each term must match a name/nickname word prefix, the VEKN/Discord ID prefix,
+ * or appear anywhere in the email / Discord handle. Contact fields are only
+ * present for an official's entitled members (full projection — see backend
+ * access_levels.py), so email/Discord search is implicitly scoped to those.
  */
 function matchesNameSearch(user: User, search: string): boolean {
   const nameWords = normalizeSearch(user.name).split(/\s+/);
+  const nickWords = user.nickname ? normalizeSearch(user.nickname).split(/\s+/) : [];
+  const email = user.contact_email ? normalizeSearch(user.contact_email) : "";
+  const discord = user.contact_discord ? normalizeSearch(user.contact_discord) : "";
   const searchTerms = search.split(/\s+/).filter(t => t.length > 0);
 
-  // Each search term must match the prefix of a name word or the VEKN ID
   return searchTerms.every(term =>
     nameWords.some(word => word.startsWith(term)) ||
-    (user.vekn_id && user.vekn_id.startsWith(term))
+    nickWords.some(word => word.startsWith(term)) ||
+    (user.vekn_id != null && user.vekn_id.startsWith(term)) ||
+    (user.discord_id != null && user.discord_id.startsWith(term)) ||
+    email.includes(term) ||
+    discord.includes(term)
   );
 }
 
