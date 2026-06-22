@@ -318,10 +318,14 @@ async def teardown_tournament(
         again. The caller passes the link's announcement/lobby/judges plus any
         tracked table/finals ids so a re-run still cleans those orphans up.
 
-    The category is deleted LAST so an early category delete never orphans a child
-    we were about to remove. Returns the channel ids that could not be deleted
-    (excluding ones already gone) so the caller can flag a partial teardown for
-    manual cleanup instead of falsely reporting success.
+    The category is deleted LAST, and only once every child is gone: deleting it
+    while a child delete is still failing would un-parent that survivor to the
+    guild root (Discord moves children up rather than deleting them), scattering
+    exactly the channels we couldn't remove. On a partial failure we keep the
+    category as the survivors' anchor so they stay grouped (and re-discoverable by
+    the scan) instead of loose at root. Returns the channel ids that could not be
+    deleted (excluding ones already gone) so the caller can flag a partial teardown
+    for manual cleanup instead of falsely reporting success.
     """
     under_category: list[int] = []
     try:
@@ -336,13 +340,13 @@ async def teardown_tournament(
         logger.warning("Teardown: failed to list channels in guild=%s: %s", guild_id, e)
 
     failed: list[int] = []
-    # Children + known orphans first; the category itself is handled last.
+    # Children + known orphans first; the category itself only after they're gone.
     targets = dict.fromkeys(
         cid
         for cid in (*under_category, *map(int, extra_channel_ids))
         if cid != int(category_id)
     )
-    for cid in (*targets, int(category_id)):
+    for cid in targets:
         try:
             await bot.rest.delete_channel(cid)
         except hikari.NotFoundError:
@@ -351,8 +355,24 @@ async def teardown_tournament(
             logger.warning("Teardown: failed to delete channel %s: %s", cid, e)
             failed.append(cid)
 
+    # Keep the category as an anchor on partial failure — never orphan survivors.
     if failed:
-        logger.warning("Teardown left %d channel(s) undeleted: %s", len(failed), failed)
+        logger.warning(
+            "Teardown left %d channel(s) undeleted; keeping category %s as their "
+            "anchor: %s",
+            len(failed),
+            category_id,
+            failed,
+        )
+        return failed
+
+    try:
+        await bot.rest.delete_channel(int(category_id))
+    except hikari.NotFoundError:
+        pass
+    except Exception as e:
+        logger.warning("Teardown: failed to delete category %s: %s", category_id, e)
+        failed.append(int(category_id))
     else:
         logger.info("Teardown removed all channels for category=%s", category_id)
     return failed

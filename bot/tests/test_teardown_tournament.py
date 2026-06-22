@@ -9,6 +9,8 @@ must still remove everything. This pins that contract:
     the category is deleted LAST and exactly once (even if passed among them);
   - channels already gone (NotFound) are ignored, while real delete failures are
     returned so the caller flags a partial teardown instead of lying success;
+  - on a partial failure the category is KEPT (not deleted), so a survivor whose
+    delete failed stays grouped under it rather than being un-parented to root;
   - a failed channel listing still deletes the explicitly-known ids.
 
 Only the REST calls the function makes are faked; real ``hikari`` error types.
@@ -107,6 +109,9 @@ async def test_reports_real_failures_ignores_already_gone() -> None:
         FakeBot(rest), guild_id=1, category_id=CATEGORY_ID
     )
     assert failed == [2]
+    # A child delete failed, so the category is kept as the survivor's anchor —
+    # deleting it would un-parent channel 2 to the guild root.
+    assert CATEGORY_ID not in rest.deleted
 
 
 @pytest.mark.asyncio
