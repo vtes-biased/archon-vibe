@@ -201,7 +201,7 @@
       <img src="/favicon.svg" alt="Archon" class="w-16 h-16" />
     </a>
 
-    <div class="flex-1 flex flex-col gap-2">
+    <div class="flex-1 flex flex-col gap-2 w-full">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
