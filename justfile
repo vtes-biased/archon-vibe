@@ -156,6 +156,10 @@ test-smoke:
 #   just release minor   # v0.1.10 -> v0.2.0
 #   just release major   # v0.1.10 -> v1.0.0
 #   just release v1.2.3  # or an explicit tag
+# The tag is the single source of truth for the backend/bot/frontend versions:
+# hatch-vcs stamps the wheels from it; CI passes it to the frontend build. The
+# Rust engine is the exception — its version is bumped by hand in engine/Cargo.toml
+# + engine/pyproject.toml when the engine changes, independent of the release tag.
 # Cut a release: bump type (patch/minor/major) or explicit vX.Y.Z (e2e-gated)
 release bump:
     #!/usr/bin/env bash
