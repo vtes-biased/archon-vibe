@@ -13,13 +13,13 @@ For terminology, consult the VTES Tournament Rules. Where a translation differs 
 
 ## 1. General Philosophy
 
-Judges are impartial overseers who maintain order, ensure fair competition, and apply the rules consistently. They intervene when a player asks for help, a breach is observed, or a situation risks disrupting the event — but are not expected to prevent every mistake. They respond to issues as they occur, correct them, and communicate clearly. Proactive intervention is appropriate outside active play (registration, deck checks, card legality).
+Judges are impartial overseers who maintain order, ensure fair competition, and apply the rules consistently. They intervene when a player asks for help, a breach is observed, or a situation risks disrupting the event, but are not expected to prevent every mistake. They respond to issues as they occur, correct them, and communicate clearly. Proactive intervention is appropriate outside active play (registration, deck checks, card legality).
 
-Penalties exist primarily to teach. The judge's first responsibility is to help the player understand what went wrong; the penalty reinforces that lesson and deters repeats. Their function is corrective and preventative — not punitive.
+Penalties exist primarily to teach. The judge's first responsibility is to help the player understand what went wrong; the penalty reinforces that lesson and deters repeats. Their function is corrective and preventative, not punitive.
 
 Minor errors players resolve fairly among themselves need no judge involvement. If the game state is clear but the communication is confusing, the judge asks for clarification rather than assigning a penalty. Significant problems are handled through the appropriate infraction category.
 
-Only the Head Judge may diverge from this guide, and only in extraordinary circumstances where no philosophy applies. Routine factors — round, player skill or age, leniency, judge experience — do not justify deviation. Any judge considering an exception must consult the Head Judge first.
+Only the Head Judge may diverge from this guide, and only in extraordinary circumstances where no philosophy applies. Routine factors — player skill or age, leniency, judge experience — do not justify deviation. Any judge considering an exception must consult the Head Judge first.
 
 Judges are not exempt from error. Mistakes should be acknowledged and corrected when doing so does not compromise the game. If a player violated a rule because they relied on flawed staff information, the Head Judge may reduce the penalty or authorize a roll-back, provided it is practical and creates no further imbalance.
 
@@ -37,19 +37,19 @@ A **Warning** is a formally tracked penalty for incorrect play or a procedural p
 
 #### 1.1.3. Standings Adjustment
 
-A **Standings Adjustment** is a severe, formally tracked penalty for infractions that warrant more than a Warning but not removal from the event. Instead of altering the game state, it imposes a **–1 VP** scoring consequence — affecting standings while preserving the integrity of the multiplayer game.
+A **Standings Adjustment** is a severe, formally tracked penalty for infractions that warrant more than a Warning but not removal from the event. Instead of altering the game state, it imposes a **–1 VP** scoring consequence, affecting standings while preserving the integrity of the multiplayer game.
 
 ##### When the –1 VP Applies
 
-The –1 VP always applies to the player's **current game** if one is in progress, otherwise to their **most recently played game**. It is never pre-applied to a future round. (If the player has not yet played — e.g., the penalty is issued before round 1 — it lands on their first game once played.)
+The –1 VP always applies to the player's **current game** if one is in progress, otherwise to their **most recently played game**. It is never pre-applied to a future round.
 
 ##### Impact on GW and TP
 
 A Standings Adjustment does not directly change GWs or TPs. But because a GW goes to the player with the strictly highest VP of at least 2, the –1 VP may shift or remove the GW, and TPs re-rank accordingly per the Tournament Rules.
 
-> **Example 1:** A player finishes with 3 VP (the next player has 2) and receives –1 VP → final VP is 2. The two are now tied at 2 VP, so neither is strictly highest — no GW; TPs follow the Tournament Rules for that tie.
+> **Example 1:** A player finishes with 3 VP (the next player has 2) and receives –1 VP: final VP is 2. The two are now tied at 2 VP, so neither is strictly highest; no GW. TPs follow the Tournament Rules for that tie.
 
-> **Example 2:** Player A sweeps a 5-player table (5 VP + GW). Player E (0 VP) receives a Standings Adjustment → –1 VP. Player A still gets 60 TP. The three players tied for 2nd–4th get (48 + 36 + 24) / 3 = 36 TP each. The penalized player, now solely 5th, gets 12 TP.
+> **Example 2:** Player A sweeps a 5-player table (5 VP + GW). Player E (0 VP) receives a Standings Adjustment: –1 VP. Player A still gets 60 TP. The three players tied for 2nd–4th get (48 + 36 + 24) / 3 = 36 TP each. The penalized player, now solely 5th, gets 12 TP.
 
 #### 1.1.4. Disqualification
 
@@ -60,7 +60,7 @@ A **Disqualification (DQ)** is the most serious penalty; it always includes a Wa
 * The player loses their current round and is dropped, is **placed last in the standings**, and **earns no rating points for the event**. Remaining players move up, and any prizes or qualifications follow the resulting order.
 * **Prizes already claimed may be kept**; any not-yet-awarded prize passes to the next eligible player.
 * DQs may also apply to non-players (spectators, staff) compromising the event.
-* The Head Judge need only conclude the player acted knowingly and intentionally — definitive proof is not required. Once that determination is made, the DQ is mandatory.
+* The Head Judge need only conclude the player acted knowingly and intentionally; definitive proof is not required. Once that determination is made, the DQ is mandatory.
 * DQs from intentional acts compromising integrity or safety must be reported to the **VEKN Ethics Committee**. DQs used purely as tournament control (accumulated unintentional infractions, non-malicious safety concerns) do not require escalation.
 
 ##### Game State Adjustment During an Ongoing Game
@@ -68,9 +68,9 @@ A **Disqualification (DQ)** is the most serious penalty; it always includes a Wa
 A DQ is **not an oust** — no VPs or pool are awarded. The judge updates the game state fairly, with minimal disruption:
 
 1. **Remove the player immediately.** Their turn ends; all minions, cards, pool, hand, and materials are removed. Ongoing effects they controlled end unless a card explicitly states otherwise.
-2. **No VP or pool awarded.** The predator gains nothing — a DQ is an administrative removal, not a game action.
+2. **No VP or pool awarded.** The predator gains nothing: a DQ is an administrative removal, not a game action.
 3. **Adjust seating.** Predator and prey of the removed player become adjacent; seating-dependent effects (e.g., The Coven) adapt.
-4. **Restarting the table** is strongly discouraged — only appropriate in **five-player games** when the DQ occurs very early, before predator–prey dynamics are meaningfully established. Preliminary restart: reseat as a 4-player table with fresh decks. Final restart: the next-highest-ranked player on premises replaces the DQ'd player and the full pre-final seating process is conducted again.
+4. **Restarting the table** is strongly discouraged, only appropriate in **five-player games** when the DQ occurs very early, before predator–prey dynamics are meaningfully established. Preliminary restart: reseat as a 4-player table with fresh decks. Final restart: the next-highest-ranked player on premises replaces the DQ'd player and the full pre-final seating process is conducted again.
 5. **Edge cases.** Benefits from earlier legal interactions with the DQ'd player stand unless corrupted by the infraction. Avoid cascading corrections absent a clear unfair advantage. For a corrupted game state, the Head Judge may roll back per Section 1.4.
 6. **Judge discretion.** The Head Judge may deviate if standard procedure produces a clearly inequitable result. Any deviation must be explained to the table and reported.
 
@@ -144,7 +144,7 @@ Before re-randomizing a library, identify which portion is in a known or arrange
 
 #### 1.4.1. Rolling Back the Game State
 
-A roll-back reverses the game to the moment immediately before an erroneous action — complete and sequential, in strict reverse order. Selective or incomplete roll-backs are never permitted. Only the Head Judge may approve; if seated in the affected game, authority passes to the next available judge.
+A roll-back reverses the game to the moment immediately before an erroneous action; complete and sequential, in strict reverse order. Selective or incomplete roll-backs are never permitted. Only the Head Judge may approve; if seated in the affected game, authority passes to the next available judge.
 
 A roll-back is appropriate only when no player's subsequent decisions were meaningfully shaped by information gained after the error, and the reconstructed sequence would plausibly unfold the same way. Because VTES decision trees branch rapidly, attempt one only with very few subsequent choices or hidden effects.
 
@@ -159,7 +159,7 @@ A roll-back is appropriate only when no player's subsequent decisions were meani
 A partial correction applies when a full roll-back is infeasible (too much hidden information revealed, too many decisions taken, too complex to unwind) but leaving the illegal state would grant a continuing advantage or distort integrity. It removes or neutralizes only the illegal elements without reversing past actions.
 
 1. **Remove the illegal element** in the least disruptive way. Cards played without meeting requirements typically go to the ash heap. Attribute corrections (blood, life, capacity) may be made only if they don't require unwinding past actions.
-2. **Minimize collateral changes** — adjust only what's needed to restore legality; do not reconstruct past actions, draws, or mandatory effects.
+2. **Minimize collateral changes:** adjust only what's needed to restore legality; do not reconstruct past actions, draws, or mandatory effects.
 3. **Accept past play as-is**, even if it would have unfolded differently.
 4. **Avoid randomization** unless the illegal element sits in a hidden area and cannot legally remain there.
 5. **Head Judge approval** is required whenever possible.
@@ -255,7 +255,7 @@ Leave the game state as-is if correction would be too disruptive. If an opponent
 
 ### 3.1. Tournament Errors — Deck Problems
 
-Covers deck construction and integrity at Constructed and Limited events. Deck checks and decklists keep decks legal and unaltered throughout. (The crypt-grouping requirement — 1 or 2 consecutive groups — applies to Constructed play; Limited formats impose no group restriction.)
+Covers deck construction and integrity at Constructed and Limited events. Deck checks and decklists keep decks legal and unaltered throughout. The crypt-grouping requirement applies to Constructed play; Limited formats impose no group restriction.
 
 #### 3.1.1. Deck Problem — Illegal Decklist
 
@@ -269,7 +269,7 @@ Covers deck construction and integrity at Constructed and Limited events. Deck c
 4. A player lists Arika (group 2) and Lutz von Hohenzollern (group 4).
 5. A player loses cards mid-event and cannot produce legitimate replacements.
 
-**Philosophy:** The decklist is the authoritative reference for what the player intends to play; illegal, unclear, or mismatching lists invite abuse. A Standings Adjustment is appropriate only when the error harms integrity or cannot be corrected without disadvantaging opponents. If a shorthand name unambiguously identifies one card, the Head Judge may reduce the penalty. A decklist error found between games is corrected before the player's next round; any –1 VP follows §1.1.3 (it lands on the most-recently-played game).
+**Philosophy:** The decklist is the authoritative reference for what the player intends to play; illegal, unclear, or mismatching lists invite abuse. A Standings Adjustment is appropriate only when the error harms integrity or cannot be corrected without disadvantaging opponents. If a shorthand name unambiguously identifies one card, the Head Judge may reduce the penalty. A decklist error found between games is corrected before the player's next round; any –1 VP follows §1.1.3; it lands on the most-recently-played game.
 
 **Penalty:** **Warning**, unless main deck and decklist are both illegal and cannot be reconciled without substantially altering the deck — in which case **Standings Adjustment**, and the player gets five minutes to adjust the decklist so the physical deck becomes legal.
 
@@ -293,7 +293,7 @@ Covers deck construction and integrity at Constructed and Limited events. Deck c
 4. A card from a previous opponent is mixed into the deck.
 5. An altered card whose artwork makes it unrecognizable.
 
-**Philosophy:** The priority is to restore the deck to match the list. Where a listed card's requirements are incompatible with the deck's crypt but the actual card matches (e.g., "Campground Hunting Ground" listed for a Gangrel crypt running "Zoo Hunting Ground"), correct the decklist instead.
+**Philosophy:** The priority is to restore the deck to match the list. Where a listed card's requirements are incompatible with the deck's crypt but the actual card matches (e.g., Campground Hunting Ground listed for a Gangrel crypt running Zoo Hunting Ground), correct the decklist instead.
 
 **Penalty:** **Standings Adjustment.** The player adjusts the deck to match the list (or the list, if it was the error source) before the next round.
 
@@ -320,7 +320,7 @@ Covers deck construction and integrity at Constructed and Limited events. Deck c
 **Additional Remedies:**
 
 * Remove all illegal cards immediately.
-* If below minimum size, add cards by a neutral, non–strategy-altering method — chosen before any additions and applied without deviation: copies of a neutral filler (Burn Option card or Anarch Convert); or copies of the card already most frequent in the library; or one of each card in descending order of existing frequency (e.g., 8× Govern, then 7× Conditioning, then 6× Deflection). Filler cards must be tournament-organizer proxies, valid only for that event and discarded or returned afterward. Never add targeted counter-cards.
+* If below minimum size, add cards by a neutral, non–strategy-altering method — chosen before any additions and applied without deviation: copies of a neutral filler (Burn Option card or Anarch Convert); or copies of the card already most frequent in the library; or one of each card in descending order of existing frequency (e.g., 8× Govern the Unaligned, then 7× Conditioning, then 6× Deflection). Filler cards must be tournament-organizer proxies, valid only for that event and discarded or returned afterward. Never add targeted counter-cards.
 * If oversized, remove random cards until legal.
 * **Incorrect crypt grouping:** same procedure as 3.1.1.
 
@@ -360,7 +360,7 @@ It **does include** strategic/tactical advice from or to anyone not seated in th
 
 **Philosophy:** Slow decisions disrupt pacing for the whole table. Players must act within a reasonable timeframe. This penalizes unreasonable delay, not thoughtful decisions.
 
-**Penalty:** **Caution.** Avoid the word "stalling" — say "please play faster" or "you're playing a little slow, please pick up the pace."
+**Penalty:** **Caution.** Avoid the word "stalling"; say "please play faster" or "you're playing a little slow, please pick up the pace."
 
 **Additional Remedy:** If Slow Play consumed significant round time, the judge may issue a time extension (see 1.2.4).
 
@@ -413,7 +413,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 ### 3.7. Tournament Error — Marked Cards
 
-**Definition:** A player's cards or sleeves show physical inconsistencies that could identify specific cards in the library, crypt, or hand — scuffs, bends, fading, nail marks, curvature, or differences in backs, thickness, or sleeves. With opaque sleeves only sleeves are evaluated; with clear sleeves both sleeves and cards are.
+**Definition:** A player's cards or sleeves show physical inconsistencies that could identify specific cards in the library, crypt, or hand: scuffs, bends, fading, nail marks, curvature, or differences in backs, thickness, or sleeves. With opaque sleeves only sleeves are evaluated; with clear sleeves both sleeves and cards are.
 
 **Two severities:**
 
@@ -434,11 +434,11 @@ This includes overlapping or stacking cards that hide visible information; non-s
 * The player replaces marked sleeves or cards as soon as possible.
 * With clear sleeves and worn cards, the Head Judge may issue proxies.
 * Lacking replacements, the player re-sleeves the whole deck or obtains sleeves from staff. If the deck cannot be brought to a legal, unmarked state in a reasonable time and no sleeves can be procured, the player is removed from the event.
-* If the deck must be modified because cards cannot be replaced, the penalty is upgraded to a Standings Adjustment and the decklist updated — revertible if replacements are found.
+* If the deck must be modified because cards cannot be replaced, the penalty is upgraded to a Standings Adjustment and the decklist updated (revertible if replacements are found).
 
 ### 3.8. Tournament Error — Insufficient Shuffling
 
-**Definition:** A player unintentionally fails to sufficiently shuffle their library or crypt before presenting it for additional randomization. A deck is not shuffled if the judge believes the player could know the position or distribution of one or more cards — including forgetting to shuffle after a required effect, or using procedures that don't adequately randomize.
+**Definition:** A player unintentionally fails to sufficiently shuffle their library or crypt before presenting it for additional randomization. A deck is not shuffled if the judge believes the player could know the position or distribution of one or more cards, including forgetting to shuffle after a required effect, or using procedures that don't adequately randomize.
 
 **Examples:**
 
@@ -456,7 +456,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 ### 4.1. Unsportsmanlike Conduct — Minor
 
-**Definition:** Disruptive, disrespectful, or emotionally charged behavior that does not target a specific individual with harassment, intimidation, or coercion. Typically brief etiquette lapses (raised voices, rude remarks, outbursts) that degrade the table environment without creating a hostile or unsafe atmosphere — non-targeted, situational, and easily correctable.
+**Definition:** Disruptive, disrespectful, or emotionally charged behavior that does not target a specific individual with harassment, intimidation, or coercion. Typically brief etiquette lapses (raised voices, rude remarks, outbursts) that degrade the table environment without creating a hostile or unsafe atmosphere; non-targeted, situational, and easily correctable.
 
 **Examples:**
 
@@ -481,7 +481,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 ### 4.2. Unsportsmanlike Conduct — Major
 
-**Definition:** Targeted, aggressive, or coercive action directed at another player, judge, or participant that creates a hostile, unsafe, or intimidating environment — persistent verbal aggression, personal insults (race, color, religion, national origin, age, gender, disability, sexual orientation, etc.), intimidation during negotiations, or any conduct that reasonably makes someone feel harassed, threatened, or singled out. Impact takes precedence over intent. Threats or attempts at physical violence are Unsportsmanlike Conduct — Aggressive Behaviour.
+**Definition:** Targeted, aggressive, or coercive action directed at another player, judge, or participant that creates a hostile, unsafe, or intimidating environment; persistent verbal aggression, personal insults (race, color, religion, national origin, age, gender, disability, sexual orientation, etc.), intimidation during negotiations, or any conduct that reasonably makes someone feel harassed, threatened, or singled out. Impact takes precedence over intent. Threats or attempts at physical violence are Unsportsmanlike Conduct — Aggressive Behaviour.
 
 **Examples:**
 
@@ -506,7 +506,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 ### 4.3. Unsportsmanlike Conduct — Aggressive Behaviour
 
-**Definition:** Physically threatening, violent, or intentionally damaging behavior toward another person, their belongings, or tournament property — anything that could reasonably make someone fear for their safety, or that constitutes physical intimidation.
+**Definition:** Physically threatening, violent, or intentionally damaging behavior toward another person, their belongings, or tournament property; anything that could reasonably make someone fear for their safety, or that constitutes physical intimidation.
 
 **Examples:**
 
@@ -528,7 +528,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 ### 4.4. Unsportsmanlike Conduct — Bribery and Wagering
 
-**Definition:** A player offers, requests, hints at, or accepts any out-of-game incentive to influence a game or match — encouraging a concession, altering play, agreeing an oust order, or manipulating VP distribution — including trading prizes, cards, or favors for a result. Wagering is any player or spectator placing, accepting, or offering a bet on a tournament, round, or portion of play; it need not be monetary, and the bettor need not be in that game.
+**Definition:** A player offers, requests, hints at, or accepts any out-of-game incentive to influence a game or match: encouraging a concession, altering play, agreeing an oust order, or manipulating VP distribution, including trading prizes, cards, or favors for a result. Wagering is any player or spectator placing, accepting, or offering a bet on a tournament, round, or portion of play; it need not be monetary, and the bettor need not be in that game.
 
 **Examples:**
 
@@ -545,7 +545,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 ### 4.5. Unsportsmanlike Conduct — Theft of Tournament Material
 
-**Definition:** A player takes, conceals, or intentionally retains materials that aren't theirs — cards, tokens, counters, seating materials, or equipment provided by the event or belonging to others.
+**Definition:** A player takes, conceals, or intentionally retains materials that aren't theirs; cards, tokens, counters, seating materials, or equipment provided by the event or belonging to others.
 
 **Examples:**
 
@@ -562,7 +562,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 ### 4.6. Unsportsmanlike Conduct — Stalling
 
-**Definition:** A player intentionally delays the game — through inaction, excessively slow decisions, or unnecessary procedural delays — to exploit the round time limit. If unintentional, refer to Tournament Error — Slow Play.
+**Definition:** A player intentionally delays the game through inaction, excessively slow decisions, or unnecessary procedural delays, to exploit the round time limit. If unintentional, refer to Tournament Error — Slow Play.
 
 **Examples:**
 
@@ -572,7 +572,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 4. A player takes excessive time on mandatory effects purely to consume time.
 5. A player suddenly performs every step explicitly in the last few minutes after using shortcuts all game ("ready for strikes" becomes "nothing before range, waiting on response, no maneuver, waiting on response…").
 
-**Philosophy:** Stalling attacks the fairness of VTES; manipulating pace is cheating. The key indicator is **behavior change**, especially when ahead or near the end — a consistent pace need not be altered for others' benefit. Stalling is always treated as intentional; investigate promptly in timed rounds and finals.
+**Philosophy:** Stalling attacks the fairness of VTES; manipulating pace is cheating. The key indicator is **behavior change**, especially when ahead or near the end; a consistent pace need not be altered for others' benefit. Stalling is always treated as intentional; investigate promptly in timed rounds and finals.
 
 **Penalty:** **Disqualification.**
 
@@ -582,7 +582,7 @@ This includes overlapping or stacking cards that hide visible information; non-s
 
 **Definition:** A person intentionally violates the rules or policies, lies to a tournament official, or becomes aware of a significant offense in their game and chooses not to report it.
 
-For an action to be Cheating, the player must be **aware the action is illegal** and either **attempt to gain an advantage** or engage in conduct the policy explicitly defines as Cheating (lying to a tournament official, or failing to report a known significant offense). If neither holds, handle it as another infraction. Cheating can resemble a simple mistake — investigate intent and awareness first.
+For an action to be Cheating, the player must be **aware the action is illegal** and either **attempt to gain an advantage** or engage in conduct the policy explicitly defines as Cheating (lying to a tournament official, or failing to report a known significant offense). If neither holds, handle it as another infraction. Cheating can resemble a simple mistake; investigate intent and awareness first.
 
 **Examples:**
 
@@ -635,7 +635,7 @@ For an action to be Cheating, the player must be **aware the action is illegal**
 
 ### 4.10. Unsportsmanlike Conduct — Health & Safety Disruption
 
-**Definition:** A player's physical condition or behavior creates an unsafe, unsanitary, or severely uncomfortable environment for others, or prevents them from reasonably participating — extreme hygiene issues, visible intoxication or impairment, or any behavior posing a health or safety risk.
+**Definition:** A player's physical condition or behavior creates an unsafe, unsanitary, or severely uncomfortable environment for others, or prevents them from reasonably participating; extreme hygiene issues, visible intoxication or impairment, or any behavior posing a health or safety risk.
 
 **Philosophy:** Address such situations promptly and discreetly. The goal is correction, not punishment; handle with professionalism and confidentiality.
 
@@ -674,7 +674,7 @@ Players need not succeed, but must genuinely pursue these goals. Negotiation, ta
 
 * A player with the game win at 3 VP concedes the rest to a 0-VP opponent for a 3–2 victory.
 * A player with no minion and 3 pool, who cannot reach time-out with 30 minutes left, self-ousts by transferring their pool away.
-* A player openly states they'll "kingmake" or self-oust but keeps taking reasonable actions toward survival or scoring — table talk and posturing are normal play.
+* A player openly states they'll "kingmake" or self-oust but keeps taking reasonable actions toward survival or scoring: table talk and posturing are normal play.
 
 **Violations (assume intent):**
 
@@ -703,7 +703,7 @@ This section covers the practical functions of running a tournament.
 * At large events not using the multi-judge system, if a player drops at a 4-player table after other tables have begun, a tournament official takes the seat as a proxy player (see 5.1.1) with a randomly selected staff deck.
 * If no legal tables can be formed, the event immediately becomes unsanctioned; between rounds, adjustments (e.g., a judge joining as a player) may restore sanctioning.
 * Drop before round 1 with no legal tables possible: the event is unsanctioned and no official prize support is distributed.
-* Event unsanctioned due to mid-tournament drops: prize support may still be distributed normally — submit the report as usual and note what happened. The event shows as unsanctioned and won't affect ratings.
+* Event unsanctioned due to mid-tournament drops: prize support may still be distributed normally. Submit the report as usual and note what happened. The event shows as unsanctioned and won't affect ratings.
 
 #### 5.1.1. Proxy Player
 
@@ -725,16 +725,16 @@ This section covers the practical functions of running a tournament.
 
 ### 5.3. Event Organization — Force Majeure and Emergency Termination
 
-**Definition:** Any unexpected external event making it unsafe or impossible to continue — fire alarms, power failures, severe weather, disruptive venue staff or third parties, or any circumstance compromising participant safety or event integrity.
+**Definition:** Any unexpected external event making it unsafe or impossible to continue: fire alarms, power failures, severe weather, disruptive venue staff or third parties, or any circumstance compromising participant safety or event integrity.
 
 **Resolution:** The Head Judge immediately halts all games and ensures safety, then determines whether continuation is possible.
 
 **A. Cannot continue:**
 
-1. **Safety first** — no play if the venue is unsafe; direct players to leave calmly.
-2. **Standings** — if the event cannot resume in a reasonable time: in-progress games end with no further VPs; players keep VPs and GWs from the last fully completed round; partial rounds don't count even if some tables finished; if terminated during the final, no winner is awarded unless policy requires otherwise.
-3. **Prizes and qualifications** — based on the last fully completed round; if none completed, the event is void.
-4. **Reporting** — the Head Judge submits a full written report to VEKN: nature of the event, decision process, standings at termination, and any safety issues.
+1. **Safety first:** no play if the venue is unsafe; direct players to leave calmly.
+2. **Standings:** if the event cannot resume in a reasonable time: in-progress games end with no further VPs; players keep VPs and GWs from the last fully completed round; partial rounds don't count even if some tables finished; if terminated during the final, no winner is awarded unless policy requires otherwise.
+3. **Prizes and qualifications:** based on the last fully completed round; if none completed, the event is void.
+4. **Reporting:** the Head Judge submits a full written report to VEKN: nature of the event, decision process, standings at termination, and any safety issues.
 
 **B. Can safely resume:** the Head Judge may restart the round (recommended) or resume the current round only if all tables agree and no competitive information was compromised. If any game state is corrupted or safety is uncertain, restart or terminate.
 
@@ -744,12 +744,12 @@ This section covers the practical functions of running a tournament.
 
 Organizers and judges should carry standardized supplies to resolve common issues quickly with minimal disruption.
 
-* **Sleeves** — enough identical, opaque, neutral sleeves for two full decks (library + crypt), for marked-card issues or emergency re-sleeving.
-* **Replacement / proxy crypt cards** — a small pool of universally reasonable vampires (e.g., Anarch Convert, group-appropriate low-impact vampires), clearly marked as judge-issued, prioritizing neutrality over optimization.
-* **Spare library cards** — innocuous, universally available cards for reaching minimum deck size (Blood Doll, Wake with Evening's Freshness, burn-option or placeholder cards); temporary and revertible.
-* **Basic materials** — pens, paper, blank decklist forms, and printed or offline copies of the tournament rules, this guide, and the current ban/errata list.
-* **Timing and administration** — a stopwatch or timer for extensions, Slow Play observations, and investigations, plus access to the tournament management system (e.g., Archon) where possible.
-* **Game aids** — generic blood/pool counters and neutral tokens for temporary game-state clarification.
+* **Sleeves:** enough identical, opaque, neutral sleeves for two full decks (library + crypt), for marked-card issues or emergency re-sleeving.
+* **Replacement / proxy crypt cards:** a small pool of universally reasonable vampires (e.g., Anarch Convert, group-appropriate low-impact vampires), clearly marked as judge-issued, prioritizing neutrality over optimization.
+* **Spare library cards:** innocuous, universally available cards for reaching minimum deck size (Blood Doll, Wake with Evening's Freshness, burn-option or placeholder cards); temporary and revertible.
+* **Basic materials:** pens, paper, blank decklist forms, and printed or offline copies of the tournament rules, this guide, and the current ban/errata list.
+* **Timing and administration:** a stopwatch or timer for extensions, Slow Play observations, and investigations, plus access to the tournament management system where possible.
+* **Game aids:** generic blood/pool counters and neutral tokens for temporary game-state clarification.
 
 ---
 
