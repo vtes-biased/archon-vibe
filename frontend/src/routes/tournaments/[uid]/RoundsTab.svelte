@@ -119,6 +119,20 @@
     const round = tournament.rounds![idx];
     return round ? round.length > 0 && round.every(t => t.state === "Finished") : false;
   }
+  // A round still needs ending while it holds a seated player who is Playing and hasn't
+  // moved on to a later round — i.e. FinishRound would actually release someone. Players
+  // re-seated into a later parallel round are excluded so an already-superseded round stops
+  // offering an End button; ended rounds (players no longer Playing) drop out too.
+  function isRoundEndable(idx: number): boolean {
+    if (tournament.state !== "Playing" || tournament.finals) return false;
+    const round = tournament.rounds![idx];
+    if (!round || round.length === 0) return false;
+    const playing = new Set((tournament.players ?? []).filter(p => p.state === "Playing").map(p => p.user_uid));
+    const laterSeated = new Set<string>();
+    for (let i = idx + 1; i < tournament.rounds!.length; i++)
+      for (const t of tournament.rounds![i]!) for (const s of t.seating) laterSeated.add(s.player_uid);
+    return round.some(t => t.seating.some(s => playing.has(s.player_uid) && !laterSeated.has(s.player_uid)));
+  }
   // Seating score
   let seatingScore = $state<{ rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null>(null);
 
@@ -494,6 +508,8 @@
       {@const isEditable = canEditSeating}
       {@const isLast = r === tournament.rounds!.length - 1}
       {@const isExpanded = expandedRounds.has(r)}
+      {@const canEndRound = isOrganizer && isRoundEndable(r)}
+      {@const allTablesScored = isRoundAllFinished(r)}
       <div class="bg-surface-muted/30 rounded-lg border border-line">
         <div class="flex items-center">
           <button
@@ -561,13 +577,16 @@
                     <ArrowRightLeft class="w-4 h-4" />{m.rounds_alter_seating()}
                   </Button>
                 {/if}
-                {#if hasParallelRounds && isRoundAllFinished(r)}
-                  <Button variant="primary" size="lg" onclick={() => doAction("FinishRound", { round: r })} disabled={actionLoading}>{m.rounds_finish_round_n({ n: String(r + 1) })}</Button>
+                {#if canEndRound}
+                  <Button variant="secondary" size="md" onclick={() => doAction("FinishRound", { round: r })} disabled={actionLoading || !allTablesScored} aria-describedby={!allTablesScored ? `end-round-hint-${r}` : undefined}>{m.rounds_finish_round_n({ n: String(r + 1) })}</Button>
                 {/if}
                 {#if hasParallelRounds && isLast && tournament.state === "Playing" && !tournament.finals}
                   <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
                 {/if}
               </div>
+              {#if canEndRound && !allTablesScored}
+                <p id="end-round-hint-{r}" class="text-sm text-ink-faint">{m.rounds_end_round_hint()}</p>
+              {/if}
               {#if showCancelConfirm && hasParallelRounds && isLast}
                 {@render cancelConfirmBox()}
               {/if}
