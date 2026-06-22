@@ -4,16 +4,15 @@
 
 The Tournament Conduct & Infraction Guide for Vampire: The Eternal Struggle establishes how judges should respond to rules violations that arise during VTES tournaments. Its purpose is twofold: to safeguard players from actions that could compromise fair play, and to protect the competitive integrity of the event as a whole. In an environment where precision and consistency matter, most violations must carry an appropriate consequence—without clear penalties, the rules cannot be meaningfully enforced.
 
-This guide is organized into three primary components.
+This guide is organized into four primary components:
 
 * Section 1 presents the general philosophy, definitions, and principles that support the enforcement system.  
 * Sections 2 through 4 detail the various infraction categories used in VTES tournaments. These infractions fall into three overarching groups:  
   * Procedural Errors,  
   * Tournament Errors, and  
   * Unsportsmanlike Conduct,  
-* Section 5 deals with organizational issues relating to the practical functions of running a tournament.
-
-each of which is further subdivided to address specific types of issues.
+* Section 5 deals with organizational issues relating to the practical functions of running a tournament.  
+* The appendix contains the penalty summary.
 
 Players and judges who need additional clarity about terminology should consult the VTES Tournament Rules, which serve as the authoritative source for definitions referenced throughout this document.
 
@@ -81,13 +80,11 @@ The purposes of an Standings Adjustment are:
 
 ##### Effect of the Penalty
 
-* When a player receives a Standings Adjustment **during an ongoing game**, the –1 VP penalty applies to that same game.
+When a player receives a Standings Adjustment **during an ongoing game**, the –1 VP penalty applies to that same game.
 
-* When a player receives a Standings Adjustment **between preliminary rounds**, or between the last preliminary round and the final), the –1 VP penalty applies to the next game they play.
+When a player receives a Standings Adjustment **between preliminary rounds or after the last preliminary round**, the –1 VP penalty applies to the previous game they played, because there is no guarantee that the player will participate in the upcoming round (if any). That is why, in this exceptional case, the penalty should be applied retroactively.
 
-* When a player receives a Standings Adjustment **after the last preliminary round**, the –1 VP penalty applies to the previous game they played.
-
-* When a player receives a Standings Adjustment **before round 1 pairings are announced**, the –1 VP penalty applies to round 1\.
+When a player receives a Standings Adjustment **before round 1 pairings are announced**, the –1 VP penalty applies to round 1\.
 
 Standings Adjustments always affect the player’s standings for the event and may influence qualification, seeding, or placement, because this penalty modifies VP totals, which may in turn alter Game Win (GW) determination and Tournament Points (TP) derived from that round.
 
@@ -198,7 +195,7 @@ Once a tournament has been concluded and officially approved, infractions that w
 
 Each infraction lists a recommended penalty for the first offense. Repeated offenses of the same infraction should escalate according to the following order:
 
-**Caution → Caution → Warning → Warning → Standings Adjustment → Standings Adjustment → Disqualification**
+**Warning → Warning → Standings Adjustment → Standings Adjustment → Disqualification**
 
 This creates the following structure:
 
@@ -218,7 +215,7 @@ If an infraction has a baseline penalty of Warning:
 * 4th offense: Standings Adjustment  
 * 5th offense: Disqualification
 
-Disqualifications due to accumulation are not considered “Disqualification without Prize.”
+A player disqualified under this provision retains any prizes already awarded and remains eligible to receive any additional prizes earned during the same tournament.
 
 If an infraction has a baseline penalty of Standings Adjustment:
 
@@ -1215,14 +1212,11 @@ The player must leave the venue if instructed by the Tournament Organizer. Judge
 ### 4.7. Unsportsmanlike Conduct — Cheating
 
 **Definition:**  
-A person intentionally violates the rules or tournament policies, lies to a tournament official, or becomes aware of a significant offense occurring in their game (or their teammate’s game in team formats) and chooses not to report it.
+A person intentionally violates the rules or tournament policies, lies to a tournament official, or becomes aware of a significant offense occurring in their game, and chooses not to report it.
 
-For an action to be considered Cheating, all of the following must be true:
+For an action to be considered Cheating, the following must be true: The player is aware that their action is illegal and either attempts to gain an advantage or engages in conduct explicitly defined as Cheating in the policy (including lying to a tournament official or failing to report a known significant offense).
 
-* The player is attempting to gain an advantage.  
-* The player is aware that their action is illegal.
-
-If any of these criteria are not met, the offense is not Cheating and should be handled as another infraction (e.g., a Procedural Error, Tournament Error, or Unsportsmanlike Conduct — Minor/Major).
+If these criteria are not met, the offense is not Cheating and should be handled as another infraction (e.g., a Procedural Error, Tournament Error, or Unsportsmanlike Conduct — Minor/Major).
 
 Cheating in VTES may initially resemble a simple procedural or gameplay mistake; judges must investigate intent and awareness before determining the appropriate infraction.
 
@@ -1417,10 +1411,54 @@ A player leaves the tournament unexpectedly and can no longer continue playing.
 
 * If the drop occurs during seating for a 5-player table: Convert the table into a 4-player table.  
 * If the drop occurs during seating for a 4-player table: Re-seat players as needed to form legal table sizes (4 or 5 players), following the procedures in V:EKN Tournament Rules, Section 3.1.2 (Seating).  
-* At large events (such as the European Championship) not using the multi-judge system, if a player drops at a four-player table after all other tables have already begun their rounds, that seat must be filled to preserve the required table size. A tournament official will take the vacant seat as a proxy player, using a deck selected at random from among the decks brought to the event by tournament staff.  
+* At large events (such as the European Championship) not using the multi-judge system, if a player drops at a four-player table after all other tables have already begun their rounds, that seat must be filled to preserve the required table size. A tournament official will take the vacant seat as a proxy player (see 5.1.1. Proxy Player), using a deck selected at random from among the decks brought to the event by tournament staff.  
 * If the drop causes the event to no longer be able to create legal tables: The event immediately becomes unsanctioned. Between rounds, adjustments may be made (e.g., the judge joining as a player) to restore sanctioning if possible.  
 * If the drop happens before the first round begins and legal tables cannot be formed: The event is unsanctioned, and no official VEKN or publisher prize support should be distributed.  
 * If the event becomes unsanctioned due to drops during the tournament: Prize support may still be distributed normally. Submit the Archon or event report as usual and note what happened. The event will appear as unsanctioned and will not affect player ratings.
+
+#### 5.1.1. Proxy Player
+
+**Definition:**
+
+A Proxy Player is a tournament official who temporarily occupies a vacant seat in an ongoing game in order to preserve the required table size and ensure the integrity of the tournament structure.
+
+A proxy player is not a participant in the tournament and does not compete for standings, ratings, or prizes. Their role is purely procedural: to allow the game to continue under valid tournament conditions.
+
+**Responsibilities:**
+
+A proxy player must:
+
+* Play to win in good faith, making reasonable strategic decisions as any normal player would, in accordance with tournament rules.  
+* Avoid bias or favoritism, and not intentionally benefit or harm any specific player.  
+* Maintain a consistent pace of play, neither slowing down nor accelerating the game unnaturally.  
+* Refrain from using external knowledge, including knowledge about players, standings, or the broader tournament state that would not normally be available in-game.  
+* Follow all rules and judge instructions as if they were a regular player.
+
+**Deck Requirements:**
+
+* The proxy player must use a functional and reasonably competitive deck, with a legitimate chance to win a table under normal circumstances.  
+* The deck should be selected at random from a pool of decks provided by tournament officials or staff, to avoid bias.  
+* The deck must be legal for the format and comply with all deck construction rules.  
+* If possible, tournament staff should prepare a small pool of pre-approved decks specifically for proxy use to ensure consistency and avoid unintended advantages.
+
+**Scoring and Tournament Impact:**
+
+* A proxy player does not receive victory points, game wins, or tournament points.  
+* Any victory points or game wins they would obtain are not recorded and have no effect on standings.  
+* For scoring purposes:  
+  * A proxy player may still oust and be ousted, and these events affect the game state normally.  
+  * Victory points generated by interactions involving the proxy player are awarded to the other players as usual, except that the proxy player does not retain any points.  
+  * The presence of a proxy player must not alter the scoring structure for the remaining players beyond what naturally occurs in gameplay.
+
+**Philosophy:**
+
+The purpose of a proxy player is to preserve tournament integrity, not to influence outcomes. A four- or five-player table is a fundamental structural requirement of VTES, and allowing a game to proceed with fewer players would significantly distort both gameplay and scoring.
+
+By requiring the proxy player to act as a normal, competitive participant—while removing their results from the tournament—we ensure that:
+
+* The game remains strategically valid,  
+* The remaining players are treated fairly, and  
+* The tournament structure is preserved.
 
 ### 5.2. Event Organization — Venue Interference
 
@@ -1546,7 +1584,7 @@ The following items are recommended:
 
 Copyright © 2026 Paradox Interactive AB. www.paradoxinteractive.com. All rights reserved. Vampire: The Eternal Struggle and Vampire: The Masquerade® are trademarks and/or registered trademarks of Paradox Interactive AB. All rights reserved.
 
-# APPENDIX I — Penalty Summary
+# APPENDIX — Penalty Summary
 
 | PROCEDURAL ERRORS |  |
 | ----- | :---- |
@@ -1559,7 +1597,7 @@ Copyright © 2026 Paradox Interactive AB. www.paradoxinteractive.com. All rights
 | Illegal Main Deck (Legal Decklist) | Standings Adjustment |
 | Illegal Main Deck (No Decklist Used) | Standings Adjustment |
 | Outside Assistance | Standings Adjustment |
-| Slow Play | Warning |
+| Slow Play | Caution |
 | Limited Procedure Violation | Caution |
 | Public Information Miscommunication | Warning |
 | Obscuring Game State | Caution |
@@ -1575,7 +1613,7 @@ Copyright © 2026 Paradox Interactive AB. www.paradoxinteractive.com. All rights
 | Cheating | Disqualification |
 | Fraud | Disqualification |
 | Collusion | Disqualification |
-| Health & Safety Disruption | Warning |
+| Health & Safety Disruption | Warning → Removal from the venue (if uncorrected) |
 | Rage-Quitting | Disqualification |
 | Failure to Play to Win | Warning (minor) / Standings Adjustment (major) |
 
