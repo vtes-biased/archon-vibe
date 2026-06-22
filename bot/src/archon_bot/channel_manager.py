@@ -10,6 +10,12 @@ import hikari
 logger = logging.getLogger(__name__)
 
 PLAYER_ALLOW = hikari.Permissions.CONNECT | hikari.Permissions.SPEAK
+# The bot's own allow on a table/finals voice channel, OVER the @everyone CONNECT
+# deny it writes there. A channel overwrite overrides the bot's server-level grant,
+# so without this the bot denies ITSELF CONNECT — and Discord requires CONNECT to
+# DELETE a voice channel, so /teardown 403s (50001) on its own tables. SEND_MESSAGES
+# lets the bot post in the voice channel's text chat.
+BOT_ALLOW = hikari.Permissions.CONNECT | hikari.Permissions.SEND_MESSAGES
 
 # Table voice-channel name: round-prefixed "R{n} - Table {m}". The optional
 # legacy "Table {m}" form (no prefix) is still matched so tournaments mid-flight
@@ -187,8 +193,12 @@ async def sync_table_permissions(
         channel = await bot.rest.fetch_channel(channel_id)
         current_member_ids = member_override_ids(channel)
 
-    # Remove stale overrides
+    # Remove stale overrides — but never the bot's own self-allow: its CONNECT is
+    # what lets teardown delete the voice channel, so reconcile must not reap it.
     stale = current_member_ids - desired_discord_ids
+    me = bot.get_me()
+    if me is not None:
+        stale.discard(int(me.id))
     missing_preview = desired_discord_ids - current_member_ids
     logger.info(
         "Syncing perms channel=%s: +%d -%d members",
@@ -235,20 +245,31 @@ async def create_round_voice_channel(
     """Create one table/finals voice channel (``@everyone DENY CONNECT`` baseline)
     and grant CONNECT+SPEAK to its members. Returns the new channel id."""
     logger.info("→ create_guild_voice_channel '%s' guild=%s", name, guild_id)
+    overwrites = [
+        hikari.PermissionOverwrite(
+            id=guild_id,
+            type=hikari.PermissionOverwriteType.ROLE,
+            deny=hikari.Permissions.CONNECT,
+        ),
+    ]
+    me = bot.get_me()
+    if me is not None:  # win back CONNECT for the bot over the @everyone deny (BOT_ALLOW)
+        overwrites.append(
+            hikari.PermissionOverwrite(
+                id=me.id,
+                type=hikari.PermissionOverwriteType.MEMBER,
+                allow=BOT_ALLOW,
+            )
+        )
     ch = await bot.rest.create_guild_voice_channel(
         guild_id,
         name=name,
         category=category_id,
-        permission_overwrites=[
-            hikari.PermissionOverwrite(
-                id=guild_id,
-                type=hikari.PermissionOverwriteType.ROLE,
-                deny=hikari.Permissions.CONNECT,
-            ),
-        ],
+        permission_overwrites=overwrites,
     )
     logger.info("✓ created '%s' id=%s", name, ch.id)
-    # Freshly created → only the @everyone override exists, so no fetch needed.
+    # Freshly created → only the @everyone + bot overrides exist; the bot's own
+    # override is preserved by sync_table_permissions, so no fetch needed.
     await sync_table_permissions(
         bot,
         guild_id,

@@ -258,17 +258,20 @@ class TeardownCommand(
                 )
             except Exception as e:
                 logger.warning("Teardown error: %s", e)
-        if failed:
-            await ctx.respond(
-                f"Removed tournament channels, but {len(failed)} could not be deleted "
-                "— check my **Manage Channels** permission and remove any leftovers "
-                "manually.",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-        else:
-            await ctx.respond(
-                "Tournament channels removed.", flags=hikari.MessageFlag.EPHEMERAL
-            )
+        msg = (
+            f"Removed tournament channels, but {len(failed)} could not be deleted "
+            "— check my **Manage Channels** permission and remove any leftovers "
+            "manually."
+            if failed
+            else "Tournament channels removed."
+        )
+        try:
+            await ctx.respond(msg, flags=hikari.MessageFlag.EPHEMERAL)
+        except (hikari.NotFoundError, hikari.BadRequestError):
+            # /teardown is usually run from a channel inside the category it just
+            # deleted, so this follow-up targets a gone channel (10003 Unknown
+            # Channel). The teardown already completed — nothing left to report.
+            logger.info("Teardown done; status reply skipped (invoking channel gone)")
 
 
 class AnnounceCommand(

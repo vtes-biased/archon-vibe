@@ -38,6 +38,7 @@ JUDGES_ID = 60
 
 # archon_uid → discord id
 DISCORD = {"p1": 1001, "p2": 1002, "org1": 9001}
+BOT_ID = 7777  # the bot's own member id — never a seated player/organizer
 
 
 @dataclass
@@ -104,9 +105,17 @@ class FakeRest:
         pass
 
 
+@dataclass
+class FakeOwnUser:
+    id: int
+
+
 class FakeBot:
     def __init__(self, rest: FakeRest) -> None:
         self.rest = rest
+
+    def get_me(self):
+        return FakeOwnUser(BOT_ID)
 
 
 class FakeStore:
@@ -201,3 +210,25 @@ async def test_in_sync_survivor_uses_payload_overwrites_never_refetches() -> Non
     assert rest.fetch_channel_calls == 0
     assert rest.edited_overwrites == [] and rest.removed_overwrites == []
     assert rest.created == [] and rest.deleted == []
+
+
+@pytest.mark.asyncio
+async def test_reconcile_preserves_the_bots_own_overwrite() -> None:
+    # The bot grants itself an overwrite on every table voice channel so it can
+    # later DELETE it (Discord needs CONNECT to delete a voice channel). The bot is
+    # never a seated player, so a naive stale-diff would reap that overwrite —
+    # leaving teardown unable to remove the channel. Reconcile must keep it.
+    ch = FakeChannel(
+        201,
+        "R1 - Table 1",
+        hikari.ChannelType.GUILD_VOICE,
+        CATEGORY_ID,
+        _member_ovw(1001, 9001, BOT_ID),
+    )
+    rest = FakeRest([_category(), ch])
+    obj = _playing(["p1"])  # desired members {p1, org1}; the bot is not among them
+
+    await reconcile_channels(FakeBot(rest), FakeStore(), GUILD, TUID, obj)
+
+    assert (201, BOT_ID) not in rest.removed_overwrites
+    assert rest.removed_overwrites == []
