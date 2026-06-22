@@ -74,7 +74,14 @@
     }
 
     button, [role="button"], summary, select { cursor: pointer; }
-    button:disabled { cursor: not-allowed; }
+    /* Checkbox/radio/file inputs (and the labels that toggle them) read as inert
+       without this — Tailwind v4 preflight leaves them unstyled and native
+       checkboxes default to the arrow, so toggle switches and option rows showed
+       no hand. Keeps cursor affordance consistent with the button rule above. */
+    input:where([type="checkbox"], [type="radio"], [type="file"]),
+    label:has(> input:where([type="checkbox"], [type="radio"], [type="file"])) { cursor: pointer; }
+    button:disabled, select:disabled, input:disabled,
+    label:has(> input:disabled) { cursor: not-allowed; }
 
     /*
      * Global keyboard-focus ring (WCAG 2.4.7). Crimson, matching the design

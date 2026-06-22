@@ -5,6 +5,7 @@
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import type { User, RatingCategory } from "$lib/types";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
+  import { goto } from "$app/navigation";
   import * as m from '$lib/paraglide/messages.js';
 
   type Tab = RatingCategory | "halloffame";
@@ -158,7 +159,11 @@
             {#each paged as user, i}
               {@const rank = page * pageSize + i + 1}
               {@const value = isHof ? (user.wins?.length ?? 0) : (user[activeTab as RatingCategory]?.total ?? 0)}
-              <tr class="border-b border-line/50 hover:bg-surface-hover/20">
+              <!-- Whole row navigates; the name <a> keeps keyboard focus + cmd-click new-tab,
+                   so the row onclick is a mouse-only enhancement (skips clicks on the link). -->
+              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+              <tr class="border-b border-line/50 hover:bg-surface-hover/20 cursor-pointer"
+                  onclick={(e) => { if (!(e.target as HTMLElement).closest('a')) goto(`/users/${user.uid}`); }}>
                 <td class="py-2 px-3 text-ink-muted">{rank}</td>
                 <td class="py-2 px-3">
                   <a href="/users/{user.uid}" class="text-ink-strong hover:text-link">
@@ -187,7 +192,7 @@
       {#if totalPages > 1}
         <div class="flex items-center justify-center gap-2 mt-4">
           <button
-            class="px-3 py-1 rounded text-sm {page > 0 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint cursor-default'}"
+            class="px-3 py-1 rounded text-sm {page > 0 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint'}"
             disabled={page === 0}
             onclick={() => { page = Math.max(0, page - 1); }}
           >
@@ -197,7 +202,7 @@
             {m.rankings_page_info({ current: String(page + 1), total: String(totalPages) })}
           </span>
           <button
-            class="px-3 py-1 rounded text-sm {page < totalPages - 1 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint cursor-default'}"
+            class="px-3 py-1 rounded text-sm {page < totalPages - 1 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint'}"
             disabled={page >= totalPages - 1}
             onclick={() => { page = Math.min(totalPages - 1, page + 1); }}
           >
