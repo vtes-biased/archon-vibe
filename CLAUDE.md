@@ -45,7 +45,7 @@ Steps 3-6 should run in parallel when applicable. Skip agents only for trivial c
 - **No pst numbers in commits or code**: never put `#N` / `pst #N` in commit messages or comments/docstrings (they clash with GitHub issue refs) — track linkage via the board; reference a `.pst/details/<slug>.md` path if needed.
 - **Keep overview docs lean**: when an issue is fixed, remove its mention from the docs (don't annotate "Resolved") — resolution detail lives in the pst detail file.
 - **Discuss before filing simplifications**: a simplify/refactor ticket is itself a decision — ground it in code and agree it *should* change before filing; cheap + isolated + useful features aren't simplification targets.
-- **Context lives in-repo**: put durable project facts in the right doc (ARCHITECTURE/SYNC/PRODUCT/TOURNAMENTS, this file, agent definitions, `.pst/details/`), not in personal auto-memory. Agent memory under `.claude/agent-memory/` is the in-repo exception, for agent-specific traps.
+- **Context lives in-repo**: put durable project facts in the right doc (ARCHITECTURE/SYNC/PRODUCT/TOURNAMENTS, this file, agent definitions, `.pst/details/`), not in personal auto-memory. Agent memory under `.claude/agent-memory/` is the in-repo exception, for agent-specific traps. Keep those memories tight: only durable agent-specific traps (a recurring gotcha, a non-obvious place to look, a tool/API quirk that bit you) — never feature specs, design decisions, prioritization, or task detail that belong in a pst ticket or `.pst/details/` file. If a finding is ticket-worthy, file/extend the ticket; don't mirror it into agent memory.
 
 # Architecture
 
