@@ -667,6 +667,19 @@ export async function timerAddTime(uid: string, table: string, seconds: number):
   });
 }
 
+// Announcement API
+
+export async function postAnnouncement(uid: string, body: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/announce`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function deleteAnnouncement(uid: string, announcementId: string): Promise<void> {
+  await apiRequest(`/api/tournaments/${uid}/announce/${announcementId}`, { method: 'DELETE' });
+}
+
 // Judge call API
 
 export async function callJudge(uid: string, table: number): Promise<void> {

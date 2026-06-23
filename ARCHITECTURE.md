@@ -152,6 +152,16 @@ Online-only. Timer state lives on the `Tournament` object and syncs via the norm
 - Endpoints (organizer-only, online-only, Playing state; all save-and-broadcast): `POST /{uid}/timer/{start|pause|reset|add-time}` — start/resume, pause, reset + clear extensions, add per-table seconds (max 600s total).
 - Frontend: `TimerDisplay.svelte` (countdown, <5 min warning, expired, organizer controls); `JudgeCallBanner.svelte` (stacks dismissible `judge_call` alerts with chime).
 
+## Announcements
+
+Organizer-initiated, online-only. Announcement state lives on the `Tournament` object and syncs via the normal SSE CRUD-on-save — same carve-out as the timer (not processed by the Rust engine).
+
+- `Announcement`: `id` (uuid7 hex, client dedup/dismissal key), `body`, `created_at`, `author_uid`, `author_name` (denormalized).
+- Tournament field: `announcements: list[Announcement]` — capped to the most recent 20; 280-char per-body limit.
+- Endpoints (organizer-only, online-only, offline_mode → 423): `POST /{uid}/announce`, `DELETE /{uid}/announce/{id}`.
+- Member-projected automatically (not in `_TOURNAMENT_MEMBER_EXCLUDE` denylist in `access_levels.py`); no `DATA_SCHEMA_VERSION` bump needed.
+- Frontend: `AnnouncementComposer.svelte` (organizer compose/delete), `AnnouncementBanner.svelte` (dismissible per-device via localStorage; arrival toast).
+
 ## Call for Judge
 
 Player-initiated, online-only: `POST /{uid}/call-judge` `{table}` — the caller must be authenticated and seated at that table in the current round, the tournament in Playing state and not offline. Emits the ephemeral `judge_call` SSE event to organizers + IC only (see Event System).

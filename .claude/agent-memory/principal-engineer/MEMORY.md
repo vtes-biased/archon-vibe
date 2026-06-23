@@ -78,6 +78,10 @@
 - [DQ dual-signal divergence traps](dq-signal-divergence-traps.md) — DQ = state||active-sanction; audit every consumer for the combined signal, and any DQ sanction create/lift/delete must recompute standings.
 - [Excluded-but-not-zeroed standings consumers](excluded-not-zeroed-standings-consumers.md) — proxy/non_competing is non-ranked but score is KEPT (DQ zeroes); league.rs + vekn_push iterate standings unfiltered and leak proxy scores; filter on disqualified||non_competing.
 
+## Online-only live tournament sub-data
+- [Online-only Tournament sub-data carve-out](online-only-tournament-subdata-carveout.md) — timer pattern: field on Tournament + backend route (tournament_transaction→save_object→broadcast_precomputed), NO Rust engine, NO optimistic update, NO new object type; reserved for online-only live UI state (announcements #290 mirror this).
+- [Tournament member projection is a denylist](tournament-member-projection-is-exclude-list.md) — compute_tournament_member excludes only {checkin_code, vekn_pushed_at}; any new Tournament field auto-reaches members at SSE; organizer-only secrets MUST be added to _TOURNAMENT_MEMBER_EXCLUDE or they leak.
+
 ## Authorization (cross-stack)
 - Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).
 

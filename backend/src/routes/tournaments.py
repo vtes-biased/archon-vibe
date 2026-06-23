@@ -49,6 +49,7 @@ from ..db import (
 from ..engine_errors import EngineRejection
 from ..middleware.auth import OptionalUser
 from ..models import (
+    Announcement,
     DeckListsMode,
     DeckObject,
     ObjectType,
@@ -1523,6 +1524,96 @@ async def timer_add_time(
             )
         tournament.table_extra_time[request.table] = current + request.seconds
         bd = await _save_timer_tx(tournament, tx_conn)
+    broadcast_precomputed(bd)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+# ============================================================================
+# Announcement endpoints (online-only, not processed by Rust engine)
+# ============================================================================
+
+MAX_ANNOUNCEMENTS = 20  # keep the most recent N; bounds the member-projection payload
+MAX_ANNOUNCEMENT_LEN = 280  # one notice-sized message
+
+
+def _validate_announce_tournament(user, tournament: Tournament | None):
+    """Validate tournament for announcement operations (inside transaction)."""
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if not permissions.is_organizer(user, tournament):
+        raise HTTPException(status_code=403, detail="Organizer access required")
+    if tournament.offline_mode:
+        raise HTTPException(status_code=423, detail="Tournament is in offline mode")
+
+
+class AnnounceRequest(BaseModel):
+    body: str
+
+
+@router.post("/{uid}/announce")
+async def post_announcement(
+    uid: str,
+    request: AnnounceRequest,
+    user: OptionalUser = None,
+) -> Response:
+    """Post a live announcement to all tournament participants."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    body = request.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Announcement is empty")
+    if len(body) > MAX_ANNOUNCEMENT_LEN:
+        raise HTTPException(
+            status_code=400, detail=f"Max {MAX_ANNOUNCEMENT_LEN} characters"
+        )
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_announce_tournament(user, tournament)
+        assert tournament is not None
+        tournament.announcements.append(
+            Announcement(
+                id=uuid7().hex,
+                body=body,
+                created_at=datetime.now(UTC),
+                author_uid=user.uid,
+                author_name=user.name,
+            )
+        )
+        # Prune on write so the projection never needs a separate cleanup job
+        tournament.announcements = tournament.announcements[-MAX_ANNOUNCEMENTS:]
+        tournament.modified = datetime.now(UTC)
+        bd = await save_object(
+            ObjectType.TOURNAMENT,
+            tournament.uid,
+            msgspec.to_builtins(tournament),
+            conn=tx_conn,
+        )
+    broadcast_precomputed(bd)
+    return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+@router.delete("/{uid}/announce/{announcement_id}")
+async def delete_announcement(
+    uid: str,
+    announcement_id: str,
+    user: OptionalUser = None,
+) -> Response:
+    """Remove an announcement (wrong-room, typo, superseded)."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        _validate_announce_tournament(user, tournament)
+        assert tournament is not None
+        kept = [a for a in tournament.announcements if a.id != announcement_id]
+        if len(kept) == len(tournament.announcements):
+            raise HTTPException(status_code=404, detail="Announcement not found")
+        tournament.announcements = kept
+        tournament.modified = datetime.now(UTC)
+        bd = await save_object(
+            ObjectType.TOURNAMENT,
+            tournament.uid,
+            msgspec.to_builtins(tournament),
+            conn=tx_conn,
+        )
     broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
 

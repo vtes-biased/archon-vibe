@@ -34,6 +34,8 @@ import { toUserMessage } from '$lib/errors';
 import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
   import JudgeCallBanner from "./JudgeCallBanner.svelte";
+  import AnnouncementBanner from "./AnnouncementBanner.svelte";
+  import AnnouncementComposer from "./AnnouncementComposer.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import type { JudgeCallData } from "$lib/sync";
@@ -736,6 +738,13 @@ import TournamentModals from "./TournamentModals.svelte";
       <!-- Judge Call Banner (organizer only, shown in any view) -->
       {#if tournament.state === "Playing"}
         <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
+      {/if}
+
+      <!-- Live announcements: organizers compose & manage; everyone else sees the banner -->
+      {#if showOrganizerView}
+        <AnnouncementComposer {tournament} />
+      {:else}
+        <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
       {/if}
 
       <!-- Organizer Console with Tabs -->

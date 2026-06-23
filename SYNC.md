@@ -286,6 +286,17 @@ Apply to IndexedDB optimistically → send to server → SSE corrects if needed.
 
 `standings_mode` (ongoing only): Private → empty, Cutoff/Top 10/Public → full standings (frontend applies display rules).
 
+### Tournament-Embedded, Online-Only Fields
+
+Some tournament fields are **not** processed by the Rust engine and have no offline path. They live on the `Tournament` struct, sync via the normal SSE CRUD-on-save, and reach members automatically because the member projection in `access_levels.py` is a denylist (`_TOURNAMENT_MEMBER_EXCLUDE`) — any new field not added to that denylist is member-visible by default.
+
+| Field | Description |
+|-------|-------------|
+| `timer` / `table_extra_time` | Round timer state; clients compute countdown locally |
+| `announcements` | Organizer broadcasts (list of `Announcement`); capped to last 20, 280 chars each |
+
+Do **not** add a new synced object type for data that belongs to a single tournament, is online-only, and needs no engine processing — embed it in `Tournament` instead.
+
 ## Adding a New Object Type
 
 1. **Backend model** in `models.py` (extend `BaseObject`)

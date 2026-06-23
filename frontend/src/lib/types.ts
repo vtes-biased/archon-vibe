@@ -260,6 +260,13 @@ export interface TimerState {
   elapsed_before_pause: number;  // seconds
   paused: boolean;
 }
+export interface Announcement {
+  id: string;            // uuid7 hex — dedup/dismissal key
+  body: string;
+  created_at: string;    // ISO datetime
+  author_uid: string;
+  author_name: string;
+}
 export type PlayerState = "Registered" | "Checked-in" | "Playing" | "Completed" | "Finished" | "Disqualified";
 export type PaymentStatus = "Pending" | "Paid" | "Refunded" | "Cancelled";
 export type TableState = "Finished" | "In Progress" | "Invalid" | "Cancelled";
@@ -389,6 +396,7 @@ export interface Tournament extends BaseObject {
   finals_time?: number;
   timer?: TimerState;
   table_extra_time?: Record<string, number>;  // table_idx → extra seconds
+  announcements?: Announcement[];  // live organizer broadcasts (online-only)
 }
 
 /** Player added during offline mode, pending reconciliation with server. */

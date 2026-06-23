@@ -302,6 +302,8 @@ Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentC
 | `POST` | `/{uid}/archon-import` | Import from legacy Archon Excel |
 | `GET` | `/{uid}/report` | Download tournament report (text/JSON) |
 | `POST` | `/{uid}/timer/*` | Timer controls (start/pause/reset/add-time) |
+| `POST` | `/{uid}/announce` | Post announcement (organizer-only, online-only, 280-char cap, last 20 kept) |
+| `DELETE` | `/{uid}/announce/{id}` | Delete an announcement |
 | `POST` | `/{uid}/call-judge` | Player requests judge at table |
 | `POST` | `/{uid}/go-offline` | Lock tournament for offline mode |
 | `POST` | `/{uid}/go-online` | Submit offline changes and unlock |

@@ -222,6 +222,16 @@ class TimerState(msgspec.Struct, kw_only=True):
     paused: bool = True  # True = not running
 
 
+class Announcement(msgspec.Struct, kw_only=True):
+    """Organizer broadcast shown live to participants (online-only, member-projected)."""
+
+    id: str  # uuid7 hex — client dedup/dismissal key (not a BaseObject uid)
+    body: str
+    created_at: datetime
+    author_uid: str
+    author_name: str = ""  # denormalized for display without a user lookup
+
+
 class RatingCategory(StrEnum):
     CONSTRUCTED_ONLINE = "constructed_online"
     CONSTRUCTED_OFFLINE = "constructed_offline"
@@ -623,6 +633,8 @@ class Tournament(TournamentConfig, kw_only=True):
     table_extra_time: dict[str, int] = msgspec.field(
         default_factory=dict
     )  # table_idx → extra seconds
+    # Live organizer announcements (online-only, member-projected, capped)
+    announcements: list[Announcement] = msgspec.field(default_factory=list)
 
 
 # OAuth 2.0 models
