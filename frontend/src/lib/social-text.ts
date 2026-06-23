@@ -2,7 +2,7 @@
  * Plain text generation for sharing tournament results via clipboard.
  */
 import type { Tournament, Deck, DeckObject, VtesCard } from "$lib/types";
-import type { StandingEntry } from "$lib/tournament-utils";
+import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
 import { seatDisplay } from "$lib/tournament-utils";
 import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
@@ -71,7 +71,7 @@ function formatDeckText(deck: Deck, cardsMap: Map<number, VtesCard>): string[] {
 
 export async function generateResultsText(
   tournament: Tournament,
-  playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>,
+  playerInfo: PlayerInfoMap,
   standings: StandingEntry[],
 ): Promise<string> {
   const lines: string[] = [];
@@ -103,7 +103,7 @@ export async function generateResultsText(
 
   // Winner
   if (tournament.winner) {
-    const winnerName = seatDisplay(tournament.winner, playerInfo);
+    const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
     const winnerEntry = standings.find((e) => e.user_uid === tournament.winner);
     const score = winnerEntry ? ` \u2014 ${formatScore(winnerEntry.gw, winnerEntry.vp, winnerEntry.tp)}` : "";
     lines.push(`\u{1F947} Winner: ${winnerName}${score}`);
@@ -114,7 +114,7 @@ export async function generateResultsText(
   if (standings.length > 0) {
     lines.push("Standings:");
     for (const entry of standings) {
-      const name = seatDisplay(entry.user_uid, playerInfo);
+      const name = seatDisplay(entry.user_uid, playerInfo, tournament.online);
       const score = formatScore(entry.gw, entry.vp, entry.tp);
       const finals = entry.finals ? ` [${entry.finals}]` : "";
       lines.push(`#${entry.rank} ${name} \u2014 ${score}${finals}`);
@@ -130,7 +130,7 @@ export async function generateResultsText(
       const deck = winnerDecks[winnerDecks.length - 1]!;
       if (Object.keys(deck.cards).length > 0) {
         const cardsMap = await getCards();
-        const winnerName = seatDisplay(tournament.winner, playerInfo);
+        const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
         lines.push(`\u{1F0CF} ${winnerName}'s deck:`);
         lines.push(...formatDeckText(deck, cardsMap));
       }

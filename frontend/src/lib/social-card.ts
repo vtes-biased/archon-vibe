@@ -3,7 +3,7 @@
  * Produces a 1080x1350 (4:5) dark card suitable for all social platforms.
  */
 import type { Tournament } from "$lib/types";
-import type { StandingEntry } from "$lib/tournament-utils";
+import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
 import { seatDisplay } from "$lib/tournament-utils";
 import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
@@ -65,7 +65,7 @@ function formatTypeLine(tournament: Tournament): string {
 
 export async function generateResultsCard(
   tournament: Tournament,
-  playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>,
+  playerInfo: PlayerInfoMap,
   standings: StandingEntry[],
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
@@ -129,7 +129,7 @@ export async function generateResultsCard(
 
     ctx.fillStyle = TEXT;
     ctx.font = `bold 36px ${FONT}`;
-    const winnerName = seatDisplay(tournament.winner, playerInfo);
+    const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
     drawTextTruncated(ctx, winnerName, pad + 24, y + 45, W - pad * 2 - 48, "left");
 
     // Winner score
@@ -180,7 +180,7 @@ export async function generateResultsCard(
 
       ctx.fillStyle = TEXT;
       ctx.font = `22px ${FONT}`;
-      const nameStr = seatDisplay(entry.user_uid, playerInfo);
+      const nameStr = seatDisplay(entry.user_uid, playerInfo, tournament.online);
       const nameMaxW = (hasFinals ? colFinals - 20 : colScore) - colName - 20;
       drawTextTruncated(ctx, nameStr, colName, y, nameMaxW, "left");
 

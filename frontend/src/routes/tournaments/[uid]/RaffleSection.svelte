@@ -25,7 +25,7 @@
   let count = $state(1);
 
   function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo);
+    return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
   // Raffle base: players seated in any round, plus players currently present

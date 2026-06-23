@@ -110,7 +110,7 @@
   const selfOrganizeCandidates = $derived(
     (tournament.players ?? [])
       .filter(p => p.user_uid && p.user_uid !== userUid && isSelfOrganizeEligible(p))
-      .map(p => ({ uid: p.user_uid as string, name: seatDisplayUtil(p.user_uid as string, playerInfo) }))
+      .map(p => ({ uid: p.user_uid as string, name: seatDisplayUtil(p.user_uid as string, playerInfo, tournament.online) }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
 
@@ -192,7 +192,7 @@
   }
 
   function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo);
+    return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
   function isPlayerDQ(userUid: string): boolean {

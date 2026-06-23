@@ -31,7 +31,7 @@
   } = $props();
 
   function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo);
+    return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
   const hasStandings = $derived(standings.length > 0);
@@ -95,7 +95,7 @@
   <!-- Winner deck nudge (no deck on file) -->
   {#if tournament.winner && !winnerHasDeck}
     <div class="banner-warn border rounded-lg p-3 text-sm">
-      {m.decks_winner_nudge_organizer({ name: playerInfo[tournament.winner]?.name ?? 'the winner' })}
+      {m.decks_winner_nudge_organizer({ name: seatDisplay(tournament.winner) })}
     </div>
   {/if}
 

@@ -583,8 +583,8 @@
                   />
                 {/if}
               </div>
-              {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
-                <div class="text-xs text-ink-faint truncate">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</div>
+              {#if (tournament.online && playerInfo[puid]?.nickname) || playerInfo[puid]?.vekn}
+                <div class="text-xs text-ink-faint truncate">{[tournament.online ? playerInfo[puid]?.nickname : null, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</div>
               {/if}
             </div>
             <div class="shrink-0">
@@ -793,8 +793,8 @@
                     />
                   {/if}
                 </span>
-                {#if playerInfo[puid]?.nickname || playerInfo[puid]?.vekn}
-                  <span class="text-xs text-ink-faint truncate block">{[playerInfo[puid]?.nickname, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</span>
+                {#if (tournament.online && playerInfo[puid]?.nickname) || playerInfo[puid]?.vekn}
+                  <span class="text-xs text-ink-faint truncate block">{[tournament.online ? playerInfo[puid]?.nickname : null, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</span>
                 {/if}
               </td>
               {#if standings.length > 0}

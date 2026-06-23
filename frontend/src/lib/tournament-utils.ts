@@ -36,11 +36,40 @@ export function getStateBadgeClass(state: TournamentState): string {
   }
 }
 
-export function seatDisplay(uid: string, playerInfo: PlayerInfoMap): string {
+/** Privacy abbreviation for a real name: first whitespace word in full, then the
+ *  capitalised initials of the remaining words, no dots/spaces between them.
+ *  "Lionel Marie Panhaleux" -> "Lionel MP"; "John Smith" -> "John S"; "Cher" -> "Cher". */
+export function abbreviateName(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  const initials = words.slice(1).map(w => w[0]!.toUpperCase()).join("");
+  return initials ? `${words[0]} ${initials}` : words[0]!;
+}
+
+/**
+ * Render a player's name for display.
+ *
+ * Offline (IRL) events: real name + vekn only — the nickname is never shown.
+ * Online events (privacy): show ONLY the nickname; the real name is never spelled
+ * out — instead its abbreviation (abbreviateName) sits with the vekn id inside the
+ * parens, e.g. "Lio (Lionel MP · 1234567)". With no nickname the abbreviation becomes
+ * the primary, e.g. "Lionel MP (1234567)". Derived purely from whatever the viewer's
+ * own access projection already put in playerInfo — nothing is precomputed server-side.
+ */
+export function seatDisplay(uid: string, playerInfo: PlayerInfoMap, online = false): string {
   const info = playerInfo[uid];
   if (!info) return uid;
-  const display = info.display_name || info.nickname || info.name;
-  return info.vekn ? `${display} (${info.vekn})` : display;
+  if (online) {
+    const nick = info.display_name || info.nickname;
+    const abbrev = abbreviateName(info.name) || info.name;
+    if (nick) {
+      const inside = [abbrev, info.vekn].filter(Boolean).join(" · ");
+      return inside ? `${nick} (${inside})` : nick;
+    }
+    return info.vekn ? `${abbrev} (${info.vekn})` : abbrev;
+  }
+  // Offline (IRL) events: real name + vekn only — the nickname is never shown.
+  return info.vekn ? `${info.name} (${info.vekn})` : info.name;
 }
 
 export function vpOptions(tableSize: number, allowImpossible: boolean): number[] {

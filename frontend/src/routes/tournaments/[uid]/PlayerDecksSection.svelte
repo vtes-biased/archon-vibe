@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament, DeckObject, VtesCard } from "$lib/types";
   import type { PlayerInfoMap } from "$lib/tournament-utils";
-  import { roundsPlayed } from "$lib/tournament-utils";
+  import { roundsPlayed, seatDisplay } from "$lib/tournament-utils";
   import { getDecksByTournamentGrouped } from "$lib/db";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -383,7 +383,7 @@
                   </span>
                   <div class="flex-1 min-w-0">
                     {#if showIdentity}
-                      <span class="text-sm text-ink-bright truncate block">{playerInfo[uid]?.name ?? uid}</span>
+                      <span class="text-sm text-ink-bright truncate block">{seatDisplay(uid, playerInfo, tournament.online)}</span>
                     {/if}
                     <span class="text-ink-muted truncate block {showIdentity ? 'text-xs' : 'text-sm'}">
                       {#if isMultideck}<span class="text-ink-faint">{m.decks_round_label({ n: String(i + 1) })}</span> — {/if}

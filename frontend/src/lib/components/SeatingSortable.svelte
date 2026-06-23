@@ -10,13 +10,15 @@
     playerIssues,
     isFinals = false,
     tableRooms,
+    online = false,
     onchange,
   }: {
     tables: string[][];
-    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null }>;
+    playerInfo: Record<string, { name: string; nickname: string | null; vekn: string | null; display_name?: string | null }>;
     playerIssues: Map<string, { level: number; message: string }>;
     isFinals: boolean;
     tableRooms?: { name: string; count: number }[];
+    online?: boolean;
     onchange: () => void;
   } = $props();
 
@@ -27,7 +29,7 @@
   let announce = $state('');
 
   function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo);
+    return seatDisplayUtil(uid, playerInfo, online);
   }
 
   function tableLabel(t: number): string {

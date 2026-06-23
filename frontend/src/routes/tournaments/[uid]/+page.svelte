@@ -323,7 +323,7 @@ import TournamentModals from "./TournamentModals.svelte";
   }
 
   function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo);
+    return seatDisplayUtil(uid, playerInfo, tournament?.online ?? false);
   }
 
   let scoreSaving = $state<number | null>(null);

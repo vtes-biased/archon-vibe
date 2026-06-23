@@ -215,7 +215,7 @@
   );
 
   function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo);
+    return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
   function enterAlterMode(roundIdx: number) {
@@ -651,6 +651,7 @@
                 {playerIssues}
                 isFinals={false}
                 tableRooms={tournament.table_rooms}
+                online={tournament.online}
                 onchange={recomputeIssues}
               />
               <Button variant="secondary" size="md" onclick={addTableInAlter} disabled={actionLoading}>

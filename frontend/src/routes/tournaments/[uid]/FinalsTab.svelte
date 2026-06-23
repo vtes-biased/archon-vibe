@@ -64,7 +64,7 @@
   let overrideSaving = $state(false);
 
   function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo);
+    return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
   async function setFinalsVp(playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
@@ -126,6 +126,7 @@
           {playerInfo}
           playerIssues={new Map()}
           isFinals={true}
+          online={tournament.online}
           onchange={() => { alterSeating = alterTables[0] ?? []; }}
         />
         <div class="flex gap-2 mt-3">

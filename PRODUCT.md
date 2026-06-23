@@ -369,6 +369,7 @@ Behaviors the app must get right that go beyond the headline rules in §3.
 - **Standings during ongoing events**: organizer-set Private / Cutoff / Top 10 / Public (manages information asymmetry).
 - **Decklists**: organizer-set Winner / Finalists / All, applied only after finish.
 - **Self-reporting window**: players set scores during the round until an organizer override locks the table.
+- **Online tournament player display** (frontend only): nickname is the primary label; real name abbreviated as first word + remaining initials (e.g. "Lionel MP") alongside VEKN id in parens. No nickname: abbreviation is primary. Organizer Players-tab roster keeps the full real name. Offline (IRL) tournaments: real name + VEKN only — the nickname is never shown.
 - Member-level field visibility and its security caveats: see §4.
 
 ### VEKN
