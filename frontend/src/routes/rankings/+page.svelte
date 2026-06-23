@@ -106,7 +106,7 @@
     <h1 class="text-3xl font-semibold text-accent mb-6">{m.rankings_page_title()}</h1>
 
     <!-- Tabs: rating categories + Hall of Fame -->
-    <div class="flex mb-6 bg-surface-card rounded-lg border border-line p-1 w-fit max-w-full overflow-x-auto">
+    <div class="flex flex-wrap gap-y-1 mb-6 bg-surface-card rounded-lg border border-line p-1 w-fit max-w-full">
       {#each tabs as tab}
         <button
           onclick={() => { activeTab = tab.value; }}
