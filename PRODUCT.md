@@ -158,7 +158,7 @@ Published preliminary standings rank GW > VP > TP using competition ranking with
 
 | Level | Visibility | Effect |
 |-------|-----------|--------|
-| Caution | Private to its tournament | Verbal warning, tracked during the event for pattern detection. Never shown on member pages or in other events (IC/Ethics excepted) |
+| Caution | Private to its tournament | Verbal warning, tracked during the event for pattern detection. Never shown on member pages or in other events — visible only inside its own tournament |
 | Warning | Member page + other events, 18 months | Tracked in VEKN database, visible to future organizers |
 | Standings Adjustment | Member page + other events, 18 months | -1 VP penalty applied to current/next/previous game depending on timing (v2 Judges Guide) |
 | Disqualification | Member page + other events, 18 months | Dropped from tournament (player state → Disqualified), prevents further check-in; bars sibling events of the same league |
@@ -180,7 +180,7 @@ Published preliminary standings rank GW > VP > TP using competition ranking with
 
 #### Visibility Rules
 
-- **Caution**: belongs to the tournament where it was issued — shown only in that event's context (the sanction dot next to the player). Hidden on member pages and in other events, except to IC/Ethics.
+- **Caution**: belongs to the tournament where it was issued — shown only in that event's context (the sanction dot next to the player). Hidden on member pages (member detail, members list, the "sanctioned" filter) and in other events — for everyone, including IC/Ethics, who see it inside the tournament instead.
 - **Warning / SA / DQ**: visible on the member detail page and members list, and in other tournaments' context, for **18 months** from issuance.
 - **Suspension / Probation**: membership-level, always visible; a permanent ban (suspension without expiry) stays visible past 18 months.
 - IC/Ethics see all levels on every surface. The filtering is a display rule — all sanction records sync to all members' clients (member access level).

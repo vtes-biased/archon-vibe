@@ -5,7 +5,7 @@
   import { visibleSanctions } from "$lib/utils";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
-  import { Pencil, TriangleAlert, CircleCheck, Trash2 } from "@lucide/svelte";
+  import { Pencil, TriangleAlert, CircleCheck, Trash2, RefreshCw } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -37,6 +37,7 @@
   let editSanctionDescription = $state("");
   let editSanctionExpiresAt = $state("");
   let processingSanctionAction = $state(false);
+  let savingSanction = $state(false);
 
   // Load sanctions when user changes
   $effect(() => {
@@ -45,9 +46,8 @@
     });
   });
 
-  // Cautions are private to their tournament; the member directory only
-  // surfaces them to managers (IC/Ethics).
-  const shownSanctions = $derived(visibleSanctions(userSanctions, canIssueSanctions));
+  // Cautions are private to their tournament — never surfaced in the directory.
+  const shownSanctions = $derived(visibleSanctions(userSanctions));
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -57,19 +57,6 @@
 
   const editExpiryRequired = $derived(editSanctionLevel === "probation");
   const editExpiryAllowed = $derived(editSanctionLevel === "suspension" || editSanctionLevel === "probation");
-
-  const editSanctionHasChanges = $derived(() => {
-    if (!editingSanction) return false;
-    const origExpiry = editingSanction.expires_at
-      ? new Date(editingSanction.expires_at).toISOString().split("T")[0]
-      : "";
-    return (
-      editSanctionLevel !== editingSanction.level ||
-      editSanctionCategory !== editingSanction.category ||
-      editSanctionDescription !== editingSanction.description ||
-      editSanctionExpiresAt !== origExpiry
-    );
-  });
 
   function focusOnMount(node: HTMLElement) {
     const input = node.querySelector<HTMLElement>("input:not(.hidden):not([type=hidden]), textarea, select");
@@ -85,14 +72,21 @@
     showSanctionModal = true;
   }
 
+  // Mirror the stored sanction into the edit form fields (used on open and to
+  // revert an optimistic edit that the server rejected).
+  function syncEditFieldsFromSanction() {
+    if (!editingSanction) return;
+    editSanctionLevel = editingSanction.level;
+    editSanctionCategory = editingSanction.category;
+    editSanctionDescription = String(editingSanction.description || "");
+    editSanctionExpiresAt = editingSanction.expires_at
+      ? new Date(editingSanction.expires_at).toISOString().split("T")[0] ?? ""
+      : "";
+  }
+
   function openEditSanctionModal(sanction: Sanction) {
     editingSanction = sanction;
-    editSanctionLevel = sanction.level;
-    editSanctionCategory = sanction.category;
-    editSanctionDescription = String(sanction.description || "");
-    editSanctionExpiresAt = sanction.expires_at
-      ? new Date(sanction.expires_at).toISOString().split("T")[0] ?? ""
-      : "";
+    syncEditFieldsFromSanction();
     showEditSanctionModal = true;
   }
 
@@ -128,26 +122,49 @@
     }
   }
 
-  async function handleSaveSanction() {
-    if (!editingSanction) return;
+  // No-save principle: each field commits on change (selects/date on change,
+  // description on blur). Optimistic — the server result replaces the local copy;
+  // a rejection reverts the form to the stored sanction.
+  async function saveSanctionField(
+    patch: { level?: SanctionLevel; category?: SanctionCategory; description?: string; expires_at?: string },
+  ) {
+    if (!editingSanction || editingSanction.lifted_at) return;
     const sanctionUid = editingSanction.uid;
-    processingSanctionAction = true;
+    savingSanction = true;
     try {
-      const updated = await updateSanction(sanctionUid, {
-        level: editSanctionLevel,
-        category: editSanctionCategory,
-        description: editSanctionDescription.trim(),
-        expires_at: editExpiryAllowed && editSanctionExpiresAt ? editSanctionExpiresAt : undefined,
-      });
+      const updated = await updateSanction(sanctionUid, patch);
       userSanctions = userSanctions.map((s) => (s.uid === sanctionUid ? updated : s));
-      showToast({ type: "success", message: m.sanction_mgr_updated() });
-      closeEditSanctionModal();
+      editingSanction = updated;
     } catch {
-      // Error toast shown by apiRequest
+      // Error toast shown by apiRequest; revert the form to the stored sanction.
+      syncEditFieldsFromSanction();
     } finally {
-      processingSanctionAction = false;
+      savingSanction = false;
     }
   }
+
+  function handleLevelChange() {
+    if (editSanctionLevel !== editingSanction?.level) saveSanctionField({ level: editSanctionLevel });
+  }
+
+  function handleCategoryChange() {
+    if (editSanctionCategory !== editingSanction?.category) saveSanctionField({ category: editSanctionCategory });
+  }
+
+  function handleDescriptionChange() {
+    const desc = editSanctionDescription.trim();
+    if (desc && desc !== editingSanction?.description) saveSanctionField({ description: desc });
+  }
+
+  function handleExpiryChange() {
+    if (editExpiryAllowed && editSanctionExpiresAt && editSanctionExpiresAt !== originalExpiry())
+      saveSanctionField({ expires_at: editSanctionExpiresAt });
+  }
+
+  const originalExpiry = () =>
+    editingSanction?.expires_at
+      ? new Date(editingSanction.expires_at).toISOString().split("T")[0] ?? ""
+      : "";
 
   async function handleLiftSanction() {
     if (!editingSanction) return;
@@ -412,6 +429,7 @@
           <select
             id="edit-sanction-level"
             bind:value={editSanctionLevel}
+            onchange={handleLevelChange}
             disabled={!!editingSanction.lifted_at}
             class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
           >
@@ -431,6 +449,7 @@
           <select
             id="edit-sanction-category"
             bind:value={editSanctionCategory}
+            onchange={handleCategoryChange}
             disabled={!!editingSanction.lifted_at}
             class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
           >
@@ -447,6 +466,7 @@
           <textarea
             id="edit-sanction-description"
             bind:value={editSanctionDescription}
+            onchange={handleDescriptionChange}
             disabled={!!editingSanction.lifted_at}
             rows="3"
             class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent resize-none disabled:opacity-50"
@@ -462,6 +482,7 @@
               id="edit-sanction-expires"
               type="date"
               bind:value={editSanctionExpiresAt}
+              onchange={handleExpiryChange}
               disabled={!!editingSanction.lifted_at}
               required={editExpiryRequired}
               min={new Date().toISOString().split("T")[0]}
@@ -474,17 +495,11 @@
         {/if}
 
         <div class="flex flex-col gap-2 pt-4 border-t border-line">
-          {#if !editingSanction.lifted_at && editSanctionHasChanges()}
-            <Button
-              variant="primary"
-              size="lg"
-              block
-              loading={processingSanctionAction}
-              disabled={!editSanctionDescription.trim() || (editExpiryRequired && !editSanctionExpiresAt)}
-              onclick={handleSaveSanction}
-            >
-              {processingSanctionAction ? m.common_saving() : m.sanction_mgr_save_changes()}
-            </Button>
+          {#if savingSanction}
+            <div class="text-xs text-ink-faint flex items-center gap-1">
+              <RefreshCw class="w-3 h-3 animate-spin" />
+              {m.common_saving()}
+            </div>
           {/if}
 
           <div class="flex gap-2">
@@ -501,7 +516,7 @@
             </Button>
 
             <Button variant="secondary" size="lg" disabled={processingSanctionAction} onclick={closeEditSanctionModal}>
-              {m.common_cancel()}
+              {m.common_close()}
             </Button>
           </div>
         </div>

@@ -576,8 +576,9 @@ export async function getSuspendedUserUids(): Promise<Set<string>> {
  */
 export async function userHasPastSanctions(userUid: string): Promise<boolean> {
   const sanctions = await getSanctionsForUser(userUid);
-  // Return true if there are any non-deleted sanctions
-  return sanctions.some(s => !s.deleted_at);
+  // Cautions stay private to their tournament — they don't count as a member-
+  // directory sanction, so the "sanctioned" filter must ignore them.
+  return sanctions.some(s => !s.deleted_at && s.level !== 'caution');
 }
 
 // Tournament operations (single store, all data levels)
