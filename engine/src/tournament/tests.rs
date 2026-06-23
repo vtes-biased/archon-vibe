@@ -334,6 +334,167 @@ fn test_start_round_drops_registered_players() {
     assert_eq!(updated["players"][5]["state"].as_str(), Some("Finished"));
 }
 
+// Self-organized rounds (#274): the player-authorized eligibility predicate. One test
+// over the whole invariant — registration is the gate, the initiator must be seated, and
+// the abuse vectors (concurrent pod, non-participant, disabled, offline) are all rejected.
+#[test]
+fn test_self_organize_round_eligibility() {
+    let mut t = make_tournament();
+    t["state"] = "Waiting".into();
+    t["online"] = true.into();
+    t["self_organized_rounds"] = true.into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p5", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p6", state: "Playing", payment_status: "Pending", toss: 0 },
+    ];
+    let p1 = make_player("p1");
+    let pod =
+        json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p1","p2","p3","p4"]}"#).unwrap();
+
+    // Happy path: a registered initiator seats a 4-player pod. Engine assigns one table,
+    // stamps provenance, seats only the chosen players, and leaves p5 available.
+    let out = json::parse(&run_event(&t, &pod, &p1).expect("self-organize")).unwrap();
+    assert_eq!(out["rounds"].len(), 1);
+    assert_eq!(out["rounds"][0].len(), 1, "exactly one table");
+    assert_eq!(out["rounds"][0][0]["organized_by"].as_str(), Some("p1"));
+    assert_eq!(out["state"].as_str(), Some("Playing"));
+    let st = |o: &JsonValue, uid: &str| {
+        o["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .unwrap()["state"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(st(&out, "p1"), "Playing");
+    assert_eq!(st(&out, "p4"), "Playing");
+    assert_eq!(
+        st(&out, "p5"),
+        "Registered",
+        "unselected player stays available"
+    );
+
+    // Initiator must seat themselves.
+    let no_self =
+        json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p2","p3","p4","p5"]}"#).unwrap();
+    assert!(matches!(
+        run_event(&t, &no_self, &p1),
+        Err(EngineError::SelfOrganizeNotSeated)
+    ));
+
+    // Concurrent-pod guard: a Playing player can't be pulled into a second pod.
+    let busy =
+        json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p1","p2","p3","p6"]}"#).unwrap();
+    assert!(matches!(
+        run_event(&t, &busy, &p1),
+        Err(EngineError::SelfOrganizeIneligible { .. })
+    ));
+
+    // Registration is the gate: a non-participant can't be seated.
+    let ghost =
+        json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p1","p2","p3","ghost"]}"#)
+            .unwrap();
+    assert!(matches!(
+        run_event(&t, &ghost, &p1),
+        Err(EngineError::NotRegistered)
+    ));
+
+    // Disabled flag rejects the whole path.
+    let mut off = t.clone();
+    off["self_organized_rounds"] = false.into();
+    assert!(matches!(
+        run_event(&off, &pod, &p1),
+        Err(EngineError::SelfOrganizeDisabled)
+    ));
+
+    // Online-only by design.
+    let mut offline = t.clone();
+    offline["online"] = false.into();
+    assert!(matches!(
+        run_event(&offline, &pod, &p1),
+        Err(EngineError::SelfOrganizeRequiresOnline)
+    ));
+}
+
+// Cancelling a NON-last round (parallel rounds, #274) soft-cancels in place: the slot is
+// preserved (index-stable for deck.round / SA round_number), the round drops out of the cap
+// and standings, its players are released, and other in-progress rounds are untouched.
+#[test]
+fn test_cancel_round_soft_cancels_non_last() {
+    let mut t = make_tournament();
+    t["state"] = "Playing".into();
+    t["online"] = true.into();
+    t["max_rounds"] = 1.into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "q1", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q2", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q3", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q4", state: "Playing", payment_status: "Pending", toss: 0 },
+    ];
+    // Two parallel rounds: round 0 finished (p-pod, which capped them at max_rounds=1),
+    // round 1 still in progress (q-pod).
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 0 } },
+        ], state: "Finished" } ],
+        [ { seating: [
+            { player_uid: "q1", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q2", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q3", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "In Progress" } ],
+    ];
+
+    let ev = json::object! { type: "CancelRound", round: 0 };
+    let out = json::parse(&run_event(&t, &ev, &make_organizer()).expect("cancel")).unwrap();
+
+    assert_eq!(out["rounds"].len(), 2, "slot preserved, not removed");
+    assert_eq!(out["rounds"][0][0]["state"].as_str(), Some("Cancelled"));
+    assert_eq!(
+        out["rounds"][1][0]["state"].as_str(),
+        Some("In Progress"),
+        "the other in-progress round is untouched"
+    );
+    assert_eq!(
+        out["state"].as_str(),
+        Some("Playing"),
+        "stay Playing — round 1 live"
+    );
+
+    let st = |o: &JsonValue, uid: &str| {
+        o["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .unwrap()["state"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    // The cancelled round no longer counts toward the cap, so its capped players re-arm.
+    assert_eq!(st(&out, "p1"), "Checked-in");
+    // The live round's players keep playing.
+    assert_eq!(st(&out, "q1"), "Playing");
+    // A player seated only in the cancelled round drops out of standings entirely.
+    assert!(
+        !out["standings"]
+            .members()
+            .any(|s| s["user_uid"].as_str() == Some("p3")),
+        "cancelled round contributes no standings"
+    );
+}
+
 #[test]
 fn test_non_organizer_cannot_open_registration() {
     let tournament = make_tournament();

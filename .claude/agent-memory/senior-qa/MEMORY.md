@@ -8,6 +8,7 @@
 - [VEKN member sync](project_vekn_member_sync.md) — member-sync role-seed test infra (`test_vekn_member_sync.py`) + the non-obvious update-path enforcement surface (`_update_user` enumeration, not vekn_data).
 - [No git checkout during mutation tests](feedback_no_git_checkout_during_mutation_tests.md) — back up the file first; `git checkout` wiped uncommitted feature code mid-QA.
 - [Engine test fixture traps](project_engine_test_fixture_traps.md) — `tournament_with_round`/`waiting_after_round` carry engine-impossible stored VP vectors; inert only because standings recompute never re-validates. Don't build full-standings asserts on their untouched tables.
+- [Engine↔model state drift](project_engine_model_state_drift.md) — engine emits state strings as bare literals (enum can be stale); route strict-converts → a missing Python enum value 500s every action. `test_engine_model_contract.py` pins it.
 
 ## How to Run Tests
 - **Backend**: `cd backend && uv run python3 -m pytest tests/ -v --tb=short`. Some suites need a test Postgres on port 5433 — skip with `--ignore` if unavailable (e.g. `test_users.py`). Pure-unit suites (SSE filters, offline mode, organizer access, access levels) need no DB.

@@ -462,6 +462,9 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     standings_mode: StandingsMode = StandingsMode.PRIVATE
     decklists_mode: DeckListsMode = DeckListsMode.WINNER
     max_rounds: int = 0
+    self_organized_rounds: bool = (
+        False  # open rounds: registered players may seat their own pod
+    )
     table_rooms: list[Room] = msgspec.field(default_factory=list)
     # Timer config
     round_time: int = 0  # Round duration in seconds (0 = no timer)
@@ -509,6 +512,7 @@ class TableState(StrEnum):
     FINISHED = "Finished"
     IN_PROGRESS = "In Progress"
     INVALID = "Invalid"
+    CANCELLED = "Cancelled"  # soft-cancelled round (slot preserved; excluded from cap/standings)
 
 
 class ScoreOverride(msgspec.Struct, kw_only=True):
@@ -520,6 +524,9 @@ class Table(msgspec.Struct, kw_only=True):
     seating: list[Seat]
     state: TableState = TableState.IN_PROGRESS
     override: ScoreOverride | None = None
+    organized_by: str | None = (
+        None  # user_uid of the player who self-organized this round (#274)
+    )
 
 
 class FinalsTable(Table, kw_only=True):

@@ -114,6 +114,12 @@ impl TournamentEvent {
             "CancelRound" => Ok(Self::CancelRound {
                 round: value["round"].as_usize(),
             }),
+            "SelfOrganizeRound" => Ok(Self::SelfOrganizeRound {
+                player_uids: value["player_uids"]
+                    .members()
+                    .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                    .collect(),
+            }),
             "SwapSeats" => {
                 let round = value["round"].as_usize().ok_or("round required")?;
                 let table1 = value["table1"].as_usize().ok_or("table1 required")?;

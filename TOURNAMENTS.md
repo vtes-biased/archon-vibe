@@ -85,8 +85,9 @@ Events are processed by the Rust engine. Each event includes:
 | Event | Required Fields | Description |
 |-------|-----------------|-------------|
 | `StartRound` | `seating?` | Creates round with seating (optional seating for deterministic forwarding) |
-| `FinishRound` | - | Ends current round |
-| `CancelRound` | - | Cancels current round, players return to Checked-in |
+| `FinishRound` | `round?` | Ends a round (any, any order) |
+| `CancelRound` | `round?` | Last round: hard-removed; any earlier round: soft-cancelled (tables set to `Cancelled`, slot preserved, players released) |
+| `SelfOrganizeRound` | `player_uids` | Player-authorized (not organizer-gated): seats one 4–5-player pod in an online open-rounds tournament with `self_organized_rounds` on; initiator must be among the UIDs |
 | `SwapSeats` | `round`, `table`, `seat_a`, `seat_b` | Swap two players within a table |
 | `AlterSeating` | `round`, `seating` | Positional prefix match: existing tables matched by index (results preserved same-table, reset cross-table); extra payload tables appended fresh; each table must seat 0/4/5 players (0 = empty draft workspace, dropped after rebuild). Finals: replaces seat order, same player set. |
 | `SeatPlayer` | `table`, `player_uid`, `seat` | Add player to a table in the **last** round |
@@ -165,8 +166,9 @@ Tied VP players share (average) the TP values for the positions they cover.
 
 The engine determines table state as follows:
 
-1. If `override` is set → **Finished** (judge forced it)
-2. Run `check_table_vps` validation:
+1. **`Cancelled`** — set by `CancelRound` on any non-last round (soft-cancel). Excluded from per-player cap, standings, rating, and active-round detection; seated players are released. Slot is preserved (mid-array removal would corrupt index-tagged `deck.round` / `standings_adjustment.round_number`).
+2. If `override` is set → **Finished** (judge forced it)
+3. Run `check_table_vps` validation:
    - `InsufficientTotal` (sum of ceil'd VPs < table_size) → **In Progress** (scores incomplete)
    - Other validation error → **Invalid**
    - No error → **Finished**
@@ -207,6 +209,26 @@ Non-VEKN format, enabled by setting `max_rounds > 0` in config. Not pushed to VE
 - **`StartFinals`**: excludes `Disqualified` and `Finished` (withdrawn) players; promotes the next-ranked qualifier automatically if a top-5 qualifier is in either of those states. `Completed` players are **not** excluded.
 - **Standings**: cumulative GW > VP > TP across all rounds played, same as standard.
 
+### Self-organized rounds
+
+Config flag `self_organized_rounds` (bool, default false). Settable only when `max_rounds > 0`. Organizer opt-in per tournament.
+
+**Eligibility for `SelfOrganizeRound`:**
+- Tournament: online, `self_organized_rounds` on, `max_rounds > 0`, state Waiting or Playing, no finals.
+- Players: exactly 4–5 distinct registered players in state `Registered` or `Checked-in` (not `Playing`, `Completed`, `Disqualified`); initiator must be among them.
+
+**Behavior:**
+- Trust-based: registration is the only integrity gate — collusion risk accepted (non-VEKN house format).
+- Engine computes single-table seating (R1 best-effort pred-prey; uses prior rounds).
+- Seated players move to `Playing`; unseated `Registered` players are untouched (unlike `StartRound`).
+- Table stamped `organized_by: <initiator_uid>` for audit.
+- Never for finals (organizer-only); never VEKN-pushed.
+
+**Organizer oversight:**
+- `FinishRound` closes any round (any order — already supported for parallel rounds).
+- `CancelRound` vetoes any round (see CancelRound behavior below).
+- `Override` voids a specific table result.
+
 ## Sanctions and Standings
 
 Sanctions are a separate object type (see SYNC.md). The tournament-relevant sanction type is `standings_adjustment` (SA).
@@ -245,7 +267,7 @@ Proxy signal: `player.non_competing == true` (judges-guide §5.1.1).
 Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentConfig`, `Player`, `Table`, `Seat`, `Score`) and `backend/src/models.py`. Non-obvious structure:
 
 - `rounds: Table[][]` — outer index = round, inner = tables in that round; `finals` is a separate field (not a round).
-- `Table` carries `seating: Seat[]`, a derived `state` (`In Progress`/`Finished`/`Invalid`), and an optional `override`.
+- `Table` carries `seating: Seat[]`, a derived `state` (`In Progress`/`Finished`/`Invalid`/`Cancelled`), an optional `override`, and an optional `organized_by` (user UID of the player who called `SelfOrganizeRound` — audit trail only).
 - `Score = {gw, vp, tp}` per seat — only `vp` is user-submitted; `gw`/`tp` are engine-computed.
 - Player `state` (`Registered`/`Checked-in`/`Playing`/`Finished`/`Completed`/`Disqualified`) and `payment_status` (`Pending`/`Paid`/`Refunded`/`Cancelled`); `toss` for finals tie-breaking; `non_competing` (boolean, default false).
   - `Completed` — reached per-player `max_rounds` cap (Open Rounds only); done with prelims, **finals-eligible**; check-in is refused.
@@ -312,6 +334,7 @@ Actions are validated by the Rust engine:
 | Add/Remove/Drop Player | Organizers |
 | Check In / Check In All / Reset Check-in | Organizers |
 | Start/Finish/Cancel Round | Organizers |
+| Self-Organize Round | Registered players (online open-rounds w/ `self_organized_rounds` on, Waiting/Playing, no finals) |
 | Set Score | Players at the table (Playing only); organizers (Waiting/Playing/Finished) |
 | Override/Unoverride | Organizers (Waiting/Playing/Finished) |
 | Seating edits (Swap, Alter, Seat, Unseat, AddTable, RemoveTable) | Organizers |

@@ -916,6 +916,7 @@ class TournamentActionRequest(BaseModel):
     status: str | None = None  # For SetPaymentStatus
     non_competing: bool | None = None  # For SetNonCompeting (proxy toggle)
     seating: list[list[str]] | None = None  # For AlterSeating
+    player_uids: list[str] | None = None  # For SelfOrganizeRound: the chosen pod
     config: dict | None = None  # For UpdateConfig: partial config fields
     # Deck
     deck: dict | None = None
@@ -977,6 +978,8 @@ async def tournament_action(
         event_data["non_competing"] = request.non_competing
     if request.seating:
         event_data["seating"] = request.seating
+    if request.player_uids is not None:
+        event_data["player_uids"] = request.player_uids
     if request.config is not None:
         event_data["config"] = request.config
     if request.deck is not None:
@@ -1126,7 +1129,7 @@ async def tournament_action(
 
         # Timer lifecycle hooks (online-only, not handled by Rust engine)
         # Skip timer reset if other rounds are still in progress (parallel rounds)
-        if request.type in ("StartRound", "StartFinals"):
+        if request.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
             in_progress = sum(
                 1
                 for r in (updated.rounds or [])

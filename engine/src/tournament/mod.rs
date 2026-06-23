@@ -30,9 +30,9 @@ use types::VpError;
 // Import everything needed for apply_event from submodules
 use crate::error::EngineError;
 use helpers::{
-    all_rounds_finished, count_player_rounds_played, find_player_index, is_deck_locked,
-    player_exists, players_in_other_active_rounds, require_can_edit_results, require_organizer,
-    require_state, require_state_or_finished, validate_enum,
+    all_rounds_finished, collect_previous_rounds, count_player_rounds_played, find_player_index,
+    is_deck_locked, player_exists, players_in_other_active_rounds, require_can_edit_results,
+    require_organizer, require_state, require_state_or_finished, validate_enum,
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
@@ -71,6 +71,16 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
                 return Err(EngineError::NameRequired);
             }
         }
+    }
+    // Self-organized rounds are an open-rounds-only feature. The real gate is the
+    // SelfOrganizeRound event's own max_rounds>0 check; this rejects the nonsensical
+    // combo at config time when both fields arrive together (the usual case — the
+    // config form posts max_rounds alongside the flag).
+    if config["self_organized_rounds"].as_bool() == Some(true)
+        && config.has_key("max_rounds")
+        && config["max_rounds"].as_usize() == Some(0)
+    {
+        return Err(EngineError::SelfOrganizeNotOpenRounds);
     }
     Ok(())
 }
@@ -120,6 +130,7 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         "standings_mode" => config["standings_mode"].as_str().unwrap_or("Private"),
         "decklists_mode" => config["decklists_mode"].as_str().unwrap_or("Winner"),
         "max_rounds" => config["max_rounds"].as_u32().unwrap_or(0),
+        "self_organized_rounds" => config["self_organized_rounds"].as_bool().unwrap_or(false),
         "league_uid" => config["league_uid"].clone(),
         "round_time" => config["round_time"].as_u32().unwrap_or(0),
         "finals_time" => config["finals_time"].as_u32().unwrap_or(0),
@@ -817,6 +828,119 @@ fn apply_event(
             Ok(())
         }
 
+        TournamentEvent::SelfOrganizeRound { player_uids } => {
+            // Player-authorized (NOT organizer-gated): a registered player seats one pod
+            // when the organizer enabled self-organized rounds on an online open-rounds
+            // tournament. The integrity gate is REGISTRATION — you can only seat already-
+            // registered players; collusion / phantom-round risk is an accepted non-VEKN
+            // tradeoff, mitigated socially + by the organizer veto (FinishRound/CancelRound/
+            // Override). Players pick WHO; the engine assigns WHERE.
+            if !tournament["self_organized_rounds"]
+                .as_bool()
+                .unwrap_or(false)
+            {
+                return Err(EngineError::SelfOrganizeDisabled);
+            }
+            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            if max_rounds == 0 {
+                return Err(EngineError::SelfOrganizeNotOpenRounds);
+            }
+            if !tournament["online"].as_bool().unwrap_or(false) {
+                return Err(EngineError::SelfOrganizeRequiresOnline);
+            }
+            // Same state rule as an online parallel StartRound: seat while Waiting/Playing.
+            if state != TournamentState::Waiting && state != TournamentState::Playing {
+                return Err(EngineError::WrongState {
+                    expected: "Waiting".to_string(),
+                    current: state.as_str().to_string(),
+                });
+            }
+            if !tournament["finals"].is_null() {
+                return Err(EngineError::PrelimAfterFinals);
+            }
+            // Exactly one legal table, distinct uids, initiator among the seated.
+            if player_uids.len() < 4 || player_uids.len() > 5 {
+                return Err(EngineError::InvalidTableSize {
+                    size: player_uids.len(),
+                });
+            }
+            let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+            for uid in player_uids {
+                if !seen.insert(uid.as_str()) {
+                    return Err(EngineError::DuplicatePlayer);
+                }
+            }
+            if !player_uids.iter().any(|uid| uid == &actor.uid) {
+                return Err(EngineError::SelfOrganizeNotSeated);
+            }
+            // Each selected player must be a registered, available participant:
+            // Registered or Checked-in only — reject Playing (already in a concurrent
+            // pod), Completed/Finished (done / withdrawn), Disqualified, and at-cap.
+            for uid in player_uids {
+                let p = tournament["players"]
+                    .members()
+                    .find(|p| p["user_uid"].as_str() == Some(uid.as_str()))
+                    .ok_or(EngineError::NotRegistered)?;
+                let pstate = p["state"].as_str().unwrap_or("");
+                if pstate == "Disqualified" {
+                    return Err(EngineError::PlayerDisqualified);
+                }
+                if pstate != "Registered" && pstate != "Checked-in" {
+                    return Err(EngineError::SelfOrganizeIneligible {
+                        player: uid.clone(),
+                    });
+                }
+                if count_player_rounds_played(tournament, uid) >= max_rounds {
+                    return Err(EngineError::PlayerReachedMaxRounds);
+                }
+            }
+            // Engine assigns seating for exactly this subset, honoring R1 best-effort.
+            let previous_rounds = collect_previous_rounds(tournament);
+            let seed = seating::seed_for_round(
+                tournament["uid"].as_str().unwrap_or(""),
+                previous_rounds.len(),
+            );
+            let (computed, _score) =
+                seating::compute_next_round(player_uids, &previous_rounds, seed)?;
+            // Single table; stamp `organized_by` for the audit trail.
+            let tables: Vec<JsonValue> = computed
+                .iter()
+                .map(|table| {
+                    let seating: Vec<JsonValue> = table
+                        .iter()
+                        .map(|player_uid| {
+                            json::object! {
+                                player_uid: player_uid.as_str(),
+                                result: { gw: 0, vp: 0.0, tp: 0 },
+                                judge_uid: "",
+                            }
+                        })
+                        .collect();
+                    json::object! {
+                        seating: seating,
+                        state: "In Progress",
+                        override: json::Null,
+                        organized_by: actor.uid.as_str(),
+                    }
+                })
+                .collect();
+            tournament["rounds"].push(JsonValue::Array(tables))?;
+            tournament["state"] = "Playing".into();
+            // Seat ONLY the chosen players; every other Registered player stays available
+            // (unlike StartRound, which withdraws unseated Registered players).
+            let seated: std::collections::HashSet<&str> =
+                player_uids.iter().map(|s| s.as_str()).collect();
+            let players = &mut tournament["players"];
+            for i in 0..players.len() {
+                if let Some(uid) = players[i]["user_uid"].as_str() {
+                    if seated.contains(uid) {
+                        players[i]["state"] = "Playing".into();
+                    }
+                }
+            }
+            Ok(())
+        }
+
         TournamentEvent::FinishRound { round } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
@@ -899,31 +1023,39 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let rounds = &mut tournament["rounds"];
-            if rounds.is_empty() {
+            let len = tournament["rounds"].len();
+            if len == 0 {
                 return Err(EngineError::NoRoundToCancel);
             }
+            let target_idx = round.unwrap_or(len - 1);
+            if target_idx >= len {
+                return Err(EngineError::InvalidRound);
+            }
 
-            let len = rounds.len();
-            // Can only cancel the last round (removing mid-array would shift indices)
-            if let Some(idx) = round {
-                if *idx != len - 1 {
-                    return Err(EngineError::OnlyLastRoundCancellable);
+            if target_idx == len - 1 {
+                // Last round: hard-remove — no later round's index can shift.
+                tournament["rounds"].array_remove(len - 1);
+            } else {
+                // Non-last round (parallel rounds): soft-cancel — mark its tables Cancelled
+                // and keep the slot. A mid-array removal would shift the round indices that
+                // deck.round and standings_adjustment.round_number are tagged by; the cap /
+                // standings / active-round helpers all skip Cancelled tables.
+                let r = &mut tournament["rounds"][target_idx];
+                for i in 0..r.len() {
+                    r[i]["state"] = "Cancelled".into();
                 }
             }
 
-            // Remove last round
-            rounds.array_remove(len - 1);
-
-            // Move playing players back — only if not in another active round.
-            // Note: exclude_round=len-1 no longer exists in the array, which is
-            // correct — we want to check ALL remaining rounds (indices 0..len-2).
+            // Move playing players back — only if not in another active round. For the
+            // hard-removed last round, exclude_round=len-1 no longer exists in the array,
+            // so this checks ALL remaining rounds; for a soft-cancel it skips the now-
+            // Cancelled tables (treated as inactive by players_in_other_active_rounds).
             let target_state = if state == TournamentState::Finished {
                 "Finished"
             } else {
                 "Checked-in"
             };
-            let still_playing = players_in_other_active_rounds(tournament, len - 1);
+            let still_playing = players_in_other_active_rounds(tournament, target_idx);
             // Cancelling a round lowers per-player counts; re-arm any Completed (capped) player
             // now back under their cap so they aren't stranded out of the remaining rounds.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
@@ -2110,6 +2242,7 @@ fn apply_event(
                 "standings_mode",
                 "decklists_mode",
                 "max_rounds",
+                "self_organized_rounds",
                 "table_rooms",
                 "league_uid",
                 "round_time",

@@ -13,6 +13,7 @@
     rank: TournamentRank;
     open_rounds: boolean;
     max_rounds: number;
+    self_organized_rounds: boolean;
     online: boolean;
     country: string;
     venue: string;
@@ -218,6 +219,21 @@
           <option value="5">5</option>
         </select>
       </div>
+      {#if values.online && values.max_rounds > 0}
+        <div class="mt-3 ml-8">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={values.self_organized_rounds}
+              {disabled}
+              onchange={(e) => handleInput("self_organized_rounds", (e.target as HTMLInputElement).checked)}
+              class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+            />
+            <span class="text-sm text-ink-bright">{m.tfield_self_organized_rounds()}</span>
+          </label>
+          <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_self_organized_rounds_desc()}</p>
+        </div>
+      {/if}
     {/if}
   </div>
 {/if}

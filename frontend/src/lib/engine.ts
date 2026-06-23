@@ -109,6 +109,7 @@ export type TournamentEventType =
   | 'MarkAllPaid'
   | 'SetNonCompeting'
   | 'StartRound'
+  | 'SelfOrganizeRound'
   | 'FinishRound'
   | 'CancelRound'
   | 'SwapSeats'
@@ -152,6 +153,7 @@ export interface TournamentEvent {
   status?: string;
   non_competing?: boolean;
   seating?: string[][];
+  player_uids?: string[]; // SelfOrganizeRound: the chosen pod
   vekn_id?: string;
   deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
   multideck?: boolean;

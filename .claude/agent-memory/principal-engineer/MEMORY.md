@@ -63,6 +63,10 @@
 - [Open rounds per-player cap](open-rounds-per-player-cap.md) — max_rounds as per-player cap (computed rounds-played gate); resting-state hazard; UpdateConfig/multideck/is_deck_locked/vekn_push ripple sites.
 - [Completed PlayerState (finalist withdrawal)](completed-player-state-finalist-withdrawal.md) — open-rounds + finalist-withdrawal forces a 6th `Completed` state (cap-done, finals-eligible) vs `Finished` (withdrew, ineligible); StartFinals excludes {Disqualified, Finished}; top5_has_ties must realign to eligible set; full cross-stack ripple.
 
+## Engine config & player-authorized events
+- [Config field create/UpdateConfig asymmetry](config-field-create-updateconfig-asymmetry.md) — a tournament config field must be added to BOTH create_tournament's literal AND UpdateConfig's config_fields array; table_rooms is a live one-site gap. Shared rules go in validate_config_fields.
+- [Player-authorized engine event pattern](player-authorized-engine-event-pattern.md) — non-organizer events (CheckIn/SetScore exemplars); eligibility-predicate landmines: state-set (exclude Registered/Playing), dual-DQ, per-player cap, mid-array round removal unsafe, start≠finish authority.
+
 ## Scoring & Standings
 - compute_final_standings = shared VEKN placement (winner=1, finalists tie 2nd) — see ARCHITECTURE.md (engine modules / League System).
 - [SA penalty single-sourced in Rust](sa-penalty-duplicated-in-python.md) — SA scoring lives only in `engine.compute_rating_vp_gw`; never re-derive in Python.

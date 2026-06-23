@@ -12,9 +12,11 @@ pub(super) fn count_player_rounds_played(tournament: &JsonValue, user_uid: &str)
         .members()
         .filter(|round| {
             round.members().any(|table| {
-                table["seating"]
-                    .members()
-                    .any(|seat| seat["player_uid"].as_str() == Some(user_uid))
+                // A soft-cancelled round doesn't count toward the per-player cap.
+                table["state"].as_str() != Some("Cancelled")
+                    && table["seating"]
+                        .members()
+                        .any(|seat| seat["player_uid"].as_str() == Some(user_uid))
             })
         })
         .count()
@@ -107,10 +109,35 @@ pub(super) fn all_rounds_finished(tournament: &JsonValue) -> bool {
     let rounds = &tournament["rounds"];
     !rounds.is_empty()
         && rounds.members().all(|round| {
+            // Cancelled tables are terminal too — a soft-cancelled round is not "in progress".
+            round.members().all(|table| {
+                matches!(
+                    table["state"].as_str(),
+                    Some("Finished") | Some("Cancelled")
+                )
+            })
+        })
+}
+
+/// Previous rounds as nested player-UID lists for seating optimization. Skips
+/// `Cancelled` tables — a soft-cancelled round did not really happen, so it must
+/// not constrain R1 (predator/prey) for future seatings.
+pub(super) fn collect_previous_rounds(tournament: &JsonValue) -> Vec<Vec<Vec<String>>> {
+    tournament["rounds"]
+        .members()
+        .map(|round| {
             round
                 .members()
-                .all(|table| table["state"].as_str() == Some("Finished"))
+                .filter(|table| table["state"].as_str() != Some("Cancelled"))
+                .map(|table| {
+                    table["seating"]
+                        .members()
+                        .filter_map(|seat| seat["player_uid"].as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .collect()
         })
+        .collect()
 }
 
 /// Collect user UIDs of players still playing in rounds other than `exclude_round`.
@@ -123,7 +150,12 @@ pub(super) fn players_in_other_active_rounds(
         .enumerate()
         .filter(|(i, _)| *i != exclude_round)
         .flat_map(|(_, round)| round.members())
-        .filter(|table| table["state"].as_str() != Some("Finished"))
+        .filter(|table| {
+            !matches!(
+                table["state"].as_str(),
+                Some("Finished") | Some("Cancelled")
+            )
+        })
         .flat_map(|table| table["seating"].members())
         .filter_map(|seat| seat["player_uid"].as_str().map(|s| s.to_string()))
         .collect()

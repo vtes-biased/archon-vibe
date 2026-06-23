@@ -44,6 +44,9 @@ pub(super) fn compute_preliminary_standings(
     // Recompute GW/TP per table from raw VPs + current sanctions; sum raw VP.
     for (round_index, round) in tournament["rounds"].members().enumerate() {
         for table in round.members() {
+            if table["state"].as_str() == Some("Cancelled") {
+                continue; // soft-cancelled round contributes no score
+            }
             let seating = &table["seating"];
             let vps: Vec<f64> = seating
                 .members()
@@ -315,6 +318,9 @@ pub fn compute_rating_vp_gw(
     let mut gw = 0.0;
     for (round_index, round) in tournament["rounds"].members().enumerate() {
         for table in round.members() {
+            if table["state"].as_str() == Some("Cancelled") {
+                continue; // soft-cancelled round earns no rating VP/GW
+            }
             let seating = &table["seating"];
             let Some(i) = seating
                 .members()

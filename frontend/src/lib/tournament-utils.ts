@@ -332,6 +332,7 @@ export function translateTableState(state: string): string {
     case "In Progress": return m.table_state_in_progress();
     case "Finished": return m.state_finished();
     case "Invalid": return m.table_state_invalid();
+    case "Cancelled": return m.table_state_cancelled();
     default: return state;
   }
 }

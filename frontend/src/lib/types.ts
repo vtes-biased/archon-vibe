@@ -262,7 +262,7 @@ export interface TimerState {
 }
 export type PlayerState = "Registered" | "Checked-in" | "Playing" | "Completed" | "Finished" | "Disqualified";
 export type PaymentStatus = "Pending" | "Paid" | "Refunded" | "Cancelled";
-export type TableState = "Finished" | "In Progress" | "Invalid";
+export type TableState = "Finished" | "In Progress" | "Invalid" | "Cancelled";
 
 export interface Score {
   gw: number;
@@ -315,6 +315,7 @@ export interface Table {
   seating: Seat[];
   state: TableState;
   override: ScoreOverride | null;
+  organized_by?: string; // user_uid of the player who self-organized this round (#274)
 }
 
 export interface FinalsTable extends Table {
@@ -363,6 +364,7 @@ export interface Tournament extends BaseObject {
   standings_mode?: StandingsMode;
   decklists_mode?: DeckListsMode;
   max_rounds?: number;
+  self_organized_rounds?: boolean; // open-rounds: let registered players seat their own pod (#274)
   table_rooms?: { name: string; count: number }[];
 
   // Full data (varies by level)
@@ -423,6 +425,7 @@ export interface TournamentConfig {
   standings_mode: StandingsMode;
   decklists_mode: DeckListsMode;
   max_rounds: number;
+  self_organized_rounds: boolean;
 }
 
 // Standalone deck object (synced separately from tournament)

@@ -8,7 +8,7 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, Users } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
@@ -52,7 +52,9 @@
   );
 
   let error = $state<string | null>(null);
-  let showCancelConfirm = $state(false);
+  // Which round index is pending cancel confirmation (null = none). The engine now
+  // soft-cancels any non-last round and hard-removes the last, so any round can be cancelled.
+  let cancelConfirmRound = $state<number | null>(null);
 
   // Alter seating mode
   let alterMode = $state(false);
@@ -316,9 +318,18 @@
     }
   }
 
-  function cancelRound() {
-    showCancelConfirm = false;
-    doAction("CancelRound", { round: tournament.rounds!.length - 1 });
+  function cancelRound(roundIdx: number) {
+    cancelConfirmRound = null;
+    doAction("CancelRound", { round: roundIdx });
+  }
+
+  // A round is cancellable while the tournament is Playing (no finals) and the round
+  // isn't already fully cancelled. Any round qualifies — the engine soft-cancels
+  // non-last rounds and hard-removes the last.
+  function isRoundCancellable(roundIdx: number): boolean {
+    if (tournament.state !== "Playing" || tournament.finals) return false;
+    const round = tournament.rounds?.[roundIdx];
+    return !!round && round.some(t => t.state !== "Cancelled");
   }
 
   function esc(s: string): string {
@@ -375,13 +386,13 @@
 </script>
 
 <div class="space-y-4">
-  {#snippet cancelConfirmBox()}
+  {#snippet cancelConfirmBox(roundIdx: number)}
     <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 space-y-3">
       <p class="text-link-soft text-sm font-medium">{m.rounds_cancel_title()}</p>
       <p class="text-ink-muted text-sm">{m.rounds_cancel_msg()}</p>
       <div class="flex gap-2">
-        <Button variant="danger" size="lg" onclick={cancelRound} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_yes()}</Button>
-        <Button variant="secondary" size="lg" onclick={() => showCancelConfirm = false}>{m.rounds_cancel_keep()}</Button>
+        <Button variant="danger" size="lg" onclick={() => cancelRound(roundIdx)} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_yes()}</Button>
+        <Button variant="secondary" size="lg" onclick={() => cancelConfirmRound = null}>{m.rounds_cancel_keep()}</Button>
       </div>
     </div>
   {/snippet}
@@ -433,7 +444,7 @@
           {/if}
         </div>
         <div class="flex gap-2">
-          <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
+          <Button variant="danger" size="md" onclick={() => cancelConfirmRound = currentRoundIdx} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
         </div>
       </div>
 
@@ -476,8 +487,8 @@
       {/if}
 
       <!-- Cancel round confirmation -->
-      {#if showCancelConfirm}
-        {@render cancelConfirmBox()}
+      {#if cancelConfirmRound === currentRoundIdx}
+        {@render cancelConfirmBox(currentRoundIdx)}
       {/if}
 
     {/if}
@@ -588,42 +599,48 @@
                 {#if canEndRound}
                   <Button variant="secondary" size="md" onclick={() => doAction("FinishRound", { round: r })} disabled={actionLoading || !allTablesScored} aria-describedby={!allTablesScored ? `end-round-hint-${r}` : undefined}>{m.rounds_finish_round_n({ n: String(r + 1) })}</Button>
                 {/if}
-                {#if hasParallelRounds && isLast && tournament.state === "Playing" && !tournament.finals}
-                  <Button variant="danger" size="md" onclick={() => showCancelConfirm = true} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
+                {#if isRoundCancellable(r) && !(!hasParallelRounds && r === currentRoundIdx)}
+                  <Button variant="danger" size="md" onclick={() => cancelConfirmRound = r} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
                 {/if}
               </div>
               {#if canEndRound && !allTablesScored}
                 <p id="end-round-hint-{r}" class="text-sm text-ink-faint">{m.rounds_end_round_hint()}</p>
               {/if}
-              {#if showCancelConfirm && hasParallelRounds && isLast}
-                {@render cancelConfirmBox()}
+              {#if cancelConfirmRound === r && !(!hasParallelRounds && r === currentRoundIdx)}
+                {@render cancelConfirmBox(r)}
               {/if}
             {/if}
             {#each round as table, i}
               {@const isScoring = scoringTable === `${r}:${i}`}
-              <div class="bg-surface-muted/50 rounded-lg p-4">
+              {@const isCancelled = table.state === 'Cancelled'}
+              <div class="bg-surface-muted/50 rounded-lg p-4 {isCancelled ? 'opacity-60' : ''}">
                 <div class="flex items-center justify-between mb-2 gap-2">
                   <button
                     onclick={() => toggleScoring(r, i)}
                     class="group flex items-center gap-2 text-left min-w-0 flex-1 min-h-[44px]"
                     aria-expanded={isScoring}
                   >
-                    {#if table.seating.length > 0}
+                    {#if table.seating.length > 0 && !isCancelled}
                       {#if isScoring}<ChevronDown class="w-4 h-4 text-ink-muted group-hover:text-ink-strong shrink-0" />{:else}<ChevronRight class="w-4 h-4 text-ink-muted group-hover:text-ink-strong shrink-0" />{/if}
                     {/if}
-                    <h3 class="text-sm font-medium text-ink-strong truncate">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
-                    {#if table.seating.length < 4 || table.seating.length > 5}
+                    <h3 class="text-sm font-medium truncate {isCancelled ? 'text-ink-muted line-through' : 'text-ink-strong'}">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
+                    {#if !isCancelled && (table.seating.length < 4 || table.seating.length > 5)}
                       <span class="text-xs text-warn shrink-0">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
                     {/if}
                   </button>
                   <div class="flex items-center gap-2 shrink-0">
-                    {#if isOrganizer && !isScoring && table.seating.length > 0}
+                    {#if table.organized_by}
+                      <span class="text-xs px-2 py-0.5 rounded badge-blue shrink-0" title={m.self_organize_organized_by({ name: seatDisplay(table.organized_by) })}>
+                        <Users class="w-3 h-3 inline -mt-0.5" aria-hidden="true" /> {seatDisplay(table.organized_by)}
+                      </span>
+                    {/if}
+                    {#if isOrganizer && !isScoring && !isCancelled && table.seating.length > 0}
                       <button
                         onclick={() => toggleScoring(r, i)}
                         class="text-xs font-medium text-select hover:opacity-80 transition-opacity px-2 py-2 -my-1"
                       >{table.state === 'In Progress' ? m.rounds_enter_scores() : m.rounds_modify_scores()}</button>
                     {/if}
-                    <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-success' : table.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
+                    <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-success' : table.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : isCancelled ? 'badge-slate' : 'badge-pending'}">
                       {translateTableState(table.state)}
                     </span>
                     {#if isEditable && isLast && table.seating.length === 0}

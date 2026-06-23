@@ -4,8 +4,9 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints, type ValidationError } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload, ExternalLink } from "@lucide/svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload, ExternalLink, Users } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import ScoreLegend from "$lib/components/ScoreLegend.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
@@ -85,6 +86,38 @@
   const atCap = $derived(
     (tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, userUid) >= (tournament.max_rounds ?? 0),
   );
+
+  // Self-organized rounds (open-rounds, online): a registered participant can seat their
+  // own 4-5 pod without an organizer. Mirrors the engine's eligibility gate (error.rs);
+  // the engine re-validates server-side, the UI just avoids showing an impossible action.
+  let showSelfOrganize = $state(false);
+  function isSelfOrganizeEligible(p: Player): boolean {
+    const uid = p.user_uid;
+    if (!uid) return false;
+    if (p.state !== "Registered" && p.state !== "Checked-in") return false;
+    return !((tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, uid) >= (tournament.max_rounds ?? 0));
+  }
+  const canSelfOrganize = $derived(
+    (tournament.self_organized_rounds ?? false) &&
+    tournament.online &&
+    (tournament.max_rounds ?? 0) > 0 &&
+    !tournament.finals &&
+    (tournament.state === "Waiting" || tournament.state === "Playing") &&
+    !!currentPlayerEntry &&
+    isSelfOrganizeEligible(currentPlayerEntry),
+  );
+  // The other eligible players the initiator may seat (current user excluded).
+  const selfOrganizeCandidates = $derived(
+    (tournament.players ?? [])
+      .filter(p => p.user_uid && p.user_uid !== userUid && isSelfOrganizeEligible(p))
+      .map(p => ({ uid: p.user_uid as string, name: seatDisplayUtil(p.user_uid as string, playerInfo) }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+
+  async function submitSelfOrganize(picked: string[]) {
+    await doAction("SelfOrganizeRound", { player_uids: [userUid, ...picked] });
+    showSelfOrganize = false;
+  }
 
   // Deck check-in CTA: distinguish "no deck" from "deck present but invalid",
   // and surface the blocking validation errors inline so the player can act
@@ -317,6 +350,28 @@
         <span class="ml-2 text-ink-strong font-medium">{formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}</span>
       </div>
     {/if}
+    <!-- Self-organize a round (open-rounds, online): seat your own 4-5 pod without an organizer -->
+    {#if canSelfOrganize}
+      <div class="bg-surface-muted/50 rounded-lg p-4 space-y-2">
+        <div class="flex items-start gap-2">
+          <Users class="w-4 h-4 mt-0.5 text-link shrink-0" aria-hidden="true" />
+          <div class="min-w-0">
+            <h3 class="text-sm font-medium text-ink-strong">{m.self_organize_title()}</h3>
+            <p class="text-xs text-ink-muted mt-0.5">{m.self_organize_tip()}</p>
+          </div>
+        </div>
+        <Button
+          variant="primary"
+          size="lg"
+          block
+          class="min-h-[44px]"
+          disabled={actionLoading}
+          onclick={() => showSelfOrganize = true}
+        >
+          {m.self_organize_start_btn()}
+        </Button>
+      </div>
+    {/if}
     <!-- Your table + seat — the primary card during play; standings/cutoff/history follow below -->
     {#if isFinals && !isFinished && tournament.finals}
       {@const finalsSeatIdx = tournament.finals.seating.findIndex(s => s.player_uid === userUid)}
@@ -530,6 +585,17 @@
   <!-- QR Check-in scanner -->
   {#if showQrScanner}
     <QrCheckinScanner tournamentUid={tournament.uid} onclose={() => showQrScanner = false} />
+  {/if}
+
+  <!-- Self-organize round picker -->
+  {#if showSelfOrganize}
+    <SelfOrganizeDialog
+      selfName={seatDisplay(userUid)}
+      candidates={selfOrganizeCandidates}
+      submitting={actionLoading}
+      onSubmit={submitSelfOrganize}
+      onClose={() => showSelfOrganize = false}
+    />
   {/if}
 
   <!-- Registered players list (player view, Planned/Registration) -->

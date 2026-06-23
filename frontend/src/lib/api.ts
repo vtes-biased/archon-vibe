@@ -482,6 +482,7 @@ export interface CreateTournamentData {
   map_url?: string;
   description?: string;
   max_rounds?: number;
+  self_organized_rounds?: boolean;
   standings_mode?: string;
   decklists_mode?: string;
   proxies?: boolean;

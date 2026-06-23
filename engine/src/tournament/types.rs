@@ -79,6 +79,7 @@ pub enum TableState {
     InProgress,
     Finished,
     Invalid,
+    Cancelled,
 }
 
 impl TableState {
@@ -88,6 +89,7 @@ impl TableState {
             "In Progress" => Some(Self::InProgress),
             "Finished" => Some(Self::Finished),
             "Invalid" => Some(Self::Invalid),
+            "Cancelled" => Some(Self::Cancelled),
             _ => None,
         }
     }
@@ -97,6 +99,7 @@ impl TableState {
             Self::InProgress => "In Progress",
             Self::Finished => "Finished",
             Self::Invalid => "Invalid",
+            Self::Cancelled => "Cancelled",
         }
     }
 }
@@ -164,6 +167,10 @@ pub enum TournamentEvent {
     },
     CancelRound {
         round: Option<usize>,
+    },
+    // Player-authorized: a registered player seats one pod (open-rounds, opt-in flag).
+    SelfOrganizeRound {
+        player_uids: Vec<String>,
     },
     SwapSeats {
         round: usize,

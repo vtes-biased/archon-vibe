@@ -96,6 +96,12 @@ pub enum EngineError {
     DeckNoCards,
     SeatingMinPlayers,
     SeatingMinRounds,
+    // Self-organized rounds (player-initiated open-rounds pods)
+    SelfOrganizeDisabled,
+    SelfOrganizeNotOpenRounds,
+    SelfOrganizeRequiresOnline,
+    SelfOrganizeNotSeated,
+    SelfOrganizeIneligible { player: String },
     // Not user-actionable
     Internal { detail: String },
 }
@@ -184,6 +190,11 @@ impl EngineError {
             DeckNoCards => "deck.no_cards",
             SeatingMinPlayers => "seating.min_players",
             SeatingMinRounds => "seating.min_rounds",
+            SelfOrganizeDisabled => "tournament.self_organize_disabled",
+            SelfOrganizeNotOpenRounds => "tournament.self_organize_not_open_rounds",
+            SelfOrganizeRequiresOnline => "tournament.self_organize_requires_online",
+            SelfOrganizeNotSeated => "tournament.self_organize_not_seated",
+            SelfOrganizeIneligible { .. } => "tournament.self_organize_ineligible",
             Internal { .. } => "internal",
         }
     }
@@ -200,6 +211,7 @@ impl EngineError {
             InvalidTableSize { size } => vec![("size", size.to_string())],
             PlayerNotInSubset { player } => vec![("player", player.clone())],
             PlayerNotInRound { player } => vec![("player", player.clone())],
+            SelfOrganizeIneligible { player } => vec![("player", player.clone())],
             MaxRoundsBelowCompleted { max, completed } => vec![
                 ("max", max.to_string()),
                 ("completed", completed.to_string()),
@@ -344,6 +356,24 @@ impl fmt::Display for EngineError {
             DeckNoCards => write!(f, "No cards found in deck list"),
             SeatingMinPlayers => write!(f, "At least 4 players required"),
             SeatingMinRounds => write!(f, "At least 1 round required"),
+            SelfOrganizeDisabled => {
+                write!(
+                    f,
+                    "Self-organized rounds are not enabled for this tournament"
+                )
+            }
+            SelfOrganizeNotOpenRounds => {
+                write!(f, "Self-organized rounds require an open-rounds tournament")
+            }
+            SelfOrganizeRequiresOnline => {
+                write!(f, "Self-organized rounds require an online tournament")
+            }
+            SelfOrganizeNotSeated => write!(f, "You must seat yourself in a round you organize"),
+            SelfOrganizeIneligible { player } => write!(
+                f,
+                "Player {} is already playing or done and cannot be seated",
+                player
+            ),
             Internal { detail } => write!(f, "Internal error: {}", detail),
         }
     }
