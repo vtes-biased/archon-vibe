@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from uuid import uuid7
 
 import msgspec
-from fastapi import APIRouter, HTTPException, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from .. import permissions
@@ -347,13 +347,17 @@ async def upload_avatar(
     # Store in database
     await db_upsert_avatar(uid, data, file.content_type or "image/webp")
 
-    # Update user's avatar_path
+    # Update user's avatar_path with a versioned URL: a re-upload yields a new
+    # URL, so SSE propagates the change and every client refetches at once,
+    # while each version stays long-cacheable (see get_avatar cache headers).
     user = await get_user_by_uid(uid)
     if user:
+        now = datetime.now(UTC)
+        version = int(now.timestamp() * 1000)
         updated_user = msgspec.structs.replace(
             user,
-            modified=datetime.now(UTC),
-            avatar_path=f"/api/users/{uid}/avatar",
+            modified=now,
+            avatar_path=f"/api/users/{uid}/avatar?v={version}",
         )
         bd = await db_save_user(updated_user)
 
@@ -367,24 +371,26 @@ async def upload_avatar(
 
 
 @router.get("/{uid}/avatar")
-async def get_avatar(uid: str) -> Response:
+async def get_avatar(uid: str, request: Request) -> Response:
     """Get user avatar image.
 
-    Returns the binary image with appropriate content type.
-    Includes cache headers for browser caching.
+    A versioned (?v=) URL is immutable content, so it can be cached for a year;
+    a legacy unversioned request gets a short TTL and revalidates hourly.
     """
     result = await db_get_avatar(uid)
     if not result:
         raise HTTPException(status_code=404, detail="Avatar not found")
 
     data, content_type = result
+    cache = (
+        "public, max-age=31536000, immutable"
+        if request.query_params.get("v")
+        else "public, max-age=3600"
+    )
     return Response(
         content=data,
         media_type=content_type,
-        headers={
-            "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-            "Content-Length": str(len(data)),
-        },
+        headers={"Cache-Control": cache, "Content-Length": str(len(data))},
     )
 
 

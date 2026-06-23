@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS avatars (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Banners table - binary storage for per-tournament hero / social-share images.
+-- Like avatars: a large binary blob served over HTTP, kept out of the synced
+-- objects table (the small banner_path string rides the Tournament object).
+CREATE TABLE IF NOT EXISTS banners (
+    tournament_uid TEXT PRIMARY KEY,
+    data BYTEA NOT NULL,
+    content_type TEXT NOT NULL DEFAULT 'image/webp',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- OAuth clients
 CREATE TABLE IF NOT EXISTS oauth_clients (
     uid TEXT PRIMARY KEY,

@@ -150,6 +150,7 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "country",
     "league_uid",
     "state",
+    "banner_path",  # public hero / og:image — visible pre-login
 }
 
 # Member gets everything EXCEPT checkin_code, vekn_pushed_at

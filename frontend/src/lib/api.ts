@@ -676,3 +676,38 @@ export async function deleteAvatar(userUid: string): Promise<{ success: boolean 
   showToast({ type: 'success', message: m.profile_avatar_removed() });
   return result;
 }
+
+/**
+ * Upload a tournament banner (organizer only). The new versioned banner_path
+ * arrives via SSE — no need to return it here.
+ * @param blob - The cropped 1.91:1 image blob (webp, max 1MB)
+ */
+export async function uploadTournamentBanner(
+  tournamentUid: string,
+  blob: Blob
+): Promise<{ success: boolean }> {
+  requireOnline();
+
+  const formData = new FormData();
+  formData.append('file', blob, 'banner.webp');
+
+  const result = await apiRequest<{ success: boolean }>(
+    `/api/tournaments/${tournamentUid}/banner`,
+    { method: 'POST', body: formData }
+  );
+  showToast({ type: 'success', message: m.tournament_banner_updated() });
+  return result;
+}
+
+export async function deleteTournamentBanner(
+  tournamentUid: string
+): Promise<{ success: boolean }> {
+  requireOnline();
+
+  const result = await apiRequest<{ success: boolean }>(
+    `/api/tournaments/${tournamentUid}/banner`,
+    { method: 'DELETE' }
+  );
+  showToast({ type: 'success', message: m.tournament_banner_removed() });
+  return result;
+}

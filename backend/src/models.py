@@ -577,6 +577,11 @@ class RaffleDraw(msgspec.Struct, kw_only=True):
 
 
 class Tournament(TournamentConfig, kw_only=True):
+    # Hero / social-share image. Versioned URL (?v=<epoch-ms>) so a re-upload
+    # produces a new URL — SSE carries it and every client refetches at once,
+    # while each version stays browser-cacheable. Bytes live in the banners
+    # table; this is just the path. See routes/tournaments.py banner endpoints.
+    banner_path: str | None = None
     external_ids: dict[str, str] = msgspec.field(default_factory=dict)  # platform: id
     checkin_code: str = msgspec.field(default_factory=lambda: secrets.token_urlsafe(16))
     players: list[Player] = msgspec.field(default_factory=list)

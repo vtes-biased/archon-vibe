@@ -13,12 +13,11 @@
 
   interface Props {
     user: any;
-    avatarCacheBust: number;
     onAvatarClick: () => void;
     onAbandonVekn: () => void;
     onClaimVekn: () => void;
   }
-  let { user, avatarCacheBust, onAvatarClick, onAbandonVekn, onClaimVekn }: Props = $props();
+  let { user, onAvatarClick, onAbandonVekn, onClaimVekn }: Props = $props();
 
   const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
   // Strict false: undefined means the viewer's projection omits the field
@@ -180,7 +179,7 @@
       >
         {#if user.avatar_path}
           <img
-            src={avatarCacheBust ? `${user.avatar_path}?v=${avatarCacheBust}` : user.avatar_path}
+            src={user.avatar_path}
             alt="Avatar"
             class="w-16 h-16 rounded-full object-cover"
           />

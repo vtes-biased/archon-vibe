@@ -1,5 +1,10 @@
 # 278 — Per-tournament banner / social-share image
 
+> **Status:** Phase 1 shipped (upload + 1.91:1 cropper + in-app masthead hero +
+> versioned `banner_path` at public level + the avatar-consistency versioned-URL
+> fix). **Phase 2 (server-rendered `og:image`) split out to ticket #286** — its
+> design notes (Option A/B, nginx UA-split, gotchas) stay below as the reference.
+
 Let organizers upload one image per tournament. It serves **two** jobs from a
 single asset:
 
@@ -66,6 +71,44 @@ The hard part, and the reason this isn't trivial:
 
 To make a tournament's banner the share image you need **server-rendered** meta
 for the share URL.
+
+### Per-platform display reality (2026, verified)
+
+`1200×630` (1.91:1) is confirmed the correct **single** asset — every platform
+reads one `og:image` tag and accepts this size, so multiple uploads / per-platform
+crops are NOT worth it (OG can't serve a different image per platform anyway).
+But *display* varies, and mobile is the worst case, so the asset must be designed
+to survive cropping:
+
+| Platform | Display of a 1.91:1 og:image | Crop |
+| --- | --- | --- |
+| **Discord** | scales the whole image into ~400×300, preserves aspect | none — shows it all |
+| **Facebook** | large ~1.91:1 card on desktop; mobile feed placements go squarer | center-crops non-1.91:1 |
+| **WhatsApp** | small left-hand thumbnail, heavily downscaled (small text unreadable) | center-crops to 1.91:1 |
+| **Reddit** | tiny feed thumbnail (~140×100) | exact dims barely matter |
+| **X** (not in scope) | prefers 16:9 `1200×675`; 1.91:1 still works | — |
+
+Hard constraints this imposes on the Phase-2 / asset design:
+
+- **Keep the title / key art in a centered safe zone (~1080×600).** Edges and
+  top/bottom go first (square + mobile crops). This is the reason for safe-zone
+  *guidance*, even though the in-app hero (Phase 1) shows the full image uncropped.
+- **WhatsApp silently drops images over ~300 KB** (others allow 5–8 MB). Our
+  cropper exports WebP @ q0.85 (~100–200 KB at 1200×630), comfortably under — but
+  the backend `MAX_BANNER_SIZE = 1 MB` is more generous than WhatsApp tolerates,
+  so a hand-uploaded near-1 MB PNG would lose its WhatsApp preview. Either keep
+  relying on the cropper's WebP output or tighten the cap toward ~300 KB.
+- **WebP is accepted** by WhatsApp/Discord/Facebook/Reddit link previews (2026),
+  so the cropper's WebP output is fine for the og use too.
+
+**Cropper guidance to add when the og use lands (Phase 2, not Phase 1):** a
+centered safe-zone overlay + a small "social preview" showing the square /
+thumbnail crop, so organizers see what WhatsApp/mobile will actually show. Left
+out of Phase 1 deliberately — today the banner is only the in-app hero (full,
+uncropped), so crop guidance now would describe cropping that doesn't happen yet.
+
+Sources: og-image.org, krumzi.com, ogrilla.com (WhatsApp), Meta WhatsApp
+link-preview docs, opengraphplus.com (Discord), missinglinkz.io.
 
 ### Deployment lever (grounding)
 

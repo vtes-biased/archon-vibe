@@ -43,7 +43,6 @@
 
   // Avatar state
   let showAvatarCropper = $state(false);
-  let avatarCacheBust = $state(0);
 
   // Derived from auth
   const hasEmail = $derived(
@@ -152,8 +151,9 @@
     if (!auth.user) return;
     await uploadAvatar(auth.user.uid, blob);
     showAvatarCropper = false;
+    // avatar_path is now a versioned URL — initAuth refetches it and the <img>
+    // refreshes on its own; no manual cache-bust needed.
     await initAuth();
-    avatarCacheBust = Date.now();
   }
 </script>
 
@@ -188,7 +188,6 @@
         {#key user.uid}
         <ProfileView
           {user}
-          {avatarCacheBust}
           onAvatarClick={() => (showAvatarCropper = true)}
           onAbandonVekn={() => (showAbandonConfirm = true)}
           onClaimVekn={() => (showClaimModal = true)}

@@ -17,6 +17,7 @@
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
+  import TournamentBanner from "$lib/components/TournamentBanner.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -517,6 +518,14 @@ import TournamentModals from "./TournamentModals.svelte";
         <p class="text-link-soft">{error}</p>
       </div>
     {:else if tournament}
+      <!-- Tournament banner (optional, PUBLIC level — visible pre-login). Sits at
+           the top as a masthead; warnings + header follow below. -->
+      <TournamentBanner
+        tournamentUid={tournament.uid}
+        bannerPath={tournament.banner_path}
+        canManage={showOrganizerView}
+      />
+
       <!-- Offline mode banner (this device has lock) -->
       {#if tournamentIsOffline}
         <div class="banner-warn border rounded-lg p-4 mb-4 flex items-center justify-between gap-4">

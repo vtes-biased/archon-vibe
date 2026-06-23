@@ -346,6 +346,7 @@ export interface Tournament extends BaseObject {
   country: string | null;
   league_uid?: string | null;
   state: TournamentState;
+  banner_path?: string | null;  // versioned hero / og:image URL (public)
 
   // Config fields (member+)
   organizers_uids?: string[];

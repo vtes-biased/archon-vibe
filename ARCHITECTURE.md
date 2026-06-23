@@ -222,9 +222,22 @@ Member-contributed links to external community resources, with moderator oversig
 
 Paraglide JS (inlang), client-only (no SSR for the SPA). Locales `en` (default), `fr`, `es`, `pt`, `it` in `frontend/messages/*.json`; a Vite plugin compiles them to TypeScript (`$lib/paraglide/messages`). Browser auto-detection (`preferredLanguage`) + cookie persistence; manual `LocaleSwitcher.svelte` in the desktop sidebar.
 
-## Avatar System
+## Binary Asset System
 
-Profile images: `POST` / `GET` / `DELETE /api/users/{uid}/avatar`. Client-side cropping (`AvatarCropper.svelte`); server-side file storage with compression on upload.
+Binary image blobs are stored in dedicated side tables (`avatars`, `banners`) — **not** in the unified `objects` table. The `objects` table rows are projected into public/member/full JSONB and streamed via SSE to every client's IndexedDB; blobs must stay off that path. Each side table uses the owning object's uid as PK plus `data BYTEA` + `content_type`.
+
+A small **path string** on the synced object points to the served URL (`avatar_path` on User, `banner_path` on Tournament). When a new image is uploaded, a fresh versioned URL is written to the object and saved — the resulting SSE broadcast propagates the new URL to all clients. Each versioned URL is served `Cache-Control: public, max-age=31536000, immutable`; an unversioned request gets a short TTL. This removes any need for client-side cache-busting.
+
+| Asset | Side table | Path field | Access level | Endpoints |
+|-------|-----------|------------|--------------|-----------|
+| User avatar | `avatars` | `avatar_path` (member+) | member | `POST/GET/DELETE /api/users/{uid}/avatar` |
+| Tournament banner | `banners` | `banner_path` (public) | public | `POST/GET/DELETE /api/tournaments/{uid}/banner` |
+
+**URL shape**: `/api/{users\|tournaments}/{uid}/{avatar\|banner}?v=<epoch-ms>`. The `?v=` parameter is the version key — a re-upload yields a new epoch-ms, making the URL unique and thus immutable-cacheable.
+
+`banner_path` is public so it can serve as a future `og:image` pre-login.
+
+Avatar upload: client-side cropping (`AvatarCropper.svelte`), server-side compression. Banner upload: organizer-gated, 1 MB, webp/png/jpeg.
 
 ## TWDA
 

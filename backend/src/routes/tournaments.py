@@ -25,8 +25,10 @@ from ..db import (
     BroadcastData,
     allocate_next_vekn_id,
     compute_access_version,
+    delete_banner,
     get_all_leagues,
     get_auth_method_by_identifier,
+    get_banner,
     get_decks_for_tournament,
     get_league_by_uid,
     get_sanctions_for_tournament,
@@ -42,6 +44,7 @@ from ..db import (
     save_user,
     soft_delete_tournament,
     tournament_transaction,
+    upsert_banner,
 )
 from ..engine_errors import EngineRejection
 from ..middleware.auth import OptionalUser
@@ -465,6 +468,113 @@ async def remove_organizer(
         content=encoder.encode(tournament),
         media_type="application/json",
     )
+
+
+# Banner endpoints — per-tournament hero / social-share image.
+# Bytes live in the banners table (not the synced objects row); the Tournament
+# only carries a versioned banner_path so a re-upload propagates via SSE while
+# each version stays long-cacheable. Organizer-gated, mirrors the avatar flow.
+MAX_BANNER_SIZE = 1024 * 1024  # 1MB
+
+
+@router.post("/{uid}/banner")
+async def upload_banner(
+    uid: str,
+    file: UploadFile,
+    current_user: OptionalUser = None,
+) -> Response:
+    """Upload or replace a tournament banner (organizer only).
+
+    Expects a 1.91:1 (1200×630) image, max 1MB. Client crops before upload.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if not permissions.is_organizer(current_user, tournament):
+        raise HTTPException(
+            status_code=403, detail="Only organizers can set the banner"
+        )
+    # Mirror every other tournament mutation: refuse server-side writes while the
+    # tournament is offline-locked, so banner_path can't diverge during the
+    # offline window and get clobbered by the go-online snapshot overwrite.
+    if tournament.offline_mode:
+        raise HTTPException(status_code=423, detail="Tournament is in offline mode")
+
+    if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
+        raise HTTPException(status_code=400, detail="Banner must be webp, png, or jpeg")
+
+    data = await file.read()
+    if len(data) > MAX_BANNER_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Banner too large. Max size: {MAX_BANNER_SIZE // 1024}KB",
+        )
+
+    await upsert_banner(uid, data, file.content_type or "image/webp")
+
+    now = datetime.now(UTC)
+    version = int(now.timestamp() * 1000)  # cache-busting token baked into the URL
+    tournament.banner_path = f"/api/tournaments/{uid}/banner?v={version}"
+    tournament.modified = now
+    bd = await save_tournament(tournament)
+    broadcast_precomputed(bd)
+
+    return Response(content=b'{"success": true}', media_type="application/json")
+
+
+@router.get("/{uid}/banner")
+async def get_banner_image(uid: str, request: Request) -> Response:
+    """Serve a tournament banner. A versioned (?v=) URL is immutable, so it can
+    be cached aggressively; an unversioned request gets a short TTL."""
+    result = await get_banner(uid)
+    if not result:
+        raise HTTPException(status_code=404, detail="Banner not found")
+
+    data, content_type = result
+    cache = (
+        "public, max-age=31536000, immutable"
+        if request.query_params.get("v")
+        else "public, max-age=3600"
+    )
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": cache, "Content-Length": str(len(data))},
+    )
+
+
+@router.delete("/{uid}/banner")
+async def delete_banner_image(
+    uid: str,
+    current_user: OptionalUser = None,
+) -> Response:
+    """Delete a tournament banner (organizer only)."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if not permissions.is_organizer(current_user, tournament):
+        raise HTTPException(
+            status_code=403, detail="Only organizers can remove the banner"
+        )
+    if tournament.offline_mode:
+        raise HTTPException(status_code=423, detail="Tournament is in offline mode")
+
+    deleted = await delete_banner(uid)
+    if tournament.banner_path is not None:
+        tournament.banner_path = None
+        tournament.modified = datetime.now(UTC)
+        bd = await save_tournament(tournament)
+        broadcast_precomputed(bd)
+    elif not deleted:
+        raise HTTPException(status_code=404, detail="Banner not found")
+
+    return Response(content=b'{"success": true}', media_type="application/json")
 
 
 class CreateTournamentRequest(BaseModel):
