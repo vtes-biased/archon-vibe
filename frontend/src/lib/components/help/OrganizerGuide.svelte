@@ -23,6 +23,9 @@
     { q: m.og_faq_q_dq(), a: m.og_faq_a_dq() },
     { q: m.og_faq_q_multiday(), a: m.og_faq_a_multiday() },
     { q: m.og_faq_q_decklists_mode(), a: m.og_faq_a_decklists_mode() },
+    { q: m.og_faq_q_open_rounds(), a: m.og_faq_a_open_rounds() },
+    { q: m.og_faq_q_proxy(), a: m.og_faq_a_proxy() },
+    { q: m.og_faq_q_discord(), a: m.og_faq_a_discord() },
   ];
 </script>
 
@@ -35,6 +38,8 @@
       <div><dt class="text-ink inline font-medium">{m.og_cfg_allow_proxies()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_allow_proxies_desc()}</dd></div>
       <div><dt class="text-ink inline font-medium">{m.og_cfg_multideck()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_multideck_desc()}</dd></div>
       <div><dt class="text-ink inline font-medium">{m.og_cfg_decklist_required()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_decklist_required_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_open_rounds()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_open_rounds_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_self_organized()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_self_organized_desc()}</dd></div>
     </dl>
   </div>
   <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
@@ -74,6 +79,10 @@
     </dl>
   </div>
 </div>
+
+{@html renderGuideSection(m.og_open_rounds())}
+
+{@html renderGuideSection(m.og_self_organized())}
 
 {@html renderGuideSection(m.og_co_organizers())}
 
@@ -247,6 +256,8 @@
   </button>
 </ExampleBox>
 
+{@html renderGuideSection(m.og_announcements())}
+
 {@html renderGuideSection(m.og_timer())}
 
 <ExampleBox>
@@ -307,6 +318,8 @@
 </ExampleBox>
 
 {@html renderGuideSection(m.og_timer_extensions())}
+
+{@html renderGuideSection(m.og_proxy_players())}
 
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
@@ -433,6 +446,10 @@
 </ExampleBox>
 
 {@html renderGuideSection(m.og_force_takeover())}
+
+{@html renderGuideSection(m.og_discord())}
+
+{@html renderGuideSection(m.og_reference())}
 
 <div class="not-prose my-6 space-y-1">
   {#each faqs as faq, i}

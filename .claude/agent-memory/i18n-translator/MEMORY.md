@@ -49,14 +49,24 @@
 | proxy (player) | Proxy | Proxy | Proxy | Proxy |
 | random (deck label) | Aléatoire | Aleatorio | Aleatório | Casuale |
 | drop player (organiser action) | Retirer le joueur | Retirar jugador | Retirar jogador | Ritira giocatore |
+| open rounds (house format) | Rondes libres | Rondas abiertas | Rodadas abertas | Round liberi |
+| self-organized rounds | Rondes auto-organisées | Rondas auto-organizadas | Rodadas auto-organizadas | Round auto-organizzati |
+| completed (player state) | Complété | Completado | Completado | Completato |
+| announcement (tournament broadcast) | Annonce | Anuncio | Anúncio | Annuncio |
+| proxy (non-competing player) | Proxy | Proxy | Proxy | Proxy |
+| call judge (in-app button) | Appeler l'arbitre | Llamar al árbitro | Chamar árbitro | Chiama giudice |
+| timer | minuteur | temporizador | cronômetro | timer* |
 
-\* it keeps English loanword (round, not "turno"; override, not translated).
+\* it keeps English loanword (round, not "turno"; override, not translated; timer = timer).
 † finals it: "Finali" (plural) for section headings, "finale" (singular) for time-config labels.
 ‡ judge it: giudice — never "arbitro".
 ¶ deck: "mazo"(es)/"mazzo"(it) exist but UI labels keep "deck".
 ‖ predator es: an older table cell had "Predador" (likely a pt copy) — "depredador" is the correct Spanish; verify before reuse.
 - Clock stop has two keys: `timer_clock_stop` (imperative/button) vs `timer_policy_clock_stop` (noun/policy) — es/pt/it differ per the two cells above; fr is identical for both.
 - Keep in English (all langs): VEKN, VP, GW, TP, TWDA, VDB, Archon, Discord, Markdown, IndexedDB, QR, Constructed, Limited, Standard, Grand Prix, Inner Circle (IC), NC, Prince, passkey, multideck.
+- NOTE/TIP callout titles per locale: fr NOTE→NOTE, TIP→CONSEIL; es NOTE→NOTA, TIP→CONSEJO; it NOTE→NOTA, TIP→CONSIGLIO (pg_ context) / SUGGERIMENTO (first-install); pt NOTE→NOTA, TIP→DICA. AVERTISSEMENT(fr)/ADVERTENCIA(es)/ATTENZIONE(it) for warnings.
+- Anchor link convention: fr/es/pt keep English slugs unchanged; it localizes slugs to match the translated heading (e.g. `#self-organized-rounds` → `#ronde-auto-organizzate`, `#seating-rules-reference` → `#riferimento-regole-di-seduta`).
+- `og_force_takeover` was split in en.json: the tail (Archon Import + Leagues + Seating Rules Reference + FAQ heading) moved to new key `og_reference`. When any locale's `og_force_takeover` still contains that tail, it must be trimmed to only the Force Takeover subsection.
 
 ## Key Naming Conventions
 - `nav_*` nav · `profile_*` profile · `help_*` help/docs · `common_*` shared · `offline_*` offline mode · `checkin_qr_*` QR check-in
