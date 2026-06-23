@@ -1084,7 +1084,11 @@ async def tournament_action(
             # the 2-4 rule applies only to standard tournaments (effective open_rounds =
             # this request's value if present, else the stored one).
             open_rounds = request.config.get("open_rounds", tournament.open_rounds)
-            if vekn_push and not open_rounds and request.config["max_rounds"] is not None:
+            if (
+                vekn_push
+                and not open_rounds
+                and request.config["max_rounds"] is not None
+            ):
                 mr = request.config["max_rounds"]
                 if mr != 0 and (mr < 2 or mr > 4):
                     raise HTTPException(

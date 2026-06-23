@@ -79,8 +79,7 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     // the "self-organized implies open-rounds" invariant in the engine, not just the UI.
     if config["self_organized_rounds"].as_bool() == Some(true)
         && ((config.has_key("max_rounds") && config["max_rounds"].as_usize() == Some(0))
-            || (config.has_key("open_rounds")
-                && config["open_rounds"].as_bool() == Some(false)))
+            || (config.has_key("open_rounds") && config["open_rounds"].as_bool() == Some(false)))
     {
         return Err(EngineError::SelfOrganizeNotOpenRounds);
     }
