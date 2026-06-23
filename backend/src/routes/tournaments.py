@@ -1202,7 +1202,12 @@ async def tournament_action(
 
         # Timer lifecycle hooks (online-only, not handled by Rust engine)
         # Skip timer reset if other rounds are still in progress (parallel rounds)
-        if request.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
+        if request.type in (
+            "StartRound",
+            "SelfOrganizeRound",
+            "StartFinals",
+            "RestoreRound",
+        ):
             in_progress = sum(
                 1
                 for r in (updated.rounds or [])

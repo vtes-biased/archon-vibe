@@ -498,6 +498,163 @@ fn test_cancel_round_soft_cancels_non_last() {
     );
 }
 
+// RestoreRound un-voids a soft-cancelled non-last round (#295). The whole point of the
+// feature: a round cancelled by mistake must come back with its retained scores re-derived.
+// This is the inverse of test_cancel_round_soft_cancels_non_last — cancel round 0, then
+// restore it, and assert the engine flips the table back to Finished (the table was complete
+// + valid when cancelled), re-arms its capped players to Completed (round re-derived fully
+// Finished, players back at their cap), and leaves the still-live round 1 untouched.
+#[test]
+fn test_restore_round_rederives_finished_from_retained_scores() {
+    let mut t = make_tournament();
+    t["state"] = "Playing".into();
+    t["online"] = true.into();
+    t["max_rounds"] = 1.into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Completed", payment_status: "Pending", toss: 0 },
+        { user_uid: "q1", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q2", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q3", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q4", state: "Playing", payment_status: "Pending", toss: 0 },
+    ];
+    // Same fixture as the cancel test: round 0 was a finished p-pod (single oust, sum == 4),
+    // round 1 a live q-pod. Engine-valid VP vectors.
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 0 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "Finished" } ],
+        [ { seating: [
+            { player_uid: "q1", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q2", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q3", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "In Progress" } ],
+    ];
+
+    // Soft-cancel round 0 through the real engine, then restore it through the real engine —
+    // round-trip on the shipped artifact, not a hand-built Cancelled fixture.
+    let cancelled = json::parse(
+        &run_event(
+            &t,
+            &json::object! { type: "CancelRound", round: 0 },
+            &make_organizer(),
+        )
+        .expect("cancel"),
+    )
+    .unwrap();
+    assert_eq!(
+        cancelled["rounds"][0][0]["state"].as_str(),
+        Some("Cancelled"),
+        "precondition: round 0 is soft-cancelled"
+    );
+
+    let out = json::parse(
+        &run_event(
+            &cancelled,
+            &json::object! { type: "RestoreRound", round: 0 },
+            &make_organizer(),
+        )
+        .expect("restore"),
+    )
+    .unwrap();
+
+    // The retained scores were a complete, valid finished table, so re-derivation -> Finished.
+    assert_eq!(
+        out["rounds"][0][0]["state"].as_str(),
+        Some("Finished"),
+        "restored round re-derives to Finished from retained scores"
+    );
+    assert_eq!(out["rounds"].len(), 2, "slot still index-stable");
+    assert_eq!(
+        out["rounds"][1][0]["state"].as_str(),
+        Some("In Progress"),
+        "the live round is untouched by restore"
+    );
+
+    let st = |o: &JsonValue, uid: &str| {
+        o["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .unwrap()["state"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    // p-pod players: now back at their cap (max_rounds=1, this round counts again) on a fully-
+    // Finished round -> Completed, mirroring FinishRound. Cancel had released them to Checked-in.
+    assert_eq!(st(&out, "p1"), "Completed");
+    assert_eq!(st(&out, "p4"), "Completed");
+    // The live round's players are unaffected.
+    assert_eq!(st(&out, "q1"), "Playing");
+    // And the restored round contributes standings again.
+    assert!(
+        out["standings"]
+            .members()
+            .any(|s| s["user_uid"].as_str() == Some("p3")),
+        "restored round contributes standings again"
+    );
+}
+
+// All-or-nothing (#295): a round restores exactly as it was saved, or not at all. If a player
+// seated in the cancelled round can no longer be reinstated — dropped out (Finished) or
+// disqualified, or (open rounds) already at their round cap via OTHER rounds — RestoreRound
+// rejects the whole operation with a clear reason rather than silently leaving them out. (The
+// count-before-flip ordering for the cap case is exercised by the success test above, where the
+// restored round is itself what brings its players to cap; here a dropped player blocks restore.)
+#[test]
+fn test_restore_round_rejects_non_reinstatable_player() {
+    let mut t = make_tournament();
+    t["state"] = "Playing".into();
+    t["online"] = true.into();
+    // Two parallel rounds: round 0 cancelled (retained finished scores), round 1 live. One round-0
+    // player (p4) has since dropped out (state Finished) -> restore must be rejected, not partial.
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "q1", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q2", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q3", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q4", state: "Playing", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 0 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "Cancelled" } ],
+        [ { seating: [
+            { player_uid: "q1", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q2", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q3", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "In Progress" } ],
+    ];
+
+    let result = run_event(
+        &t,
+        &json::object! { type: "RestoreRound", round: 0 },
+        &make_organizer(),
+    );
+    assert!(
+        result.is_err(),
+        "restore must be rejected when a seated player has dropped out"
+    );
+    let msg = result.unwrap_err().to_string();
+    assert!(
+        msg.contains("restored"),
+        "rejection explains why, got: {msg}"
+    );
+}
+
 #[test]
 fn test_non_organizer_cannot_open_registration() {
     let tournament = make_tournament();

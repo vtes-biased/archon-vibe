@@ -112,6 +112,7 @@ export type TournamentEventType =
   | 'SelfOrganizeRound'
   | 'FinishRound'
   | 'CancelRound'
+  | 'RestoreRound'
   | 'SwapSeats'
   | 'AlterSeating'
   | 'SeatPlayer'

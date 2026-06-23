@@ -8,11 +8,12 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, Users } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
+  import { showToast } from "$lib/stores/toast.svelte";
 
   let {
     tournament = $bindable(),
@@ -55,6 +56,8 @@
   // Which round index is pending cancel confirmation (null = none). The engine now
   // soft-cancels any non-last round and hard-removes the last, so any round can be cancelled.
   let cancelConfirmRound = $state<number | null>(null);
+  // Which fully-cancelled round is pending restore confirmation (null = none).
+  let restoreConfirmRound = $state<number | null>(null);
 
   // Alter seating mode
   let alterMode = $state(false);
@@ -70,13 +73,14 @@
   let seatTargetTable = $state<number | null>(null);
   let expandedRounds = $state<Set<number>>(new Set());
 
-  // Auto-expand in-progress rounds
+  // Auto-expand in-progress rounds. Cancelled rounds stay discreet (collapsed) —
+  // they're not "in progress"; the organizer expands one deliberately to restore it.
   $effect(() => {
     if (tournament.rounds!.length > 0) {
       if (tournament.state === "Playing") {
         const inProgress = new Set<number>();
         for (let i = 0; i < tournament.rounds!.length; i++) {
-          if (tournament.rounds![i]!.some(t => t.state !== "Finished")) {
+          if (tournament.rounds![i]!.some(t => t.state !== "Finished" && t.state !== "Cancelled")) {
             inProgress.add(i);
           }
         }
@@ -145,8 +149,9 @@
 
   function computeSeatingScore() {
     if (!tournament.rounds!.length) { seatingScore = null; return; }
+    // Skip Cancelled tables — a voided round must not skew the seating score.
     const rounds = tournament.rounds!.map(round =>
-      round.map(table => table.seating.map(s => s.player_uid).filter(Boolean))
+      round.filter(t => t.state !== 'Cancelled').map(table => table.seating.map(s => s.player_uid).filter(Boolean))
     );
     seatingScore = scoreSeatingSync(rounds);
   }
@@ -241,7 +246,7 @@
 
   function recomputeIssues() {
     const allRounds = tournament.rounds!.map((round, r) =>
-      r === alterRoundIdx ? alterTables : round.map(t => t.seating.map(s => s.player_uid))
+      r === alterRoundIdx ? alterTables : round.filter(t => t.state !== 'Cancelled').map(t => t.seating.map(s => s.player_uid))
     );
     seatingScore = scoreSeatingSync(allRounds);
     const issues = computePlayerIssuesSync(allRounds);
@@ -332,6 +337,53 @@
     return !!round && round.some(t => t.state !== "Cancelled");
   }
 
+  // Players seated in the round who can't be reinstated, by display name. Mirrors
+  // the engine's all-or-nothing rule (dropped/Finished, disqualified, or — open
+  // rounds — already at cap via OTHER rounds; the still-Cancelled target round is
+  // naturally excluded from the count). The engine re-checks authoritatively; this
+  // only names them up front so the toast can guide the organizer.
+  function restoreBlockers(roundIdx: number): string[] {
+    const round = tournament.rounds?.[roundIdx];
+    if (!round) return [];
+    const maxRounds = tournament.max_rounds ?? 0;
+    const countPlayed = (uid: string) =>
+      (tournament.rounds ?? []).filter(rd => rd.some(t => t.state !== 'Cancelled' && t.seating.some(s => s.player_uid === uid))).length;
+    const seated = [...new Set(round.flatMap(t => t.seating.map(s => s.player_uid)))];
+    return seated
+      .filter(uid => {
+        const p = (tournament.players ?? []).find(pl => pl.user_uid === uid);
+        if (!p) return false;
+        if (p.state === 'Disqualified' || p.state === 'Finished') return true;
+        return maxRounds > 0 && countPlayed(uid) >= maxRounds;
+      })
+      .map(uid => seatDisplay(uid));
+  }
+
+  function restoreRound(roundIdx: number) {
+    restoreConfirmRound = null;
+    const blockers = restoreBlockers(roundIdx);
+    if (blockers.length > 0) {
+      showToast({ type: 'error', message: m.rounds_restore_blocked({ players: blockers.join(', ') }) });
+      return;
+    }
+    doAction("RestoreRound", { round: roundIdx });
+  }
+
+  // A fully-cancelled (soft-voided) round shows a Cancelled badge and a Restore
+  // affordance. The last round is hard-removed on cancel, so a fully-Cancelled
+  // round is always a restorable non-last soft-cancel.
+  function isRoundFullyCancelled(roundIdx: number): boolean {
+    const round = tournament.rounds?.[roundIdx];
+    return !!round && round.length > 0 && round.every(t => t.state === "Cancelled");
+  }
+
+  // Restore mirrors the engine guard: prelim-phase only (Playing/Waiting, no finals).
+  function isRoundRestorable(roundIdx: number): boolean {
+    if (tournament.finals) return false;
+    if (tournament.state !== "Playing" && tournament.state !== "Waiting") return false;
+    return isRoundFullyCancelled(roundIdx);
+  }
+
   function esc(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
@@ -387,12 +439,26 @@
 
 <div class="space-y-4">
   {#snippet cancelConfirmBox(roundIdx: number)}
+    <!-- Cancelling the LAST round hard-removes it (results lost); any earlier round
+         is soft-voided and restorable, so the warning differs. -->
+    {@const isLastRound = roundIdx === tournament.rounds!.length - 1}
     <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 space-y-3">
       <p class="text-link-soft text-sm font-medium">{m.rounds_cancel_title()}</p>
-      <p class="text-ink-muted text-sm">{m.rounds_cancel_msg()}</p>
+      <p class="text-ink-muted text-sm">{isLastRound ? m.rounds_cancel_msg_last() : m.rounds_cancel_msg()}</p>
       <div class="flex gap-2">
         <Button variant="danger" size="lg" onclick={() => cancelRound(roundIdx)} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_yes()}</Button>
         <Button variant="secondary" size="lg" onclick={() => cancelConfirmRound = null}>{m.rounds_cancel_keep()}</Button>
+      </div>
+    </div>
+  {/snippet}
+
+  {#snippet restoreConfirmBox(roundIdx: number)}
+    <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 space-y-3">
+      <p class="text-link-soft text-sm font-medium">{m.rounds_restore_title()}</p>
+      <p class="text-ink-muted text-sm">{m.rounds_restore_msg()}</p>
+      <div class="flex gap-2">
+        <Button variant="primary" size="lg" onclick={() => restoreRound(roundIdx)} disabled={actionLoading}><RotateCcw class="w-4 h-4" aria-hidden="true" />{m.rounds_restore_yes()}</Button>
+        <Button variant="secondary" size="lg" onclick={() => restoreConfirmRound = null}>{m.rounds_restore_keep()}</Button>
       </div>
     </div>
   {/snippet}
@@ -540,7 +606,9 @@
               <span class="text-sm font-medium {isCurrent ? 'text-ink-strong' : 'text-ink'}">
                 {m.rounds_round_n({ n: String(r + 1) })}
               </span>
-              {#if tournament.state === "Playing" && isRoundInProgress(r)}
+              {#if isRoundFullyCancelled(r)}
+                <span class="text-xs px-2 py-0.5 rounded badge-slate">{m.rounds_cancelled_badge()}</span>
+              {:else if tournament.state === "Playing" && isRoundInProgress(r)}
                 {@const prog = roundProgress(r)}
                 <span class="text-xs px-2 py-0.5 rounded badge-pending">{m.rounds_in_progress()}</span>
                 <span class="text-xs text-ink-faint">{prog.done}/{prog.total}</span>
@@ -591,7 +659,7 @@
             {:else}
             {#if isOrganizer}
               <div class="flex gap-2 flex-wrap">
-                {#if isEditable && !alterMode}
+                {#if isEditable && !alterMode && !isRoundFullyCancelled(r)}
                   <Button variant="secondary" size="md" onclick={() => enterAlterMode(r)} disabled={actionLoading}>
                     <ArrowRightLeft class="w-4 h-4" />{m.rounds_alter_seating()}
                   </Button>
@@ -602,12 +670,18 @@
                 {#if isRoundCancellable(r) && !(!hasParallelRounds && r === currentRoundIdx)}
                   <Button variant="danger" size="md" onclick={() => cancelConfirmRound = r} disabled={actionLoading}><Ban class="w-4 h-4" aria-hidden="true" />{m.rounds_cancel_round()}</Button>
                 {/if}
+                {#if isRoundRestorable(r)}
+                  <Button variant="secondary" size="md" onclick={() => restoreConfirmRound = r} disabled={actionLoading}><RotateCcw class="w-4 h-4" aria-hidden="true" />{m.rounds_restore_round()}</Button>
+                {/if}
               </div>
               {#if canEndRound && !allTablesScored}
                 <p id="end-round-hint-{r}" class="text-sm text-ink-faint">{m.rounds_end_round_hint()}</p>
               {/if}
               {#if cancelConfirmRound === r && !(!hasParallelRounds && r === currentRoundIdx)}
                 {@render cancelConfirmBox(r)}
+              {/if}
+              {#if restoreConfirmRound === r}
+                {@render restoreConfirmBox(r)}
               {/if}
             {/if}
             {#each round as table, i}
@@ -690,7 +764,7 @@
                               <UserMinus class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
                             </button>
                           {/if}
-                          {#if isOrganizer}
+                          {#if isOrganizer && !isCancelled}
                             <button
                               onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
                               class="p-2 sm:p-0.5 text-ink-faint hover:text-warn transition-colors"

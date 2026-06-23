@@ -114,6 +114,9 @@ impl TournamentEvent {
             "CancelRound" => Ok(Self::CancelRound {
                 round: value["round"].as_usize(),
             }),
+            "RestoreRound" => Ok(Self::RestoreRound {
+                round: value["round"].as_usize(),
+            }),
             "SelfOrganizeRound" => Ok(Self::SelfOrganizeRound {
                 player_uids: value["player_uids"]
                     .members()

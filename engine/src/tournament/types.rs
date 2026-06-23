@@ -168,6 +168,9 @@ pub enum TournamentEvent {
     CancelRound {
         round: Option<usize>,
     },
+    RestoreRound {
+        round: Option<usize>,
+    },
     // Player-authorized: a registered player seats one pod (open-rounds, opt-in flag).
     SelfOrganizeRound {
         player_uids: Vec<String>,

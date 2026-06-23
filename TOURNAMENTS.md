@@ -86,7 +86,8 @@ Events are processed by the Rust engine. Each event includes:
 |-------|-----------------|-------------|
 | `StartRound` | `seating?` | Creates round with seating (optional seating for deterministic forwarding) |
 | `FinishRound` | `round?` | Ends a round (any, any order) |
-| `CancelRound` | `round?` | Last round: hard-removed; any earlier round: soft-cancelled (tables set to `Cancelled`, slot preserved, players released) |
+| `CancelRound` | `round?` | Last round: hard-removed (permanent); any earlier round: soft-cancelled (tables set to `Cancelled`, slot preserved, players released — restorable via `RestoreRound`) |
+| `RestoreRound` | `round` | Un-voids a soft-cancelled non-last round: re-derives each table's state from retained scores (override→Finished; else `check_table_vps`→In Progress/Invalid/Finished); re-arms seated players to Playing (a player already Playing in another live round is left there). If the round re-derives to fully Finished, players go Completed(capped)/Checked-in instead. **All-or-nothing**: if any seated player can no longer be reinstated as-saved — dropped (Finished), disqualified, or (open rounds) already at their round cap via other rounds — the whole restore is rejected (`err_tournament_cannot_restore_round`) rather than silently dropping them. Requires tournament Playing/Waiting, no finals, round fully `Cancelled`. |
 | `SelfOrganizeRound` | `player_uids` | Player-authorized (not organizer-gated): seats one 4–5-player pod in an open-rounds tournament with `self_organized_rounds` on; initiator must be among the UIDs |
 | `SwapSeats` | `round`, `table`, `seat_a`, `seat_b` | Swap two players within a table |
 | `AlterSeating` | `round`, `seating` | Positional prefix match: existing tables matched by index (results preserved same-table, reset cross-table); extra payload tables appended fresh; each table must seat 0/4/5 players (0 = empty draft workspace, dropped after rebuild). Finals: replaces seat order, same player set. |
@@ -166,7 +167,7 @@ Tied VP players share (average) the TP values for the positions they cover.
 
 The engine determines table state as follows:
 
-1. **`Cancelled`** — set by `CancelRound` on any non-last round (soft-cancel). Excluded from per-player cap, standings, rating, and active-round detection; seated players are released. Slot is preserved (mid-array removal would corrupt index-tagged `deck.round` / `standings_adjustment.round_number`).
+1. **`Cancelled`** — set by `CancelRound` on any non-last round (soft-cancel; restorable via `RestoreRound`). Excluded from per-player cap, standings, rating, and active-round detection; seated players are released. Slot is preserved (mid-array removal would corrupt index-tagged `deck.round` / `standings_adjustment.round_number`). The last round is always hard-removed on cancel and is not restorable.
 2. If `override` is set → **Finished** (judge forced it)
 3. Run `check_table_vps` validation:
    - `InsufficientTotal` (sum of ceil'd VPs < table_size) → **In Progress** (scores incomplete)
@@ -228,7 +229,7 @@ Config flag `self_organized_rounds` (bool, default false). Settable on any open-
 
 **Organizer oversight:**
 - `FinishRound` closes any round (any order — already supported for parallel rounds).
-- `CancelRound` vetoes any round (see CancelRound behavior below).
+- `CancelRound` soft-cancels any non-last round (or hard-removes the last); `RestoreRound` un-voids a soft-cancelled round (see event table above).
 - `Override` voids a specific table result.
 
 ## Sanctions and Standings

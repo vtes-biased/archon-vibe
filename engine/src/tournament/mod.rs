@@ -720,23 +720,10 @@ fn apply_event(
                 return Err(EngineError::NotEnoughPlayers);
             }
 
-            // Get previous rounds for seating optimization
-            let previous_rounds: Vec<Vec<Vec<String>>> = tournament["rounds"]
-                .members()
-                .map(|round| {
-                    round
-                        .members()
-                        .map(|table| {
-                            table["seating"]
-                                .members()
-                                .filter_map(|seat| {
-                                    seat["player_uid"].as_str().map(|s| s.to_string())
-                                })
-                                .collect()
-                        })
-                        .collect()
-                })
-                .collect();
+            // Previous rounds for seating optimization. Use the shared helper so
+            // Cancelled rounds are skipped — a soft-cancelled round did not really
+            // happen and must not constrain new-round pairings or sit-out selection.
+            let previous_rounds = collect_previous_rounds(tournament);
 
             // Select which players to seat (handles awkward counts like 6, 7, 11)
             let players_to_seat = seating::select_players_for_round(&checked_in, &previous_rounds);
@@ -1092,6 +1079,145 @@ fn apply_event(
                 tournament["state"] = "Waiting".into();
             }
             // else: stay Playing (other rounds still in progress)
+            update_standings(tournament, sanctions);
+            Ok(())
+        }
+
+        TournamentEvent::RestoreRound { round } => {
+            require_organizer(actor)?;
+            // Restore un-voids a soft-cancelled round. It is a prelim-phase
+            // correction only: allowed while the tournament is still running
+            // (Playing/Waiting) and before finals are seeded. Once finals exist
+            // the prelim standings are frozen (finalists chosen), so un-voiding a
+            // round would silently invalidate the cut. NOTE the deliberate
+            // asymmetry: CancelRound also accepts Finished, but restore refuses it
+            // — cancel/restore is not a clean undo once the tournament is over.
+            if state != TournamentState::Playing && state != TournamentState::Waiting {
+                return Err(EngineError::WrongState {
+                    expected: TournamentState::Playing.as_str().to_string(),
+                    current: state.as_str().to_string(),
+                });
+            }
+            if !tournament["finals"].is_null() {
+                return Err(EngineError::PrelimAfterFinals);
+            }
+
+            let len = tournament["rounds"].len();
+            let target_idx = round.ok_or(EngineError::InvalidRound)?;
+            if target_idx >= len {
+                return Err(EngineError::InvalidRound);
+            }
+            // Only a fully-Cancelled round is restorable (the last round is hard-
+            // removed on cancel, so any Cancelled round is a non-last soft-cancel).
+            if tournament["rounds"][target_idx].is_empty()
+                || !tournament["rounds"][target_idx]
+                    .members()
+                    .all(|t| t["state"].as_str() == Some("Cancelled"))
+            {
+                return Err(EngineError::RoundNotCancelled);
+            }
+
+            let seated: std::collections::HashSet<String> = tournament["rounds"][target_idx]
+                .members()
+                .flat_map(|t| t["seating"].members())
+                .filter_map(|s| s["player_uid"].as_str().map(String::from))
+                .collect();
+
+            // All-or-nothing: a round restores exactly as it was saved, or not at
+            // all. If any seated player can no longer be reinstated — disqualified,
+            // dropped (Finished), or (open rounds) already at their round cap from
+            // OTHER rounds — reject the whole restore with a clear reason instead of
+            // silently dropping them. Runs BEFORE any mutation; the cap is measured
+            // with this round still Cancelled (excluded by count_player_rounds_played),
+            // i.e. "would re-adding this round push them over?".
+            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            for uid in &seated {
+                let pstate = tournament["players"]
+                    .members()
+                    .find(|p| p["user_uid"].as_str() == Some(uid.as_str()))
+                    .and_then(|p| p["state"].as_str());
+                if matches!(pstate, Some("Disqualified") | Some("Finished")) {
+                    return Err(EngineError::CannotRestoreRound);
+                }
+                if max_rounds > 0 && count_player_rounds_played(tournament, uid) >= max_rounds {
+                    return Err(EngineError::CannotRestoreRound);
+                }
+            }
+
+            // Re-derive each table's state from its retained scores (same path as
+            // Unoverride): an override forces Finished; otherwise check_table_vps
+            // maps complete+valid -> Finished, partial -> In Progress, invalid
+            // oust order -> Invalid. A round with any non-Finished table is "live".
+            let mut round_is_live = false;
+            {
+                let r = &mut tournament["rounds"][target_idx];
+                for i in 0..r.len() {
+                    let new_state = if !r[i]["override"].is_null() {
+                        "Finished"
+                    } else {
+                        let size = r[i]["seating"].len();
+                        let vps: Vec<f64> = (0..size)
+                            .map(|j| r[i]["seating"][j]["result"]["vp"].as_f64().unwrap_or(0.0))
+                            .collect();
+                        match check_table_vps(&vps) {
+                            Some(VpError::InsufficientTotal) => "In Progress",
+                            Some(_) => "Invalid",
+                            None => "Finished",
+                        }
+                    };
+                    if new_state != "Finished" {
+                        round_is_live = true;
+                    }
+                    r[i]["state"] = new_state.into();
+                }
+            }
+
+            // Post-restore cap membership (tables now flipped): a seated player at
+            // their cap on a round that re-derived to fully Finished retires to
+            // Completed, mirroring FinishRound.
+            let capped: std::collections::HashSet<String> = if max_rounds > 0 {
+                seated
+                    .iter()
+                    .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
+                    .cloned()
+                    .collect()
+            } else {
+                std::collections::HashSet::new()
+            };
+
+            // Re-arm seated players. Validation above guarantees every seat is
+            // reinstatable, so the only one left untouched is a player already
+            // Playing in another live round — don't demote them out of their game.
+            // Live round -> Playing; a round that re-derived to fully Finished
+            // mirrors FinishRound's post-state (capped -> Completed, else Checked-in).
+            let players = &mut tournament["players"];
+            for i in 0..players.len() {
+                let uid = match players[i]["user_uid"].as_str() {
+                    Some(u) => u.to_string(),
+                    None => continue,
+                };
+                if !seated.contains(&uid) {
+                    continue;
+                }
+                if players[i]["state"].as_str() == Some("Playing") {
+                    continue;
+                }
+                players[i]["state"] = if round_is_live {
+                    "Playing"
+                } else if capped.contains(&uid) {
+                    "Completed"
+                } else {
+                    "Checked-in"
+                }
+                .into();
+            }
+
+            if round_is_live {
+                tournament["state"] = "Playing".into();
+            } else if all_rounds_finished(tournament) {
+                tournament["state"] = "Waiting".into();
+            }
+            // else: another round is still live — stay Playing.
             update_standings(tournament, sanctions);
             Ok(())
         }
