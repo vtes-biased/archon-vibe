@@ -600,6 +600,8 @@ class CreateTournamentRequest(BaseModel):
     standings_mode: str = "Private"
     decklists_mode: str = "Winner"
     max_rounds: int = 0
+    open_rounds: bool = False
+    self_organized_rounds: bool = False
     league_uid: str | None = None
     round_time: int = 0
     finals_time: int = 0
@@ -639,9 +641,10 @@ async def create_tournament(
             status_code=400, detail=f"Invalid rank: {request.rank}"
         ) from e
 
-    # VEKN_PUSH: validate max_rounds is 2-4
+    # VEKN_PUSH: standard tournaments need max_rounds 2-4. Open-rounds events are
+    # non-VEKN (not pushed), so max_rounds there is a free per-player cap (0 = no limit).
     vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
-    if vekn_push:
+    if vekn_push and not request.open_rounds:
         if request.max_rounds < 2 or request.max_rounds > 4:
             raise HTTPException(
                 status_code=400,
@@ -697,6 +700,8 @@ async def create_tournament(
         standings_mode=standings,
         decklists_mode=decklists,
         max_rounds=request.max_rounds,
+        open_rounds=request.open_rounds,
+        self_organized_rounds=request.self_organized_rounds,
         league_uid=request.league_uid or None,
         organizers_uids=[current_user.uid],
         round_time=request.round_time,
@@ -1015,7 +1020,11 @@ async def tournament_action(
                         detail="max_rounds cannot be changed after tournament is pushed to VEKN",
                     )
             vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
-            if vekn_push and request.config["max_rounds"] is not None:
+            # Open-rounds events are non-VEKN: max_rounds is a free per-player cap, so
+            # the 2-4 rule applies only to standard tournaments (effective open_rounds =
+            # this request's value if present, else the stored one).
+            open_rounds = request.config.get("open_rounds", tournament.open_rounds)
+            if vekn_push and not open_rounds and request.config["max_rounds"] is not None:
                 mr = request.config["max_rounds"]
                 if mr != 0 and (mr < 2 or mr > 4):
                     raise HTTPException(

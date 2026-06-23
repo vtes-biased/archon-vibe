@@ -5,6 +5,7 @@
   import { getAllLeagues } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
+  import { Info } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   export interface TournamentFieldValues {
@@ -82,6 +83,19 @@
     onchange?.(field, value);
   }
 
+  function handleOpenRoundsToggle(checked: boolean) {
+    if (!checked) {
+      // Back to a standard tournament: self-organize is open-rounds-only. The VEKN
+      // build needs a valid 2–4 round count; house tournaments accept any cap, keep it.
+      values.self_organized_rounds = false;
+      if (veknPush && !(values.max_rounds >= 2 && values.max_rounds <= 4)) {
+        values.max_rounds = 3;
+      }
+    }
+    // Persist open_rounds last so ConfigTab can read the coerced sibling fields.
+    handleInput("open_rounds", checked);
+  }
+
   function handleVenueSelect(venue: VenueInfo) {
     values.venue = venue.venue;
     values.venue_url = venue.venue_url;
@@ -120,7 +134,7 @@
       value={values.format}
       {disabled}
       onchange={(e) => handleInput("format", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="Standard">Standard</option>
       <option value="V5">V5</option>
@@ -134,7 +148,7 @@
       value={values.rank}
       {disabled}
       onchange={(e) => handleInput("rank", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="">{m.tfield_rank_basic()}</option>
       <option value="National Championship">National Championship</option>
@@ -152,7 +166,7 @@
       value={values.league_uid}
       {disabled}
       onchange={(e) => handleInput("league_uid", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="">{m.common_none()}</option>
       {#each myLeagues as league}
@@ -165,78 +179,80 @@
   </div>
 {/if}
 
-<!-- Open Rounds / Max Rounds -->
-{#if veknPush}
-  <!-- VEKN push mode: max_rounds is always visible and required (2-4) -->
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
+<!-- Rounds: open-rounds opt-in + round count / per-player cap (always shown) -->
+<fieldset class="border-0 p-0 m-0">
+  <legend class="sr-only">{m.tfield_round_settings()}</legend>
+  <label class="flex items-center gap-3 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={values.open_rounds}
+      disabled={disabled || disabledFields.has("open_rounds")}
+      onchange={(e) => handleOpenRoundsToggle((e.target as HTMLInputElement).checked)}
+      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+    />
+    <span class="text-sm text-ink-bright">{m.tfield_open_rounds()}</span>
+  </label>
+  {#if values.open_rounds}
+    <div class="banner-warn flex items-start gap-2 rounded-lg p-2 mt-1 ml-8 text-xs">
+      <Info class="w-4 h-4 shrink-0 mt-px" aria-hidden="true" />
+      <span>{m.tfield_open_rounds_warning()}</span>
+    </div>
+  {:else}
+    <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
+  {/if}
+
+  <!-- Round count (standard) / per-player cap (open rounds) — always visible; the
+       VEKN-push build constrains a standard tournament to 2–4 (the count it reports). -->
+  <div class="mt-2 ml-8">
+    <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>
+      {values.open_rounds ? m.tfield_round_cap() : m.tfield_round_count()}
+    </label>
     <select
       id={id("max-rounds")}
       value={String(values.max_rounds)}
       disabled={disabled || disabledFields.has("max_rounds")}
-      onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      onchange={(e) => {
+        const mr = parseInt((e.target as HTMLSelectElement).value);
+        handleInput("max_rounds", mr);
+        // Self-organize needs a cap (>0); clear it if the cap is lifted.
+        if (mr === 0 && values.self_organized_rounds) handleInput("self_organized_rounds", false);
+      }}
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-    </select>
-  </div>
-{:else}
-  <div>
-    <label class="flex items-center gap-3 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={values.open_rounds}
-        disabled={disabled || disabledFields.has("open_rounds")}
-        onchange={(e) => {
-          const checked = (e.target as HTMLInputElement).checked;
-          handleInput("open_rounds", checked);
-          if (!checked) {
-            handleInput("max_rounds", 0);
-          }
-        }}
-        class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-      />
-      <span class="text-sm text-ink-bright">{m.tfield_open_rounds()}</span>
-    </label>
-    <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
-    {#if values.open_rounds}
-      <div class="mt-2 ml-8">
-        <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>{m.tfield_max_rounds()}</label>
-        <select
-          id={id("max-rounds")}
-          value={String(values.max_rounds)}
-          disabled={disabled || disabledFields.has("max_rounds")}
-          onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
-          class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-        >
-          <option value="0">{m.tfield_max_rounds_no_limit()}</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-        </select>
-      </div>
-      {#if values.online && values.max_rounds > 0}
-        <div class="mt-3 ml-8">
-          <label class="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={values.self_organized_rounds}
-              {disabled}
-              onchange={(e) => handleInput("self_organized_rounds", (e.target as HTMLInputElement).checked)}
-              class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-            />
-            <span class="text-sm text-ink-bright">{m.tfield_self_organized_rounds()}</span>
-          </label>
-          <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_self_organized_rounds_desc()}</p>
-        </div>
+      {#if !values.open_rounds && veknPush}
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+      {:else}
+        <option value="0">{m.tfield_max_rounds_no_limit()}</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
       {/if}
+    </select>
+    {#if disabledFields.has("max_rounds")}
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_locked_hint()}</p>
     {/if}
   </div>
-{/if}
+
+  {#if values.open_rounds && values.online && values.max_rounds > 0}
+    <div class="mt-3 ml-8">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={values.self_organized_rounds}
+          {disabled}
+          onchange={(e) => handleInput("self_organized_rounds", (e.target as HTMLInputElement).checked)}
+          class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+        />
+        <span class="text-sm text-ink-bright">{m.tfield_self_organized_rounds()}</span>
+      </label>
+      <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_self_organized_rounds_desc()}</p>
+    </div>
+  {/if}
+</fieldset>
 
 <!-- Dates & Timezone -->
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -270,7 +286,7 @@
       value={values.timezone}
       {disabled}
       onchange={(e) => handleInput("timezone", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       {#each timezones as tz}
         <option value={tz}>{tz.replace(/_/g, " ")}</option>
@@ -387,7 +403,7 @@
       value={values.standings_mode}
       {disabled}
       onchange={(e) => handleInput("standings_mode", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="Private">{m.tournament_standings_private()}</option>
       <option value="Cutoff">{m.tfield_standings_cutoff()}</option>
@@ -402,7 +418,7 @@
       value={values.decklists_mode}
       {disabled}
       onchange={(e) => handleInput("decklists_mode", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="Winner">{m.tfield_decklists_winner()}</option>
       <option value="Finalists">{m.tfield_decklists_finalists()}</option>
@@ -458,7 +474,7 @@
         value={String(values.round_time ?? 0)}
         {disabled}
         onchange={(e) => handleInput("round_time", parseInt((e.target as HTMLSelectElement).value))}
-        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
       >
         <option value="0">{m.timer_no_timer()}</option>
         <option value="7200">2h</option>
@@ -475,7 +491,7 @@
         value={String(values.finals_time ?? 0)}
         {disabled}
         onchange={(e) => handleInput("finals_time", parseInt((e.target as HTMLSelectElement).value))}
-        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
       >
         <option value="0">{m.timer_same_as_round()}</option>
         <option value="7200">2h</option>

@@ -61,6 +61,7 @@
 
 ## Formats
 - [Open rounds per-player cap](open-rounds-per-player-cap.md) — max_rounds as per-player cap (computed rounds-played gate); resting-state hazard; UpdateConfig/multideck/is_deck_locked/vekn_push ripple sites.
+- [Open-rounds exclusion parallel consumers](open-rounds-exclusion-parallel-consumers.md) — open_rounds now a persisted flag (excluded from VEKN/ratings); get_tournament_wins_for_users (→HoF) is an unfiltered parallel path that leaks; self_organized⟹open_rounds is UI-only, not engine-enforced.
 - [Completed PlayerState (finalist withdrawal)](completed-player-state-finalist-withdrawal.md) — open-rounds + finalist-withdrawal forces a 6th `Completed` state (cap-done, finals-eligible) vs `Finished` (withdrew, ineligible); StartFinals excludes {Disqualified, Finished}; top5_has_ties must realign to eligible set; full cross-stack ripple.
 
 ## Engine config & player-authorized events

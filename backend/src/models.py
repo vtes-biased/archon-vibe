@@ -462,6 +462,10 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     standings_mode: StandingsMode = StandingsMode.PRIVATE
     decklists_mode: DeckListsMode = DeckListsMode.WINNER
     max_rounds: int = 0
+    # House (non-VEKN) open-rounds event: per-player cap from a shared pool. Never
+    # pushed to VEKN, never counted toward ratings/RTP. Decoupled from max_rounds
+    # because the VEKN-push build forces max_rounds 2-4 on every (standard) tournament.
+    open_rounds: bool = False
     self_organized_rounds: bool = (
         False  # open rounds: registered players may seat their own pod
     )

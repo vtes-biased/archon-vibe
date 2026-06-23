@@ -199,7 +199,9 @@ Example: On a 5-player table `[2, 1, 0, 0.5, 1.5]` in seating order:
 
 ## Open Rounds (per-player cap)
 
-Non-VEKN format, enabled by setting `max_rounds > 0` in config. Not pushed to VEKN.
+The persisted **`open_rounds`** flag (bool, organizer opt-in in create + config) marks a tournament as the non-VEKN **house format**: open-rounds events are **never pushed to VEKN and never counted toward ratings/RTP** (enforced by the `vekn_push.py` push queries + `push_tournament_event` guard, and the `ratings.py` recompute filters). The flag is **decoupled from `max_rounds`** on purpose — the VEKN-push build forces `max_rounds` to 2–4 on every *standard* tournament, so `max_rounds > 0` alone cannot distinguish a house open-rounds event from a standard one.
+
+The per-player **cap mechanics** below are driven by `max_rounds > 0` (independent of the flag — a standard VEKN tournament where everyone plays every round hits its cap naturally):
 
 - **Per-player cap**: each player plays up to `max_rounds` rounds from a shared pool. The tournament continues running new rounds for players who haven't hit their cap. Total rounds started MAY exceed `max_rounds`.
 - **`max_rounds = 0`**: no cap (standard behaviour).

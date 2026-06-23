@@ -31,7 +31,13 @@ from src.vekn_api import VEKNAPIConnectionError, VEKNAPIError
 from src.vekn_push import UNCREATED_EVENTS_QUERY, UNPUSHED_RESULTS_QUERY, batch_push
 
 
-def _tournament(uid: str, *, with_rounds: bool) -> Tournament:
+def _tournament(
+    uid: str,
+    *,
+    with_rounds: bool,
+    open_rounds: bool = False,
+    self_organized_rounds: bool = False,
+) -> Tournament:
     rounds = (
         [[Table(seating=[Seat(player_uid="p1")], state=TableState.FINISHED)]]
         if with_rounds
@@ -50,6 +56,8 @@ def _tournament(uid: str, *, with_rounds: bool) -> Tournament:
         standings=[Standing(user_uid="p1", gw=1.0, vp=4.0, tp=36)],
         external_ids={"vekn": "999"},
         organizers_uids=["org-1"],
+        open_rounds=open_rounds,
+        self_organized_rounds=self_organized_rounds,
     )
 
 
@@ -139,6 +147,61 @@ async def test_batch_push_skips_data_error_and_continues(test_db, monkeypatch):
     assert stats["aborted"] is False
     assert stats["members_pushed"] == 1
     assert client.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_push_queries_exclude_open_and_self_organized_rounds(test_db):
+    """House open-rounds / self-organized events are never pushed to VEKN.
+
+    Both batch_push selection queries must exclude them: an open_rounds=true
+    (or self_organized_rounds=true) tournament is byte-identical to a standard
+    VEKN event except for the flag, so without the guard its results would be
+    sent to the public VEKN registry. Asserts the invariant against the shipped
+    queries; a standard event with the same shape stays selected.
+    """
+    try:
+        # Standard pushable event (rounds + vekn id, unpushed) → stays selected.
+        await db.save_tournament(_tournament("standard", with_rounds=True))
+        await db.save_tournament(
+            _tournament("open", with_rounds=True, open_rounds=True)
+        )
+        await db.save_tournament(
+            _tournament("self-org", with_rounds=True, self_organized_rounds=True)
+        )
+
+        async with db.get_connection() as conn:
+            result = await conn.execute(
+                UNPUSHED_RESULTS_QUERY, (ObjectType.TOURNAMENT,)
+            )
+            results_selected = {r[0]["uid"] for r in await result.fetchall()}
+        assert results_selected == {"standard"}
+
+        # Same trio, but as un-created calendar events (no vekn id, unstamped).
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE type = 'tournament'")
+        for uid, open_r, self_org in (
+            ("standard", False, False),
+            ("open", True, False),
+            ("self-org", False, True),
+        ):
+            t = _tournament(
+                uid,
+                with_rounds=True,
+                open_rounds=open_r,
+                self_organized_rounds=self_org,
+            )
+            t.external_ids = {}
+            await db.save_tournament(t)
+
+        async with db.get_connection() as conn:
+            result = await conn.execute(
+                UNCREATED_EVENTS_QUERY, (ObjectType.TOURNAMENT,)
+            )
+            events_selected = {r[0]["uid"] for r in await result.fetchall()}
+        assert events_selected == {"standard"}
+    finally:
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE type = 'tournament'")
 
 
 @pytest.mark.asyncio

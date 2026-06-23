@@ -187,6 +187,11 @@ async def recompute_ratings_for_players(
         all_tournaments.extend(
             await get_finished_tournaments_for_category(fmt, online, cutoff_str)
         )
+    # Open-rounds / self-organized events are the non-VEKN house format — they never
+    # count toward ratings/RTP (mirrors their exclusion from VEKN push).
+    all_tournaments = [
+        t for t in all_tournaments if not (t.open_rounds or t.self_organized_rounds)
+    ]
 
     # Fetch wins + the player User objects in batch (one query each, not N).
     wins_map = await get_tournament_wins_for_users(player_uids)
@@ -247,6 +252,8 @@ async def recompute_all_ratings() -> list[tuple[User, BroadcastData]]:
             t = decode_json(json_str, Tournament)
             if t.state != "Finished" or t.deleted_at:
                 continue
+            if t.open_rounds or t.self_organized_rounds:
+                continue  # non-VEKN house format: excluded from ratings
             category = rating_category_for_tournament(t)
             players = _players_with_rounds(t)
             players_by_category[category].update(players)

@@ -1072,6 +1072,10 @@ async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[s
             f"WHERE type = 'tournament' "
             f"AND \"full\"->>'state' = 'Finished' "
             f"AND \"full\"->>'winner' IN ({placeholders}) "
+            # Non-VEKN house format: open-rounds / self-organized wins don't count
+            # toward the Hall of Fame (mirrors their exclusion from ratings/push).
+            f"AND (\"full\"->>'open_rounds') IS DISTINCT FROM 'true' "
+            f"AND (\"full\"->>'self_organized_rounds') IS DISTINCT FROM 'true' "
             f"AND deleted_at IS NULL",
             tuple(user_uids),
         )

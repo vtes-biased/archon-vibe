@@ -170,6 +170,8 @@
 
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
   const standingsMap = $derived(new Map(standings.map(s => [s.user_uid, s])));
+  // Per-player-cap MECHANICS (engine-driven by max_rounds), not the non-VEKN
+  // `open_rounds` reporting flag — keep this keyed on max_rounds.
   const openRounds = $derived((tournament?.max_rounds ?? 0) > 0);
   // Per-player rounds-played, computed once per render (open rounds: each player has their own count).
   const roundsPlayedMap = $derived.by(() => {

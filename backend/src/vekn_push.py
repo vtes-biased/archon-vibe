@@ -127,6 +127,11 @@ async def push_tournament_event(
     if not os.getenv("VEKN_PUSH", "").lower() == "true":
         return None
 
+    # Non-VEKN house format — never pushed (the batch queries already exclude these;
+    # this guards direct callers too).
+    if tournament.open_rounds or tournament.self_organized_rounds:
+        return None
+
     # Validate requirements
     if not tournament.name or len(tournament.name) < 3:
         logger.warning(f"Tournament {tournament.uid}: name too short for VEKN")
@@ -343,6 +348,9 @@ async def push_member_background(user: User) -> None:
 # tournaments without a vekn id are stamped at import (no push owed) and must
 # not get calendar events created for them years after the fact.
 # Guard covered by test_vekn_push_batch.py.
+# open_rounds / self_organized_rounds events are the non-VEKN house format — never
+# create a vekn.net calendar entry for them (IS DISTINCT FROM keeps legacy rows that
+# predate the flag, where ->> is NULL, in the push set).
 UNCREATED_EVENTS_QUERY = """
     SELECT "full" FROM objects
     WHERE type = %s
@@ -352,6 +360,8 @@ UNCREATED_EVENTS_QUERY = """
       AND "full"->>'vekn_pushed_at' IS NULL
       AND "full"->>'name' IS NOT NULL
       AND "full"->>'start' IS NOT NULL
+      AND ("full"->>'open_rounds') IS DISTINCT FROM 'true'
+      AND ("full"->>'self_organized_rounds') IS DISTINCT FROM 'true'
 """
 
 # batch_push step 3 selection. The rounds guard keeps tournaments whose results
@@ -367,6 +377,8 @@ UNPUSHED_RESULTS_QUERY = """
       AND "full"->>'vekn_pushed_at' IS NULL
       AND ("full"->'external_ids'->>'vekn') IS NOT NULL
       AND jsonb_array_length(COALESCE("full"->'rounds', '[]'::jsonb)) > 0
+      AND ("full"->>'open_rounds') IS DISTINCT FROM 'true'
+      AND ("full"->>'self_organized_rounds') IS DISTINCT FROM 'true'
 """
 
 

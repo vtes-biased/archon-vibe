@@ -17,7 +17,7 @@
     name: "",
     format: "Standard",
     rank: "",
-    open_rounds: !veknPush ? false : true,
+    open_rounds: false,
     max_rounds: veknPush ? 3 : 0,
     self_organized_rounds: false,
     online: false,
@@ -56,7 +56,7 @@
       error = m.tournament_new_error_country_required();
       return;
     }
-    if (veknPush && (values.max_rounds < 2 || values.max_rounds > 4)) {
+    if (veknPush && !values.open_rounds && (values.max_rounds < 2 || values.max_rounds > 4)) {
       error = m.tournament_new_error_max_rounds();
       return;
     }
@@ -80,6 +80,7 @@
         timezone: values.timezone,
         description: values.description,
         max_rounds: values.max_rounds,
+        open_rounds: values.open_rounds,
         self_organized_rounds: values.self_organized_rounds,
         standings_mode: values.standings_mode,
         decklists_mode: values.decklists_mode,

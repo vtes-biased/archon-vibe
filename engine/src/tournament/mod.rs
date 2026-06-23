@@ -72,13 +72,15 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
             }
         }
     }
-    // Self-organized rounds are an open-rounds-only feature. The real gate is the
-    // SelfOrganizeRound event's own max_rounds>0 check; this rejects the nonsensical
-    // combo at config time when both fields arrive together (the usual case — the
-    // config form posts max_rounds alongside the flag).
+    // Self-organized rounds are an open-rounds-only feature: they require both the
+    // open_rounds flag and a per-player cap (max_rounds>0). Rejects the nonsensical
+    // combos at config time when the fields arrive together (the usual case — the
+    // config form posts open_rounds + max_rounds alongside the flag). Single-sources
+    // the "self-organized implies open-rounds" invariant in the engine, not just the UI.
     if config["self_organized_rounds"].as_bool() == Some(true)
-        && config.has_key("max_rounds")
-        && config["max_rounds"].as_usize() == Some(0)
+        && ((config.has_key("max_rounds") && config["max_rounds"].as_usize() == Some(0))
+            || (config.has_key("open_rounds")
+                && config["open_rounds"].as_bool() == Some(false)))
     {
         return Err(EngineError::SelfOrganizeNotOpenRounds);
     }
@@ -130,6 +132,7 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         "standings_mode" => config["standings_mode"].as_str().unwrap_or("Private"),
         "decklists_mode" => config["decklists_mode"].as_str().unwrap_or("Winner"),
         "max_rounds" => config["max_rounds"].as_u32().unwrap_or(0),
+        "open_rounds" => config["open_rounds"].as_bool().unwrap_or(false),
         "self_organized_rounds" => config["self_organized_rounds"].as_bool().unwrap_or(false),
         "league_uid" => config["league_uid"].clone(),
         "round_time" => config["round_time"].as_u32().unwrap_or(0),
@@ -2242,6 +2245,7 @@ fn apply_event(
                 "standings_mode",
                 "decklists_mode",
                 "max_rounds",
+                "open_rounds",
                 "self_organized_rounds",
                 "table_rooms",
                 "league_uid",

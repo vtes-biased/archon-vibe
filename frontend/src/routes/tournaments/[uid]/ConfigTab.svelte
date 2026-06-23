@@ -36,7 +36,7 @@
     name: tournament.name,
     format: tournament.format,
     rank: tournament.rank,
-    open_rounds: (tournament.max_rounds ?? 0) > 0,
+    open_rounds: tournament.open_rounds ?? false,
     max_rounds: (tournament.max_rounds ?? 0),
     self_organized_rounds: tournament.self_organized_rounds ?? false,
     online: tournament.online,
@@ -68,7 +68,7 @@
         name: t.name,
         format: t.format,
         rank: t.rank,
-        open_rounds: (t.max_rounds ?? 0) > 0,
+        open_rounds: t.open_rounds ?? false,
         max_rounds: (t.max_rounds ?? 0),
         self_organized_rounds: t.self_organized_rounds ?? false,
         online: t.online,
@@ -138,7 +138,16 @@
   const debouncedFields = new Set(["name", "venue", "venue_url", "address", "map_url", "description"]);
 
   function handleFieldChange(field: string, value: any) {
-    if (field === "open_rounds") return; // UI-only toggle, max_rounds handles the save
+    if (field === "open_rounds") {
+      // Toggling open_rounds also coerces max_rounds + self_organized_rounds
+      // (see TournamentFields.handleOpenRoundsToggle) — persist all three together.
+      saveMultiple({
+        open_rounds: value,
+        max_rounds: fieldValues.max_rounds,
+        self_organized_rounds: fieldValues.self_organized_rounds,
+      });
+      return;
+    }
     if (field === "online") {
       handleToggleOnline(value);
       return;

@@ -364,6 +364,7 @@ export interface Tournament extends BaseObject {
   standings_mode?: StandingsMode;
   decklists_mode?: DeckListsMode;
   max_rounds?: number;
+  open_rounds?: boolean; // non-VEKN house format: per-player cap, not pushed to VEKN, not ranked
   self_organized_rounds?: boolean; // open-rounds: let registered players seat their own pod (#274)
   table_rooms?: { name: string; count: number }[];
 
