@@ -201,9 +201,10 @@
     <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
   {/if}
 
-  <!-- Round count (standard) / per-player cap (open rounds) — always visible; the
+  <!-- Round count (standard) / per-player cap (open rounds) — always visible and
+       aligned flush with the other fields; it no longer depends on open rounds. The
        VEKN-push build constrains a standard tournament to 2–4 (the count it reports). -->
-  <div class="mt-2 ml-8">
+  <div class="mt-3">
     <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>
       {values.open_rounds ? m.tfield_round_cap() : m.tfield_round_count()}
     </label>
@@ -211,12 +212,7 @@
       id={id("max-rounds")}
       value={String(values.max_rounds)}
       disabled={disabled || disabledFields.has("max_rounds")}
-      onchange={(e) => {
-        const mr = parseInt((e.target as HTMLSelectElement).value);
-        handleInput("max_rounds", mr);
-        // Self-organize needs a cap (>0); clear it if the cap is lifted.
-        if (mr === 0 && values.self_organized_rounds) handleInput("self_organized_rounds", false);
-      }}
+      onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
       class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       {#if !values.open_rounds && veknPush}
@@ -237,8 +233,11 @@
     {/if}
   </div>
 
-  {#if values.open_rounds && values.online && values.max_rounds > 0}
-    <div class="mt-3 ml-8">
+  <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite
+       (works offline and with or without a per-player cap) — lets present players
+       seat their own pod without an organizer. -->
+  {#if values.open_rounds}
+    <div class="mt-3">
       <label class="flex items-center gap-3 cursor-pointer">
         <input
           type="checkbox"

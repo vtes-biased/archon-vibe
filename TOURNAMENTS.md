@@ -87,7 +87,7 @@ Events are processed by the Rust engine. Each event includes:
 | `StartRound` | `seating?` | Creates round with seating (optional seating for deterministic forwarding) |
 | `FinishRound` | `round?` | Ends a round (any, any order) |
 | `CancelRound` | `round?` | Last round: hard-removed; any earlier round: soft-cancelled (tables set to `Cancelled`, slot preserved, players released) |
-| `SelfOrganizeRound` | `player_uids` | Player-authorized (not organizer-gated): seats one 4–5-player pod in an online open-rounds tournament with `self_organized_rounds` on; initiator must be among the UIDs |
+| `SelfOrganizeRound` | `player_uids` | Player-authorized (not organizer-gated): seats one 4–5-player pod in an open-rounds tournament with `self_organized_rounds` on; initiator must be among the UIDs |
 | `SwapSeats` | `round`, `table`, `seat_a`, `seat_b` | Swap two players within a table |
 | `AlterSeating` | `round`, `seating` | Positional prefix match: existing tables matched by index (results preserved same-table, reset cross-table); extra payload tables appended fresh; each table must seat 0/4/5 players (0 = empty draft workspace, dropped after rebuild). Finals: replaces seat order, same player set. |
 | `SeatPlayer` | `table`, `player_uid`, `seat` | Add player to a table in the **last** round |
@@ -213,10 +213,10 @@ The per-player **cap mechanics** below are driven by `max_rounds > 0` (independe
 
 ### Self-organized rounds
 
-Config flag `self_organized_rounds` (bool, default false). Settable only when `max_rounds > 0`. Organizer opt-in per tournament.
+Config flag `self_organized_rounds` (bool, default false). Settable on any open-rounds tournament (no online or per-player-cap requirement). Organizer opt-in per tournament.
 
 **Eligibility for `SelfOrganizeRound`:**
-- Tournament: online, `self_organized_rounds` on, `max_rounds > 0`, state Waiting or Playing, no finals.
+- Tournament: open rounds with `self_organized_rounds` on, state Waiting or Playing, no finals. Works offline and with or without a per-player cap.
 - Players: exactly 4–5 distinct registered players in state `Registered` or `Checked-in` (not `Playing`, `Completed`, `Disqualified`); initiator must be among them.
 
 **Behavior:**
@@ -338,7 +338,7 @@ Actions are validated by the Rust engine:
 | Add/Remove/Drop Player | Organizers |
 | Check In / Check In All / Reset Check-in | Organizers |
 | Start/Finish/Cancel Round | Organizers |
-| Self-Organize Round | Registered players (online open-rounds w/ `self_organized_rounds` on, Waiting/Playing, no finals) |
+| Self-Organize Round | Registered players (open-rounds w/ `self_organized_rounds` on, Waiting/Playing, no finals) |
 | Set Score | Players at the table (Playing only); organizers (Waiting/Playing/Finished) |
 | Override/Unoverride | Organizers (Waiting/Playing/Finished) |
 | Seating edits (Swap, Alter, Seat, Unseat, AddTable, RemoveTable) | Organizers |

@@ -335,8 +335,9 @@ fn test_start_round_drops_registered_players() {
 }
 
 // Self-organized rounds (#274): the player-authorized eligibility predicate. One test
-// over the whole invariant — registration is the gate, the initiator must be seated, and
-// the abuse vectors (concurrent pod, non-participant, disabled, offline) are all rejected.
+// over the whole invariant — registration is the gate, the initiator must be seated, the
+// abuse vectors (concurrent pod, non-participant, disabled) are rejected, and it works
+// offline / with no per-player cap (open-rounds is the only prerequisite).
 #[test]
 fn test_self_organize_round_eligibility() {
     let mut t = make_tournament();
@@ -412,13 +413,15 @@ fn test_self_organize_round_eligibility() {
         Err(EngineError::SelfOrganizeDisabled)
     ));
 
-    // Online-only by design.
+    // No online or per-player-cap prerequisite: an offline, uncapped tournament still
+    // seats a self-organized pod (open-rounds + the flag are the only requirements).
     let mut offline = t.clone();
     offline["online"] = false.into();
-    assert!(matches!(
-        run_event(&offline, &pod, &p1),
-        Err(EngineError::SelfOrganizeRequiresOnline)
-    ));
+    offline["max_rounds"] = 0.into();
+    assert!(
+        run_event(&offline, &pod, &p1).is_ok(),
+        "self-organize allowed offline with no cap"
+    );
 }
 
 // Cancelling a NON-last round (parallel rounds, #274) soft-cancels in place: the slot is

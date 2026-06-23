@@ -72,14 +72,14 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
             }
         }
     }
-    // Self-organized rounds are an open-rounds-only feature: they require both the
-    // open_rounds flag and a per-player cap (max_rounds>0). Rejects the nonsensical
-    // combos at config time when the fields arrive together (the usual case — the
-    // config form posts open_rounds + max_rounds alongside the flag). Single-sources
-    // the "self-organized implies open-rounds" invariant in the engine, not just the UI.
+    // Self-organized rounds are an open-rounds-only feature (no online or per-player-cap
+    // requirement). Rejects the nonsensical combo at config time when the fields arrive
+    // together (the usual case — the config form posts open_rounds alongside the flag).
+    // Single-sources the "self-organized implies open-rounds" invariant in the engine,
+    // not just the UI.
     if config["self_organized_rounds"].as_bool() == Some(true)
-        && ((config.has_key("max_rounds") && config["max_rounds"].as_usize() == Some(0))
-            || (config.has_key("open_rounds") && config["open_rounds"].as_bool() == Some(false)))
+        && config.has_key("open_rounds")
+        && config["open_rounds"].as_bool() == Some(false)
     {
         return Err(EngineError::SelfOrganizeNotOpenRounds);
     }
@@ -832,24 +832,19 @@ fn apply_event(
 
         TournamentEvent::SelfOrganizeRound { player_uids } => {
             // Player-authorized (NOT organizer-gated): a registered player seats one pod
-            // when the organizer enabled self-organized rounds on an online open-rounds
-            // tournament. The integrity gate is REGISTRATION — you can only seat already-
-            // registered players; collusion / phantom-round risk is an accepted non-VEKN
-            // tradeoff, mitigated socially + by the organizer veto (FinishRound/CancelRound/
-            // Override). Players pick WHO; the engine assigns WHERE.
+            // when the organizer enabled self-organized rounds on an open-rounds tournament
+            // (no online or per-player-cap requirement). The integrity gate is REGISTRATION
+            // — you can only seat already-registered players; collusion / phantom-round risk
+            // is an accepted non-VEKN tradeoff, mitigated socially + by the organizer veto
+            // (FinishRound/CancelRound/Override). Players pick WHO; the engine assigns WHERE.
             if !tournament["self_organized_rounds"]
                 .as_bool()
                 .unwrap_or(false)
             {
                 return Err(EngineError::SelfOrganizeDisabled);
             }
+            // 0 == no per-player cap; only enforced below when a cap is set.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
-            if max_rounds == 0 {
-                return Err(EngineError::SelfOrganizeNotOpenRounds);
-            }
-            if !tournament["online"].as_bool().unwrap_or(false) {
-                return Err(EngineError::SelfOrganizeRequiresOnline);
-            }
             // Same state rule as an online parallel StartRound: seat while Waiting/Playing.
             if state != TournamentState::Waiting && state != TournamentState::Playing {
                 return Err(EngineError::WrongState {
@@ -892,7 +887,7 @@ fn apply_event(
                         player: uid.clone(),
                     });
                 }
-                if count_player_rounds_played(tournament, uid) >= max_rounds {
+                if max_rounds > 0 && count_player_rounds_played(tournament, uid) >= max_rounds {
                     return Err(EngineError::PlayerReachedMaxRounds);
                 }
             }

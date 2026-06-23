@@ -99,7 +99,6 @@ pub enum EngineError {
     // Self-organized rounds (player-initiated open-rounds pods)
     SelfOrganizeDisabled,
     SelfOrganizeNotOpenRounds,
-    SelfOrganizeRequiresOnline,
     SelfOrganizeNotSeated,
     SelfOrganizeIneligible { player: String },
     // Not user-actionable
@@ -192,7 +191,6 @@ impl EngineError {
             SeatingMinRounds => "seating.min_rounds",
             SelfOrganizeDisabled => "tournament.self_organize_disabled",
             SelfOrganizeNotOpenRounds => "tournament.self_organize_not_open_rounds",
-            SelfOrganizeRequiresOnline => "tournament.self_organize_requires_online",
             SelfOrganizeNotSeated => "tournament.self_organize_not_seated",
             SelfOrganizeIneligible { .. } => "tournament.self_organize_ineligible",
             Internal { .. } => "internal",
@@ -364,9 +362,6 @@ impl fmt::Display for EngineError {
             }
             SelfOrganizeNotOpenRounds => {
                 write!(f, "Self-organized rounds require an open-rounds tournament")
-            }
-            SelfOrganizeRequiresOnline => {
-                write!(f, "Self-organized rounds require an online tournament")
             }
             SelfOrganizeNotSeated => write!(f, "You must seat yourself in a round you organize"),
             SelfOrganizeIneligible { player } => write!(

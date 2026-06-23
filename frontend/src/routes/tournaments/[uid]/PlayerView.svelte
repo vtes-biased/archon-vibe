@@ -87,20 +87,20 @@
     (tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, userUid) >= (tournament.max_rounds ?? 0),
   );
 
-  // Self-organized rounds (open-rounds, online): a registered participant can seat their
-  // own 4-5 pod without an organizer. Mirrors the engine's eligibility gate (error.rs);
-  // the engine re-validates server-side, the UI just avoids showing an impossible action.
+  // Self-organized rounds (open-rounds): a registered participant can seat their own
+  // 4-5 pod without an organizer — no online or per-player-cap requirement. Mirrors the
+  // engine's eligibility gate (error.rs); the engine re-validates server-side, the UI
+  // just avoids showing an impossible action.
   let showSelfOrganize = $state(false);
   function isSelfOrganizeEligible(p: Player): boolean {
     const uid = p.user_uid;
     if (!uid) return false;
     if (p.state !== "Registered" && p.state !== "Checked-in") return false;
+    // No cap (max_rounds 0) means no per-player limit; only gate when a cap is set.
     return !((tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, uid) >= (tournament.max_rounds ?? 0));
   }
   const canSelfOrganize = $derived(
     (tournament.self_organized_rounds ?? false) &&
-    tournament.online &&
-    (tournament.max_rounds ?? 0) > 0 &&
     !tournament.finals &&
     (tournament.state === "Waiting" || tournament.state === "Playing") &&
     !!currentPlayerEntry &&

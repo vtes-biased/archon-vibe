@@ -114,7 +114,6 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.max_rounds_below_completed': (p) => m.err_tournament_max_rounds_below_completed({ max: p.max ?? '', completed: p.completed ?? '' }),
   'tournament.self_organize_disabled': () => m.err_tournament_self_organize_disabled(),
   'tournament.self_organize_not_open_rounds': () => m.err_tournament_self_organize_not_open_rounds(),
-  'tournament.self_organize_requires_online': () => m.err_tournament_self_organize_requires_online(),
   'tournament.self_organize_not_seated': () => m.err_tournament_self_organize_not_seated(),
   'tournament.self_organize_ineligible': (p) => m.err_tournament_self_organize_ineligible({ player: p.player ?? '' }),
   'deck.no_cards': () => m.err_deck_no_cards(),
