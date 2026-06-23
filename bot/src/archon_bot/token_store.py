@@ -46,6 +46,14 @@ class TokenStore:
                 PRIMARY KEY (guild_id, tournament_uid)
             )
         """)
+        # Migration: the Discord scheduled-event id for this tournament (added later).
+        # ALTER on an existing table; ignore the duplicate-column error on re-run.
+        try:
+            await self._db.execute(
+                "ALTER TABLE guild_tournaments ADD COLUMN scheduled_event_id TEXT"
+            )
+        except aiosqlite.OperationalError:
+            pass
         # Pending OAuth flows (state → context)
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS pending_oauth (
@@ -175,7 +183,7 @@ class TokenStore:
         assert self._db
         async with self._db.execute(
             """SELECT organizer_discord_id, announcement_channel_id, lobby_channel_id,
-                      judges_channel_id, category_id
+                      judges_channel_id, category_id, scheduled_event_id
                FROM guild_tournaments WHERE guild_id = ? AND tournament_uid = ?""",
             (guild_id, tournament_uid),
         ) as cur:
@@ -188,7 +196,20 @@ class TokenStore:
                 "lobby_channel_id": row[2],
                 "judges_channel_id": row[3],
                 "category_id": row[4],
+                "scheduled_event_id": row[5],
             }
+
+    async def set_scheduled_event_id(
+        self, guild_id: str, tournament_uid: str, event_id: str | None
+    ) -> None:
+        """Record (or clear) the Discord scheduled-event id for a linked tournament."""
+        assert self._db
+        await self._db.execute(
+            """UPDATE guild_tournaments SET scheduled_event_id = ?
+               WHERE guild_id = ? AND tournament_uid = ?""",
+            (event_id, guild_id, tournament_uid),
+        )
+        await self._db.commit()
 
     async def get_guild_tournaments(self, guild_id: str) -> list[dict]:
         assert self._db

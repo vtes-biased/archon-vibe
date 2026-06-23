@@ -8,7 +8,7 @@ Offline-first PWA, client-server, with a shared Rust core providing identical bu
 
 - **Frontend**: Svelte + Vite + TypeScript; IndexedDB local storage; PWA service workers.
 - **Backend**: FastAPI (Python 3.11+); PostgreSQL (JSONB); psycopg3 async, no ORM; msgspec JSON; tooling `uv` / `ruff` / `ty`.
-- **Discord bot**: separate process; hikari + lightbulb + miru; SQLite token/state; pure OAuth client (no DB, no business logic).
+- **Discord bot**: separate process; hikari + lightbulb + miru + Pillow; SQLite token/state; pure OAuth client (no DB, no business logic).
 - **Shared core**: Rust → WebAssembly (frontend) + native library via PyO3 (backend).
 
 ## Data Model
@@ -187,7 +187,7 @@ Standalone process (`bot/`) managing online VTES tournaments inside Discord serv
 
 **Commands**: `/setup <url>` (link tournament; create category + announcement/lobby/judges channels — NC/Prince/IC only), `/teardown`, `/announce`, `/sync` (reconcile voice channels — repair tool), `/register`, `/checkin`, `/report <vp>` (→ `SetScore`), `/judge` (→ `judge_call`), `/sanction` (multi-step).
 
-**Modules**: `token_store.py` (SQLite: `tokens`, `guild_tournaments`, `pending_oauth` 15-min TTL); `archon_api.py` (REST client using stored OAuth tokens); `sse_listener.py` (per-(guild, tournament) SSE subscription driving channel/announcement updates); `channel_manager.py` (voice channels with per-player CONNECT+SPEAK perms); `oauth_callback.py` (local PKCE redirect server); `commands/{setup,player,judge}.py`.
+**Modules**: `token_store.py` (SQLite: `tokens`, `guild_tournaments` (+ `scheduled_event_id`), `pending_oauth` 15-min TTL); `archon_api.py` (REST client using stored OAuth tokens); `sse_listener.py` (per-(guild, tournament) SSE subscription driving channel/announcement/scheduled-event updates); `channel_manager.py` (voice channels with per-player CONNECT+SPEAK perms); `scheduled_events.py` (Guild Scheduled Event lifecycle); `oauth_callback.py` (local PKCE redirect server); `commands/{setup,player,judge}.py`.
 
 **SSE listener** — subscribes to a **tournament-scoped** stream (`/stream?tournament=<uid>`) with the organizer's `user:impersonate` token, one connection per active (guild, tournament) pair, delivering only that tournament + its sanctions + judge calls:
 - `reconcile_channels(...)` is the sole idempotent authority that creates/deletes voice channels and sets per-member CONNECT+SPEAK permissions; called on every relevant state change (round start/end, finals, reconnect, `/sync`). `channel_manager.desired_channels(obj)` (pure) computes the target set; `structure_signature(obj)` is a change-guard hash so reconcile is skipped when structure is unchanged. A per-tournament `asyncio.Lock` serializes structural mutations so concurrent events, reconnects, and `/sync` never interleave.
@@ -195,6 +195,8 @@ Standalone process (`bot/`) managing online VTES tournaments inside Discord serv
 - **Catch-up on (re)connect**: the bot sends no `since` cursor → the backend replays full current state; events seed state silently until `sync_complete` flips `synced`, so a restart/reconnect never re-posts past announcements. A `resync` message triggers a fresh reconnect. A shared `aiohttp` session spans reconnects; module-level state is cleaned up on `stop_sse` and teardown.
 
 **Channel permissions**: #announcement — @everyone DENY SEND_MESSAGES, bot allowed; table voice — @everyone DENY CONNECT, per-player + organizers ALLOW CONNECT+SPEAK (organizers may join any table to judge); synced idempotently.
+
+**Scheduled events**: `scheduled_events.py` (`ensure_scheduled_event`) creates/edits/deletes a Discord EXTERNAL Guild Scheduled Event per linked online tournament — driven off the SSE snapshot (no setup-time create path): on catch-up reconnect (initial + restart-idempotent via the persisted `scheduled_event_id`) and every relevant state change (name/start/finish/banner); deleted on finish or `/teardown`. Cover image: tournament banner transcoded webp→PNG via Pillow. Requires **MANAGE_EVENTS** bot permission; graceful if absent (logged + one-time hint to #judges).
 
 **OAuth flow**: `/setup` initiates PKCE → user authorizes `user:impersonate` → redirect to the local callback server → token stored in SQLite for all API calls and SSE subscriptions.
 

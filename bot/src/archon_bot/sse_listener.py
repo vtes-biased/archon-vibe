@@ -29,6 +29,7 @@ from .channel_manager import (
     structure_signature,
     sync_table_permissions,
 )
+from .scheduled_events import ensure_scheduled_event, event_signature
 from .token_store import TokenStore
 
 logger = logging.getLogger(__name__)
@@ -789,6 +790,18 @@ async def _handle_update(
     except Exception as e:
         logger.error("Announcement emit failed for %s: %s", key, e)
 
+    # Scheduled-event half — driven off the public-field signature (name/start/
+    # finish/banner/state), independent of channel structure. Same structural lock so
+    # a concurrent reconcile can't race the stored event id.
+    if event_signature(prev_obj or {}) != event_signature(obj):
+        async with structural_lock(guild_id, tournament_uid):
+            try:
+                await ensure_scheduled_event(
+                    bot, store, guild_id, tournament_uid, obj, prev_obj
+                )
+            except Exception as e:
+                logger.error("Scheduled-event ensure failed for %s: %s", key, e)
+
     # Snapshot LAST: the diffs above need the previous object; a crash retries next event.
     _last_tournament[key] = obj
 
@@ -1121,9 +1134,19 @@ async def _reconcile(
     state = obj.get("state", "") if obj else "(none)"
     logger.info("Reconciling %s after (re)connect (state=%s)", key, state)
     if not obj:
+        # Catch-up filters deleted_at IS NULL, so a tournament soft-deleted while the
+        # bot was DOWN never reappears here — no ensure runs, and any scheduled event
+        # is left for /teardown to remove (the authority for a deleted tournament's
+        # Discord cleanup). Narrow window: tournament delete is PLANNED-state only.
         return
     async with structural_lock(guild_id, tournament_uid):
         await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
+        # Initial create + restart idempotency: the stored event id survives in
+        # SQLite, so ensure no-ops (edits) rather than double-creating.
+        try:
+            await ensure_scheduled_event(bot, store, guild_id, tournament_uid, obj)
+        except Exception as e:
+            logger.error("Scheduled-event ensure failed for %s: %s", key, e)
 
 
 async def _handle_sanction_update(

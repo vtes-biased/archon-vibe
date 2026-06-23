@@ -9,6 +9,9 @@ dependencies = [
     "hikari-miru>=4.0.0",
     "aiohttp>=3.9.0",
     "aiosqlite>=0.20.0",
+    # Transcodes the webp tournament banner -> PNG for the Discord scheduled-event
+    # cover (Discord's event-cover data-URI accepts only PNG/JPEG/GIF).
+    "pillow>=10.0.0",
 ]
 
 # Console entry point installed into the venv (used by the systemd unit).

@@ -10,6 +10,7 @@ from .. import config
 from ..archon_api import ArchonAPI
 from ..channel_manager import create_tournament_channels, teardown_tournament
 from ..oauth_utils import generate_pkce, make_oauth_url
+from ..scheduled_events import delete_scheduled_event
 from ..sse_listener import (
     start_sse,
     stop_sse,
@@ -245,6 +246,14 @@ class TeardownCommand(
                 if link.get(k)
             ]
             extra_ids += tracked_table_channels(guild_id, tournament_uid)
+
+            # Remove the Discord scheduled event before the link row is dropped.
+            try:
+                await delete_scheduled_event(
+                    ctx.client.app, store, guild_id, tournament_uid
+                )
+            except Exception as e:
+                logger.warning("Failed to delete scheduled event on teardown: %s", e)
 
             await stop_sse(guild_id, tournament_uid)
             await store.unlink_tournament(guild_id, tournament_uid)
