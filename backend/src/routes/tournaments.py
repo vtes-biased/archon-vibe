@@ -432,6 +432,65 @@ async def add_organizer(
     )
 
 
+@router.post("/{uid}/push-vekn")
+async def push_vekn(
+    uid: str,
+    current_user: OptionalUser = None,
+) -> Response:
+    """Register a tournament with the VEKN calendar on demand (organizer action).
+
+    The hourly batch_push only creates the event once a tournament leaves
+    'Planned' (registration opens); this lets an organizer do it earlier.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if not permissions.is_organizer(current_user, tournament):
+        raise HTTPException(status_code=403, detail="Only organizers can sync to VEKN")
+
+    # Open-rounds / self-organized events are the non-VEKN house format — never pushed.
+    if tournament.open_rounds or tournament.self_organized_rounds:
+        raise HTTPException(
+            status_code=400, detail="Open-rounds events are not reported to VEKN"
+        )
+
+    if tournament.external_ids.get("vekn"):
+        # Already registered — idempotent no-op.
+        return Response(
+            content=encoder.encode(tournament), media_type="application/json"
+        )
+
+    from ..vekn_api import VEKNAPIConnectionError
+    from ..vekn_push import push_tournament_event, vekn_push_client
+
+    try:
+        async with vekn_push_client() as client:
+            if client is None:
+                raise HTTPException(status_code=400, detail="VEKN sync is not enabled")
+            # push_tournament_event saves external_ids.vekn + broadcasts on success.
+            event_id = await push_tournament_event(client, tournament)
+    except VEKNAPIConnectionError as e:
+        raise HTTPException(
+            status_code=502, detail="VEKN API is unavailable, try again later"
+        ) from e
+
+    if not event_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "VEKN sync failed — needs a name (≥3 chars), a start date, and an "
+                "organizer with a VEKN ID"
+            ),
+        )
+
+    updated = await get_tournament_by_uid(uid) or tournament
+    return Response(content=encoder.encode(updated), media_type="application/json")
+
+
 @router.delete("/{uid}/organizers/{organizer_uid}")
 async def remove_organizer(
     uid: str,

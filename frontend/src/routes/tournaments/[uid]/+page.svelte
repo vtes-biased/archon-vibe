@@ -2,18 +2,18 @@
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { untrack } from "svelte";
-  import { deleteTournamentApi } from "$lib/api";
+  import { deleteTournamentApi, syncTournamentVekn } from "$lib/api";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
-  import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague } from "$lib/db";
+  import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { scoreSeatingSync, computeRatingPoints, initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2, Trash2, Upload } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2, Trash2, Upload, CloudUpload } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
@@ -285,6 +285,28 @@ import TournamentModals from "./TournamentModals.svelte";
 
   // Archon import lives in the action-bar More menu across every organizer state.
   const archonImportItem = $derived({ label: m.archon_import_title(), icon: Upload, onclick: () => (showArchonImport = true) });
+
+  let syncingVekn = $state(false);
+  async function doSyncVekn() {
+    if (!tournament || syncingVekn) return; // guard double-click: avoids a duplicate VEKN event
+    syncingVekn = true;
+    try {
+      const updated = await syncTournamentVekn(tournament.uid);
+      await saveTournament(updated);
+      showToast({ type: 'success', message: m.vekn_sync_success() });
+    } catch (e) {
+      showToast({ type: 'error', message: toUserMessage(e, m.vekn_sync_error()) });
+    } finally {
+      syncingVekn = false;
+    }
+  }
+  // "Sync to VEKN" — register the calendar event on demand (e.g. before opening
+  // registration). Hidden once pushed, and for non-VEKN open-rounds events.
+  const syncVeknItem = $derived(
+    veknPush && !tournament?.external_ids?.vekn && !tournament?.open_rounds && !tournament?.self_organized_rounds
+      ? { label: m.vekn_sync_action(), icon: CloudUpload, onclick: () => doSyncVekn(), disabled: actionLoading || syncingVekn }
+      : null
+  );
 
   // Player DQ state and sanctions helpers for standings display
   function isPlayerDQ(userUid: string): boolean {
@@ -783,13 +805,14 @@ import TournamentModals from "./TournamentModals.svelte";
             <div class="flex flex-wrap items-center gap-2">
               {#if tournament.state === "Planned"}
                 <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("OpenRegistration")}>{m.overview_open_registration()}</Button>
-                <ActionMenu label={m.common_more()} items={[archonImportItem]} />
+                <ActionMenu label={m.common_more()} items={[...(syncVeknItem ? [syncVeknItem] : []), archonImportItem]} />
 
               {:else if tournament.state === "Registration"}
                 <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("CloseRegistration")}>{m.overview_close_registration()}</Button>
                 <ActionMenu label={m.common_more()} items={[
                   ...(qrCheckin ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
                   { label: m.overview_back_to_planning(), icon: Undo2, onclick: () => doAction("CancelRegistration"), disabled: actionLoading },
+                  ...(syncVeknItem ? [syncVeknItem] : []),
                   archonImportItem,
                 ]} />
 
@@ -818,6 +841,7 @@ import TournamentModals from "./TournamentModals.svelte";
                   ...(hasRounds && !tournament.online ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
                   ...(qrCheckin && hasRounds ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
                   { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
+                  ...(syncVeknItem ? [syncVeknItem] : []),
                   archonImportItem,
                 ]} />
 
@@ -836,7 +860,7 @@ import TournamentModals from "./TournamentModals.svelte";
                   {@const canStartNext = (checkedInCount + playingCount) >= 4}
                   <Button variant="primary" size="lg" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
                 {/if}
-                <ActionMenu label={m.common_more()} items={[archonImportItem]} />
+                <ActionMenu label={m.common_more()} items={[...(syncVeknItem ? [syncVeknItem] : []), archonImportItem]} />
               {/if}
             </div>
 

@@ -554,6 +554,14 @@ export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToa
   return result;
 }
 
+/** Register a tournament with the VEKN calendar on demand (organizer action). */
+export async function syncTournamentVekn(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<Tournament> {
+  requireOnline(opts);
+  return apiRequest<Tournament>(`/api/tournaments/${uid}/push-vekn`, {
+    method: 'POST',
+  }, opts);
+}
+
 /**
  * Self check-in via QR code (server-only, no optimistic path).
  */
