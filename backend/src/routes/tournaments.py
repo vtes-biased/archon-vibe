@@ -86,6 +86,9 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         "DeleteDeck",
         "SetPaymentStatus",
         "MarkAllPaid",
+        # Proxy toggle: rating is recomputed only from FINISHED tournaments, and the
+        # engine blocks the toggle once finished — so it never changes a live rating.
+        "SetNonCompeting",
         "RaffleDraw",
         "RaffleUndo",
         "RaffleClear",
@@ -911,6 +914,7 @@ class TournamentActionRequest(BaseModel):
     comment: str | None = None  # For Override
     toss: int | None = None  # For SetToss
     status: str | None = None  # For SetPaymentStatus
+    non_competing: bool | None = None  # For SetNonCompeting (proxy toggle)
     seating: list[list[str]] | None = None  # For AlterSeating
     config: dict | None = None  # For UpdateConfig: partial config fields
     # Deck
@@ -969,6 +973,8 @@ async def tournament_action(
         event_data["toss"] = request.toss
     if request.status:
         event_data["status"] = request.status
+    if request.non_competing is not None:
+        event_data["non_competing"] = request.non_competing
     if request.seating:
         event_data["seating"] = request.seating
     if request.config is not None:

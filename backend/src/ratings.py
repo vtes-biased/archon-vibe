@@ -95,6 +95,14 @@ def _is_disqualified(t: Tournament, sanctions: list | None, user_uid: str) -> bo
     )
 
 
+def _is_non_competing(t: Tournament, user_uid: str) -> bool:
+    """A proxied (non-competing) player earns no rating from this tournament — a
+    non-competing official stood in for them. Unlike DQ the score is not zeroed, so
+    they must be skipped explicitly here (mirrors the engine's standings/finals
+    exclusion)."""
+    return any(p.user_uid == user_uid and p.non_competing for p in t.players)
+
+
 def _finalist_position(t: Tournament, user_uid: str) -> int:
     """0=none, 1=winner, 2=runner-up."""
     if t.winner == user_uid:
@@ -200,6 +208,8 @@ async def recompute_ratings_for_players(
                     sanctions_cache[t.uid] = await get_sanctions_for_tournament(t.uid)
                 if _is_disqualified(t, sanctions_cache[t.uid], user_uid):
                     continue  # DQ'd: no rating entry, no participation base
+                if _is_non_competing(t, user_uid):
+                    continue  # proxy: non-competing official stood in — no rating
                 entries.append(_compute_entry_sync(t, user_uid, sanctions_cache[t.uid]))
 
         entries.sort(key=lambda e: e.points, reverse=True)

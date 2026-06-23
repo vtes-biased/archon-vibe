@@ -14,6 +14,9 @@ export interface StandingEntry {
   finalist?: boolean;
   /** DQ'd: score forfeited (zeroed), sorted last, no competitive rank / RTP. */
   disqualified?: boolean;
+  /** Proxy: a non-competing official stood in. Excluded from rank/RTP/finals and
+   *  sorted last like DQ, but the score is NOT zeroed (the seat's VPs are real). */
+  non_competing?: boolean;
 }
 
 /** Player display info keyed by user uid (built from User records + per-tournament display_name). */
@@ -112,8 +115,8 @@ export function top5HasTies(standings: StandingEntry[]): boolean {
   const fifth = standings[4]!;
   for (let k = 5; k < standings.length; k++) {
     const s = standings[k]!;
-    // DQ'd rows are zeroed and parked last; they never tie for the finals cutoff.
-    if (!s.disqualified && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp && s.toss === fifth.toss) return true;
+    // DQ'd/proxy rows are parked last and never finals-eligible; they never tie for the cutoff.
+    if (!s.disqualified && !s.non_competing && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp && s.toss === fifth.toss) return true;
   }
   return false;
 }
@@ -130,7 +133,7 @@ export function top5HasScoreTies(standings: StandingEntry[]): boolean {
   const fifth = standings[4]!;
   for (let k = 5; k < standings.length; k++) {
     const s = standings[k]!;
-    if (!s.disqualified && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp) return true;
+    if (!s.disqualified && !s.non_competing && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp) return true;
   }
   return false;
 }
@@ -227,15 +230,31 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
   for (const s of tournament.standings ?? []) {
     if (s.disqualified) dqUids.add(s.user_uid);
   }
+  // Proxy (non-competing): excluded from rank like DQ, but the score is NOT zeroed
+  // (the seat's VPs are real). Same dual source as DQ: live player flag OR the
+  // engine-persisted standings flag (covers synced/imported tournaments).
+  const ncUids = new Set<string>(
+    tournament.players.filter(p => p.non_competing && p.user_uid).map(p => p.user_uid!)
+  );
+  for (const s of tournament.standings ?? []) {
+    if (s.non_competing) ncUids.add(s.user_uid);
+  }
   const prelimDq = prelim.map(e => {
     const disqualified = dqUids.has(e.user_uid);
-    return disqualified ? { ...e, gw: 0, vp: 0, tp: 0, disqualified } : { ...e, disqualified };
+    const non_competing = ncUids.has(e.user_uid);
+    return disqualified
+      ? { ...e, gw: 0, vp: 0, tp: 0, disqualified, non_competing }
+      : { ...e, disqualified, non_competing };
   });
 
-  // The engine assumes input pre-sorted descending by preliminary score, DQ last.
-  prelimDq.sort((a, b) =>
-    (a.disqualified === b.disqualified ? 0 : a.disqualified ? 1 : -1)
-    || b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss || a.user_uid.localeCompare(b.user_uid));
+  // The engine assumes input pre-sorted descending by preliminary score, with the
+  // non-ranked (DQ'd or proxy) parked last.
+  prelimDq.sort((a, b) => {
+    const aEx = a.disqualified || a.non_competing;
+    const bEx = b.disqualified || b.non_competing;
+    return (aEx === bEx ? 0 : aEx ? 1 : -1)
+      || b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss || a.user_uid.localeCompare(b.user_uid);
+  });
   const ranked = computeFinalStandings(prelimDq, winnerUid);
   if (!ranked.length) {
     // Engine not ready (load() awaits initEngine, so this is a safety net):
@@ -244,7 +263,7 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
   }
   return ranked.map(e => {
     const entry: StandingEntry = {
-      user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank, finalist: e.finalist, disqualified: e.disqualified,
+      user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank, finalist: e.finalist, disqualified: e.disqualified, non_competing: e.non_competing,
     };
     const fr = finalsResults?.get(e.user_uid);
     if (fr) entry.finals = formatScore(fr.gw, fr.vp, fr.tp);

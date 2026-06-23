@@ -70,6 +70,9 @@ Player states (terminal/near-terminal):
 - Finished   — withdrew / dropped / tournament over (not finals-eligible)
 - Disqualified — DQ sanction active
 
+Player flags:
+- non_competing — proxy player (§5.1.1): a non-competing official standing in for an absent player on a random stock deck. Seat plays normally; excluded from standings rank, rating, and finals. Score shown (not zeroed). Set/cleared by organizers via SetNonCompeting; blocked once finals are seeded or tournament Finished.
+
 Barriers to check-in:
 - Decklist required but not uploaded
 - Player banned by VEKN
@@ -129,7 +132,7 @@ After preliminary rounds, top 5 players qualify. Ranking order:
 3. Tournament Points (TP) — second tiebreaker
 4. Random (toss) — for remaining ties in top 5
 
-Organizers must drop unavailable finalists before launching finals. If a top-5 qualifier withdraws (state `Finished`), `StartFinals` excludes them and auto-promotes the next-ranked qualifier. `Completed` (capped) players remain finals-eligible and are not excluded.
+Organizers must drop unavailable finalists before launching finals. If a top-5 qualifier withdraws (state `Finished`), `StartFinals` excludes them and auto-promotes the next-ranked qualifier. `Completed` (capped) players remain finals-eligible and are not excluded. Non-competing (proxy) players are excluded from finals qualification entirely — they do not appear in the top-5 candidate pool.
 
 Published preliminary standings rank GW > VP > TP using competition ranking with skips (tied players share a place; the next place is skipped). The random toss resolves only a tie straddling the top-5 finals cutoff — it never re-orders tied players elsewhere in the standings.
 

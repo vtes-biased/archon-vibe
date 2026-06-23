@@ -47,6 +47,7 @@ pub enum EngineError {
     CannotDropOut,
     CannotFinish,
     CannotAlterSeating,
+    CannotSetNonCompeting,
     // Rounds / seating
     NoRoundInProgress,
     NoRoundToFinish,
@@ -137,6 +138,7 @@ impl EngineError {
             CannotDropOut => "tournament.cannot_drop_out",
             CannotFinish => "tournament.cannot_finish",
             CannotAlterSeating => "tournament.cannot_alter_seating",
+            CannotSetNonCompeting => "tournament.cannot_set_non_competing",
             NoRoundInProgress => "tournament.no_round_in_progress",
             NoRoundToFinish => "tournament.no_round_to_finish",
             NoRoundToCancel => "tournament.no_round_to_cancel",
@@ -264,6 +266,12 @@ impl fmt::Display for EngineError {
             CannotDropOut => write!(f, "Cannot drop out in this state"),
             CannotFinish => write!(f, "Cannot finish from this state"),
             CannotAlterSeating => write!(f, "Cannot alter seating in this state"),
+            CannotSetNonCompeting => {
+                write!(
+                    f,
+                    "Cannot change proxy status after finals or once the tournament is finished"
+                )
+            }
             NoRoundInProgress => write!(f, "No rounds in progress"),
             NoRoundToFinish => write!(f, "No rounds to finish"),
             NoRoundToCancel => write!(f, "No rounds to cancel"),

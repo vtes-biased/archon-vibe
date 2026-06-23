@@ -70,6 +70,11 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
             if uid.is_empty() {
                 continue;
             }
+            // Proxy (non-competing official stood in): not a league participant at all
+            // — exclude entirely (not just zero-scored, or they'd inflate tournaments_count).
+            if standing["non_competing"].as_bool().unwrap_or(false) {
+                continue;
+            }
             let gw = standing["gw"].as_f64().unwrap_or(0.0);
             let vp = standing["vp"].as_f64().unwrap_or(0.0);
             let tp = standing["tp"].as_i32().unwrap_or(0);

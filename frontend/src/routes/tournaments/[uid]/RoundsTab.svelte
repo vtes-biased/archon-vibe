@@ -46,6 +46,11 @@
     return map;
   });
 
+  // Proxy (non-competing) seats: read-only badge here; the toggle lives in PlayersTab.
+  const nonCompetingUids = $derived(
+    new Set((tournament.players ?? []).filter(p => p.non_competing && p.user_uid).map(p => p.user_uid!))
+  );
+
   let error = $state<string | null>(null);
   let showCancelConfirm = $state(false);
 
@@ -324,9 +329,12 @@
     const info = playerInfo[uid];
     if (!info) return esc(uid);
     const name = esc(info.nickname || info.name);
-    return info.vekn
+    const base = info.vekn
       ? `${name} <span style="color:#888;font-size:10pt">(${esc(info.vekn)})</span>`
       : name;
+    return nonCompetingUids.has(uid)
+      ? `${base} <span style="color:#888;font-size:9pt">(${esc(m.proxy_label())})</span>`
+      : base;
   }
 
   function printRound(r: number) {
@@ -644,6 +652,9 @@
                       <div class="flex items-center justify-between gap-2 text-sm">
                         <span class="text-ink inline-flex items-center gap-1 min-w-0">
                           {seatDisplay(seat.player_uid)}
+                          {#if nonCompetingUids.has(seat.player_uid)}
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-active text-ink-muted shrink-0" title={m.proxy_hint()}>{m.proxy_label()}</span>
+                          {/if}
                           {#if playerSanctionsMap[seat.player_uid]?.length}
                             <SanctionIndicator
                               sanctions={playerSanctionsMap[seat.player_uid]!}

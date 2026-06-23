@@ -706,6 +706,62 @@ fn test_dq_player_zeroed_and_sorted_last_opponents_unaffected() {
 }
 
 #[test]
+fn test_proxy_kept_not_zeroed_sorted_last_opponents_and_rating_unaffected() {
+    // p2 is a proxy (non_competing: a non-competing official stood in). The KEY
+    // divergence from DQ: p2 keeps its own gw/vp/tp (NOT zeroed) yet sorts last
+    // and earns no rating. Opponents keep what they scored against the seat.
+    // Guards the shared DQ/proxy path against a refactor that starts zeroing the
+    // proxy score or stops excluding it from rank/rating.
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+        ],
+    }]];
+    tournament["players"] = json::array![
+        { user_uid: "p1", toss: 0 },
+        { user_uid: "p2", toss: 0, non_competing: true },
+        { user_uid: "p3", toss: 0 },
+        { user_uid: "p4", toss: 0 },
+    ];
+    let empty = json::array![];
+    let standings = super::standings::compute_preliminary_standings(&tournament, &empty);
+    let p2 = standings.iter().find(|s| s.user_uid == "p2").unwrap();
+    assert!(p2.non_competing);
+    assert_eq!(
+        (p2.gw, p2.vp, p2.tp),
+        (0.0, 1.0, 48.0),
+        "proxy KEEPS its score (unlike DQ which zeroes)"
+    );
+    assert_eq!(
+        standings.last().unwrap().user_uid,
+        "p2",
+        "proxy sorts last despite a non-zero score"
+    );
+
+    let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
+    assert_eq!(
+        (p1.gw, p1.vp),
+        (1.0, 2.0),
+        "opponent keeps GW + VP earned vs the proxy seat"
+    );
+
+    // Rating: proxy earns nothing; opponent unchanged.
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &empty, "p2"),
+        (0.0, 0.0),
+        "proxy earns no rating"
+    );
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &empty, "p1"),
+        (2.0, 1.0)
+    );
+}
+
+#[test]
 fn test_rating_vp_gw_includes_finals_and_full_sa() {
     // Rating recomputes prelim GW from raw VPs + sanctions and adds the stored
     // finals GW. p1: round0 2.5VP (table-high -> GW), round1 0VP with an SA (-1, so

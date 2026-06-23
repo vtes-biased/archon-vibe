@@ -78,6 +78,7 @@ Events are processed by the Rust engine. Each event includes:
 | `ResetCheckIn` | - | All checked-in → registered |
 | `SetPaymentStatus` | `player_uid`, `payment_status` | Toggle payment status (Pending/Paid/Refunded/Cancelled) |
 | `MarkAllPaid` | - | Set all registered players to Paid |
+| `SetNonCompeting` | `player_uid`, `non_competing` | Toggle proxy (non-competing) status; blocked once finals are seeded or tournament is Finished |
 
 #### Rounds & Seating
 
@@ -229,6 +230,16 @@ DQ signal: `player.state == "Disqualified"` OR an active `disqualification` sanc
 - **Rating**: DQ'd players earn **no rating points** — not the 5-point participation base, no finalist bonus, no rating-history entry for that tournament. `backend/src/ratings.py` skips them entirely.
 - **Player count**: DQ'd players are **included** in `player_count` for the rating coefficient (tournament-rules A.2: counts as long as they played ≥ 1 round).
 
+### Proxy (Non-Competing) and Standings
+
+Proxy signal: `player.non_competing == true` (judges-guide §5.1.1).
+
+- **Standings row**: proxy players appear sorted last (alongside DQ'd entries), neutral badge (not crimson), rank "—". Their VP/GW/TP are **kept** (not zeroed) — the real scores matter for oust-order validation and opponents' totals.
+- **Rating**: proxy players earn **no rating points** — same early-return guard as DQ in `compute_rating_vp_gw`.
+- **Finals**: excluded from finals qualification candidates and the top-5 / tie logic.
+- **Seat behavior**: the seat plays normally; opponents score VPs against it and it participates in oust-order validation. Scoring flow is unchanged.
+- **Comparison with DQ**: same rank-exclusion pattern, but score is shown (not zeroed) and the badge is neutral (not punitive).
+
 ## Data Model
 
 Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentConfig`, `Player`, `Table`, `Seat`, `Score`) and `backend/src/models.py`. Non-obvious structure:
@@ -236,10 +247,11 @@ Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentC
 - `rounds: Table[][]` — outer index = round, inner = tables in that round; `finals` is a separate field (not a round).
 - `Table` carries `seating: Seat[]`, a derived `state` (`In Progress`/`Finished`/`Invalid`), and an optional `override`.
 - `Score = {gw, vp, tp}` per seat — only `vp` is user-submitted; `gw`/`tp` are engine-computed.
-- Player `state` (`Registered`/`Checked-in`/`Playing`/`Finished`/`Completed`/`Disqualified`) and `payment_status` (`Pending`/`Paid`/`Refunded`/`Cancelled`); `toss` for finals tie-breaking.
+- Player `state` (`Registered`/`Checked-in`/`Playing`/`Finished`/`Completed`/`Disqualified`) and `payment_status` (`Pending`/`Paid`/`Refunded`/`Cancelled`); `toss` for finals tie-breaking; `non_competing` (boolean, default false).
   - `Completed` — reached per-player `max_rounds` cap (Open Rounds only); done with prelims, **finals-eligible**; check-in is refused.
   - `Finished` — withdrew/dropped/tournament-over; **not** finals-eligible.
   - `Disqualified` — DQ sanction active; not finals-eligible.
+  - `non_competing` — proxy player (judges-guide §5.1.1): a non-competing official standing in for an absent player on a random deck from the officials' stock. Their seat plays normally (VPs count for oust-order and opponents); they are excluded from standings rank, rating, and finals. Score is shown but not zeroed (unlike DQ). Field name avoids collision with `Tournament.proxies` (proxy-cards-allowed). Mirrored onto `StandingEntry` for badge/rank logic. Cannot be toggled once finals are seeded or the tournament is Finished.
 
 ## API Endpoints
 
@@ -304,6 +316,7 @@ Actions are validated by the Rust engine:
 | Override/Unoverride | Organizers (Waiting/Playing/Finished) |
 | Seating edits (Swap, Alter, Seat, Unseat, AddTable, RemoveTable) | Organizers |
 | Set Toss / Random Toss | Organizers |
+| Set Non-Competing (Proxy) | Organizers |
 | Start/Finish Finals | Organizers |
 | Finish/Reopen Tournament | Organizers |
 | Payment Status | Organizers |

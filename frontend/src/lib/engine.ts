@@ -107,6 +107,7 @@ export type TournamentEventType =
   | 'ResetCheckIn'
   | 'SetPaymentStatus'
   | 'MarkAllPaid'
+  | 'SetNonCompeting'
   | 'StartRound'
   | 'FinishRound'
   | 'CancelRound'
@@ -149,6 +150,7 @@ export interface TournamentEvent {
   comment?: string;
   toss?: number;
   status?: string;
+  non_competing?: boolean;
   seating?: string[][];
   vekn_id?: string;
   deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
@@ -509,9 +511,9 @@ export async function computeLeagueStandings(
  * "did a final happen?" is read from the `finalist` flags.
  */
 export function computeFinalStandings(
-  standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean; disqualified?: boolean }>,
+  standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean; disqualified?: boolean; non_competing?: boolean }>,
   winner: string
-): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number; disqualified?: boolean }> {
+): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number; disqualified?: boolean; non_competing?: boolean }> {
   const engine = getEngineReactive();
   if (!engine) return [];
   const resultJson = callEngine(() => engine.computeFinalStandings(JSON.stringify({ standings, winner })));

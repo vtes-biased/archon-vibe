@@ -149,6 +149,12 @@ pub enum TournamentEvent {
     },
     MarkAllPaid,
 
+    // Proxy (non-competing official standing in for a player; UI label "Proxy")
+    SetNonCompeting {
+        player_uid: String,
+        non_competing: bool,
+    },
+
     // Round management
     StartRound {
         seating: Option<Vec<Vec<String>>>,

@@ -314,6 +314,7 @@ fn apply_event(
                 toss: 0,
                 result: { gw: 0, vp: 0.0, tp: 0 },
                 finalist: false,
+                non_competing: false,
             };
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
@@ -384,6 +385,7 @@ fn apply_event(
                 toss: 0,
                 result: { gw: 0, vp: 0.0, tp: 0 },
                 finalist: false,
+                non_competing: false,
             };
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
@@ -479,6 +481,7 @@ fn apply_event(
                         toss: 0,
                         result: { gw: 0, vp: 0.0, tp: 0 },
                         finalist: false,
+                        non_competing: false,
                     };
                     if let Some(dn) = display_name {
                         if !dn.is_empty() {
@@ -621,6 +624,26 @@ fn apply_event(
             let idx = find_player_index(&tournament["players"], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
             tournament["players"][idx]["payment_status"] = status.as_str().into();
+            Ok(())
+        }
+
+        TournamentEvent::SetNonCompeting {
+            player_uid,
+            non_competing,
+        } => {
+            require_organizer(actor)?;
+            // Proxy (non-competing) status is settled once the event is decided:
+            // block after finals are seeded or the tournament is finished, so a
+            // proxied↔competing flip can't rewrite a concluded result. Standings are
+            // recomputed below, so toggling mid-prelim is safe — and is the use case
+            // (a no-show stood in for by an official partway through).
+            if !tournament["finals"].is_null() || state == TournamentState::Finished {
+                return Err(EngineError::CannotSetNonCompeting);
+            }
+            let idx = find_player_index(&tournament["players"], player_uid)
+                .ok_or(EngineError::PlayerNotFound)?;
+            tournament["players"][idx]["non_competing"] = (*non_competing).into();
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1679,8 +1702,9 @@ fn apply_event(
                     let ps = player.and_then(|p| p["state"].as_str()).unwrap_or("");
                     // `disqualified` carries the dual DQ signal (state OR active DQ
                     // sanction) the standings already resolved — use it so finals
-                    // eligibility can't diverge from who got zeroed.
-                    !s.disqualified && ps != "Finished"
+                    // eligibility can't diverge from who got zeroed. Proxies
+                    // (non_competing) are non-competitors: never finals-eligible.
+                    !s.disqualified && !s.non_competing && ps != "Finished"
                 })
                 .collect();
 

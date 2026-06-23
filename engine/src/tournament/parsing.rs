@@ -78,6 +78,19 @@ impl TournamentEvent {
                 Ok(Self::SetPaymentStatus { player_uid, status })
             }
             "MarkAllPaid" => Ok(Self::MarkAllPaid),
+            "SetNonCompeting" => {
+                let player_uid = value["player_uid"]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string();
+                let non_competing = value["non_competing"]
+                    .as_bool()
+                    .ok_or("non_competing required")?;
+                Ok(Self::SetNonCompeting {
+                    player_uid,
+                    non_competing,
+                })
+            }
             "StartRound" => {
                 let seating = if value["seating"].is_null() || !value["seating"].is_array() {
                     None

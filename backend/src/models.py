@@ -494,6 +494,9 @@ class Player(msgspec.Struct, kw_only=True):
     )  # aggregated score (used when no round detail, e.g. VEKN sync)
     finalist: bool = False  # true if player reached the finals table
     display_name: str | None = None  # Discord guild nickname (per-tournament)
+    non_competing: bool = (
+        False  # proxy: non-competing official stood in; excluded from rank/RTP/finals
+    )
 
 
 class Seat(msgspec.Struct, kw_only=True):
@@ -560,6 +563,9 @@ class Standing(msgspec.Struct, kw_only=True, frozen=True):
     toss: int = 0
     finalist: bool = False
     disqualified: bool = False  # forfeited score (zeroed), sorted last, no RTP
+    non_competing: bool = (
+        False  # proxy: excluded from rank/RTP/finals, score NOT zeroed
+    )
 
 
 class RafflePool(StrEnum):

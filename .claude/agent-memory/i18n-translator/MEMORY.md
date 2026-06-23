@@ -46,6 +46,9 @@
 | library | Bibliothèque | biblioteca | biblioteca | biblioteca |
 | clock stop | Arrêt d'horloge | parar reloj / parada de reloj | parar relógio / parada de relógio | ferma orologio / arresto orologio |
 | developer portal | Portail développeur | Portal de desarrollador | Portal do desenvolvedor | Portale sviluppatore |
+| proxy (player) | Proxy | Proxy | Proxy | Proxy |
+| random (deck label) | Aléatoire | Aleatorio | Aleatório | Casuale |
+| drop player (organiser action) | Retirer le joueur | Retirar jugador | Retirar jogador | Ritira giocatore |
 
 \* it keeps English loanword (round, not "turno"; override, not translated).
 † finals it: "Finali" (plural) for section headings, "finale" (singular) for time-config labels.

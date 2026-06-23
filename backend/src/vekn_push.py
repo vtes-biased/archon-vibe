@@ -89,6 +89,11 @@ def generate_archondata(
         user = users_by_uid.get(standing.user_uid)
         if not user:
             continue
+        # Proxy (non-competing official stood in): not a real competitor — never push
+        # to VEKN (the system of record). They sort last in standings, so skipping
+        # them doesn't disturb the leading competitors' rank_idx.
+        if standing.non_competing:
+            continue
 
         # Split name into first/last
         name_parts = (user.name or "").split(maxsplit=1)

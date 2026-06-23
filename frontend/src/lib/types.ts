@@ -278,6 +278,7 @@ export interface Player {
   result: Score;
   finalist: boolean;
   display_name?: string | null; // Discord guild nickname (per-tournament)
+  non_competing?: boolean; // proxy: non-competing official stood in; excluded from rank/RTP/finals
 }
 
 export interface Standing {
@@ -288,6 +289,7 @@ export interface Standing {
   toss: number;
   finalist: boolean;
   disqualified?: boolean;
+  non_competing?: boolean;
 }
 
 export type RafflePool = "AllPlayers" | "NonFinalists" | "GameWinners" | "NoGameWin" | "NoVictoryPoint";

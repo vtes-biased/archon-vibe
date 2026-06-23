@@ -302,6 +302,33 @@ def test_archondata_skips_missing_users(mock_compute):
 
 
 @patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+def test_archondata_skips_non_competing(mock_compute):
+    """A proxy (non_competing) is a non-competing official stood in — never pushed to
+    VEKN as a competitor, even though their seat scored real (non-zeroed) VPs."""
+    users = {
+        "u1": _user("u1", "Alice Smith", "1000001"),
+        "u2": _user("u2", "Proxy Official", "1000002"),
+    }
+    standings = [
+        Standing(user_uid="u1", gw=2.0, vp=8.0, tp=60),
+        Standing(user_uid="u2", gw=0.0, vp=1.0, tp=48, non_competing=True),
+    ]
+    rounds = [
+        [
+            Table(
+                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
+                state=TableState.FINISHED,
+            )
+        ]
+    ]
+    t = _make_tournament(rounds=rounds, standings=standings)
+    result = generate_archondata(t, users)
+
+    assert "1000001" in result  # real competitor pushed
+    assert "1000002" not in result  # proxy excluded from the system of record
+
+
+@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
 def test_archondata_single_name_user(mock_compute):
     """User with a single-word name should have empty last name."""
     users = {"u1": _user("u1", "Madonna", "1000001")}
