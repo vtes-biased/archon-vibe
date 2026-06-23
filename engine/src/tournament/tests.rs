@@ -666,22 +666,43 @@ fn test_dq_player_zeroed_and_sorted_last_opponents_unaffected() {
     let empty = json::array![];
     let standings = super::standings::compute_preliminary_standings(&tournament, &empty);
     let p2 = standings.iter().find(|s| s.user_uid == "p2").unwrap();
-    assert_eq!((p2.gw, p2.vp, p2.tp), (0.0, 0.0, 0.0), "DQ'd player forfeits score");
+    assert_eq!(
+        (p2.gw, p2.vp, p2.tp),
+        (0.0, 0.0, 0.0),
+        "DQ'd player forfeits score"
+    );
     assert!(p2.disqualified);
-    assert_eq!(standings.last().unwrap().user_uid, "p2", "DQ'd player sorts last");
+    assert_eq!(
+        standings.last().unwrap().user_uid,
+        "p2",
+        "DQ'd player sorts last"
+    );
 
     let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
-    assert_eq!((p1.gw, p1.vp), (1.0, 2.0), "opponent keeps GW + VP earned vs the DQ'd seat");
+    assert_eq!(
+        (p1.gw, p1.vp),
+        (1.0, 2.0),
+        "opponent keeps GW + VP earned vs the DQ'd seat"
+    );
 
     // Rating VP/GW: zero for the DQ'd player, unchanged for the opponent.
-    assert_eq!(super::compute_rating_vp_gw(&tournament, &empty, "p2"), (0.0, 0.0));
-    assert_eq!(super::compute_rating_vp_gw(&tournament, &empty, "p1"), (2.0, 1.0));
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &empty, "p2"),
+        (0.0, 0.0)
+    );
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &empty, "p1"),
+        (2.0, 1.0)
+    );
 
     // An active DQ *sanction* alone (no player state) is also honored.
     let sanctions = json::array![
         { user_uid: "p1", level: "disqualification", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
     ];
-    assert_eq!(super::compute_rating_vp_gw(&tournament, &sanctions, "p1"), (0.0, 0.0));
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &sanctions, "p1"),
+        (0.0, 0.0)
+    );
 }
 
 #[test]
@@ -855,8 +876,14 @@ fn test_rating_vp_gw_sa_never_lands_on_finals() {
         { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
     ];
     let (vp, gw) = super::compute_rating_vp_gw(&tournament, &sanctions, "p1");
-    assert_eq!(vp, 4.0, "prelim 2.0 + finals 3.0 - 1.0 SA (redirected to prelim)");
-    assert_eq!(gw, 1.0, "round 0 GW removed by SA; finals GW (stored) intact");
+    assert_eq!(
+        vp, 4.0,
+        "prelim 2.0 + finals 3.0 - 1.0 SA (redirected to prelim)"
+    );
+    assert_eq!(
+        gw, 1.0,
+        "round 0 GW removed by SA; finals GW (stored) intact"
+    );
 }
 
 #[test]

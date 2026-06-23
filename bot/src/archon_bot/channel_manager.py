@@ -253,7 +253,9 @@ async def create_round_voice_channel(
         ),
     ]
     me = bot.get_me()
-    if me is not None:  # win back CONNECT for the bot over the @everyone deny (BOT_ALLOW)
+    if (
+        me is not None
+    ):  # win back CONNECT for the bot over the @everyone deny (BOT_ALLOW)
         overwrites.append(
             hikari.PermissionOverwrite(
                 id=me.id,

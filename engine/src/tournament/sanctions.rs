@@ -46,9 +46,11 @@ pub(super) fn resolve_sa_effective_rounds(
     let rounds = &tournament["rounds"];
     let nrounds = rounds.len();
     let seated_in = |uid: &str, r: usize| -> bool {
-        rounds[r]
-            .members()
-            .any(|table| table["seating"].members().any(|s| s["player_uid"].as_str() == Some(uid)))
+        rounds[r].members().any(|table| {
+            table["seating"]
+                .members()
+                .any(|s| s["player_uid"].as_str() == Some(uid))
+        })
     };
     let mut out = Vec::new();
     for (uid, stored) in get_sa_sanctions(sanctions) {

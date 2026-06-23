@@ -2,7 +2,9 @@
 
 use json::JsonValue;
 
-use super::sanctions::{has_dq_sanction, resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments};
+use super::sanctions::{
+    has_dq_sanction, resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments,
+};
 use super::scoring::{compute_gw, compute_tp};
 
 /// Player standing: (user_uid, gw, vp, tp, toss, finalist, disqualified)
@@ -89,7 +91,11 @@ pub(super) fn compute_preliminary_standings(
             // GW/TP the opponents earned already stand.
             let disqualified = player.and_then(|p| p["state"].as_str()) == Some("Disqualified")
                 || has_dq_sanction(sanctions, &uid);
-            let (gw, vp, tp) = if disqualified { (0.0, 0.0, 0.0) } else { (gw, vp, tp) };
+            let (gw, vp, tp) = if disqualified {
+                (0.0, 0.0, 0.0)
+            } else {
+                (gw, vp, tp)
+            };
             Standing {
                 user_uid: uid,
                 gw,
@@ -239,10 +245,9 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     // DQ'd players have no competitive place: append them last with ranks that
     // continue past every non-DQ rank, so any rank-keyed sort keeps them at the
     // bottom. The number is never shown — the UI renders DQ rows as "—" + badge.
-    let mut dq_rank = finalist_count + non_finalists.len() + 1;
-    for s in &disqualified {
-        out.push(with_rank(s, dq_rank));
-        dq_rank += 1;
+    let dq_start = finalist_count + non_finalists.len() + 1;
+    for (i, s) in disqualified.iter().enumerate() {
+        out.push(with_rank(s, dq_start + i));
     }
     out
 }
@@ -265,10 +270,9 @@ pub fn compute_rating_vp_gw(
 ) -> (f64, f64) {
     // DQ'd players earn no rating: forfeit their rating VP/GW too (the participation
     // base + finalist bonus are suppressed upstream in the rating-entry builder).
-    let disqualified = tournament["players"]
-        .members()
-        .any(|p| p["user_uid"].as_str() == Some(user_uid) && p["state"].as_str() == Some("Disqualified"))
-        || has_dq_sanction(sanctions, user_uid);
+    let disqualified = tournament["players"].members().any(|p| {
+        p["user_uid"].as_str() == Some(user_uid) && p["state"].as_str() == Some("Disqualified")
+    }) || has_dq_sanction(sanctions, user_uid);
     if disqualified {
         return (0.0, 0.0);
     }
