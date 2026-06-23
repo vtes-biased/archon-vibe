@@ -1084,6 +1084,7 @@
   "community_go_to_profile": "Aller au profil",
   "community_login_prompt": "Connectez-vous pour voir votre communauté locale et les officiels.",
   "community_sign_in": "Se connecter",
+  "members_login_prompt": "Connectez-vous pour parcourir l'annuaire des membres.",
   "community_your_country": "Votre pays",
   "community_no_officials": "Aucun officiel trouvé",
   "community_no_officials_hint": "Les officiels apparaîtront ici une fois les données synchronisées.",

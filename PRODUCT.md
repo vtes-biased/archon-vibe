@@ -259,6 +259,25 @@ attendee is not expected to crack open IndexedDB to influence standings). Making
 display defaults a real boundary would require a per-player overlay — more complexity than
 the risk warrants. Treat the matrix as UI defaults, not a security guarantee.
 
+### Anonymous (not-logged-in) Display Gates
+
+A further frontend display layer gates on `getAuthState().isAuthenticated`. Not-logged-in
+visitors see a reduced UI — these are **frontend-only gates, not backend access-control
+boundaries**. The `public` projection is unchanged: officials' contact info (contact_email /
+contact_phone, base64-obfuscated via `_obfuscate_public_contacts`) still flows over SSE and
+into IndexedDB for anonymous viewers. Officials are meant to be reasonably contactable so
+newcomers can join the association; the obfuscation is a harvest speed-bump, not access
+control. Do not "fix" this by stripping the public projection — that reverses a deliberate
+decision.
+
+| Surface | Logged-out display | Backend data on wire? |
+|---------|--------------------|-----------------------|
+| Community tab — Officials Directory | Hidden | Yes (public projection) |
+| Members tab / UserList | Replaced by sign-in prompt | Partial — officials + link-holders only; full roster is member-level |
+| Tournament list | Current + upcoming only (`state !== 'Finished'`) | Yes (full list in IndexedDB) |
+| League list | Active only (`showPast=false`, toggle hidden) | Yes (full list in IndexedDB) |
+| Finished tournament detail (`/tournaments/{uid}`) | Accessible (direct link / og:image crawl) | Yes |
+
 ## 5. Feature Map
 
 A compact map of what exists; implementation detail lives in code and the docs in §9. **Outstanding/planned work is tracked in pst tickets, not here** — that previously included the Discord tournament bot, tournament audit logs, Draft/Limited pod support, multi-day events, auto-close, deck statistics, and spectator mode.

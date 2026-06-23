@@ -165,6 +165,11 @@
       });
   });
 
+  // Officials directory carries contact info — gate it behind sign-in so it isn't
+  // shown directly to logged-out visitors (the public projection still ships the
+  // data; this is a display gate, see .pst/details/307-anonymous-access-tiering.md).
+  const showOfficials = $derived(auth.isAuthenticated && officialGroups.length > 0);
+
   let expandedOfficialCountries = $state<Set<string>>(new Set());
 
   async function loadData() {
@@ -317,8 +322,8 @@
     </div>
   {/if}
 
-  <!-- Officials Directory -->
-  {#if officialGroups.length > 0}
+  <!-- Officials Directory (signed-in only) -->
+  {#if showOfficials}
     <div>
       <div class="flex items-center gap-2 mb-3">
         <Users class="w-5 h-5 text-accent" />
@@ -402,8 +407,9 @@
     </div>
   {/if}
 
-  <!-- Empty state -->
-  {#if socialGroups.length === 0 && contentItems.length === 0 && officialGroups.length === 0 && globalLinks.length === 0}
+  <!-- Empty state — only for signed-in users; anonymous already sees the sign-in
+       banner above, so the officials-flavored empty copy would be misleading. -->
+  {#if auth.isAuthenticated && socialGroups.length === 0 && contentItems.length === 0 && !showOfficials && globalLinks.length === 0}
     <div class="text-center py-12">
       <Users class="mx-auto h-12 w-12 text-ink-faint mb-4" />
       <h3 class="text-lg font-medium text-ink-strong mb-2">{m.community_no_officials()}</h3>

@@ -8,9 +8,14 @@ Three access levels determine what data each SSE viewer receives:
 
 | Level | Viewer | Description |
 |-------|--------|-------------|
-| `public` | No token or no vekn_id | Only Prince/NC users (with contact info), minimal tournaments, no sanctions |
+| `public` | No token or no vekn_id | Only Prince/NC users (with contact info, base64-obfuscated), minimal tournaments, no sanctions |
 | `member` | Has vekn_id | All users (no contact info), all sanctions, tournaments with standings/filtered decks |
 | `full` | IC, NC/Prince (same country), organizer | Everything including rounds, finals, checkin_code |
+
+Note: a second, frontend-only display gate (`getAuthState().isAuthenticated`) further
+reduces what not-logged-in visitors *see* in the UI (officials directory, members list,
+past events) — but the `public` projection on the wire is unchanged. See PRODUCT.md
+§4 "Anonymous (not-logged-in) Display Gates" for the full table and rationale.
 
 ## Backend Streaming
 

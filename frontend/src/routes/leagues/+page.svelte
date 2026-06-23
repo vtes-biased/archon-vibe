@@ -3,7 +3,7 @@
   import { getAllLeagues } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { hasAnyRole } from "$lib/stores/auth.svelte";
+  import { hasAnyRole, getAuthState } from "$lib/stores/auth.svelte";
   import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
   import { Loader2, BarChart3 } from "@lucide/svelte";
@@ -21,6 +21,10 @@
 
   const countries = getCountries();
   const canCreate = $derived(hasAnyRole("IC", "NC"));
+  const auth = $derived(getAuthState());
+  // Logged-out viewers never see past leagues; the toggle is hidden for them, so a
+  // stale showPast=true (toggled on before logout) must not leak through filter or copy.
+  const effectiveShowPast = $derived(showPast && auth.isAuthenticated);
 
   function standingsModeLabel(mode: LeagueStandingsMode): string {
     switch (mode) {
@@ -63,8 +67,8 @@
       metaLeagueNames = metaMap;
       // Exclude soft-deleted
       all = all.filter(l => !l.deleted_at);
-      // Filter past
-      if (!showPast) {
+      // Filter past — logged-out viewers always see active leagues only.
+      if (!effectiveShowPast) {
         all = all.filter(l => isActive(l));
       }
       // Filter by country
@@ -93,6 +97,7 @@
     const _s = searchQuery;
     const _c = selectedCountry;
     const _p = showPast;
+    const _a = auth.isAuthenticated;
     untrack(() => loadLeagues());
   });
 
@@ -158,16 +163,18 @@
           </select>
         </div>
 
-        <!-- Show past -->
-        <div class="flex items-center gap-3 pb-1">
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" bind:checked={showPast} class="sr-only peer" />
-            <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
-              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={showPast}></div>
-            </div>
-            <span class="text-sm text-ink">{m.league_show_past()}</span>
-          </label>
-        </div>
+        <!-- Show past (signed-in only; logged-out sees active leagues only) -->
+        {#if auth.isAuthenticated}
+          <div class="flex items-center gap-3 pb-1">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" bind:checked={showPast} class="sr-only peer" />
+              <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
+                <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={showPast}></div>
+              </div>
+              <span class="text-sm text-ink">{m.league_show_past()}</span>
+            </label>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -273,7 +280,7 @@
         <p class="text-ink-muted">
           {#if searchQuery.trim() || selectedCountry !== "all"}
             {m.league_adjust_filters()}
-          {:else if !showPast}
+          {:else if !effectiveShowPast}
             {m.league_no_active()}
           {:else}
             {m.league_none_yet()}

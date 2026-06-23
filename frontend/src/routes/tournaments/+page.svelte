@@ -110,6 +110,8 @@
             country: selectedCountry,
             format: selectedFormat,
             search: searchQuery,
+            // Logged-out visitors see current + upcoming only, not past events.
+            excludePast: !auth.isAuthenticated,
           },
           page,
           PAGE_SIZE,
@@ -149,6 +151,7 @@
     const _io = includeOnline;
     const _vm = viewMode;
     const _p = page;
+    const _a = auth.isAuthenticated;
     untrack(() => loadTournaments());
   });
 

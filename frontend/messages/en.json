@@ -1084,6 +1084,7 @@
   "community_go_to_profile": "Go to Profile",
   "community_login_prompt": "Sign in to see your local community and officials.",
   "community_sign_in": "Sign in",
+  "members_login_prompt": "Sign in to browse the members directory.",
   "community_your_country": "Your country",
   "community_no_officials": "No officials found",
   "community_no_officials_hint": "Officials will appear here once data is synced.",

@@ -84,6 +84,7 @@
 
 ## Authorization (cross-stack)
 - Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).
+- [Projection tier: column vs content split](projection-tier-column-vs-content-split.md) — new precomputed access column ONLY when projection CONTENT must vary by viewer at the same level (else collapse onto existing column + shrink lower one); base64 contact obfuscation is a harvester speed-bump, not access control.
 
 ## Error handling (cross-stack)
 - [Error-codes contract](error-codes-contract.md) — `EngineError` enum = single error taxonomy; `{code,params,message}` wire JSON across WASM/PyO3/HTTP; domain rejection MUST be an explicit variant (From-impls silently demote to internal); EngineRejection-in-transaction is sound FastAPI.

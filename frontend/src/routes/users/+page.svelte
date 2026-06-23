@@ -2,7 +2,10 @@
   import { page } from '$app/stores';
   import UserList from '$lib/components/UserList.svelte';
   import CommunityTab from '$lib/components/CommunityTab.svelte';
+  import { getAuthState } from '$lib/stores/auth.svelte';
   import * as m from '$lib/paraglide/messages.js';
+
+  const auth = $derived(getAuthState());
 
   // Read tab from URL query param
   const urlTab = $derived($page.url.searchParams.get('tab'));
@@ -40,8 +43,14 @@
 
     {#if activeTab === 'community'}
       <CommunityTab />
-    {:else}
+    {:else if auth.isAuthenticated}
       <UserList />
+    {:else}
+      <!-- Members directory is sign-in gated; show an inviting prompt, not the list. -->
+      <div class="p-4 rounded-lg bg-surface-muted border border-line-strong text-sm text-ink">
+        {m.members_login_prompt()}
+        <a href="/login" class="underline text-link hover:text-link-soft ml-1">{m.community_sign_in()}</a>
+      </div>
     {/if}
   </div>
 </div>

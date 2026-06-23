@@ -33,7 +33,31 @@ the wire / in IDB). The projection itself must shrink for anonymous.
   directory, local community, contacts.
 - **VEKN member**: unchanged member projection.
 
-## Open design decisions (product-manager + principal-engineer)
+## RESOLUTION (owner decision, 2026-06)
+
+Backend tiering is **NOT** done. The `public` projection stays exactly as-is — officials'
+contact info remaining reachable on the wire/IndexedDB is acceptable: officials are *meant*
+to be reasonably contactable (to help newcomers join the association), so this is a
+reasonable-privacy matter, not a security boundary. The "data is one IndexedDB query away"
+caveat is understood and accepted (it isn't *immediately* visible to a non-technical
+visitor, which is the bar we're setting).
+
+Scope is therefore **frontend-only**, gating on `getAuthState().isAuthenticated`:
+
+- **#308 backend access model — WON'T DO** (closed). Keep 3 levels (`public`/`member`/`full`);
+  no 4th tier, no projection shrink, no `entitled_level` change.
+- **#309 Community tab** — logged-out: hide the **Officials Directory** section; keep the
+  community (social) + content link sections (those are the fully-public links).
+- **#310 Members tab** — logged-out: hide the Members tab + `UserList`; show an explicit
+  sign-in prompt instead.
+- **#311 Tournaments & leagues lists** — logged-out: **current + upcoming only, not past**.
+  Tournaments exclude `state === 'Finished'`; leagues force `showPast=false` + hide the
+  toggle (`isActive` already filters by `finish`). Direct links to a finished tournament
+  still resolve (the list filter doesn't touch `/tournaments/{uid}`), so shared links /
+  og:image crawling are unaffected. No member-sourced PII in either list today (tournament
+  rows show name/date/country/format/state/league — no organizer name), so no field-strip.
+
+## Superseded design decisions (kept for context — resolution above overrides)
 
 1. **Tier shape.** Either:
    - (A) introduce a 4th projection level "authenticated" between `public` and `member`

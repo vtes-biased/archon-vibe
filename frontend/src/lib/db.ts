@@ -638,6 +638,7 @@ export async function getFilteredTournaments(
     country?: string;
     format?: string;
     search?: string;
+    excludePast?: boolean;
   },
   page = 0,
   pageSize = 50,
@@ -657,6 +658,10 @@ export async function getFilteredTournaments(
   // Apply filters in JS
   if (filters.ongoing) {
     items = items.filter(t => ONGOING_STATES.has(t.state));
+  }
+  // Logged-out viewers see current + upcoming only (no finished/past events).
+  if (filters.excludePast) {
+    items = items.filter(t => t.state !== 'Finished');
   }
   if (filters.country && filters.country !== 'all') {
     items = items.filter(t => t.country === filters.country);
