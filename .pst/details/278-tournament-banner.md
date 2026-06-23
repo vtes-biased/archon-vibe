@@ -2,8 +2,9 @@
 
 > **Status:** Phase 1 shipped (upload + 1.91:1 cropper + in-app masthead hero +
 > versioned `banner_path` at public level + the avatar-consistency versioned-URL
-> fix). **Phase 2 (server-rendered `og:image`) split out to ticket #286** — its
-> design notes (Option A/B, nginx UA-split, gotchas) stay below as the reference.
+> fix). **Phase 2 shipped (#286)** — nginx UA-split + FastAPI OG stub +
+> `og.py` render + `app.html` site-wide og tags + safe-zone overlay in the cropper.
+> Design notes (Option A/B, nginx UA-split, gotchas) stay below as the reference.
 
 Let organizers upload one image per tournament. It serves **two** jobs from a
 single asset:
@@ -57,7 +58,7 @@ access projections; banner is presumably `public`-level so it shows pre-login)
 → organizer upload UI with 1.91:1 cropper → render hero on the tournament page.
 No architecture changes needed.
 
-## Phase 2 — banner as `og:image` (BLOCKED — needs server-rendered meta)
+## Phase 2 — banner as `og:image` (shipped #286 — Option B: nginx UA-split)
 
 The hard part, and the reason this isn't trivial:
 
@@ -101,11 +102,9 @@ Hard constraints this imposes on the Phase-2 / asset design:
 - **WebP is accepted** by WhatsApp/Discord/Facebook/Reddit link previews (2026),
   so the cropper's WebP output is fine for the og use too.
 
-**Cropper guidance to add when the og use lands (Phase 2, not Phase 1):** a
-centered safe-zone overlay + a small "social preview" showing the square /
-thumbnail crop, so organizers see what WhatsApp/mobile will actually show. Left
-out of Phase 1 deliberately — today the banner is only the in-app hero (full,
-uncropped), so crop guidance now would describe cropping that doesn't happen yet.
+**Cropper guidance (shipped Phase 2):** centered dashed safe-zone overlay +
+square "mobile crop" preview canvas in `BannerCropper.svelte`, so organizers see
+what WhatsApp/mobile will actually show.
 
 Sources: og-image.org, krumzi.com, ogrilla.com (WhatsApp), Meta WhatsApp
 link-preview docs, opengraphplus.com (Discord), missinglinkz.io.
@@ -211,8 +210,5 @@ banner, and add `og:image:width` / `og:image:height` / `og:image:alt` in
 
 ## Scope note
 
-Phase 1 is the cheap, self-contained win (mirrors avatars). Phase 2 is a real
-architecture decision (first server-rendered route in a static-SPA stack) —
-worth splitting into its own child ticket if/when picked up. Also consider
-moderation (organizer-uploaded public images) before exposing at `public`
-access.
+Both phases shipped. Open consideration: moderation of organizer-uploaded public
+images (banner is exposed at `public` access level).

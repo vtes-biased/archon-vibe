@@ -1,3 +1,12 @@
+# Social link-preview crawlers — curated to *preview* bots (NOT search engines:
+# Googlebot/Bingbot render JS and must index the real SPA route). An unlisted new
+# crawler just gets the site-wide card; drift degrades gracefully. Ground truth:
+# github.com/monperrus/crawler-user-agents. Lives in http context (above server{}).
+map $http_user_agent $is_social_bot {
+  default 0;
+  "~*facebookexternalhit|Facebot|meta-externalagent|Twitterbot|Discordbot|redditbot|Slackbot|Slack-ImgProxy|TelegramBot|WhatsApp|LinkedInBot|Pinterest|SkypeUriPreview|vkShare|Embedly|Iframely|FlipboardProxy|Bluesky|Mastodon|Applebot" 1;
+}
+
 server {
   listen 443 ssl;
   listen [::]:443 ssl;
@@ -67,6 +76,26 @@ server {
     proxy_read_timeout 1d;
     gzip off;
     chunked_transfer_encoding on;
+    proxy_pass http://127.0.0.1:{{ r.backend_port }};
+  }
+
+  # ---- Tournament share links: UA-split for og:image --------------------
+  # Humans get the static SPA shell (offline/SW intact); social crawlers are
+  # proxied to FastAPI's per-tournament og stub (they don't run JS, so the SPA's
+  # client-set meta is invisible to them). `if`+`return` is the safe escape from
+  # a location (NOT proxy_pass inside if); the named @og_stub does the proxy.
+  # Only the bare /tournaments/{uid} share URL — sub-routes fall through to SPA.
+  location ~ ^/tournaments/[0-9a-fA-F-]+$ {
+    error_page 418 = @og_stub;
+    if ($is_social_bot) { return 418; }
+    try_files $uri $uri.html /200.html;
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+  }
+  location @og_stub {
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host $http_host;
+    proxy_http_version 1.1;
     proxy_pass http://127.0.0.1:{{ r.backend_port }};
   }
 

@@ -50,6 +50,7 @@
 - [Destructive store-wipe offline rescue](destructive-store-wipe-offline-rescue.md) — db.ts upgrade AND sync.ts clearAllStores both wipe stores; must rescue the FULL offline set (tournament + sanctions + decks + player-stubs).
 - objects has two timestamps (column modified_at vs JSONB modified); never mix in the since-cursor — see SYNC.md (Sync Cursor).
 - tournament_transaction connection discipline (reads join txn; writes acquire pool independently; never a 2nd conn under lock) — see ARCHITECTURE.md (Database Access & Connection Model).
+- [Asset-cleanup autocommit non-atomicity](asset-cleanup-autocommit-nonatomic.md) — pool is autocommit=True, so multi-statement writes needing consistency require explicit conn.transaction(); delete_object/purge are the fixed exemplar (object + avatars/banners side-row deletes, no FK cascade) — don't re-fix them.
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — holds player user_uids; easily missed in any per-player UID remap.
 - [Error localization across throw surfaces](error-localization-offline-path-trap.md) — engine-error localization covers HTTP + offline WASM + JS pre-checks (wired); preserve all three when changing error presentation.
 - [Resync branch zero-delay loop](sync-resync-branch-zero-delay-loop.md) — sync.ts resync onmessage branch reconnects with NO delay; cold-start trigger fixed, branch unguarded for any other persistent resync cause; route resync reconnects through backoff.

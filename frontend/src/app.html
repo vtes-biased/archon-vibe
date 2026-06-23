@@ -8,13 +8,20 @@
     <meta name="theme-color" content="#DC143C" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="VEKN Tournament Management - Web App" />
-    <!-- Social share (Open Graph / Twitter). Image path is root-relative on purpose:
-         the same build ships to every domain (see .env.production), and crawlers
-         resolve it against the page URL. Square icon → Twitter "summary" card. -->
+    <!-- Site-wide social card (Open Graph / Twitter). This static fallback ships
+         to every route; per-tournament og:image is server-rendered for crawlers
+         on /tournaments/{uid} (backend og.py + nginx UA-split). Image path is
+         root-relative on purpose: the same build ships to every domain (see
+         .env.production), crawlers resolve it against the page URL. The default
+         image is the square 512 icon, so the card stays "summary" — a
+         summary_large_image card would letterbox/crop a square asset. -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Archon" />
     <meta property="og:description" content="VEKN Tournament Management - Web App" />
     <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Archon — VEKN Tournament Management" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Archon" />
     <meta name="twitter:description" content="VEKN Tournament Management - Web App" />

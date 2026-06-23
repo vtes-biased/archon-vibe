@@ -1780,6 +1780,21 @@ async def go_online(
             merged = list(dict.fromkeys(original_organizers + client_organizers))
             request.tournament["organizers_uids"] = merged
 
+            # Server-managed side-channel fields the offline WASM engine never
+            # touches: re-pull them from the locked server row so a value that
+            # changed server-side during the offline window (VEKN sync writes
+            # external_ids/vekn_pushed_at; a re-uploaded banner_path) isn't
+            # reverted by this device's stale snapshot. "Server wins" for
+            # non-engine fields, same as organizers_uids above.
+            request.tournament["banner_path"] = tournament.banner_path
+            request.tournament["external_ids"] = tournament.external_ids
+            request.tournament["checkin_code"] = tournament.checkin_code
+            request.tournament["vekn_pushed_at"] = (
+                tournament.vekn_pushed_at.isoformat()
+                if tournament.vekn_pushed_at
+                else None
+            )
+
         # Remap temp UIDs → real user UIDs throughout tournament data
         tournament_data = request.tournament
         if uid_map:

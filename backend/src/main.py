@@ -31,6 +31,7 @@ from .db import (
     delete_sanction_hard,
     get_expired_sanctions,
     get_sanctions_for_cleanup,
+    get_tournament_public_projection,
     init_db,
     save_sanction,
 )
@@ -538,6 +539,23 @@ app.include_router(calendar.router)
 async def root() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "version": __version__}
+
+
+@app.get("/tournaments/{uid}")
+async def tournament_og_stub(uid: str, request: Request) -> Response:
+    """Open Graph stub for a tournament share link — reached ONLY by social
+    crawlers (nginx UA-splits /tournaments/{uid}; humans get the static SPA).
+
+    Serves the public projection only (no auth on a crawler request); an unknown
+    or soft-deleted uid falls back to the site-wide card rather than erroring.
+    """
+    from .og import render_og_html
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    pub = await get_tournament_public_projection(uid)
+    html = render_og_html(f"{proto}://{host}", uid, pub)
+    return Response(content=html, media_type="text/html")
 
 
 # ---------------------------------------------------------------------------

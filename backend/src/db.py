@@ -408,13 +408,29 @@ async def save_object_from_model(
 async def delete_object(
     uid: str, *, conn: psycopg.AsyncConnection | None = None
 ) -> None:
-    """Hard delete an object from the objects table."""
-    query = "DELETE FROM objects WHERE uid = %s"
+    """Hard delete an object and any side-table binary asset keyed by its uid.
+
+    Avatars (user_uid) and banners (tournament_uid) live in separate tables with
+    no FK cascade, so a bare `DELETE FROM objects` would orphan their image bytes.
+    A uid is a v7 UUID — it matches at most one of the two side tables, so both
+    cleanup deletes are cheap PK lookups that no-op for objects without an asset.
+    """
+
+    async def _run(c: psycopg.AsyncConnection) -> None:
+        # Atomic across the three tables: the pool is autocommit, so without an
+        # explicit transaction a crash between deletes would orphan asset bytes
+        # permanently (no future purge can re-find them). Nests as a savepoint if
+        # `c` is already in a caller transaction.
+        async with c.transaction():
+            await c.execute("DELETE FROM objects WHERE uid = %s", (uid,))
+            await c.execute("DELETE FROM avatars WHERE user_uid = %s", (uid,))
+            await c.execute("DELETE FROM banners WHERE tournament_uid = %s", (uid,))
+
     if conn:
-        await conn.execute(query, (uid,))
+        await _run(conn)
     else:
         async with get_connection() as c:
-            await c.execute(query, (uid,))
+            await _run(c)
 
 
 def _level_col(level: str) -> str:
@@ -548,11 +564,26 @@ async def purge_deleted_objects(days: int = 30) -> int:
     if not _pool:
         raise RuntimeError("Database not initialized")
     async with _pool.connection() as conn:
-        result = await conn.execute(
-            "DELETE FROM objects WHERE deleted_at < NOW() - make_interval(days => %s)",
-            (days,),
-        )
-        return result.rowcount or 0
+        # One transaction (pool is autocommit): the object purge and its
+        # side-table asset cleanup commit together, so a crash can't leave bytes
+        # orphaned with their owning row already gone (unrecoverable — no future
+        # purge can re-find them).
+        async with conn.transaction():
+            result = await conn.execute(
+                "DELETE FROM objects WHERE deleted_at < NOW() - make_interval(days => %s) "
+                "RETURNING uid",
+                (days,),
+            )
+            purged = [row[0] for row in await result.fetchall()]
+            if purged:
+                # Drop orphaned side-table assets (no FK cascade); see delete_object.
+                await conn.execute(
+                    "DELETE FROM avatars WHERE user_uid = ANY(%s)", (purged,)
+                )
+                await conn.execute(
+                    "DELETE FROM banners WHERE tournament_uid = ANY(%s)", (purged,)
+                )
+        return len(purged)
 
 
 # ---------------------------------------------------------------------------
@@ -974,6 +1005,23 @@ async def get_tournament_by_uid(
 async def delete_tournament_db(uid: str) -> None:
     """Delete a tournament from the database."""
     await delete_object(uid)
+
+
+async def get_tournament_public_projection(uid: str) -> dict | None:
+    """Public-level projection of a tournament, as a raw dict.
+
+    For the unauthenticated OG share-stub: type-filtered so a non-tournament uid
+    can't leak another object's public projection through /tournaments/{uid}.
+    """
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT \"public\" FROM objects WHERE uid = %s AND type = 'tournament'",
+            (uid,),
+        )
+        row = await result.fetchone()
+        if row and row[0] is not None:
+            return row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
+        return None
 
 
 async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] | None:

@@ -12,6 +12,9 @@
 
   let fileInput: HTMLInputElement | null = $state(null);
   let canvas: HTMLCanvasElement | null = $state(null);
+  // Square "what mobile / WhatsApp crops to" preview: the centered square column
+  // of the 1.91:1 crop (see drawCanvas — same transform, narrower frame).
+  let squareCanvas: HTMLCanvasElement | null = $state(null);
   let image: HTMLImageElement | null = $state(null);
   let saving = $state(false);
 
@@ -32,6 +35,9 @@
   const CROP_W = 400;
   const CROP_H = 210;
   const OUT_SCALE = 3;
+  // Square preview side = crop height: painting the same transform into a square
+  // frame yields exactly the centered square the crop would be center-cropped to.
+  const SQUARE = CROP_H;
 
   function focusOnMount(node: HTMLElement) {
     const input = node.querySelector<HTMLElement>("input:not(.hidden):not([type=hidden]), textarea, select");
@@ -94,6 +100,8 @@
   function drawCanvas() {
     const ctx = canvas?.getContext('2d');
     if (ctx) paint(ctx, CROP_W, CROP_H, 1);
+    const sctx = squareCanvas?.getContext('2d');
+    if (sctx) paint(sctx, SQUARE, SQUARE, 1);
   }
 
   function handleZoom(event: Event) {
@@ -226,6 +234,11 @@
         >
           <!-- The whole canvas IS the crop — frame exactly equals the output. -->
           <canvas bind:this={canvas} width={CROP_W} height={CROP_H} class="w-full h-auto rounded-lg bg-surface-muted"></canvas>
+          <!-- Safe zone (~1080×565, centered): edges/corners get cropped or rounded
+               on square/mobile placements, so keep title + key art inside it. -->
+          <div class="pointer-events-none absolute inset-0 rounded-lg overflow-hidden">
+            <div class="absolute inset-[5%] border border-dashed border-white/70 rounded"></div>
+          </div>
         </div>
 
         <div class="w-full flex items-center gap-3">
@@ -240,6 +253,16 @@
             class="flex-1 accent-accent"
           />
           <ZoomIn class="w-5 h-5 text-ink-muted" />
+        </div>
+
+        <div class="w-full flex items-center gap-3">
+          <canvas
+            bind:this={squareCanvas}
+            width={SQUARE}
+            height={SQUARE}
+            class="w-16 h-16 rounded bg-surface-muted shrink-0"
+          ></canvas>
+          <p class="text-xs text-ink-faint">{m.banner_mobile_preview_hint()}</p>
         </div>
 
         <p class="text-xs text-ink-faint">{m.avatar_drag_reposition()}</p>

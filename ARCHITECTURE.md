@@ -235,9 +235,9 @@ A small **path string** on the synced object points to the served URL (`avatar_p
 
 **URL shape**: `/api/{users\|tournaments}/{uid}/{avatar\|banner}?v=<epoch-ms>`. The `?v=` parameter is the version key — a re-upload yields a new epoch-ms, making the URL unique and thus immutable-cacheable.
 
-`banner_path` is public so it can serve as a future `og:image` pre-login.
+`banner_path` is public so it serves as the `og:image` for social share links (see Social Sharing below).
 
-Avatar upload: client-side cropping (`AvatarCropper.svelte`), server-side compression. Banner upload: organizer-gated, 1 MB, webp/png/jpeg.
+Avatar upload: client-side cropping (`AvatarCropper.svelte`), server-side compression. Banner upload: organizer-gated, 1 MB, webp/png/jpeg; blocked while offline (so `banner_path` can't diverge from the device snapshot and get overwritten on go-online).
 
 ## TWDA
 
@@ -277,6 +277,19 @@ Import legacy Archon Excel results: `GET /api/tournaments/archon-template` (blan
 - **Reports**: `GET /api/tournaments/{uid}/report` (organizer-only) — Text (standings + results) or JSON (full data).
 - **Social sharing**: canvas-rendered PNG (`social-card.ts`) + plain text with deck info (`social-text.ts`); Share buttons on `FinishedResults.svelte` (organizer action bar) for finished tournaments.
 
+### Open Graph Share Image
+
+Social link-preview crawlers (Discord, Facebook, Reddit, WhatsApp, Telegram, …) don't run JavaScript, so they always see the static SPA shell with the site-wide `og:image`. To serve per-tournament banners, nginx UA-splits `/tournaments/{uid}`:
+
+- **Humans** → `try_files … /200.html` (static SPA, SW-cacheable, offline-first unaffected).
+- **Social bots** → `@og_stub` named location → FastAPI `GET /tournaments/{uid}`.
+
+The FastAPI route (`main.py`) calls `get_tournament_public_projection(uid)` (type-filtered, unauthenticated — public level only) and passes the dict to `og.render_og_html()` (`backend/src/og.py`), which renders a minimal HTML stub with `og:title/description/image/…` and `twitter:card`. If the tournament has a `banner_path`, the stub uses `twitter:card=summary_large_image` (1200×630); otherwise it falls back to the 512×512 site icon with `summary`. Unknown/deleted uids fall back gracefully — no 404 to crawlers.
+
+`/tournaments/{uid}` is **not** in the `_backend_paths` proxied-prefix list. It is served statically for humans and reaches FastAPI only via the named-location bot proxy — the offline-first SPA is unaffected.
+
+Search engines (Googlebot, Bingbot) are deliberately excluded from the UA list — they render JS and should index the real SPA route. The UA list lives in `frontend/nginx.conf` (Docker/local) and `ansible/roles/static_site/templates/https.conf.j2` (prod) so beta and prod stay in sync. An unlisted crawler gets the generic site-wide card (today's pre-existing behavior), never an error.
+
 ## User Account Surgery
 
 ### Deceased Members
@@ -305,4 +318,4 @@ Import legacy Archon Excel results: `GET /api/tournaments/archon-template` (blan
 | Rating recompute | Daily | `ratings.py` | Full recompute of all player ratings and wins |
 | OAuth cleanup | Hourly | `db_oauth.py` | Clean expired authorization codes and revoked tokens |
 | Snapshot generation | Every 15 min | `snapshots.py` | Regenerate gzip snapshots (public/member/full) for initial sync |
-| Deleted objects purge | Daily | `db.py` | Hard-delete soft-deleted objects older than 30 days |
+| Deleted objects purge | Daily | `db.py` | Hard-delete soft-deleted objects older than 30 days; also drops orphaned `avatars`/`banners` side-table rows (no FK cascade) |
