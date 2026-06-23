@@ -173,7 +173,7 @@
 
 <div class="space-y-6">
   <!-- Decklist required reminder -->
-  {#if tournament.decklist_required && (tournament.state === 'Registration' || tournament.state === 'Waiting')}
+  {#if tournament.decklist_required && tournament.state === 'Registration'}
     <div class="banner-warn border rounded-lg p-3 text-sm">
       {#if isPlayer && myDecks.length === 0}
         {m.decks_required_player_hint()}
@@ -183,6 +183,15 @@
         {m.decks_required_notice()}
       {/if}
     </div>
+  {:else if tournament.decklist_required && tournament.state === 'Waiting'}
+    <!-- Check-in window: the loud message is "check in" (PlayerView banner). A
+         present deck is the happy path → quiet note, not an amber warning. The
+         no-deck penalty warning lives beside the check-in CTA in PlayerView. -->
+    {#if isPlayer && myDecks.length > 0}
+      <p class="text-xs text-ink-muted">{m.decks_submitted_note()}</p>
+    {:else if !isPlayer}
+      <div class="banner-warn border rounded-lg p-3 text-sm">{m.decks_required_notice()}</div>
+    {/if}
   {/if}
 
   <!-- Proxy policy: a deck-building constraint the player must know before showing up -->

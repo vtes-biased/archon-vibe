@@ -124,15 +124,18 @@
   // at the door instead of hunting for the deck section.
   const hasDeck = $derived(!!decksByUser?.[userUid]?.[0]);
   const deckErrorMessages = $derived((myDeckErrors ?? []).filter(e => e.severity === 'error').map(e => e.message));
-  // Show the deck CTA (instead of the check-in/drop buttons) when a not-yet-checked-in
-  // player is missing a valid deck in the check-in window.
-  const needsDeckCta = $derived(
+  // A registered (or reinstatable Finished) player who still needs to check in during
+  // the check-in window. Drives the prominent check-in call and the deck warning.
+  const notCheckedIn = $derived(
     !!currentPlayerEntry &&
     (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished") &&
     tournament.state === "Waiting" &&
-    !atCap &&
-    !playerHasValidDeck
+    !atCap
   );
+  // Missing/invalid decklist is a warning beside the check-in CTA, NOT a gate: the
+  // engine allows deck-less check-in (mod.rs CheckIn just stamps missing_decklist).
+  // Only surfaced when a decklist is required (playerHasValidDeck is always true otherwise).
+  const showDeckWarn = $derived(notCheckedIn && tournament.decklist_required && !playerHasValidDeck);
   function scrollToDeck() {
     document.getElementById('player-deck-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -210,15 +213,16 @@
   }
 </script>
 
-<!-- Actionable deck reminder: a player blocked at check-in by a missing/invalid
-     deck gets the specific errors + a button straight to the deck section,
-     rather than passive warning text. -->
-{#snippet deckCta()}
+<!-- Missing/invalid decklist no longer hides the check-in button (engine treats it
+     as non-blocking). Surface it as a warning BESIDE the check-in CTA — penalty
+     framing, specific errors, jump to the deck section — with a secondary button,
+     since checking in is now the primary action. -->
+{#snippet deckWarn()}
   <div class="banner-warn border rounded-lg p-3 space-y-3">
     <div class="flex items-start gap-2 text-sm">
       <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
       <div class="min-w-0">
-        <p class="font-medium">{m.tournament_upload_valid_deck()}</p>
+        <p class="font-medium">{hasDeck ? m.tournament_checkin_invalid_deck_warn() : m.tournament_checkin_no_deck_warn()}</p>
         {#if deckErrorMessages.length > 0}
           <ul class="mt-1 list-disc list-inside text-xs space-y-0.5">
             {#each deckErrorMessages as msg}<li>{msg}</li>{/each}
@@ -226,7 +230,7 @@
         {/if}
       </div>
     </div>
-    <Button variant="primary" size="lg" block class="min-h-[44px]" onclick={scrollToDeck}>
+    <Button variant="secondary" size="lg" block class="min-h-[44px]" onclick={scrollToDeck}>
       <Upload class="w-4 h-4" aria-hidden="true" />
       {hasDeck ? m.tournament_fix_deck_btn() : m.decks_upload()}
     </Button>
@@ -293,6 +297,14 @@
       </Button>
     {/if}
   {:else if currentPlayerEntry}
+    <!-- Prominent check-in call: during the check-in window this is the loudest
+         message a not-yet-checked-in player sees — above status and deck notes. -->
+    {#if notCheckedIn}
+      <div class="banner-info border rounded-lg p-3 mb-3 text-sm">
+        <p class="font-medium">{m.tournament_checkin_call_player()}</p>
+        <p class="text-ink-muted">{tournament.online ? m.tournament_checkin_call_player_online() : m.tournament_checkin_call_player_qr()}</p>
+      </div>
+    {/if}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
         <span class="text-ink-faint">{m.tournament_your_status()}</span>
@@ -300,7 +312,7 @@
           ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
           : translatePlayerState(currentPlayerEntry.state)}</span>
       </div>
-      {#if !tournament.online && !atCap && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting" && playerHasValidDeck}
+      {#if !tournament.online && !atCap && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting"}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = !showQrScanner}
@@ -309,7 +321,7 @@
           <QrCode class="w-4 h-4" />
           {m.checkin_qr_scan_btn()}
         </Button>
-      {:else if !tournament.online && !atCap && currentPlayerEntry.state === "Finished" && tournament.state === "Waiting" && playerHasValidDeck}
+      {:else if !tournament.online && !atCap && currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = true}
@@ -318,7 +330,7 @@
           <QrCode class="w-4 h-4" />
           {m.tournament_check_in_btn()}
         </Button>
-      {:else if !needsDeckCta && currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
+      {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
         <Button
           variant="danger"
           onclick={() => dropPlayer(userUid)}
@@ -326,22 +338,19 @@
         ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.tournament_drop_out_btn()}</Button>
       {/if}
     </div>
-    <!-- Online check-in is server-side (bot self-serve or organizer): give the
-         player the join link + a status line in place of the dead QR scanner. -->
-    {#if tournament.online && !atCap && tournament.state === "Waiting" && playerHasValidDeck && (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished")}
-      <div class="mb-3 space-y-2">
+    <!-- Online check-in is server-side (bot self-serve or organizer). The check-in
+         call banner above carries the instruction; here we just surface the Join link. -->
+    {#if tournament.online && notCheckedIn}
+      <div class="mb-3">
         {@render onlineJoin()}
-        <p class="text-sm text-ink-muted">
-          {currentPlayerEntry.state === "Finished" ? m.tournament_online_recheckin() : m.tournament_online_checkin_status()}
-        </p>
       </div>
     {/if}
     <!-- Open rounds: capped player gets no check-in CTA — tell them they're done and finals-eligible. -->
     {#if atCap && tournament.state === "Waiting"}
       <p class="text-sm text-ink-muted mb-3">{m.player_completed_awaiting_finals()}</p>
     {/if}
-    {#if needsDeckCta}
-      <div class="mb-3">{@render deckCta()}</div>
+    {#if showDeckWarn}
+      <div class="mb-3">{@render deckWarn()}</div>
     {/if}
     <!-- Player's current score -->
     {#if myStanding && (tournament.state === "Playing" || tournament.state === "Waiting") && (tournament.rounds?.length ?? 0) > 0}
