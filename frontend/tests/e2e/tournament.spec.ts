@@ -116,8 +116,10 @@ test.describe('Tournament lifecycle', () => {
 
     // ── Step 5: Close Registration & Check In All (optimistic) ──
     await page.getByRole('button', { name: 'Start Check-in' }).click();
-    // Bulk check-in lives in the "More" overflow menu (one primary CTA per state).
-    await page.getByRole('button', { name: 'More' }).click();
+    // Bulk check-in lives in the toolbar "More" overflow menu (one primary CTA per
+    // state). Per-player rows also carry a "More" drawer, so scope to the overflow
+    // trigger (the only one with aria-haspopup) to avoid a strict-mode match.
+    await page.getByRole('button', { name: 'More' }).and(page.locator('[aria-haspopup="true"]')).click();
     await expect(page.getByRole('button', { name: 'Check All In' })).toBeVisible({ timeout: 2_000 });
     await page.getByRole('button', { name: 'Check All In' }).click();
     await expect(

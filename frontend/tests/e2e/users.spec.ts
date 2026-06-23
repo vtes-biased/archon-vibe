@@ -39,6 +39,8 @@ test.describe('App loads correctly', () => {
   });
 
   test('displays users page elements on Members tab', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForUsers(page);
     await expect(page.locator('#name-search')).toBeVisible();
@@ -46,6 +48,8 @@ test.describe('App loads correctly', () => {
   });
 
   test('loads users via SSE', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForUsers(page);
 
@@ -58,6 +62,9 @@ test.describe('App loads correctly', () => {
 
 test.describe('Community tab', () => {
   test('shows all three sections with seeded links', async ({ page }) => {
+    // Officials Directory is gated behind sign-in, so authenticate first.
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForSync(page);
     await expect(page.getByText('Global Resources')).toBeVisible({ timeout: 3_000 });
@@ -150,6 +157,8 @@ test.describe('Login page', () => {
 
 test.describe('Users list filtering', () => {
   test('filters users by name search', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForUsers(page);
 
@@ -168,6 +177,8 @@ test.describe('Users list filtering', () => {
   });
 
   test('filters users by country', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForUsers(page);
 
@@ -179,6 +190,8 @@ test.describe('Users list filtering', () => {
   });
 
   test('filters users by role', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForUsers(page);
 
@@ -190,6 +203,8 @@ test.describe('Users list filtering', () => {
   });
 
   test('navigates to user detail page on row click', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForUsers(page);
 
@@ -201,6 +216,8 @@ test.describe('Users list filtering', () => {
   });
 
   test('combines name and country filters', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForUsers(page);
 
