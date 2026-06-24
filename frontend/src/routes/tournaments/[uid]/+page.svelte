@@ -65,13 +65,20 @@ import TournamentModals from "./TournamentModals.svelte";
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
   );
-  // Push opt-in eligibility (#314): a participant in a live tournament who hasn't
-  // dropped out — the moment "which table am I at?" actually matters.
+  // Push opt-in eligibility: a live tournament (Waiting/Playing) where notifications
+  // are useful — for a participant who hasn't dropped out ("which table am I at?",
+  // #314), or for an organizer (judge calls, #323).
+  const pushLive = $derived(
+    tournament?.state === "Waiting" || tournament?.state === "Playing"
+  );
   const pushEligible = $derived(
-    !!currentPlayerEntry &&
-    (tournament?.state === "Waiting" || tournament?.state === "Playing") &&
-    currentPlayerEntry.state !== "Finished" &&
-    currentPlayerEntry.state !== "Disqualified"
+    pushLive &&
+    (
+      isOrganizer ||
+      (!!currentPlayerEntry &&
+        currentPlayerEntry.state !== "Finished" &&
+        currentPlayerEntry.state !== "Disqualified")
+    )
   );
   let viewAsPlayer = $state(false);
   let showDeleteConfirm = $state(false);
@@ -750,11 +757,11 @@ import TournamentModals from "./TournamentModals.svelte";
       {/if}
 
       <!-- Live announcements: organizers compose & manage; everyone else sees the banner -->
+      <PushOptIn tournamentUid={uid} eligible={pushEligible} {isOrganizer} />
       {#if showOrganizerView}
         <AnnouncementComposer {tournament} />
       {:else}
         <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
-        <PushOptIn tournamentUid={uid} eligible={pushEligible} />
       {/if}
 
       <!-- Organizer Console with Tabs -->

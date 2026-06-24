@@ -77,7 +77,7 @@ sw.addEventListener('message', (event) => {
 // Backend payload: { title, body, url, tag }. iOS revokes permission if a push
 // doesn't show a notification, so this ALWAYS calls showNotification.
 sw.addEventListener('push', (event) => {
-  let data: { title?: string; body?: string; url?: string; tag?: string } = {};
+  let data: { title?: string; body?: string; url?: string; tag?: string; renotify?: boolean } = {};
   try {
     data = event.data?.json() ?? {};
   } catch {
@@ -89,6 +89,8 @@ sw.addEventListener('push', (event) => {
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       tag: data.tag, // collapse repeats (e.g. same round re-started)
+      // re-alert (sound/vibrate) on a collapsed tag — judge calls set this
+      renotify: data.renotify === true,
       data: { url: data.url || '/' },
     })
   );

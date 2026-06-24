@@ -22,7 +22,11 @@
     refreshPushState,
   } from "$lib/stores/push.svelte";
 
-  let { tournamentUid, eligible }: { tournamentUid: string; eligible: boolean } = $props();
+  let {
+    tournamentUid,
+    eligible,
+    isOrganizer = false,
+  }: { tournamentUid: string; eligible: boolean; isOrganizer?: boolean } = $props();
 
   const dismissKey = () => `push-optin-dismissed:${tournamentUid}`;
   let dismissed = $state(true); // assume dismissed until localStorage is read (avoids flash)
@@ -94,8 +98,12 @@
     <div class="bg-surface-card border border-line rounded-lg p-4 mb-4 flex gap-3 items-start">
       <Bell class="w-5 h-5 text-accent-strong shrink-0 mt-0.5" />
       <div class="flex-1 space-y-3 text-sm">
-        <p class="font-medium text-ink">{m.notifications_prompt_title()}</p>
-        <p class="text-ink-muted">{m.notifications_prompt_body()}</p>
+        <p class="font-medium text-ink">
+          {isOrganizer ? m.notifications_prompt_title_organizer() : m.notifications_prompt_title()}
+        </p>
+        <p class="text-ink-muted">
+          {isOrganizer ? m.notifications_prompt_body_organizer() : m.notifications_prompt_body()}
+        </p>
         <div class="flex gap-2">
           <Button variant="primary" loading={isPushBusy()} onclick={onEnable} class="min-h-[44px]">
             {m.notifications_prompt_enable()}

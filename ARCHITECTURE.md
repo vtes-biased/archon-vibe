@@ -251,16 +251,17 @@ Three env vars: `VAPID_PRIVATE_KEY` (raw base64url scalar, loaded via `Vapid01.f
 
 ### Backend Send Path (`backend/src/push_service.py`)
 
-Pure payload builders `build_seating_payloads` / `build_announcement_payload`. `send_to_users` fans out over `asyncio.to_thread` (blocking `pywebpush.webpush`) under `Semaphore(12)` to cap concurrency against the small connection pool. Sends fire as `asyncio.create_task` **after** `tournament_transaction` commits — a DB-touching task must never run inside the lock (see DB invariant in Connection discipline above).
+Pure payload builders `build_seating_payloads` / `build_announcement_payload` / `build_judge_call_payload`. `send_to_users` fans out over `asyncio.to_thread` (blocking `pywebpush.webpush`) under `Semaphore(12)` to cap concurrency against the small connection pool. Sends fire as `asyncio.create_task` and, for the tournament-action triggers, **after** `tournament_transaction` commits — a DB-touching task must never run inside the lock (see DB invariant in Connection discipline above). Payload bodies are English-only (no i18n on the wire, like the bot).
 
-### Triggers (v1)
+### Triggers
 
 | Event | Who receives | Where fired |
 |-------|-------------|-------------|
 | `StartRound` / `SelfOrganizeRound` / `StartFinals` | Each player newly seated in `rounds[-1]` or `finals.seating` | `_maybe_push_seating` in `routes/tournaments.py` |
 | `POST /{uid}/announce` | All checked-in participants except the poster | `_maybe_push_announcement` in `routes/tournaments.py` |
+| `POST /{uid}/call-judge` | The tournament's organizers except the caller (same audience as the ephemeral `judge_call` SSE) | `_maybe_push_judge_call` in `routes/tournaments.py` |
 
-`RestoreRound` is excluded (re-seats no one). Each send is fire-and-forget; delivery failure never delays the action response.
+`RestoreRound` is excluded (re-seats no one). The judge-call push fires alongside `broadcast_judge_call` (no transaction — it's an ephemeral event) and carries `renotify: true` so a repeat call at a table re-alerts. Each send is fire-and-forget; delivery failure never delays the action response.
 
 ### Routes (`backend/src/routes/push.py`)
 

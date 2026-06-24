@@ -231,6 +231,31 @@ async def _maybe_push_announcement(
         logger.exception("Failed to send announcement push for %s", tournament.uid)
 
 
+async def _maybe_push_judge_call(
+    tournament: Tournament,
+    table: int,
+    table_label: str,
+    player_name: str,
+    exclude_uid: str,
+) -> None:
+    """Web Push a judge call to the on-premises organizers (#323) — same audience as
+    the ephemeral judge_call SSE, for a judge who's away from the screen."""
+    try:
+        from .. import push_service
+
+        payload = push_service.build_judge_call_payload(
+            tournament_uid=tournament.uid,
+            tournament_name=tournament.name,
+            table=table,
+            table_label=table_label,
+            player_name=player_name,
+        )
+        uids = [u for u in (tournament.organizers_uids or []) if u != exclude_uid]
+        await push_service.send_to_users([(uid, payload) for uid in uids])
+    except Exception:
+        logger.exception("Failed to send judge-call push for %s", tournament.uid)
+
+
 async def _maybe_push_vekn_event(tournament: Tournament) -> None:
     """Create VEKN calendar event if VEKN_PUSH is enabled."""
     try:
@@ -1700,13 +1725,19 @@ async def call_judge(
         raise HTTPException(status_code=403, detail="You are not seated at this table")
     # Build table label
     table_label = resolveTableLabelPy(tournament.table_rooms, request.table)
-    # Broadcast to organizers
+    # Broadcast to organizers (live, in-app), and Web Push the same audience so a
+    # judge away from the screen is alerted (#323). Fire-and-forget, exclude caller.
     await broadcast_judge_call(
         tournament_uid=tournament.uid,
         table=request.table,
         table_label=table_label,
         player_name=user.name,
         organizer_uids=tournament.organizers_uids,
+    )
+    asyncio.create_task(
+        _maybe_push_judge_call(
+            tournament, request.table, table_label, user.name, user.uid
+        )
     )
     return Response(status_code=204)
 

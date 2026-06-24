@@ -118,6 +118,20 @@ def build_announcement_payload(t: Tournament, body: str) -> dict:
     }
 
 
+def build_judge_call_payload(
+    *, tournament_uid: str, tournament_name: str, table: int, table_label: str, player_name: str
+) -> dict:
+    return {
+        "title": f"Judge call · {tournament_name}",
+        "body": f"{player_name} needs a judge at {table_label}.",
+        "url": f"/tournaments/{tournament_uid}",
+        "tag": f"judge-{tournament_uid}-{table}",
+        # Re-alert even if a prior call at this table is still on screen — the
+        # organizer must not miss a second player flagging the same table.
+        "renotify": True,
+    }
+
+
 # --- Delivery -----------------------------------------------------------------
 
 

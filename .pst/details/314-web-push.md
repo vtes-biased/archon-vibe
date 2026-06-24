@@ -102,6 +102,15 @@ that guide (`pg_install`: iOS Safari / Android Chrome / Desktop). A native
 `beforeinstallprompt` "Install" button for Android/desktop was explicitly NOT added (push
 works in a tab there; deferred as a general PWA nicety).
 
+JUDGE-CALL PUSH (#323, same branch): a third push type — `POST /{uid}/call-judge` now also
+Web-Pushes the tournament's organizers (except the caller; same audience as the ephemeral
+`judge_call` SSE) so a judge away from the screen is alerted. `build_judge_call_payload`
+(renotify=true → repeat calls re-alert); `_maybe_push_judge_call` fired fire-and-forget right
+after `broadcast_judge_call` (no transaction — ephemeral event). The `PushOptIn` card now also
+shows to organizers of a live tournament with role-aware copy (judge calls + announcements), so
+organizers can opt in contextually (else via the profile toggle). Reverses the v1
+"no organizer-facing push" deferral for THIS case only. SW gained generic `renotify` passthrough.
+
 DEPLOY ENABLEMENT (separate follow-up ticket): the feature is a no-op until each env has a
 VAPID keypair — `just vapid-keys`, private key + subject in ansible-vault, `VAPID_*` env wired
 so `GET /api/push/vapid-key` serves the public key. Until then `is_configured()` is False and
