@@ -111,7 +111,7 @@
   <button
     type="button"
     onclick={() => (showCropper = true)}
-    class="-mx-4 sm:mx-0 mb-6 sm:rounded-lg w-full aspect-[1200/630] max-h-40 sm:max-h-44
+    class="-mx-4 sm:mx-0 mb-6 sm:rounded-lg aspect-[1200/630] max-h-40 sm:max-h-44
            flex flex-col items-center justify-center gap-2 text-center px-4
            border-2 border-dashed border-line text-ink-muted
            hover:border-line-strong hover:text-ink-bright hover:bg-surface-hover/30
