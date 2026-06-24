@@ -383,7 +383,7 @@
         {/if}
         {#if puid && hasRounds && !isOfflineMode}
           <Button variant="secondary" size="sm" onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}>
-            <TriangleAlert class="w-4 h-4 text-warn" aria-hidden="true" />{m.sanction_tournament_issue_title()}
+            <TriangleAlert class="w-4 h-4 text-warn" aria-hidden="true" />{m.players_sanction_btn()}
           </Button>
         {/if}
       </div>
