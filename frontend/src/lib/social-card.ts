@@ -20,6 +20,43 @@ const FONT = "system-ui, -apple-system, sans-serif";
 
 const W = 1080;
 const H = 1350;
+const BANNER_BAND_H = 360; // header band height when the tournament has a banner
+
+/**
+ * Load the tournament banner for compositing. crossOrigin='anonymous' keeps the
+ * canvas untainted so toBlob() can't throw SecurityError (banner is same-origin
+ * /api/tournaments/{uid}/banner, but be defensive). Resolves null when there's
+ * no banner or it fails to load — the card then renders bannerless, never blocked.
+ */
+function loadBanner(tournament: Tournament): Promise<HTMLImageElement | null> {
+  const src = tournament.banner_path;
+  if (!src) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    // A hung request (stalled SW/flaky mobile) fires neither event; cap the wait
+    // so the share degrades to the bannerless card instead of spinning forever.
+    setTimeout(() => resolve(null), 4000);
+    img.src = src;
+  });
+}
+
+/** Draw img into the dest rect, scaled to cover and center-cropped. */
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+) {
+  const scale = Math.max(dw / img.width, dh / img.height);
+  const sw = dw / scale;
+  const sh = dh / scale;
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, dx, dy, dw, dh);
+}
 
 function drawTextTruncated(
   ctx: CanvasRenderingContext2D,
@@ -77,12 +114,22 @@ export async function generateResultsCard(
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, W, H);
 
-  // Top crimson accent bar
-  ctx.fillStyle = CRIMSON;
-  ctx.fillRect(0, 0, W, 6);
-
-  let y = 70;
   const pad = 60;
+  let y: number;
+
+  // Banner header band (full-width, center-cropped) when set; else the plain
+  // top crimson accent. Either way content flows below.
+  const banner = await loadBanner(tournament);
+  if (banner) {
+    drawImageCover(ctx, banner, 0, 0, W, BANNER_BAND_H);
+    ctx.fillStyle = CRIMSON;
+    ctx.fillRect(0, BANNER_BAND_H - 6, W, 6); // crimson divider under the band
+    y = BANNER_BAND_H + 60;
+  } else {
+    ctx.fillStyle = CRIMSON;
+    ctx.fillRect(0, 0, W, 6);
+    y = 70;
+  }
 
   // Tournament name
   ctx.fillStyle = TEXT;
