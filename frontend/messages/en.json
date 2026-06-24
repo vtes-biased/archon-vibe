@@ -1312,5 +1312,7 @@
   "notifications_prompt_dismiss": "Not now",
   "notifications_ios_title": "Add Archon to your Home Screen",
   "notifications_ios_body": "To get notifications on iPhone or iPad, install the app first: tap the Share button, then “Add to Home Screen.”",
+  "notifications_ios_open_safari": "Notifications on iPhone and iPad work only in Safari. Open this page in Safari, then tap Share and “Add to Home Screen.”",
+  "notifications_ios_learn_more": "Installation help",
   "notifications_ios_dismiss": "Got it"
 }

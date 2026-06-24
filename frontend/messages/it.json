@@ -666,9 +666,9 @@
   "rounds_unavoidable": "(inevitabile)",
   "rounds_cancel_title": "Annullare questo round?",
   "rounds_cancel_msg": "Questo round verrà sospeso — la sua disposizione e i punteggi sono conservati e il round può essere ripristinato in seguito. I giocatori tornano nel pool di check-in.",
+  "rounds_cancel_msg_last": "Questo è l'ultimo round. Annullarlo lo elimina del tutto — la sua disposizione e i punteggi vengono persi definitivamente e non potrà essere ripristinato.",
   "rounds_cancel_yes": "Sì, annulla round",
   "rounds_cancel_keep": "Continua a giocare",
-  "rounds_cancel_msg_last": "Questo è l'ultimo round. Annullarlo lo elimina del tutto — la sua disposizione e i punteggi vengono persi definitivamente e non potrà essere ripristinato.",
   "rounds_cancelled_badge": "Annullato",
   "rounds_restore_round": "Ripristina Round",
   "rounds_restore_title": "Ripristinare questo round?",
@@ -1312,5 +1312,7 @@
   "notifications_prompt_dismiss": "Non ora",
   "notifications_ios_title": "Aggiungi Archon alla schermata Home",
   "notifications_ios_body": "Per ricevere notifiche su iPhone o iPad, installa prima l’app: tocca il pulsante Condividi, poi «Aggiungi alla schermata Home».",
+  "notifications_ios_open_safari": "Le notifiche su iPhone e iPad funzionano soltanto in Safari. Aprite questa pagina in Safari, toccate Condividi e poi «Aggiungi alla schermata Home».",
+  "notifications_ios_learn_more": "Guida all’installazione",
   "notifications_ios_dismiss": "Capito"
 }

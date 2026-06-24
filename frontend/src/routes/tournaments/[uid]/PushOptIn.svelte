@@ -17,6 +17,7 @@
     getPushPermission,
     enablePush,
     isIOS,
+    isIOSSafari,
     isStandalone,
     refreshPushState,
   } from "$lib/stores/push.svelte";
@@ -32,12 +33,16 @@
     refreshPushState();
   });
 
+  // On an iOS browser tab PushManager/Notification don't exist, so pushSupported()
+  // is false — yet this is exactly the user who must be nudged to install. Show the
+  // card when push is usable OR when installing on iOS would make it usable.
+  const iosNeedsInstall = $derived(isIOS() && !isStandalone());
   const visible = $derived(
     eligible &&
       !dismissed &&
-      pushSupported() &&
       !isPushSubscribed() &&
-      getPushPermission() !== "denied"
+      getPushPermission() !== "denied" &&
+      (pushSupported() || iosNeedsInstall)
   );
 
   function dismiss() {
@@ -51,7 +56,7 @@
   }
 
   async function onEnable() {
-    if (isIOS() && !isStandalone()) {
+    if (iosNeedsInstall) {
       showIosNudge = true; // can't subscribe in an iOS tab — show how to install first
       return;
     }
@@ -70,10 +75,19 @@
       <Share class="w-5 h-5 text-accent-strong shrink-0 mt-0.5" />
       <div class="flex-1 space-y-3 text-sm">
         <p class="font-medium text-ink">{m.notifications_ios_title()}</p>
-        <p class="text-ink-muted">{m.notifications_ios_body()}</p>
-        <Button variant="secondary" onclick={dismiss} class="min-h-[44px]">
-          {m.notifications_ios_dismiss()}
-        </Button>
+        <!-- iOS push only works from a Safari-installed PWA; other iOS browsers
+             (Chrome/Firefox/in-app webviews) must open the page in Safari first. -->
+        <p class="text-ink-muted">
+          {isIOSSafari() ? m.notifications_ios_body() : m.notifications_ios_open_safari()}
+        </p>
+        <a href="/help/player-guide#installing-the-app" class="inline-block text-link hover:underline">
+          {m.notifications_ios_learn_more()}
+        </a>
+        <div>
+          <Button variant="secondary" onclick={dismiss} class="min-h-[44px]">
+            {m.notifications_ios_dismiss()}
+          </Button>
+        </div>
       </div>
     </div>
   {:else}

@@ -64,6 +64,18 @@ export function isIOS(): boolean {
   );
 }
 
+/**
+ * True only for real iOS Safari — the ONLY iOS browser that can install a
+ * push-capable PWA. Chrome (CriOS), Firefox (FxiOS), Edge (EdgiOS) and in-app
+ * webviews (which lack the "Safari" token) can't Add-to-Home-Screen into a
+ * standalone app, so those users must be told to open the page in Safari first.
+ */
+export function isIOSSafari(): boolean {
+  if (!isIOS() || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA|mercury/i.test(ua);
+}
+
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');

@@ -92,6 +92,16 @@ backend ruff green; `backend/tests/test_push_seating.py` (seating-diff invariant
 Reviews: principal-engineer SHIP (all rulings verified), staff-frontend-engineer blocking
 touch-target items fixed (Button + min-h-[44px]), senior-qa one test.
 
+FOLLOW-UP (post-ship, same branch): iOS install guidance hardened. The opt-in card now
+shows on iOS browser TABS too (where `pushSupported()` is false but installing fixes that —
+gated on `pushSupported() || (isIOS && !standalone)`); the install nudge is Safari-aware
+(`isIOSSafari()` — Chrome/Firefox/in-app webviews on iOS can't A2HS a push-capable PWA, so
+they're told to open in Safari first) and links to the Player Guide install section
+(`/help/player-guide#installing-the-app`). General OS-split install docs already live in
+that guide (`pg_install`: iOS Safari / Android Chrome / Desktop). A native
+`beforeinstallprompt` "Install" button for Android/desktop was explicitly NOT added (push
+works in a tab there; deferred as a general PWA nicety).
+
 DEPLOY ENABLEMENT (separate follow-up ticket): the feature is a no-op until each env has a
 VAPID keypair — `just vapid-keys`, private key + subject in ansible-vault, `VAPID_*` env wired
 so `GET /api/push/vapid-key` serves the public key. Until then `is_configured()` is False and

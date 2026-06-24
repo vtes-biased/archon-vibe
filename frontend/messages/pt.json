@@ -666,9 +666,9 @@
   "rounds_unavoidable": "(inevitável)",
   "rounds_cancel_title": "Cancelar esta rodada?",
   "rounds_cancel_msg": "Esta rodada será suspensa — sua alocação e pontuações são mantidas e a rodada pode ser restaurada mais tarde. Os jogadores retornam ao pool de check-in.",
+  "rounds_cancel_msg_last": "Esta é a última rodada. Cancelá-la a descarta completamente — sua alocação e pontuações são perdidas permanentemente e não poderá ser restaurada.",
   "rounds_cancel_yes": "Sim, cancelar rodada",
   "rounds_cancel_keep": "Continuar jogando",
-  "rounds_cancel_msg_last": "Esta é a última rodada. Cancelá-la a descarta completamente — sua alocação e pontuações são perdidas permanentemente e não poderá ser restaurada.",
   "rounds_cancelled_badge": "Cancelada",
   "rounds_restore_round": "Restaurar Rodada",
   "rounds_restore_title": "Restaurar esta rodada?",
@@ -1312,5 +1312,7 @@
   "notifications_prompt_dismiss": "Agora não",
   "notifications_ios_title": "Adicione o Archon à sua tela inicial",
   "notifications_ios_body": "Para receber notificações no iPhone ou iPad, instale o app primeiro: toque no botão Compartilhar e depois em “Adicionar à Tela Inicial”.",
+  "notifications_ios_open_safari": "As notificações no iPhone e iPad funcionam apenas no Safari. Abra esta página no Safari, toque em Compartilhar e depois em \"Adicionar à Tela Inicial\".",
+  "notifications_ios_learn_more": "Ajuda para instalação",
   "notifications_ios_dismiss": "Entendido"
 }
