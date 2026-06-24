@@ -35,6 +35,7 @@ def _finished_event() -> dict:
         "event_startdate": "2025-03-01",
         "event_enddate": "2025-03-01",
         "venue_country": "FR",
+        "rounds": "3R+F",  # VEKN's real format: leading int = preliminary rounds
         "players": [
             {"pos": "1", "veknid": "1000001", "gw": "1", "vp": "4", "tp": "36"},
         ],
@@ -60,6 +61,15 @@ def test_finished_import_stamps_vekn_pushed_at():
     assert t.standings and not t.rounds
     # Must be stamped so batch_push never re-uploads it.
     assert t.vekn_pushed_at is not None
+
+
+def test_import_populates_round_count():
+    # VEKN's calendar 'rounds' field is the preliminary round count; the sync
+    # maps it onto max_rounds (the app's "number of rounds"), not just for
+    # open-rounds events.
+    users = {"1000001": _user("u1", "1000001")}
+    t = _map_vekn_to_tournament(_finished_event(), users)
+    assert t is not None and t.max_rounds == 3
 
 
 def test_planned_import_leaves_vekn_pushed_at_null():

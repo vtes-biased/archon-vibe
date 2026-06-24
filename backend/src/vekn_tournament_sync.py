@@ -1,6 +1,7 @@
 """VEKN tournament synchronization service."""
 
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
@@ -70,6 +71,19 @@ def _guess_timezone(
     return COUNTRY_TIMEZONE.get(country, "UTC")
 
 
+def _parse_rounds(raw: Any) -> int:
+    """VEKN event 'rounds' field → preliminary round count (the app's "number of
+    rounds").
+
+    VEKN encodes it as a string like "3R+F" — the leading integer is the number
+    of preliminary rounds; the trailing "+F" just marks that a final is played
+    (the app tracks finals separately, so it isn't counted here). A plain int
+    or junk both degrade to the leading-digits read (→ 0 when absent).
+    """
+    m = re.match(r"\s*(\d+)", str(raw))
+    return int(m.group(1)) if m else 0
+
+
 def _parse_date(
     date_str: str | None, time_str: str | None = None, tz_name: str = "UTC"
 ) -> datetime | None:
@@ -101,7 +115,7 @@ def _map_vekn_to_tournament(
 
     VEKN event fields:
       event_id, event_name, event_startdate, event_starttime,
-      event_enddate, event_endtime, event_isonline, eventtype_id,
+      event_enddate, event_endtime, event_isonline, eventtype_id, rounds,
       venue_name, venue_city, venue_country, venue_id,
       players[{pos, veknid, gw, vp, tp, tie, vpf, ...}]
     venue_data (from separate /venue/<id> call):
@@ -163,6 +177,9 @@ def _map_vekn_to_tournament(
     organizer_vekn = str(data.get("organizer_veknid") or "")
     organizer_user = users_by_vekn_id.get(organizer_vekn)
     organizers_uids = [organizer_user.uid] if organizer_user else []
+
+    # Number of preliminary rounds (the app's "round count" field).
+    max_rounds = _parse_rounds(data.get("rounds"))
 
     # Players
     vekn_players = data.get("players", [])
@@ -240,6 +257,7 @@ def _map_vekn_to_tournament(
             map_url=map_url,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
+            max_rounds=max_rounds,
             players=players,
             winner=winner_uid,
             standings=standings,
@@ -268,6 +286,7 @@ def _map_vekn_to_tournament(
             map_url=map_url,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
+            max_rounds=max_rounds,
         )
 
 
