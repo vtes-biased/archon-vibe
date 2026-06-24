@@ -302,6 +302,18 @@ Some tournament fields are **not** processed by the Rust engine and have no offl
 
 Do **not** add a new synced object type for data that belongs to a single tournament, is online-only, and needs no engine processing — embed it in `Tournament` instead.
 
+## Non-Synced Side Tables
+
+Not all persistent server state flows through the `objects` projection/SSE pipeline. Some data is server-side only and must stay off that path:
+
+| Side table | Rationale |
+|-----------|-----------|
+| `avatars`, `banners` | Binary blobs; served directly, path string on the object |
+| `push_subscriptions` | Send credentials (endpoints the backend delivers to, never display data). Routing them through the projection/SSE pipeline would broadcast per-device push endpoints to every client — wrong semantics and a privacy/security issue. Managed entirely in `push_service.py` + `routes/push.py`. |
+| `oauth_*` | OAuth state / token management |
+
+When adding new state: if it's display data keyed by uid that every authorized client needs, use the `objects` path. If it's server-side-only credentials or blobs, use a side table.
+
 ## Adding a New Object Type
 
 1. **Backend model** in `models.py` (extend `BaseObject`)

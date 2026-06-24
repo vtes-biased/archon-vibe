@@ -1297,5 +1297,20 @@
   "og_faq_a_proxy": "Un asiento ocupado por alguien que realmente no está compitiendo — por ejemplo, un oficial que sustituye a un jugador ausente con un mazo aleatorio. Sus VP cuentan para los oponentes y para la validación del orden de eliminación, pero el proxy no obtiene clasificación, puntos de rating ni plaza en la final. Esto es diferente del parámetro **Permitir proxies**, que trata sobre las cartas proxy en las listas de mazos.",
   "og_faq_q_discord": "¿Necesito el bot de Discord para organizar un evento en línea?",
   "og_faq_a_discord": "No. Los torneos en línea funcionan completamente en la aplicación (temporizador, Llamar al árbitro, anuncios). El bot de Discord es una comodidad opcional: configura canales de voz por mesa, un evento programado, y permite a los jugadores registrarse, hacer check-in, declarar resultados y llamar a un árbitro desde Discord. Véase [Organizar un evento en línea en Discord](#organizar-un-evento-en-lnea-en-discord).",
-  "pg_self_organize": "## Auto-organizar una ronda\n\nAlgunos eventos casuales de rondas abiertas permiten a los jugadores iniciar sus propias rondas. Si el organizador ha activado esta opción, verá un botón **Auto-organizar una ronda** en la página del torneo una vez inscrito.\n\nReúna a 3 o 4 jugadores inscritos más, pulse el botón y selecciónelos de la lista (usted se añade automáticamente). Pulse **Iniciar ronda** y la aplicación distribuye los asientos de su pod de 4–5 — sin necesidad de un organizador. Juegue y declare sus puntuaciones normalmente; el organizador termina la ronda cuando esté completada."
+  "pg_self_organize": "## Auto-organizar una ronda\n\nAlgunos eventos casuales de rondas abiertas permiten a los jugadores iniciar sus propias rondas. Si el organizador ha activado esta opción, verá un botón **Auto-organizar una ronda** en la página del torneo una vez inscrito.\n\nReúna a 3 o 4 jugadores inscritos más, pulse el botón y selecciónelos de la lista (usted se añade automáticamente). Pulse **Iniciar ronda** y la aplicación distribuye los asientos de su pod de 4–5 — sin necesidad de un organizador. Juegue y declare sus puntuaciones normalmente; el organizador termina la ronda cuando esté completada.",
+  "notifications_label": "Notificaciones push",
+  "notifications_description": "Solo le notificaremos sobre su asignación de mesa y los anuncios del organizador — nada más.",
+  "notifications_enable": "Activar",
+  "notifications_turn_off": "Desactivar",
+  "notifications_blocked": "Bloqueadas — permita las notificaciones en los ajustes de su navegador",
+  "notifications_unsupported": "No compatible con este dispositivo",
+  "notifications_enabled_toast": "Notificaciones activadas",
+  "notifications_denied_toast": "Las notificaciones están bloqueadas. Actívelas en los ajustes de su navegador para recibir su asignación de mesa.",
+  "notifications_prompt_title": "Reciba avisos cuando su mesa esté lista",
+  "notifications_prompt_body": "Active las notificaciones para su asignación de mesa y los anuncios del organizador.",
+  "notifications_prompt_enable": "Activar notificaciones",
+  "notifications_prompt_dismiss": "Ahora no",
+  "notifications_ios_title": "Añada Archon a su pantalla de inicio",
+  "notifications_ios_body": "Para recibir notificaciones en iPhone o iPad, instale primero la aplicación: pulse el botón Compartir y luego «Añadir a pantalla de inicio».",
+  "notifications_ios_dismiss": "Entendido"
 }

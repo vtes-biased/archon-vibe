@@ -1297,5 +1297,20 @@
   "og_faq_a_proxy": "Une place occupée par quelqu'un qui ne participe pas vraiment à la compétition — par ex. un officiel remplaçant un joueur absent avec un deck aléatoire. Ses VP comptent pour les adversaires et pour la validation de l'ordre d'élimination, mais le proxy lui-même n'obtient ni classement, ni points de rating, ni place en finale. C'est différent du paramètre **Autoriser les proxies**, qui concerne les cartes proxy dans les listes de decks.",
   "og_faq_q_discord": "Ai-je besoin du bot Discord pour organiser un événement en ligne ?",
   "og_faq_a_discord": "Non. Les tournois en ligne fonctionnent entièrement dans l'application (minuteur, Appeler l'arbitre, annonces). Le bot Discord est une commodité optionnelle : il configure des salons vocaux par table, un événement planifié, et permet aux joueurs de s'inscrire, de pointer, de déclarer leurs scores et d'appeler un arbitre depuis Discord. Voir [Organiser un événement en ligne sur Discord](#organiser-un-vnement-en-ligne-sur-discord).",
-  "pg_self_organize": "## Auto-organiser une ronde\n\nCertains événements décontractés à rondes libres permettent aux joueurs de démarrer leurs propres rondes. Si l'organisateur a activé cette option, vous verrez un bouton **Auto-organiser une ronde** sur la page du tournoi une fois inscrit.\n\nRassemblez 3 ou 4 autres joueurs inscrits, appuyez sur le bouton et sélectionnez-les dans la liste (vous êtes ajouté automatiquement). Appuyez sur **Démarrer la ronde** et l'application place votre pod de 4–5 — sans avoir besoin d'un organisateur. Jouez et déclarez vos scores normalement ; l'organisateur termine la ronde quand elle est finie."
+  "pg_self_organize": "## Auto-organiser une ronde\n\nCertains événements décontractés à rondes libres permettent aux joueurs de démarrer leurs propres rondes. Si l'organisateur a activé cette option, vous verrez un bouton **Auto-organiser une ronde** sur la page du tournoi une fois inscrit.\n\nRassemblez 3 ou 4 autres joueurs inscrits, appuyez sur le bouton et sélectionnez-les dans la liste (vous êtes ajouté automatiquement). Appuyez sur **Démarrer la ronde** et l'application place votre pod de 4–5 — sans avoir besoin d'un organisateur. Jouez et déclarez vos scores normalement ; l'organisateur termine la ronde quand elle est finie.",
+  "notifications_label": "Notifications push",
+  "notifications_description": "Nous vous notifierons uniquement de vos placements à une table et des annonces de l’organisateur — rien d’autre.",
+  "notifications_enable": "Activer",
+  "notifications_turn_off": "Désactiver",
+  "notifications_blocked": "Bloquées — autorisez les notifications dans les paramètres de votre navigateur",
+  "notifications_unsupported": "Non pris en charge sur cet appareil",
+  "notifications_enabled_toast": "Notifications activées",
+  "notifications_denied_toast": "Les notifications sont bloquées. Autorisez-les dans les paramètres de votre navigateur pour recevoir vos placements à une table.",
+  "notifications_prompt_title": "Soyez notifié(e) quand votre table est prête",
+  "notifications_prompt_body": "Activez les notifications pour vos placements à une table et les annonces de l’organisateur.",
+  "notifications_prompt_enable": "Activer les notifications",
+  "notifications_prompt_dismiss": "Pas maintenant",
+  "notifications_ios_title": "Ajoutez Archon à votre écran d’accueil",
+  "notifications_ios_body": "Pour recevoir des notifications sur iPhone ou iPad, installez d’abord l’appli : appuyez sur le bouton Partager, puis sur « Ajouter à l’écran d’accueil ».",
+  "notifications_ios_dismiss": "Compris"
 }

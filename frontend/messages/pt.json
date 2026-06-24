@@ -1297,5 +1297,20 @@
   "og_faq_a_proxy": "Um assento ocupado por alguém que não está realmente competindo — por exemplo, um oficial substituindo um jogador ausente com um deck aleatório. Seus VP contam para os oponentes e para a validação da ordem de oust, mas o proxy não obtém classificação, pontos de rating nem vaga na final. Isso é diferente da configuração **Permitir proxies**, que trata de cartas proxy nas listas de decks.",
   "og_faq_q_discord": "Preciso do bot do Discord para realizar um evento online?",
   "og_faq_a_discord": "Não. Os torneios online funcionam inteiramente no aplicativo (cronômetro, Chamar árbitro, anúncios). O bot do Discord é uma comodidade opcional: configura canais de voz por mesa, um evento agendado e permite que os jogadores se inscrevam, façam check-in, declarem resultados e chamem um árbitro pelo Discord. Veja [Realizar um Evento Online no Discord](#realizar-um-evento-online-no-discord).",
-  "pg_self_organize": "## Auto-organizar uma rodada\n\nAlguns eventos casuais de rodadas abertas permitem que os jogadores iniciem suas próprias rodadas. Se o organizador tiver ativado isso, você verá um botão **Auto-organizar uma rodada** na página do torneio assim que estiver inscrito.\n\nReúna outros 3 ou 4 jogadores inscritos, toque no botão e selecione-os da lista (você é adicionado automaticamente). Toque em **Iniciar rodada** e o aplicativo distribui os assentos do seu pod de 4–5 — sem precisar de um organizador. Jogue e declare suas pontuações normalmente; o organizador encerra a rodada quando ela estiver concluída."
+  "pg_self_organize": "## Auto-organizar uma rodada\n\nAlguns eventos casuais de rodadas abertas permitem que os jogadores iniciem suas próprias rodadas. Se o organizador tiver ativado isso, você verá um botão **Auto-organizar uma rodada** na página do torneio assim que estiver inscrito.\n\nReúna outros 3 ou 4 jogadores inscritos, toque no botão e selecione-os da lista (você é adicionado automaticamente). Toque em **Iniciar rodada** e o aplicativo distribui os assentos do seu pod de 4–5 — sem precisar de um organizador. Jogue e declare suas pontuações normalmente; o organizador encerra a rodada quando ela estiver concluída.",
+  "notifications_label": "Notificações push",
+  "notifications_description": "Vamos notificar você apenas sobre os assentos da sua mesa e os anúncios do organizador — nada mais.",
+  "notifications_enable": "Ativar",
+  "notifications_turn_off": "Desativar",
+  "notifications_blocked": "Bloqueadas — permita as notificações nas configurações do seu navegador",
+  "notifications_unsupported": "Não suportado neste dispositivo",
+  "notifications_enabled_toast": "Notificações ativadas",
+  "notifications_denied_toast": "As notificações estão bloqueadas. Ative-as nas configurações do seu navegador para receber os assentos da sua mesa.",
+  "notifications_prompt_title": "Receba avisos quando sua mesa estiver pronta",
+  "notifications_prompt_body": "Ative as notificações para os assentos da sua mesa e os anúncios do organizador.",
+  "notifications_prompt_enable": "Ativar notificações",
+  "notifications_prompt_dismiss": "Agora não",
+  "notifications_ios_title": "Adicione o Archon à sua tela inicial",
+  "notifications_ios_body": "Para receber notificações no iPhone ou iPad, instale o app primeiro: toque no botão Compartilhar e depois em “Adicionar à Tela Inicial”.",
+  "notifications_ios_dismiss": "Entendido"
 }

@@ -50,11 +50,17 @@
 - [Destructive store-wipe offline rescue](destructive-store-wipe-offline-rescue.md) — db.ts upgrade AND sync.ts clearAllStores both wipe stores; must rescue the FULL offline set (tournament + sanctions + decks + player-stubs).
 - objects has two timestamps (column modified_at vs JSONB modified); never mix in the since-cursor — see SYNC.md (Sync Cursor).
 - tournament_transaction connection discipline (reads join txn; writes acquire pool independently; never a 2nd conn under lock) — see ARCHITECTURE.md (Database Access & Connection Model).
-- [Asset-cleanup autocommit non-atomicity](asset-cleanup-autocommit-nonatomic.md) — pool is autocommit=True, so multi-statement writes needing consistency require explicit conn.transaction(); delete_object/purge are the fixed exemplar (object + avatars/banners side-row deletes, no FK cascade) — don't re-fix them.
+- [Asset-cleanup autocommit non-atomicity](asset-cleanup-autocommit-nonatomic.md) — pool is autocommit=True, so multi-statement writes needing consistency require explicit conn.transaction(); delete_object/purge are the fixed exemplar (object + avatars/banners/push_subscriptions side-row deletes, no FK cascade) — don't re-fix them.
 - [finals.seed_order is a UID field](finals-seed-order-uid-field.md) — holds player user_uids; easily missed in any per-player UID remap.
 - [Error localization across throw surfaces](error-localization-offline-path-trap.md) — engine-error localization covers HTTP + offline WASM + JS pre-checks (wired); preserve all three when changing error presentation.
 - [Resync branch zero-delay loop](sync-resync-branch-zero-delay-loop.md) — sync.ts resync onmessage branch reconnects with NO delay; cold-start trigger fixed, branch unguarded for any other persistent resync cause; route resync reconnects through backoff.
 - [go-online self-echo + 409 gap](go-online-self-echo-409-gap.md) — FIXED: broadcast_precomputed exclude_device_id self-excludes the initiating device + goingOnlineUids guard (HTTP response is sole authority in-flight) + 409→clearOfflineState. Residual: bounded in-flight reconciliation window.
+
+## Web Push (#314)
+- [Web Push VAPID thread + claims traps](webpush-vapid-thread-and-claims.md) — `vapid_claims` dict IS mutated per-send (fresh dict required); `Vapid01` instance is NOT (safe to share across to_thread). Backwards from intuition.
+- Push subs = `push_subscriptions` side table (endpoint PK), NOT synced objects — same carve-out as avatars/banners/oauth_*. Pruned on 404/410 at send + owner hard-delete (delete_object AND purge).
+- Sends are fire-and-forget `asyncio.create_task` POST-commit (outside tournament_transaction); helpers own their errors. No DB-touching task inside the lock — preserve for any new push trigger.
+- `pushsubscriptionchange` SW handler re-subscribes LOCALLY only (SW has no auth); app lazy-reconciles via authed `/api/push/subscribe` on next open (reconcilePush in +layout). No unauthenticated endpoint-rewrite path — keep it that way.
 
 ## Deck Parsing
 - [Deck parser prefix-match trap](deck-parser-prefix-match-trap.md) — try_name_first count-strip + by_name prefix match miscount count-less lines (Channel 10/AK-47/Kpist m/45); group-from-tail (Annabelle G3 vs G6) untested bug; fix = exact-key gating, not krcg regex.

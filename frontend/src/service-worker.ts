@@ -72,3 +72,64 @@ sw.addEventListener('message', (event) => {
     sw.skipWaiting();
   }
 });
+
+// --- Web Push (#314) ---------------------------------------------------------
+// Backend payload: { title, body, url, tag }. iOS revokes permission if a push
+// doesn't show a notification, so this ALWAYS calls showNotification.
+sw.addEventListener('push', (event) => {
+  let data: { title?: string; body?: string; url?: string; tag?: string } = {};
+  try {
+    data = event.data?.json() ?? {};
+  } catch {
+    data = { body: event.data?.text() ?? '' };
+  }
+  event.waitUntil(
+    sw.registration.showNotification(data.title || 'Archon', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.tag, // collapse repeats (e.g. same round re-started)
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
+// Tap → focus an open tab (navigating it to the deep link), else open one. The deep
+// link resolves offline (the app reads it from IndexedDB), so no network is required.
+sw.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data?.url as string) || '/';
+  event.waitUntil(
+    sw.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clients) => {
+        for (const client of clients) {
+          if ('focus' in client) {
+            client.focus();
+            if ('navigate' in client) client.navigate(url).catch(() => {});
+            return undefined;
+          }
+        }
+        return sw.clients.openWindow(url);
+      })
+  );
+});
+
+// Browser rotated the subscription. Re-subscribe locally with the same server key so
+// pushManager.getSubscription() is valid again; the app re-POSTs it on next open (lazy
+// reconcile) and the stale endpoint is pruned server-side on its next 404/410.
+sw.addEventListener('pushsubscriptionchange', (event) => {
+  const e = event as Event & {
+    oldSubscription?: PushSubscription;
+    newSubscription?: PushSubscription;
+  };
+  if (e.newSubscription) return; // browser already provided a replacement
+  const appServerKey = e.oldSubscription?.options?.applicationServerKey;
+  if (!appServerKey) return; // app will reconcile from scratch on next open
+  event.waitUntil(
+    sw.registration.pushManager
+      .subscribe({ userVisibleOnly: true, applicationServerKey: appServerKey })
+      .then(() => undefined)
+      .catch(() => undefined)
+  );
+});

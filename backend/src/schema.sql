@@ -120,6 +120,24 @@ CREATE TABLE IF NOT EXISTS transient_tokens (
 CREATE INDEX IF NOT EXISTS idx_transient_tokens_expires
 ON transient_tokens(expires_at);
 
+-- Web Push subscriptions (server-side send credentials; never synced — see #314).
+-- Like avatars/banners/oauth_*, a side table kept OUT of the synced objects table:
+-- these are push endpoints the backend SENDS to, not user-visible display data, so
+-- the public/member/full projection pipeline buys nothing and would leak push keys.
+-- One row per (browser, endpoint); a user may hold many across devices. Rows are
+-- pruned on 404/410 at send time and on owner hard-delete (purge_deleted_objects).
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint TEXT PRIMARY KEY,
+    user_uid TEXT NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    ua TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_uid
+ON push_subscriptions(user_uid);
+
 -- ---------------------------------------------------------------
 -- Unified objects table (users, tournaments, sanctions, leagues, etc.)
 -- ---------------------------------------------------------------

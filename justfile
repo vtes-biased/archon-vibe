@@ -120,6 +120,11 @@ cards:
 build-geonames:
     uv run python backend/scripts/build_geonames.py
 
+# Generate a VAPID keypair for Web Push (#314). One per env; store the private key in
+# ansible-vault, never commit it. Rotating invalidates all existing subscriptions.
+vapid-keys:
+    uv run python backend/scripts/gen_vapid_keys.py
+
 # Reset dev database (clears all data)
 dev-reset:
     #!/usr/bin/env bash

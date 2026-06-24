@@ -235,6 +235,50 @@ Member-contributed links to external community resources, with moderator oversig
 
 Paraglide JS (inlang), client-only (no SSR for the SPA). Locales `en` (default), `fr`, `es`, `pt`, `it` in `frontend/messages/*.json`; a Vite plugin compiles them to TypeScript (`$lib/paraglide/messages`). Browser auto-detection (`preferredLanguage`) + cookie persistence; manual `LocaleSwitcher.svelte` in the desktop sidebar.
 
+## Web Push Notifications
+
+Opt-in browser push notifications for tournament events. Degrades gracefully when VAPID keys are absent (`is_configured()` → no-op); gated on iOS behind Add-to-Home-Screen (PWA standalone mode).
+
+### Side Table
+
+`push_subscriptions(endpoint PK, user_uid, p256dh, auth, ua, created_at, last_seen_at)` — **not** in the synced `objects` table and not projected (send credentials, never display data; same pattern as `avatars`/`banners`/`oauth_*`). Indexed on `user_uid`. Pruned on owner hard-delete (`delete_object` + `purge_deleted_objects` in `db.py`) and lazily on send-time 404/410.
+
+### VAPID Config
+
+Three env vars: `VAPID_PRIVATE_KEY` (raw base64url scalar, loaded via `Vapid01.from_raw`), `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`. Keygen: `just vapid-keys` → `backend/scripts/gen_vapid_keys.py`. Private key + subject are ansible-vault secrets; `.env.example` has the blank vars.
+
+**VAPID public key is delivered at runtime** (`GET /api/push/vapid-key`), not baked into the frontend build — the frontend ships as one release artifact across all envs; a baked key would force beta and prod to share a keypair.
+
+### Backend Send Path (`backend/src/push_service.py`)
+
+Pure payload builders `build_seating_payloads` / `build_announcement_payload`. `send_to_users` fans out over `asyncio.to_thread` (blocking `pywebpush.webpush`) under `Semaphore(12)` to cap concurrency against the small connection pool. Sends fire as `asyncio.create_task` **after** `tournament_transaction` commits — a DB-touching task must never run inside the lock (see DB invariant in Connection discipline above).
+
+### Triggers (v1)
+
+| Event | Who receives | Where fired |
+|-------|-------------|-------------|
+| `StartRound` / `SelfOrganizeRound` / `StartFinals` | Each player newly seated in `rounds[-1]` or `finals.seating` | `_maybe_push_seating` in `routes/tournaments.py` |
+| `POST /{uid}/announce` | All checked-in participants except the poster | `_maybe_push_announcement` in `routes/tournaments.py` |
+
+`RestoreRound` is excluded (re-seats no one). Each send is fire-and-forget; delivery failure never delays the action response.
+
+### Routes (`backend/src/routes/push.py`)
+
+- `GET /api/push/vapid-key` — public key (503 when not configured)
+- `POST /api/push/subscribe` — authed upsert; covers initial subscribe + lazy reconcile after `pushsubscriptionchange`
+- `POST /api/push/unsubscribe` — authed drop
+
+No unauthenticated rotate endpoint (an endpoint-only rewrite would be a notification-hijack vector); stale rows are pruned on 404/410 at send time.
+
+### Frontend
+
+- SW handlers in `service-worker.ts`: `push` → `showNotification`; `notificationclick` → focus/open deep-link; `pushsubscriptionchange` → local re-subscribe (the SW has no auth; the updated endpoint is reconciled server-side on next app-open via `reconcilePush()`).
+- Store: `lib/stores/push.svelte.ts` — subscribe/unsubscribe/lazy-reconcile, permission + iOS/standalone detection.
+- API client fns: `lib/api.ts`.
+- Profile toggle: `profile/AppSettings.svelte`.
+- Per-tournament opt-in + iOS A2HS nudge: `tournaments/[uid]/PushOptIn.svelte` (shown to checked-in participants of a live tournament).
+- Lazy reconcile on app open: `+layout.svelte`.
+
 ## Binary Asset System
 
 Binary image blobs are stored in dedicated side tables (`avatars`, `banners`) — **not** in the unified `objects` table. The `objects` table rows are projected into public/member/full JSONB and streamed via SSE to every client's IndexedDB; blobs must stay off that path. Each side table uses the owning object's uid as PK plus `data BYTEA` + `content_type`.
@@ -331,4 +375,4 @@ Search engines (Googlebot, Bingbot) are deliberately excluded from the UA list �
 | Rating recompute | Daily | `ratings.py` | Full recompute of all player ratings and wins |
 | OAuth cleanup | Hourly | `db_oauth.py` | Clean expired authorization codes and revoked tokens |
 | Snapshot generation | Every 15 min | `snapshots.py` | Regenerate gzip snapshots (public/member/full) for initial sync |
-| Deleted objects purge | Daily | `db.py` | Hard-delete soft-deleted objects older than 30 days; also drops orphaned `avatars`/`banners` side-table rows (no FK cascade) |
+| Deleted objects purge | Daily | `db.py` | Hard-delete soft-deleted objects older than 30 days; also drops orphaned `avatars`/`banners`/`push_subscriptions` side-table rows (no FK cascade; push rows also pruned on-send on 404/410) |

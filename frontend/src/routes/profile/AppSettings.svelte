@@ -1,8 +1,34 @@
 <script lang="ts">
-  import { Monitor, Sun, Moon } from "@lucide/svelte";
+  import { Monitor, Sun, Moon, Bell } from "@lucide/svelte";
+  import { onMount } from "svelte";
   import { getTheme, setTheme, type ThemePref } from "$lib/stores/theme.svelte";
   import { getLocale, setLocale, locales } from '$lib/paraglide/runtime.js';
   import * as m from '$lib/paraglide/messages.js';
+  import Button from "$lib/components/Button.svelte";
+  import { showToast } from "$lib/stores/toast.svelte";
+  import {
+    pushSupported,
+    getPushPermission,
+    isPushSubscribed,
+    isPushBusy,
+    enablePush,
+    disablePush,
+    refreshPushState,
+  } from "$lib/stores/push.svelte";
+
+  onMount(refreshPushState);
+
+  async function toggleNotifications() {
+    if (isPushSubscribed()) {
+      await disablePush();
+    } else {
+      const ok = await enablePush();
+      showToast({
+        type: ok ? "success" : "error",
+        message: ok ? m.notifications_enabled_toast() : m.notifications_denied_toast(),
+      });
+    }
+  }
 
   const localeLabels: Record<string, string> = {
     en: 'EN', fr: 'FR', es: 'ES', pt: 'PT', it: 'IT',
@@ -57,5 +83,25 @@
         </button>
       {/each}
     </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="space-y-2">
+    <span class="block text-sm text-ink-muted">{m.notifications_label()}</span>
+    {#if !pushSupported()}
+      <p class="text-sm text-ink-muted">{m.notifications_unsupported()}</p>
+    {:else if getPushPermission() === 'denied'}
+      <p class="text-sm text-ink-muted">{m.notifications_blocked()}</p>
+    {:else}
+      <Button
+        variant={isPushSubscribed() ? 'secondary' : 'primary'}
+        loading={isPushBusy()}
+        onclick={toggleNotifications}
+      >
+        <Bell class="w-4 h-4" />
+        {isPushSubscribed() ? m.notifications_turn_off() : m.notifications_enable()}
+      </Button>
+      <p class="text-xs text-ink-muted">{m.notifications_description()}</p>
+    {/if}
   </div>
 </div>

@@ -425,6 +425,9 @@ async def delete_object(
             await c.execute("DELETE FROM objects WHERE uid = %s", (uid,))
             await c.execute("DELETE FROM avatars WHERE user_uid = %s", (uid,))
             await c.execute("DELETE FROM banners WHERE tournament_uid = %s", (uid,))
+            await c.execute(
+                "DELETE FROM push_subscriptions WHERE user_uid = %s", (uid,)
+            )
 
     if conn:
         await _run(conn)
@@ -582,6 +585,9 @@ async def purge_deleted_objects(days: int = 30) -> int:
                 )
                 await conn.execute(
                     "DELETE FROM banners WHERE tournament_uid = ANY(%s)", (purged,)
+                )
+                await conn.execute(
+                    "DELETE FROM push_subscriptions WHERE user_uid = ANY(%s)", (purged,)
                 )
         return len(purged)
 
@@ -1304,3 +1310,61 @@ async def cleanup_expired_tokens() -> int:
         )
         rows = await result.fetchall()
         return len(rows)
+
+
+# ---------------------------------------------------------------------------
+# Web Push subscriptions (#314): server-side send credentials, never synced.
+# ---------------------------------------------------------------------------
+
+
+async def save_push_subscription(
+    *, endpoint: str, user_uid: str, p256dh: str, auth: str, ua: str | None = None
+) -> None:
+    """Upsert a browser's push subscription, keyed by endpoint (re-subscribe = update)."""
+    async with get_connection() as conn:
+        await conn.execute(
+            """
+            INSERT INTO push_subscriptions
+                (endpoint, user_uid, p256dh, auth, ua, last_seen_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (endpoint) DO UPDATE SET
+                user_uid = EXCLUDED.user_uid,
+                p256dh = EXCLUDED.p256dh,
+                auth = EXCLUDED.auth,
+                ua = EXCLUDED.ua,
+                last_seen_at = NOW()
+            """,
+            (endpoint, user_uid, p256dh, auth, ua),
+        )
+
+
+async def delete_push_subscription(
+    endpoint: str, user_uid: str | None = None
+) -> None:
+    """Delete a subscription. Scope by ``user_uid`` for user-initiated unsubscribe;
+    omit it for the send-path 404/410 prune (the endpoint is gone for everyone)."""
+    async with get_connection() as conn:
+        if user_uid is None:
+            await conn.execute(
+                "DELETE FROM push_subscriptions WHERE endpoint = %s", (endpoint,)
+            )
+        else:
+            await conn.execute(
+                "DELETE FROM push_subscriptions WHERE endpoint = %s AND user_uid = %s",
+                (endpoint, user_uid),
+            )
+
+
+async def get_push_subscriptions_for_users(
+    user_uids: list[str],
+) -> list[tuple[str, str, str, str]]:
+    """All (endpoint, user_uid, p256dh, auth) rows for the given users (fan-out query)."""
+    if not user_uids:
+        return []
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT endpoint, user_uid, p256dh, auth "
+            "FROM push_subscriptions WHERE user_uid = ANY(%s)",
+            (user_uids,),
+        )
+        return await result.fetchall()

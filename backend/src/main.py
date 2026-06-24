@@ -51,6 +51,7 @@ from .routes import (
     cards,
     leagues,
     oauth,
+    push,
     sanctions,
     tournaments,
     users,
@@ -533,6 +534,7 @@ app.include_router(oauth.router)
 app.include_router(cards.router)
 app.include_router(leagues.router)
 app.include_router(calendar.router)
+app.include_router(push.router)
 
 
 @app.get("/")

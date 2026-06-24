@@ -202,6 +202,35 @@ async def _maybe_push_vekn(tournament: Tournament) -> None:
         logger.exception("Failed to push VEKN results")
 
 
+async def _maybe_push_seating(tournament: Tournament, event_type: str) -> None:
+    """Web Push each seated player their table/seat for a just-started round (#314)."""
+    try:
+        from .. import push_service
+
+        targets = push_service.build_seating_payloads(tournament, event_type)
+        await push_service.send_to_users(targets)
+    except Exception:
+        logger.exception("Failed to send seating push for %s", tournament.uid)
+
+
+async def _maybe_push_announcement(
+    tournament: Tournament, body: str, exclude_uid: str
+) -> None:
+    """Web Push an organizer announcement to all participants but the poster (#314)."""
+    try:
+        from .. import push_service
+
+        payload = push_service.build_announcement_payload(tournament, body)
+        uids = {
+            p.user_uid
+            for p in tournament.players
+            if p.user_uid and p.user_uid != exclude_uid
+        }
+        await push_service.send_to_users([(uid, payload) for uid in uids])
+    except Exception:
+        logger.exception("Failed to send announcement push for %s", tournament.uid)
+
+
 async def _maybe_push_vekn_event(tournament: Tournament) -> None:
     """Create VEKN calendar event if VEKN_PUSH is enabled."""
     try:
@@ -1254,6 +1283,12 @@ async def tournament_action(
 
     broadcast_precomputed(tournament_bd)
 
+    # Web Push seating notification (#314): on a just-started round/finals, push each
+    # seated player their table+seat. Fire-and-forget, post-commit (a DB-touching task
+    # must not run inside tournament_transaction). RestoreRound re-seats no one → excluded.
+    if request.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
+        asyncio.create_task(_maybe_push_seating(updated, request.type))
+
     # Recompute ratings when the tournament enters/leaves Finished (state change),
     # or when a result-affecting action lands on an already-finished tournament
     # (e.g. SetScore/Override correction). Skip the recompute for finished-state
@@ -1596,6 +1631,9 @@ async def post_announcement(
             conn=tx_conn,
         )
     broadcast_precomputed(bd)
+    # Web Push announcement (#314): fire-and-forget to every participant except the
+    # posting organizer (who has the composer open). Post-commit, like seating above.
+    asyncio.create_task(_maybe_push_announcement(tournament, body, user.uid))
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 

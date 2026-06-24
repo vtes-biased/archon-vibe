@@ -35,6 +35,7 @@ import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
   import JudgeCallBanner from "./JudgeCallBanner.svelte";
   import AnnouncementBanner from "./AnnouncementBanner.svelte";
+  import PushOptIn from "./PushOptIn.svelte";
   import AnnouncementComposer from "./AnnouncementComposer.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
@@ -63,6 +64,14 @@ import TournamentModals from "./TournamentModals.svelte";
   );
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
+  );
+  // Push opt-in eligibility (#314): a participant in a live tournament who hasn't
+  // dropped out — the moment "which table am I at?" actually matters.
+  const pushEligible = $derived(
+    !!currentPlayerEntry &&
+    (tournament?.state === "Waiting" || tournament?.state === "Playing") &&
+    currentPlayerEntry.state !== "Finished" &&
+    currentPlayerEntry.state !== "Disqualified"
   );
   let viewAsPlayer = $state(false);
   let showDeleteConfirm = $state(false);
@@ -745,6 +754,7 @@ import TournamentModals from "./TournamentModals.svelte";
         <AnnouncementComposer {tournament} />
       {:else}
         <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
+        <PushOptIn tournamentUid={uid} eligible={pushEligible} />
       {/if}
 
       <!-- Organizer Console with Tabs -->

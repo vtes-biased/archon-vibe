@@ -7,6 +7,7 @@
   import { engineLoadFailed } from '$lib/stores/engine-ready.svelte';
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState } from '$lib/stores/offline.svelte';
+  import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
   import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
   import Toast from '$lib/components/Toast.svelte';
@@ -60,7 +61,12 @@
     initEngine().catch(err => console.error('Failed to initialize engine:', err));
 
     // Initialize auth state, then connect SSE with valid token
-    initAuth().then(() => syncManager.connect());
+    initAuth().then(() => {
+      syncManager.connect();
+      // Lazy-reconcile the push subscription once authed (#314): re-register a
+      // subscription the SW rotated/re-created while the app was closed.
+      reconcilePush();
+    });
 
     // Restore offline tournament state from IndexedDB
     initOfflineState().catch(err => console.error('Failed to init offline state:', err));

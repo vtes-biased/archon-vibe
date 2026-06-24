@@ -126,6 +126,32 @@ export function requireOnline({ suppressErrorToast = false }: { suppressErrorToa
   throw new ApiError(message, 0);
 }
 
+// --- Web Push (#314) ---------------------------------------------------------
+
+/** Per-env VAPID public key (applicationServerKey) the browser subscribes with. */
+export async function getVapidPublicKey(): Promise<string> {
+  const { key } = await apiRequest<{ key: string }>('/api/push/vapid-key', {}, { suppressErrorToast: true });
+  return key;
+}
+
+/** Register (upsert) the browser's push subscription for the current user. */
+export async function registerPushSubscription(sub: PushSubscriptionJSON): Promise<void> {
+  await apiRequest<void>(
+    '/api/push/subscribe',
+    { method: 'POST', body: JSON.stringify(sub) },
+    { suppressErrorToast: true }
+  );
+}
+
+/** Drop the browser's push subscription server-side (toggle off). */
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await apiRequest<void>(
+    '/api/push/unsubscribe',
+    { method: 'POST', body: JSON.stringify({ endpoint }) },
+    { suppressErrorToast: true }
+  );
+}
+
 /**
  * Fetch users - always use IndexedDB for offline-first approach.
  */
