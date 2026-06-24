@@ -28,6 +28,7 @@ class PushKeys(BaseModel):
 class SubscribeRequest(BaseModel):
     endpoint: str
     keys: PushKeys
+    locale: str = "en"  # browser UI language; payload bodies render per-subscription
 
 
 class UnsubscribeRequest(BaseModel):
@@ -56,6 +57,7 @@ async def subscribe(
         p256dh=body.keys.p256dh,
         auth=body.keys.auth,
         ua=request.headers.get("user-agent"),
+        locale=body.locale,
     )
     return Response(status_code=204)
 

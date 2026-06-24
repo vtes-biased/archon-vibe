@@ -132,9 +132,12 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     p256dh TEXT NOT NULL,
     auth TEXT NOT NULL,
     ua TEXT,
+    locale TEXT NOT NULL DEFAULT 'en',  -- browser locale; payload bodies render per-row
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Idempotent for a dev DB that created the table before locale existed.
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'en';
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_uid
 ON push_subscriptions(user_uid);
 

@@ -58,30 +58,75 @@ def vapid_public_key() -> str:
     return _VAPID_PUBLIC_KEY
 
 
-# --- Payload builders (pure; the one part worth a unit test) ------------------
+# --- Localized message templates ----------------------------------------------
+#
+# Only the TEMPLATED bodies are localized. The announcement body is organizer free
+# text (rendered as typed); a title that is a tournament name isn't translatable.
+# Bodies render per-SUBSCRIPTION (a user may carry a FR phone and an EN laptop),
+# keyed by the locale stored on each push_subscriptions row. en is the source; the
+# other locales are maintained by the i18n-translator — keep the {placeholders} intact.
+
+_FALLBACK_LOCALE = "en"
+
+_PUSH_MESSAGES: dict[str, dict[str, str]] = {
+    "en": {
+        "seating_round": "Round {round} — you're at Table {table}, seat {seat}.",
+        "seating_finals": "Finals — you're at the table, seat {seat}.",
+        "judge_title": "Judge call",
+        "judge_body": "{player} needs a judge at {table}.",
+    },
+    "fr": {
+        "seating_round": "Ronde {round} — vous êtes à la table {table}, siège {seat}.",
+        "seating_finals": "Finale — vous êtes à la table, siège {seat}.",
+        "judge_title": "Appel d'arbitre",
+        "judge_body": "{player} demande un arbitre à {table}.",
+    },
+    "es": {
+        "seating_round": "Ronda {round} — estás en la mesa {table}, asiento {seat}.",
+        "seating_finals": "Final — estás en la mesa, asiento {seat}.",
+        "judge_title": "Llamada al juez",
+        "judge_body": "{player} necesita un juez en {table}.",
+    },
+    "pt": {
+        "seating_round": "Rodada {round} — você está na mesa {table}, assento {seat}.",
+        "seating_finals": "Final — você está na mesa, assento {seat}.",
+        "judge_title": "Chamada de juiz",
+        "judge_body": "{player} precisa de um juiz em {table}.",
+    },
+    "it": {
+        "seating_round": "Round {round} — sei al tavolo {table}, posto {seat}.",
+        "seating_finals": "Finale — sei al tavolo, posto {seat}.",
+        "judge_title": "Chiamata giudice",
+        "judge_body": "{player} chiede un giudice a {table}.",
+    },
+}
 
 
-def build_seating_payloads(t: Tournament, event_type: str) -> list[tuple[str, dict]]:
-    """(user_uid, payload) for each player seated by a just-started round/finals.
+def _loc(locale: str | None) -> str:
+    return locale if locale in _PUSH_MESSAGES else _FALLBACK_LOCALE
 
-    Enumerates ONLY the newly-appended round (``t.rounds[-1]``) or the finals table, so
-    StartRound (all tables), SelfOrganizeRound (one pod), and StartFinals are handled
-    uniformly: a parallel-pod player who was not re-seated gets nothing. RestoreRound is
-    excluded by the caller (it re-seats no one).
+
+# --- Notification specs (pure data; localized at send time) --------------------
+
+
+def build_seating_specs(t: Tournament, event_type: str) -> list[tuple[str, dict]]:
+    """(user_uid, spec) for each player seated by a just-started round/finals.
+
+    A *spec* is locale-independent data; ``render_payload(spec, locale)`` turns it into
+    the wire notification. Enumerates ONLY the newly-appended round (``t.rounds[-1]``) or
+    the finals table, so StartRound (all tables), SelfOrganizeRound (one pod), and
+    StartFinals are uniform; a parallel-pod player who was not re-seated gets nothing.
+    RestoreRound is excluded by the caller (it re-seats no one).
     """
     if event_type == "StartFinals":
         if t.finals is None:
             return []
         url = f"/tournaments/{t.uid}?finals=1"
+        tag = f"seating-{t.uid}-finals"
         return [
             (
                 seat.player_uid,
-                {
-                    "title": t.name,
-                    "body": f"Finals — you're at the table, seat {i + 1}.",
-                    "url": url,
-                    "tag": f"seating-{t.uid}-finals",
-                },
+                {"kind": "seating_finals", "title": t.name, "seat": i + 1, "url": url, "tag": tag},
             )
             for i, seat in enumerate(t.finals.seating)
         ]
@@ -89,6 +134,7 @@ def build_seating_payloads(t: Tournament, event_type: str) -> list[tuple[str, di
     if not t.rounds:
         return []
     round_no = len(t.rounds)
+    tag = f"seating-{t.uid}-{round_no}"
     out: list[tuple[str, dict]] = []
     for table_idx, table in enumerate(t.rounds[-1]):
         for seat_idx, seat in enumerate(table.seating):
@@ -96,21 +142,23 @@ def build_seating_payloads(t: Tournament, event_type: str) -> list[tuple[str, di
                 (
                     seat.player_uid,
                     {
+                        "kind": "seating_round",
                         "title": t.name,
-                        "body": (
-                            f"Round {round_no} — you're at Table {table_idx + 1}, "
-                            f"seat {seat_idx + 1}."
-                        ),
+                        "round": round_no,
+                        "table": table_idx + 1,
+                        "seat": seat_idx + 1,
                         "url": f"/tournaments/{t.uid}?table={table_idx + 1}",
-                        "tag": f"seating-{t.uid}-{round_no}",
+                        "tag": tag,
                     },
                 )
             )
     return out
 
 
-def build_announcement_payload(t: Tournament, body: str) -> dict:
+def build_announcement_spec(t: Tournament, body: str) -> dict:
+    # body is organizer free text — never localized.
     return {
+        "kind": "announcement",
         "title": t.name,
         "body": body,
         "url": f"/tournaments/{t.uid}#announcements",
@@ -118,12 +166,14 @@ def build_announcement_payload(t: Tournament, body: str) -> dict:
     }
 
 
-def build_judge_call_payload(
+def build_judge_call_spec(
     *, tournament_uid: str, tournament_name: str, table: int, table_label: str, player_name: str
 ) -> dict:
     return {
-        "title": f"Judge call · {tournament_name}",
-        "body": f"{player_name} needs a judge at {table_label}.",
+        "kind": "judge",
+        "title": tournament_name,
+        "player": player_name,
+        "table": table_label,
         "url": f"/tournaments/{tournament_uid}",
         "tag": f"judge-{tournament_uid}-{table}",
         # Re-alert even if a prior call at this table is still on screen — the
@@ -132,15 +182,40 @@ def build_judge_call_payload(
     }
 
 
+def render_payload(spec: dict, locale: str) -> dict:
+    """Localize a notification spec into the wire payload for a subscription's locale."""
+    m = _PUSH_MESSAGES[_loc(locale)]
+    kind = spec["kind"]
+    if kind == "seating_round":
+        title = spec["title"]
+        body = m["seating_round"].format(
+            round=spec["round"], table=spec["table"], seat=spec["seat"]
+        )
+    elif kind == "seating_finals":
+        title = spec["title"]
+        body = m["seating_finals"].format(seat=spec["seat"])
+    elif kind == "judge":
+        title = f"{m['judge_title']} · {spec['title']}"
+        body = m["judge_body"].format(player=spec["player"], table=spec["table"])
+    else:  # announcement: tournament-name title, free-text body — neither localized
+        title = spec["title"]
+        body = spec["body"]
+    payload = {"title": title, "body": body, "url": spec["url"], "tag": spec["tag"]}
+    if spec.get("renotify"):
+        payload["renotify"] = True
+    return payload
+
+
 # --- Delivery -----------------------------------------------------------------
 
 
 async def send_to_users(targets: list[tuple[str, dict]]) -> None:
-    """Deliver per-user payloads to every device each user has subscribed.
+    """Deliver a per-user notification spec to every device the user subscribed,
+    rendered in EACH subscription's own locale.
 
-    ``targets`` is (user_uid, payload) pairs (one payload per user). Looks up all
-    subscriptions for the target users in one query, then sends each via a bounded
-    thread-pool offload of the blocking ``webpush`` call, pruning rows on 404/410.
+    ``targets`` is (user_uid, spec) pairs. Looks up all subscriptions for the target
+    users in one query, then sends each via a bounded thread-pool offload of the
+    blocking ``webpush`` call, pruning rows on 404/410.
     """
     if not is_configured() or not targets:
         return
@@ -151,10 +226,13 @@ async def send_to_users(targets: list[tuple[str, dict]]) -> None:
 
     sem = asyncio.Semaphore(_MAX_CONCURRENT_SENDS)
 
-    async def _send(endpoint: str, user_uid: str, p256dh: str, auth: str) -> None:
-        payload = by_user.get(user_uid)
-        if payload is None:
+    async def _send(
+        endpoint: str, user_uid: str, p256dh: str, auth: str, locale: str
+    ) -> None:
+        spec = by_user.get(user_uid)
+        if spec is None:
             return
+        payload = render_payload(spec, locale)
         async with sem:
             try:
                 await asyncio.to_thread(_webpush_sync, endpoint, p256dh, auth, payload)

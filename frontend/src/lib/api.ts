@@ -134,11 +134,16 @@ export async function getVapidPublicKey(): Promise<string> {
   return key;
 }
 
-/** Register (upsert) the browser's push subscription for the current user. */
-export async function registerPushSubscription(sub: PushSubscriptionJSON): Promise<void> {
+/** Register (upsert) the browser's push subscription for the current user. The
+ *  locale is stored per-subscription so notification bodies render in this device's
+ *  language (a user may have a FR phone and an EN laptop). */
+export async function registerPushSubscription(
+  sub: PushSubscriptionJSON,
+  locale: string
+): Promise<void> {
   await apiRequest<void>(
     '/api/push/subscribe',
-    { method: 'POST', body: JSON.stringify(sub) },
+    { method: 'POST', body: JSON.stringify({ ...sub, locale }) },
     { suppressErrorToast: true }
   );
 }

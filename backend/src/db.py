@@ -1318,23 +1318,31 @@ async def cleanup_expired_tokens() -> int:
 
 
 async def save_push_subscription(
-    *, endpoint: str, user_uid: str, p256dh: str, auth: str, ua: str | None = None
+    *,
+    endpoint: str,
+    user_uid: str,
+    p256dh: str,
+    auth: str,
+    ua: str | None = None,
+    locale: str = "en",
 ) -> None:
-    """Upsert a browser's push subscription, keyed by endpoint (re-subscribe = update)."""
+    """Upsert a browser's push subscription, keyed by endpoint (re-subscribe = update).
+    `locale` is the browser's UI language; payload bodies render per-subscription."""
     async with get_connection() as conn:
         await conn.execute(
             """
             INSERT INTO push_subscriptions
-                (endpoint, user_uid, p256dh, auth, ua, last_seen_at)
-            VALUES (%s, %s, %s, %s, %s, NOW())
+                (endpoint, user_uid, p256dh, auth, ua, locale, last_seen_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (endpoint) DO UPDATE SET
                 user_uid = EXCLUDED.user_uid,
                 p256dh = EXCLUDED.p256dh,
                 auth = EXCLUDED.auth,
                 ua = EXCLUDED.ua,
+                locale = EXCLUDED.locale,
                 last_seen_at = NOW()
             """,
-            (endpoint, user_uid, p256dh, auth, ua),
+            (endpoint, user_uid, p256dh, auth, ua, locale),
         )
 
 
@@ -1357,13 +1365,13 @@ async def delete_push_subscription(
 
 async def get_push_subscriptions_for_users(
     user_uids: list[str],
-) -> list[tuple[str, str, str, str]]:
-    """All (endpoint, user_uid, p256dh, auth) rows for the given users (fan-out query)."""
+) -> list[tuple[str, str, str, str, str]]:
+    """All (endpoint, user_uid, p256dh, auth, locale) rows for the given users."""
     if not user_uids:
         return []
     async with get_connection() as conn:
         result = await conn.execute(
-            "SELECT endpoint, user_uid, p256dh, auth "
+            "SELECT endpoint, user_uid, p256dh, auth, locale "
             "FROM push_subscriptions WHERE user_uid = ANY(%s)",
             (user_uids,),
         )

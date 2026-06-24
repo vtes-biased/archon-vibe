@@ -17,6 +17,7 @@ import {
   isOnline,
   registerPushSubscription,
 } from '$lib/api';
+import { getLocale } from '$lib/paraglide/runtime.js';
 
 let permission = $state<NotificationPermission>(
   typeof Notification !== 'undefined' ? Notification.permission : 'default'
@@ -119,7 +120,7 @@ export async function enablePush(): Promise<boolean> {
         // ArrayBufferLike (incl. SharedArrayBuffer) which the param type rejects.
         applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
       }));
-    await registerPushSubscription(sub.toJSON());
+    await registerPushSubscription(sub.toJSON(), getLocale());
     subscribed = true;
     return true;
   } catch (e) {
@@ -167,7 +168,8 @@ export async function reconcilePush(): Promise<void> {
   subscribed = !!sub;
   if (!sub) return;
   try {
-    await registerPushSubscription(sub.toJSON());
+    // re-POST current locale too, so an in-app language switch propagates here
+    await registerPushSubscription(sub.toJSON(), getLocale());
   } catch {
     /* not logged in yet / offline — retried on next app open */
   }

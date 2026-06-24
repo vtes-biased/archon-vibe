@@ -207,7 +207,7 @@ async def _maybe_push_seating(tournament: Tournament, event_type: str) -> None:
     try:
         from .. import push_service
 
-        targets = push_service.build_seating_payloads(tournament, event_type)
+        targets = push_service.build_seating_specs(tournament, event_type)
         await push_service.send_to_users(targets)
     except Exception:
         logger.exception("Failed to send seating push for %s", tournament.uid)
@@ -220,13 +220,13 @@ async def _maybe_push_announcement(
     try:
         from .. import push_service
 
-        payload = push_service.build_announcement_payload(tournament, body)
+        spec = push_service.build_announcement_spec(tournament, body)
         uids = {
             p.user_uid
             for p in tournament.players
             if p.user_uid and p.user_uid != exclude_uid
         }
-        await push_service.send_to_users([(uid, payload) for uid in uids])
+        await push_service.send_to_users([(uid, spec) for uid in uids])
     except Exception:
         logger.exception("Failed to send announcement push for %s", tournament.uid)
 
@@ -243,7 +243,7 @@ async def _maybe_push_judge_call(
     try:
         from .. import push_service
 
-        payload = push_service.build_judge_call_payload(
+        spec = push_service.build_judge_call_spec(
             tournament_uid=tournament.uid,
             tournament_name=tournament.name,
             table=table,
@@ -251,7 +251,7 @@ async def _maybe_push_judge_call(
             player_name=player_name,
         )
         uids = [u for u in (tournament.organizers_uids or []) if u != exclude_uid]
-        await push_service.send_to_users([(uid, payload) for uid in uids])
+        await push_service.send_to_users([(uid, spec) for uid in uids])
     except Exception:
         logger.exception("Failed to send judge-call push for %s", tournament.uid)
 

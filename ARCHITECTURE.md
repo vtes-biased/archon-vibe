@@ -251,7 +251,7 @@ Three env vars: `VAPID_PRIVATE_KEY` (raw base64url scalar, loaded via `Vapid01.f
 
 ### Backend Send Path (`backend/src/push_service.py`)
 
-Pure payload builders `build_seating_payloads` / `build_announcement_payload` / `build_judge_call_payload`. `send_to_users` fans out over `asyncio.to_thread` (blocking `pywebpush.webpush`) under `Semaphore(12)` to cap concurrency against the small connection pool. Sends fire as `asyncio.create_task` and, for the tournament-action triggers, **after** `tournament_transaction` commits — a DB-touching task must never run inside the lock (see DB invariant in Connection discipline above). Payload bodies are English-only (no i18n on the wire, like the bot).
+Pure builders `build_seating_specs` / `build_announcement_spec` / `build_judge_call_spec` return locale-independent *specs*; `render_payload(spec, locale)` localizes them into the wire notification. `send_to_users` looks up the target users' subscriptions and renders **per subscription** in that row's stored `locale` (a user may carry a FR phone and an EN laptop), fanning out over `asyncio.to_thread` (blocking `pywebpush.webpush`) under `Semaphore(12)` to cap concurrency against the small connection pool. Sends fire as `asyncio.create_task` and, for the tournament-action triggers, **after** `tournament_transaction` commits — a DB-touching task must never run inside the lock (see DB invariant in Connection discipline above). The templated bodies (seating, judge call) are localized via the `_PUSH_MESSAGES` table (5 locales, en source, `{placeholder}` format strings); the announcement body is organizer free text, rendered as typed.
 
 ### Triggers
 

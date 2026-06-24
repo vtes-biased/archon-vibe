@@ -111,6 +111,13 @@ shows to organizers of a live tournament with role-aware copy (judge calls + ann
 organizers can opt in contextually (else via the profile toggle). Reverses the v1
 "no organizer-facing push" deferral for THIS case only. SW gained generic `renotify` passthrough.
 
+LOCALIZED PAYLOADS (#324, same branch): notification bodies now render in EACH
+subscription's locale (per-device, not per-user — a FR phone + EN laptop differ). The
+browser locale rides the subscribe/reconcile POST into a new `push_subscriptions.locale`
+column; `push_service` builders return locale-independent specs and `render_payload(spec,
+locale)` localizes the templated bodies via `_PUSH_MESSAGES` (5 locales, en source). The
+announcement body is organizer free text — rendered as typed, never translated.
+
 DEPLOY ENABLEMENT (separate follow-up ticket): the feature is a no-op until each env has a
 VAPID keypair — `just vapid-keys`, private key + subject in ansible-vault, `VAPID_*` env wired
 so `GET /api/push/vapid-key` serves the public key. Until then `is_configured()` is False and
