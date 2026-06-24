@@ -20,7 +20,9 @@ const FONT = "system-ui, -apple-system, sans-serif";
 
 const W = 1080;
 const H = 1350;
-const BANNER_BAND_H = 360; // header band height when the tournament has a banner
+// Banners are 1.91:1 (1200×630), so at full width the whole image is ~567px tall
+// and shown uncropped. The cap only bites on an unusually tall source.
+const BANNER_MAX_H = 600;
 
 /**
  * Load the tournament banner for compositing. crossOrigin='anonymous' keeps the
@@ -43,19 +45,21 @@ function loadBanner(tournament: Tournament): Promise<HTMLImageElement | null> {
   });
 }
 
-/** Draw img into the dest rect, scaled to cover and center-cropped. */
-function drawImageCover(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  dx: number,
-  dy: number,
-  dw: number,
-  dh: number,
-) {
-  const scale = Math.max(dw / img.width, dh / img.height);
-  const sw = dw / scale;
-  const sh = dh / scale;
-  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, dx, dy, dw, dh);
+/**
+ * Draw the full banner (no crop) as a header band and return the band height.
+ * At full width the whole image is shown; only an unusually tall source hits
+ * BANNER_MAX_H, in which case it's shrunk to fit and centered (letterboxed on
+ * the BG) — width gives way so height is never cropped.
+ */
+function drawBanner(ctx: CanvasRenderingContext2D, img: HTMLImageElement): number {
+  const fullH = Math.round((W * img.height) / img.width);
+  if (fullH <= BANNER_MAX_H) {
+    ctx.drawImage(img, 0, 0, W, fullH);
+    return fullH;
+  }
+  const dw = Math.round((BANNER_MAX_H * img.width) / img.height);
+  ctx.drawImage(img, (W - dw) / 2, 0, dw, BANNER_MAX_H);
+  return BANNER_MAX_H;
 }
 
 function drawTextTruncated(
@@ -117,14 +121,14 @@ export async function generateResultsCard(
   const pad = 60;
   let y: number;
 
-  // Banner header band (full-width, center-cropped) when set; else the plain
-  // top crimson accent. Either way content flows below.
+  // Full uncropped banner header band when set; else the plain top crimson
+  // accent. Either way content flows below.
   const banner = await loadBanner(tournament);
   if (banner) {
-    drawImageCover(ctx, banner, 0, 0, W, BANNER_BAND_H);
+    const bandH = drawBanner(ctx, banner);
     ctx.fillStyle = CRIMSON;
-    ctx.fillRect(0, BANNER_BAND_H - 6, W, 6); // crimson divider under the band
-    y = BANNER_BAND_H + 60;
+    ctx.fillRect(0, bandH, W, 6); // crimson divider under the band
+    y = bandH + 60;
   } else {
     ctx.fillStyle = CRIMSON;
     ctx.fillRect(0, 0, W, 6);
