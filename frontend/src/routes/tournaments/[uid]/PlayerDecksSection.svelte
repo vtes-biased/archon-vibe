@@ -10,7 +10,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import { toUserMessage } from "$lib/errors";
   import { getCards } from "$lib/cards";
-  import { ChevronDown, ChevronRight, CircleCheck, Lock, Trash2 } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, CircleCheck, Lock, Trash2, Trophy } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import Button from '$lib/components/Button.svelte';
@@ -371,7 +371,8 @@
               {@const key = `${uid}-${i}`}
               {@const expanded = expandedDecks.has(key)}
               {@const counts = deckCounts(deck)}
-              {@const showIdentity = tournament.decklists_mode !== 'All'}
+              {@const showIdentity = tournament.decklists_mode !== 'All' || uid === winnerUid}
+              {@const isWinnerDeck = uid === winnerUid}
               <div class="bg-surface-muted/50 rounded-lg">
                 <button
                   class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
@@ -383,7 +384,15 @@
                   </span>
                   <div class="flex-1 min-w-0">
                     {#if showIdentity}
-                      <span class="text-sm text-ink-bright truncate block">{seatDisplay(uid, playerInfo, tournament.online)}</span>
+                      {#if isWinnerDeck}
+                        <span class="text-sm font-semibold text-highlight truncate flex items-center gap-1.5">
+                          <Trophy class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          <span class="truncate">{seatDisplay(uid, playerInfo, tournament.online)}</span>
+                          <span class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded badge-highlight shrink-0">{m.tournament_winner()}</span>
+                        </span>
+                      {:else}
+                        <span class="text-sm text-ink-bright truncate block">{seatDisplay(uid, playerInfo, tournament.online)}</span>
+                      {/if}
                     {/if}
                     <span class="text-ink-muted truncate block {showIdentity ? 'text-xs' : 'text-sm'}">
                       {#if isMultideck}<span class="text-ink-faint">{m.decks_round_label({ n: String(i + 1) })}</span> — {/if}

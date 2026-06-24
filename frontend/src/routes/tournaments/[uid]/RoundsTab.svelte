@@ -8,7 +8,7 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2 } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
@@ -712,8 +712,8 @@
                     {#if isOrganizer && !isScoring && !isCancelled && table.seating.length > 0}
                       <button
                         onclick={() => toggleScoring(r, i)}
-                        class="text-xs font-medium text-select hover:opacity-80 transition-opacity px-2 py-2 -my-1"
-                      >{table.state === 'In Progress' ? m.rounds_enter_scores() : m.rounds_modify_scores()}</button>
+                        class="inline-flex items-center gap-1 text-xs font-medium text-select border border-select/40 rounded-md px-2.5 min-h-[44px] sm:min-h-0 sm:py-1.5 hover:bg-select/10 transition-colors shrink-0"
+                      ><Settings2 class="w-3.5 h-3.5" aria-hidden="true" />{m.rounds_manage()}</button>
                     {/if}
                     <span class="text-xs px-2 py-0.5 rounded {table.state === 'Finished' ? 'badge-success' : table.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : isCancelled ? 'badge-slate' : 'badge-pending'}">
                       {translateTableState(table.state)}
