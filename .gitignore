@@ -110,6 +110,7 @@ ansible/secrets/*
 # Role secret files — commit only the ansible-vault (.vault) variants, never plaintext.
 ansible/roles/fastapi_backend/files/officials_contacts.json
 ansible/roles/fastapi_backend/files/twda_github_app.pem
+ansible/roles/fastapi_backend/files/feedback_github_app.pem
 ansible/*.retry
 ansible/galaxy_collections/
 
