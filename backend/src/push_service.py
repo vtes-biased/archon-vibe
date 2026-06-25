@@ -2,9 +2,13 @@
 
 Push subscriptions are server-side send credentials in the ``push_subscriptions`` side
 table — NOT the synced objects pipeline (they're endpoints the backend sends to, never
-display data). This module loads the VAPID keypair from the environment, builds the two
-v1 notification payloads (seating, announcement), and fans sends out over the *blocking*
-``pywebpush`` library via a bounded ``asyncio.to_thread`` offload.
+display data). This module loads the VAPID keypair from the environment, builds the three
+notification types (seating, announcement, judge call), and delivers them with
+``pywebpush.webpush_async`` over a single shared ``aiohttp.ClientSession``. The session's
+TCPConnector pools connections per push host (most Chrome subs share fcm.googleapis.com),
+so a fan-out reuses keep-alive connections instead of a fresh TLS handshake per push;
+``limit`` / ``limit_per_host`` bound concurrency on the small box. (pywebpush owns the
+RFC 8291 payload encryption + RFC 8292 VAPID signing — the crypto we must not hand-roll.)
 
 Callers fire sends as ``asyncio.create_task`` AFTER a tournament transaction commits — a
 delivery failure must never fail or delay the action response, and a DB-touching task
@@ -22,27 +26,30 @@ import json
 import logging
 import os
 
-from py_vapid import Vapid01
-from pywebpush import WebPushException, webpush
+import aiohttp
+from py_vapid import Vapid02
+from pywebpush import WebPushException, webpush_async
 
 from . import db
 from .models import Tournament
 
 logger = logging.getLogger(__name__)
 
-# Bound the blocking webpush() offload: a large announcement could target hundreds of
-# subscriptions, but the box is small (DB pool max_size=20) so cap concurrent sends.
-_MAX_CONCURRENT_SENDS = 12
+# A large announcement can target hundreds of subscriptions; the box is small (DB pool
+# max_size=20), so bound concurrent push connections — total and per push host.
+_MAX_CONNECTIONS = 16
+_MAX_CONNECTIONS_PER_HOST = 8
+_REQUEST_TIMEOUT_S = 10
 _TTL_SECONDS = 12 * 60 * 60  # push service holds undelivered up to 12h, then drops
 
 _VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "")
 _VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
 _VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
 
-_vapid: Vapid01 | None = None
+_vapid: Vapid02 | None = None
 if _VAPID_PRIVATE_KEY and _VAPID_SUBJECT:
     try:
-        _vapid = Vapid01.from_raw(_VAPID_PRIVATE_KEY.encode())
+        _vapid = Vapid02.from_raw(_VAPID_PRIVATE_KEY.encode())
     except Exception as e:  # noqa: BLE001 - a bad key must not crash startup
         logger.error("Invalid VAPID_PRIVATE_KEY; Web Push disabled: %s", e)
 elif _VAPID_PRIVATE_KEY or _VAPID_PUBLIC_KEY:
@@ -214,8 +221,8 @@ async def send_to_users(targets: list[tuple[str, dict]]) -> None:
     rendered in EACH subscription's own locale.
 
     ``targets`` is (user_uid, spec) pairs. Looks up all subscriptions for the target
-    users in one query, then sends each via a bounded thread-pool offload of the
-    blocking ``webpush`` call, pruning rows on 404/410.
+    users in one query, then sends them over a single shared ``aiohttp.ClientSession``
+    whose connector pools connections per push host, pruning rows on 404/410.
     """
     if not is_configured() or not targets:
         return
@@ -224,41 +231,48 @@ async def send_to_users(targets: list[tuple[str, dict]]) -> None:
     if not subs:
         return
 
-    sem = asyncio.Semaphore(_MAX_CONCURRENT_SENDS)
-
     async def _send(
-        endpoint: str, user_uid: str, p256dh: str, auth: str, locale: str
+        session: aiohttp.ClientSession,
+        endpoint: str,
+        user_uid: str,
+        p256dh: str,
+        auth: str,
+        locale: str,
     ) -> None:
         spec = by_user.get(user_uid)
         if spec is None:
             return
-        payload = render_payload(spec, locale)
-        async with sem:
-            try:
-                await asyncio.to_thread(_webpush_sync, endpoint, p256dh, auth, payload)
-            except WebPushException as e:
-                status = getattr(e.response, "status_code", None)
-                if status in (404, 410):  # gone/unknown → endpoint is dead, prune it
-                    await db.delete_push_subscription(endpoint)
-                    logger.info("Pruned dead push subscription (HTTP %s)", status)
-                else:  # 429/5xx/network = transient; keep the row
-                    logger.warning("Web Push send failed (HTTP %s): %s", status, e)
-            except Exception as e:  # noqa: BLE001 - never let one send kill the gather
-                logger.warning("Web Push send error: %s", e)
+        try:
+            await webpush_async(
+                subscription_info={
+                    "endpoint": endpoint,
+                    "keys": {"p256dh": p256dh, "auth": auth},
+                },
+                data=json.dumps(render_payload(spec, locale)),
+                vapid_private_key=_vapid,
+                # Fresh claims per call: webpush mutates it in place (per-endpoint
+                # `aud`/`exp`), so a shared dict would carry a stale audience.
+                vapid_claims={"sub": _VAPID_SUBJECT},
+                ttl=_TTL_SECONDS,
+                timeout=aiohttp.ClientTimeout(total=_REQUEST_TIMEOUT_S),
+                aiohttp_session=session,
+            )
+        except WebPushException as e:
+            status = getattr(e.response, "status", None)  # aiohttp ClientResponse
+            if status in (404, 410):  # gone/unknown → endpoint is dead, prune it
+                await db.delete_push_subscription(endpoint)
+                logger.info("Pruned dead push subscription (HTTP %s)", status)
+            else:  # 429/5xx/network = transient; keep the row
+                logger.warning("Web Push send failed (HTTP %s): %s", status, e)
+        except Exception as e:  # noqa: BLE001 - never let one send kill the gather
+            logger.warning("Web Push send error: %s", e)
 
-    await asyncio.gather(*(_send(*s) for s in subs), return_exceptions=True)
-
-
-def _webpush_sync(endpoint: str, p256dh: str, auth: str, payload: dict) -> None:
-    # Fresh vapid_claims dict per call: webpush() mutates it in place (sets per-endpoint
-    # `aud` and `exp`), so a shared dict would carry a stale audience to the next send.
-    webpush(
-        subscription_info={
-            "endpoint": endpoint,
-            "keys": {"p256dh": p256dh, "auth": auth},
-        },
-        data=json.dumps(payload),
-        vapid_private_key=_vapid,
-        vapid_claims={"sub": _VAPID_SUBJECT},
-        ttl=_TTL_SECONDS,
+    # One session for the whole fan-out: the connector reuses keep-alive connections
+    # per host (FCM/Mozilla/Apple) and bounds concurrency; closed when the batch ends.
+    connector = aiohttp.TCPConnector(
+        limit=_MAX_CONNECTIONS, limit_per_host=_MAX_CONNECTIONS_PER_HOST
     )
+    async with aiohttp.ClientSession(connector=connector) as session:
+        await asyncio.gather(
+            *(_send(session, *s) for s in subs), return_exceptions=True
+        )

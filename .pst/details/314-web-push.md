@@ -102,7 +102,7 @@ that guide (`pg_install`: iOS Safari / Android Chrome / Desktop). A native
 `beforeinstallprompt` "Install" button for Android/desktop was explicitly NOT added (push
 works in a tab there; deferred as a general PWA nicety).
 
-JUDGE-CALL PUSH (#323, same branch): a third push type — `POST /{uid}/call-judge` now also
+JUDGE-CALL PUSH (#328, same branch): a third push type — `POST /{uid}/call-judge` now also
 Web-Pushes the tournament's organizers (except the caller; same audience as the ephemeral
 `judge_call` SSE) so a judge away from the screen is alerted. `build_judge_call_payload`
 (renotify=true → repeat calls re-alert); `_maybe_push_judge_call` fired fire-and-forget right
@@ -111,12 +111,24 @@ shows to organizers of a live tournament with role-aware copy (judge calls + ann
 organizers can opt in contextually (else via the profile toggle). Reverses the v1
 "no organizer-facing push" deferral for THIS case only. SW gained generic `renotify` passthrough.
 
-LOCALIZED PAYLOADS (#324, same branch): notification bodies now render in EACH
+LOCALIZED PAYLOADS (#329, same branch): notification bodies now render in EACH
 subscription's locale (per-device, not per-user — a FR phone + EN laptop differ). The
 browser locale rides the subscribe/reconcile POST into a new `push_subscriptions.locale`
 column; `push_service` builders return locale-independent specs and `render_payload(spec,
 locale)` localizes the templated bodies via `_PUSH_MESSAGES` (5 locales, en source). The
 announcement body is organizer free text — rendered as typed, never translated.
+
+ASYNC TRANSPORT (#330, same branch): delivery uses `pywebpush.webpush_async` over one
+shared `aiohttp.ClientSession` per fan-out (was `asyncio.to_thread(webpush)` + a thread
+pool). The `TCPConnector(limit=16, limit_per_host=8)` pools keep-alive connections per
+push host (FCM/Mozilla/Apple), so a 300-player blast reuses connections instead of a fresh
+TLS handshake per push; no threads, no `requests.Session` thread-safety concern. VAPID
+switched to `Vapid02` (final RFC 8292 header format; subclass of Vapid01, identical
+`from_raw`). Prune reads `WebPushException.response.status` (aiohttp `.status`, not requests
+`.status_code`). pywebpush still owns the RFC 8291 encryption + VAPID signing — we own only
+the transport. FUTURE (only at thousands-of-subs scale): aiohttp is HTTP/1.1; true HTTP/2
+multiplexing to FCM would mean owning the POST via `httpx[http2]` + the crypto primitives —
+deferred, not worth leaving pywebpush's transport at tournament scale.
 
 DEPLOY ENABLEMENT (separate follow-up ticket): the feature is a no-op until each env has a
 VAPID keypair — `just vapid-keys`, private key + subject in ansible-vault, `VAPID_*` env wired
