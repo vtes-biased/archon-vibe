@@ -35,7 +35,9 @@ _GH_API_VERSION = github_app.GH_API_VERSION
 
 def _is_configured() -> bool:
     return bool(
-        TWDA_GITHUB_CLIENT_ID and TWDA_GITHUB_PRIVATE_KEY and TWDA_GITHUB_INSTALLATION_ID
+        TWDA_GITHUB_CLIENT_ID
+        and TWDA_GITHUB_PRIVATE_KEY
+        and TWDA_GITHUB_INSTALLATION_ID
     )
 
 
