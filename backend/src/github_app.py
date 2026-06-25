@@ -36,7 +36,9 @@ def create_jwt(app_id: str, private_key: str) -> str:
     payload = {
         "iat": now - 60,  # clock-drift margin
         "exp": now + 600,  # max 10 minutes
-        "iss": int(app_id),  # GitHub expects the numeric App ID
+        # App ID (or client ID) as a STRING -- PyJWT >= 2.10 rejects a non-str iss
+        # ("Issuer (iss) must be a string."), and GitHub accepts the id as a string.
+        "iss": app_id,
     }
     return jwt.encode(payload, private_key, algorithm="RS256")
 
