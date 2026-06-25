@@ -53,7 +53,9 @@ if _VAPID_PRIVATE_KEY and _VAPID_SUBJECT:
     except Exception as e:  # noqa: BLE001 - a bad key must not crash startup
         logger.error("Invalid VAPID_PRIVATE_KEY; Web Push disabled: %s", e)
 elif _VAPID_PRIVATE_KEY or _VAPID_PUBLIC_KEY:
-    logger.warning("Web Push partially configured; needs VAPID_PRIVATE_KEY + VAPID_SUBJECT")
+    logger.warning(
+        "Web Push partially configured; needs VAPID_PRIVATE_KEY + VAPID_SUBJECT"
+    )
 
 
 def is_configured() -> bool:
@@ -133,7 +135,13 @@ def build_seating_specs(t: Tournament, event_type: str) -> list[tuple[str, dict]
         return [
             (
                 seat.player_uid,
-                {"kind": "seating_finals", "title": t.name, "seat": i + 1, "url": url, "tag": tag},
+                {
+                    "kind": "seating_finals",
+                    "title": t.name,
+                    "seat": i + 1,
+                    "url": url,
+                    "tag": tag,
+                },
             )
             for i, seat in enumerate(t.finals.seating)
         ]
@@ -174,7 +182,12 @@ def build_announcement_spec(t: Tournament, body: str) -> dict:
 
 
 def build_judge_call_spec(
-    *, tournament_uid: str, tournament_name: str, table: int, table_label: str, player_name: str
+    *,
+    tournament_uid: str,
+    tournament_name: str,
+    table: int,
+    table_label: str,
+    player_name: str,
 ) -> dict:
     return {
         "kind": "judge",

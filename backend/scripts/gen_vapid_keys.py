@@ -31,7 +31,9 @@ def main() -> None:
     )
     print("VAPID_PRIVATE_KEY=" + b64url(private_raw))
     print("VAPID_PUBLIC_KEY=" + b64url(public_raw))
-    print("VAPID_SUBJECT=mailto:admin@example.com  # set to a real contact mailto:/https URL")
+    print(
+        "VAPID_SUBJECT=mailto:admin@example.com  # set to a real contact mailto:/https URL"
+    )
 
 
 if __name__ == "__main__":

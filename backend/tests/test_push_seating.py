@@ -40,7 +40,11 @@ def test_start_round_numbers_each_seat_by_table_and_seat() -> None:
     assert len(specs) == 10  # every seated player, once
     # Table 1 seat 1 and table 2 seat 3 pin the per-table 1-based numbering.
     assert specs["a0"]["url"] == "/tournaments/trn-1?table=1"
-    assert (specs["a0"]["round"], specs["a0"]["table"], specs["a0"]["seat"]) == (1, 1, 1)
+    assert (specs["a0"]["round"], specs["a0"]["table"], specs["a0"]["seat"]) == (
+        1,
+        1,
+        1,
+    )
     assert (specs["b2"]["table"], specs["b2"]["seat"]) == (2, 3)
     # tag is per-round so a re-seated round replaces, not stacks.
     assert specs["a0"]["tag"] == "seating-trn-1-1"

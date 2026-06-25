@@ -1346,9 +1346,7 @@ async def save_push_subscription(
         )
 
 
-async def delete_push_subscription(
-    endpoint: str, user_uid: str | None = None
-) -> None:
+async def delete_push_subscription(endpoint: str, user_uid: str | None = None) -> None:
     """Delete a subscription. Scope by ``user_uid`` for user-initiated unsubscribe;
     omit it for the send-path 404/410 prune (the endpoint is gone for everyone)."""
     async with get_connection() as conn:
