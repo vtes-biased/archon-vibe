@@ -90,6 +90,13 @@ backend_env:
   VEKN_API_PASSWORD: "{{ vault_vekn_password }}"
   VEKN_PUSH: "true"            # prod pushes ratified results back to VEKN
   VEKN_PUSH_INTERVAL_HOURS: 1
+  # --- Web Push / VAPID ---------------------------------------------------
+  # Per-env keypair (beta and prod must NOT share). Both keys live in vault so
+  # they rotate atomically; default('') keeps push a graceful no-op until set.
+  # Rotating the keypair invalidates every existing browser subscription.
+  VAPID_PUBLIC_KEY: "{{ vault_vapid_public_key | default('') }}"
+  VAPID_PRIVATE_KEY: "{{ vault_vapid_private_key | default('') }}"
+  VAPID_SUBJECT: "mailto:{{ contact_email }}"
   # --- misc ---------------------------------------------------------------
   SNAPSHOT_DIR: /var/lib/archon/snapshots
   TWDA_GITHUB_APP_ID: "{{ vault_twda_github_app_id | default('') }}"
