@@ -88,6 +88,7 @@
 - [Online-only Tournament sub-data carve-out](online-only-tournament-subdata-carveout.md) — timer pattern: field on Tournament + backend route (tournament_transaction→save_object→broadcast_precomputed), NO Rust engine, NO optimistic update, NO new object type; reserved for online-only live UI state (announcements #290 mirror this).
 - [Tournament member projection is a denylist](tournament-member-projection-is-exclude-list.md) — compute_tournament_member excludes only {checkin_code, vekn_pushed_at}; any new Tournament field auto-reaches members at SSE; organizer-only secrets MUST be added to _TOURNAMENT_MEMBER_EXCLUDE or they leak.
 - [Round lifecycle traps](reference_round_lifecycle_traps.md) — engine round/finals state quirks (RestoreRound re-derives to fully Finished, finals not in `rounds`, table states, timer online-only) to check when reviewing round-lifecycle hooks.
+- [bot _active_tables finals-seating trap](bot-active-tables-finals-seating-trap.md) — bot _active_tables tags "finals" on seating-truthiness, NOT completion; consumers that should stop at table/finals completion (timer reminders) over-trigger. There is NO top-level table.result (find_player_table's guard is a no-op) — skip done tables via _table_done (state==Finished/override).
 
 ## Authorization (cross-stack)
 - Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).

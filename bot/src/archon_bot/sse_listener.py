@@ -8,16 +8,19 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 import aiohttp
 
 from . import config
 from .announcements import (
+    format_announcement,
     format_finals,
     format_round_seating,
     format_sanction,
     format_standings,
     format_table_result,
+    format_timer_reminder,
     player_display,
 )
 from .channel_manager import (
@@ -79,6 +82,22 @@ _structural_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 # participants alongside the tournament object). Lets seating/standings resolve a
 # name for players not linked to Discord. Popped in stop_sse.
 _user_names: dict[str, dict[str, dict]] = defaultdict(dict)
+
+
+# key → pending asyncio.Task for scheduled round-timer reminders. Cancelled and
+# rebuilt whenever the timer signature changes (start/pause/resume/extra-time/round
+# change) and after a reconnect's catch-up. Cleared in stop_sse.
+_timer_tasks: dict[str, list[asyncio.Task]] = defaultdict(list)
+
+# key → reminder tokens (round_tag, table_index, threshold) already posted, so a
+# reschedule (re-broadcast, added extra time, reconnect) never double-fires. Reset
+# when the round_tag changes (a new round has fresh thresholds). Cleared in stop_sse.
+# The check-then-add in _fire_timer_reminder is unlocked: it relies on SSE dispatch
+# being serial (one event handled at a time) — parallelizing handlers would need a lock.
+_timer_fired: dict[str, set] = defaultdict(set)
+
+# key → the round_tag _timer_fired currently belongs to; a change resets the set.
+_timer_round_tag: dict[str, str] = {}
 
 
 def _cache_user_identity(key: str, user_obj: dict) -> None:
@@ -178,6 +197,10 @@ async def stop_sse(guild_id: str, tournament_uid: str) -> None:
     _table_channels.pop(key, None)
     _last_tournament.pop(key, None)
     _user_names.pop(key, None)
+    _cancel_timer_tasks(key)
+    _timer_tasks.pop(key, None)
+    _timer_fired.pop(key, None)
+    _timer_round_tag.pop(key, None)
     # _structural_locks intentionally NOT popped — see structural_lock.
 
 
@@ -545,6 +568,220 @@ def compute_result_announcements(
     return out
 
 
+def compute_announcement_posts(
+    prev_obj: dict | None, cur_obj: dict
+) -> list[tuple[str, str]]:
+    """Pure: organizer in-app announcements to mirror to Discord, in list order.
+
+    Diffs the tournament's append-only ``announcements`` list (newest last, capped
+    at 20) by ``id``: any id present in cur but not prev is new. Returns
+    ``[(id, message), …]``. Returns ``[]`` when ``prev_obj`` is None — catch-up
+    seeds the snapshot silently, so a (re)connect never re-posts the backlog (the
+    idempotency-across-restart guard the ticket calls for).
+    """
+    if prev_obj is None:
+        return []
+    prev_ids = {a.get("id") for a in (prev_obj.get("announcements") or [])}
+    out: list[tuple[str, str]] = []
+    for a in cur_obj.get("announcements") or []:
+        aid = a.get("id")
+        if not aid or aid in prev_ids:
+            continue
+        body = (a.get("body") or "").strip()
+        if body:
+            out.append((aid, format_announcement(body)))
+    return out
+
+
+def _table_done(table: dict) -> bool:
+    """A table whose result is complete/final — no timer reminder is useful.
+
+    ``Finished`` = VPs add up; an ``override`` = a judge finalized it. ``Invalid``
+    (reported but VPs don't add up) and ``In Progress`` are NOT done — those still
+    want the time-up nudge. There is no top-level ``result`` field on a table (only
+    per-seat ``result``), so state/override is the only completion signal.
+    """
+    return table.get("state") == "Finished" or bool(table.get("override"))
+
+
+# Reminders fire at these many seconds of remaining time, per table: a 5-minute
+# warning and the time-up post. Ordered longest-first only for readability.
+_TIMER_THRESHOLDS = (300, 0)
+
+
+@dataclass(frozen=True)
+class TimerReminder:
+    """One scheduled timer post: where, the dedup token, the delay, the text."""
+
+    channel_id: int
+    token: tuple
+    delay: float  # wall-clock seconds from `now`; ≤0 means the threshold has passed
+    message: str
+
+
+def _parse_started_at_epoch(started_at: str | None) -> float | None:
+    """Parse the timer's ISO ``started_at`` to a UTC epoch (seconds), or None.
+
+    msgspec serializes ``datetime.now(UTC)`` as an offset-aware ISO string; a bare
+    ``Z`` and naive strings are handled defensively (naive ⇒ assume UTC).
+    """
+    if not started_at:
+        return None
+    try:
+        dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt.timestamp() if dt.tzinfo else dt.replace(tzinfo=UTC).timestamp()
+
+
+def compute_timer_reminders(
+    obj: dict, table_chs: list[int], now: float
+) -> list[TimerReminder]:
+    """Pure: the per-table timer reminders to schedule, given ``now`` (UTC epoch).
+
+    Mirrors the frontend countdown exactly (TimerDisplay.svelte): per table,
+    ``remaining = total - (elapsed_before_pause + (now - started_at)) + extra``,
+    where ``total`` is ``finals_time or round_time`` for finals else ``round_time``.
+    A reminder's ``delay`` is when that table hits the threshold, in wall-clock
+    seconds from ``now``; the caller suppresses any ``delay ≤ 0`` (already passed)
+    so a reconnect/restart never posts a stale reminder.
+
+    Returns ``[]`` when no clock is running: not Playing, no ``round_time`` set,
+    paused, or no ``started_at`` — i.e. nothing to count down to.
+    """
+    if obj.get("state", "") != "Playing":
+        return []
+    timer = obj.get("timer") or {}
+    if timer.get("paused"):
+        return []
+    started_epoch = _parse_started_at_epoch(timer.get("started_at"))
+    if started_epoch is None:
+        return []
+
+    tag, tables = _active_tables(obj)
+    if not tag:
+        return []
+    is_finals = tag == "finals"
+    total = (
+        (obj.get("finals_time") or obj.get("round_time") or 0)
+        if is_finals
+        else (obj.get("round_time") or 0)
+    )
+    if total <= 0:
+        return []
+
+    elapsed_before = float(timer.get("elapsed_before_pause") or 0.0)
+    extra_map = obj.get("table_extra_time") or {}
+    out: list[TimerReminder] = []
+    for i, table in enumerate(tables):
+        if i >= len(table_chs) or not table_chs[i]:  # skip 0 sentinel / missing
+            continue
+        if _table_done(table):
+            # Reported-and-final / judge-overridden: the game's over even if the
+            # round/finals isn't formally closed yet, so no reminder is useful. A
+            # finished finals (seating still populated) would otherwise keep a
+            # stale "Time!" scheduled until the tournament is finalized.
+            continue
+        extra = extra_map.get(str(i), 0)
+        deadline = started_epoch + total + extra - elapsed_before
+        label = "Finals" if is_finals else f"Table {i + 1}"
+        for thr in _TIMER_THRESHOLDS:
+            out.append(
+                TimerReminder(
+                    channel_id=table_chs[i],
+                    token=(tag, i, thr),
+                    delay=(deadline - thr) - now,
+                    message=format_timer_reminder(label, thr),
+                )
+            )
+    return out
+
+
+def _timer_signature(obj: dict) -> tuple:
+    """Cheap digest of the timer-affecting fields — the reschedule guard.
+
+    Equal between two snapshots ⇒ the schedule still holds (skips score/sanction
+    churn). The active-tables ``tag`` flips on a round change or prelim→finals; the
+    per-table done-states flip when a table finishes early (so its pending reminder
+    is cancelled); the extra-time map flips when an extension pushes a deadline out.
+    """
+    timer = obj.get("timer") or {}
+    tag, tables = _active_tables(obj)
+    return (
+        obj.get("state"),
+        obj.get("round_time") or 0,
+        obj.get("finals_time") or 0,
+        tag,
+        tuple(_table_done(t) for t in tables),
+        timer.get("started_at"),
+        bool(timer.get("paused")),
+        timer.get("elapsed_before_pause"),
+        tuple(sorted((obj.get("table_extra_time") or {}).items())),
+    )
+
+
+def _cancel_timer_tasks(key: str) -> None:
+    """Cancel and drop all pending timer reminders for a tournament."""
+    for t in _timer_tasks.get(key, []):
+        if not t.done():
+            t.cancel()
+    _timer_tasks[key] = []
+
+
+async def _fire_timer_reminder(bot, key: str, reminder: TimerReminder) -> None:
+    """Sleep until a reminder's threshold, then post it once.
+
+    Cancellation (a reschedule supersedes this one) returns silently. The fired
+    set guards the narrow window where this posts just as a reschedule recomputes.
+    """
+    try:
+        await asyncio.sleep(reminder.delay)
+    except asyncio.CancelledError:
+        return
+    if reminder.token in _timer_fired[key]:
+        return
+    _timer_fired[key].add(reminder.token)
+    await _post(bot, reminder.channel_id, reminder.message)
+
+
+async def _reschedule_timers(
+    bot, guild_id: str, tournament_uid: str, obj: dict
+) -> None:
+    """Rebuild a tournament's timer reminders from the current snapshot.
+
+    Idempotent and the single authority for the schedule: cancels everything
+    pending, then re-schedules each future threshold not already fired. A passed
+    threshold (``delay ≤ 0``) is marked fired WITHOUT posting — that suppresses
+    stale reminders on reconnect/restart. Reads the live table voice channels from
+    ``_table_channels`` (populated by reconcile), so reminders land in the same
+    per-table chats as score posts.
+    """
+    key = _task_key(guild_id, tournament_uid)
+    _cancel_timer_tasks(key)
+
+    # A new round/finals has fresh thresholds — drop the prior round's fired set.
+    tag, _ = _active_tables(obj)
+    if _timer_round_tag.get(key) != tag:
+        _timer_round_tag[key] = tag
+        _timer_fired[key] = set()
+
+    fired = _timer_fired[key]
+    for reminder in compute_timer_reminders(
+        obj, _table_channels.get(key, []), time.time()
+    ):
+        if reminder.token in fired:
+            continue
+        if reminder.delay <= 0:
+            fired.add(reminder.token)  # already passed → suppress, don't post late
+            continue
+        _timer_tasks[key].append(
+            asyncio.create_task(_fire_timer_reminder(bot, key, reminder))
+        )
+    logger.info(
+        "Timer reschedule %s: %d pending (tag=%s)", key, len(_timer_tasks[key]), tag
+    )
+
+
 async def _build_discord_id_map(
     store: TokenStore, archon_uids: set[str]
 ) -> dict[str, int]:
@@ -802,6 +1039,16 @@ async def _handle_update(
             except Exception as e:
                 logger.error("Scheduled-event ensure failed for %s: %s", key, e)
 
+    # Timer half — reschedule per-table round-timer reminders when the timer state
+    # changed (start/pause/resume, added extra time, new round). No structural lock:
+    # it only touches in-process reminder tasks, never Discord channels. Runs after
+    # any structural reconcile above so _table_channels is current.
+    if _timer_signature(prev_obj or {}) != _timer_signature(obj):
+        try:
+            await _reschedule_timers(bot, guild_id, tournament_uid, obj)
+        except Exception as e:
+            logger.error("Timer reschedule failed for %s: %s", key, e)
+
     # Snapshot LAST: the diffs above need the previous object; a crash retries next event.
     _last_tournament[key] = obj
 
@@ -944,6 +1191,13 @@ async def _emit_announcements(
             prev_obj, obj, _table_channels.get(key, []), players, _user_names[key]
         ):
             await _post(bot, ch_id, msg)
+
+    # ── Organizer in-app announcements mirrored to the Discord announcement channel ──
+    # Diffed by id against the prev snapshot (catch-up seeds it silently, so a
+    # reconnect doesn't re-post the backlog). Not state-gated — an organizer can
+    # broadcast at any phase.
+    for _aid, msg in compute_announcement_posts(prev_obj, obj):
+        await _post(bot, announcement_id, msg)
 
     # ── Tournament finished (channel cleanup is reconcile's job) ──
     if state == "Finished" and prev_state != "Finished":
@@ -1147,6 +1401,14 @@ async def _reconcile(
             await ensure_scheduled_event(bot, store, guild_id, tournament_uid, obj)
         except Exception as e:
             logger.error("Scheduled-event ensure failed for %s: %s", key, e)
+
+    # Re-arm timer reminders from the seeded snapshot (channels now reconciled): a
+    # restart mid-round rebuilds the schedule — passed thresholds are suppressed,
+    # still-future ones re-scheduled. No persisted cron; this is the recompute.
+    try:
+        await _reschedule_timers(bot, guild_id, tournament_uid, obj)
+    except Exception as e:
+        logger.error("Timer reschedule failed for %s: %s", key, e)
 
 
 async def _handle_sanction_update(

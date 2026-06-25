@@ -197,6 +197,32 @@ def format_table_result(
     return "\n".join(lines)
 
 
+def format_timer_reminder(table_label: str, threshold_seconds: int) -> str:
+    """Render a round-timer reminder for a table's voice text chat.
+
+    ``threshold_seconds`` is how much time remains at the moment it fires: a
+    positive value is a "N minutes left" warning, 0 (or less) is the time-up post.
+    Plain English — the bot has no i18n.
+    """
+    if threshold_seconds <= 0:
+        return (
+            f"⏰ **Time!** {table_label} — the round clock has run out. "
+            f"Finish the current turn, then report results with `/report`."
+        )
+    minutes = threshold_seconds // 60
+    unit = "minute" if minutes == 1 else "minutes"
+    return f"⏳ **{minutes} {unit} remaining** at {table_label}."
+
+
+def format_announcement(text: str) -> str:
+    """Render an organizer's in-app broadcast for the Discord announcement channel.
+
+    The text is authored by the organizer (already localized by them); we only
+    frame it. Plain English framing, no i18n.
+    """
+    return f"📣 **Announcement**\n{text}"
+
+
 def format_sanction(
     level: str,
     category: str,
