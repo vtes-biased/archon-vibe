@@ -28,7 +28,7 @@ def load_private_key(key: str) -> str:
     return key
 
 
-def create_jwt(app_id: str, private_key: str) -> str:
+def create_jwt(client_id: str, private_key: str) -> str:
     """Create a short-lived RS256 JWT for GitHub App authentication."""
     import jwt
 
@@ -36,15 +36,15 @@ def create_jwt(app_id: str, private_key: str) -> str:
     payload = {
         "iat": now - 60,  # clock-drift margin
         "exp": now + 600,  # max 10 minutes
-        # App ID (or client ID) as a STRING -- PyJWT >= 2.10 rejects a non-str iss
-        # ("Issuer (iss) must be a string."), and GitHub accepts the id as a string.
-        "iss": app_id,
+        # Client ID (the App ID also works) as a STRING -- PyJWT >= 2.10 rejects a
+        # non-str iss ("Issuer (iss) must be a string."); GitHub accepts the string.
+        "iss": client_id,
     }
     return jwt.encode(payload, private_key, algorithm="RS256")
 
 
 async def get_installation_token(
-    app_id: str,
+    client_id: str,
     private_key: str,
     installation_id: str,
     permissions: dict[str, str],
@@ -54,7 +54,7 @@ async def get_installation_token(
     Raises ValueError on a non-201 response; aiohttp.ClientError / TimeoutError
     propagate to the caller's transport handling.
     """
-    app_jwt = create_jwt(app_id, private_key)
+    app_jwt = create_jwt(client_id, private_key)
     async with aiohttp.ClientSession(
         base_url="https://api.github.com",
         timeout=aiohttp.ClientTimeout(total=15.0),

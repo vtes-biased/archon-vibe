@@ -70,9 +70,9 @@ The in-app feedback endpoint files GitHub issues on `vtes-biased/archon-vibe` vi
 with **Issues: write**, installed only on this repo. Three env vars, configured like
 the TWDA App below:
 
-- `FEEDBACK_GITHUB_APP_ID` (numeric) and `FEEDBACK_GITHUB_INSTALLATION_ID` (numeric) are
-  short, so they ride in the env file via `vault_feedback_github_app_id` /
-  `vault_feedback_github_installation_id`.
+- `FEEDBACK_GITHUB_CLIENT_ID` (the App's client id, used as the JWT iss) and
+  `FEEDBACK_GITHUB_INSTALLATION_ID` (numeric) are short, so they ride in the env file
+  via `vault_feedback_github_client_id` / `vault_feedback_github_installation_id`.
 - `FEEDBACK_GITHUB_PRIVATE_KEY` is the multi-line PEM — delivered out of band exactly like
   the TWDA key (next section): the role copies `files/feedback_github_app.pem.<env>.vault`
   to `{{ env_dir }}/feedback_github_app.pem`, and `vault_feedback_github_private_key` is set
@@ -99,8 +99,8 @@ is a **multi-line** secret, so it can't ride in the systemd `EnvironmentFile`
   *different* keys (encrypted with that env's vault password).
 - The copy task uses `fileglob`, so it's a **no-op when the vault file is absent**
   — deploys never break. TWDA itself also no-ops unless all three of
-  `TWDA_GITHUB_APP_ID` (numeric), `TWDA_GITHUB_INSTALLATION_ID` (numeric), and
-  `TWDA_GITHUB_PRIVATE_KEY` are set (`twda.py:93`).
+  `TWDA_GITHUB_CLIENT_ID` (client id, JWT iss), `TWDA_GITHUB_INSTALLATION_ID` (numeric),
+  and `TWDA_GITHUB_PRIVATE_KEY` are set (`twda.py:93`).
 
 ### Provide / refresh the key
 

@@ -8,7 +8,7 @@ Uses a GitHub App installed on the TWD repo with permissions:
 - Pull requests: write (to open PRs)
 
 Configuration (env vars):
-- TWDA_GITHUB_APP_ID: GitHub App ID (numeric)
+- TWDA_GITHUB_CLIENT_ID: GitHub App client ID (used as the JWT iss)
 - TWDA_GITHUB_PRIVATE_KEY: PEM private key contents, or path to .pem file
 - TWDA_GITHUB_INSTALLATION_ID: Installation ID on the TWD repo (numeric)
 """
@@ -24,7 +24,7 @@ from . import github_app
 
 logger = logging.getLogger(__name__)
 
-TWDA_GITHUB_APP_ID = os.environ.get("TWDA_GITHUB_APP_ID", "")
+TWDA_GITHUB_CLIENT_ID = os.environ.get("TWDA_GITHUB_CLIENT_ID", "")
 TWDA_GITHUB_PRIVATE_KEY = os.environ.get("TWDA_GITHUB_PRIVATE_KEY", "")
 TWDA_GITHUB_INSTALLATION_ID = os.environ.get("TWDA_GITHUB_INSTALLATION_ID", "")
 TWDA_TARGET_REPO = "GiottoVerducci/TWD"
@@ -35,7 +35,7 @@ _GH_API_VERSION = github_app.GH_API_VERSION
 
 def _is_configured() -> bool:
     return bool(
-        TWDA_GITHUB_APP_ID and TWDA_GITHUB_PRIVATE_KEY and TWDA_GITHUB_INSTALLATION_ID
+        TWDA_GITHUB_CLIENT_ID and TWDA_GITHUB_PRIVATE_KEY and TWDA_GITHUB_INSTALLATION_ID
     )
 
 
@@ -57,7 +57,7 @@ async def submit_twda_pr(
 
     try:
         token = await github_app.get_installation_token(
-            TWDA_GITHUB_APP_ID,
+            TWDA_GITHUB_CLIENT_ID,
             github_app.load_private_key(TWDA_GITHUB_PRIVATE_KEY),
             TWDA_GITHUB_INSTALLATION_ID,
             {"contents": "write", "pull_requests": "write"},

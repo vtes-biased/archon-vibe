@@ -6,7 +6,7 @@ installed only on this repo) -- never exposed client-side; the repo is public.
 A separate App from the TWDA importer so the two integrations stay isolated.
 
 Configuration (env vars):
-- FEEDBACK_GITHUB_APP_ID: GitHub App ID (numeric).
+- FEEDBACK_GITHUB_CLIENT_ID: GitHub App client ID (used as the JWT iss).
 - FEEDBACK_GITHUB_PRIVATE_KEY: PEM private key contents, or path to the .pem file.
 - FEEDBACK_GITHUB_INSTALLATION_ID: the App's installation id on this repo (numeric).
   Any unset -> the endpoint returns 503, so the feature degrades gracefully (same
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
-FEEDBACK_GITHUB_APP_ID = os.environ.get("FEEDBACK_GITHUB_APP_ID", "")
+FEEDBACK_GITHUB_CLIENT_ID = os.environ.get("FEEDBACK_GITHUB_CLIENT_ID", "")
 FEEDBACK_GITHUB_PRIVATE_KEY = os.environ.get("FEEDBACK_GITHUB_PRIVATE_KEY", "")
 FEEDBACK_GITHUB_INSTALLATION_ID = os.environ.get("FEEDBACK_GITHUB_INSTALLATION_ID", "")
 FEEDBACK_TARGET_REPO = "vtes-biased/archon-vibe"
@@ -39,7 +39,7 @@ FEEDBACK_TARGET_REPO = "vtes-biased/archon-vibe"
 
 def _is_configured() -> bool:
     return bool(
-        FEEDBACK_GITHUB_APP_ID
+        FEEDBACK_GITHUB_CLIENT_ID
         and FEEDBACK_GITHUB_PRIVATE_KEY
         and FEEDBACK_GITHUB_INSTALLATION_ID
     )
@@ -128,7 +128,7 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
 
     try:
         token = await github_app.get_installation_token(
-            FEEDBACK_GITHUB_APP_ID,
+            FEEDBACK_GITHUB_CLIENT_ID,
             github_app.load_private_key(FEEDBACK_GITHUB_PRIVATE_KEY),
             FEEDBACK_GITHUB_INSTALLATION_ID,
             {"issues": "write"},
