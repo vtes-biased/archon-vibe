@@ -769,7 +769,7 @@
                             <button
                               onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
                               class="p-2 sm:p-0.5 text-ink-faint hover:text-warn transition-colors"
-                              title={m.sanction_tournament_issue_title()}
+                              title={m.players_sanction_btn()}
                             >
                               <TriangleAlert class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
                             </button>

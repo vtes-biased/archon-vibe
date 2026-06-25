@@ -32,9 +32,9 @@ async function sweepTable(page: Page, heading: string, vp: number) {
   const card = page
     .locator('div.bg-surface-muted\\/50')
     .filter({ has: page.getByRole('heading', { name: heading, exact: true }) });
-  // Prelim tables fold their scores behind "Enter scores"; the finals table shows
+  // Prelim tables fold their scores behind "Manage"; the finals table shows
   // them directly. Expand only when the trigger is present.
-  const enter = card.getByRole('button', { name: 'Enter scores' });
+  const enter = card.getByRole('button', { name: 'Manage' });
   if (await enter.count()) await enter.click();
   // Give the first seat all VPs (a sweep is a valid oust order). VP is now a
   // button group (VpInput), not a <select>.
@@ -55,11 +55,13 @@ const DECK_TEXT = fs.readFileSync(
 
 /** Paste a decklist in the (visible, desktop) upload form and submit. */
 async function uploadDeck(scope: ReturnType<Page['locator']>, name: string) {
+  // The upload form defaults to the URL tab; switch to "Paste Deck" for text import.
+  await scope.getByRole('button', { name: 'Paste Deck' }).click();
   await scope.getByPlaceholder('Deck name (optional)').fill(name);
   await scope.getByPlaceholder('Paste your deck list here...').fill(DECK_TEXT);
   await scope.getByRole('button', { name: 'Upload Deck' }).click();
   // Upload registered: contents stay hidden pre-round-1, replace is offered
-  await expect(scope.getByRole('button', { name: 'Replace deck' })).toBeVisible({ timeout: 5_000 });
+  await expect(scope.getByRole('button', { name: 'Replace' })).toBeVisible({ timeout: 5_000 });
 }
 
 test.describe('Tournament lifecycle', () => {
@@ -135,10 +137,10 @@ test.describe('Tournament lifecycle', () => {
     await page
       .locator('tr')
       .filter({ hasText: state.player_names[0]! })
-      .getByTitle('View deck')
+      .getByTitle('View')
       .click();
     await uploadDeck(playersDesktop, 'E2E Deck v1');
-    await playersDesktop.getByRole('button', { name: 'Replace deck' }).click();
+    await playersDesktop.getByRole('button', { name: 'Replace' }).click();
     await uploadDeck(playersDesktop, 'E2E Deck v2');
 
     // ── Steps 6-7: Rounds 1 and 2, scored through the Rounds tab UI ──
@@ -156,7 +158,7 @@ test.describe('Tournament lifecycle', () => {
         await page
           .locator('tr')
           .filter({ hasText: state.player_names[0]! })
-          .getByTitle('View deck')
+          .getByTitle('View')
           .click();
         await expect(playersDesktop.getByText('E2E Deck v2')).toBeVisible({ timeout: 5_000 });
       }
@@ -181,7 +183,7 @@ test.describe('Tournament lifecycle', () => {
         // ── In-event sanction: caution the (new) first seat ──
         // The indicator dot renders from IDB, so its appearance proves the
         // sanction came back over SSE (POST /sanctions is not optimistic).
-        await seatRows.first().getByTitle('Issue Tournament Sanction').click();
+        await seatRows.first().getByTitle('Sanction').click();
         await page.locator('#ts-description').fill('E2E caution: slow play');
         await page.getByRole('button', { name: 'Issue Sanction' }).click();
         await expect(seatRows.first().getByTitle('Caution (R1)')).toBeVisible({ timeout: 5_000 });
