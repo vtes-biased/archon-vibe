@@ -55,7 +55,8 @@
     for (const u of allUsersWithLinks) {
       const country = u.country || "??";
       const socialLinks = (u.community_links || []).filter(l =>
-        SOCIAL_TYPES.has(l.type) && (l.moderation?.status !== "hidden" || isModerator)
+        SOCIAL_TYPES.has(l.type) && pinScope(l) !== "global" &&
+        (l.moderation?.status !== "hidden" || isModerator)
       );
       if (socialLinks.length === 0) continue;
       if (!grouped.has(country)) grouped.set(country, []);
@@ -96,15 +97,16 @@
     for (const u of allUsersWithLinks) {
       for (const l of u.community_links || []) {
         if (!CONTENT_TYPES.has(l.type)) continue;
+        if (pinScope(l) === "global") continue; // shown once in Global Resources
         if (l.moderation?.status === "hidden" && !isModerator) continue;
         if (selectedLanguage && l.languages?.length && !l.languages.includes(selectedLanguage)) continue;
         items.push({ user: u, link: l });
       }
     }
-    // Sort: global pin, national pin, promoted, officials, then by user name
+    // Sort: national pin, other promoted, then officials/user name (global
+    // pins are excluded above — they live in Global Resources)
     const rank = (l: CommunityLink) => {
       if (l.moderation?.status !== "promoted") return 3;
-      if (l.moderation.scope === "global") return 0;
       if (l.moderation.scope === "national") return 1;
       return 2;
     };
