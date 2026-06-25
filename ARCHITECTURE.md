@@ -150,6 +150,7 @@ Online-only. Timer state lives on the `Tournament` object and syncs via the norm
 - `TimerState`: `started_at` (UTC, when started/resumed), `elapsed_before_pause` (seconds), `paused`.
 - Tournament fields: `timer: TimerState` (global), `table_extra_time: dict[str,int]` (table_idx → extra seconds). Config: `round_time` (seconds, 0 = no timer), `finals_time` (0 = use round_time).
 - Endpoints (organizer-only, online-only, Playing state; all save-and-broadcast): `POST /{uid}/timer/{start|pause|reset|add-time}` — start/resume, pause, reset + clear extensions, add per-table seconds (max 600s total).
+- **Per-round lifecycle** (backend, not Rust engine): on round-start events (StartRound, SelfOrganizeRound, StartFinals, RestoreRound) the timer auto-starts fresh (`started_at=now`, `paused=False`, `table_extra_time` cleared) when that is the only round in progress; a parallel-round guard prevents clobbering a still-running clock. On round-end events (FinishRound, CancelRound, FinishTournament, CancelFinals) the timer and `table_extra_time` are cleared once no round remains running.
 - Frontend: `TimerDisplay.svelte` (countdown, <5 min warning, expired, organizer controls); `JudgeCallBanner.svelte` (stacks dismissible `judge_call` alerts with chime).
 
 ## Announcements

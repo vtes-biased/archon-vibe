@@ -994,6 +994,16 @@ class TournamentActionRequest(BaseModel):
     seed: int | None = None
 
 
+def _live_game_count(t: Tournament) -> int:
+    """Games currently being played, for the per-round timer reset.
+    A prelim round is live if any table is unfinished (In Progress / Invalid)
+    — Cancelled and Finished tables don't count; likewise the finals table.
+    """
+    live = ("In Progress", "Invalid")
+    rounds = sum(1 for r in (t.rounds or []) if any(tbl.state in live for tbl in r))
+    return rounds + (1 if t.finals is not None and t.finals.state in live else 0)
+
+
 @router.post("/{uid}/action")
 async def tournament_action(
     uid: str,
@@ -1200,40 +1210,29 @@ async def tournament_action(
             updated.finish = datetime.now(UTC)
         deck_ops = result.get("deck_ops", [])
 
-        # Timer lifecycle hooks (online-only, not handled by Rust engine)
-        # Skip timer reset if other rounds are still in progress (parallel rounds)
-        if request.type in (
+        # Timer lifecycle hooks (online-only, not handled by Rust engine).
+        # Each game (prelim round or finals) runs on its own fresh full timer:
+        # the action that makes the FIRST game live starts the clock from now;
+        # the action that leaves NO game live clears it. Keying on the before/
+        # after live-game count (not the event name) keeps parallel rounds and
+        # RestoreRound-to-already-finished from clobbering a still-running clock.
+        TIMER_EVENTS = (
             "StartRound",
             "SelfOrganizeRound",
             "StartFinals",
             "RestoreRound",
-        ):
-            in_progress = sum(
-                1
-                for r in (updated.rounds or [])
-                if any(t.state != "Finished" for t in r)
-            )
-            if in_progress <= 1:
-                updated.timer = TimerState()  # Fresh paused timer
-                updated.table_extra_time = {}
-        elif request.type in (
             "FinishRound",
             "CancelRound",
+            "FinishFinals",
             "FinishTournament",
             "CancelFinals",
-        ):
-            # Only reset timer if tournament left Playing state (all rounds done)
-            if updated.state != "Playing":
-                if not updated.timer.paused and updated.timer.started_at:
-                    # Accumulate elapsed time before pausing
-                    elapsed = (
-                        datetime.now(UTC) - updated.timer.started_at
-                    ).total_seconds()
-                    updated.timer = TimerState(
-                        elapsed_before_pause=updated.timer.elapsed_before_pause
-                        + elapsed,
-                        paused=True,
-                    )
+        )
+        if request.type in TIMER_EVENTS:
+            if _live_game_count(updated) == 0:  # nothing running -> clear
+                updated.timer = TimerState()
+                updated.table_extra_time = {}
+            elif _live_game_count(tournament) == 0:  # first game live -> run
+                updated.timer = TimerState(started_at=datetime.now(UTC), paused=False)
                 updated.table_extra_time = {}
 
         # Save within the same transaction (row is still locked)

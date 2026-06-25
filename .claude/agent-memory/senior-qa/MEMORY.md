@@ -9,6 +9,7 @@
 - [No git checkout during mutation tests](feedback_no_git_checkout_during_mutation_tests.md) — back up the file first; `git checkout` wiped uncommitted feature code mid-QA.
 - [Engine test fixture traps](project_engine_test_fixture_traps.md) — `tournament_with_round`/`waiting_after_round` carry engine-impossible stored VP vectors; inert only because standings recompute never re-validates. Don't build full-standings asserts on their untouched tables.
 - [Engine↔model state drift](project_engine_model_state_drift.md) — engine emits state strings as bare literals (enum can be stale); route strict-converts → a missing Python enum value 500s every action. `test_engine_model_contract.py` pins it.
+- [Tournament-action route test reachability](trap_tournament_action_route_untested.md) — post-engine route hooks (timer, finish-stamp) aren't reachable via the engine-contract test pattern; no route-level tournament_action test exists, and no timer test anywhere.
 - [Open-rounds non-VEKN flag](project_open_rounds_non_vekn.md) — `open_rounds`/`self_organized_rounds` = house format; "never push" invariant lives in the shipped `vekn_push.py` queries (tested), "never rate" is an inert in-Python skip (not tested, by design).
 
 ## How to Run Tests
