@@ -23,13 +23,14 @@ plus per-*seat* `result`). The real completion signal is the table itself:
 
 **How to apply:** When adding a new per-table side-effect keyed off
 `_active_tables`, ask whether it should fire on a finished-but-not-finalized
-table/finals. If not, skip done tables via `_table_done(table)` (`state ==
-"Finished" or override`) — do NOT gate on `finals.get("result")`. And if the
-effect is scheduled/cancelled, make its change-guard signature sensitive to
-per-table done-state (`_timer_signature` does this), else a table finishing
-won't trigger the cancel. `_table_done` + the signature fix shipped for the
-timer feature. `finals_time` is often 0 in VEKN (untimed finals), so the timer's
-`total <= 0` guard already suppresses the finals case there too.
+table/finals. If not, gate on `_table_pending(table)` — pending = NOT in
+`{Finished, Invalid, Cancelled}` and no `override` (i.e. still being played); do
+NOT gate on `finals.get("result")`. And if the effect is scheduled/cancelled,
+make its change-guard signature sensitive to per-table pending-state
+(`_timer_signature` does this), else a table finishing won't trigger the cancel.
+`_table_pending` + the signature fix shipped for the timer feature. `finals_time`
+is often 0 in VEKN (untimed finals), so the timer's `total <= 0` guard already
+suppresses the finals case there too.
 
 Related: [[online-only-tournament-subdata-carveout]] (the carve-out pattern the
 bot timer/announcement features live inside).

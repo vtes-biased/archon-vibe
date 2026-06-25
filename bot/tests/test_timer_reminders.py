@@ -74,28 +74,31 @@ def _delays_by_channel(reminders) -> dict[int, list[float]]:
     return {ch: sorted(v) for ch, v in by_ch.items()}
 
 
-def test_fresh_round_schedules_warning_then_timeup() -> None:
+def test_fresh_round_schedules_15_5_and_timeup() -> None:
     out = compute_timer_reminders(_tourney(round_time=1200), [111], EPOCH)
-    # 20-min round just started: warn at 15:00 in (1200-300), time-up at 20:00.
-    assert _delays_by_channel(out) == {111: [900.0, 1200.0]}
-    warn = next(r for r in out if r.token[2] == 300)
-    timeup = next(r for r in out if r.token[2] == 0)
-    assert "5 minutes remaining" in warn.message
-    assert "Time!" in timeup.message
+    # 20-min round just started: warn at 5:00 in (1200-900), 15:00 in (1200-300),
+    # time-up at 20:00.
+    assert _delays_by_channel(out) == {111: [300.0, 900.0, 1200.0]}
+    assert "15 minutes remaining" in next(r for r in out if r.token[2] == 900).message
+    assert "5 minutes remaining" in next(r for r in out if r.token[2] == 300).message
+    assert "Time!" in next(r for r in out if r.token[2] == 0).message
 
 
 def test_elapsed_before_pause_shifts_deadline_in() -> None:
-    # 10 min already accrued before a pause/resume → only 10 min of a 20-min round
-    # remains, so the deadline (and both thresholds) move 600s closer.
-    out = compute_timer_reminders(_tourney(elapsed=600.0), [111], EPOCH)
-    assert _delays_by_channel(out) == {111: [300.0, 600.0]}
+    # 10 min already accrued before a pause/resume → only 20 min of a 30-min round
+    # remains, so all three thresholds move 600s closer (vs 900/1500/1800 fresh).
+    out = compute_timer_reminders(
+        _tourney(round_time=1800, elapsed=600.0), [111], EPOCH
+    )
+    assert _delays_by_channel(out) == {111: [300.0, 900.0, 1200.0]}
 
 
 def test_finals_uses_finals_time() -> None:
     out = compute_timer_reminders(
-        _tourney(finals=True, finals_time=600, round_time=1200), [999], EPOCH
+        _tourney(finals=True, finals_time=1800, round_time=1200), [999], EPOCH
     )
-    assert _delays_by_channel(out) == {999: [300.0, 600.0]}  # total=600, not 1200
+    # total=1800 (finals_time), not 1200 (round_time) → 900/1500/1800.
+    assert _delays_by_channel(out) == {999: [900.0, 1500.0, 1800.0]}
     assert any("Finals" in r.message for r in out)
 
 
@@ -103,16 +106,20 @@ def test_per_table_extra_time_extends_only_that_table() -> None:
     out = compute_timer_reminders(
         _tourney(tables=2, extra={"1": 120}), [111, 222], EPOCH
     )
-    # Table 0 unchanged; table 1 (channel 222) gets +120s on both thresholds.
-    assert _delays_by_channel(out) == {111: [900.0, 1200.0], 222: [1020.0, 1320.0]}
+    # Table 0 unchanged; table 1 (channel 222) gets +120s on every threshold.
+    assert _delays_by_channel(out) == {
+        111: [300.0, 900.0, 1200.0],
+        222: [420.0, 1020.0, 1320.0],
+    }
 
 
 def test_passed_threshold_yields_negative_delay() -> None:
-    # 16:40 into a 20-min round: the 15:00 warning is in the past (caller suppresses
-    # it), time-up is still 3:20 ahead.
+    # 16:40 into a 20-min round: the 5:00 and 15:00 warnings are in the past (the
+    # caller suppresses them), time-up is still 3:20 ahead.
     out = compute_timer_reminders(_tourney(), [111], EPOCH + 1000)
     by_thr = {r.token[2]: r.delay for r in out}
-    assert by_thr[300] == -100.0  # warning already passed
+    assert by_thr[900] == -700.0  # 15-min warning already passed
+    assert by_thr[300] == -100.0  # 5-min warning already passed
     assert by_thr[0] == 200.0  # time-up still upcoming
 
 
@@ -122,13 +129,21 @@ def test_zero_sentinel_channel_skipped() -> None:
     assert {r.channel_id for r in out} == {111}
 
 
-def test_finished_or_overridden_table_gets_no_reminder() -> None:
-    # A table reported-and-final (or judge-overridden) is done even before the round
-    # closes — no warning, no "Time!". 'Invalid'/'In Progress' still get reminders.
-    obj = _tourney(tables=2)
-    obj["rounds"][-1][0]["state"] = "Finished"  # table 0 done
-    obj["rounds"][-1][1]["override"] = {"judge_uid": "j"}  # table 1 finalized
-    assert compute_timer_reminders(obj, [111, 222], EPOCH) == []
+def test_only_pending_tables_get_reminders() -> None:
+    # Any table whose result is reported/voided/finalized has stopped play — no
+    # reminder. Only 'In Progress' (or an unset default) is pending.
+    obj = _tourney(tables=4)
+    obj["rounds"][-1][0]["state"] = "Finished"
+    obj["rounds"][-1][1]["state"] = "Invalid"
+    obj["rounds"][-1][2]["state"] = "Cancelled"
+    obj["rounds"][-1][3]["state"] = "In Progress"  # the only pending table
+    out = compute_timer_reminders(obj, [111, 222, 333, 444], EPOCH)
+    assert {r.channel_id for r in out} == {444}
+
+    # An override (judge-finalized, state still In Progress) also stops reminders.
+    ov = _tourney(tables=1)
+    ov["rounds"][-1][0]["override"] = {"judge_uid": "j"}
+    assert compute_timer_reminders(ov, [111], EPOCH) == []
 
     # A finished finals (seating still populated, tournament not yet finalized) must
     # not keep a stale "Time!" scheduled — the over-trigger the reviewer flagged.

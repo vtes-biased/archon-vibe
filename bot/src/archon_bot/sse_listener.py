@@ -593,20 +593,26 @@ def compute_announcement_posts(
     return out
 
 
-def _table_done(table: dict) -> bool:
-    """A table whose result is complete/final — no timer reminder is useful.
+# Terminal table states: play has stopped (result reported, voided, or finalized).
+# There is no top-level ``result`` field on a table (only per-seat ``result``), so
+# state + override is the only completion signal.
+_TABLE_DONE_STATES = {"Finished", "Invalid", "Cancelled"}
 
-    ``Finished`` = VPs add up; an ``override`` = a judge finalized it. ``Invalid``
-    (reported but VPs don't add up) and ``In Progress`` are NOT done — those still
-    want the time-up nudge. There is no top-level ``result`` field on a table (only
-    per-seat ``result``), so state/override is the only completion signal.
+
+def _table_pending(table: dict) -> bool:
+    """A table still being played — the only kind that wants a timer reminder.
+
+    Anything with a reported/voided/judge-finalized result (``Finished`` /
+    ``Invalid`` / ``Cancelled`` or an ``override``) has stopped play, so a
+    "15 minutes left" or "Time!" post would just be noise. An unset state
+    defaults to pending.
     """
-    return table.get("state") == "Finished" or bool(table.get("override"))
+    return table.get("state") not in _TABLE_DONE_STATES and not table.get("override")
 
 
-# Reminders fire at these many seconds of remaining time, per table: a 5-minute
-# warning and the time-up post. Ordered longest-first only for readability.
-_TIMER_THRESHOLDS = (300, 0)
+# Reminders fire at these many seconds of remaining time, per table: 15-minute and
+# 5-minute warnings, then the time-up post. Ordered longest-first for readability.
+_TIMER_THRESHOLDS = (900, 300, 0)
 
 
 @dataclass(frozen=True)
@@ -676,11 +682,11 @@ def compute_timer_reminders(
     for i, table in enumerate(tables):
         if i >= len(table_chs) or not table_chs[i]:  # skip 0 sentinel / missing
             continue
-        if _table_done(table):
-            # Reported-and-final / judge-overridden: the game's over even if the
-            # round/finals isn't formally closed yet, so no reminder is useful. A
-            # finished finals (seating still populated) would otherwise keep a
-            # stale "Time!" scheduled until the tournament is finalized.
+        if not _table_pending(table):
+            # Only tables still in play want a reminder. A table with a reported,
+            # voided, or judge-finalized result has stopped — and a finished finals
+            # (seating still populated) would otherwise keep a stale "Time!"
+            # scheduled until the tournament is formally finalized.
             continue
         extra = extra_map.get(str(i), 0)
         deadline = started_epoch + total + extra - elapsed_before
@@ -702,8 +708,8 @@ def _timer_signature(obj: dict) -> tuple:
 
     Equal between two snapshots ⇒ the schedule still holds (skips score/sanction
     churn). The active-tables ``tag`` flips on a round change or prelim→finals; the
-    per-table done-states flip when a table finishes early (so its pending reminder
-    is cancelled); the extra-time map flips when an extension pushes a deadline out.
+    per-table pending flags flip when a table finishes early (so its reminder is
+    cancelled); the extra-time map flips when an extension pushes a deadline out.
     """
     timer = obj.get("timer") or {}
     tag, tables = _active_tables(obj)
@@ -712,7 +718,7 @@ def _timer_signature(obj: dict) -> tuple:
         obj.get("round_time") or 0,
         obj.get("finals_time") or 0,
         tag,
-        tuple(_table_done(t) for t in tables),
+        tuple(_table_pending(t) for t in tables),
         timer.get("started_at"),
         bool(timer.get("paused")),
         timer.get("elapsed_before_pause"),
