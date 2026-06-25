@@ -1,8 +1,13 @@
 <script lang="ts">
   import { helpDocs, referenceDocs, userGuides } from "$lib/help-docs";
-  import { BookOpen, Trophy, Scale, Shield, UserRound, ClipboardList, ShieldCheck, FileText } from "@lucide/svelte";
+  import { BookOpen, Trophy, Scale, Shield, UserRound, ClipboardList, ShieldCheck, FileText, MessageSquarePlus } from "@lucide/svelte";
   import { ArrowLeft } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import Button from "$lib/components/Button.svelte";
+  import FeedbackModal from "$lib/components/FeedbackModal.svelte";
+  import { getAuthState } from "$lib/stores/auth.svelte";
+
+  let showFeedback = $state(false);
 
   const iconMap: Record<string, typeof BookOpen> = {
     book: BookOpen,
@@ -77,6 +82,20 @@
       </div>
     </section>
 
+    {#if getAuthState().user?.vekn_id}
+      <!-- Feedback (VEKN members only — backend gates on a VEKN id) -->
+      <section class="mb-8">
+        <h2 class="text-lg font-medium text-ink-strong mb-4">{m.feedback_section()}</h2>
+        <div class="bg-surface-card rounded-lg border border-line p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <p class="text-sm text-ink-muted flex-1">{m.feedback_section_blurb()}</p>
+          <Button variant="primary" size="lg" onclick={() => (showFeedback = true)}>
+            <MessageSquarePlus class="w-4 h-4" />
+            {m.feedback_open_button()}
+          </Button>
+        </div>
+      </section>
+    {/if}
+
     <!-- Legal -->
     <section>
       <h2 class="text-lg font-medium text-ink-strong mb-4">{m.help_legal_section()}</h2>
@@ -102,3 +121,7 @@
     </section>
   </div>
 </div>
+
+{#if showFeedback}
+  <FeedbackModal onClose={() => (showFeedback = false)} />
+{/if}

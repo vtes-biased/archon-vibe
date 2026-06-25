@@ -95,6 +95,7 @@
 - [Projection tier: column vs content split](projection-tier-column-vs-content-split.md) — new precomputed access column ONLY when projection CONTENT must vary by viewer at the same level (else collapse onto existing column + shrink lower one); base64 contact obfuscation is a harvester speed-bump, not access control.
 
 ## Error handling (cross-stack)
+- [aiohttp timeout escapes ClientError](aiohttp-timeout-escapes-clienterror.md) — ClientTimeout breach raises asyncio.TimeoutError, NOT aiohttp.ClientError; `except aiohttp.ClientError` misses timeouts (→ 500 not 502) on every external-proxy route (feedback/twda/webpush).
 - [Error-codes contract](error-codes-contract.md) — `EngineError` enum = single error taxonomy; `{code,params,message}` wire JSON across WASM/PyO3/HTTP; domain rejection MUST be an explicit variant (From-impls silently demote to internal); EngineRejection-in-transaction is sound FastAPI.
 
 ## Migration / legacy-archon merge (residual hazards)

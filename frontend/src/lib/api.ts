@@ -157,6 +157,32 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
   );
 }
 
+// --- In-app feedback (#332) --------------------------------------------------
+
+export interface FeedbackSubmission {
+  category: 'bug' | 'feature' | 'question';
+  title: string;
+  description: string;
+  app_version: string;
+  route: string;
+  locale: string;
+  user_agent: string;
+}
+
+/** File in-app feedback as a GitHub issue (online-only). The modal renders its own
+ *  success/error state, so callers suppress the apiRequest toast. */
+export async function submitFeedback(
+  data: FeedbackSubmission,
+  opts?: { suppressErrorToast?: boolean }
+): Promise<{ issue_url: string; issue_number: number }> {
+  requireOnline(opts);
+  return apiRequest<{ issue_url: string; issue_number: number }>(
+    '/api/feedback/',
+    { method: 'POST', body: JSON.stringify(data) },
+    opts
+  );
+}
+
 /**
  * Fetch users - always use IndexedDB for offline-first approach.
  */

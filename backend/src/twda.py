@@ -17,9 +17,10 @@ import base64
 import json
 import logging
 import os
-import time
 
 import aiohttp
+
+from . import github_app
 
 logger = logging.getLogger(__name__)
 
@@ -29,66 +30,7 @@ TWDA_GITHUB_INSTALLATION_ID = os.environ.get("TWDA_GITHUB_INSTALLATION_ID", "")
 TWDA_TARGET_REPO = "GiottoVerducci/TWD"
 TWDA_TARGET_OWNER = TWDA_TARGET_REPO.split("/")[0]  # "GiottoVerducci"
 
-_GH_API_VERSION = "2022-11-28"
-
-
-def _load_private_key() -> str:
-    """Load PEM private key from env var (inline or file path)."""
-    key = TWDA_GITHUB_PRIVATE_KEY
-    if not key:
-        return ""
-    # If it looks like a file path (not PEM content), read it
-    if not key.startswith("-----") and os.path.isfile(key):
-        with open(key) as f:
-            return f.read()
-    return key
-
-
-def _create_jwt() -> str:
-    """Create a short-lived JWT for GitHub App authentication (RS256)."""
-    import jwt
-
-    private_key = _load_private_key()
-    if not private_key:
-        raise ValueError("TWDA_GITHUB_PRIVATE_KEY not configured")
-
-    now = int(time.time())
-    payload = {
-        "iat": now - 60,  # 60s clock-drift margin
-        "exp": now + 600,  # max 10 minutes
-        "iss": int(TWDA_GITHUB_APP_ID),  # GitHub expects integer
-    }
-    return jwt.encode(payload, private_key, algorithm="RS256")
-
-
-async def _get_installation_token() -> str:
-    """Exchange App JWT for a scoped installation access token (1h TTL)."""
-    app_jwt = _create_jwt()
-    timeout = aiohttp.ClientTimeout(total=15.0)
-    async with aiohttp.ClientSession(
-        base_url="https://api.github.com",
-        timeout=timeout,
-    ) as session:
-        async with session.post(
-            f"/app/installations/{TWDA_GITHUB_INSTALLATION_ID}/access_tokens",
-            headers={
-                "Authorization": f"Bearer {app_jwt}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": _GH_API_VERSION,
-            },
-            json={
-                "permissions": {
-                    "contents": "write",
-                    "pull_requests": "write",
-                },
-            },
-        ) as resp:
-            if resp.status != 201:
-                raise ValueError(
-                    f"Failed to get installation token: {resp.status} {await resp.text()}"
-                )
-            data = await resp.json(content_type=None)
-            return data["token"]
+_GH_API_VERSION = github_app.GH_API_VERSION
 
 
 def _is_configured() -> bool:
@@ -114,7 +56,12 @@ async def submit_twda_pr(
         return None
 
     try:
-        token = await _get_installation_token()
+        token = await github_app.get_installation_token(
+            TWDA_GITHUB_APP_ID,
+            github_app.load_private_key(TWDA_GITHUB_PRIVATE_KEY),
+            TWDA_GITHUB_INSTALLATION_ID,
+            {"contents": "write", "pull_requests": "write"},
+        )
     except Exception:
         logger.exception("Failed to get TWDA GitHub installation token")
         return None

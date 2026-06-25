@@ -63,6 +63,27 @@ ansible-vault view ansible/roles/fastapi_backend/files/officials_contacts.json.p
 
 The repo never holds the plaintext; the vault password is the only gate.
 
+## Feedback GitHub App (env vars + vault-delivered key)
+
+The in-app feedback endpoint files GitHub issues on `vtes-biased/archon-vibe` via a
+**dedicated GitHub App** (separate from TWDA's, so the two integrations stay isolated)
+with **Issues: write**, installed only on this repo. Three env vars, configured like
+the TWDA App below:
+
+- `FEEDBACK_GITHUB_APP_ID` (numeric) and `FEEDBACK_GITHUB_INSTALLATION_ID` (numeric) are
+  short, so they ride in the env file via `vault_feedback_github_app_id` /
+  `vault_feedback_github_installation_id`.
+- `FEEDBACK_GITHUB_PRIVATE_KEY` is the multi-line PEM — delivered out of band exactly like
+  the TWDA key (next section): the role copies `files/feedback_github_app.pem.<env>.vault`
+  to `{{ env_dir }}/feedback_github_app.pem`, and `vault_feedback_github_private_key` is set
+  to that **path**.
+
+Any of the three unset → `POST /api/feedback/` returns 503 (graceful degradation). Provide /
+refresh the key the same way as the TWDA key, using `feedback_github_app.pem.<env>.vault`.
+
+Pre-create the `feedback` label on the repo once (the category labels `bug`/`enhancement`/
+`question` are GitHub defaults) for predictable colour/grouping.
+
 ## TWDA GitHub App key (secret — vault-delivered)
 
 The TWDA importer authenticates as a GitHub App using a private key (PEM). The key

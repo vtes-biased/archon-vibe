@@ -21,6 +21,8 @@
 #                            officials_contacts.json.vault; e.g. ...json.beta.vault)
 # r.twda_key_vault        optional (per-env vault filename in files/; default
 #                            twda_github_app.pem.vault; e.g. ...pem.beta.vault)
+# r.feedback_key_vault    optional (per-env vault filename in files/; default
+#                            feedback_github_app.pem.vault; e.g. ...pem.beta.vault)
 r: {}
 fastapi_env_dir_default: /etc/archon
 fastapi_data_dir_default: /var/lib/archon

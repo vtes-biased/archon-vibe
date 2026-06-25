@@ -216,6 +216,20 @@
   loop: "{{ query('ansible.builtin.fileglob', r.twda_key_vault | default('twda_github_app.pem.vault')) }}"
   notify: Restart backend service
 
+# GitHub App private key for the in-app feedback endpoint (PEM). Same out-of-band
+# delivery as the TWDA key above — a per-env ansible-vault file (r.feedback_key_vault,
+# e.g. feedback_github_app.pem.beta.vault) decrypted to the path FEEDBACK_GITHUB_PRIVATE_KEY
+# points at. A separate App/key from TWDA so the two integrations stay isolated.
+- name: Deploy feedback GitHub App private key (ansible-vault, optional)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ _env_dir }}/feedback_github_app.pem"
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0640"
+  loop: "{{ query('ansible.builtin.fileglob', r.feedback_key_vault | default('feedback_github_app.pem.vault')) }}"
+  notify: Restart backend service
+
 - name: Render systemd unit
   ansible.builtin.template:
     src: service.j2

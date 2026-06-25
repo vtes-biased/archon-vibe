@@ -56,6 +56,7 @@
 | proxy (non-competing player) | Proxy | Proxy | Proxy | Proxy |
 | call judge (in-app button) | Appeler l'arbitre | Llamar al árbitro | Chamar árbitro | Chiama giudice |
 | timer | minuteur | temporizador | cronômetro | timer* |
+| feedback (section/UI) | Commentaires | Comentarios | Feedback | Feedback |
 
 \* it keeps English loanword (round, not "turno"; override, not translated; timer = timer).
 † finals it: "Finali" (plural) for section headings, "finale" (singular) for time-config labels.

@@ -40,6 +40,7 @@
         env_dir: "{{ env_dir }}"
         officials_contacts_vault: officials_contacts.json.prod.vault
         twda_key_vault: twda_github_app.pem.prod.vault
+        feedback_key_vault: feedback_github_app.pem.prod.vault
 
     # 3. Frontend static site + nginx vhost for the main domain (proxies backend)
     - role: static_site

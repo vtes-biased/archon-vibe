@@ -105,6 +105,11 @@ backend_env:
   TWDA_GITHUB_APP_ID: "{{ vault_twda_github_app_id | default('') }}"
   TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
   TWDA_GITHUB_PRIVATE_KEY: "{{ vault_twda_github_private_key | default('') }}"
+  # In-app feedback -> GitHub issues. Dedicated GitHub App, Issues:write on this repo.
+  # PRIVATE_KEY is a runtime PATH; the PEM is vault-delivered there (see role README).
+  FEEDBACK_GITHUB_APP_ID: "{{ vault_feedback_github_app_id | default('') }}"
+  FEEDBACK_GITHUB_INSTALLATION_ID: "{{ vault_feedback_github_installation_id | default('') }}"
+  FEEDBACK_GITHUB_PRIVATE_KEY: "{{ vault_feedback_github_private_key | default('') }}"
 
 # --- bot env vars (non-secret) --------------------------------------------
 bot_env:
