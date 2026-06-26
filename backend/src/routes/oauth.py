@@ -15,15 +15,18 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from ..db_oauth import (
+    delete_oauth_consent,
     get_oauth_client_by_client_id,
     get_oauth_clients_by_owner,
     get_oauth_code,
     get_oauth_consent,
+    get_oauth_consents_by_user,
     get_oauth_token_by_jti,
     insert_oauth_client,
     insert_oauth_code,
     insert_oauth_token,
     revoke_oauth_token_chain,
+    revoke_oauth_tokens_for_user_client,
     update_oauth_client,
     update_oauth_code,
     update_oauth_token,
@@ -323,6 +326,11 @@ async def _handle_authorization_code(body: dict, client: OAuthClient) -> dict:
     if not _verify_pkce(code_verifier, auth_code.code_challenge):
         raise HTTPException(400, "Invalid code_verifier (PKCE)")
 
+    # Consent is authoritative: a revoke between code issuance and exchange (≤60s,
+    # or any auto-approve race) deletes the consent row and must block redemption.
+    if not await get_oauth_consent(auth_code.user_uid, client.client_id):
+        raise HTTPException(400, "Consent has been revoked")
+
     # Mark code as used
     used_code = OAuthAuthorizationCode(
         uid=auth_code.uid,
@@ -377,6 +385,11 @@ async def _handle_refresh_token(body: dict, client: OAuthClient) -> dict:
             await revoke_oauth_token_chain(token_record.parent_token_uid)
         logger.warning(f"Revoked refresh token reuse detected: jti={jti}")
         raise HTTPException(400, "Refresh token has been revoked")
+
+    # Consent is authoritative: revoking it deletes the row, so a surviving refresh
+    # token (e.g. a partial revoke) still can't mint new access tokens.
+    if not await get_oauth_consent(payload["sub"], client.client_id):
+        raise HTTPException(400, "Consent has been revoked")
 
     # Revoke old refresh token
     now = datetime.now(UTC)
@@ -482,6 +495,53 @@ async def userinfo(user: CurrentUser, request: Request):
         "roles": [r.value for r in user.roles],
         "vekn_id": user.vekn_id,
     }
+
+
+# --- Authorized Apps (member-facing consent management) ---
+
+
+def _require_first_party(request: Request) -> None:
+    """Consent management is self-service only: a third-party OAuth token must not
+    enumerate or revoke the user's grants to other apps."""
+    if getattr(request.state, "oauth_scopes", None) is not None:
+        raise HTTPException(403, "Consent management requires a first-party session")
+
+
+@router.get("/consents")
+async def list_consents(user: CurrentUser, request: Request):
+    """List the third-party apps the current user has authorized."""
+    _require_first_party(request)
+    consents = await get_oauth_consents_by_user(user.uid)
+    out = []
+    for c in consents:
+        client = await get_oauth_client_by_client_id(c.client_id)
+        if not client:
+            continue  # orphaned consent (client hard-deleted) — nothing to show
+        out.append(
+            {
+                "client_id": c.client_id,
+                "name": client.name,
+                "scopes": [s.value for s in c.scopes],
+                "granted_at": c.modified.isoformat(),
+            }
+        )
+    return out
+
+
+@router.delete("/consents/{client_id}")
+async def revoke_consent(client_id: str, user: CurrentUser, request: Request):
+    """Revoke a granted app: kill its live tokens, then drop the remembered consent.
+
+    Tokens first so access is cut immediately; consent last so that if anything
+    fails in between, the leftover consent is harmlessly re-revokable and — since
+    issuance re-checks consent — still can't mint fresh tokens on its own.
+    """
+    _require_first_party(request)
+    revoked = await revoke_oauth_tokens_for_user_client(user.uid, client_id)
+    deleted = await delete_oauth_consent(user.uid, client_id)
+    if not deleted and not revoked:
+        raise HTTPException(404, "No authorization found for this app")
+    return {"status": "revoked", "client_id": client_id, "tokens_revoked": revoked}
 
 
 # --- Client Management (DEV role) ---

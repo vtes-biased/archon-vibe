@@ -162,6 +162,45 @@ async def upsert_oauth_consent(consent: OAuthConsent) -> None:
             )
 
 
+async def get_oauth_consents_by_user(user_uid: str) -> list[OAuthConsent]:
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data FROM oauth_consents WHERE data->>'user_uid' = %s ORDER BY modified DESC",
+            (user_uid,),
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], OAuthConsent) for row in rows]
+
+
+async def delete_oauth_consent(user_uid: str, client_id: str) -> bool:
+    """Hard-delete a user's remembered consent for a client. Returns True if a row was removed."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "DELETE FROM oauth_consents WHERE data->>'user_uid' = %s AND data->>'client_id' = %s RETURNING uid",
+            (user_uid, client_id),
+        )
+        return await result.fetchone() is not None
+
+
+async def revoke_oauth_tokens_for_user_client(user_uid: str, client_id: str) -> int:
+    """Revoke every live token a client holds for a user, in one atomic statement so
+    consent revocation cuts access with no partial-failure window. Returns the count."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """
+            UPDATE oauth_tokens
+            SET data = jsonb_set(data, '{revoked}', 'true')
+            WHERE data->>'user_uid' = %s
+              AND data->>'client_id' = %s
+              AND data->>'revoked' = 'false'
+            RETURNING uid
+            """,
+            (user_uid, client_id),
+        )
+        rows = await result.fetchall()
+        return len(rows)
+
+
 async def cleanup_expired_oauth_codes() -> int:
     """Delete expired authorization codes."""
     async with get_connection() as conn:

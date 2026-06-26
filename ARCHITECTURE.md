@@ -191,7 +191,7 @@ Pushes VEKN role metadata (organization/judge/playtest levels) to Discord so ser
 
 ## OAuth2 Provider
 
-Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access. Endpoints `/oauth/{authorize,token,userinfo}`; client CRUD + secret regeneration under `/oauth/clients` (DEV role). Scopes: `profile:read` (limited to `/oauth/*`), `user:impersonate` (full API). Security: PKCE S256 required, Argon2-hashed client secrets, refresh-token rotation with a revocation chain, single-use auth codes, consent persistence. Frontend: `/consent` page, `DeveloperSection.svelte`. Files: `routes/oauth.py`, `db_oauth.py`, `models.py`, `middleware/auth.py`.
+Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access. Endpoints `/oauth/{authorize,token,userinfo}`; client CRUD + secret regeneration under `/oauth/clients` (DEV role); `GET /oauth/consents` (list authorized apps, first-party session only — rejects OAuth tokens with 403), `DELETE /oauth/consents/{client_id}` (revoke consent + immediately revoke live tokens for that client). Scopes: `profile:read` (limited to `/oauth/*`), `user:impersonate` (full API). Security: PKCE S256 required, Argon2-hashed client secrets, refresh-token rotation with a revocation chain, single-use auth codes, consent persistence; `revoked` flag on access tokens honored by auth middleware. Frontend: `/consent` page, `DeveloperSection.svelte` (developer-facing); `AuthorizedApps.svelte` (member-facing profile section). Files: `routes/oauth.py`, `db_oauth.py`, `models.py`, `middleware/auth.py`.
 
 ## Discord Tournament Bot
 

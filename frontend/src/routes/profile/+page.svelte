@@ -19,6 +19,7 @@
 
   import ProfileView from "./ProfileView.svelte";
   import LinkedAccounts from "./LinkedAccounts.svelte";
+  import AuthorizedApps from "./AuthorizedApps.svelte";
   import AppSettings from "./AppSettings.svelte";
   import DeveloperSection from "./DeveloperSection.svelte";
   import AdminSection from "./AdminSection.svelte";
@@ -207,6 +208,7 @@
           onLinkDiscord={handleLinkDiscord}
           onRegisterPasskey={handleRegisterPasskey}
         />
+        <AuthorizedApps />
         <AppSettings />
         {#if isDev}
           <DeveloperSection />
