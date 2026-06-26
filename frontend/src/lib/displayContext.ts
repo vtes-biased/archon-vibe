@@ -141,21 +141,6 @@ class DisplayContext {
       userName.localeCompare(lastVisibleName) <= 0
     );
   }
-
-  /**
-   * Check if any filters are currently active.
-   */
-  hasActiveFilters(): boolean {
-    return !!(
-      this.filters.country ||
-      (this.filters.roles && this.filters.roles.length > 0) ||
-      this.filters.nameSearch ||
-      this.filters.hasPastSanctions ||
-      this.filters.currentlySanctioned ||
-      this.filters.sponsor ||
-      this.filters.noVekn
-    );
-  }
 }
 
 // Singleton instance

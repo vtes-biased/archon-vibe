@@ -300,6 +300,7 @@
   "user_list_filter_my_recruits": "Meus recrutas",
   "user_list_filter_no_sponsor": "Sem patrocinador",
   "user_list_filter_no_vekn": "Sem VEKN",
+  "user_list_filter_recruits_have_vekn": "Seus recrutas sempre têm um ID VEKN",
   "user_list_showing_range": "Mostrando {from} a {to} de {total} usuários",
   "user_list_page_info": "Página {current} de {total}",
   "user_list_showing_total": "Mostrando {count} usuários",

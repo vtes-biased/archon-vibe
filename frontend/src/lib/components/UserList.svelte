@@ -414,7 +414,7 @@
               {#each availableRoles as role}
                 <button
                   onclick={() => toggleRole(role)}
-                  class="px-3 py-1 rounded text-sm font-medium transition-colors {selectedRoles.includes(
+                  class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors {selectedRoles.includes(
                     role,
                   )
                     ? getRoleClasses(role)
@@ -432,7 +432,7 @@
             <div class="flex flex-wrap gap-2">
               <button
                 onclick={() => toggleSanctionFilter("past")}
-                class="px-3 py-1 rounded text-sm font-medium transition-colors {filterHasPastSanctions
+                class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors {filterHasPastSanctions
                   ? 'bg-accent-soft/60 text-link-soft'
                   : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
               >
@@ -440,7 +440,7 @@
               </button>
               <button
                 onclick={() => toggleSanctionFilter("current")}
-                class="px-3 py-1 rounded text-sm font-medium transition-colors {filterCurrentlySanctioned
+                class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors {filterCurrentlySanctioned
                   ? 'bg-accent-soft/80 text-link-soft'
                   : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
               >
@@ -457,7 +457,9 @@
                 <button
                   onclick={() => setSponsorFilter("mine")}
                   aria-pressed={sponsorFilter === "mine"}
-                  class="px-3 py-1 rounded text-sm font-medium transition-colors {sponsorFilter === 'mine'
+                  disabled={filterNoVekn}
+                  title={filterNoVekn ? m.user_list_filter_recruits_have_vekn() : undefined}
+                  class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed {sponsorFilter === 'mine'
                     ? 'bg-accent-soft/60 text-link-soft'
                     : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
                 >
@@ -466,7 +468,7 @@
                 <button
                   onclick={() => setSponsorFilter("none")}
                   aria-pressed={sponsorFilter === "none"}
-                  class="px-3 py-1 rounded text-sm font-medium transition-colors {sponsorFilter === 'none'
+                  class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors {sponsorFilter === 'none'
                     ? 'bg-accent-soft/60 text-link-soft'
                     : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
                 >
@@ -475,7 +477,9 @@
                 <button
                   onclick={toggleNoVekn}
                   aria-pressed={filterNoVekn}
-                  class="px-3 py-1 rounded text-sm font-medium transition-colors {filterNoVekn
+                  disabled={sponsorFilter === "mine"}
+                  title={sponsorFilter === "mine" ? m.user_list_filter_recruits_have_vekn() : undefined}
+                  class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed {filterNoVekn
                     ? 'bg-accent-soft/60 text-link-soft'
                     : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
                 >
