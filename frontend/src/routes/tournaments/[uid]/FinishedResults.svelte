@@ -36,9 +36,10 @@
 
   const hasStandings = $derived(standings.length > 0);
 
-  function downloadReport() {
+  function downloadReport(format: "json" | "text" = "json") {
     const a = document.createElement("a");
-    a.href = `${API_BASE}/api/tournaments/${tournament.uid}/report`;
+    const qs = format === "json" ? "" : `?fmt=${format}`;
+    a.href = `${API_BASE}/api/tournaments/${tournament.uid}/report${qs}`;
     a.download = "";
     document.body.appendChild(a);
     a.click();
@@ -99,7 +100,7 @@
     </div>
   {/if}
 
-  <!-- Results actions. With standings: share + copy + More (JSON report) on one
+  <!-- Results actions. With standings: share + copy + More (report download) on one
        line. Without (empty finished shell): a direct Archon-import button, per #256. -->
   <div class="flex flex-wrap items-center gap-2">
     {#if hasStandings}
@@ -111,7 +112,10 @@
         <ClipboardCopy class="w-4 h-4" />
         {m.share_results_text()}
       </Button>
-      <ActionMenu label={m.common_more()} items={[{ label: m.decks_download_report_json(), icon: Download, onclick: downloadReport }]} />
+      <ActionMenu label={m.common_more()} items={[
+        { label: m.decks_download_report_json(), icon: Download, onclick: () => downloadReport("json") },
+        { label: m.decks_download_report_text(), icon: Download, onclick: () => downloadReport("text") },
+      ]} />
     {:else}
       <Button variant="secondary" size="md" onclick={() => onImportArchon?.()}>
         <Upload class="w-4 h-4" />

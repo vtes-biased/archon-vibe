@@ -748,6 +748,7 @@
   "decks_upload": "Télécharger",
   "decks_player_deck": "Deck de {name}",
   "decks_download_report_json": "Télécharger le rapport (JSON)",
+  "decks_download_report_text": "Télécharger le rapport (Texte)",
   "decks_required_player_hint": "Une decklist est obligatoire pour ce tournoi. Veuillez télécharger votre deck avant le check-in.",
   "decks_required_submitted": "Decklist soumise. Vous pouvez la remplacer jusqu'au début du tournoi.",
   "decks_submitted_note": "Decklist enregistrée. Vous pouvez encore la remplacer jusqu'au début du tournoi.",

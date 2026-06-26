@@ -748,6 +748,7 @@
   "decks_upload": "Upload",
   "decks_player_deck": "{name}'s Deck",
   "decks_download_report_json": "Download Report (JSON)",
+  "decks_download_report_text": "Download Report (Text)",
   "decks_required_player_hint": "A decklist is required for this tournament. Please upload your deck before check-in.",
   "decks_required_submitted": "Decklist submitted. You can replace it until the tournament starts.",
   "decks_submitted_note": "Decklist on file. You can still replace it until the tournament starts.",

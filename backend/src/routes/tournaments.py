@@ -10,7 +10,7 @@ from uuid import uuid7
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -37,6 +37,7 @@ from ..db import (
     get_tournament_by_uid,
     get_user_by_uid,
     get_user_by_vekn_id,
+    get_users_by_uids,
     save_object,
     save_object_from_model,
     save_sanction,
@@ -268,6 +269,64 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
         logger.exception("Failed to push VEKN event")
 
 
+async def _winner_deck_twda(tournament: Tournament) -> str | None:
+    """TWDA-formatted winner decklist — self-contained (event header + deck in TWD
+    layout), ready to paste into the TWDA. None if the winner has no stored deck.
+    Shared by the auto-TWDA PR (_maybe_submit_twda) and the text report download."""
+    if not tournament.winner:
+        return None
+
+    # Find winner's deck from DeckObject store
+    decks = await get_decks_for_tournament(tournament.uid)
+    winner_deck = next((d for d in decks if d.user_uid == tournament.winner), None)
+    if not winner_deck:
+        return None
+
+    player_user = await get_user_by_uid(tournament.winner)
+    player_name = player_user.name if player_user else "Unknown"
+
+    # Resolve the TWDA "Created by:" designer credit from the deck's attribution
+    # (the "designed by" reference), not the raw author text.
+    #   None              -> anonymous (null) or unset/self: omit the credit
+    #                        (never leak a stored author the designer hid)
+    #   "twda"            -> historical import; author already holds the name
+    #   player's own id   -> self: omit (redundant with the header player line)
+    #   other vekn / name -> credit that member; resolve a vekn -> display name
+    attribution = winner_deck.attribution
+    self_ids = {i for i in (getattr(player_user, "vekn_id", ""), player_name) if i}
+    if attribution == "twda":
+        designer_credit = winner_deck.author
+    elif not attribution or attribution in self_ids:
+        designer_credit = ""
+    else:
+        designer = await get_user_by_vekn_id(attribution)
+        designer_credit = (designer.name if designer else "") or winner_deck.author
+
+    deck_json = json.dumps(
+        {
+            "name": winner_deck.name,
+            "author": designer_credit,
+            "comments": winner_deck.comments,
+            "cards": winner_deck.cards,
+        }
+    )
+    tournament_date = tournament.start or tournament.modified.isoformat()
+    rounds_count = len(tournament.rounds)
+    tournament_format = f"{rounds_count}R" + ("+F" if tournament.finals else "")
+
+    return _engine.export_twda(
+        deck_json,
+        _load_cards_json(),
+        tournament.name,
+        str(tournament_date),
+        tournament.country or "",
+        tournament_format,
+        "",  # tournament_url
+        len(tournament.players),
+        player_name,
+    )
+
+
 async def _maybe_submit_twda(tournament: Tournament) -> None:
     """Submit winner's deck to TWDA if conditions are met.
 
@@ -283,63 +342,12 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
     if not vekn_event_id:
         return
 
-    # Find winner's deck from DeckObject store
-    decks = await get_decks_for_tournament(tournament.uid)
-    winner_deck = next((d for d in decks if d.user_uid == tournament.winner), None)
-    if not winner_deck:
-        return
-
     try:
         from ..twda import submit_twda_pr
 
-        engine = _engine
-
-        player_user = await get_user_by_uid(tournament.winner)
-        player_name = player_user.name if player_user else "Unknown"
-
-        # Resolve the TWDA "Created by:" designer credit from the deck's
-        # attribution (the "designed by" reference), not the raw author text.
-        #   None              -> anonymous (null) or unset/self: omit the credit
-        #                        (never leak a stored author the designer hid)
-        #   "twda"            -> historical import; author already holds the name
-        #   player's own id   -> self: omit (redundant with the header player line)
-        #   other vekn / name -> credit that member; resolve a vekn -> display name
-        attribution = winner_deck.attribution
-        self_ids = {i for i in (getattr(player_user, "vekn_id", ""), player_name) if i}
-        if attribution == "twda":
-            designer_credit = winner_deck.author
-        elif not attribution or attribution in self_ids:
-            designer_credit = ""
-        else:
-            designer = await get_user_by_vekn_id(attribution)
-            designer_credit = (designer.name if designer else "") or winner_deck.author
-
-        deck_json = json.dumps(
-            {
-                "name": winner_deck.name,
-                "author": designer_credit,
-                "comments": winner_deck.comments,
-                "cards": winner_deck.cards,
-            }
-        )
-        player_count = len(tournament.players)
-        tournament_date = tournament.start or tournament.modified.isoformat()
-        rounds_count = len(tournament.rounds)
-        has_finals = tournament.finals is not None
-        tournament_format = f"{rounds_count}R" + ("+F" if has_finals else "")
-
-        deck_text = engine.export_twda(
-            deck_json,
-            _load_cards_json(),
-            tournament.name,
-            str(tournament_date),
-            tournament.country or "",
-            tournament_format,
-            "",  # tournament_url
-            player_count,
-            player_name,
-        )
-
+        deck_text = await _winner_deck_twda(tournament)
+        if not deck_text:
+            return
         await submit_twda_pr(vekn_event_id, deck_text, tournament.name)
     except Exception:
         logger.exception("Failed to submit TWDA PR")
@@ -1419,12 +1427,104 @@ def _load_cards_json() -> str:
     return text
 
 
+def _format_num(x: float) -> str:
+    """Drop a trailing .0 so scores read like the frontend (1GW2.5, not 1.0GW2.5)."""
+    return str(int(x)) if float(x).is_integer() else str(x)
+
+
+def _format_score(gw: float, vp: float, tp: int) -> str:
+    """Mirror frontend formatScore (utils.ts): GW shown only when > 0."""
+    head = f"{_format_num(gw)}GW{_format_num(vp)}" if gw > 0 else f"{_format_num(vp)}VP"
+    return f"{head} {tp}TP"
+
+
+def _abbreviate_name(name: str) -> str:
+    """Mirror frontend abbreviateName: first word + initials of the rest."""
+    words = name.split()
+    if not words:
+        return ""
+    initials = "".join(w[0].upper() for w in words[1:])
+    return f"{words[0]} {initials}" if initials else words[0]
+
+
+def _seat_display(
+    uid: str,
+    users_by_uid: dict[str, User],
+    display_names: dict[str, str | None],
+    online: bool,
+) -> str:
+    """Backend mirror of frontend seatDisplay (tournament-utils.ts). Online events
+    show the nickname (real name abbreviated, in parens) for privacy; IRL events show
+    the real name + VEKN only and never the nickname."""
+    user = users_by_uid.get(uid)
+    name = (user.name if user else "") or uid
+    vekn = user.vekn_id if user else None
+    if online:
+        nick = display_names.get(uid) or (user.nickname if user else None)
+        abbrev = _abbreviate_name(name) or name
+        if nick:
+            inside = " · ".join(p for p in (abbrev, vekn) if p)
+            return f"{nick} ({inside})" if inside else nick
+        return f"{abbrev} ({vekn})" if vekn else abbrev
+    return f"{name} ({vekn})" if vekn else name
+
+
+def _render_text_report(
+    tournament: Tournament,
+    users_by_uid: dict[str, User],
+    deck_text: str | None,
+) -> str:
+    """Readable standings + winner decklist (TWDA format). Honors the online/IRL
+    name-vs-nickname distinction via _seat_display."""
+    display_names = {
+        p.user_uid: p.display_name for p in tournament.players if p.user_uid
+    }
+
+    def who(uid: str) -> str:
+        return _seat_display(uid, users_by_uid, display_names, tournament.online)
+
+    lines: list[str] = [tournament.name, ""]
+
+    if tournament.winner:
+        win = next(
+            (s for s in tournament.standings if s.user_uid == tournament.winner), None
+        )
+        score = f" — {_format_score(win.gw, win.vp, win.tp)}" if win else ""
+        lines += [f"Winner: {who(tournament.winner)}{score}", ""]
+
+    lines.append("Standings:")
+    for rank, s in enumerate(tournament.standings, 1):
+        tags = []
+        if s.user_uid == tournament.winner:
+            tags.append("Winner")
+        elif s.finalist:
+            tags.append("Finalist")
+        if s.disqualified:
+            tags.append("DQ")
+        if s.non_competing:
+            tags.append("Proxy")
+        suffix = f" [{', '.join(tags)}]" if tags else ""
+        lines.append(
+            f"{rank}. {who(s.user_uid)} — {_format_score(s.gw, s.vp, s.tp)}{suffix}"
+        )
+
+    if deck_text:
+        lines += ["", "-" * 60, "", deck_text.rstrip()]
+    elif tournament.winner:
+        lines += ["", "(Winner's decklist not submitted.)"]
+
+    return "\n".join(lines) + "\n"
+
+
 @router.get("/{uid}/report")
 async def tournament_report(
     uid: str,
+    fmt: str = Query("json", pattern="^(json|text)$"),
     user: OptionalUser = None,
 ) -> Response:
-    """Download a tournament report (JSON) with standings and results."""
+    """Download a tournament report. `fmt=json` (default) returns structured
+    standings/results; `fmt=text` returns a readable standings list plus the
+    winner's decklist in TWDA format. Organizer-only, finished tournaments only."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1438,6 +1538,21 @@ async def tournament_report(
     if not permissions.is_organizer(user, tournament):
         raise HTTPException(
             status_code=403, detail="Only organizers can download reports"
+        )
+
+    if fmt == "text":
+        users_by_uid = await get_users_by_uids(
+            {s.user_uid for s in tournament.standings}
+        )
+        try:
+            deck_text = await _winner_deck_twda(tournament)
+        except Exception:
+            logger.exception("Failed to render winner deck for text report")
+            deck_text = None
+        return Response(
+            content=_render_text_report(tournament, users_by_uid, deck_text),
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{uid}-report.txt"'},
         )
 
     report = {

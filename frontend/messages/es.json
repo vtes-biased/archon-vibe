@@ -748,6 +748,7 @@
   "decks_upload": "Cargar",
   "decks_player_deck": "Deck de {name}",
   "decks_download_report_json": "Descargar informe (JSON)",
+  "decks_download_report_text": "Descargar informe (Texto)",
   "decks_required_player_hint": "Se requiere una decklist para este torneo. Cargue su deck antes del check-in.",
   "decks_required_submitted": "Decklist enviada. Puede reemplazarla hasta que comience el torneo.",
   "decks_submitted_note": "Decklist registrada. Aún puede reemplazarla hasta que comience el torneo.",
