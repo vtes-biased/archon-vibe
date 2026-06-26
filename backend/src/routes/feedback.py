@@ -73,6 +73,27 @@ def _rate_limited(user_uid: str) -> bool:
     return limited
 
 
+async def _resolve_login(
+    session: aiohttp.ClientSession, github_id: str | None, fallback: str | None
+) -> str | None:
+    """Live @handle for a linked GitHub account, resolved from the stable numeric id.
+
+    github_login is a point-in-time snapshot — renames aren't pushed to us and freed
+    handles get recycled — so a stale login could mention/assign the wrong account in
+    this PUBLIC repo. github_id never changes, so re-resolve through it. Falls back to
+    the stored login on any error (GET /user/{id} accepts the installation token and
+    needs no permissions)."""
+    if not github_id:
+        return fallback
+    try:
+        async with session.get(f"/user/{github_id}") as resp:
+            if resp.status != 200:
+                return fallback
+            return (await resp.json(content_type=None)).get("login") or fallback
+    except (aiohttp.ClientError, TimeoutError, ValueError):
+        return fallback
+
+
 class FeedbackRequest(BaseModel):
     """JSON body for POST /api/feedback/. Length caps mirror the frontend maxlength
     and keep us well under GitHub's 65k issue-body limit."""
@@ -107,25 +128,8 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
         )
 
     prefix, category_label = _CATEGORIES[body.category]
-
-    # Identity in the public issue: VEKN id, plus the linked GitHub @handle (a
-    # public handle) so the reporter can be mentioned. No other PII (no-PII rule).
     roles = ", ".join(r.value for r in current_user.roles) or "player"
-    mention = current_user.github_login
     vekn = f"VEKN {current_user.vekn_id}"
-    who = f"@{mention} ({vekn})" if mention else vekn
-
-    meta = [
-        f"- **Submitted by:** {who} — role: {roles}",
-        f"- **App version:** {body.app_version or 'unknown'}",
-    ]
-    if body.route:
-        meta.append(f"- **Page:** `{body.route}`")
-    if body.locale:
-        meta.append(f"- **Locale:** {body.locale}")
-    if body.user_agent:
-        meta.append(f"- **User agent:** {body.user_agent}")
-    issue_body = body.description.strip() + "\n\n---\n" + "\n".join(meta)
 
     try:
         token = await github_app.get_installation_token(
@@ -143,6 +147,24 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
             },
             timeout=aiohttp.ClientTimeout(total=15.0),
         ) as session:
+            # Identity in the public issue: VEKN id, plus the linked GitHub @handle (a
+            # public handle) so the reporter can be mentioned. No other PII (no-PII rule).
+            mention = await _resolve_login(
+                session, current_user.github_id, current_user.github_login
+            )
+            who = f"@{mention} ({vekn})" if mention else vekn
+            meta = [
+                f"- **Submitted by:** {who} — role: {roles}",
+                f"- **App version:** {body.app_version or 'unknown'}",
+            ]
+            if body.route:
+                meta.append(f"- **Page:** `{body.route}`")
+            if body.locale:
+                meta.append(f"- **Locale:** {body.locale}")
+            if body.user_agent:
+                meta.append(f"- **User agent:** {body.user_agent}")
+            issue_body = body.description.strip() + "\n\n---\n" + "\n".join(meta)
+
             issue: dict = {
                 "title": f"[{prefix}] {body.title}",
                 "body": issue_body,
