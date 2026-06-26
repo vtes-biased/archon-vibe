@@ -60,6 +60,40 @@ update:
     uv run maturin develop --manifest-path engine/Cargo.toml
     @just hooks   # ensure the pre-commit hook is installed (idempotent symlink refresh)
 
+# Exits non-zero if any ecosystem has updates available — used to gate `just release`.
+# Report whether `just update` would pull newer deps (read-only; no lockfile writes).
+deps-check:
+    #!/usr/bin/env bash
+    set -uo pipefail   # not -e: run all three probes, then aggregate
+    stale=0
+    echo "Dependency freshness (read-only):"
+    # Python/uv: `uv lock --upgrade --dry-run` reports what `just update` WOULD change
+    # (within constraints) — unlike `uv tree --outdated`, which flags transitive deps
+    # that are pinned by their parents and thus unreachable. Prints "No lockfile
+    # changes detected" when nothing would move.
+    if out=$(uv lock --upgrade --dry-run 2>&1); then
+        if printf '%s\n' "$out" | grep -q 'No lockfile changes detected'; then
+            echo "  uv (python)    current"
+        else
+            stale=1; echo "  uv (python)    updates available:"
+            printf '%s\n' "$out" | grep -vE '^[[:space:]]*$|Resolved ' | sed 's/^/      /'
+        fi
+    else echo "  uv (python)    (could not check)"; fi
+    # Frontend/npm: `npm outdated` exits non-zero when a package is upgradable.
+    if (cd frontend && npm outdated) >/dev/null 2>&1; then
+        echo "  npm (frontend) current"
+    else
+        stale=1; echo "  npm (frontend) updates available (see 'cd frontend && npm outdated')"
+    fi
+    # Engine/cargo: `cargo update --dry-run` prints "name vX -> vY" without writing.
+    if out=$(cd engine && cargo update --dry-run 2>&1); then
+        if printf '%s\n' "$out" | grep -q ' -> '; then
+            stale=1; echo "  cargo (engine) updates available:"
+            printf '%s\n' "$out" | grep ' -> ' | sed 's/^/      /'
+        else echo "  cargo (engine) current"; fi
+    else echo "  cargo (engine) (could not check)"; fi
+    exit "$stale"
+
 # Run all tests
 test:
     (cd engine && cargo test)
@@ -195,7 +229,15 @@ release bump:
         *) echo "usage: just release <patch|minor|major|vX.Y.Z>"; exit 1 ;;
     esac
     git rev-parse "$tag" >/dev/null 2>&1 && { echo "tag $tag already exists"; exit 1; }
-    read -r -p "Release $tag (latest is ${latest:-none})? [y/N] " ans
+    # Nudge: discourage (but don't block) releasing on stale deps — prefer
+    # `just update` (refresh, test, commit) first. `if` keeps set -e from aborting.
+    if just deps-check 2>/dev/null; then   # 2>/dev/null: drop just's "recipe failed" wrapper line
+        prompt="Release $tag (latest is ${latest:-none})? [y/N] "
+    else
+        echo "⚠ Dependencies are out of date — prefer 'just update' before cutting a release."
+        prompt="Release $tag anyway, with stale deps? [y/N] "
+    fi
+    read -r -p "$prompt" ans
     [ "$ans" = y ] || [ "$ans" = Y ] || { echo "aborted"; exit 1; }
     git tag "$tag"
     git push origin "$tag"
