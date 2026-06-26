@@ -157,8 +157,12 @@
    * Uses debounced refresh to avoid flooding during initial sync.
    */
   function handleSyncUserUpdate(user: UserType) {
-    // Check if this user is relevant to current display filters
-    if (!displayContext.matchesCurrentFilters(user)) {
+    // Refresh when the update is relevant to the current view. matchesCurrentFilters
+    // sees the NEW data, so it only catches users moving INTO the filter — a displayed
+    // user edited OUT of it (e.g. country FR→DE while filtering FR) would otherwise
+    // linger stale. So also refresh if the user is currently displayed.
+    const isDisplayed = filteredUsers.some((u) => u.uid === user.uid);
+    if (!isDisplayed && !displayContext.matchesCurrentFilters(user)) {
       return;
     }
 
