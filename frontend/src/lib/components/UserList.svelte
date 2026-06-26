@@ -8,7 +8,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses } from "$lib/roles";
   import { syncManager } from "$lib/sync";
-  import { hasAnyRole } from "$lib/stores/auth.svelte";
+  import { hasAnyRole, getAuthState } from "$lib/stores/auth.svelte";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
   import Button from '$lib/components/Button.svelte';
@@ -39,6 +39,10 @@
   let searchQuery = $state("");
   let filterHasPastSanctions = $state(false);
   let filterCurrentlySanctioned = $state(false);
+  // Official-only sponsor-management filters (coopted_by / vekn_id). 'mine' and
+  // 'none' are mutually exclusive (a member either was coopted by me or by no one).
+  let sponsorFilter = $state<"all" | "mine" | "none">("all");
+  let filterNoVekn = $state(false);
 
   // Display refresh scheduling - simple debounce
   let displayRefreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -81,7 +85,7 @@
       error = null;
 
       // Get filters from display context (single source of truth)
-      const { country, roles, nameSearch, hasPastSanctions, currentlySanctioned } = displayContext.getFilters();
+      const { country, roles, nameSearch, hasPastSanctions, currentlySanctioned, sponsor, noVekn } = displayContext.getFilters();
       let users = await getFilteredUsers(country, roles, nameSearch);
 
       // Apply sanction filters (async per-user checks)
@@ -99,6 +103,17 @@
           })
         );
         users = sanctionChecks.filter(({ passes }) => passes).map(({ user }) => user);
+      }
+
+      // Sponsor / VEKN filters (officials only — coopted_by is full-projection).
+      if (sponsor === "mine") {
+        const myUid = getAuthState().user?.uid;
+        users = users.filter((u) => !!myUid && u.coopted_by === myUid);
+      } else if (sponsor === "none") {
+        users = users.filter((u) => !u.coopted_by);
+      }
+      if (noVekn) {
+        users = users.filter((u) => !u.vekn_id);
       }
 
       filteredUsers = users;
@@ -205,8 +220,24 @@
       roles,
       search,
       filterHasPastSanctions,
-      filterCurrentlySanctioned
+      filterCurrentlySanctioned,
+      sponsorFilter !== "all" ? sponsorFilter : undefined,
+      filterNoVekn
     );
+  }
+
+  function setSponsorFilter(mode: "mine" | "none") {
+    sponsorFilter = sponsorFilter === mode ? "all" : mode; // toggle off if re-clicked
+    currentPage = 1;
+    updateDisplayContext();
+    loadUsers();
+  }
+
+  function toggleNoVekn() {
+    filterNoVekn = !filterNoVekn;
+    currentPage = 1;
+    updateDisplayContext();
+    loadUsers();
   }
 
   function toggleSanctionFilter(type: "past" | "current") {
@@ -413,6 +444,42 @@
               </button>
             </div>
           </div>
+
+          <!-- Sponsor / VEKN filters (organizer & NC sponsor-management workflow) -->
+          {#if isOfficial}
+            <div class="mt-4">
+              <div class="block text-sm font-medium text-ink-muted mb-2">{m.user_list_filter_sponsor_title()}</div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  onclick={() => setSponsorFilter("mine")}
+                  aria-pressed={sponsorFilter === "mine"}
+                  class="px-3 py-1 rounded text-sm font-medium transition-colors {sponsorFilter === 'mine'
+                    ? 'bg-accent-soft/60 text-link-soft'
+                    : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
+                >
+                  {m.user_list_filter_my_recruits()}
+                </button>
+                <button
+                  onclick={() => setSponsorFilter("none")}
+                  aria-pressed={sponsorFilter === "none"}
+                  class="px-3 py-1 rounded text-sm font-medium transition-colors {sponsorFilter === 'none'
+                    ? 'bg-accent-soft/60 text-link-soft'
+                    : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
+                >
+                  {m.user_list_filter_no_sponsor()}
+                </button>
+                <button
+                  onclick={toggleNoVekn}
+                  aria-pressed={filterNoVekn}
+                  class="px-3 py-1 rounded text-sm font-medium transition-colors {filterNoVekn
+                    ? 'bg-accent-soft/60 text-link-soft'
+                    : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
+                >
+                  {m.user_list_filter_no_vekn()}
+                </button>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     </div>
@@ -597,7 +664,7 @@
           </div>
           <h3 class="text-lg font-medium text-ink-strong mb-2">{m.user_list_no_users()}</h3>
           <p class="text-ink-muted">
-            {#if searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0 || filterHasPastSanctions || filterCurrentlySanctioned}
+            {#if searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0 || filterHasPastSanctions || filterCurrentlySanctioned || sponsorFilter !== "all" || filterNoVekn}
               {m.user_list_adjust_filters()}
             {:else}
               {m.user_list_no_users_yet()}

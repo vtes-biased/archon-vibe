@@ -15,6 +15,11 @@ export interface DisplayFilters {
   nameSearch?: string;
   hasPastSanctions?: boolean;
   currentlySanctioned?: boolean;
+  // Official-only sponsor-management filters (coopted_by / vekn_id). Applied
+  // client-side in loadUsers, like the sanction filters — deliberately NOT in
+  // matchesCurrentFilters, which stays a coarse refresh gate.
+  sponsor?: 'mine' | 'none';
+  noVekn?: boolean;
 }
 
 interface PaginationContext {
@@ -41,7 +46,9 @@ class DisplayContext {
     roles?: Role[],
     nameSearch?: string,
     hasPastSanctions?: boolean,
-    currentlySanctioned?: boolean
+    currentlySanctioned?: boolean,
+    sponsor?: 'mine' | 'none',
+    noVekn?: boolean
   ): void {
     this.filters = {
       country: country && country !== 'all' ? country : undefined,
@@ -49,6 +56,8 @@ class DisplayContext {
       nameSearch: nameSearch && nameSearch.trim() ? normalizeSearch(nameSearch.trim()) : undefined,
       hasPastSanctions: hasPastSanctions || undefined,
       currentlySanctioned: currentlySanctioned || undefined,
+      sponsor: sponsor || undefined,
+      noVekn: noVekn || undefined,
     };
     // Reset page to 1 when filters change
     // Note: We don't reset boundaries here - they'll be updated by loadUsers()
@@ -142,7 +151,9 @@ class DisplayContext {
       (this.filters.roles && this.filters.roles.length > 0) ||
       this.filters.nameSearch ||
       this.filters.hasPastSanctions ||
-      this.filters.currentlySanctioned
+      this.filters.currentlySanctioned ||
+      this.filters.sponsor ||
+      this.filters.noVekn
     );
   }
 }
