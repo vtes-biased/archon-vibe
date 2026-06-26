@@ -11,7 +11,7 @@
 - [Engine↔model state drift](project_engine_model_state_drift.md) — engine emits state strings as bare literals (enum can be stale); route strict-converts → a missing Python enum value 500s every action. `test_engine_model_contract.py` pins it.
 - [Tournament-action route test reachability](trap_tournament_action_route_untested.md) — post-engine route hooks (timer, finish-stamp) aren't reachable via the engine-contract test pattern; no route-level tournament_action test exists, and no timer test anywhere.
 - [Open-rounds non-VEKN flag](project_open_rounds_non_vekn.md) — `open_rounds`/`self_organized_rounds` = house format; "never push" invariant lives in the shipped `vekn_push.py` queries (tested), "never rate" is an inert in-Python skip (not tested, by design).
-- [Flaky test_update_user](trap_flaky_update_user_mock_officials.md) — intermittent IC-denied 403 is unseeded mock data fabricating vekn-less officials (engine-impossible), NOT a regression.
+- [Flaky test_update_user (RESOLVED)](trap_flaky_update_user_mock_officials.md) — fixed: unseeded mock data fabricated vekn-less officials (engine-impossible); worked example of the fixture class.
 - [OAuth consent test infra](project_oauth_consent_test_infra.md) — how to mint first-party vs third-party OAuth tokens in backend tests, `/oauth` root mount, oauth tables not auto-cleaned; first-party-only + consent-authoritative invariants.
 
 ## How to Run Tests

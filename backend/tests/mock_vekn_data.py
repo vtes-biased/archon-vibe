@@ -277,8 +277,19 @@ def generate_mock_users(count: int = 400) -> list[User]:
             else None
         )
 
-        # Generate VEKN ID (sequential to avoid collisions with unique constraint)
-        if random.random() > 0.2:
+        # Assign roles first - most users have 0-2 roles
+        role_count = random.choices([0, 1, 2, 3], weights=[60, 25, 10, 5])[0]
+        user_roles = (
+            random.sample(all_roles, min(role_count, len(all_roles)))
+            if role_count > 0
+            else []
+        )
+
+        # Generate VEKN ID (sequential to avoid collisions with unique constraint).
+        # Officials always carry a vekn_id in prod (roles require one), so force one
+        # for any user with roles: the engine denies a role/country change on a
+        # vekn-less target before the IC bypass, an engine-impossible fixture state.
+        if user_roles or random.random() > 0.2:
             vekn_id = str(next_vekn_id)
             next_vekn_id += 1
         else:
@@ -289,14 +300,6 @@ def generate_mock_users(count: int = 400) -> list[User]:
             f"{first_name[:3]}{random.randint(10, 99)}"
             if random.random() > 0.7
             else None
-        )
-
-        # Assign roles - most users have 0-2 roles
-        role_count = random.choices([0, 1, 2, 3], weights=[60, 25, 10, 5])[0]
-        user_roles = (
-            random.sample(all_roles, min(role_count, len(all_roles)))
-            if role_count > 0
-            else []
         )
 
         # Modified time varies

@@ -1,12 +1,16 @@
 ---
 name: trap-flaky-update-user-mock-officials
-description: test_users.py::test_update_user flakily 403s — unseeded mock data fabricates engine-impossible officials (roles but no vekn_id); not a regression.
+description: RESOLVED — test_users.py::test_update_user flakily 403d because unseeded mock data fabricated engine-impossible officials (roles but no vekn_id); fixed in generate_mock_users. Worked example of the engine-impossible-fixture class.
 metadata:
   type: project
 ---
 
-`backend/tests/test_users.py::test_update_user` fails intermittently (~5-12% of
-runs) with `assert 403 == 200` — an IC admin denied editing a user's country.
+**RESOLVED 2026-06** in `generate_mock_users` (roles are now decided first and
+any user with roles is forced a vekn_id). Kept as a worked example of the
+"never encode engine-impossible states" fixture class. Original diagnosis below.
+
+`backend/tests/test_users.py::test_update_user` used to fail intermittently
+(~5-12% of runs) with `assert 403 == 200` — an IC admin denied editing a user's country.
 **It is NOT a regression and NOT OAuth-related.** Reproduces in `test_users.py`
 alone and in a pure `permissions` script with zero OAuth code.
 
