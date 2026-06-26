@@ -319,6 +319,8 @@ async def detach_user_from_vekn(
         contact_email=None,
         contact_discord=None,
         discord_id=None,
+        github_login=None,
+        github_id=None,
         contact_phone=None,
         phone_is_whatsapp=False,
         calendar_token=None,

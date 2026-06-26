@@ -183,6 +183,10 @@ export interface User extends BaseObject {
   contact_phone?: string | null;
   phone_is_whatsapp?: boolean;
 
+  // Linked GitHub account (full projection only) — attributes feedback issues.
+  github_login?: string | null; // GitHub @handle
+  github_id?: string | null; // GitHub numeric user id
+
   // Community links (officials only)
   community_links?: CommunityLink[];
 

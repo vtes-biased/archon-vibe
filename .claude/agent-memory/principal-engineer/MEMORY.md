@@ -43,6 +43,7 @@
 
 ## Recurring trap: manual object reconstruction
 - Several call sites hand-rebuild a `Sanction(...)` / `User(...)` from fields (sanction cleanup in `main.py`, sanctions delete endpoint, merge/detach in `db.py`). When a model gains a field, grep ALL manual constructors — prefer `msgspec.structs.replace` over hand-listing fields (hand-listing silently drops new fields, e.g. `resync_after`).
+- Two from-scratch `User(...)` rebuilds of an EXISTING user silently drop unlisted fields on a routine path: `vekn_sync.py` `_infer_coopted_by` prefix branch (nightly job — already drops `city_geoname_id`/`phone_is_whatsapp`/`community_links`/ratings; github_login/github_id were the latest victims) and the `accounts.py` `detach_user_from_vekn` `vekn_record` *null-list* (the inverse trap: a NEW personal/login field must be ADDED to the null-list or it leaks onto the abandoned VEKN record for the next claimant — github_login/github_id were missed there). All other `User(...)` sites are fresh-uid creates (nothing to drop).
 - Reassigning object refs (sanctions/decks/coopted_by on merge/detach) MUST return `BroadcastData` and broadcast, or other clients stay stale until snapshot resync — the established pattern; preserve it in any new merge-like flow.
 - Svelte 5 `$props()`: props must be listed in the destructure, not just the type annotation.
 

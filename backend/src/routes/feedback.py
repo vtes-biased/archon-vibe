@@ -108,11 +108,12 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
 
     prefix, category_label = _CATEGORIES[body.category]
 
-    # Identity: VEKN id only -- public on the VEKN site, and enough to reach the
-    # reporter out of band. No name/email/Discord (public repo, CLAUDE.md no-PII rule).
-    # A linkable GitHub handle would be friendlier here -- see the profile ticket.
+    # Identity in the public issue: VEKN id, plus the linked GitHub @handle (a
+    # public handle) so the reporter can be mentioned. No other PII (no-PII rule).
     roles = ", ".join(r.value for r in current_user.roles) or "player"
-    who = f"VEKN {current_user.vekn_id}"
+    mention = current_user.github_login
+    vekn = f"VEKN {current_user.vekn_id}"
+    who = f"@{mention} ({vekn})" if mention else vekn
 
     meta = [
         f"- **Submitted by:** {who} — role: {roles}",
@@ -142,13 +143,18 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
             },
             timeout=aiohttp.ClientTimeout(total=15.0),
         ) as session:
+            issue: dict = {
+                "title": f"[{prefix}] {body.title}",
+                "body": issue_body,
+                "labels": ["feedback", category_label],
+            }
+            # Non-collaborator assignees are silently dropped by the API; the
+            # body @-mention still notifies them.
+            if mention:
+                issue["assignees"] = [mention]
             async with session.post(
                 f"/repos/{FEEDBACK_TARGET_REPO}/issues",
-                json={
-                    "title": f"[{prefix}] {body.title}",
-                    "body": issue_body,
-                    "labels": ["feedback", category_label],
-                },
+                json=issue,
             ) as resp:
                 text = await resp.text()
                 if resp.status != 201:

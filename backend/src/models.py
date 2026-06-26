@@ -304,6 +304,11 @@ class User(BaseObject, kw_only=True):
     contact_phone: str | None = None
     phone_is_whatsapp: bool = False
 
+    # Linked GitHub account (full projection only); attributes feedback issues.
+    # github_login can go stale on rename/recycle — github_id is the stable anchor.
+    github_login: str | None = None
+    github_id: str | None = None
+
     # Community links (officials only: NC/Prince/IC)
     community_links: list[CommunityLink] = msgspec.field(default_factory=list)
 

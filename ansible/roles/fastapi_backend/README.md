@@ -63,6 +63,14 @@ ansible-vault view ansible/roles/fastapi_backend/files/officials_contacts.json.p
 
 The repo never holds the plaintext; the vault password is the only gate.
 
+## GitHub OAuth App (account linking)
+
+A user-facing GitHub OAuth App (distinct from the two GitHub Apps used by TWDA and feedback) lets members link their GitHub account so feedback issues @-mention their handle. Three short env vars — no private key:
+
+- `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_SECRET`, `GITHUB_OAUTH_REDIRECT_URI` ride in the env file via matching vault vars.
+
+`GITHUB_OAUTH_CLIENT_ID` unset → the "Link GitHub" button degrades gracefully (the authorize route redirects back to the profile with a `?github_error=not_configured` toast rather than erroring). Register an OAuth App on GitHub; set the redirect URI to `{site_url_base}/auth/github/callback`.
+
 ## Feedback GitHub App (env vars + vault-delivered key)
 
 The in-app feedback endpoint files GitHub issues on `vtes-biased/archon-vibe` via a

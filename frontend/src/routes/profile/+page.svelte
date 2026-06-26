@@ -33,6 +33,8 @@
 
   let discordMessage = $state("");
   let discordError = $state("");
+  let githubMessage = $state("");
+  let githubError = $state("");
   let passkeyMessage = $state("");
 
   // VEKN claim/abandon state
@@ -61,12 +63,18 @@
   const discordUsername = $derived(
     auth.authMethods.find((am) => am.type === "discord")?.identifier || null
   );
+  // GitHub is a link-only field on the user (not a login method), so its state
+  // comes from the user object rather than authMethods.
+  const hasGithub = $derived(!!auth.user?.github_login);
+  const githubUsername = $derived(auth.user?.github_login || null);
 
-  // Handle Discord link callback
+  // Handle Discord / GitHub link callbacks
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
     const discordLinked = params.get("discord_linked");
     const error = params.get("error");
+    const githubLinked = params.get("github_linked");
+    const githubErr = params.get("github_error");
 
     if (discordLinked === "success") {
       discordMessage = m.profile_discord_linked();
@@ -79,7 +87,14 @@
       discordError = m.profile_discord_error({ error });
     }
 
-    if (discordLinked || error) {
+    if (githubLinked === "success") {
+      githubMessage = m.profile_github_linked();
+      await initAuth();
+    } else if (githubErr) {
+      githubError = m.profile_github_error({ error: githubErr });
+    }
+
+    if (discordLinked || error || githubLinked || githubErr) {
       replaceState("/profile", {});
     }
   });
@@ -115,6 +130,35 @@
       return;
     }
     window.location.href = `${API_BASE}/auth/discord/authorize?link=true&token=${encodeURIComponent(token)}`;
+  }
+
+  function handleLinkGithub() {
+    const token = getAccessToken();
+    if (!token) {
+      githubError = m.profile_not_authenticated();
+      return;
+    }
+    window.location.href = `${API_BASE}/auth/github/authorize?token=${encodeURIComponent(token)}`;
+  }
+
+  async function handleUnlinkGithub() {
+    githubMessage = "";
+    githubError = "";
+    const token = getAccessToken();
+    if (!token) {
+      githubError = m.profile_not_authenticated();
+      return;
+    }
+    const res = await fetch(`${API_BASE}/auth/github/unlink`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      githubMessage = m.profile_github_unlinked();
+      await initAuth();
+    } else {
+      githubError = m.profile_github_error({ error: String(res.status) });
+    }
   }
 
   async function handleClaimVekn() {
@@ -199,13 +243,19 @@
           {emailIdentifier}
           {hasDiscord}
           {discordUsername}
+          {hasGithub}
+          {githubUsername}
           {hasPasskey}
           {discordMessage}
           {discordError}
+          {githubMessage}
+          {githubError}
           {passkeyMessage}
           error={auth.error}
           onLinkEmail={handleLinkEmail}
           onLinkDiscord={handleLinkDiscord}
+          onLinkGithub={handleLinkGithub}
+          onUnlinkGithub={handleUnlinkGithub}
           onRegisterPasskey={handleRegisterPasskey}
         />
         <AuthorizedApps />

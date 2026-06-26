@@ -43,7 +43,7 @@ async def stream_objects_new(
 
 | Type | `public` | `member` | `full` |
 |------|----------|----------|--------|
-| user | NC/Prince only (with contact + community_links); IC only (community_links, no contact) | all users (no contact, no `deceased_by_uid`); `deceased_at` included; any user with non-empty community_links gets community_links included | everything except `calendar_token` |
+| user | NC/Prince only (with contact + community_links); IC only (community_links, no contact) | all users (no contact, no `deceased_by_uid`, no `github_login`/`github_id`); `deceased_at` included; any user with non-empty community_links gets community_links included | everything except `calendar_token` |
 | tournament | minimal fields + `banner_path` | all except `checkin_code`, `vekn_pushed_at` | everything |
 | sanction | `None` | full data | full data |
 | deck | `None` | full data if `public=true`, else `None` | full data |

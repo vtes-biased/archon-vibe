@@ -829,30 +829,11 @@ class VEKNSyncService:
                 if user.coopted_by:
                     continue
 
-                # Update user with coopted_by
-                updated = User(
-                    uid=user.uid,
-                    modified=now,
-                    name=user.name,
-                    country=user.country,
-                    vekn_id=user.vekn_id,
-                    city=user.city,
-                    state=user.state,
-                    nickname=user.nickname,
-                    roles=user.roles,
-                    avatar_path=user.avatar_path,
-                    contact_email=user.contact_email,
-                    contact_discord=user.contact_discord,
-                    discord_id=user.discord_id,
-                    contact_phone=user.contact_phone,
-                    coopted_by=sponsor.uid,
-                    coopted_at=None,  # Historical - no timestamp
-                    vekn_synced=user.vekn_synced,
-                    vekn_synced_at=user.vekn_synced_at,
-                    local_modifications=user.local_modifications,
-                    vekn_prefix=user.vekn_prefix,
-                )
-                await save_user(updated)
+                # In place — a from-scratch User(...) drops every non-sync field.
+                user.coopted_by = sponsor.uid
+                user.coopted_at = None
+                user.modified = now
+                await save_user(user)
                 count += 1
 
         return count

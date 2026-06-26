@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from . import _tokens, discord, email_password, magic_link, passkeys, profile
+from . import _tokens, discord, email_password, github, magic_link, passkeys, profile
 from ._tokens import create_access_token, create_refresh_token, verify_token
 from .magic_link import send_invite_email
 
@@ -13,6 +13,7 @@ router.include_router(magic_link.router)
 router.include_router(profile.router)
 router.include_router(passkeys.router)
 router.include_router(discord.router)
+router.include_router(github.router)
 
 __all__ = [
     "create_access_token",

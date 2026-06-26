@@ -182,6 +182,7 @@ Multiple methods, all issuing JWT access/refresh token pairs.
 | Magic Link | signup, password reset, invite; link valid until the password is actually set (not just verified); landing at `/verify-email` | `email_service.py` |
 | WebAuthn / Passkeys | FIDO2; four endpoints — `register/{options,verify}` (authenticated, add to existing account) and `create/{options,verify}` (unauthenticated, create new user) | `passkeys.svelte.ts` |
 | Discord OAuth | `GET /auth/discord/authorize` (`mode=login\|link`) → `/callback`; login matches by Discord ID or creates a user, link attaches the Discord ID to the authenticated user | `routes/auth.py` |
+| GitHub OAuth | **link-only** (not a login method): `GET /auth/github/authorize` (auth-required) → `/callback`, `POST /auth/github/unlink`; stores `github_login`/`github_id` on User (full-only); used to @-mention reporter in feedback issues | `routes/auth/github.py` |
 
 JWT: short-lived access, longer-lived refresh; OAuth tokens are a separate `oauth_access` type with scope restrictions.
 

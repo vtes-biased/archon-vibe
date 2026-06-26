@@ -2,6 +2,7 @@
   import { KeyRound, Mail } from "@lucide/svelte";
   import { isPasskeySupported } from "$lib/stores/passkeys.svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
+  import GithubIcon from "$lib/components/GithubIcon.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -10,20 +11,27 @@
     emailIdentifier: string | null;
     hasDiscord: boolean;
     discordUsername: string | null;
+    hasGithub: boolean;
+    githubUsername: string | null;
     hasPasskey: boolean;
     discordMessage: string;
     discordError: string;
+    githubMessage: string;
+    githubError: string;
     passkeyMessage: string;
     error: string | null;
     onLinkEmail: (email: string) => Promise<boolean>;
     onLinkDiscord: () => void;
+    onLinkGithub: () => void;
+    onUnlinkGithub: () => void;
     onRegisterPasskey: () => void;
   }
   let {
     hasEmail, emailIdentifier,
-    hasDiscord, discordUsername, hasPasskey,
-    discordMessage, discordError, passkeyMessage, error,
-    onLinkEmail, onLinkDiscord, onRegisterPasskey,
+    hasDiscord, discordUsername,
+    hasGithub, githubUsername, hasPasskey,
+    discordMessage, discordError, githubMessage, githubError, passkeyMessage, error,
+    onLinkEmail, onLinkDiscord, onLinkGithub, onUnlinkGithub, onRegisterPasskey,
   }: Props = $props();
 
   let registeringPasskey = $state(false);
@@ -130,6 +138,37 @@
   {/if}
   {#if discordError}
     <p class="text-sm text-link">{discordError}</p>
+  {/if}
+
+  <!-- GitHub -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <GithubIcon class="w-5 h-5 text-ink-strong" />
+      <div>
+        <p class="text-ink-strong">GitHub</p>
+        {#if hasGithub && githubUsername}
+          <p class="text-sm text-ink-muted">@{githubUsername}</p>
+        {:else}
+          <p class="text-sm text-ink-muted">{m.profile_github_hint()}</p>
+        {/if}
+      </div>
+    </div>
+    {#if !hasGithub}
+      <button onclick={onLinkGithub}
+        class="px-4 py-2 bg-[#24292e] hover:bg-[#1b1f23] text-white rounded font-medium transition-colors">
+        {m.profile_link()}
+      </button>
+    {:else}
+      <Button variant="secondary" size="lg" onclick={onUnlinkGithub}>
+        {m.profile_unlink()}
+      </Button>
+    {/if}
+  </div>
+  {#if githubMessage}
+    <p class="text-sm text-info">{githubMessage}</p>
+  {/if}
+  {#if githubError}
+    <p class="text-sm text-link">{githubError}</p>
   {/if}
 
   <!-- Passkey -->

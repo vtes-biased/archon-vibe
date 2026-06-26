@@ -2,11 +2,17 @@
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
   import { CircleCheck, TriangleAlert } from '@lucide/svelte';
+  import GithubIcon from '$lib/components/GithubIcon.svelte';
   import Button from '$lib/components/Button.svelte';
   import { submitFeedback } from '$lib/api';
+  import { getAuthState, getAccessToken } from '$lib/stores/auth.svelte';
   import { toUserMessage } from '$lib/errors';
 
+  const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+
   let { onClose }: { onClose: () => void } = $props();
+
+  const auth = $derived(getAuthState());
 
   type Category = 'bug' | 'feature' | 'question';
   let category = $state<Category>('bug');
@@ -33,6 +39,15 @@
   const canSubmit = $derived(
     !offline && title.trim().length > 0 && description.trim().length > 0
   );
+
+  // Shown before the fields: linking is a full-page redirect that drops the draft.
+  const showGithubNudge = $derived(!offline && !!auth.user && !auth.user.github_login);
+
+  function linkGithub() {
+    const token = getAccessToken();
+    if (!token) return;
+    window.location.href = `${API_BASE}/auth/github/authorize?token=${encodeURIComponent(token)}`;
+  }
 
   const categories: { value: Category; label: () => string }[] = [
     { value: 'bug', label: () => m.feedback_category_bug() },
@@ -117,6 +132,16 @@
         </div>
       {:else}
         <p class="text-ink-muted text-sm mb-4">{m.feedback_intro()}</p>
+
+        {#if showGithubNudge}
+          <div class="flex items-start gap-2 mb-4 p-3 rounded-lg bg-surface-muted border border-line">
+            <GithubIcon class="w-4 h-4 shrink-0 mt-0.5 text-ink-strong" />
+            <span class="flex-1 text-xs text-ink-muted">{m.feedback_github_nudge()}</span>
+            <button onclick={linkGithub} class="shrink-0 text-xs font-medium text-link hover:underline">
+              {m.profile_link()}
+            </button>
+          </div>
+        {/if}
 
         <div class="space-y-4">
           <div>
