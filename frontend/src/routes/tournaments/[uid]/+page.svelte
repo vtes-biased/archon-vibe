@@ -942,6 +942,8 @@ import TournamentModals from "./TournamentModals.svelte";
                 {tournament}
                 {playerInfo}
                 {standings}
+                {playerStandings}
+                {cutoffScore}
                 isOrganizer={true}
                 {actionLoading}
                 {doAction}

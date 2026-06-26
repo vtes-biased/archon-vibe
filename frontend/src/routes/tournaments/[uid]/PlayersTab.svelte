@@ -9,7 +9,7 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff, Trash2, Ellipsis, Dices } from "@lucide/svelte";
+  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff, Trash2, Ellipsis, Dices, Printer } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import RaffleSection from "./RaffleSection.svelte";
@@ -17,7 +17,7 @@
   import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
   import { sponsorVeknMember, createUser, isOnline } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -30,6 +30,8 @@
     tournamentSanctions,
     isOfflineMode = false,
     decksByUser,
+    playerStandings,
+    cutoffScore,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
@@ -40,7 +42,61 @@
     tournamentSanctions?: Sanction[];
     isOfflineMode?: boolean;
     decksByUser: DeckMap;
+    // Mode + finished-aware standings (the player-visible subset) for the print sheet.
+    playerStandings: StandingEntry[];
+    cutoffScore: { gw: number; vp: number; tp: number } | null;
   } = $props();
+
+  // Printable standings sheet — mirrors the print-seating pattern (RoundsTab) and the
+  // player-visible standings (honors standings_mode + finished state via playerStandings).
+  function esc(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function printStandings() {
+    const title = esc(tournament.name || m.tournament_fallback_title());
+    const finished = tournament.state === "Finished";
+    const modeLabel = !finished && tournament.standings_mode !== "Public"
+      ? ` <span style="font-size:13pt;color:#888;font-weight:normal">(${esc(translateStandingsMode(tournament.standings_mode))})</span>`
+      : '';
+
+    let body: string;
+    if (playerStandings.length === 0 && cutoffScore) {
+      // Cutoff mode pre-finish: only the top-5 threshold is public, not the list.
+      body = `<div style="font-size:14pt;padding:8px 0">${esc(m.tournament_cutoff_threshold())} <strong>${esc(formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp))}</strong></div>`;
+    } else {
+      let rows = '';
+      playerStandings.forEach((e, i) => {
+        const tags: string[] = [];
+        if (finished && e.user_uid === tournament.winner) tags.push(m.tournament_winner());
+        else if (e.finalist) tags.push(m.tournament_finalist());
+        if (e.non_competing) tags.push(m.proxy_label());
+        if (e.disqualified) tags.push(m.tournament_disqualified());
+        const tag = tags.length ? ` <span style="color:#888;font-size:10pt">[${tags.map(esc).join(', ')}]</span>` : '';
+        // DQ'd / proxy carry no competitive rank — mirror the on-screen "—".
+        const rankCell = e.disqualified || e.non_competing ? '—' : `${e.rank}.`;
+        const bg = i % 2 === 0 ? '#f5f5f5' : 'transparent';
+        rows += `<tr style="background:${bg}"><td style="padding:4px 10px;text-align:right;font-weight:bold;width:36px">${rankCell}</td><td style="padding:4px 10px">${esc(seatDisplay(e.user_uid, playerInfo, tournament.online))}${tag}</td><td style="padding:4px 10px;text-align:right;white-space:nowrap">${esc(formatScore(e.gw, e.vp, e.tp))}</td></tr>`;
+      });
+      body = `<table style="width:100%;border-collapse:collapse;font-size:12pt"><thead><tr style="color:#444;font-size:10pt;border-bottom:1px solid #000"><th style="padding:4px 10px;text-align:right">#</th><th style="padding:4px 10px;text-align:left">${esc(m.tournament_col_player())}</th><th style="padding:4px 10px;text-align:right">${esc(m.tournament_col_score())}</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    const css = [
+      `body{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;font-size:12pt;color:#000;margin:0;padding:0;line-height:1.4}`,
+      `@page{margin:15mm}`,
+      `.footer{position:fixed;bottom:0;width:100%;text-align:right;font-size:9pt;color:#999}`,
+    ].join('');
+    const heading = esc(m.tournament_standings());
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} — ${heading}</title><style>${css}</style></head><body>`
+      + `<div style="font-size:20pt;font-weight:bold">${title}</div>`
+      + `<div style="font-size:16pt;color:#444;margin-top:4px">${heading}${modeLabel}</div>`
+      + `<hr style="border:none;border-top:2px solid #000;margin:8px 0 16px">`
+      + body
+      + `<div class="footer">${title}</div>`
+      + `<script>window.onload=()=>window.print()<\/script></body></html>`;
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+  }
 
   // Sanction modal state
   let sanctionTarget = $state<{ uid: string; name: string } | null>(null);
@@ -533,6 +589,16 @@
           onclick={() => playerSort = 'vekn'}
         >{m.players_sort_vekn()}</button>
       </div>
+      {#if isOrganizer && (playerStandings.length > 0 || cutoffScore)}
+        <button
+          onclick={printStandings}
+          class="inline-flex items-center gap-1 px-3 py-2 sm:px-2 sm:py-1 text-xs rounded bg-surface-hover/50 text-ink-muted hover:text-ink-bright transition-colors"
+          title={m.players_print_standings_hint()}
+        >
+          <Printer class="w-3.5 h-3.5" />
+          {m.players_print_standings()}
+        </button>
+      {/if}
       {#if isOrganizer}
         <div class="flex items-center gap-2">
           <div class="flex gap-1">

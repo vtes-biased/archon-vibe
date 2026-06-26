@@ -641,6 +641,8 @@
   "players_sort_standings": "Classifiche",
   "players_sort_name": "Nome",
   "players_sort_vekn": "VEKN",
+  "players_print_standings": "Stampa la classifica",
+  "players_print_standings_hint": "Stampa il foglio classifica pubblico (rispetta la modalità visibilità classifica)",
   "players_no_account": "(nessun account)",
   "players_check_in": "Check in",
   "players_check_out": "Check out",

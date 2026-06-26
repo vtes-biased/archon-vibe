@@ -641,6 +641,8 @@
   "players_sort_standings": "Standings",
   "players_sort_name": "Name",
   "players_sort_vekn": "VEKN",
+  "players_print_standings": "Print standings",
+  "players_print_standings_hint": "Print the public standings sheet (honors the standings visibility mode)",
   "players_no_account": "(no account)",
   "players_check_in": "Check in",
   "players_check_out": "Check out",
