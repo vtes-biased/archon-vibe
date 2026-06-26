@@ -17,7 +17,6 @@ from uuid import uuid7
 
 import pytest
 from httpx import AsyncClient
-
 from src import db
 from src.db_oauth import insert_oauth_token
 from src.models import OAuthScope, OAuthToken, User
@@ -30,7 +29,9 @@ from tests.conftest import make_auth_header
 async def test_consent_management_rejects_third_party_oauth_token(
     test_client: AsyncClient, test_db
 ):
-    user = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Member", country="US")
+    user = User(
+        uid=str(uuid7()), modified=datetime.now(UTC), name="Member", country="US"
+    )
     await db.save_user(user)
 
     # A live third-party access token for this member, recorded so the
@@ -52,7 +53,12 @@ async def test_consent_management_rejects_third_party_oauth_token(
     oauth_header = {
         "Authorization": "Bearer "
         + _create_oauth_jwt(
-            user.uid, "access", [OAuthScope.PROFILE_READ], client_id, jti, ACCESS_TOKEN_LIFETIME
+            user.uid,
+            "access",
+            [OAuthScope.PROFILE_READ],
+            client_id,
+            jti,
+            ACCESS_TOKEN_LIFETIME,
         )
     }
 

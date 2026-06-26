@@ -58,6 +58,7 @@ update:
     # archon_engine (our PyO3 module) isn't a tracked dep, so `uv sync` above
     # prunes it — rebuild it into the venv so the env is complete after update.
     uv run maturin develop --manifest-path engine/Cargo.toml
+    @just hooks   # ensure the pre-commit hook is installed (idempotent symlink refresh)
 
 # Run all tests
 test:
@@ -111,6 +112,15 @@ lint-check:
 lint:
     uv run ruff check --fix . && uv run ruff format .
     (cd engine && cargo fmt && cargo clippy --all-targets --all-features -- -D warnings)
+
+# Install git hooks (pre-commit: pst tickets lint + ruff auto-format of staged Python)
+hooks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src="$(git rev-parse --show-toplevel)/.githooks/pre-commit"
+    dst="$(git rev-parse --git-path hooks)/pre-commit"   # worktree-safe, not hard-coded .git/hooks
+    ln -sf "$src" "$dst"
+    echo "Installed $dst -> $src"
 
 # Update VTES card data (downloads from krcg.org → engine/data/cards.json)
 cards:

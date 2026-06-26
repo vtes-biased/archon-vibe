@@ -1,0 +1,60 @@
+#!/bin/sh
+# Shared pre-commit hook. Tracked in-repo; install (or re-install) with `just hooks`,
+# which symlinks .git/hooks/pre-commit -> ../../.githooks/pre-commit.
+#
+#   1. pst: reject a structurally invalid staged .pst/tickets file.
+#   2. ruff: auto-format/-fix staged Python and re-stage it, so formatting never
+#      reaches CI red. Mirrors `just lint` over the staged set.
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+# ---- 1. pst tickets validation ----------------------------------------------
+PST_FILE=".pst/tickets"
+if git diff --cached --name-only | grep -qx "$PST_FILE"; then
+    if ! command -v pst >/dev/null 2>&1; then
+        echo "pst not found on PATH; it's part of the build — install it to validate $PST_FILE." >&2
+        exit 1
+    fi
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT
+    git show ":$PST_FILE" >"$tmp"
+    if ! pst lint --file "$tmp"; then
+        echo "pst: staged $PST_FILE is invalid; commit rejected." >&2
+        exit 1
+    fi
+fi
+
+# ---- 2. ruff auto-format of staged Python -----------------------------------
+staged="$(git diff --cached --name-only --diff-filter=ACM -- '*.py' || true)"
+[ -z "$staged" ] && exit 0
+
+# A file with *unstaged* changes can't be auto-rewritten in place — `git add`
+# would sweep those hunks into the commit. Only auto-fix fully-staged files;
+# the rest fall through to the final gate below.
+fixable=""
+for f in $staged; do
+    if git diff --quiet -- "$f"; then
+        fixable="$fixable $f"
+    fi
+done
+
+if [ -n "$fixable" ]; then
+    # shellcheck disable=SC2086  # intentional word-splitting over the file list
+    uv run ruff check --fix --quiet -- $fixable || true
+    # shellcheck disable=SC2086
+    uv run ruff format --quiet -- $fixable
+    # shellcheck disable=SC2086
+    git add -- $fixable
+fi
+
+# Final gate over everything staged (mirrors CI): catches unfixable lint and any
+# partially-staged file we didn't rewrite. Output is shown so you know what to fix.
+# shellcheck disable=SC2086
+if uv run ruff check -- $staged && uv run ruff format --check -- $staged; then
+    exit 0
+fi
+echo "ruff: staged Python has issues left above (likely a partially-staged file)." >&2
+echo "      Run 'just lint', re-stage, and commit again." >&2
+exit 1
