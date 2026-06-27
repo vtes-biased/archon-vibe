@@ -1,8 +1,9 @@
 /// League standings computation shared between frontend (WASM) and backend (PyO3).
 ///
 /// Three standings modes:
-/// - **RTP**: Sum of per-tournament rating points; GW/VP include finals
-/// - **Score**: Sum of preliminary GW/VP/TP only (finals excluded)
+/// - **RTP**: Sum of per-tournament rating points, on the same total as the global
+///   rating (prelim + finals + the no-final tournament-win GW); GW/VP include finals
+/// - **Score**: Sum of preliminary GW/VP/TP only (finals + win GW excluded)
 /// - **GP**: Position-based points per tournament; GW/VP include finals
 use json::JsonValue;
 
@@ -55,15 +56,37 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
         // lead the preliminaries; other finalists tie for 2nd). Resolve every
         // player's final-placement rank once per tournament from the shared
         // engine helper, then the loop below just looks it up.
+        let winner = tournament["winner"].as_str().unwrap_or("");
         let final_place: std::collections::HashMap<String, usize> = if mode == "Score" {
             std::collections::HashMap::new()
         } else {
-            let winner = tournament["winner"].as_str().unwrap_or("");
             crate::tournament::compute_final_standings(&tournament["standings"], winner)
                 .iter()
                 .filter_map(|s| Some((s["user_uid"].as_str()?.to_string(), s["rank"].as_usize()?)))
                 .collect()
         };
+
+        // Finals seats indexed by player (flattened {player_uid, gw, vp, tp}). For
+        // the non-Score modes the per-tournament VP/GW base is the SAME total the
+        // global per-tournament rating uses (compute_rating_vp_gw): prelim + finals +
+        // the tournament-win GW credited to the winner when no finals table was
+        // played (a no-final import; native leaves winner=="", so it stays inert).
+        // Score stays prelim-only — it adds none of this, final or not.
+        let has_finals = !tournament["finals"].is_empty();
+        let finals_by_uid: std::collections::HashMap<String, (f64, f64, i32)> = tournament
+            ["finals"]
+            .members()
+            .filter_map(|s| {
+                Some((
+                    s["player_uid"].as_str()?.to_string(),
+                    (
+                        s["gw"].as_f64().unwrap_or(0.0),
+                        s["vp"].as_f64().unwrap_or(0.0),
+                        s["tp"].as_i32().unwrap_or(0),
+                    ),
+                ))
+            })
+            .collect();
 
         for standing in tournament["standings"].members() {
             let uid = standing["user_uid"].as_str().unwrap_or("").to_string();
@@ -90,17 +113,32 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
             });
             entry.tournaments_count += 1;
 
+            if mode == "Score" {
+                // Prelim-only (compute_preliminary_standings sums rounds only); finals
+                // and the win GW are deliberately excluded, with or without a final.
+                entry.gw += gw;
+                entry.vp += vp;
+                entry.tp += tp;
+                continue;
+            }
+
+            // Non-Score total = prelim + finals + the no-final tournament-win GW.
+            let (fgw, fvp, ftp) = finals_by_uid.get(&uid).copied().unwrap_or((0.0, 0.0, 0));
+            let win_gw = if !has_finals && uid == winner {
+                1.0
+            } else {
+                0.0
+            };
+            let total_gw = gw + fgw + win_gw;
+            let total_vp = vp + fvp;
+            let total_tp = tp + ftp;
+
             match mode {
-                "Score" => {
-                    // Standings are prelim-only (compute_preliminary_standings sums rounds only)
-                    entry.gw += gw;
-                    entry.vp += vp;
-                    entry.tp += tp;
-                }
                 "RTP" => {
-                    // Finalist bonus is gated on the finalist flag (every data
-                    // source sets it when a final is played); winner (final rank
-                    // 1) = 1, other finalists = 2.
+                    // Finalist bonus is gated on the finalist flag (every data source
+                    // sets it when a final is played); winner (final rank 1) = 1, other
+                    // finalists = 2. Points use the full rating total so league RTP
+                    // matches the global per-tournament rating.
                     let finalist_position = if finalist {
                         if final_place.get(&uid) == Some(&1) {
                             1
@@ -110,19 +148,17 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
                     } else {
                         0
                     };
-                    let rtp =
-                        compute_rating_points(vp, gw as i32, finalist_position, player_count, rank);
-                    entry.points += rtp;
-                    entry.gw += gw;
-                    entry.vp += vp;
-                    entry.tp += tp;
+                    entry.points += compute_rating_points(
+                        total_vp,
+                        total_gw as i32,
+                        finalist_position,
+                        player_count,
+                        rank,
+                    );
                 }
                 "GP" => {
                     let place = final_place.get(&uid).copied().unwrap_or(0);
                     entry.points += compute_gp_points(place, 0);
-                    entry.gw += gw;
-                    entry.vp += vp;
-                    entry.tp += tp;
                 }
                 _ => {
                     return Err(EngineError::internal(format!(
@@ -131,18 +167,9 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
                     )));
                 }
             }
-        }
-
-        // For non-Score modes, add finals GW/VP/TP to displayed totals
-        if mode != "Score" {
-            for finalist in tournament["finals"].members() {
-                let uid = finalist["player_uid"].as_str().unwrap_or("").to_string();
-                if let Some(entry) = players.get_mut(&uid) {
-                    entry.gw += finalist["gw"].as_f64().unwrap_or(0.0);
-                    entry.vp += finalist["vp"].as_f64().unwrap_or(0.0);
-                    entry.tp += finalist["tp"].as_i32().unwrap_or(0);
-                }
-            }
+            entry.gw += total_gw;
+            entry.vp += total_vp;
+            entry.tp += total_tp;
         }
     }
 
@@ -261,6 +288,57 @@ mod tests {
                                                             // p3 has no finals data, unchanged
         assert_eq!(parsed[2]["gw"].as_f64().unwrap(), 1.0);
         assert_eq!(parsed[2]["vp"].as_f64().unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_rtp_points_count_finals_and_no_final_win_gw() {
+        // League RTP points must use the FULL rating total (prelim + finals + the
+        // no-final tournament-win GW), so they match the global per-tournament rating
+        // (compute_rating_vp_gw → compute_rating_points) — not the prelim-only base.
+        let pts = |parsed: &json::JsonValue, uid: &str| -> i32 {
+            parsed
+                .members()
+                .find(|e| e["user_uid"].as_str() == Some(uid))
+                .unwrap()["points"]
+                .as_i32()
+                .unwrap()
+        };
+
+        // A real final: p1's points include the finals seat (vp 4+2, gw 2+1).
+        let with_final = r#"{
+            "standings_mode": "RTP",
+            "tournaments": [{
+                "uid": "t1", "rank": "", "player_count": 20, "winner": "p1",
+                "standings": [
+                    {"user_uid": "p1", "gw": 2.0, "vp": 4.0, "tp": 140, "finalist": true},
+                    {"user_uid": "p2", "gw": 1.0, "vp": 2.0, "tp": 100, "finalist": true}
+                ],
+                "finals": [
+                    {"player_uid": "p1", "gw": 1, "vp": 2.0, "tp": 60},
+                    {"player_uid": "p2", "gw": 0, "vp": 1.0, "tp": 24}
+                ]
+            }]
+        }"#;
+        let a = json::parse(&compute_league_standings(with_final).unwrap()).unwrap();
+        assert_eq!(pts(&a, "p1"), compute_rating_points(6.0, 3, 1, 20, ""));
+        assert_eq!(pts(&a, "p2"), compute_rating_points(3.0, 1, 2, 20, ""));
+
+        // No final (finals=[]) but a winner is set (a no-final import): the winner —
+        // and only the winner — gets the +1 tournament-win GW in the points base.
+        let no_final = r#"{
+            "standings_mode": "RTP",
+            "tournaments": [{
+                "uid": "t1", "rank": "", "player_count": 12, "winner": "p1",
+                "standings": [
+                    {"user_uid": "p1", "gw": 1.0, "vp": 3.0, "tp": 90, "finalist": true},
+                    {"user_uid": "p2", "gw": 1.0, "vp": 2.0, "tp": 60, "finalist": true}
+                ],
+                "finals": []
+            }]
+        }"#;
+        let b = json::parse(&compute_league_standings(no_final).unwrap()).unwrap();
+        assert_eq!(pts(&b, "p1"), compute_rating_points(3.0, 2, 1, 12, "")); // gw 1 + win 1
+        assert_eq!(pts(&b, "p2"), compute_rating_points(2.0, 1, 2, 12, "")); // no win GW
     }
 
     #[test]

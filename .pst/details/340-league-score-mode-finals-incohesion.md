@@ -122,9 +122,8 @@ Not an issue for the prod migration (#39) — that's a fresh import with no lega
 computes RTP points from the prelim-only standings base and only adds finals to *displayed* gw/vp
 (`league.rs:113` vs `:137-146`). Pre-#340 imports had folded standings, so their league RTP points
 accidentally *included* finals; native standings were always prelim-only, so native league RTP
-*excluded* them. #340 makes imports prelim-only too → league RTP points now **consistent across
-origins** (both exclude finals from the points base), which is the ticket's goal. Side effect:
-imported finalists' league RTP `points` drop ~`floor(4·vpf + 8·win)`. Displayed gw/vp totals are
-unchanged (finals re-added at `:146`). Whether league RTP points *should* include finals (to mirror
-the global/VEKN per-tournament rating) is a separate, native-affecting decision — filed as a p3
-follow-up, NOT changed here.
+*excluded* them. #340 alone left both prelim-only (consistent across origins, but diverging from
+the global rating). The p3 follow-up **resolved the direction**: league **RTP** now uses the full
+rating total (prelim + finals + the no-final win GW) so it matches the global/VEKN per-tournament
+rating for native AND imports; league **Score** stays prelim-only (finals + win GW excluded), with
+or without a final; GP points unchanged (placement-based). So league RTP no longer diverges.
