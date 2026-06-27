@@ -366,9 +366,9 @@ UNCREATED_EVENTS_QUERY = """
 
 # batch_push step 3 selection. The rounds guard keeps tournaments whose results
 # did not originate here (VEKN imports, ETL-migrated history — standings but no
-# play data) out of the push set even if their vekn_pushed_at was never stamped:
-# re-pushing them would send wrong numbers (their standings fold finals in;
-# archondata assumes prelim-only). Guard covered by test_vekn_push_batch.py.
+# per-round play data) out of the push set even if their vekn_pushed_at was never
+# stamped: re-pushing the source of record is pointless and archondata needs the
+# round detail an import never had. Guard covered by test_vekn_push_batch.py.
 UNPUSHED_RESULTS_QUERY = """
     SELECT "full" FROM objects
     WHERE type = %s

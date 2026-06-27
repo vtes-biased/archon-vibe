@@ -1141,6 +1141,34 @@ fn test_rating_vp_gw_reads_standings_when_no_rounds() {
 }
 
 #[test]
+fn test_rating_vp_gw_credits_no_final_winner() {
+    // NO-final VEKN import: rounds AND finals both absent, but `winner` is set, so
+    // the tournament-win GW (+1) is credited from the winner field (no finals table
+    // recorded it). Matches vekn.net rtp (a no-final winner with prelim gw1 rates as
+    // gw2). A non-winner in the same import gets no bonus. The inert side
+    // (winner=="", native today) is pinned by the test above — keep this pair in
+    // sync. Guards the #340 rating gate: import totals must stay unchanged once the
+    // winner's +1 moved out of the folded standings and into this rule.
+    let mut tournament = make_tournament();
+    tournament["winner"] = "p1".into();
+    tournament["standings"] = json::array![
+        json::object! { user_uid: "p1", gw: 1.0, vp: 3.0, tp: 90 },
+        json::object! { user_uid: "p2", gw: 0.0, vp: 2.0, tp: 60 },
+    ];
+    let empty = json::array![];
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &empty, "p1"),
+        (3.0, 2.0),
+        "no-final winner: prelim GW 1 + tournament-win GW 1; VP unchanged"
+    );
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &empty, "p2"),
+        (2.0, 0.0),
+        "non-winner in a no-final import gets no tournament-win bonus"
+    );
+}
+
+#[test]
 fn test_standings_vp_sa_ignores_lifted_redirects_unplayed_round() {
     // A lifted SA must not penalize. An active SA whose stored round p1 never
     // played (round 1 here — only round 0 exists) is NOT deferred (JG v2 §1.1.3:

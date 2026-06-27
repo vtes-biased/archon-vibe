@@ -98,3 +98,33 @@ Cross-stack change: importer (Python) + the rating computation (Rust engine, con
 PyO3 and WASM) → principal-engineer + senior-qa. Key regression gate: a sample of imported
 events' `rtp`/rating must be **unchanged** before vs after (decompose a batch via the
 throwaway scratchpad scripts). League Score/RTP/GP totals re-checked on a mixed-origin league.
+
+## Implemented (verified) + review findings
+
+Landed: importer writes prelim-only standings + reconstructs `finals` (`vekn_tournament_sync.py`),
+engine `compute_rating_vp_gw` generalized with the `win_gw` rule (`standings.rs`), `ratings.py`
+`_players_with_rounds` gates on `rounds` not `finals`, and the sync `changed` detector compares
+`standings`/`finals` so legacy folded imports self-heal. Global RTP entry (points/vp/gw/fp/pc)
+verified **unchanged** WITH- and NO-final. WASM unaffected (`compute_rating_vp_gw` is PyO3-only).
+Native safe (`StartFinals` needs ≥2 rounds + `winner` only set in finals-finalization, so a
+no-final native finish has `winner==""` → `win_gw` inert).
+
+**DEPLOY SEQUENCING (rollout hazard — beta instances with legacy folded imports only).** The new
+engine and importer are coupled: `win_gw` assumes prelim-only standings. A legacy folded import
+not yet re-synced still has `finals=null` AND `standings.gw=prelim+1`, so the new engine
+*double-counts* the winner's GW (folded +1, then `win_gw` +1) until the nightly VEKN sync heals
+that row. A rating recompute in that window would *persist* the inflated GW. So on a beta deploy:
+**run a full VEKN re-sync (the self-heal pass) before any rating recompute touches legacy imports.**
+The self-heal pass re-broadcasts every healed import once (a bounded one-time SSE/write spike).
+Not an issue for the prod migration (#39) — that's a fresh import with no legacy folded records.
+
+**League RTP/GP *points* for imported finalists change (consistency, not regression).** `league.rs`
+computes RTP points from the prelim-only standings base and only adds finals to *displayed* gw/vp
+(`league.rs:113` vs `:137-146`). Pre-#340 imports had folded standings, so their league RTP points
+accidentally *included* finals; native standings were always prelim-only, so native league RTP
+*excluded* them. #340 makes imports prelim-only too → league RTP points now **consistent across
+origins** (both exclude finals from the points base), which is the ticket's goal. Side effect:
+imported finalists' league RTP `points` drop ~`floor(4·vpf + 8·win)`. Displayed gw/vp totals are
+unchanged (finals re-added at `:146`). Whether league RTP points *should* include finals (to mirror
+the global/VEKN per-tournament rating) is a separate, native-affecting decision — filed as a p3
+follow-up, NOT changed here.

@@ -271,12 +271,16 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
 }
 
 /// Compute a player's SA-adjusted rating VP and GW for a finished tournament.
-/// Prelim GW is **recomputed** per table from raw VPs + current sanctions (so a
-/// late SA that flips a GW is reflected, matching [`compute_preliminary_standings`]);
-/// finals GW is read from the stored seat (finals SA is disallowed). VP sums the
-/// raw per-seat VP across rounds and the finals table, then subtracts the full SA
-/// penalty ([`sa_vp_penalty`]; may go negative). For VEKN-synced tournaments (no
-/// rounds and no finals) reads the player's standings row.
+/// Prelim VP/GW come from the rounds when per-round detail exists (GW
+/// **recomputed** per table from raw VPs + current sanctions, so a late SA that
+/// flips a GW is reflected, matching [`compute_preliminary_standings`]; VP minus
+/// the full SA penalty via [`sa_vp_penalty`], may go negative); otherwise from the
+/// player's (prelim-only) standings row as-is (VEKN-synced/rounds-less imports —
+/// SA is already baked into synced numbers, so it is not re-applied there). Finals
+/// VP/GW are then added from the finals seat (native, or a reconstructed import
+/// final). When **no** finals table recorded the win, the tournament winner is
+/// credited a +1 GW (a NO-final VEKN import; a native no-final once #341 sets
+/// `winner` — native today leaves `winner==""`, so this stays inert).
 ///
 /// Single source so the backend rating and VEKN-push paths consume the SA rule
 /// from Rust instead of re-implementing it. Unlike preliminary standings VP, this
@@ -299,51 +303,54 @@ pub fn compute_rating_vp_gw(
         return (0.0, 0.0);
     }
 
-    let has_play = !tournament["rounds"].is_empty() || !tournament["finals"].is_null();
-    if !has_play {
-        // VEKN-synced or rounds-less: standings already carry the authoritative totals.
-        for s in tournament["standings"].members() {
-            if s["user_uid"].as_str() == Some(user_uid) {
-                return (
-                    s["vp"].as_f64().unwrap_or(0.0),
-                    s["gw"].as_f64().unwrap_or(0.0),
-                );
-            }
-        }
-        return (0.0, 0.0);
-    }
-
-    let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
     let mut vp = 0.0;
     let mut gw = 0.0;
-    for (round_index, round) in tournament["rounds"].members().enumerate() {
-        for table in round.members() {
-            if table["state"].as_str() == Some("Cancelled") {
-                continue; // soft-cancelled round earns no rating VP/GW
+    // Prelim VP/GW: sum the rounds when we have per-round detail; otherwise read the
+    // (prelim-only) standings row. Imports keep finals in the finals object below.
+    if tournament["rounds"].is_empty() {
+        for s in tournament["standings"].members() {
+            if s["user_uid"].as_str() == Some(user_uid) {
+                vp += s["vp"].as_f64().unwrap_or(0.0);
+                gw += s["gw"].as_f64().unwrap_or(0.0);
+                break;
             }
-            let seating = &table["seating"];
-            let Some(i) = seating
-                .members()
-                .position(|s| s["player_uid"].as_str() == Some(user_uid))
-            else {
-                continue;
-            };
-            let vps: Vec<f64> = seating
-                .members()
-                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
-                .collect();
-            let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
-            vp += vps[i];
-            gw += compute_gw(&vps, &adjustments)[i];
         }
+    } else {
+        let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
+        for (round_index, round) in tournament["rounds"].members().enumerate() {
+            for table in round.members() {
+                if table["state"].as_str() == Some("Cancelled") {
+                    continue; // soft-cancelled round earns no rating VP/GW
+                }
+                let seating = &table["seating"];
+                let Some(i) = seating
+                    .members()
+                    .position(|s| s["player_uid"].as_str() == Some(user_uid))
+                else {
+                    continue;
+                };
+                let vps: Vec<f64> = seating
+                    .members()
+                    .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                    .collect();
+                let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
+                vp += vps[i];
+                gw += compute_gw(&vps, &adjustments)[i];
+            }
+        }
+        vp -= sa_vp_penalty(&effective_sas, user_uid);
     }
+    // Finals VP/GW from the finals table (native, or a reconstructed import final).
     for seat in tournament["finals"]["seating"].members() {
         if seat["player_uid"].as_str() == Some(user_uid) {
             vp += seat["result"]["vp"].as_f64().unwrap_or(0.0);
             gw += seat["result"]["gw"].as_f64().unwrap_or(0.0);
         }
     }
-    vp -= sa_vp_penalty(&effective_sas, user_uid);
+    // No finals table recorded the win → credit the tournament-win GW to the winner.
+    if tournament["finals"].is_null() && tournament["winner"].as_str() == Some(user_uid) {
+        gw += 1.0;
+    }
     (vp, gw)
 }
 

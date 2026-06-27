@@ -19,12 +19,15 @@ from .db import (
     save_tournament,
 )
 from .models import (
+    FinalsTable,
     ObjectType,
     PaymentStatus,
     Player,
     PlayerState,
     Score,
+    Seat,
     Standing,
+    TableState,
     Tournament,
     TournamentFormat,
     TournamentRank,
@@ -191,6 +194,8 @@ def _map_vekn_to_tournament(
         players: list[Player] = []
         standings: list[Standing] = []
         winner_uid = ""
+        # Finalists for a reconstructed finals object: (user_uid, pos, vpf).
+        finalists: list[tuple[str, int, float]] = []
 
         for vp_data in vekn_players:
             vekn_id = str(vp_data.get("veknid") or "")
@@ -198,35 +203,42 @@ def _map_vekn_to_tournament(
             if not user:
                 continue
 
-            # Parse scores
-            gw = int(vp_data.get("gw", 0) or 0)
+            # VEKN reports prelim GW/VP, separate finals VP (vpf), and a final
+            # placement (pos 1..5); pos==1 is the tournament winner.
+            prelim_gw = int(vp_data.get("gw", 0) or 0)
             pos = str(vp_data.get("pos") or "")
             is_finalist = pos in ("1", "2", "3", "4", "5")
-            if pos == "1":
-                gw += 1  # Finals win
-                winner_uid = user.uid
-
             vp_prelim = float(vp_data.get("vp", 0) or 0)
             vp_finals = float(vp_data.get("vpf", 0) or 0)
-            vp = vp_prelim + vp_finals
             tp = int(vp_data.get("tp", 0) or 0)
             toss = int(vp_data.get("tie", 0) or 0)
+            if pos == "1":
+                winner_uid = user.uid
+            if is_finalist:
+                finalists.append((user.uid, int(pos), vp_finals))
 
+            # Player.result is the full aggregate (prelim + finals win), like every
+            # other importer. Standings stay PRELIM-ONLY (the contract): finals live
+            # in the reconstructed finals object below; rating/league add them on top.
             players.append(
                 Player(
                     user_uid=user.uid,
                     state=PlayerState.FINISHED,
                     payment_status=PaymentStatus.PAID,
                     toss=toss,
-                    result=Score(gw=gw, vp=vp, tp=tp),
+                    result=Score(
+                        gw=prelim_gw + (1 if pos == "1" else 0),
+                        vp=vp_prelim + vp_finals,
+                        tp=tp,
+                    ),
                     finalist=is_finalist,
                 )
             )
             standings.append(
                 Standing(
                     user_uid=user.uid,
-                    gw=float(gw),
-                    vp=vp,
+                    gw=float(prelim_gw),
+                    vp=vp_prelim,
                     tp=tp,
                     toss=toss,
                     finalist=is_finalist,
@@ -236,8 +248,32 @@ def _map_vekn_to_tournament(
         if not players:
             return None  # All players unknown
 
-        # Sort standings: GW desc, VP desc, TP desc, toss desc
-        standings.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss))
+        # Reconstruct a finals object iff a final was actually played (some vpf > 0).
+        # VEKN gives no finals seating, so seats are ordered by final placement
+        # (synthetic seed_order, display/record only — nothing computes off it; the
+        # winner + per-seat vpf are known). Winner gets the +1 GW, vp = their vpf,
+        # tp = 0 (no seat order to derive a real table-point from; keeps the league
+        # RTP/GP displayed TP at prelim levels, unchanged from before this fix).
+        finals: FinalsTable | None = None
+        if sum(vpf for _, _, vpf in finalists) > 0:
+            finalists.sort(key=lambda f: f[1])  # by final placement (pos 1..5)
+            finals = FinalsTable(
+                seating=[
+                    Seat(
+                        player_uid=uid,
+                        result=Score(gw=1 if pos == 1 else 0, vp=vpf, tp=0),
+                    )
+                    for uid, pos, vpf in finalists
+                ],
+                seed_order=[uid for uid, _, _ in finalists],
+                state=TableState.FINISHED,
+            )
+
+        # Sort standings: GW desc, VP desc, TP desc, toss desc, then user_uid asc as
+        # a total-order tiebreak. Without it, tied rows keep VEKN's API order, which
+        # can differ across syncs → the standings-equality check below (self-heal)
+        # would see a spurious diff and re-import/re-broadcast on every run.
+        standings.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss, s.user_uid))
 
         return Tournament(
             uid=str(uuid7()),
@@ -261,9 +297,10 @@ def _map_vekn_to_tournament(
             players=players,
             winner=winner_uid,
             standings=standings,
-            # Results came FROM vekn.net — stamp so batch_push never re-uploads
-            # them (the importer's standings fold finals in; archondata assumes
-            # prelim-only, so a re-push would send wrong numbers).
+            finals=finals,
+            # Results came FROM vekn.net — stamp so batch_push never re-uploads them
+            # (round-tripping our own import back to the source of record is pointless
+            # and the synthetic finals seating carries no info VEKN didn't already have).
             vekn_pushed_at=now,
         )
     else:
@@ -352,12 +389,15 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 merged_organizers = list(
                     dict.fromkeys(existing.organizers_uids + tournament.organizers_uids)
                 )
-                if existing.rounds or existing.finals is not None:
-                    # Tournament was run in-app (it has play data). VEKN.net is NOT
-                    # authoritative for its rounds/finals/standings/players/winner/state
-                    # — only for descriptive event metadata. Refresh metadata only and
-                    # NEVER overwrite the play data (doing so would silently wipe rounds
-                    # and corrupt standings/ratings).
+                if existing.rounds:
+                    # Tournament was run in-app (it has per-round play data). VEKN.net
+                    # is NOT authoritative for its rounds/finals/standings/players/
+                    # winner/state — only for descriptive event metadata. Refresh
+                    # metadata only and NEVER overwrite the play data (doing so would
+                    # silently wipe rounds and corrupt standings/ratings). Gate on
+                    # `rounds` only: a re-imported VEKN event now carries a
+                    # reconstructed finals object, but VEKN stays authoritative for
+                    # it (a final implies prelim rounds, so this never misses in-app).
                     meta_changed = (
                         existing.name != tournament.name
                         or existing.format != tournament.format
@@ -415,6 +455,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         or existing.venue_url != tournament.venue_url
                         or existing.map_url != tournament.map_url
                         or len(existing.players) != len(tournament.players)
+                        # Compare the authoritative play data so a VEKN-side score
+                        # correction is picked up — and so legacy folded imports (old
+                        # standings = prelim+finals, finals=None) self-heal to the
+                        # prelim-only + reconstructed-finals shape on the next sync.
+                        # Deterministic mapping ⇒ a migrated import compares equal and
+                        # won't thrash.
+                        or existing.standings != tournament.standings
+                        or existing.finals != tournament.finals
                     )
                     if changed:
                         tournament = Tournament(
@@ -435,9 +483,11 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             map_url=tournament.map_url,
                             external_ids=tournament.external_ids,
                             organizers_uids=merged_organizers,
+                            max_rounds=tournament.max_rounds,
                             players=tournament.players,
                             winner=tournament.winner,
                             standings=tournament.standings,
+                            finals=tournament.finals,
                             vekn_pushed_at=tournament.vekn_pushed_at,
                         )
                         bd = await save_tournament(tournament)

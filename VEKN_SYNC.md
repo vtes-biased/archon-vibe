@@ -34,7 +34,7 @@ Each function SSE-broadcasts the updated object after saving so clients reflect 
 - Tournament events: `external_ids.vekn` absent
 - Tournament results: `vekn_pushed_at IS NULL` AND `rounds` array non-empty
 
-Results that did not originate in-app must never be re-uploaded. The `rounds` guard excludes round-less VEKN imports (the importer folds finals into standings; archondata assumes prelim-only, so a re-push would send wrong numbers); rich ETL/archon-merged history has rounds, so both importers also stamp `vekn_pushed_at` on every finished tournament they write (old archon already pushed those results).
+Results that did not originate in-app must never be re-uploaded. The `rounds` guard excludes round-less VEKN imports (an import has summary results only — no per-round detail — and re-pushing the source of record is pointless); rich ETL/archon-merged history has rounds, so both importers also stamp `vekn_pushed_at` on every finished tournament they write (old archon already pushed those results).
 
 ### Outage resilience
 
@@ -97,6 +97,13 @@ Tracking fields on User: `vekn_synced` (bool), `vekn_synced_at` (timestamp), `lo
 
 `sync_all_tournaments()` imports historical tournaments:
 - Creates Tournament objects for past events
+- Standings are **prelim-only** (the project contract); when a final was played
+  (`sum(vpf) > 0`) it reconstructs a `finals` object (seats by placement, winner
+  GW 1, seat VP = `vpf`) so rating/league add finals on top — same shape as a
+  native or ETL-imported tournament. A summary-only winner with no `vpf` gets the
+  tournament-win GW from the engine rating rule instead (no finals object)
+- Re-sync compares the authoritative play data (`standings`/`finals`/`winner`/…)
+  so a VEKN-side score correction — and legacy folded imports — self-heal
 - Seeds venue autocomplete data
 - Stamps `vekn_pushed_at=now` on finished imports so batch_push never re-uploads them
 

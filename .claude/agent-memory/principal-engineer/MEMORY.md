@@ -84,6 +84,7 @@
 - [SA round-targeting two consumers](sa-round-targeting-two-consumers.md) — SA −1 VP has two engine consumers keyed differently (per-table GW/TP by round_index vs VP total by rounds_len); must share one effective-round resolution or VP/GW/TP silently diverge (JG v2 §1.1.3 redirect, no deferral).
 - [DQ dual-signal divergence traps](dq-signal-divergence-traps.md) — DQ = state||active-sanction; audit every consumer for the combined signal, and any DQ sanction create/lift/delete must recompute standings.
 - [Excluded-but-not-zeroed standings consumers](excluded-not-zeroed-standings-consumers.md) — proxy/non_competing is non-ranked but score is KEPT (DQ zeroes); league.rs + vekn_push iterate standings unfiltered and leak proxy scores; filter on disqualified||non_competing.
+- [League RTP vs global RTP points base](league-rtp-vs-global-rtp-points-base.md) — league.rs RTP points use PRELIM-ONLY standings vp/gw (finals only added to displayed totals); global rating uses TOTAL vp/gw; the two RTP consumers diverge — verify the `points` field, not just displayed gw/vp.
 
 ## Online-only live tournament sub-data
 - [Online-only Tournament sub-data carve-out](online-only-tournament-subdata-carveout.md) — timer pattern: field on Tournament + backend route (tournament_transaction→save_object→broadcast_precomputed), NO Rust engine, NO optimistic update, NO new object type; reserved for online-only live UI state (announcements #290 mirror this).

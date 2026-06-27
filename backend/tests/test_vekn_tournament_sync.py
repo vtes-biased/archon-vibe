@@ -1,12 +1,11 @@
-"""Tests for VEKN tournament import → vekn_pushed_at stamping.
+"""Tests for VEKN tournament import → prelim-only standings + finals + push guard.
 
-Imported VEKN-origin results must never be re-uploaded by batch_push: the
-importer folds finals into `standings` (the "standings are prelim-only"
-contract is violated on purpose for imports), so archondata — which assumes
-prelim-only — would send wrong numbers on a re-push. The guard is two-sided:
+The import honors the project contract: `standings` are **preliminary-only**, a
+final lives in a reconstructed `finals` object, and rating/league scoring add it
+on top. Imported VEKN-origin results must also never be re-uploaded by batch_push:
 the importer stamps `vekn_pushed_at` on finished imports (here), and batch_push
-also requires `rounds` non-empty (see test_vekn_push_batch.py). Either alone
-keeps imports out of the push set; both together is belt-and-suspenders.
+also requires `rounds` non-empty (see test_vekn_push_batch.py). Either alone keeps
+imports out of the push set; both together is belt-and-suspenders.
 
 `_map_vekn_to_tournament` is a pure function — no DB, no mocks.
 """
@@ -78,3 +77,54 @@ def test_planned_import_leaves_vekn_pushed_at_null():
     t = _map_vekn_to_tournament(_planned_event(), {})
     assert t is not None
     assert t.vekn_pushed_at is None
+
+
+# A 5-player final: winner (pos 1) took 3 prelim VP + 2 finals VP (vpf).
+def _final_event() -> dict:
+    return {
+        "event_id": "557",
+        "event_name": "Final Cup",
+        "eventtype_id": "2",
+        "event_startdate": "2025-03-01",
+        "venue_country": "FR",
+        "rounds": "3R+F",
+        "players": [
+            {"pos": "1", "veknid": "1", "gw": "1", "vp": "3", "vpf": "2", "tp": "36"},
+            {"pos": "2", "veknid": "2", "gw": "0", "vp": "2", "vpf": "1", "tp": "30"},
+            {"pos": "3", "veknid": "3", "gw": "0", "vp": "2", "vpf": "1", "tp": "28"},
+            {"pos": "4", "veknid": "4", "gw": "0", "vp": "1", "vpf": "0", "tp": "20"},
+            {"pos": "5", "veknid": "5", "gw": "0", "vp": "1", "vpf": "0", "tp": "18"},
+            {"pos": "9", "veknid": "6", "gw": "0", "vp": "0", "vpf": "0", "tp": "10"},
+        ],
+    }
+
+
+def test_import_standings_prelim_only_and_reconstructs_finals():
+    # The #340 contract: standings carry PRELIM-only scores (winner's +1 finals GW
+    # and everyone's vpf excluded); the final lives in a reconstructed finals object
+    # with the winner's +1 GW and each seat's vp = their vpf.
+    users = {str(i): _user(f"u{i}", str(i)) for i in range(1, 7)}
+    t = _map_vekn_to_tournament(_final_event(), users)
+    assert t is not None
+
+    winner = next(s for s in t.standings if s.user_uid == "u1")
+    assert (winner.gw, winner.vp) == (1.0, 3.0)  # prelim only: no +1, no vpf
+
+    assert t.finals is not None
+    seats = {s.player_uid: s.result for s in t.finals.seating}
+    assert (seats["u1"].gw, seats["u1"].vp) == (1, 2.0)  # winner GW + vpf
+    assert (seats["u2"].gw, seats["u2"].vp) == (0, 1.0)
+    assert "u6" not in seats  # non-finalist not seated
+    assert t.winner == "u1"
+
+
+def test_no_final_import_omits_finals_but_keeps_winner():
+    # No final played (all vpf=0) → no finals object, but the winner is still set
+    # so the engine's tournament-win GW rule credits it. Standings stay prelim-only.
+    users = {"1000001": _user("u1", "1000001")}
+    t = _map_vekn_to_tournament(_finished_event(), users)
+    assert t is not None
+    assert t.finals is None
+    assert t.winner == "u1"
+    winner = next(s for s in t.standings if s.user_uid == "u1")
+    assert (winner.gw, winner.vp) == (1.0, 4.0)  # prelim only (gw not +1)

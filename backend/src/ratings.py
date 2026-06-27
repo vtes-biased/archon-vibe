@@ -52,9 +52,11 @@ def rating_category_for_tournament(t: Tournament) -> RatingCategory:
 def _players_with_rounds(t: Tournament) -> set[str]:
     """Get user_uids of players who played at least 1 round.
 
-    For VEKN-synced tournaments (no rounds/finals), uses standings instead.
+    Gates on `rounds`, not `finals`: a VEKN import has no per-round detail but DOES
+    carry a reconstructed finals object (a subset — the final table). Counting it
+    would undercount the field to ~5; the full field lives in standings instead.
     """
-    if t.rounds or t.finals:
+    if t.rounds:
         played = set()
         for round_tables in t.rounds:
             for table in round_tables:
@@ -66,7 +68,7 @@ def _players_with_rounds(t: Tournament) -> set[str]:
                 if seat.player_uid:
                     played.add(seat.player_uid)
         return played
-    # VEKN-synced or rounds-less: use standings
+    # VEKN-synced or rounds-less: use standings (finalists always carry prelim TP)
     return {s.user_uid for s in t.standings if s.gw or s.vp or s.tp}
 
 
