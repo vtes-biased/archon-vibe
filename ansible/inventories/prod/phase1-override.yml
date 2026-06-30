@@ -1,0 +1,17 @@
+---
+# Phase-1 parallel-run override for the prod box (archon-vibe alongside legacy
+# archon). Passed via `-e @…` (extra-vars = highest precedence) by the prod
+# justfile targets, so vars.yml stays prod-final and untouched.
+#
+# REMOVE AT THE PHASE-2 FLIP: blank the `phase1_override` variable in the
+# ansible justfile. Prod then reverts to archon.vekn.net with push on.
+# Runbook: ../.pst/details/39-phase1-parallel-run.md
+
+# Serve the new stack at new.archon.vekn.net (legacy keeps archon.vekn.net).
+# site_url_base, all redirect URIs and WEBAUTHN_RP_ID derive from this.
+domain_main: new.archon.vekn.net
+
+# Deploy with push OFF. Order: deploy -> VEKN seed -> legacy merge -> push
+# audit reads all-zero -> set this "true" (or blank phase1_override) and
+# redeploy. Guards against re-submitting already-ratified results during seed.
+vekn_push_enabled: "false"

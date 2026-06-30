@@ -50,8 +50,11 @@ python_version: "3.14"
 uv_python_install_dir: /opt/uv/python
 
 # --- database -------------------------------------------------------------
+# Distinct role from legacy archon's `archon` PG role: both stacks share one
+# PG17 cluster during the parallel run, and reusing `archon` would reset its
+# password and lock legacy out. db_name `archon` (≠ legacy `archondb`) is safe.
 db_name: archon
-db_user: archon
+db_user: archonvibe
 db_password: "{{ vault_db_password }}"
 
 # --- backend env vars -----------------------------------------------------
@@ -88,7 +91,7 @@ backend_env:
   VEKN_API_BASE_URL: "https://www.vekn.net/api"
   VEKN_API_USERNAME: "{{ vault_vekn_username }}"
   VEKN_API_PASSWORD: "{{ vault_vekn_password }}"
-  VEKN_PUSH: "true"            # prod pushes ratified results back to VEKN
+  VEKN_PUSH: "{{ vekn_push_enabled | default('true') }}"   # prod-final on; phase-1 override gates it off
   VEKN_PUSH_INTERVAL_HOURS: 1
   # --- Web Push / VAPID ---------------------------------------------------
   # Per-env keypair (beta and prod must NOT share). Both keys live in vault so

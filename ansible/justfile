@@ -22,6 +22,12 @@ manylinux := "quay.io/pypa/manylinux_2_28_x86_64"
 vault_pass_beta := justfile_directory() / ".beta.vault_pass"
 vault_pass_prod := justfile_directory() / ".prod.vault_pass"
 
+# Phase-1 parallel run: serve prod at new.archon.vekn.net with push off (extra-vars
+# beat group_vars, so prod's vars.yml stays prod-final). Blank this line at the
+# Phase-2 flip to revert to archon.vekn.net + push on. See
+# ../.pst/details/39-phase1-parallel-run.md
+phase1_override := "-e @inventories/prod/phase1-override.yml"
+
 default:
     @just --list
 
@@ -89,7 +95,7 @@ build-all: build-engine-wheel build-backend build-bot build-frontend
 # `just deploy-beta` is the only beta entrypoint.
 # First-time provision: prod (packages, users, firewall, db, services)
 bootstrap-prod: galaxy
-    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/site.yml
 
 # Beta's DB/role is created by deploy-beta.yml via server-setup's postgres_db role.
 # Install/configure PostgreSQL + archon DB/user on prod
@@ -114,7 +120,7 @@ deploy-prod:
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
-    uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/deploy.yml $extra
+    uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/deploy.yml $extra
 
 # No beta variant: frankfurt system updates (apt + reboots) belong to server-setup.
 # apt upgrade + (optional) reboot on prod (FULL=1 REBOOT=1)
@@ -148,4 +154,4 @@ dry-deploy-beta: galaxy
 
 # Dry-run (check mode) of site.yml against prod
 dry-prod: galaxy
-    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml --check --diff
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/site.yml --check --diff
