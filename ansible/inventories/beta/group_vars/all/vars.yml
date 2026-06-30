@@ -110,6 +110,12 @@ backend_env:
   FEEDBACK_GITHUB_CLIENT_ID: "{{ vault_feedback_github_client_id | default('') }}"
   FEEDBACK_GITHUB_INSTALLATION_ID: "{{ vault_feedback_github_installation_id | default('') }}"
   FEEDBACK_GITHUB_PRIVATE_KEY: "{{ vault_feedback_github_private_key | default('') }}"
+  # User-facing GitHub OAuth App (profile account-linking). Distinct from the two
+  # GitHub Apps above: a client secret, no private key. Unset client id -> the
+  # "Link GitHub" button degrades to a not_configured toast.
+  GITHUB_OAUTH_CLIENT_ID: "{{ vault_github_oauth_client_id | default('') }}"
+  GITHUB_OAUTH_SECRET: "{{ vault_github_oauth_secret | default('') }}"
+  GITHUB_OAUTH_REDIRECT_URI: "{{ site_url_base }}/auth/github/callback"
 
 # --- bot env vars (non-secret) --------------------------------------------
 bot_env:
