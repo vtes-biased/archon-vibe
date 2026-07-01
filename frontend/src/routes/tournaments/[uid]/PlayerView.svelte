@@ -4,7 +4,7 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { computeRatingPoints, type ValidationError } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, Upload, ExternalLink, Users } from "@lucide/svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
@@ -136,9 +136,6 @@
   // engine allows deck-less check-in (mod.rs CheckIn just stamps missing_decklist).
   // Only surfaced when a decklist is required (playerHasValidDeck is always true otherwise).
   const showDeckWarn = $derived(notCheckedIn && tournament.decklist_required && !playerHasValidDeck);
-  function scrollToDeck() {
-    document.getElementById('player-deck-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
   const previousRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.rounds.length < 1) return [];
     const result: { round: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
@@ -215,10 +212,10 @@
 
 <!-- Missing/invalid decklist no longer hides the check-in button (engine treats it
      as non-blocking). Surface it as a warning BESIDE the check-in CTA — penalty
-     framing, specific errors, jump to the deck section — with a secondary button,
-     since checking in is now the primary action. -->
+     framing + specific errors. No jump-to-deck button: the deck upload section is
+     right below, and the button read as a spurious 'upload' action (it only scrolled). -->
 {#snippet deckWarn()}
-  <div class="banner-warn border rounded-lg p-3 space-y-3">
+  <div class="banner-warn border rounded-lg p-3">
     <div class="flex items-start gap-2 text-sm">
       <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
       <div class="min-w-0">
@@ -230,10 +227,6 @@
         {/if}
       </div>
     </div>
-    <Button variant="secondary" size="lg" block class="min-h-[44px]" onclick={scrollToDeck}>
-      <Upload class="w-4 h-4" aria-hidden="true" />
-      {hasDeck ? m.tournament_fix_deck_btn() : m.decks_upload()}
-    </Button>
   </div>
 {/snippet}
 
