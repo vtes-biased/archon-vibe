@@ -14,6 +14,19 @@ events. When they hold → proceed to **#40 Phase-2 flip**. Deferred during the 
 **#346** (post-cutover push of stuck legacy event 13379), #344 (resize box), #343
 (warning-free deploys), #345 (calendar URL), #115 residual TODO (unattended-merge
 cutover-gate). Prod-guild bot install + Discord portal for archon.vekn.net = #41.
+
+**⚠️ UNDEPLOYED on prod (local `main`, unpushed as of 2026-07-01):** the deploy
+above is live, but local `main` is **ahead of what's running** — the next
+`RELEASE_TAG=… just deploy-prod` (new CI tag) ships this session's product fixes:
+**#347/#348** (manual "Publish to VEKN" now also pushes results + the winner's
+TWDA deck for a FINISHED event, closing the same-session timing gap; TWDA gated to
+**10+ players who actually played**) + the redundant check-in deck-button removal
++ i18n. Also filed this session, not yet started: **#349** (manual-publish
+hardening — real VEKN error message + sync-route timeout), **#350** (Discord
+contact links can't start first contact), **#351** (daily prod DB backup).
+History was squashed to one `ops(prod): prep + execute Phase-1 …` commit + the
+feature commits; branch `backup-squash` holds the pre-squash history. Nothing
+pushed yet (owner: ship on next deploy cycle).
 C-3 legacy merge finished 22:40 UTC **Result=success** (CPU 69s, peak 82 MB RAM /
 53 MB swap — caps never near; ~33 min wall, IO/1-core bound). Summary: 513 rich
 tournaments merged (284 ins / 229 upd), **7,897 echoes correctly skipped**; 3,129
