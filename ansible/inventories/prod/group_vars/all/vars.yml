@@ -57,6 +57,16 @@ db_name: archon
 db_user: archonvibe
 db_password: "{{ vault_db_password }}"
 
+# --- legacy-archon merge (parallel run; remove at Phase-4 decommission) ----
+# Reads legacy `archondb` (role `archon`) over the socket via peer auth (the unit
+# runs as OS user `archon`) and merges rich data into the vekn-seeded copies. No
+# legacy password needed; the new-db write uses the archonvibe scram cred.
+legacy_sync_enabled: true
+legacy_db_user: archon
+legacy_db_name: archondb
+merge_backup_dir: /var/lib/archon/merge-backups
+legacy_sync_oncalendar: "*-*-* 04:00:00"
+
 # --- backend env vars -----------------------------------------------------
 backend_env:
   PYTHONOPTIMIZE: 1

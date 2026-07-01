@@ -1,7 +1,8 @@
 server {
-  listen 443 ssl;
-  listen [::]:443 ssl;
-  http2 on;
+  # http2 as a listen param, not the standalone `http2 on;` directive — the
+  # latter needs nginx >= 1.25.1; the prod box runs 1.24 (Ubuntu 24.04).
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
   server_name {{ r.server_name }};
 
   ssl_certificate         /etc/letsencrypt/live/{{ r.server_name }}/fullchain.pem;
@@ -10,7 +11,9 @@ server {
 
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_prefer_server_ciphers off;
-  ssl_session_cache shared:SSL:10m;
+  # Uniquely named zone: legacy archon on this box declares shared:SSL (a
+  # different size), and same-name/different-size aborts nginx -t.
+  ssl_session_cache shared:archonvibe_ssl:10m;
   ssl_session_timeout 5m;
   ssl_stapling on;
   ssl_stapling_verify on;

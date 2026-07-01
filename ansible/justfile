@@ -24,9 +24,10 @@ vault_pass_prod := justfile_directory() / ".prod.vault_pass"
 
 # Phase-1 parallel run: serve prod at new.archon.vekn.net with push off (extra-vars
 # beat group_vars, so prod's vars.yml stays prod-final). Blank this line at the
-# Phase-2 flip to revert to archon.vekn.net + push on. See
-# ../.pst/details/39-phase1-parallel-run.md
-phase1_override := "-e @inventories/prod/phase1-override.yml"
+# Phase-2 flip to revert to archon.vekn.net + push on. The file lives OUTSIDE
+# inventories/prod/ on purpose — a vars file inside the `-i` dir gets mis-parsed
+# as an inventory source. See ../.pst/details/39-phase1-parallel-run.md
+phase1_override := "-e @inventories/prod-phase1-override.yml"
 
 default:
     @just --list
@@ -93,7 +94,19 @@ build-all: build-engine-wheel build-backend build-bot build-frontend
 
 # Beta has no bootstrap: server-setup owns the frankfurt foundation, and
 # `just deploy-beta` is the only beta entrypoint.
-# First-time provision: prod (packages, users, firewall, db, services)
+
+# On the shared legacy VPS the bring-up MUST be sequenced foundation-prod ->
+# migrate-postgres-prod -> database-prod -> deploy-prod, or site.yml's database
+# step runs before the PG16->17 migration and hits the two-cluster trap.
+# Prod foundation only (common role: packages+psycopg2, archon user, dirs, uv, nginx, ufw)
+foundation-prod: galaxy
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/bootstrap.yml
+
+# Dry-run (check mode) of the foundation only — review before foundation-prod
+dry-foundation-prod: galaxy
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/bootstrap.yml --check --diff
+
+# Greenfield one-shot of a CLEAN box (foundation+db+deploy via site.yml); NOT the shared legacy VPS
 bootstrap-prod: galaxy
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/site.yml
 

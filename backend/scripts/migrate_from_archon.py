@@ -52,11 +52,15 @@ merged the rich payload into a vekn-created copy), else by `external_ids.vekn`
 stay valid); a round-less incoming copy never overwrites a rich original (echo
 guard); both rich is a one-app-per-event violation: logged loudly, skipped.
 
-Dry-run against the sandbox:
-    cd backend
+Dry-run against the sandbox (from the repo root):
     OLD_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_old \\
     NEW_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_new \\
-    uv run python scripts/migrate_from_archon.py --truncate
+    uv run python backend/scripts/migrate_from_archon.py --truncate
+
+On the prod box the deployed venv already has `backend.src` installed, so run
+it directly (no checkout needed) — this is what the archon-legacy-sync unit does:
+    /opt/archon/backend/.venv/bin/python \\
+      /opt/archon/backend/scripts/migrate_from_archon.py --merge
 
 `--limit N` caps each type for quick smoke runs; `--truncate` wipes the new
 objects/auth_methods first so ETL reruns are idempotent.
@@ -64,6 +68,7 @@ objects/auth_methods first so ETL reruns are idempotent.
 
 import argparse
 import asyncio
+import importlib.util
 import os
 import subprocess
 import sys
@@ -73,18 +78,24 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
-# Make backend/src importable when run as a standalone script.
-backend_dir = Path(__file__).parent.parent
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+# Make `backend.src` importable from a source checkout (local `uv run`). On the
+# deployed box it's already installed in the venv, so skip the insert there —
+# adding the repo root could otherwise let a stray src/ shadow the wheel package.
+try:
+    _have_backend = importlib.util.find_spec("backend.src") is not None
+except ModuleNotFoundError:
+    _have_backend = False
+if not _have_backend:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from uuid import uuid7
 
 import msgspec
 import psycopg
 from psycopg.rows import dict_row
-from src import db
-from src.models import (
+
+from backend.src import db
+from backend.src.models import (
     AuthMethod,
     AuthMethodType,
     DeckListsMode,
@@ -111,7 +122,7 @@ from src.models import (
     TournamentRank,
     TournamentState,
 )
-from src.vekn_sync import OFFICIALS_EMAILS
+from backend.src.vekn_sync import OFFICIALS_EMAILS
 
 # --------------------------------------------------------------------------- #
 # Mapping tables                                                               #

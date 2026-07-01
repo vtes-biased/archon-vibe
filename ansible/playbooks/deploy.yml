@@ -68,3 +68,23 @@
         state_dir: "{{ bot_state_dir }}"
         env: "{{ bot_env }}"
         env_dir: "{{ env_dir }}"
+
+    # 5. Legacy-archon -> archon-vibe daily merge (parallel run, prod-only).
+    # Gated by legacy_sync_enabled; runs the merge script with the deployed venv.
+    # Remove at Phase-4 decommission.
+    - role: legacy_sync
+      when: legacy_sync_enabled | default(false) | bool
+      r:
+        service_name: archon-legacy-sync
+        site_root: "{{ backend_site_root }}"
+        user: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        env_dir: "{{ env_dir }}"
+        script_src: "{{ playbook_dir }}/../../backend/scripts/migrate_from_archon.py"
+        legacy_db_user: "{{ legacy_db_user }}"
+        legacy_db_name: "{{ legacy_db_name }}"
+        new_db_user: "{{ db_user }}"
+        new_db_password: "{{ db_password }}"
+        new_db_name: "{{ db_name }}"
+        merge_backup_dir: "{{ merge_backup_dir | default('/var/lib/archon/merge-backups') }}"
+        oncalendar: "{{ legacy_sync_oncalendar | default('*-*-* 04:00:00') }}"

@@ -1,0 +1,24 @@
+[Unit]
+Description=archon legacy-archon to archon-vibe merge ({{ r.service_name }})
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User={{ r.user }}
+Group={{ r.group }}
+EnvironmentFile={{ r.env_dir }}/{{ r.service_name }}.env
+# Heavy one-shot on a memory-tight box — run gently so legacy + backend stay
+# responsive (the merge spikes RAM/IO during its pg_dump + bulk upserts).
+Nice=10
+IOSchedulingClass=idle
+# Both stacks share one PG17 cluster, so an OOM-kill of postgres would take down
+# legacy too. Make the merge the guaranteed victim and cap its RAM: a runaway
+# dies (idempotent + pre-run pg_dump make a retry safe) while legacy survives.
+# Tune via `systemctl show -p MemoryPeak {{ r.service_name }}.service` after run 1.
+OOMScoreAdjust=800
+MemoryHigh=400M
+MemoryMax=600M
+# oneshot disables the start timeout by default; pin it so a long merge is never SIGTERM'd.
+TimeoutStartSec=infinity
+ExecStart={{ r.site_root }}/.venv/bin/python {{ r.site_root }}/scripts/migrate_from_archon.py --merge

@@ -135,3 +135,37 @@ means we never import the pale copy over the rich original.
   soft-delete dedups must be loud in those logs.
 - Needs principal-engineer review when implemented (sync semantics, SSE/IDB
   tombstone behavior).
+
+## REOPENED 2026-06-30 — runner/deploy never built (blocks C-3 + E-1)
+The merge *logic* shipped, but nothing runs it on prod. Found during the Phase-1
+bring-up — new stack live + seeded (18,855 users) but the merge un-runnable:
+- `backend/scripts/migrate_from_archon.py` is **not on the box** — the wheel deploy
+  doesn't ship `backend/scripts/`.
+- The script imports `from src import db` / `from src.models import …`, but the
+  wheel installs the package as **`backend`** (entrypoint `backend.src.main:app`);
+  `import src.db` → ModuleNotFoundError against the deployed venv. Imports must
+  become `backend.src.…` (or run from a source checkout — but the box has none and
+  a fresh uv build can't compile the Rust engine).
+- No `OLD_DATABASE_URL` in the backend env; no systemd timer / in-app job (runner
+  was left "timer vs in-app" — never decided/built).
+To do: (1) make the script wheel-import-compatible; (2) ship it via ansible (run
+with the deployed venv that already has the engine wheel); (3) wire `OLD_DATABASE_URL`
+(legacy `archon` cred) + a runner — manual path for the C-3 seed, timer/in-app for
+the E-1 daily. Cutover gate already met (18,855 ≥ ~18k; legacy archondb 19,034).
+
+### DONE 2026-06-30 — runner built (script + `legacy_sync` ansible role)
+(1) script imports `src.`→`backend.src.` + find_spec-guarded path hack (loads on
+the wheel venv); (2) new `roles/legacy_sync` ships the script to
+`/opt/archon/backend/scripts/`, renders `/etc/archon/archon-legacy-sync.env`
+(keyword conninfo, escaped pw), installs a oneshot service + daily 04:00 timer
+running it with the deployed venv, capped (OOMScoreAdjust/MemoryMax) so a runaway
+merge dies instead of OOM-killing the shared postgres/legacy; (3) wired into
+`deploy.yml` gated by `legacy_sync_enabled`; prod vars only — no legacy secret
+needed: OLD (`archondb`) connects via **peer auth** (unit runs as OS `archon` →
+PG role `archon`; verified reads 19,034 rows), NEW writes as `archonvibe` (scram,
+existing `vault_db_password`). Principal-engineer reviewed (no blockers; the
+memory caps were the key add; peer-for-OLD found in pre-flight, dropped the secret).
+**Still TODO (daily-automation safety):** the ~18k cutover check is a manual
+pre-flight, NOT in the script — for unattended daily runs, add a guard that aborts
+the merge if the new DB's vekn-account count is implausibly low (a half-failed
+VEKN sync could otherwise let the 04:00 merge write under wrong uids).

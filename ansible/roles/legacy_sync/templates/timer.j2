@@ -1,0 +1,10 @@
+[Unit]
+Description=daily archon legacy-archon merge
+
+[Timer]
+OnCalendar={{ r.oncalendar }}
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,89 @@
+---
+# Deploys the legacy-archon -> archon-vibe daily merge on the shared prod box:
+# ships the merge script (NOT in the wheel — keeps the app package free of
+# legacy-schema code), renders its env, and installs a oneshot service + daily
+# timer that runs it with the already-deployed venv. Prod-only, parallel-run;
+# remove at Phase-4 decommission. See ../.pst/details/115-legacy-archon-sync.md
+- name: Assert required inputs
+  ansible.builtin.assert:
+    that:
+      - r.service_name is defined
+      - r.site_root is defined
+      - r.user is defined
+      - r.group is defined
+      - r.env_dir is defined
+      - r.script_src is defined
+      - r.legacy_db_user is defined
+      - r.legacy_db_name is defined
+      - r.new_db_user is defined
+      - r.new_db_name is defined
+      - r.new_db_password | default('') | length > 0
+      - r.merge_backup_dir is defined
+      - r.oncalendar is defined
+    fail_msg: "legacy_sync role missing required r.* inputs"
+
+- name: Ensure scripts dir exists
+  ansible.builtin.file:
+    path: "{{ r.site_root }}/scripts"
+    state: directory
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Ship the merge script
+  ansible.builtin.copy:
+    src: "{{ r.script_src }}"
+    dest: "{{ r.site_root }}/scripts/migrate_from_archon.py"
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+
+- name: Ensure merge backup dir exists
+  ansible.builtin.file:
+    path: "{{ r.merge_backup_dir }}"
+    state: directory
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0750"
+
+- name: Render legacy-sync env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ r.env_dir }}/{{ r.service_name }}.env"
+    owner: root
+    group: "{{ r.group }}"
+    mode: "0640"
+  notify: Reload systemd (legacy_sync)
+
+- name: Render legacy-sync service unit (oneshot)
+  ansible.builtin.template:
+    src: service.j2
+    dest: "/etc/systemd/system/{{ r.service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd (legacy_sync)
+
+- name: Render legacy-sync timer unit (daily)
+  ansible.builtin.template:
+    src: timer.j2
+    dest: "/etc/systemd/system/{{ r.service_name }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd (legacy_sync)
+
+# Enable the daily timer. The first (C-3) merge is run by hand —
+# `systemctl start {{ r.service_name }}.service` — and watched before the 04:00
+# timer first fires; the pre-run pg_dump + idempotent upserts + phase-1 push-off
+# make either path safe (the ~18k vekn-account check is a manual pre-flight, not
+# enforced in the script).
+- name: Enable + start the daily timer
+  ansible.builtin.systemd:
+    name: "{{ r.service_name }}.timer"
+    enabled: true
+    state: started
+    daemon_reload: true
+  # Skipped under --check: the unit files aren't materialized in check mode, so
+  # systemctl can't find the timer to enable it. Runs for real on deploy.
+  when: not ansible_check_mode

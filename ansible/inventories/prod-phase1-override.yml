@@ -3,6 +3,9 @@
 # archon). Passed via `-e @…` (extra-vars = highest precedence) by the prod
 # justfile targets, so vars.yml stays prod-final and untouched.
 #
+# Lives here, NOT in inventories/prod/ — a vars file inside the `-i inventories/prod`
+# dir gets mis-parsed as an inventory source ("not a valid group definition").
+#
 # REMOVE AT THE PHASE-2 FLIP: blank the `phase1_override` variable in the
 # ansible justfile. Prod then reverts to archon.vekn.net with push on.
 # Runbook: ../.pst/details/39-phase1-parallel-run.md
@@ -12,6 +15,8 @@
 domain_main: new.archon.vekn.net
 
 # Deploy with push OFF. Order: deploy -> VEKN seed -> legacy merge -> push
-# audit reads all-zero -> set this "true" (or blank phase1_override) and
-# redeploy. Guards against re-submitting already-ratified results during seed.
-vekn_push_enabled: "false"
+# audit reads all-zero -> set this "true" and redeploy (E-2). NB: must be the
+# literal string "true" — an empty value does NOT fall back to the vars.yml
+# default('true') (Jinja default() only fires on *undefined*, not empty), it
+# deploys push-off. Guards against re-submitting already-ratified results.
+vekn_push_enabled: "true"
