@@ -83,8 +83,9 @@ the TWDA App below:
   via `vault_feedback_github_client_id` / `vault_feedback_github_installation_id`.
 - `FEEDBACK_GITHUB_PRIVATE_KEY` is the multi-line PEM — delivered out of band exactly like
   the TWDA key (next section): the role copies `files/feedback_github_app.pem.<env>.vault`
-  to `{{ env_dir }}/feedback_github_app.pem`, and `vault_feedback_github_private_key` is set
-  to that **path**.
+  to `{{ env_dir }}/feedback_github_app.pem`, and the env var is set to that **path**,
+  **derived from `env_dir`** in `vars.yml` (`{{ env_dir }}/feedback_github_app.pem`) so it
+  can't drift from the copy destination — no per-env vault scalar for the path.
 
 Any of the three unset → `POST /api/feedback/` returns 503 (graceful degradation). Provide /
 refresh the key the same way as the TWDA key, using `feedback_github_app.pem.<env>.vault`.
@@ -99,10 +100,10 @@ is a **multi-line** secret, so it can't ride in the systemd `EnvironmentFile`
 (flat `KEY=value` lines) — it's delivered out of band, same pattern as above:
 
 - The role copies `files/twda_github_app.pem.<env>.vault` (an `ansible-vault` file)
-  to `{{ env_dir }}/twda_github_app.pem`, decrypting on the fly. Point the backend
-  at it by setting `TWDA_GITHUB_PRIVATE_KEY` to that **path** (`twda.py:_load_private_key`
-  reads the file when the value isn't inline PEM). On beta that's
-  `vault_twda_github_private_key: /etc/new_archon/twda_github_app.pem`.
+  to `{{ env_dir }}/twda_github_app.pem`, decrypting on the fly. `TWDA_GITHUB_PRIVATE_KEY`
+  is set to that **path**, **derived from `env_dir`** in `vars.yml`
+  (`{{ env_dir }}/twda_github_app.pem`) — no per-env vault scalar — so it can't drift from
+  the copy destination (`twda.py:_load_private_key` reads the file when the value isn't inline PEM).
 - Each env has its own GitHub App, so the `.beta.vault` and `.prod.vault` hold
   *different* keys (encrypted with that env's vault password).
 - The copy task uses `fileglob`, so it's a **no-op when the vault file is absent**

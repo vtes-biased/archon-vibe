@@ -104,12 +104,14 @@ backend_env:
   SNAPSHOT_DIR: "{{ app_lib_dir }}/snapshots"
   TWDA_GITHUB_CLIENT_ID: "{{ vault_twda_github_client_id | default('') }}"
   TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
-  TWDA_GITHUB_PRIVATE_KEY: "{{ vault_twda_github_private_key | default('') }}"
+  # PRIVATE_KEY is the runtime PEM path — derived from env_dir so it always matches
+  # where the role copies the vault-delivered .pem (a hardcoded path drifts per-env).
+  TWDA_GITHUB_PRIVATE_KEY: "{{ env_dir }}/twda_github_app.pem"
   # In-app feedback -> GitHub issues. Dedicated GitHub App, Issues:write on this repo.
-  # PRIVATE_KEY is a runtime PATH; the PEM is vault-delivered there (see role README).
   FEEDBACK_GITHUB_CLIENT_ID: "{{ vault_feedback_github_client_id | default('') }}"
   FEEDBACK_GITHUB_INSTALLATION_ID: "{{ vault_feedback_github_installation_id | default('') }}"
-  FEEDBACK_GITHUB_PRIVATE_KEY: "{{ vault_feedback_github_private_key | default('') }}"
+  # PRIVATE_KEY: env_dir-derived PEM path (see TWDA note above).
+  FEEDBACK_GITHUB_PRIVATE_KEY: "{{ env_dir }}/feedback_github_app.pem"
   # User-facing GitHub OAuth App (profile account-linking). Distinct from the two
   # GitHub Apps above: a client secret, no private key. Unset client id -> the
   # "Link GitHub" button degrades to a not_configured toast.
