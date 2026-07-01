@@ -16,13 +16,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from src.models import (
     DeckObject,
+    Seat,
+    Table,
+    TableState,
     Tournament,
     TournamentFormat,
     TournamentRank,
     TournamentState,
     User,
 )
-from src.routes.tournaments import _maybe_submit_twda
+from src.routes.tournaments import TWDA_MIN_PLAYERS, _maybe_submit_twda
 
 
 def _user(uid: str, name: str, vekn_id: str = "") -> User:
@@ -34,7 +37,22 @@ def _user(uid: str, name: str, vekn_id: str = "") -> User:
     )
 
 
-def _tournament(winner_uid: str) -> Tournament:
+def _finished_rounds(player_uids: list[str]) -> list[list[Table]]:
+    """One finished prelim round in 4–5 seat tables (10 players -> [5, 5]). The
+    TWDA participation gate reads seat identities only, so scores stay default."""
+    seats = [Seat(player_uid=u) for u in player_uids]
+    return [
+        [
+            Table(seating=seats[i : i + 5], state=TableState.FINISHED)
+            for i in range(0, len(seats), 5)
+        ]
+    ]
+
+
+def _tournament(winner_uid: str, *, seated: int = TWDA_MIN_PLAYERS) -> Tournament:
+    # Seat `seated` distinct players (winner included) so the participation floor
+    # is met by default; the credit tests care about the winner's deck, not counts.
+    player_uids = [winner_uid] + [f"p-{i:03d}" for i in range(seated - 1)]
     return Tournament(
         uid="t-001",
         modified=datetime(2025, 6, 1, tzinfo=UTC),
@@ -45,6 +63,7 @@ def _tournament(winner_uid: str) -> Tournament:
         start=datetime(2025, 6, 1, tzinfo=UTC),
         external_ids={"vekn": "12345"},
         winner=winner_uid,
+        rounds=_finished_rounds(player_uids),
     )
 
 
@@ -144,3 +163,21 @@ async def test_twda_sentinel_passes_author_through():
     deck = _deck(author="Historical Player", attribution="twda")
     credit = await _captured_credit(winner=winner, deck=deck, designer=None)
     assert credit == "Historical Player"
+
+
+@pytest.mark.asyncio
+async def test_below_participation_floor_skips_twda():
+    """Fewer than TWDA_MIN_PLAYERS who actually played -> the winner's deck is NOT
+    published to the public TWDA. Small sanctioned events are valid but not
+    TWDA-worthy; guards against leaking a sub-floor deck to a third-party archive."""
+    tournament = _tournament("w-001", seated=TWDA_MIN_PLAYERS - 1)
+    submit = AsyncMock(return_value="http://pr")
+    with (
+        patch(
+            "src.routes.tournaments._winner_deck_twda",
+            AsyncMock(return_value="TWDA TEXT"),
+        ),
+        patch("src.twda.submit_twda_pr", submit),
+    ):
+        await _maybe_submit_twda(tournament)
+    submit.assert_not_called()

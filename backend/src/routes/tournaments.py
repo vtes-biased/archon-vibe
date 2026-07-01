@@ -327,10 +327,32 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
     )
 
 
+# TWDA eligibility floor: the winner's deck is archived only for events with
+# enough players who ACTUALLY played (seated in >=1 round, not merely registered).
+# Smaller sanctioned events are valid but their winner's deck isn't TWDA-worthy.
+TWDA_MIN_PLAYERS = 10
+
+
+def _played_player_count(tournament: Tournament) -> int:
+    """Distinct real competitors who actually played — seated in >=1 prelim round
+    or the finals, minus non-competing proxies (officials who stood in, excluded
+    from rank/RTP; matches generate_archondata's competitor definition). Registered
+    no-shows (never seated) don't count either."""
+    proxies = {p.user_uid for p in tournament.players if p.non_competing}
+    seated: set[str] = set()
+    for rnd in tournament.rounds:
+        for table in rnd:
+            seated.update(s.player_uid for s in table.seating if s.player_uid)
+    if tournament.finals:
+        seated.update(s.player_uid for s in tournament.finals.seating if s.player_uid)
+    return len(seated - proxies)
+
+
 async def _maybe_submit_twda(tournament: Tournament) -> None:
     """Submit winner's deck to TWDA if conditions are met.
 
-    Conditions: sanctioned tournament, finished, winner has deck, has VEKN event ID.
+    Conditions: finished, sanctioned (rank != Basic), >=10 players who actually
+    played, a winner with a stored deck, and a VEKN event ID.
     """
     if tournament.state != TournamentState.FINISHED:
         return
@@ -338,6 +360,8 @@ async def _maybe_submit_twda(tournament: Tournament) -> None:
         return
     if tournament.rank == TournamentRank.BASIC:
         return  # unsanctioned
+    if _played_player_count(tournament) < TWDA_MIN_PLAYERS:
+        return  # too few participants for TWDA eligibility
     vekn_event_id = tournament.external_ids.get("vekn")
     if not vekn_event_id:
         return
@@ -500,10 +524,12 @@ async def push_vekn(
     uid: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Register a tournament with the VEKN calendar on demand (organizer action).
+    """Publish a tournament to VEKN on demand (organizer action).
 
-    The hourly batch_push only creates the event once a tournament leaves
-    'Planned' (registration opens); this lets an organizer do it earlier.
+    Registers the calendar event if needed; for a FINISHED event it also uploads
+    results (once) and submits the winner's deck to the TWDA. Lets an organizer
+    publish immediately instead of waiting for the hourly batch_push (which never
+    retries the TWDA submission, so a same-session event could otherwise miss it).
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -521,34 +547,52 @@ async def push_vekn(
             status_code=400, detail="Open-rounds events are not reported to VEKN"
         )
 
-    if tournament.external_ids.get("vekn"):
-        # Already registered — idempotent no-op.
-        return Response(
-            content=encoder.encode(tournament), media_type="application/json"
-        )
-
     from ..vekn_api import VEKNAPIConnectionError
-    from ..vekn_push import push_tournament_event, vekn_push_client
+    from ..vekn_push import (
+        push_tournament_event,
+        push_tournament_results,
+        vekn_push_client,
+    )
 
     try:
         async with vekn_push_client() as client:
             if client is None:
                 raise HTTPException(status_code=400, detail="VEKN sync is not enabled")
-            # push_tournament_event saves external_ids.vekn + broadcasts on success.
-            event_id = await push_tournament_event(client, tournament)
+            # 1. Register the calendar event if it isn't on VEKN yet.
+            if not tournament.external_ids.get("vekn"):
+                # push_tournament_event saves external_ids.vekn + broadcasts on success.
+                event_id = await push_tournament_event(client, tournament)
+                if not event_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "VEKN sync failed — needs a name (≥3 chars), a start "
+                            "date, and an organizer with a VEKN ID"
+                        ),
+                    )
+                tournament = await get_tournament_by_uid(uid) or tournament
+            # 2. A finished event also uploads results (once) + the winner's TWDA
+            #    deck, so publishing a same-session event doesn't wait for (or get
+            #    missed by) the hourly batch_push.
+            if tournament.state == TournamentState.FINISHED:
+                if not tournament.vekn_pushed_at:
+                    # A manual publish must report a real outcome — don't swallow a
+                    # failed results push (e.g. a finalist with no VEKN ID) as success.
+                    if not await push_tournament_results(client, tournament):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "Results couldn't be published to VEKN — check that "
+                                "every player (including finalists) has a VEKN ID, "
+                                "then try again."
+                            ),
+                        )
+                    tournament = await get_tournament_by_uid(uid) or tournament
+                await _maybe_submit_twda(tournament)
     except VEKNAPIConnectionError as e:
         raise HTTPException(
             status_code=502, detail="VEKN API is unavailable, try again later"
         ) from e
-
-    if not event_id:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "VEKN sync failed — needs a name (≥3 chars), a start date, and an "
-                "organizer with a VEKN ID"
-            ),
-        )
 
     updated = await get_tournament_by_uid(uid) or tournament
     return Response(content=encoder.encode(updated), media_type="application/json")

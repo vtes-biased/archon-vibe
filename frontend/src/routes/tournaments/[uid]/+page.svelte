@@ -305,8 +305,18 @@ import TournamentModals from "./TournamentModals.svelte";
   const archonImportItem = $derived({ label: m.archon_import_title(), icon: Upload, onclick: () => (showArchonImport = true) });
 
   let syncingVekn = $state(false);
+  // VEKN needs a round count to register an event: require it configured (a
+  // running/finished event already has rounds; a Planned one needs max_rounds).
+  const roundsConfigured = $derived(
+    (tournament?.rounds?.length ?? 0) > 0 || (tournament?.max_rounds ?? 0) > 0
+  );
   async function doSyncVekn() {
     if (!tournament || syncingVekn) return; // guard double-click: avoids a duplicate VEKN event
+    if (!roundsConfigured) {
+      // Stay visible + explain rather than silently disappear (mobile has no hover).
+      showToast({ type: 'error', message: m.vekn_sync_rounds_required() });
+      return;
+    }
     syncingVekn = true;
     try {
       const updated = await syncTournamentVekn(tournament.uid);
@@ -318,10 +328,14 @@ import TournamentModals from "./TournamentModals.svelte";
       syncingVekn = false;
     }
   }
-  // "Sync to VEKN" — register the calendar event on demand (e.g. before opening
-  // registration). Hidden once pushed, and for non-VEKN open-rounds events.
+  // "Publish to VEKN" — register the calendar event on demand, and for a finished
+  // event also push results + the winner's TWDA deck. Shown whenever push is on and
+  // the event isn't fully on VEKN yet (never silently absent — an unconfigured round
+  // count is explained on click, not hidden). Not for non-VEKN open-rounds events.
   const syncVeknItem = $derived(
-    veknPush && !tournament?.external_ids?.vekn && !tournament?.open_rounds && !tournament?.self_organized_rounds
+    veknPush && !tournament?.open_rounds && !tournament?.self_organized_rounds
+      && (!tournament?.external_ids?.vekn
+          || (tournament?.state === "Finished" && !tournament?.vekn_pushed_at))
       ? { label: m.vekn_sync_action(), icon: CloudUpload, onclick: () => doSyncVekn(), disabled: actionLoading || syncingVekn }
       : null
   );

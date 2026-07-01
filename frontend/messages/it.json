@@ -980,6 +980,7 @@
   "vekn_sync_action": "Sincronizza con la VEKN",
   "vekn_sync_success": "Torneo registrato presso la VEKN.",
   "vekn_sync_error": "Sincronizzazione con la VEKN non riuscita.",
+  "vekn_sync_rounds_required": "Configuri il numero di round prima di pubblicare sulla VEKN.",
   "archon_import_description": "Importa i risultati da un foglio di calcolo Archon storico (.xlsx). Tutti i giocatori devono avere VEKN ID validi.",
   "archon_download_template": "Scarica il modello vuoto",
   "archon_upload_file": "Importa",
