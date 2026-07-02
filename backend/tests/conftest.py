@@ -44,9 +44,23 @@ def _ensure_test_db_exists() -> None:
 # Auto-create test database before any test collection
 _ensure_test_db_exists()
 
+# migrate_from_archon.py is a prod-standalone script: it imports the package by its
+# installed name (`backend.src.*`), while this harness sets it up as top-level `src.*`
+# (backend/ on sys.path). Alias so both names resolve to ONE module object — otherwise
+# `backend.src.db` and `src.db` are distinct modules with separate _pool globals and the
+# script's db calls never see test_db()'s init_db().
+import importlib
+import types
+
 from src import db
 from src.main import app
 from src.routes.auth import create_access_token
+
+sys.modules.setdefault("backend", types.ModuleType("backend"))
+sys.modules["backend"].src = sys.modules["src"]
+sys.modules["backend.src"] = sys.modules["src"]
+for _mod in ("db", "models", "vekn_sync"):
+    sys.modules[f"backend.src.{_mod}"] = importlib.import_module(f"src.{_mod}")
 
 from tests.mock_vekn_data import generate_mock_users
 
