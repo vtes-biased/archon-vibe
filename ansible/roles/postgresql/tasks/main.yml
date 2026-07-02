@@ -73,17 +73,33 @@
   become: true
   become_user: postgres
 
-- name: Apply PostgreSQL tunings
+# shared_buffers + max_connections only take effect on a full restart (SIGHUP
+# reload ignores them), so they get their own task with the restart handler.
+- name: Apply PostgreSQL tunings (restart-required)
   community.postgresql.postgresql_alter_system:
     param: "{{ item.key }}"
     value: "{{ item.value }}"
-  loop: "{{ postgresql_tunings | dict2items }}"
+  loop: "{{ postgresql_restart_tunings | dict2items }}"
   vars:
-    postgresql_tunings:
+    postgresql_restart_tunings:
+      shared_buffers: "{{ postgresql_shared_buffers }}"
+      max_connections: "{{ postgresql_max_connections }}"
+  become: true
+  become_user: postgres
+  notify: Restart postgresql
+
+- name: Apply PostgreSQL tunings (reload)
+  community.postgresql.postgresql_alter_system:
+    param: "{{ item.key }}"
+    value: "{{ item.value }}"
+  loop: "{{ postgresql_reload_tunings | dict2items }}"
+  vars:
+    postgresql_reload_tunings:
       log_destination: syslog
       statement_timeout: "{{ postgresql_statement_timeout_ms }}"
       lock_timeout: "{{ postgresql_lock_timeout_ms }}"
       idle_in_transaction_session_timeout: "{{ postgresql_idle_in_transaction_timeout_ms }}"
+      effective_cache_size: "{{ postgresql_effective_cache_size }}"
   become: true
   become_user: postgres
   notify: Reload postgresql

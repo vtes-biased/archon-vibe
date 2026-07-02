@@ -1,4 +1,9 @@
 ---
+# Swap first so the box has headroom before the heavier apt/python steps.
+- name: Import swap tasks
+  ansible.builtin.import_tasks: swap.yml
+  when: swapfile_enabled | bool
+
 - name: Import packages tasks
   ansible.builtin.import_tasks: packages.yml
 

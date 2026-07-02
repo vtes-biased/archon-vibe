@@ -49,6 +49,12 @@ postgresql_version: 17
 python_version: "3.14"
 uv_python_install_dir: /opt/uv/python
 
+# --- host resources -------------------------------------------------------
+# Tiny VPS (~945MB RAM, 1 vCPU) → codify a swap safety-net so it survives a
+# reprovision. No-op against the swap already added by hand (won't reformat or
+# resize a live swapfile); mainly ensures the fstab entry + swappiness.
+swapfile_enabled: true
+
 # --- database -------------------------------------------------------------
 # Distinct role from legacy archon's `archon` PG role: both stacks share one
 # PG17 cluster during the parallel run, and reusing `archon` would reset its
@@ -56,6 +62,16 @@ uv_python_install_dir: /opt/uv/python
 db_name: archon
 db_user: archonvibe
 db_password: "{{ vault_db_password }}"
+
+# PG footprint trimmed for the tiny VPS (~945MB RAM, 1 vCPU) shared by both
+# stacks during the parallel run: free RAM for the two Python apps, cap live
+# backends. Small DB → OS page cache covers what shared_buffers gives up.
+# shared_buffers + max_connections take effect on the next PG restart (the
+# role's Restart handler; a one-time blip). effective_cache_size is a planner
+# hint only. max_connections covers new(≤20) + legacy(≤20) + merge + reserved.
+postgresql_shared_buffers: 96MB
+postgresql_max_connections: 60
+postgresql_effective_cache_size: 384MB
 
 # --- legacy-archon merge (parallel run; remove at Phase-4 decommission) ----
 # Reads legacy `archondb` (role `archon`) over the socket via peer auth (the unit
@@ -75,6 +91,9 @@ backend_env:
   FRONTEND_URL: "{{ site_url_base }}"
   API_BASE_URL: "{{ site_url_base }}"
   DATABASE_URL: "postgresql://{{ db_user }}:{{ db_password }}@/{{ db_name }}?host=/var/run/postgresql"
+  # One async worker; 8 PG backends is ample for the officials load and keeps
+  # the pool's memory bounded on the tiny shared box (default is 20).
+  DB_POOL_MAX_SIZE: 8
   # --- mail ---------------------------------------------------------------
   MAIL_SERVER: smtp.gmail.com
   MAIL_PORT: 587

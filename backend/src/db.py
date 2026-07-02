@@ -55,6 +55,11 @@ DB_URL = os.getenv(
     "postgresql://archon:archon_dev_password@localhost:5433/archon",
 )
 
+# Pool ceiling. One async uvicorn worker, so this bounds the backend's PG
+# backends (~5-10MB RSS each). Lowered via env on the memory-constrained prod
+# box that shares one cluster with legacy archon; beta/dev keep the default.
+POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "20"))
+
 # Global connection pool
 _pool: AsyncConnectionPool | None = None
 
@@ -93,7 +98,7 @@ async def init_db() -> None:
     _pool = AsyncConnectionPool(
         conninfo=DB_URL,
         min_size=2,
-        max_size=20,
+        max_size=POOL_MAX_SIZE,
         open=False,
         kwargs={"autocommit": True},
     )

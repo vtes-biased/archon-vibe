@@ -3,3 +3,10 @@ postgresql_version: 17
 postgresql_statement_timeout_ms: 30000
 postgresql_lock_timeout_ms: 5000
 postgresql_idle_in_transaction_timeout_ms: 300000
+
+# Memory/connection footprint — PG stock defaults here; overridden per-inventory
+# for constrained boxes (prod is a ~945MB/1-vCPU VPS sharing the cluster with
+# legacy archon). shared_buffers + max_connections need a PG RESTART to apply.
+postgresql_shared_buffers: 128MB
+postgresql_max_connections: 100
+postgresql_effective_cache_size: 4GB
