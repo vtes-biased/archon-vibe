@@ -12,6 +12,9 @@
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+  // Subscription URLs get pasted into external calendar apps, so they must be
+  // absolute — prod builds set VITE_API_URL='' (same-origin), leaving API_BASE empty.
+  const CALENDAR_BASE = API_BASE || window.location.origin;
 
   let tournaments = $state<Tournament[]>([]);
   let totalCount = $state(0);
@@ -187,7 +190,7 @@
   // Calendar helpers
   const calendarUrl = $derived.by(() => {
     if (viewMode === "agenda" && auth.user?.calendar_token) {
-      return `${API_BASE}/api/calendar/tournaments.ics?token=${auth.user.calendar_token}`;
+      return `${CALENDAR_BASE}/api/calendar/tournaments.ics?token=${auth.user.calendar_token}`;
     }
     const params = new URLSearchParams();
     if (selectedCountry && selectedCountry !== "all") {
@@ -197,7 +200,7 @@
       params.set("online", "false");
     }
     const qs = params.toString();
-    return `${API_BASE}/api/calendar/tournaments.ics${qs ? '?' + qs : ''}`;
+    return `${CALENDAR_BASE}/api/calendar/tournaments.ics${qs ? '?' + qs : ''}`;
   });
 
   async function handleGenerateCalendarToken() {
