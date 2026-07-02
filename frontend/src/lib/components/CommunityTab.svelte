@@ -11,7 +11,7 @@
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunitySocialSection from "./CommunitySocialSection.svelte";
   import CommunityContentSection from "./CommunityContentSection.svelte";
-  import DiscordIcon from "./DiscordIcon.svelte";
+  import DiscordContact from "./DiscordContact.svelte";
   import { ChevronDown, ChevronRight, Globe, Hash, Pencil, Search, Users, Video } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -378,15 +378,7 @@
                               <a href="mailto:{email}" class="text-link hover:text-link-soft">{email}</a>
                             {/if}
                             {#if official.discord_id}
-                              <a
-                                href="https://discord.com/users/{official.discord_id}"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1 text-link hover:text-link-soft"
-                              >
-                                <DiscordIcon class="w-3.5 h-3.5" />
-                                <span>{official.contact_discord || "Discord"}</span>
-                              </a>
+                              <DiscordContact discordId={official.discord_id} username={official.contact_discord} />
                             {/if}
                             {#if phone}
                               {#if official.phone_is_whatsapp}

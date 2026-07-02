@@ -8,8 +8,9 @@
 ## Tone & Register
 - Semi-formal throughout, no slang. VTES game terms (Methuselah, Crypt, Pool, Torper…) use official Black Chantry rulebook translations — check blackchantry.com/utilities/rulebook/ before coining one; flag uncertain terms for human review.
 - Organizer/management UI (offline session, force-unlock, takeover): plain administrative language, no game flavour.
-- Form of address: es "usted", pt "você" (not "tu"), it "Lei", fr vouvoiement — formal throughout.
+- Form of address: es "usted", pt "você" (not "tu"), fr vouvoiement — formal throughout. **it uses informal "tu"** (not "Lei" — verified across it.json: "puoi", "hai", "premi", "vai al profilo", imperatives like "Attiva"/"Raduna"/"Apri"; a prior version of this memory wrongly said "Lei", corrected 2026-07-02).
 - "check-in" is a loanword kept as-is in es/pt/it (pt "check-in realizado" = confirmed); fr uses Enregistrement/Pointer. Don't render "failed" as "denied" (camera errors) — use "failed access" phrasing.
+- Referencing a named UI feature/button inline in a sentence (own app or third-party, e.g. Discord's "Add Friend"): wrap in the locale's quote convention — fr `« text »` (guillemets + non-breaking space), es/it `«text»` (guillemets, no space), pt `“text”` (curly quotes). Source `en.json` sometimes uses curly quotes too (see `notifications_ios_body`). For third-party product features (Discord, etc.), use that product's own localized UI term per language, not a literal translation — verify via web search if unsure (e.g. Discord's "Add Friend" = fr "Ajouter un ami", es "Añadir amigo", pt-BR "Adicionar amigo", it "Aggiungi amico").
 
 ## VTES / UI Term Glossary (verified from existing locale files; `—` = not yet recorded, derive from en + rulebook)
 | en | fr | es | pt | it |

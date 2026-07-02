@@ -11,6 +11,7 @@
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
+  import DiscordContact from "./DiscordContact.svelte";
   import Button from '$lib/components/Button.svelte';
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -601,7 +602,7 @@
               {/if}
               {#if user.discord_id}
                 <div class="text-sm">
-                  <a href="https://discord.com/users/{user.discord_id}" target="_blank" rel="noopener noreferrer" class="text-link hover:text-link-soft">{m.profile_contact_discord()}: {user.contact_discord || "Discord"}</a>
+                  <DiscordContact discordId={user.discord_id} username={user.contact_discord} />
                 </div>
               {/if}
               {#if phone}
