@@ -165,7 +165,9 @@ needed: OLD (`archondb`) connects via **peer auth** (unit runs as OS `archon` �
 PG role `archon`; verified reads 19,034 rows), NEW writes as `archonvibe` (scram,
 existing `vault_db_password`). Principal-engineer reviewed (no blockers; the
 memory caps were the key add; peer-for-OLD found in pre-flight, dropped the secret).
-**Still TODO (daily-automation safety):** the ~18k cutover check is a manual
-pre-flight, NOT in the script — for unattended daily runs, add a guard that aborts
-the merge if the new DB's vekn-account count is implausibly low (a half-failed
-VEKN sync could otherwise let the 04:00 merge write under wrong uids).
+### CLOSED 2026-07-02 — unattended-merge count guard DROPPED (owner decision)
+The proposed in-script guard (abort the merge if the new DB's vekn-account count
+is implausibly low) is not worth building: prod is live and seeded above 18k
+accounts and won't regress below it, and the whole legacy sync is decommissioned
+with the end of the parallel run (#42). The ~18k check stays what it was — a
+one-time manual cutover pre-flight, already satisfied.

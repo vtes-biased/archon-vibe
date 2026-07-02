@@ -12,8 +12,8 @@ roles-in-new-app). Box: **1 vCPU / 945 MB** Xen VPS + 4 GB swap (undersized —
 **NOW:** run for ~2 weeks and watch the **F exit criteria** (below) on real
 events. When they hold → proceed to **#40 Phase-2 flip**. Deferred during the run:
 **#346** (post-cutover push of stuck legacy event 13379), #344 (resize box), #343
-(warning-free deploys), #345 (calendar URL), #115 residual TODO (unattended-merge
-cutover-gate). Prod-guild bot install + Discord portal for archon.vekn.net = #41.
+(warning-free deploys), #345 (calendar URL). Prod-guild bot install + Discord
+portal for archon.vekn.net = #41.
 
 **⚠️ UNDEPLOYED on prod (local `main`, unpushed as of 2026-07-01):** the deploy
 above is live, but local `main` is **ahead of what's running** — the next
@@ -50,7 +50,7 @@ stamped `vekn_synced` → **post-flip re-audit Q1=Q2=Q3=0**. Push behaving.
 Linked Roles working (3 metadata ladders, `>=` thresholds, no Ethics field).
 **E-4 DONE**: IC admins notified. → Phase-1 bring-up complete; now watching F.
 
-**Open tickets:** #344 (resize prod — strong case now: 1 vCPU/945 MB vs beta 6/11.4 GB; or trim PG) · #343 (warning-free deploys) · #115 wip (runner DONE; remaining TODO = add the ~18k cutover-gate to the script for unattended daily safety, then close) · #41/#24 (Discord portal, Phase 3). Optional: clean prod disk-read benchmark (skipped during merge).
+**Open tickets:** #344 (resize prod — strong case now: 1 vCPU/945 MB vs beta 6/11.4 GB; or trim PG) · #343 (warning-free deploys) · #41/#24 (Discord portal, Phase 3). Optional: clean prod disk-read benchmark (skipped during merge). (#115 closed 2026-07-02 — runner done; the unattended-merge count guard was dropped, owner decision.)
 
 ---
 
