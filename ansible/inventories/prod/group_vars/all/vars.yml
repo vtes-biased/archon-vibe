@@ -93,7 +93,7 @@ db_backup_enabled: true
 db_backup_dir: /var/backups/postgres
 db_backup_retention_days: 7
 db_backup_oncalendar: "*-*-* 03:00:00"
-db_backup_check_oncalendar: "Web *-*-* 06:00:00"
+db_backup_check_oncalendar: "Wed *-*-* 06:00:00"
 # Failure alerting (dead-man's switch): set vault_db_backup_healthcheck_url +
 # vault_db_backup_check_healthcheck_url in vault.yml (ping UUIDs are
 # capability URLs; the repo is public) to healthchecks.io-style check URLs —
