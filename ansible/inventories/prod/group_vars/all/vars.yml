@@ -83,6 +83,33 @@ legacy_db_name: archondb
 merge_backup_dir: /var/lib/archon/merge-backups
 legacy_sync_oncalendar: "*-*-* 04:00:00"
 
+# --- database backups -------------------------------------------------------
+# Daily cluster-wide pg_dump (covers `archon` AND legacy `archondb` while the
+# parallel run lasts; decommission needs no config change) + weekly
+# restore-verify, mirroring server-setup's mechanism on frankfurt. 03:00 lands
+# a restore point right before the 04:00 legacy merge — the riskiest daily
+# write — with no contention on the 1-vCPU box.
+db_backup_enabled: true
+db_backup_dir: /var/backups/postgres
+db_backup_retention_days: 7
+db_backup_oncalendar: "*-*-* 03:00:00"
+db_backup_check_oncalendar: "Web *-*-* 06:00:00"
+# Failure alerting (dead-man's switch): set vault_db_backup_healthcheck_url +
+# vault_db_backup_check_healthcheck_url in vault.yml (ping UUIDs are
+# capability URLs; the repo is public) to healthchecks.io-style check URLs —
+# success pings GET them, failures GET <url>/fail, and a backup that silently
+# stops running alerts by ABSENCE of pings. Empty = no pings (journald only).
+# Off-box push via restic -> S3 (frankfurt parity; local-only until the bucket
+# exists). To flip on: create the Scaleway bucket + an API key scoped to it,
+# add vault_remote_backup_{access_key,secret_key,restic_password} to vault.yml,
+# then set true — the deploy asserts the secrets when enabled.
+db_backup_remote_enabled: true
+db_backup_remote_bucket: "archon-db-backups"
+db_backup_remote_endpoint: "https://s3.fr-par.scw.cloud"
+db_backup_remote_keep_daily: 7
+db_backup_remote_keep_weekly: 4
+db_backup_remote_keep_monthly: 12
+
 # --- backend env vars -----------------------------------------------------
 backend_env:
   PYTHONOPTIMIZE: 1

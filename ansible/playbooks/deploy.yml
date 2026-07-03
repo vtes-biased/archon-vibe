@@ -88,3 +88,25 @@
         new_db_name: "{{ db_name }}"
         merge_backup_dir: "{{ merge_backup_dir | default('/var/lib/archon/merge-backups') }}"
         oncalendar: "{{ legacy_sync_oncalendar | default('*-*-* 04:00:00') }}"
+
+    # 6. Daily cluster-wide DB backup (pg_dump of every DB — new `archon` AND
+    # legacy `archondb` while the parallel run lasts) + weekly restore-verify.
+    # Optional off-box push via restic -> S3. Gated by db_backup_enabled.
+    - role: db_backup
+      when: db_backup_enabled | default(false) | bool
+      r:
+        backup_dir: "{{ db_backup_dir | default('/var/backups/postgres') }}"
+        retention_days: "{{ db_backup_retention_days | default(7) }}"
+        oncalendar: "{{ db_backup_oncalendar | default('*-*-* 03:00:00') }}"
+        check_oncalendar: "{{ db_backup_check_oncalendar | default('Sun *-*-* 06:00:00') }}"
+        remote_enabled: "{{ db_backup_remote_enabled | default(false) }}"
+        remote_bucket: "{{ db_backup_remote_bucket | default('') }}"
+        remote_endpoint: "{{ db_backup_remote_endpoint | default('https://s3.fr-par.scw.cloud') }}"
+        remote_keep_daily: "{{ db_backup_remote_keep_daily | default(7) }}"
+        remote_keep_weekly: "{{ db_backup_remote_keep_weekly | default(4) }}"
+        remote_keep_monthly: "{{ db_backup_remote_keep_monthly | default(12) }}"
+        remote_access_key: "{{ vault_remote_backup_access_key | default('') }}"
+        remote_secret_key: "{{ vault_remote_backup_secret_key | default('') }}"
+        remote_restic_password: "{{ vault_remote_backup_restic_password | default('') }}"
+        healthcheck_url: "{{ vault_db_backup_healthcheck_url | default('') }}"
+        check_healthcheck_url: "{{ vault_db_backup_check_healthcheck_url | default('') }}"

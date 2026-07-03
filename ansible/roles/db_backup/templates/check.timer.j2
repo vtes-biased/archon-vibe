@@ -1,0 +1,11 @@
+[Unit]
+Description=Scheduled restore-verify of postgres backups
+
+[Timer]
+OnCalendar={{ r.check_oncalendar }}
+Persistent=true
+RandomizedDelaySec=30m
+Unit=postgres-backup-check.service
+
+[Install]
+WantedBy=timers.target

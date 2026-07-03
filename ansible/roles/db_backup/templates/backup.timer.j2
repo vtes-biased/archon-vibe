@@ -1,0 +1,13 @@
+[Unit]
+Description=Scheduled pg_dump backup of every database in the cluster
+
+[Timer]
+OnCalendar={{ r.oncalendar }}
+Persistent=true
+# Short jitter so a delayed start still lands well before the box's next
+# timer (the 04:00 legacy merge) — the backup is its pre-merge restore point.
+RandomizedDelaySec=15m
+Unit=postgres-backup.service
+
+[Install]
+WantedBy=timers.target

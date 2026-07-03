@@ -1,0 +1,153 @@
+---
+# Daily cluster-wide postgres backup on the prod box, mirroring server-setup's
+# mechanism on frankfurt (scripts kept in sync with that repo): pg_dump -F c of
+# every non-template DB — so it covers both `archon` and legacy `archondb`
+# while the parallel run coexists, and the Phase-4 decommission needs no config
+# change — local prune after retention_days, optional restic push to S3, and a
+# weekly restore-verify round-trip. Runs as postgres (peer auth, no password).
+- name: Assert required inputs
+  ansible.builtin.assert:
+    that:
+      - r.backup_dir is defined
+      - r.retention_days is defined
+      - r.oncalendar is defined
+      - r.check_oncalendar is defined
+    fail_msg: "db_backup role missing required r.* inputs"
+
+- name: Assert remote backup secrets are present
+  ansible.builtin.assert:
+    that:
+      - r.remote_access_key | default('') | length > 0
+      - r.remote_secret_key | default('') | length > 0
+      - r.remote_restic_password | default('') | length > 0
+      - r.remote_bucket | default('') | length > 0
+    fail_msg: >-
+      db_backup_remote_enabled=true requires vault_remote_backup_access_key,
+      vault_remote_backup_secret_key and vault_remote_backup_restic_password
+      in vault.yml, and db_backup_remote_bucket in inventory
+  when: r.remote_enabled | default(false) | bool
+
+- name: Install restic
+  ansible.builtin.apt:
+    name: restic
+    state: present
+  when: r.remote_enabled | default(false) | bool
+
+- name: Ensure backup dir exists
+  ansible.builtin.file:
+    path: "{{ r.backup_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+
+- name: Ensure backup config dir exists
+  ansible.builtin.file:
+    path: /etc/postgres-backup
+    state: directory
+    owner: root
+    group: postgres
+    mode: "0750"
+
+- name: Write healthcheck ping URLs
+  # Capability URLs (healthchecks.io-style ping UUIDs) — vault-held since the
+  # repo is public; scripts no-op without the file (units load it with `-`).
+  ansible.builtin.copy:
+    content: |
+      BACKUP_HEALTHCHECK_URL={{ r.healthcheck_url | default('') }}
+      CHECK_HEALTHCHECK_URL={{ r.check_healthcheck_url | default('') }}
+    dest: /etc/postgres-backup/healthcheck.env
+    owner: root
+    group: postgres
+    mode: "0640"
+  when: >-
+    (r.healthcheck_url | default('') | length > 0)
+    or (r.check_healthcheck_url | default('') | length > 0)
+  no_log: true
+
+- name: Write remote backup credentials
+  ansible.builtin.copy:
+    content: |
+      AWS_ACCESS_KEY_ID={{ r.remote_access_key }}
+      AWS_SECRET_ACCESS_KEY={{ r.remote_secret_key }}
+      RESTIC_PASSWORD={{ r.remote_restic_password }}
+      RESTIC_REPOSITORY_BASE=s3:{{ r.remote_endpoint }}/{{ r.remote_bucket }}
+      REMOTE_KEEP_DAILY={{ r.remote_keep_daily }}
+      REMOTE_KEEP_WEEKLY={{ r.remote_keep_weekly }}
+      REMOTE_KEEP_MONTHLY={{ r.remote_keep_monthly }}
+    dest: /etc/postgres-backup/remote.env
+    owner: root
+    group: postgres
+    mode: "0640"
+  when: r.remote_enabled | default(false) | bool
+  no_log: true
+
+- name: Install pg-backup script
+  ansible.builtin.copy:
+    src: pg-backup.sh
+    dest: /usr/local/bin/pg-backup
+    owner: root
+    group: postgres
+    mode: "0750"
+
+- name: Install pg-backup-check script
+  ansible.builtin.copy:
+    src: pg-backup-check.sh
+    dest: /usr/local/bin/pg-backup-check
+    owner: root
+    group: postgres
+    mode: "0750"
+
+- name: Render backup service unit (oneshot)
+  ansible.builtin.template:
+    src: backup.service.j2
+    dest: /etc/systemd/system/postgres-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd (db_backup)
+
+- name: Render backup timer unit (daily)
+  ansible.builtin.template:
+    src: backup.timer.j2
+    dest: /etc/systemd/system/postgres-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd (db_backup)
+
+- name: Render backup-check service unit (oneshot)
+  ansible.builtin.template:
+    src: check.service.j2
+    dest: /etc/systemd/system/postgres-backup-check.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd (db_backup)
+
+- name: Render backup-check timer unit (weekly)
+  ansible.builtin.template:
+    src: check.timer.j2
+    dest: /etc/systemd/system/postgres-backup-check.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd (db_backup)
+
+- name: Enable + start the backup timer
+  ansible.builtin.systemd:
+    name: postgres-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  # Skipped under --check: the unit files aren't materialized in check mode, so
+  # systemctl can't find the timer to enable it. Runs for real on deploy.
+  when: not ansible_check_mode
+
+- name: Enable + start the backup-check timer
+  ansible.builtin.systemd:
+    name: postgres-backup-check.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode

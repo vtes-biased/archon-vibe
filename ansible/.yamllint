@@ -22,4 +22,4 @@ ignore: |
   .ansible/
   .ansible_facts/
   galaxy_collections/
-  inventories/*/group_vars/vault.yml
+  inventories/*/group_vars/all/vault.yml
