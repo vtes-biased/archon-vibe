@@ -20,6 +20,7 @@ import time
 from typing import Literal
 
 import aiohttp
+import jwt
 import msgspec
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -188,9 +189,11 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
                         detail="Could not file feedback right now; please try again later",
                     )
                 data = json.loads(text)
-    # ValueError = token fetch returned non-201 (github_app.get_installation_token).
-    except (aiohttp.ClientError, TimeoutError, ValueError):
-        logger.exception("Feedback issue creation transport error")
+    # ValueError = token fetch returned non-201 (github_app.get_installation_token);
+    # OSError = unreadable key file (load_private_key); PyJWTError = bad key content
+    # (create_jwt). All degrade to the same clean 502 instead of a raw 500.
+    except (aiohttp.ClientError, TimeoutError, ValueError, OSError, jwt.PyJWTError):
+        logger.exception("Feedback issue creation error")
         raise HTTPException(
             status_code=502,
             detail="Could not file feedback right now; please try again later",

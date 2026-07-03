@@ -19,13 +19,17 @@ GH_API_VERSION = "2022-11-28"
 
 def load_private_key(key: str) -> str:
     """Resolve a GitHub App private key from an env value: inline PEM, or a path
-    to a .pem file (the multi-line secret is vault-delivered to a runtime path)."""
-    if not key:
-        return ""
-    if not key.startswith("-----") and os.path.isfile(key):
-        with open(key) as f:
-            return f.read()
-    return key
+    to a .pem file (the multi-line secret is vault-delivered to a runtime path).
+
+    A non-PEM value MUST be a readable file: falling through with the path string
+    would surface later as PyJWT's cryptic InvalidKeyError instead of naming the
+    misconfigured path. Raises OSError (FileNotFoundError/PermissionError)."""
+    if not key or key.startswith("-----"):
+        return key
+    if not os.path.isfile(key):
+        raise FileNotFoundError(f"GitHub App private key file not found: {key}")
+    with open(key) as f:
+        return f.read()
 
 
 def create_jwt(client_id: str, private_key: str) -> str:
