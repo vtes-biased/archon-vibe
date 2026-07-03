@@ -1,14 +1,14 @@
 #!/bin/bash
-# Weekly integrity check of postgres backups. Adapted from server-setup's
-# files/pg-backup-check.sh, with a local mode added (upstream is remote-only)
-# and cleanup restructured (upstream's RETURN traps abort multi-DB runs).
+# Weekly integrity check of postgres backups. Kept in sync with server-setup's
+# files/pg-backup-check.sh — sole divergence: createdb pins UTF8/C.UTF-8 here
+# (how roles/postgresql creates the real DBs); upstream uses cluster defaults.
 #
 # Remote mode (RESTIC_REPOSITORY_BASE set), two passes per DB:
 #   1. `restic check --read-data-subset=1/10` — samples 10% of pack files and
 #      fully decodes them, catching bit-rot in the restic repo itself.
 #   2. Restore round-trip of the latest snapshot (see below).
 # Local mode (no remote configured): round-trip the newest local dump in
-# BACKUP_DIR instead, so restores are still proven before off-box is enabled.
+# BACKUP_DIR instead, so restores are still proven before remote is enabled.
 #
 # The round-trip restores into a throwaway `pg_check_<db>` database, asserts
 # at least one user table, then drops it — catches the failure mode where the
@@ -60,10 +60,10 @@ restore_dump_inner() {
     local tmpdb="pg_check_$db"
 
     # The round-trip transiently materializes a full copy of the DB inside
-    # PGDATA — on the disk-tight prod box, filling that filesystem would crash
-    # the live cluster serving both stacks. Require 5x the compressed dump
-    # size free (custom-format dumps expand several-fold on restore); a skip
-    # is a FAILED verify, so it stays loud instead of rotting silently.
+    # PGDATA — filling that filesystem would crash the live cluster. Require
+    # 5x the compressed dump size free (custom-format dumps expand several-
+    # fold on restore); a skip is a FAILED verify, so it stays loud instead
+    # of rotting silently.
     local pgdata avail_kb need_kb
     pgdata=$(/usr/bin/psql -tAc "SHOW data_directory")
     avail_kb=$(/usr/bin/df -Pk "$pgdata" | /usr/bin/awk 'NR==2 {print $4}')

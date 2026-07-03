@@ -1,9 +1,9 @@
 #!/bin/bash
 # Cluster-wide postgres backup — iterates every non-template database in the
-# cluster, dumps each to its own file (pg_dump -F c), optionally uploads to
-# S3-compatible storage via restic (one repo per DB), and prunes locally.
-# Adapted from server-setup's files/pg-backup.sh; additions worth porting back
-# upstream: the globals dump, the healthcheck ping, the factored restic_push.
+# cluster, dumps each to its own file (pg_dump -F c), dumps cluster globals
+# (pg_dumpall --globals-only), optionally uploads to S3-compatible storage via
+# restic (one repo per DB, plus one for globals), and prunes locally.
+# Kept in sync with server-setup's files/pg-backup.sh (frankfurt runs that copy).
 #
 # Per-DB progress is logged via `logger -t <db>` so journald filtering picks it
 # up alongside the app's other syslog streams. pg_dump / restic stderr lands
@@ -107,7 +107,7 @@ backup_globals || FAIL=1
 
 # Dead-man's switch: a backup that silently stops running pages by ABSENCE of
 # the success ping; failures ping the /fail endpoint for immediate alerting.
-# No-op when the URL is unset (no healthchecks account wired yet).
+# No-op when the URL is unset.
 if [ -n "${BACKUP_HEALTHCHECK_URL:-}" ]; then
     [ "$FAIL" -eq 0 ] && HC_URL="$BACKUP_HEALTHCHECK_URL" || HC_URL="$BACKUP_HEALTHCHECK_URL/fail"
     /usr/bin/curl -fsS -m 10 --retry 3 -o /dev/null "$HC_URL" \
