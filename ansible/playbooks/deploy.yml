@@ -2,14 +2,18 @@
 - name: Deploy archon app (backend + frontend + bot)
   hosts: archon
   become: true
-  gather_facts: true
+  gather_facts: false  # no deploy-path role reads gathered facts; saves the setup round trip
 
   vars_files:
     - ../vars/release_artifacts.yml
 
+  # Quick lane: `--tags app` (QUICK=1 in the justfile) ships artifacts only —
+  # the [app] roles below run whole, untagged provisioning roles are skipped.
+  # Any nginx/TLS/db/unit change needs the full (default, untagged) deploy.
   pre_tasks:
     - name: Fetch release artifacts (shared)
       ansible.builtin.import_tasks: ../tasks/fetch_release.yml
+      tags: [always]
 
   roles:
     # 1. TLS certs for main + bot domain (certbot webroot, idempotent)
@@ -24,6 +28,7 @@
 
     # 2. Backend uvicorn service (localhost only; the static_site vhost proxies to it)
     - role: fastapi_backend
+      tags: [app]
       r:
         service_name: "{{ backend_service }}"
         site_root: "{{ backend_site_root }}"
@@ -44,6 +49,7 @@
 
     # 3. Frontend static site + nginx vhost for the main domain (proxies backend)
     - role: static_site
+      tags: [app]
       r:
         server_name: "{{ domain_main }}"
         site_root: "{{ frontend_site_root }}"
@@ -54,6 +60,7 @@
 
     # 4. Discord bot service + nginx vhost on bot.<domain>
     - role: discord_bot
+      tags: [app]
       r:
         service_name: "{{ bot_service }}"
         site_root: "{{ bot_site_root }}"

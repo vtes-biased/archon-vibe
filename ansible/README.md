@@ -201,7 +201,12 @@ just deploy-beta                           # deploy latest Release to beta
 just deploy-prod                           # same for prod
 RELEASE_TAG=v1.2.3 just deploy-prod        # deploy a specific Release
 SOURCE=local just deploy-beta              # build locally + deploy (un-released change)
+QUICK=1 just deploy-beta                   # version bump only: ship artifacts, skip provisioning
 ```
+
+`QUICK=1` passes `--tags app`, running only the artifact-shipping roles
+(backend/frontend/bot); TLS, nginx vhosts, db and user provisioning are skipped.
+Use a full (default) deploy for any nginx/TLS/db/systemd/env change.
 
 The playbook prints the concrete tag it resolved (so `latest` is auditable) and,
 for a public repo, needs no auth — set `GITHUB_TOKEN` in the environment only to

@@ -8,7 +8,8 @@
 # the build-* recipes are for local dev / `SOURCE=local` deploys.
 #
 # Env-var overrides (prefix the command): RELEASE_TAG=vX.Y.Z, SOURCE=local,
-# FULL=1, REBOOT=1.
+# FULL=1, REBOOT=1, QUICK=1 (deploys: artifacts only via --tags app — skips the
+# provisioning roles; use a full deploy for any nginx/TLS/db/unit change).
 
 repo_root := parent_directory(justfile_directory())
 build_dir := justfile_directory() / "build"
@@ -115,7 +116,7 @@ bootstrap-prod: galaxy
 database-prod:
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/database.yml
 
-# Deploy archon-vibe to beta/frankfurt (RELEASE_TAG=… / SOURCE=local)
+# Deploy archon-vibe to beta/frankfurt (RELEASE_TAG=… / SOURCE=local / QUICK=1)
 deploy-beta:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -123,9 +124,10 @@ deploy-beta:
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
+    if [ -n "${QUICK:-}" ]; then extra="$extra --tags app"; fi
     uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/deploy-beta.yml $extra
 
-# Deploy backend/frontend/bot to prod (RELEASE_TAG=… / SOURCE=local)
+# Deploy backend/frontend/bot to prod (RELEASE_TAG=… / SOURCE=local / QUICK=1)
 deploy-prod:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -133,6 +135,7 @@ deploy-prod:
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
+    if [ -n "${QUICK:-}" ]; then extra="$extra --tags app"; fi
     uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/deploy.yml $extra
 
 # No beta variant: frankfurt system updates (apt + reboots) belong to server-setup.

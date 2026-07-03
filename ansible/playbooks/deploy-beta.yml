@@ -8,14 +8,18 @@
 - name: Deploy archon-vibe (beta — server-setup foundation)
   hosts: archon
   become: true
-  gather_facts: true
+  gather_facts: false  # no deploy-path role reads gathered facts; saves the setup round trip
 
   vars_files:
     - ../vars/release_artifacts.yml
 
+  # Quick lane: `--tags app` (QUICK=1 in the justfile) ships artifacts only —
+  # the [app] roles below run whole, untagged provisioning roles are skipped.
+  # Any nginx/TLS/db/unit change needs the full (default, untagged) deploy.
   pre_tasks:
     - name: Fetch release artifacts (shared)
       ansible.builtin.import_tasks: ../tasks/fetch_release.yml
+      tags: [always]
 
     - name: Ensure runtime user + app dirs
       ansible.builtin.import_tasks: ../tasks/app_user.yml
@@ -40,6 +44,7 @@
 
     # 3. Backend uvicorn service (localhost only; the frontend vhost proxies to it).
     - role: fastapi_backend
+      tags: [app]
       r:
         service_name: "{{ backend_service }}"
         site_root: "{{ backend_site_root }}"
@@ -61,6 +66,7 @@
 
     # 4. Frontend dist + PWA-correct vhost (archon's own role manages this nginx).
     - role: static_site
+      tags: [app]
       r:
         server_name: "{{ domain_main }}"
         site_root: "{{ frontend_site_root }}"
@@ -71,6 +77,7 @@
 
     # 5. Bot service only — vhost delegated to nginx_site below.
     - role: discord_bot
+      tags: [app]
       r:
         manage_nginx: false
         service_name: "{{ bot_service }}"
