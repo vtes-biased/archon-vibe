@@ -122,8 +122,15 @@ def generate_archondata(
 async def push_tournament_event(
     client: VEKNAPIClient,
     tournament: Tournament,
+    *,
+    raise_api_errors: bool = False,
 ) -> str | None:
-    """Create a VEKN calendar entry for a tournament. Returns event_id or None."""
+    """Create a VEKN calendar entry for a tournament. Returns event_id or None.
+
+    raise_api_errors=True lets a VEKNAPIError propagate instead of being logged
+    and swallowed — the manual on-demand push shows VEKN's actual message to the
+    organizer ('event already exists for this date', 'not a prince', ...); the
+    batch path keeps the log-and-skip default."""
     if not os.getenv("VEKN_PUSH", "").lower() == "true":
         return None
 
@@ -205,6 +212,8 @@ async def push_tournament_event(
     except VEKNAPIConnectionError:
         raise  # batch-fatal: let batch_push abort and retry next cycle
     except VEKNAPIError as e:
+        if raise_api_errors:
+            raise
         logger.error(f"Failed to create VEKN event for {tournament.uid}: {e}")
         return None
 
@@ -223,8 +232,13 @@ async def push_tournament_event(
 async def push_tournament_results(
     client: VEKNAPIClient,
     tournament: Tournament,
+    *,
+    raise_api_errors: bool = False,
 ) -> bool:
-    """Upload archondata for a finished tournament. Returns True on success."""
+    """Upload archondata for a finished tournament. Returns True on success.
+
+    raise_api_errors: see push_tournament_event — propagated to the nested
+    event-create too."""
     if not os.getenv("VEKN_PUSH", "").lower() == "true":
         return False
 
@@ -249,7 +263,9 @@ async def push_tournament_results(
     # Ensure VEKN event exists
     vekn_event_id = tournament.external_ids.get("vekn")
     if not vekn_event_id:
-        vekn_event_id = await push_tournament_event(client, tournament)
+        vekn_event_id = await push_tournament_event(
+            client, tournament, raise_api_errors=raise_api_errors
+        )
         if not vekn_event_id:
             logger.error(f"Tournament {tournament.uid}: cannot create VEKN event")
             return False
@@ -263,6 +279,8 @@ async def push_tournament_results(
     except VEKNAPIConnectionError:
         raise  # batch-fatal: let batch_push abort and retry next cycle
     except VEKNAPIError as e:
+        if raise_api_errors:
+            raise
         logger.error(f"Failed to upload results for {tournament.uid}: {e}")
         return False
 

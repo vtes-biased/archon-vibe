@@ -78,8 +78,11 @@ class VEKNAPIClient:
     def _get_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session."""
         if self._session is None or self._session.closed:
-            # Use longer timeout for VEKN API operations (can be slow)
-            timeout = aiohttp.ClientTimeout(total=120, connect=30, sock_read=60)
+            # Fail fast: every operation is retried or safely re-invokable (batch_push
+            # reruns hourly, the manual push is idempotent, sync skips-and-continues),
+            # and the manual push-vekn route runs VEKN calls inline on the request —
+            # it must complete under nginx's 60s proxy_read_timeout.
+            timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_read=15)
             self._session = aiohttp.ClientSession(timeout=timeout)
         return self._session
 
@@ -212,7 +215,10 @@ class VEKNAPIClient:
 
                 return inner_data["players"]
 
-        except aiohttp.ClientError as e:
+        # TimeoutError too: aiohttp's `total` timeout raises bare asyncio.TimeoutError
+        # (not a ClientError) — it must map to VEKNAPIError so fetch_all_members can
+        # skip the prefix and continue instead of the whole sync run dying.
+        except (aiohttp.ClientError, TimeoutError) as e:
             raise VEKNAPIError(f"HTTP error searching players: {e}") from e
 
     # -------------------------------------------------------------------------

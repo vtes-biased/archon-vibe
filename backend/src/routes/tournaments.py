@@ -547,7 +547,7 @@ async def push_vekn(
             status_code=400, detail="Open-rounds events are not reported to VEKN"
         )
 
-    from ..vekn_api import VEKNAPIConnectionError
+    from ..vekn_api import VEKNAPIConnectionError, VEKNAPIError
     from ..vekn_push import (
         push_tournament_event,
         push_tournament_results,
@@ -561,7 +561,9 @@ async def push_vekn(
             # 1. Register the calendar event if it isn't on VEKN yet.
             if not tournament.external_ids.get("vekn"):
                 # push_tournament_event saves external_ids.vekn + broadcasts on success.
-                event_id = await push_tournament_event(client, tournament)
+                event_id = await push_tournament_event(
+                    client, tournament, raise_api_errors=True
+                )
                 if not event_id:
                     raise HTTPException(
                         status_code=400,
@@ -578,7 +580,9 @@ async def push_vekn(
                 if not tournament.vekn_pushed_at:
                     # A manual publish must report a real outcome — don't swallow a
                     # failed results push (e.g. a finalist with no VEKN ID) as success.
-                    if not await push_tournament_results(client, tournament):
+                    if not await push_tournament_results(
+                        client, tournament, raise_api_errors=True
+                    ):
                         raise HTTPException(
                             status_code=400,
                             detail=(
@@ -593,6 +597,11 @@ async def push_vekn(
         raise HTTPException(
             status_code=502, detail="VEKN API is unavailable, try again later"
         ) from e
+    # Order matters: VEKNAPIConnectionError subclasses VEKNAPIError. A data error
+    # carries VEKN's actual reason ('event already exists for this date', 'not a
+    # prince', ...) — show it to the organizer instead of a guessed hint.
+    except VEKNAPIError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     updated = await get_tournament_by_uid(uid) or tournament
     return Response(content=encoder.encode(updated), media_type="application/json")
