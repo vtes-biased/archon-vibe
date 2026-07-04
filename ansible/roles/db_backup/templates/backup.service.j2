@@ -10,6 +10,7 @@ Group=postgres
 SyslogIdentifier=postgres-backup
 Environment=BACKUP_DIR={{ r.backup_dir }}
 Environment=RETENTION_DAYS={{ r.retention_days }}
+Environment="EXCLUDE_DBS={{ r.exclude | default([]) | join(' ') }}"
 {% if r.remote_enabled | default(false) | bool %}
 EnvironmentFile=/etc/postgres-backup/remote.env
 {% endif %}

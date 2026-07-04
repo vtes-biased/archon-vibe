@@ -27,9 +27,12 @@
       in vault.yml, and db_backup_remote_bucket in inventory
   when: r.remote_enabled | default(false) | bool
 
-- name: Install restic
+# rclone: pg-backup's orphan-repo scan (restic can't list bucket prefixes)
+- name: Install restic + rclone
   ansible.builtin.apt:
-    name: restic
+    name:
+      - restic
+      - rclone
     state: present
   when: r.remote_enabled | default(false) | bool
 

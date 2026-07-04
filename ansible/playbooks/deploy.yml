@@ -104,6 +104,7 @@
       r:
         backup_dir: "{{ db_backup_dir | default('/var/backups/postgres') }}"
         retention_days: "{{ db_backup_retention_days | default(7) }}"
+        exclude: "{{ db_backup_exclude | default([]) }}"
         oncalendar: "{{ db_backup_oncalendar | default('*-*-* 03:00:00') }}"
         check_oncalendar: "{{ db_backup_check_oncalendar | default('Sun *-*-* 06:00:00') }}"
         remote_enabled: "{{ db_backup_remote_enabled | default(false) }}"
