@@ -1109,16 +1109,6 @@ class TournamentActionRequest(BaseModel):
     seed: int | None = None
 
 
-def _live_game_count(t: Tournament) -> int:
-    """Games currently being played, for the per-round timer reset.
-    A prelim round is live if any table is unfinished (In Progress / Invalid)
-    — Cancelled and Finished tables don't count; likewise the finals table.
-    """
-    live = ("In Progress", "Invalid")
-    rounds = sum(1 for r in (t.rounds or []) if any(tbl.state in live for tbl in r))
-    return rounds + (1 if t.finals is not None and t.finals.state in live else 0)
-
-
 @router.post("/{uid}/action")
 async def tournament_action(
     uid: str,
@@ -1326,11 +1316,16 @@ async def tournament_action(
         deck_ops = result.get("deck_ops", [])
 
         # Timer lifecycle hooks (online-only, not handled by Rust engine).
-        # Each game (prelim round or finals) runs on its own fresh full timer:
-        # the action that makes the FIRST game live starts the clock from now;
-        # the action that leaves NO game live clears it. Keying on the before/
-        # after live-game count (not the event name) keeps parallel rounds and
-        # RestoreRound-to-already-finished from clobbering a still-running clock.
+        # Dumb rule: any round/finals lifecycle transition resets the clock to a
+        # fresh full PAUSED timer (TimerState() == started_at None, elapsed 0,
+        # paused). Starting a round NEVER launches the clock — players need time to
+        # get seated, so the organizer starts it explicitly via /timer/start; a
+        # fresh paused timer and a cleared-on-end timer are the same state, so one
+        # reset covers both. The global timer is meaningless with parallel rounds
+        # (self-organized pods each push their own round); the UI and bot deactivate
+        # it when more than one round is live, so clobbering here is harmless.
+        # AddTable stays OUT of this list so a mid-round table add never resets a
+        # running clock.
         TIMER_EVENTS = (
             "StartRound",
             "SelfOrganizeRound",
@@ -1343,12 +1338,8 @@ async def tournament_action(
             "CancelFinals",
         )
         if request.type in TIMER_EVENTS:
-            if _live_game_count(updated) == 0:  # nothing running -> clear
-                updated.timer = TimerState()
-                updated.table_extra_time = {}
-            elif _live_game_count(tournament) == 0:  # first game live -> run
-                updated.timer = TimerState(started_at=datetime.now(UTC), paused=False)
-                updated.table_extra_time = {}
+            updated.timer = TimerState()
+            updated.table_extra_time = {}
 
         # Save within the same transaction (row is still locked)
         tournament_bd = await save_object(

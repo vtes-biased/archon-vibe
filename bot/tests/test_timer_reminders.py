@@ -157,3 +157,17 @@ def test_no_reminders_when_clock_not_running() -> None:
     assert compute_timer_reminders(_tourney(state="Waiting"), [111], EPOCH) == []
     assert compute_timer_reminders(_tourney(round_time=0), [111], EPOCH) == []
     assert compute_timer_reminders(_tourney(started_at=None), [111], EPOCH) == []
+
+
+def test_parallel_rounds_suppress_all_reminders() -> None:
+    # >1 live prelim round (e.g. self-organized pods) deactivates the single shared
+    # timer entirely — the frontend hides it in the same case.
+    obj = _tourney()
+    obj["rounds"] = [[{"seating": [], "state": "In Progress"}]] * 2
+    assert compute_timer_reminders(obj, [111], EPOCH) == []
+    # A single live round (an earlier round fully Finished) still schedules normally.
+    obj["rounds"] = [
+        [{"seating": [], "state": "Finished"}],
+        [{"seating": [], "state": "In Progress"}],
+    ]
+    assert compute_timer_reminders(obj, [111], EPOCH) != []

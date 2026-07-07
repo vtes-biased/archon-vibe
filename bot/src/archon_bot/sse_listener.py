@@ -610,6 +610,11 @@ def _table_pending(table: dict) -> bool:
     return table.get("state") not in _TABLE_DONE_STATES and not table.get("override")
 
 
+def _live_round_count(obj: dict) -> int:
+    """Prelim rounds with at least one table still in play — the parallel-round gauge."""
+    return sum(1 for r in obj.get("rounds", []) if any(_table_pending(t) for t in r))
+
+
 # Reminders fire at these many seconds of remaining time, per table: 15-minute and
 # 5-minute warnings, then the time-up post. Ordered longest-first for readability.
 _TIMER_THRESHOLDS = (900, 300, 0)
@@ -668,6 +673,11 @@ def compute_timer_reminders(
     if not tag:
         return []
     is_finals = tag == "finals"
+    # Deactivate the timer during parallel rounds: it tracks one shared clock, which
+    # is meaningless once >1 prelim round is live (self-organized pods each push their
+    # own round). Mirrors the frontend, which hides the timer in the same case.
+    if not is_finals and _live_round_count(obj) > 1:
+        return []
     total = (
         (obj.get("finals_time") or obj.get("round_time") or 0)
         if is_finals
@@ -718,6 +728,7 @@ def _timer_signature(obj: dict) -> tuple:
         obj.get("round_time") or 0,
         obj.get("finals_time") or 0,
         tag,
+        _live_round_count(obj),  # flips the schedule on/off across a parallel boundary
         tuple(_table_pending(t) for t in tables),
         timer.get("started_at"),
         bool(timer.get("paused")),
