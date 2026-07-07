@@ -1,7 +1,9 @@
 # Native no-final tournament finish: no winner/finalist rating (diverges from vekn.net)
 
-**Status: needs rules-director discussion before implementing.** The right behavior is a
-product/rules call, not just an engineering one (see "Rules tension").
+**Status: Rules-Director question set drafted (below); interim stance decided with owner
+(2026-07): engine unchanged + ranked/unranked badge companion (#420).** Send the brief;
+resolve Q5 (push encoding) before cutover regardless of the rules answer — it decides whether
+this is display-only in archon or a real reporting divergence into the system of record.
 
 ## Current behavior
 
@@ -73,6 +75,46 @@ tournament-win GW. Decisions needed:
   `compute_rating_vp_gw` / standings would need to add it for the no-final winner.
 - **VEKN push**: `generate_archondata` must encode winner/finalist + winner GW the way vekn.net
   expects for a no-final event.
+
+## Rules-Director question set (drafted 2026-07, area-2 product pass)
+
+1. **Intended behavior** — for a §3.1.6-compliant no-final event, should the standings leader
+   receive the winner bonus (90·coef) and the +1 winner GW, and ranks 2–5 the finalist bonus
+   (30·coef) — i.e. vekn.net's current behavior — or is that an implementation accident, with
+   the rules-literal zero bonus being the intent?
+2. **Eligibility gate** — if credited: every no-final finish, or only legitimate §3.1.6 events
+   (<8 players, announced before round 1)? An 8+-player event finished without the required
+   final: credited anyway, or treated as incomplete/unranked?
+3. **Finalist semantics** — in a no-final event, is "finalist" simply top-5 by final standings?
+   Exactly min(5, N)? A tie at the 5th position: resolved by toss (like the finals cut), or all
+   tied players credited?
+4. **Winner determination** — the standings leader under the normal GW > VP > TP order (toss on
+   the cut tie), receiving the same +1 GW a finals winner gets?
+5. **Push encoding — gates cutover.** When archondata is uploaded for a no-final event, does
+   vekn.net recompute rtp from positions/GW/VP, or store the pushed per-player `rtp` verbatim
+   (we push our own computed rtp)? Riders for the same conversation: does a results re-upload
+   REPLACE or APPEND (needed by the reopen→refinish repair path, see the area-2 reopen ticket),
+   and is the Hall of Fame convention IRL-only wins (archon's HoF currently counts online wins)?
+
+## Interim stance (decided with owner, 2026-07)
+
+Engine unchanged — native no-final finishes stay uncredited. Rationale: rules-literal, quiet,
+recoverable; over-crediting then reversing would churn ratings/HoF and mis-report to vekn.net.
+Companion: derived ranked/unranked badge (#420) so the missing bonus reads as a rule, not a bug.
+
+## Per-branch plan (once answered)
+
+- **A — credit like vekn.net** (matches system of record): `FinishTournament`-without-finals
+  derives winner (standings leader) + top `min(5, N)` finalists behind the Q2 eligibility gate,
+  reusing the #387 winner-derivation fix; add the winner +1 GW in the rating path; do NOT
+  overload the "played the final table" meaning of the finalist flag on UI surfaces — restrict
+  to rating/push derivation or introduce a distinct standings-finalist concept; encode the push
+  per Q5. A credited no-final event with ≥8 players then IS ranked — reconcile the #420 badge.
+- **B — rules-literal (zero bonus intended)**: engine stays as-is. Flag the asymmetry with
+  imported history (importer credits from `pos`): either accept it (imports mirror the source
+  of record) or ask VEKN to fix vekn.net's implementation. #420 badge explains the outcome.
+- **C — hybrid (credit only <8)**: branch A behind a `player_count < 8` gate; an 8+ no-final
+  finish stays uncredited and gets an "incomplete — final required" treatment in the badge.
 
 ## References
 
