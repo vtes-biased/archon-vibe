@@ -31,12 +31,12 @@
 ## Leagues — Key Decisions
 - Standings modes: RTP, Score, GP (GP is an app house rule, not VEKN — see PRODUCT.md Leagues).
 - Standings computed at read time via the Rust engine (WASM frontend / PyO3 backend); league SSE payload is **config only**, standings derived client-side from IndexedDB tournaments.
-- Meta-leagues: 2-level hierarchy max. `allow_no_finals` is a hint, not enforcement.
+- Meta-leagues: 2-level hierarchy max. (`allow_no_finals` was a dead never-wired field — removal ticketed in the area-12 product pass, 2026-07.)
 
 ## Roadmap Status (as of 2026-06)
 Core features have shipped; `PRODUCT.md` + pst tickets are the source of truth — don't re-track shipped features here. Still outstanding / forward-looking:
 - Discord tournament bot — partially built (slash commands + SSE listener exist), not finished.
-- Table labels, Pretix integration, VEKN venue import.
+- VEKN venue import. (Table labels shipped as table rooms; Pretix rejected 2026-07 — payments stay deliberately status-only, see PRODUCT.md §5 Payments.)
 
 ## Agent Conventions
 - Principal engineer: guards offline-first, Rust pipeline, data sync model.
@@ -46,7 +46,7 @@ Core features have shipped; `PRODUCT.md` + pst tickets are the source of truth �
 
 ## Memory Files
 - Published standings = GW/VP/TP competition-ranking w/ skips; toss is top-5-cutoff-only — see PRODUCT.md (§3.5).
-- GP league points (app house rule; ties best-position+skip; position=final placement) — see PRODUCT.md (Leagues).
+- GP league points (established convention, NOT to be framed as "house rule" — the app is VEKN-official; merely not a hard VEKN tournament rule; ties best-position+skip; position=final placement) — see PRODUCT.md (Leagues).
 - [VEKN ID detach policy](project_vekn_id_detach_policy.md) — what stays with the VEKN ID vs follows the human on abandon/displace/merge; self-abandon blocked while suspended.
 - [Account-surgery regression watch-list](project_vekn_account_surgery_bugs.md) — the merge/detach defect classes (fixed); check none return when touching that code.
 - TWDA designer-credit convention (Created by:, anonymity=omit, names-only) — see ARCHITECTURE.md (TWDA Outbound).

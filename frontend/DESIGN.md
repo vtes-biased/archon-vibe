@@ -171,8 +171,8 @@ Show country flag emoji with country name. Use `getCountryFlag(isoCode)` from `l
 **No explicit save buttons.** Changes save/sync immediately on input.
 
 - Provide clear feedback (loading states, success indicators)
-- Always allow undo/cancel/revert
-- Exception: destructive or batch actions may require confirmation
+- No "Cancel" affordance on auto-save forms — changes persist as they're made, so the exit action is Close/Done, and a pending debounce is **flushed** on close (never dropped)
+- Exception: genuinely irreversible or externally-visible actions gate behind an explicit confirm step; for everything else prefer clean reversibility over confirmation (no confirmation bloat)
 
 ## Mobile First
 

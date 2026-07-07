@@ -114,9 +114,11 @@ ansible/roles/fastapi_backend/files/feedback_github_app.pem
 ansible/*.retry
 ansible/galaxy_collections/
 
-# Local prod DB dump for migration dry-runs (never commit)
+# Local prod DB dumps / restore staging (never commit)
 archondb.dump.gz
 *.dump.gz
+*.dump
+archon-restore/
 
 # Personal data (scraped NC/Prince contacts) — never commit plaintext.
 # Dev keeps an untracked copy here; prod gets it via ansible-vault at deploy.

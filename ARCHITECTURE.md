@@ -231,6 +231,7 @@ Member-contributed links to external community resources, with moderator oversig
 `GET /api/calendar/tournaments.ics` serves iCal for client subscriptions. Feeds: **Personal** (`?token=<calendar_token>`, agenda-matched), **Country** (`?country=XX`), **Global** (no params); `?online=false` excludes online events from any feed.
 
 - `calendar_token` (User, nullable, generated on demand via `POST /auth/me/calendar-token`); stripped from SSE, only visible via `/auth/me`; partial DB index (WHERE NOT NULL).
+- Anonymous (no-token) feeds deliberately render venue/address into LOCATION from the **full** column, bypassing the member-level projection — the `.ics` is an advertising artifact mirroring vekn.net's public event calendar; venue granularity is the organizer's data-entry choice. Do not "fix" by stripping location.
 - Agenda matching (`_matches_agenda()`): the user organizes (any state), participates (any state), or — non-finished only — same country / online / NC-CC on the user's continent.
 - Frontend: `getAgendaTournaments()` / `getFilteredTournaments()` (db.ts, IndexedDB mirrors of the agenda logic), `generateCalendarToken()` (auth.svelte.ts), `getContinent()` / `getCountriesOnContinent()` (geonames.ts). The tournament list uses a "My Agenda" toggle (logged-in) plus an "Include online" toggle.
 
@@ -304,9 +305,9 @@ Avatar upload: client-side cropping (`AvatarCropper.svelte`), server-side compre
 
 ### Outbound (Export)
 
-On the transition into `Finished` (if the winner has a deck), `twda.py` opens or updates a GitHub PR against the [TWDA repo](https://github.com/GiottoVerducci/TWD) — idempotent (branch `archon/{vekn_event_id}` + file `decks/{id}.txt`, create-or-update). It re-fires when the winner's deck is upserted on an already-finished tournament (organizer-only; players are deck-locked post-finish), so late uploads and post-event edits reach the archive. Files: `backend/src/twda.py`, `engine/src/deck.rs` (`export_twda`).
+On the transition into `Finished` (if the winner has a deck), `twda.py` opens or updates a GitHub PR against the [TWDA repo](https://github.com/GiottoVerducci/TWD) — idempotent (branch `archon/{vekn_event_id}` + file `decks/{id}.txt`, create-or-update). It re-fires when the winner's deck is upserted on an already-finished tournament (by an organizer, or by the winner adding their *first* deck — post-finish, players can add but not replace), so late uploads and post-event edits reach the archive. Files: `backend/src/twda.py`, `engine/src/deck.rs` (`export_twda`).
 
-Designer credit: the winner's name is always in the header; a separate optional `Created by: <name>` line is emitted only when the deck is attributed to someone else (or historical `twda` backfill) — omitted for self-designed or anonymous decks. Names only, never VEKN IDs.
+Designer credit: the winner's name is always in the header; a separate optional `Created by: <name>` line is emitted only when the deck is attributed to someone else (or historical `twda` backfill) — omitted for self-designed or anonymous decks. Names only, never VEKN IDs. The winner's name appearing regardless of attribution is intentional: TWDA is the public win registry — you win, your name goes there.
 
 ### Inbound (Import)
 
