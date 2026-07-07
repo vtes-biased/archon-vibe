@@ -75,6 +75,19 @@ def verify_token(token: str, expected_type: str = "access") -> str:
         raise HTTPException(status_code=401, detail="Invalid token") from err
 
 
+async def assert_account_active(user_uid: str) -> None:
+    """Reject a login-flow token mint for a tombstoned account.
+
+    A soft-deleted (IC-deleted) user keeps its auth_method rows — only a merge
+    reassigns them — so a surviving passkey/email/magic-link credential must
+    re-check deleted_at before minting, the same guard get_current_user and
+    /auth/refresh apply at resolution time.
+    """
+    user = await get_user_by_uid(user_uid)
+    if not user or user.deleted_at:
+        raise HTTPException(status_code=403, detail="This account is no longer active")
+
+
 @router.post("/refresh")
 async def refresh_token_endpoint(request: RefreshRequest) -> Response:
     """Refresh an access token using a refresh token."""

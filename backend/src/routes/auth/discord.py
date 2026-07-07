@@ -367,6 +367,14 @@ async def discord_callback(
         # Store Discord tokens and push Linked Roles metadata
         await _store_and_push_discord_roles(user_uid, discord_tokens)
 
+        # A tombstoned (IC-deleted) account keeps its Discord auth method — block a
+        # fresh login from re-minting for it (a new signup has a live uid, passes).
+        login_user = await get_user_by_uid(user_uid)
+        if not login_user or login_user.deleted_at:
+            return RedirectResponse(
+                url=f"{frontend_url}/login?error=account_deleted", status_code=302
+            )
+
         # Generate tokens
         access_token, _ = create_access_token(user_uid)
         refresh_token = create_refresh_token(user_uid)

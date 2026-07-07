@@ -15,7 +15,12 @@ from ...db import (
     update_auth_method,
 )
 from ...models import AuthMethod, AuthMethodType, User
-from ._tokens import TokenResponse, create_access_token, create_refresh_token
+from ._tokens import (
+    TokenResponse,
+    assert_account_active,
+    create_access_token,
+    create_refresh_token,
+)
 
 router = APIRouter()
 ph = PasswordHasher()
@@ -131,6 +136,9 @@ async def login(request: LoginRequest) -> Response:
             last_used_at=datetime.now(UTC),
         )
         await update_auth_method(auth_method)
+
+    # A tombstoned account keeps its email credential — block a fresh login.
+    await assert_account_active(auth_method.user_uid)
 
     # Generate tokens
     access_token, expires_in = create_access_token(auth_method.user_uid)

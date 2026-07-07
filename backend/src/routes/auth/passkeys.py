@@ -37,6 +37,7 @@ from ...middleware.auth import CurrentUser
 from ...models import AuthMethod, AuthMethodType, User
 from ._tokens import (
     TokenResponse,
+    assert_account_active,
     create_access_token,
     create_refresh_token,
 )
@@ -393,6 +394,9 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
         sign_count=verification.new_sign_count,
     )
     await update_auth_method(updated_auth_method)
+
+    # A tombstoned account keeps its passkey — block a fresh login from re-minting.
+    await assert_account_active(auth_method.user_uid)
 
     # Generate tokens
     access_token, expires_in = create_access_token(auth_method.user_uid)

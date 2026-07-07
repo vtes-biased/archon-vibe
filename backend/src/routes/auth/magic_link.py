@@ -24,6 +24,7 @@ from ...email_service import send_magic_link_email
 from ...models import AuthMethod, AuthMethodType, User
 from ._tokens import (
     TokenResponse,
+    assert_account_active,
     create_access_token,
     create_refresh_token,
     verify_token,
@@ -354,6 +355,10 @@ async def set_password(request: SetPasswordRequest) -> Response:
 
     else:
         raise HTTPException(status_code=400, detail="Invalid purpose")
+
+    # A tombstoned account keeps its email credential — block a reset/login mint
+    # for it (a fresh signup resolves to a new, live uid and passes).
+    await assert_account_active(user_uid)
 
     # Generate authentication tokens
     access_token, expires_in = create_access_token(user_uid)
