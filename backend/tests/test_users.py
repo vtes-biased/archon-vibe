@@ -56,6 +56,33 @@ async def test_create_user(test_client: AsyncClient, populated_db):
 
 
 @pytest.mark.asyncio
+async def test_create_user_dedup_email_conflict(test_db, test_client: AsyncClient):
+    """An email already on a live member 409s (case-insensitively) with the match
+    uid, so the door flow pivots to sponsor+register instead of a duplicate."""
+    ic = await _mk_user("US", [Role.IC], vekn="3000001")
+    existing = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Jane Doe",
+        country="US",
+        vekn_id="3000002",
+        contact_email="jane@example.com",
+        local_modifications=set(),
+    )
+    await db.save_user(existing)
+
+    resp = await test_client.post(
+        "/api/users/",
+        json={"name": "Jane D", "country": "US", "email": "JANE@example.com"},
+        headers=make_auth_header(ic.uid),
+    )
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["code"] == "user.email_exists"
+    assert body["params"]["uid"] == existing.uid
+
+
+@pytest.mark.asyncio
 async def test_update_user(test_client: AsyncClient, populated_db):
     """Test updating a user's information (requires auth)."""
     # IC can edit any user in any country (mock targets have random countries).

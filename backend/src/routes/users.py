@@ -6,12 +6,14 @@ from uuid import uuid7
 
 import msgspec
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .. import permissions
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
+    get_user_by_contact_email,
     get_user_by_uid,
     soft_delete_user,
 )
@@ -93,6 +95,23 @@ async def create_user(
                     status_code=400,
                     detail=f"Invalid role: {role_str}. Valid roles: {[r.value for r in Role]}",
                 ) from err
+
+    # Door-dedup: an email already on a live member means this person almost
+    # certainly already has an account. Don't mint a duplicate — 409 with the
+    # matched uid so the caller pivots to sponsor+register that account instead.
+    # The client resolves name/vekn from its local member projection (which
+    # carries every user), so only the uid is needed on the wire.
+    if email:
+        existing = await get_user_by_contact_email(email)
+        if existing:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "A member with this email already exists",
+                    "code": "user.email_exists",
+                    "params": {"uid": existing.uid},
+                },
+            )
 
     # Auto-allocate VEKN ID
     vekn_id = await allocate_next_vekn_id()

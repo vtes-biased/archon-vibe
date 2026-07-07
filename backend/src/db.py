@@ -656,11 +656,17 @@ async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
 
 
 async def get_user_by_contact_email(email: str) -> User | None:
-    """Find a user by contact_email for account merging."""
+    """Find a live user by contact_email (account-merge + door-dedup lookup).
+
+    Skips soft-deleted rows — a merged/tombstoned duplicate must neither block a
+    fresh create nor be a merge target. ORDER BY uid + LIMIT 1 is a stable pick
+    across the legacy dup emails (#368-class data) both callers can encounter.
+    """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'user' AND LOWER("full"->>'contact_email') = LOWER(%s)""",
+            WHERE type = 'user' AND LOWER("full"->>'contact_email') = LOWER(%s)
+              AND deleted_at IS NULL ORDER BY uid LIMIT 1""",
             (email,),
         )
         row = await result.fetchone()

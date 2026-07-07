@@ -118,6 +118,8 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.self_organize_not_open_rounds': () => m.err_tournament_self_organize_not_open_rounds(),
   'tournament.self_organize_not_seated': () => m.err_tournament_self_organize_not_seated(),
   'tournament.self_organize_ineligible': (p) => m.err_tournament_self_organize_ineligible({ player: p.player ?? '' }),
+  // Backend-origin (not an engine/error.rs code): create_user's dup-email 409.
+  'user.email_exists': () => m.err_user_email_exists(),
   'deck.no_cards': () => m.err_deck_no_cards(),
   'seating.min_players': () => m.err_seating_min_players(),
   'seating.min_rounds': () => m.err_seating_min_rounds(),
