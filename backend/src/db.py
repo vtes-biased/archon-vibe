@@ -398,6 +398,8 @@ async def save_object(
 async def save_object_from_model(
     obj_type: ObjectType,
     obj: msgspec.Struct,
+    *,
+    conn: psycopg.AsyncConnection | None = None,
 ) -> BroadcastData:
     """Save a msgspec model to the objects table."""
     full_data = msgspec.to_builtins(obj)
@@ -409,7 +411,9 @@ async def save_object_from_model(
             if hasattr(deleted_at, "isoformat")
             else str(deleted_at)
         )
-    return await save_object(obj_type, obj.uid, full_data, deleted_at=deleted_at)  # ty: ignore[unresolved-attribute]
+    return await save_object(
+        obj_type, obj.uid, full_data, conn=conn, deleted_at=deleted_at
+    )  # ty: ignore[unresolved-attribute]
 
 
 async def delete_object(
@@ -1026,9 +1030,15 @@ async def delete_sanction_hard(uid: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def save_tournament(tournament: Tournament) -> BroadcastData:
-    """Upsert a tournament into the objects table."""
-    return await save_object_from_model(ObjectType.TOURNAMENT, tournament)
+async def save_tournament(
+    tournament: Tournament, *, conn: psycopg.AsyncConnection
+) -> BroadcastData:
+    """Upsert a tournament. `conn` is REQUIRED: every whole-row tournament write
+    must run on a caller-supplied connection — inside tournament_transaction(uid)
+    for an existing row (so a concurrent /action commit can't be lost to a stale
+    read-modify-write), or a plain get_connection() for a fresh uuid7 (creation)
+    or bulk seed. Non-optional so an unlocked tournament write can no longer be typed."""
+    return await save_object_from_model(ObjectType.TOURNAMENT, tournament, conn=conn)
 
 
 async def get_tournament_by_uid(
@@ -1061,14 +1071,14 @@ async def get_tournament_public_projection(uid: str) -> dict | None:
 
 
 async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] | None:
-    """Soft-delete a tournament. Returns (tournament, BroadcastData) for SSE."""
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        return None
-    now = datetime.now(UTC)
-    tournament.deleted_at = now
-    tournament.modified = now
-    bd = await save_tournament(tournament)
+    """Soft-delete a tournament under a row lock. Returns (tournament, BroadcastData)."""
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            return None
+        now = datetime.now(UTC)
+        tournament.deleted_at = now
+        tournament.modified = now
+        bd = await save_tournament(tournament, conn=tx_conn)
     return tournament, bd
 
 

@@ -1338,15 +1338,19 @@ async def process_tournament_row(
         )
 
     stats.bump("tournaments")
+    # ETL seed/merge — save_tournament requires a conn; a plain pooled connection
+    # (no FOR UPDATE lock) suffices for the offline batch import.
     if merge and existing is not None:
         if same_but_modified(t, existing):
             stats.bump("tournaments.unchanged")
         else:
             t.modified = datetime.now(UTC)
-            await db.save_tournament(t)
+            async with db.get_connection() as conn:
+                await db.save_tournament(t, conn=conn)
             stats.bump("tournaments.updated")
     else:
-        await db.save_tournament(t)
+        async with db.get_connection() as conn:
+            await db.save_tournament(t, conn=conn)
         if merge:
             stats.bump("tournaments.inserted")
         stats.bump(f"tournament_state:{t.state.value}")

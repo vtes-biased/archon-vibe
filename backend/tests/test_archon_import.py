@@ -27,6 +27,8 @@ from src.models import (
     User,
 )
 
+from tests.conftest import seed_tournament
+
 
 @asynccontextmanager
 async def _cleanup_tournaments():
@@ -57,7 +59,7 @@ async def test_import_standings_are_prelim_only(test_db):
         for i in range(5):
             await db.save_user(_user(f"u{i + 1}", vekn[i]))
 
-        await db.save_tournament(
+        await seed_tournament(
             Tournament(
                 uid="t-import-1",
                 modified=datetime(2025, 6, 1, tzinfo=UTC),

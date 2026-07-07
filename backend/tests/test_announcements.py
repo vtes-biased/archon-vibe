@@ -15,7 +15,7 @@ from src import db
 from src.models import Tournament, User
 from src.routes.tournaments import MAX_ANNOUNCEMENTS
 
-from tests.conftest import make_auth_header
+from tests.conftest import make_auth_header, seed_tournament
 
 NOW = datetime.now(UTC)
 
@@ -24,7 +24,7 @@ NOW = datetime.now(UTC)
 async def test_announcements_capped_keeping_newest(test_client: AsyncClient, test_db):
     org = User(uid="org-ann", modified=NOW, name="Olivia Organizer")
     await db.save_user(org)
-    await db.save_tournament(
+    await seed_tournament(
         Tournament(uid="trn-ann", modified=NOW, name="Cup", organizers_uids=["org-ann"])
     )
     try:

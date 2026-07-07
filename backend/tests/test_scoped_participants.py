@@ -13,6 +13,8 @@ from src import db
 from src.main import _scoped_catchup_frames
 from src.models import Player, Tournament, User
 
+from tests.conftest import seed_tournament
+
 NOW = datetime.now(UTC)
 
 
@@ -31,7 +33,7 @@ async def test_scoped_catchup_seeds_participant_identities(test_db):
         organizers_uids=["org-1"],
         players=[Player(user_uid="play-1"), Player(user_uid="play-2")],
     )
-    await db.save_tournament(t)
+    await seed_tournament(t)
     try:
         sent: set[str] = set()
         frames, _ts = await _scoped_catchup_frames(org, "trn-1", sent)

@@ -30,6 +30,8 @@ from src.models import (
 from src.vekn_api import VEKNAPIConnectionError, VEKNAPIError
 from src.vekn_push import UNCREATED_EVENTS_QUERY, UNPUSHED_RESULTS_QUERY, batch_push
 
+from tests.conftest import seed_tournament
+
 
 def _tournament(
     uid: str,
@@ -65,10 +67,10 @@ def _tournament(
 async def test_results_query_selects_in_app_excludes_imports(test_db):
     try:
         # In-app finished tournament: has rounds, unpushed → MUST be selected.
-        await db.save_tournament(_tournament("in-app", with_rounds=True))
+        await seed_tournament(_tournament("in-app", with_rounds=True))
         # VEKN import: standings but no rounds, unpushed → MUST NOT be selected
         # (even with vekn_pushed_at unset, the rounds guard keeps it out).
-        await db.save_tournament(_tournament("import", with_rounds=False))
+        await seed_tournament(_tournament("import", with_rounds=False))
 
         async with db.get_connection() as conn:
             result = await conn.execute(
@@ -161,11 +163,9 @@ async def test_push_queries_exclude_open_and_self_organized_rounds(test_db):
     """
     try:
         # Standard pushable event (rounds + vekn id, unpushed) → stays selected.
-        await db.save_tournament(_tournament("standard", with_rounds=True))
-        await db.save_tournament(
-            _tournament("open", with_rounds=True, open_rounds=True)
-        )
-        await db.save_tournament(
+        await seed_tournament(_tournament("standard", with_rounds=True))
+        await seed_tournament(_tournament("open", with_rounds=True, open_rounds=True))
+        await seed_tournament(
             _tournament("self-org", with_rounds=True, self_organized_rounds=True)
         )
 
@@ -191,7 +191,7 @@ async def test_push_queries_exclude_open_and_self_organized_rounds(test_db):
                 self_organized_rounds=self_org,
             )
             t.external_ids = {}
-            await db.save_tournament(t)
+            await seed_tournament(t)
 
         async with db.get_connection() as conn:
             result = await conn.execute(
@@ -210,13 +210,13 @@ async def test_events_query_excludes_stamped_imports(test_db):
         # In-app tournament without a vekn event yet → MUST be selected.
         t_new = _tournament("in-app", with_rounds=True)
         t_new.external_ids = {}
-        await db.save_tournament(t_new)
+        await seed_tournament(t_new)
         # ETL-imported finished tournament without a vekn id: stamped
         # vekn_pushed_at at import (no push owed) → MUST NOT be selected.
         t_old = _tournament("import", with_rounds=True)
         t_old.external_ids = {}
         t_old.vekn_pushed_at = datetime(2025, 6, 2, tzinfo=UTC)
-        await db.save_tournament(t_old)
+        await seed_tournament(t_old)
 
         async with db.get_connection() as conn:
             result = await conn.execute(

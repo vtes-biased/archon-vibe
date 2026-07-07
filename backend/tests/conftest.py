@@ -71,6 +71,13 @@ def make_auth_header(user_uid: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+async def seed_tournament(tournament):
+    """Persist a tournament in test setup. save_tournament requires a conn (the prod
+    row-lock invariant); a fresh seed just needs any connection, no FOR UPDATE lock."""
+    async with db.get_connection() as conn:
+        return await db.save_tournament(tournament, conn=conn)
+
+
 @pytest_asyncio.fixture
 async def test_db() -> AsyncIterator[None]:
     """Initialize test database and clean it up after tests."""

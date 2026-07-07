@@ -16,7 +16,7 @@ import pytest_asyncio
 import src.db as db
 from src.models import Player, Seat, Table, Tournament, TournamentState, User
 
-from tests.conftest import make_auth_header
+from tests.conftest import make_auth_header, seed_tournament
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -58,7 +58,7 @@ async def _seed(org_uid: str) -> str:
     t = msgspec.convert(
         _offline_tournament_payload(uid, org_uid, "TEMP-seed"), Tournament
     )
-    await db.save_tournament(t)
+    await seed_tournament(t)
     return uid
 
 
@@ -118,7 +118,7 @@ async def test_go_online_refused_when_server_not_offline(test_client, test_db):
 
     # An ONLINE tournament (offline_mode defaults False) owned by org.
     uid = str(uuid7())
-    await db.save_tournament(
+    await seed_tournament(
         Tournament(
             uid=uid,
             modified=datetime.now(UTC),

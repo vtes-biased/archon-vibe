@@ -16,6 +16,8 @@ from src.broadcast import SSEConnection, _sse_connections
 from src.models import DeckObject, ObjectType, Tournament, User
 from src.routes.tournaments import _invalidate_organizer_view
 
+from tests.conftest import seed_tournament
+
 NOW = datetime.now(UTC)
 PUSH_TS = "2026-06-15T00:00:00"
 
@@ -44,7 +46,7 @@ async def test_remove_organizer_tombstones_private_deck(test_db):
     await db.save_object_from_model(ObjectType.DECK, deck)
     # The tournament AFTER removal: `org` is no longer an organizer.
     t = Tournament(uid="trn-x", modified=NOW, name="T", organizers_uids=[])
-    bd = await db.save_tournament(t)
+    bd = await seed_tournament(t)
     assert (
         bd.modified_at
     )  # self-heal invariant: the row was (re)written, modified_at moved

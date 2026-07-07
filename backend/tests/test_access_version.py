@@ -10,8 +10,10 @@ from datetime import UTC, datetime
 
 import pytest
 from src import db
-from src.db import compute_access_version, save_tournament, save_user
+from src.db import compute_access_version, save_user
 from src.models import Role, Tournament, User
+
+from tests.conftest import seed_tournament
 
 NOW = datetime.now(UTC)
 
@@ -70,7 +72,7 @@ async def test_av_tracks_the_organizer_set(test_db):
     before = await compute_access_version(member)
 
     t = Tournament(uid="av-trn-1", modified=NOW, name="T", organizers_uids=[member.uid])
-    await save_tournament(t)
+    await seed_tournament(t)
     try:
         after = await compute_access_version(member)
         assert after != before  # gained an organized tournament → fp moves

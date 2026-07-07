@@ -17,6 +17,7 @@ from .db import (
     get_connection,
     get_tournament_by_external_id,
     save_tournament,
+    tournament_transaction,
 )
 from .models import (
     FinalsTable,
@@ -383,120 +384,134 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 stats["skipped"] += 1
                 continue
 
-            # Check if already exists
-            existing = await get_tournament_by_external_id("vekn", str(event_id))
-            if existing:
-                merged_organizers = list(
-                    dict.fromkeys(existing.organizers_uids + tournament.organizers_uids)
-                )
-                if existing.rounds:
-                    # Tournament was run in-app (it has per-round play data). VEKN.net
-                    # is NOT authoritative for its rounds/finals/standings/players/
-                    # winner/state — only for descriptive event metadata. Refresh
-                    # metadata only and NEVER overwrite the play data (doing so would
-                    # silently wipe rounds and corrupt standings/ratings). Gate on
-                    # `rounds` only: a re-imported VEKN event now carries a
-                    # reconstructed finals object, but VEKN stays authoritative for
-                    # it (a final implies prelim rounds, so this never misses in-app).
-                    meta_changed = (
-                        existing.name != tournament.name
-                        or existing.format != tournament.format
-                        or existing.rank != tournament.rank
-                        or existing.start != tournament.start
-                        or existing.finish != tournament.finish
-                        or existing.timezone != tournament.timezone
-                        or existing.country != tournament.country
-                        or existing.online != tournament.online
-                        or existing.venue != tournament.venue
-                        or existing.address != tournament.address
-                        or existing.venue_url != tournament.venue_url
-                        or existing.map_url != tournament.map_url
-                        or merged_organizers != existing.organizers_uids
-                    )
-                    if meta_changed:
-                        updated = msgspec.structs.replace(
-                            existing,
-                            modified=datetime.now(UTC),
-                            name=tournament.name,
-                            format=tournament.format,
-                            rank=tournament.rank,
-                            online=tournament.online,
-                            start=tournament.start,
-                            finish=tournament.finish,
-                            timezone=tournament.timezone,
-                            country=tournament.country,
-                            venue=tournament.venue,
-                            venue_url=tournament.venue_url,
-                            address=tournament.address,
-                            map_url=tournament.map_url,
-                            organizers_uids=merged_organizers,
+            # Check if already exists (unlocked lookup by external id → uid)
+            existing_ref = await get_tournament_by_external_id("vekn", str(event_id))
+            if existing_ref:
+                bd = None
+                # Re-read the row under a FOR UPDATE lock so this wholesale overwrite
+                # serializes against any concurrent /action commit rather than
+                # clobbering it (the meta path replaces onto the LOCKED row, so live
+                # play data added mid-sync survives).
+                async with tournament_transaction(existing_ref.uid) as (
+                    existing,
+                    tx_conn,
+                ):
+                    existing = existing or existing_ref  # hard-deleted between reads
+                    merged_organizers = list(
+                        dict.fromkeys(
+                            existing.organizers_uids + tournament.organizers_uids
                         )
-                        bd = await save_tournament(updated)
-                        broadcast_precomputed(bd)
-                        stats["updated"] += 1
-                    else:
-                        stats["unchanged"] += 1
-                else:
-                    # vekn-origin import (no play data): VEKN.net is authoritative for
-                    # everything, including players/standings/winner.
-                    changed = (
-                        existing.state != tournament.state
-                        or existing.name != tournament.name
-                        or existing.format != tournament.format
-                        or existing.rank != tournament.rank
-                        or existing.start != tournament.start
-                        or existing.finish != tournament.finish
-                        or existing.timezone != tournament.timezone
-                        or existing.country != tournament.country
-                        or existing.online != tournament.online
-                        or existing.winner != tournament.winner
-                        or existing.venue != tournament.venue
-                        or existing.address != tournament.address
-                        or existing.venue_url != tournament.venue_url
-                        or existing.map_url != tournament.map_url
-                        or len(existing.players) != len(tournament.players)
-                        # Compare the authoritative play data so a VEKN-side score
-                        # correction is picked up — and so legacy folded imports (old
-                        # standings = prelim+finals, finals=None) self-heal to the
-                        # prelim-only + reconstructed-finals shape on the next sync.
-                        # Deterministic mapping ⇒ a migrated import compares equal and
-                        # won't thrash.
-                        or existing.standings != tournament.standings
-                        or existing.finals != tournament.finals
                     )
-                    if changed:
-                        tournament = Tournament(
-                            uid=existing.uid,
-                            modified=datetime.now(UTC),
-                            name=tournament.name,
-                            format=tournament.format,
-                            rank=tournament.rank,
-                            online=tournament.online,
-                            start=tournament.start,
-                            finish=tournament.finish,
-                            timezone=tournament.timezone,
-                            country=tournament.country,
-                            state=tournament.state,
-                            venue=tournament.venue,
-                            venue_url=tournament.venue_url,
-                            address=tournament.address,
-                            map_url=tournament.map_url,
-                            external_ids=tournament.external_ids,
-                            organizers_uids=merged_organizers,
-                            max_rounds=tournament.max_rounds,
-                            players=tournament.players,
-                            winner=tournament.winner,
-                            standings=tournament.standings,
-                            finals=tournament.finals,
-                            vekn_pushed_at=tournament.vekn_pushed_at,
+                    if existing.rounds:
+                        # Tournament was run in-app (it has per-round play data). VEKN.net
+                        # is NOT authoritative for its rounds/finals/standings/players/
+                        # winner/state — only for descriptive event metadata. Refresh
+                        # metadata only and NEVER overwrite the play data (doing so would
+                        # silently wipe rounds and corrupt standings/ratings). Gate on
+                        # `rounds` only: a re-imported VEKN event now carries a
+                        # reconstructed finals object, but VEKN stays authoritative for
+                        # it (a final implies prelim rounds, so this never misses in-app).
+                        meta_changed = (
+                            existing.name != tournament.name
+                            or existing.format != tournament.format
+                            or existing.rank != tournament.rank
+                            or existing.start != tournament.start
+                            or existing.finish != tournament.finish
+                            or existing.timezone != tournament.timezone
+                            or existing.country != tournament.country
+                            or existing.online != tournament.online
+                            or existing.venue != tournament.venue
+                            or existing.address != tournament.address
+                            or existing.venue_url != tournament.venue_url
+                            or existing.map_url != tournament.map_url
+                            or merged_organizers != existing.organizers_uids
                         )
-                        bd = await save_tournament(tournament)
-                        broadcast_precomputed(bd)
-                        stats["updated"] += 1
+                        if meta_changed:
+                            updated = msgspec.structs.replace(
+                                existing,
+                                modified=datetime.now(UTC),
+                                name=tournament.name,
+                                format=tournament.format,
+                                rank=tournament.rank,
+                                online=tournament.online,
+                                start=tournament.start,
+                                finish=tournament.finish,
+                                timezone=tournament.timezone,
+                                country=tournament.country,
+                                venue=tournament.venue,
+                                venue_url=tournament.venue_url,
+                                address=tournament.address,
+                                map_url=tournament.map_url,
+                                organizers_uids=merged_organizers,
+                            )
+                            bd = await save_tournament(updated, conn=tx_conn)
+                            stats["updated"] += 1
+                        else:
+                            stats["unchanged"] += 1
                     else:
-                        stats["unchanged"] += 1
+                        # vekn-origin import (no play data): VEKN.net is authoritative for
+                        # everything, including players/standings/winner.
+                        changed = (
+                            existing.state != tournament.state
+                            or existing.name != tournament.name
+                            or existing.format != tournament.format
+                            or existing.rank != tournament.rank
+                            or existing.start != tournament.start
+                            or existing.finish != tournament.finish
+                            or existing.timezone != tournament.timezone
+                            or existing.country != tournament.country
+                            or existing.online != tournament.online
+                            or existing.winner != tournament.winner
+                            or existing.venue != tournament.venue
+                            or existing.address != tournament.address
+                            or existing.venue_url != tournament.venue_url
+                            or existing.map_url != tournament.map_url
+                            or len(existing.players) != len(tournament.players)
+                            # Compare the authoritative play data so a VEKN-side score
+                            # correction is picked up — and so legacy folded imports (old
+                            # standings = prelim+finals, finals=None) self-heal to the
+                            # prelim-only + reconstructed-finals shape on the next sync.
+                            # Deterministic mapping ⇒ a migrated import compares equal and
+                            # won't thrash.
+                            or existing.standings != tournament.standings
+                            or existing.finals != tournament.finals
+                        )
+                        if changed:
+                            tournament = Tournament(
+                                uid=existing.uid,
+                                modified=datetime.now(UTC),
+                                name=tournament.name,
+                                format=tournament.format,
+                                rank=tournament.rank,
+                                online=tournament.online,
+                                start=tournament.start,
+                                finish=tournament.finish,
+                                timezone=tournament.timezone,
+                                country=tournament.country,
+                                state=tournament.state,
+                                venue=tournament.venue,
+                                venue_url=tournament.venue_url,
+                                address=tournament.address,
+                                map_url=tournament.map_url,
+                                external_ids=tournament.external_ids,
+                                organizers_uids=merged_organizers,
+                                max_rounds=tournament.max_rounds,
+                                players=tournament.players,
+                                winner=tournament.winner,
+                                standings=tournament.standings,
+                                finals=tournament.finals,
+                                vekn_pushed_at=tournament.vekn_pushed_at,
+                            )
+                            bd = await save_tournament(tournament, conn=tx_conn)
+                            stats["updated"] += 1
+                        else:
+                            stats["unchanged"] += 1
+                if bd is not None:
+                    broadcast_precomputed(bd)
             else:
-                bd = await save_tournament(tournament)
+                # Fresh vekn-origin import: no existing row to lock.
+                async with get_connection() as conn:
+                    bd = await save_tournament(tournament, conn=conn)
                 broadcast_precomputed(bd)
                 stats["created"] += 1
 

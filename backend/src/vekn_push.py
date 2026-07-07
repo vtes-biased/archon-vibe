@@ -10,10 +10,10 @@ from .broadcast import broadcast_precomputed
 from .db import (
     get_connection,
     get_sanctions_for_tournament,
-    get_tournament_by_uid,
     get_user_by_uid,
     save_tournament,
     save_user,
+    tournament_transaction,
 )
 from .models import (
     ObjectType,
@@ -217,13 +217,14 @@ async def push_tournament_event(
         logger.error(f"Failed to create VEKN event for {tournament.uid}: {e}")
         return None
 
-    # Store the VEKN event ID. Re-fetch first: batch_push loads rows up
-    # front but saves here minutes later — only the vekn fields are ours, so we
-    # write them onto a fresh snapshot instead of clobbering interim edits.
-    fresh = await get_tournament_by_uid(tournament.uid) or tournament
-    fresh.external_ids["vekn"] = event_id
-    fresh.modified = datetime.now(UTC)
-    bd = await save_tournament(fresh)
+    # Store the VEKN event ID. Re-fetch under the row lock: batch_push loads rows up
+    # front but saves here minutes later — only the vekn fields are ours, so we write
+    # them onto the CURRENT locked snapshot so interim /action edits aren't clobbered.
+    async with tournament_transaction(tournament.uid) as (fresh, tx_conn):
+        fresh = fresh or tournament  # hard-deleted mid-push: fall back to re-create
+        fresh.external_ids["vekn"] = event_id
+        fresh.modified = datetime.now(UTC)
+        bd = await save_tournament(fresh, conn=tx_conn)
     broadcast_precomputed(bd)
     logger.info(f"Tournament {tournament.uid} → VEKN event {event_id}")
     return event_id
@@ -284,14 +285,15 @@ async def push_tournament_results(
         logger.error(f"Failed to upload results for {tournament.uid}: {e}")
         return False
 
-    # Mark as pushed. Re-fetch first: the snapshot we computed archondata
-    # from may be minutes stale by now — write only the vekn fields onto a fresh
-    # one so concurrent edits aren't clobbered. push_tournament_event above may
-    # have already bumped external_ids.vekn; re-reading picks that up too.
-    fresh = await get_tournament_by_uid(tournament.uid) or tournament
-    fresh.vekn_pushed_at = datetime.now(UTC)
-    fresh.modified = datetime.now(UTC)
-    bd = await save_tournament(fresh)
+    # Mark as pushed. Re-fetch under the row lock: the snapshot we computed
+    # archondata from may be minutes stale by now — write only the vekn fields onto
+    # the CURRENT locked row so concurrent edits aren't clobbered. push_tournament_event
+    # above may have already bumped external_ids.vekn; the locked read picks that up too.
+    async with tournament_transaction(tournament.uid) as (fresh, tx_conn):
+        fresh = fresh or tournament  # hard-deleted mid-push: fall back to re-create
+        fresh.vekn_pushed_at = datetime.now(UTC)
+        fresh.modified = datetime.now(UTC)
+        bd = await save_tournament(fresh, conn=tx_conn)
     broadcast_precomputed(bd)
     logger.info(
         f"Tournament {tournament.uid} results pushed to VEKN event {vekn_event_id}"

@@ -53,6 +53,8 @@ from src.models import (
     User,
 )
 
+from tests.conftest import seed_tournament
+
 
 @asynccontextmanager
 async def _cleanup():
@@ -137,7 +139,7 @@ def _old_member_row(uid: str, vekn: str = "", **data) -> dict:
 @pytest.mark.asyncio
 async def test_rich_merge_into_vekn_copy_then_idempotent(test_db):
     async with _cleanup():
-        await db.save_tournament(_vekn_created("x-1", "555"))
+        await seed_tournament(_vekn_created("x-1", "555"))
         row = _old_tournament_row("o-1", vekn_id="555", with_deck=True)
 
         uid_map: dict[str, str] = {}
@@ -168,7 +170,7 @@ async def test_archon_first_interleave_tombstones_roundless_copy(test_db):
         # Run N inserted the rich tournament before old archon pushed to vekn…
         await process_tournament_row(_old_tournament_row("o-2"), {}, Stats(), True, {})
         # …then the VEKN sync created a round-less copy under a fresh uid…
-        await db.save_tournament(_vekn_created("c-2", "777"))
+        await seed_tournament(_vekn_created("c-2", "777"))
 
         # …and run N+1 sees the old tournament with its vekn id.
         stats = Stats()
@@ -187,7 +189,7 @@ async def test_archon_first_interleave_tombstones_roundless_copy(test_db):
 @pytest.mark.asyncio
 async def test_echo_guard_roundless_never_overwrites_rich(test_db):
     async with _cleanup():
-        await db.save_tournament(_vekn_created("x-3", "888", rich=True))
+        await seed_tournament(_vekn_created("x-3", "888", rich=True))
 
         stats = Stats()
         uid_map: dict[str, str] = {}
@@ -209,7 +211,7 @@ async def test_echo_guard_roundless_never_overwrites_rich(test_db):
 @pytest.mark.asyncio
 async def test_both_rich_conflict_is_skipped(test_db):
     async with _cleanup():
-        await db.save_tournament(_vekn_created("x-4", "999", rich=True))
+        await seed_tournament(_vekn_created("x-4", "999", rich=True))
         before = await db.get_tournament_by_uid("x-4")
 
         stats = Stats()

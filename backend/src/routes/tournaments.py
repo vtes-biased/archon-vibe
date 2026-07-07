@@ -29,6 +29,7 @@ from ..db import (
     get_all_leagues,
     get_auth_method_by_identifier,
     get_banner,
+    get_connection,
     get_decks_for_tournament,
     get_league_by_uid,
     get_sanctions_for_tournament,
@@ -495,19 +496,20 @@ async def add_organizer(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+    bd = None
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        if not permissions.is_organizer(current_user, tournament):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can manage organizers"
+            )
+        if body.user_uid not in tournament.organizers_uids:
+            tournament.organizers_uids.append(body.user_uid)
+            tournament.modified = datetime.now(UTC)
+            bd = await save_tournament(tournament, conn=tx_conn)
 
-    if not permissions.is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can manage organizers"
-        )
-
-    if body.user_uid not in tournament.organizers_uids:
-        tournament.organizers_uids.append(body.user_uid)
-        tournament.modified = datetime.now(UTC)
-        bd = await save_tournament(tournament)
+    if bd is not None:
         broadcast_precomputed(bd)
         # Grant access: push the tournament + its (private) decks at full to the new
         # organizer — broadcast_precomputed delivers the tournament but never the decks.
@@ -617,26 +619,27 @@ async def remove_organizer(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    if not permissions.is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can manage organizers"
-        )
-
-    if organizer_uid in tournament.organizers_uids:
-        if len(tournament.organizers_uids) <= 1:
+    bd = None
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        if not permissions.is_organizer(current_user, tournament):
             raise HTTPException(
-                status_code=400, detail="Cannot remove the last organizer"
+                status_code=403, detail="Only organizers can manage organizers"
             )
-        tournament.organizers_uids.remove(organizer_uid)
-        tournament.modified = datetime.now(UTC)
-        # save_tournament advances modified_at, so the member-level tournament self-heals
-        # via the since-catch-up too (checkin_code/vekn_pushed_at drop) — the targeted push
-        # below additionally tombstones the now-invisible private decks (the leak fix).
-        bd = await save_tournament(tournament)
+        if organizer_uid in tournament.organizers_uids:
+            if len(tournament.organizers_uids) <= 1:
+                raise HTTPException(
+                    status_code=400, detail="Cannot remove the last organizer"
+                )
+            tournament.organizers_uids.remove(organizer_uid)
+            tournament.modified = datetime.now(UTC)
+            # save_tournament advances modified_at, so the member-level tournament self-heals
+            # via the since-catch-up too (checkin_code/vekn_pushed_at drop) — the targeted push
+            # below additionally tombstones the now-invisible private decks (the leak fix).
+            bd = await save_tournament(tournament, conn=tx_conn)
+
+    if bd is not None:
         broadcast_precomputed(bd)
         # Revoke access without a full resync: downgrade the tournament + tombstone the
         # private decks for just this user (offline removal is caught by the fp at connect).
@@ -668,36 +671,38 @@ async def upload_banner(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    if not permissions.is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can set the banner"
-        )
-    # Mirror every other tournament mutation: refuse server-side writes while the
-    # tournament is offline-locked, so banner_path can't diverge during the
-    # offline window and get clobbered by the go-online snapshot overwrite.
-    if tournament.offline_mode:
-        raise HTTPException(status_code=423, detail="Tournament is in offline mode")
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        if not permissions.is_organizer(current_user, tournament):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can set the banner"
+            )
+        # Mirror every other tournament mutation: refuse server-side writes while the
+        # tournament is offline-locked, so banner_path can't diverge during the
+        # offline window and get clobbered by the go-online snapshot overwrite.
+        if tournament.offline_mode:
+            raise HTTPException(status_code=423, detail="Tournament is in offline mode")
 
-    if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
-        raise HTTPException(status_code=400, detail="Banner must be webp, png, or jpeg")
+        if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
+            raise HTTPException(
+                status_code=400, detail="Banner must be webp, png, or jpeg"
+            )
 
-    data = await file.read()
-    if len(data) > MAX_BANNER_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Banner too large. Max size: {MAX_BANNER_SIZE // 1024}KB",
-        )
+        data = await file.read()
+        if len(data) > MAX_BANNER_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Banner too large. Max size: {MAX_BANNER_SIZE // 1024}KB",
+            )
 
-    await upsert_banner(uid, data, file.content_type or "image/webp")
+        await upsert_banner(uid, data, file.content_type or "image/webp")
 
-    now = datetime.now(UTC)
-    version = int(now.timestamp() * 1000)  # cache-busting token baked into the URL
-    tournament.banner_path = f"/api/tournaments/{uid}/banner?v={version}"
-    tournament.modified = now
-    bd = await save_tournament(tournament)
+        now = datetime.now(UTC)
+        version = int(now.timestamp() * 1000)  # cache-busting token baked into the URL
+        tournament.banner_path = f"/api/tournaments/{uid}/banner?v={version}"
+        tournament.modified = now
+        bd = await save_tournament(tournament, conn=tx_conn)
     broadcast_precomputed(bd)
 
     return Response(content=b'{"success": true}', media_type="application/json")
@@ -733,24 +738,27 @@ async def delete_banner_image(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    if not permissions.is_organizer(current_user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can remove the banner"
-        )
-    if tournament.offline_mode:
-        raise HTTPException(status_code=423, detail="Tournament is in offline mode")
+    bd = None
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        if not permissions.is_organizer(current_user, tournament):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can remove the banner"
+            )
+        if tournament.offline_mode:
+            raise HTTPException(status_code=423, detail="Tournament is in offline mode")
 
-    deleted = await delete_banner(uid)
-    if tournament.banner_path is not None:
-        tournament.banner_path = None
-        tournament.modified = datetime.now(UTC)
-        bd = await save_tournament(tournament)
+        deleted = await delete_banner(uid)
+        if tournament.banner_path is not None:
+            tournament.banner_path = None
+            tournament.modified = datetime.now(UTC)
+            bd = await save_tournament(tournament, conn=tx_conn)
+        elif not deleted:
+            raise HTTPException(status_code=404, detail="Banner not found")
+
+    if bd is not None:
         broadcast_precomputed(bd)
-    elif not deleted:
-        raise HTTPException(status_code=404, detail="Banner not found")
 
     return Response(content=b'{"success": true}', media_type="application/json")
 
@@ -883,7 +891,9 @@ async def create_tournament(
         finals_time=request.finals_time,
     )
 
-    bd = await save_tournament(tournament)
+    # Fresh uuid7 — no existing row to lock, but save_tournament requires a conn.
+    async with get_connection() as conn:
+        bd = await save_tournament(tournament, conn=conn)
     logger.info(f"Tournament {tournament.uid} created by {current_user.uid}")
 
     broadcast_precomputed(bd)

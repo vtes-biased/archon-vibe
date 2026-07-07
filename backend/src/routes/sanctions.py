@@ -20,6 +20,7 @@ from ..db import (
     get_user_by_uid,
     save_sanction,
     save_tournament,
+    tournament_transaction,
 )
 from ..middleware.auth import OptionalUser
 from ..models import (
@@ -111,58 +112,67 @@ def _validate_expiry(
             )
 
 
-async def _set_player_dq_state(
-    tournament_uid: str, user_uid: str, new_state: PlayerState
+async def _apply_sanction_to_tournament(
+    tournament_uid: str,
+    *,
+    dq_user_uid: str | None = None,
+    dq_state: PlayerState | None = None,
 ) -> None:
-    """Set a player's state on a tournament (for DQ sanctions).
+    """Reflect a sanction change on its tournament under ONE row lock.
 
-    Updates the tournament object and broadcasts the change.
+    Issuing/lifting/deleting a DQ or SA is not a TournamentEvent, so the tournament
+    row must be refreshed out-of-band. This merges the former two-step DQ handling
+    (set player state, then recompute standings) into a single locked read-modify-
+    write + one save/broadcast: the old pair did two unlocked saves back-to-back,
+    each clobbering a concurrent /action commit and double-broadcasting.
+
+    - dq_user_uid/dq_state: set that player's state (create → DISQUALIFIED,
+      lift/delete → FINISHED). Saved even when the tournament has no rounds.
+    - Standings recompute (engine update_standings, the single source of truth for
+      SA scoring) runs whenever the tournament has rounds, over the CURRENT
+      sanctions — so call AFTER the sanction row is saved. No-op without rounds.
+
+    The DQ state is set on the in-memory tournament BEFORE the engine call, so the
+    recompute zeroes the disqualified player; it is re-asserted on the engine output
+    in case update_standings doesn't echo player.state.
     """
-    tournament = await get_tournament_by_uid(tournament_uid)
-    if not tournament:
-        return
-    for player in tournament.players:
-        if player.user_uid == user_uid:
-            player.state = new_state
-            break
-    else:
-        return  # Player not found in tournament
-
-    tournament.modified = datetime.now(UTC)
-    bd = await save_tournament(tournament)
-    broadcast_precomputed(bd)
-
-
-async def _recompute_tournament_standings(tournament_uid: str) -> None:
-    """Refresh a tournament's standings after a standings_adjustment (SA) changes.
-
-    Issuing/lifting/deleting an SA is not a TournamentEvent, so standings would
-    otherwise only pick up the -1 VP penalty on the next tournament action. The
-    engine recompute (same update_standings every event ends with) is the single
-    source of truth, so we don't re-implement SA scoring here. No-op when the
-    tournament has no rounds (the engine guards that too). Call AFTER the sanction
-    mutation is saved, so the refetched sanctions reflect it.
-    """
-    tournament = await get_tournament_by_uid(tournament_uid)
-    if not tournament or not tournament.rounds:
-        return
-    sanctions = await get_sanctions_for_tournament(tournament_uid)
-    sanctions_data = [
-        {
-            "user_uid": s.user_uid,
-            "level": s.level.value,
-            "round_number": s.round_number,
-            "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
-            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
-        }
-        for s in sanctions
-    ]
-    tournament_json = encoder.encode(tournament).decode("utf-8")
-    sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
-    result_json = _engine.update_standings(tournament_json, sanctions_json)
-    updated = msgspec.convert(json.loads(result_json), Tournament)
-    updated.modified = datetime.now(UTC)
-    bd = await save_tournament(updated)
+    async with tournament_transaction(tournament_uid) as (tournament, tx_conn):
+        if tournament is None:
+            return
+        changed = False
+        if dq_user_uid is not None and dq_state is not None:
+            for player in tournament.players:
+                if player.user_uid == dq_user_uid:
+                    player.state = dq_state
+                    changed = True
+                    break
+        if tournament.rounds:
+            sanctions = await get_sanctions_for_tournament(tournament_uid)
+            sanctions_data = [
+                {
+                    "user_uid": s.user_uid,
+                    "level": s.level.value,
+                    "round_number": s.round_number,
+                    "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
+                    "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+                }
+                for s in sanctions
+            ]
+            tournament_json = encoder.encode(tournament).decode("utf-8")
+            sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+            result_json = _engine.update_standings(tournament_json, sanctions_json)
+            tournament = msgspec.convert(json.loads(result_json), Tournament)
+            # Re-assert the DQ state in case the engine rebuilt players without it.
+            if dq_user_uid is not None and dq_state is not None:
+                for player in tournament.players:
+                    if player.user_uid == dq_user_uid:
+                        player.state = dq_state
+                        break
+            changed = True
+        if not changed:
+            return
+        tournament.modified = datetime.now(UTC)
+        bd = await save_tournament(tournament, conn=tx_conn)
     broadcast_precomputed(bd)
 
 
@@ -307,13 +317,14 @@ async def create_sanction(
     # standings so the DQ'd player is zeroed + sorted last immediately (the lift/delete
     # paths below recompute too; a sanction is not a TournamentEvent on its own).
     if level == SanctionLevel.DISQUALIFICATION and request.tournament_uid:
-        await _set_player_dq_state(
-            request.tournament_uid, request.user_uid, PlayerState.DISQUALIFIED
+        await _apply_sanction_to_tournament(
+            request.tournament_uid,
+            dq_user_uid=request.user_uid,
+            dq_state=PlayerState.DISQUALIFIED,
         )
-        await _recompute_tournament_standings(request.tournament_uid)
     # SA sanction: refresh standings so the -1 VP penalty shows immediately
     elif level == SanctionLevel.STANDINGS_ADJUSTMENT and request.tournament_uid:
-        await _recompute_tournament_standings(request.tournament_uid)
+        await _apply_sanction_to_tournament(request.tournament_uid)
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
@@ -477,12 +488,14 @@ async def update_sanction_endpoint(
         and sanction.level == SanctionLevel.DISQUALIFICATION
         and sanction.tournament_uid
     ):
-        await _set_player_dq_state(
-            sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
-        )
         # Restore the un-zeroed scores: the player is no longer DQ'd, so standings
-        # must recompute (the stored standings carry the zeroed totals otherwise).
-        await _recompute_tournament_standings(sanction.tournament_uid)
+        # recompute (the stored standings carry the zeroed totals otherwise) — the
+        # merged helper sets FINISHED and recomputes under one lock.
+        await _apply_sanction_to_tournament(
+            sanction.tournament_uid,
+            dq_user_uid=sanction.user_uid,
+            dq_state=PlayerState.FINISHED,
+        )
 
     # SA touched (lifted, round changed, or level changed to/from SA): refresh
     # standings so the -1 VP penalty appears/clears immediately.
@@ -490,7 +503,7 @@ async def update_sanction_endpoint(
         updated.level == SanctionLevel.STANDINGS_ADJUSTMENT
         or sanction.level == SanctionLevel.STANDINGS_ADJUSTMENT
     ):
-        await _recompute_tournament_standings(sanction.tournament_uid)
+        await _apply_sanction_to_tournament(sanction.tournament_uid)
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
@@ -547,11 +560,12 @@ async def delete_sanction_endpoint(
         and sanction.lifted_at is None
         and sanction.tournament_uid
     ):
-        await _set_player_dq_state(
-            sanction.tournament_uid, sanction.user_uid, PlayerState.FINISHED
-        )
         # Restore the un-zeroed scores (mirrors the lift path above).
-        await _recompute_tournament_standings(sanction.tournament_uid)
+        await _apply_sanction_to_tournament(
+            sanction.tournament_uid,
+            dq_user_uid=sanction.user_uid,
+            dq_state=PlayerState.FINISHED,
+        )
 
     # Deleting an active SA drops its -1 VP penalty: refresh standings
     if (
@@ -559,7 +573,7 @@ async def delete_sanction_endpoint(
         and sanction.lifted_at is None
         and sanction.tournament_uid
     ):
-        await _recompute_tournament_standings(sanction.tournament_uid)
+        await _apply_sanction_to_tournament(sanction.tournament_uid)
 
     # Broadcast to SSE clients
     broadcast_precomputed(bd)
