@@ -2364,6 +2364,14 @@ async def sync_offline(
                 status_code=400, detail="Tournament is not in offline mode"
             )
 
+        # offline_device_id is member-visible, so the device-lock check alone
+        # lets any member overwrite the snapshot — gate on organizer like the
+        # go_offline/go_online/force_takeover siblings.
+        if not permissions.is_organizer(current_user, tournament):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can sync an offline tournament"
+            )
+
         if tournament.offline_device_id != request.device_id:
             raise HTTPException(
                 status_code=409, detail="Device does not hold the offline lock"

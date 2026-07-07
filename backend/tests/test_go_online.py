@@ -339,3 +339,27 @@ async def test_finished_go_online_recomputes_ratings(test_client, test_db):
     # The organizer is not a participant, so was not recomputed.
     org_after = await db.get_user_by_uid(org.uid)
     assert getattr(org_after, category.value) is None
+
+
+@pytest.mark.asyncio
+async def test_sync_offline_rejects_non_organizer(test_client, test_db):
+    """sync-offline must gate on organizer, not just the device lock: the intruder
+    here holds the CORRECT device_id (offline_device_id is member-visible), yet must
+    still be refused — otherwise any member could overwrite the locked snapshot."""
+    org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
+    intruder = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Intruder")
+    await db.save_user(org)
+    await db.save_user(intruder)
+    uid = await _seed(org.uid)
+
+    payload = _offline_tournament_payload(uid, org.uid, "TEMP-x")
+    # A distinguishable name: it would clobber the snapshot if the gate were missing.
+    payload["name"] = "Overwritten"
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/sync-offline",
+        json={"device_id": "devA", "tournament": payload},
+        headers=make_auth_header(intruder.uid),
+    )
+    assert resp.status_code == 403
+    saved = await db.get_tournament_by_uid(uid)
+    assert saved.name == "Offline T"  # snapshot untouched
