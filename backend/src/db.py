@@ -18,6 +18,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from .models import (
     AuthMethod,
+    DeckObject,
     League,
     ObjectType,
     Role,
@@ -196,7 +197,9 @@ async def tournament_transaction(
         try:
             async with conn.transaction():
                 result = await conn.execute(
-                    'SELECT "full" FROM objects WHERE uid = %s FOR UPDATE',
+                    # type predicate: a non-tournament uid must read as absent, not
+                    # decode a foreign row as Tournament and get overwritten in place.
+                    "SELECT \"full\" FROM objects WHERE uid = %s AND type = 'tournament' FOR UPDATE",
                     (uid,),
                 )
                 row = await result.fetchone()
@@ -309,7 +312,6 @@ def decode_json[T](data: str | dict, type_: type[T]) -> T:
 # ---------------------------------------------------------------------------
 
 from .access_levels import compute_full, compute_member, compute_public  # noqa: E402
-from .models import DeckObject  # noqa: E402
 
 
 async def get_decks_for_tournament(
@@ -442,10 +444,13 @@ async def delete_object(
 
 
 def _level_col(level: str) -> str:
-    """Map access level name to quoted SQL column name."""
-    return {"public": '"public"', "member": '"member"', "full": '"full"'}.get(
-        level, '"full"'
-    )
+    """Map access level name to quoted SQL column name.
+
+    Fail-closed: an unknown level raises KeyError rather than silently serving
+    the "full" projection — a mistyped level must never leak fields. Every caller
+    passes a DataLevel value (public/member/full), so this never fires in practice.
+    """
+    return {"public": '"public"', "member": '"member"', "full": '"full"'}[level]
 
 
 async def get_object(uid: str, *, level: str = "full") -> dict | None:
@@ -466,14 +471,28 @@ async def get_object(uid: str, *, level: str = "full") -> dict | None:
         return None
 
 
+# Model class -> stored `type` string. Lets get_object_full constrain its read to
+# the type it will decode into, so a uid of the wrong type reads as absent instead
+# of decoding a foreign row (msgspec fills the defaults) and being written back
+# under EXCLUDED.type — silently transmuting e.g. a User row into a Tournament.
+_OBJECT_TYPES: dict[type, ObjectType] = {
+    User: ObjectType.USER,
+    Sanction: ObjectType.SANCTION,
+    Tournament: ObjectType.TOURNAMENT,
+    League: ObjectType.LEAGUE,
+    DeckObject: ObjectType.DECK,
+}
+
+
 async def get_object_full[T](
     uid: str, type_: type[T], conn: psycopg.AsyncConnection | None = None
 ) -> T | None:
     """Get an object from the objects table, decoded into a typed model."""
+    obj_type = _OBJECT_TYPES[type_]  # KeyError on an unmapped class = fail-closed
     async with _acquire(conn) as conn:
         result = await conn.execute(
-            'SELECT "full" FROM objects WHERE uid = %s',
-            (uid,),
+            'SELECT "full" FROM objects WHERE uid = %s AND type = %s',
+            (uid, obj_type),
         )
         row = await result.fetchone()
         if row and row[0] is not None:
