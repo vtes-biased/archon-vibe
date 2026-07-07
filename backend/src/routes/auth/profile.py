@@ -5,7 +5,7 @@ import secrets
 from datetime import UTC, datetime
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from ... import permissions
@@ -13,13 +13,10 @@ from ...broadcast import broadcast_precomputed
 from ...db import (
     get_auth_methods_for_user,
     get_calendar_token,
-    get_user_by_uid,
     save_user,
 )
+from ...middleware.auth import CurrentUser
 from ...models import CommunityLink, CommunityLinkType
-from ._tokens import (
-    verify_token,
-)
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()
@@ -49,30 +46,15 @@ class ProfileUpdateRequest(BaseModel):
 
 
 @router.get("/me")
-async def get_current_user(
-    authorization: str | None = Header(default=None),
-) -> Response:
-    """Get the current authenticated user.
-
-    Requires Authorization header with Bearer token.
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid authorization header"
-        )
-
-    token = authorization[7:]  # Remove "Bearer " prefix
-    user_uid = verify_token(token, expected_type="access")
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+async def get_me(current_user: CurrentUser) -> Response:
+    """Get the current authenticated user."""
+    user = current_user
 
     # Surface the owner's calendar feed token (kept out of all projections).
-    user.calendar_token = await get_calendar_token(user_uid)
+    user.calendar_token = await get_calendar_token(user.uid)
 
     # Get auth methods for this user (without credential hashes)
-    auth_methods = await get_auth_methods_for_user(user_uid)
+    auth_methods = await get_auth_methods_for_user(user.uid)
     methods_info = [
         {
             "type": m.method_type.value,
@@ -95,24 +77,13 @@ async def get_current_user(
 @router.patch("/me")
 async def update_current_user(
     request: ProfileUpdateRequest,
-    authorization: str | None = Header(default=None),
+    current_user: CurrentUser,
 ) -> Response:
     """Update the current authenticated user's profile.
 
     Only updates fields that are provided (non-None).
-    Requires Authorization header with Bearer token.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid authorization header"
-        )
-
-    token = authorization[7:]
-    user_uid = verify_token(token, expected_type="access")
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = current_user
 
     # Track locally modified fields so VEKN sync won't overwrite them
     local_mods = set(user.local_modifications)
@@ -223,10 +194,10 @@ async def update_current_user(
     broadcast_precomputed(bd)
 
     # Surface the owner's calendar feed token (preserved by COALESCE, not in "full").
-    user.calendar_token = await get_calendar_token(user_uid)
+    user.calendar_token = await get_calendar_token(user.uid)
 
     # Return updated user with auth methods
-    auth_methods = await get_auth_methods_for_user(user_uid)
+    auth_methods = await get_auth_methods_for_user(user.uid)
     methods_info = [
         {
             "type": m.method_type.value,
@@ -247,21 +218,9 @@ async def update_current_user(
 
 
 @router.post("/me/calendar-token")
-async def generate_calendar_token(
-    authorization: str | None = Header(default=None),
-) -> Response:
+async def generate_calendar_token(current_user: CurrentUser) -> Response:
     """Generate or regenerate a calendar subscription token."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid authorization header"
-        )
-
-    token = authorization[7:]
-    user_uid = verify_token(token, expected_type="access")
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = current_user
 
     # Generate new token
     cal_token = secrets.token_urlsafe(32)

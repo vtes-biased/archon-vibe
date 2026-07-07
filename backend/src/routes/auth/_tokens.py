@@ -80,9 +80,10 @@ async def refresh_token_endpoint(request: RefreshRequest) -> Response:
     """Refresh an access token using a refresh token."""
     user_uid = verify_token(request.refresh_token, expected_type="refresh")
 
-    # Verify user still exists
+    # Verify user still exists and is not tombstoned — refresh mints fresh 7d
+    # tokens, so an IC-deleted / merge-absorbed account must not renew here.
     user = await get_user_by_uid(user_uid)
-    if not user:
+    if not user or user.deleted_at:
         raise HTTPException(status_code=401, detail="User not found")
 
     # Generate new tokens

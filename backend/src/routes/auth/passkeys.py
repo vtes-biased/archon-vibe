@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
 import msgspec
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from webauthn import (
     generate_authentication_options,
@@ -28,18 +28,17 @@ from ...db import (
     get_auth_method_by_identifier,
     get_auth_methods_for_user,
     get_transient_token,
-    get_user_by_uid,
     insert_auth_method,
     save_user,
     store_transient_token,
     update_auth_method,
 )
+from ...middleware.auth import CurrentUser
 from ...models import AuthMethod, AuthMethodType, User
 from ._tokens import (
     TokenResponse,
     create_access_token,
     create_refresh_token,
-    verify_token,
 )
 
 router = APIRouter()
@@ -64,22 +63,13 @@ class PasskeyLoginVerifyRequest(BaseModel):
 
 
 @router.post("/passkey/register/options")
-async def passkey_register_options(
-    authorization: str = Header(..., description="Bearer token"),
-) -> Response:
+async def passkey_register_options(current_user: CurrentUser) -> Response:
     """Generate passkey registration options for an authenticated user.
 
     User must be logged in to register a passkey.
     """
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization[7:]
-    user_uid = verify_token(token, expected_type="access")
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = current_user
+    user_uid = user.uid
 
     # Get existing passkey credentials to exclude
     auth_methods = await get_auth_methods_for_user(user_uid)
@@ -125,14 +115,10 @@ async def passkey_register_options(
 @router.post("/passkey/register/verify")
 async def passkey_register_verify(
     request: PasskeyRegisterVerifyRequest,
-    authorization: str = Header(..., description="Bearer token"),
+    current_user: CurrentUser,
 ) -> Response:
     """Verify passkey registration and save the credential."""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization[7:]
-    user_uid = verify_token(token, expected_type="access")
+    user_uid = current_user.uid
 
     # Find the challenge
     client_data_json = base64.urlsafe_b64decode(

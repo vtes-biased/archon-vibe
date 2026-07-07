@@ -34,6 +34,7 @@ from ...db import (
     save_user,
     store_transient_token,
 )
+from ...middleware.auth import CurrentUser
 from ._tokens import verify_token
 
 router = APIRouter()
@@ -174,7 +175,7 @@ async def github_callback(
     github_id = str(gh_id)
 
     user = await get_user_by_uid(user_uid)
-    if not user:
+    if not user or user.deleted_at:
         return fail("github_error")
     if user.github_id != github_id or user.github_login != github_login:
         user.github_id = github_id
@@ -188,19 +189,9 @@ async def github_callback(
 
 
 @router.post("/github/unlink")
-async def github_unlink(
-    authorization: str | None = Header(default=None),
-) -> Response:
+async def github_unlink(current_user: CurrentUser) -> Response:
     """Clear the caller's linked GitHub account."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid authorization header"
-        )
-    user_uid = verify_token(authorization[7:], expected_type="access")
-
-    user = await get_user_by_uid(user_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = current_user
     if user.github_id or user.github_login:
         user.github_id = None
         user.github_login = None

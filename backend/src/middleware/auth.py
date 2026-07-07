@@ -95,7 +95,11 @@ async def get_current_user(
         ) from err
 
     user = await get_user_by_uid(user_uid)
-    if not user:
+    # Tombstoned accounts (IC-deleted or merge-absorbed) must stop authenticating
+    # here, the single resolution point every first-party handler funnels through.
+    # deleted_at is set ONLY by soft_delete_user (manual delete / merge) — no
+    # expiry path tombstones users, so this never locks out a live member.
+    if not user or user.deleted_at:
         raise HTTPException(status_code=401, detail="User not found")
 
     return user
