@@ -98,192 +98,19 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
             )
 
 
-# --- Sponsorship Modal ---
-
-
-class SponsorshipModal(miru.Modal, title="New Player Registration"):
-    country = miru.TextInput(
-        label="Country (ISO code, e.g., US, FR, DE)",
-        placeholder="US",
-        required=True,
-        min_length=2,
-        max_length=2,
-    )
-    city = miru.TextInput(
-        label="City (optional)",
-        placeholder="New York",
-        required=False,
-    )
-
-    def __init__(
-        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, guild_id: str
-    ) -> None:
-        super().__init__()
-        self._store = store
-        self._api = api
-        self._tournament_uid = tournament_uid
-        self._guild_id = guild_id
-
-    async def callback(self, ctx: miru.ModalContext) -> None:
-        discord_id = str(ctx.user.id)
-        info = await fetch_userinfo(self._api, ctx, discord_id)
-        if info is None:
-            return
-
-        link = await self._store.get_tournament_link(
-            self._guild_id, self._tournament_uid
-        )
-        if not link:
-            await ctx.respond(
-                "Tournament configuration not found. Ask an organizer to run `/setup` again.",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-            return
-
-        judges_id = int(link["judges_channel_id"])
-
-        view = SponsorshipView(
-            self._store,
-            self._api,
-            self._tournament_uid,
-            player_discord_id=discord_id,
-            player_uid=info.data["sub"],
-            country=self.country.value.strip().upper(),
-            city=self.city.value.strip() if self.city.value else "",
-        )
-
-        try:
-            await ctx.client.app.rest.create_message(
-                judges_id,
-                f"**New player sponsorship request**\n"
-                f"Player: <@{discord_id}>\n"
-                f"Country: {self.country.value.strip().upper()}\n"
-                f"City: {self.city.value.strip() or 'N/A'}",
-                components=view,
-            )
-        except hikari.ForbiddenError:
-            await ctx.respond(
-                "Cannot post to the judges channel. The bot may be missing permissions.",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-            return
-
-        await ctx.respond(
-            "Your sponsorship request has been sent to the judges. Please wait for approval.",
-            flags=hikari.MessageFlag.EPHEMERAL,
-        )
-
-
-# --- Sponsorship Approve/Deny Buttons ---
-
-
-class SponsorshipView(miru.View):
-    def __init__(
-        self,
-        store: TokenStore,
-        api: ArchonAPI,
-        tournament_uid: str,
-        player_discord_id: str,
-        player_uid: str,
-        country: str,
-        city: str,
-    ) -> None:
-        super().__init__(timeout=3600)
-        self._store = store
-        self._api = api
-        self._tournament_uid = tournament_uid
-        self._player_discord_id = player_discord_id
-        self._player_uid = player_uid
-        self._country = country
-        self._city = city
-
-    @miru.button(label="Approve", style=hikari.ButtonStyle.SUCCESS)
-    async def approve(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        organizer_discord_id = str(ctx.user.id)
-
-        info = await fetch_userinfo(self._api, ctx, organizer_discord_id)
-        if info is None:
-            return
-
-        roles = set(info.data.get("roles", []))
-        if not roles & {"IC", "NC", "Prince"}:
-            await ctx.respond(
-                "You need NC, Prince, or IC rights to sponsor players.",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-            return
-
-        sponsor = await self._api.sponsor_player(
-            organizer_discord_id, self._player_uid, self._country, self._city
-        )
-        if not sponsor.ok:
-            await ctx.respond(
-                f"Sponsorship failed: {sponsor.error}",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-            return
-
-        # Auto check-in the player
-        reg = await self._api.tournament_action(
-            self._player_discord_id,
-            self._tournament_uid,
-            "CheckIn",
-            player_uid=self._player_uid,
-        )
-        status = (
-            "Sponsored and checked in!"
-            if reg.ok
-            else f"Sponsored, but check-in failed: {reg.error}"
-        )
-        await ctx.edit_response(
-            f"**Approved** by <@{organizer_discord_id}>. {status}",
-            components=[],
-        )
-        self.stop()
-
-    @miru.button(label="Deny", style=hikari.ButtonStyle.DANGER)
-    async def deny(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        await ctx.edit_response(
-            f"**Denied** by <@{ctx.user.id}>.",
-            components=[],
-        )
-        self.stop()
-
-    async def on_timeout(self) -> None:
-        try:
-            if self.message:
-                await self.message.edit(
-                    "**Sponsorship request expired** (1 hour timeout).",
-                    components=[],
-                )
-        except Exception:
-            pass
-
-
-# --- VEKN Choice Buttons ---
+# --- VEKN ID Claim Button ---
 
 
 class VeknChoiceView(miru.View):
-    def __init__(
-        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, guild_id: str
-    ) -> None:
+    def __init__(self, store: TokenStore, api: ArchonAPI, tournament_uid: str) -> None:
         super().__init__(timeout=300)
         self._store = store
         self._api = api
         self._tournament_uid = tournament_uid
-        self._guild_id = guild_id
 
     @miru.button(label="I have a VEKN ID", style=hikari.ButtonStyle.PRIMARY)
     async def has_vekn(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         modal = VeknIdModal(self._store, self._api, self._tournament_uid)
-        await ctx.respond_with_modal(modal)
-        self.stop()
-
-    @miru.button(label="I'm new", style=hikari.ButtonStyle.SECONDARY)
-    async def is_new(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        modal = SponsorshipModal(
-            self._store, self._api, self._tournament_uid, self._guild_id
-        )
         await ctx.respond_with_modal(modal)
         self.stop()
 
@@ -370,12 +197,15 @@ async def _handle_registration_pipeline(
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
     else:
-        # No VEKN ID → show choice buttons
-        guild_id = str(ctx.guild_id) if ctx.guild_id else "0"
-        view = VeknChoiceView(store, api, tournament_uid, guild_id)
+        # No VEKN ID linked. If they already have one, let them claim it here;
+        # new players are created at the door by an official (sponsorship is no
+        # longer a bot flow — the desk curates the member list).
+        view = VeknChoiceView(store, api, tournament_uid)
         await ctx.respond(
             "**You need a VEKN ID to play.**\n"
-            "Do you already have one, or are you a new player?",
+            "If you already have one, tap the button below to link it.\n"
+            "If you're new to VTES, see a tournament official at the "
+            "check-in desk — they'll register you.",
             components=view,
             flags=hikari.MessageFlag.EPHEMERAL,
         )

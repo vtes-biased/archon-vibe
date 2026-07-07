@@ -228,17 +228,6 @@ class ArchonAPI:
             "POST", "/vekn/claim", discord_id, json_body={"vekn_id": vekn_id}
         )
 
-    async def sponsor_player(
-        self, organizer_discord_id: str, player_uid: str, country: str, city: str = ""
-    ) -> ApiResult:
-        """Sponsor a new VEKN member via POST /vekn/sponsor."""
-        payload: dict = {"user_uid": player_uid, "country": country}
-        if city:
-            payload["city"] = city
-        return await self._request(
-            "POST", "/vekn/sponsor", organizer_discord_id, json_body=payload
-        )
-
     async def create_sanction(
         self,
         discord_id: str,
