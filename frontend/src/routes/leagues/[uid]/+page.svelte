@@ -10,7 +10,7 @@
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { canEditLeague, computeLeagueStandings } from "$lib/engine";
-  import { translateTournamentState } from "$lib/tournament-utils";
+  import { translateTournamentState, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
@@ -127,7 +127,8 @@
         const tournamentData = finishedTournaments.map(t => ({
           uid: t.uid,
           rank: t.rank || "",
-          player_count: t.players?.length || 0,
+          // Match ratings.py: players seated in ≥1 round (not all registered incl. no-shows).
+          player_count: seatedPlayerCount(t),
           winner: t.winner || "",
           standings: (t.standings || []).map(s => ({
             user_uid: s.user_uid,
@@ -135,6 +136,8 @@
             vp: s.vp,
             tp: s.tp,
             finalist: s.finalist,
+            disqualified: s.disqualified,
+            non_competing: s.non_competing,
           })),
           finals: t.finals?.seating?.map(s => ({
             player_uid: s.player_uid,

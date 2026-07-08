@@ -486,7 +486,7 @@ export async function computeLeagueStandings(
     rank: string;
     player_count: number;
     winner?: string;
-    standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; finalist: boolean }>;
+    standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; finalist: boolean; disqualified?: boolean; non_competing?: boolean }>;
     finals: Array<{ player_uid: string; gw: number; vp: number; tp: number }>;
   }>
 ): Promise<Array<{

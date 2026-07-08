@@ -98,6 +98,13 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
             if standing["non_competing"].as_bool().unwrap_or(false) {
                 continue;
             }
+            // DQ'd: earns no league standing either — their row is zeroed, so keeping
+            // it would still collect the RTP participation base / a GP bucket slot.
+            // Mirrors ratings.py _is_disqualified (a DQ earns no rating). player_count
+            // is unaffected (it still counts them, lifting others' coefficient).
+            if standing["disqualified"].as_bool().unwrap_or(false) {
+                continue;
+            }
             let gw = standing["gw"].as_f64().unwrap_or(0.0);
             let vp = standing["vp"].as_f64().unwrap_or(0.0);
             let tp = standing["tp"].as_i32().unwrap_or(0);
@@ -653,5 +660,29 @@ mod tests {
         let config = r#"{"standings_mode": "RTP", "tournaments": []}"#;
         let result = compute_league_standings(config).unwrap();
         assert_eq!(result, "[]");
+    }
+
+    #[test]
+    fn test_disqualified_excluded_from_standings() {
+        // A DQ'd player (zeroed row) must not appear in the league table — no RTP
+        // participation base, no tournaments_count. Mirrors the non_competing skip.
+        let config = r#"{
+            "standings_mode": "RTP",
+            "tournaments": [{
+                "uid": "t1", "rank": "", "player_count": 10, "winner": "p1",
+                "standings": [
+                    {"user_uid": "p1", "gw": 2.0, "vp": 4.0, "tp": 120, "finalist": false},
+                    {"user_uid": "p2", "gw": 0.0, "vp": 0.0, "tp": 0, "finalist": false, "disqualified": true}
+                ],
+                "finals": []
+            }]
+        }"#;
+        let parsed = json::parse(&compute_league_standings(config).unwrap()).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0]["user_uid"].as_str().unwrap(), "p1");
+        assert!(
+            parsed.members().all(|e| e["user_uid"] != "p2"),
+            "DQ'd player must not earn a league entry"
+        );
     }
 }

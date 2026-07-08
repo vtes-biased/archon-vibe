@@ -330,6 +330,27 @@ export function roundsPlayed(tournament: Tournament, uid: string): number {
   ).length;
 }
 
+/** Distinct players seated in ≥1 preliminary round (finals seats folded in), or —
+ *  for a rounds-less VEKN import — standings rows carrying any score. Mirrors backend
+ *  ratings.py `_players_with_rounds`/`_player_count` so league RTP shares the exact
+ *  field size that feeds every profile-rating coefficient (t.players.length would
+ *  over-count no-shows). Stays inclusive of DQ'd players: their head-count still lifts
+ *  everyone else's finalist coefficient. */
+export function seatedPlayerCount(tournament: Tournament): number {
+  const rounds = tournament.rounds ?? [];
+  if (rounds.length) {
+    const played = new Set<string>();
+    for (const round of rounds)
+      for (const table of round)
+        for (const seat of table.seating ?? [])
+          if (seat.player_uid) played.add(seat.player_uid);
+    for (const seat of tournament.finals?.seating ?? [])
+      if (seat.player_uid) played.add(seat.player_uid);
+    return played.size;
+  }
+  return (tournament.standings ?? []).filter((s) => s.gw || s.vp || s.tp).length;
+}
+
 export function translateStandingsMode(mode: string | undefined): string {
   switch (mode) {
     case "Private": return m.tournament_standings_private();
