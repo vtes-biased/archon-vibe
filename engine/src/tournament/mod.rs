@@ -1279,6 +1279,10 @@ fn apply_event(
                 round_tables[*table2]["seating"][*seat2]["player_uid"] = uid1.as_str().into();
             }
 
+            // Seats moved under standing results — recompute (no later FinishRound
+            // refreshes when this fires in Finished state). No-op for the finals
+            // branch: prelim standings read from rounds only.
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1462,6 +1466,9 @@ fn apply_event(
                 }
             }
 
+            // Refresh after the reseat (no later round event refreshes in Finished
+            // state). No-op for the finals branch: prelim standings read rounds only.
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1530,6 +1537,7 @@ fn apply_event(
 
             // Set player state to Playing
             tournament["players"][player_idx]["state"] = "Playing".into();
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1567,10 +1575,17 @@ fn apply_event(
                 });
             }
 
-            // Set player state back to Registered
+            // Reset player state — mirror CheckOut: Finished tournament keeps the
+            // player Finished, otherwise back to Registered.
             if let Some(idx) = find_player_index(&tournament["players"], player_uid) {
-                tournament["players"][idx]["state"] = "Registered".into();
+                tournament["players"][idx]["state"] = if state == TournamentState::Finished {
+                    "Finished"
+                } else {
+                    "Registered"
+                }
+                .into();
             }
+            update_standings(tournament, sanctions);
             Ok(())
         }
 

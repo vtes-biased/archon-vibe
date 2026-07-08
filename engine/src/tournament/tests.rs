@@ -2059,6 +2059,63 @@ fn test_alter_seating_invalid_state_fails() {
         .contains("Cannot alter seating"));
 }
 
+// SwapSeats is reachable in Finished state (require_state_or_finished), where no later
+// FinishRound/finals refreshes standings. Because it swaps player_uids but leaves each
+// seat's result in place, a swap silently *exchanges* two scored players' standings — and
+// those stored standings feed ratings, the vekn.net push, and exports. Regression guard for
+// #359: after the swap, the stored standings must credit each player with the score at the
+// seat they now occupy (gw + vp move with them), not the pre-swap arrangement.
+#[test]
+fn test_swap_seats_in_finished_refreshes_standings() {
+    let mut t = make_tournament();
+    t["state"] = "Finished".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Finished", payment_status: "Pending", toss: 0 },
+    ];
+    // One finished table, engine-valid VP vector (single oust, sum == 4). p1 is the clear
+    // game winner (vp 2.0 -> gw 1.0 via compute_gw); p4 has nothing (vp 0.0 -> gw 0.0).
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+    ];
+    // Pre-swap standings, as they stood when the tournament finished. The bug is that these go
+    // *stale* on a swap (not that they go missing) — pre-seeding them makes the pre-fix path
+    // pass them through untouched, so the test pins staleness, not absence.
+    t["standings"] = json::array![
+        { user_uid: "p1", gw: 1.0, vp: 2.0, tp: 0.0, toss: 0, finalist: false, disqualified: false, non_competing: false },
+        { user_uid: "p2", gw: 0.0, vp: 1.0, tp: 0.0, toss: 0, finalist: false, disqualified: false, non_competing: false },
+        { user_uid: "p3", gw: 0.0, vp: 1.0, tp: 0.0, toss: 0, finalist: false, disqualified: false, non_competing: false },
+        { user_uid: "p4", gw: 0.0, vp: 0.0, tp: 0.0, toss: 0, finalist: false, disqualified: false, non_competing: false },
+    ];
+
+    // Swap the game winner (seat 0) with the last-place player (seat 3) on the scored table.
+    let event = json::object! {
+        type: "SwapSeats", round: 0, table1: 0, seat1: 0, table2: 0, seat2: 3,
+    };
+    let out = json::parse(&run_event(&t, &event, &make_organizer()).expect("swap")).unwrap();
+
+    let standing = |uid: &str| {
+        out["standings"]
+            .members()
+            .find(|s| s["user_uid"].as_str() == Some(uid))
+            .unwrap_or_else(|| panic!("no standing for {uid}"))
+            .clone()
+    };
+    // The score (and the game win) moved to the seat's new occupant: p4 now holds p1's result,
+    // p1 now holds p4's. Pre-fix, standings were left untouched -> p4 would still read vp 0.0.
+    assert_eq!(standing("p4")["vp"].as_f64(), Some(2.0));
+    assert_eq!(standing("p4")["gw"].as_f64(), Some(1.0));
+    assert_eq!(standing("p1")["vp"].as_f64(), Some(0.0));
+    assert_eq!(standing("p1")["gw"].as_f64(), Some(0.0));
+}
+
 #[test]
 fn test_update_config_basic() {
     let tournament = make_tournament();
