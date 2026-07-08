@@ -30,9 +30,10 @@ use types::VpError;
 // Import everything needed for apply_event from submodules
 use crate::error::EngineError;
 use helpers::{
-    all_rounds_finished, collect_previous_rounds, count_player_rounds_played, find_player_index,
-    is_deck_locked, player_exists, players_in_other_active_rounds, require_can_edit_results,
-    require_organizer, require_state, require_state_or_finished, validate_enum,
+    all_rounds_finished, collect_previous_rounds, count_played_rounds, count_player_rounds_played,
+    find_player_index, is_deck_locked, player_exists, players_in_other_active_rounds,
+    require_can_edit_results, require_organizer, require_state, require_state_or_finished,
+    validate_enum,
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
@@ -1386,6 +1387,11 @@ fn apply_event(
                             let rd = &tournament["rounds"][r];
                             let mut tables = Vec::new();
                             for t in 0..rd.len() {
+                                // A soft-cancelled table's pairing was voided — it must
+                                // not constrain R1 (mirrors collect_previous_rounds).
+                                if rd[t]["state"].as_str() == Some("Cancelled") {
+                                    continue;
+                                }
                                 let mut tbl = Vec::new();
                                 for s in 0..rd[t]["seating"].len() {
                                     tbl.push(
@@ -1869,7 +1875,7 @@ fn apply_event(
         TournamentEvent::SetToss { player_uid, toss } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
-            if tournament["rounds"].len() < 2 {
+            if count_played_rounds(tournament) < 2 {
                 return Err(EngineError::TossMinRounds);
             }
             let idx = find_player_index(&tournament["players"], player_uid)
@@ -1881,7 +1887,7 @@ fn apply_event(
         TournamentEvent::RandomToss => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
-            if tournament["rounds"].len() < 2 {
+            if count_played_rounds(tournament) < 2 {
                 return Err(EngineError::TossMinRounds);
             }
 
@@ -1957,7 +1963,7 @@ fn apply_event(
         TournamentEvent::StartFinals => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
-            if tournament["rounds"].len() < 2 {
+            if count_played_rounds(tournament) < 2 {
                 return Err(EngineError::FinalsMinRounds);
             }
             if !tournament["finals"].is_null() {

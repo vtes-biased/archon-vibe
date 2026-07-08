@@ -1806,6 +1806,65 @@ fn test_start_finals_includes_completed_excludes_withdrawn() {
     assert_eq!(seated.len(), 5);
 }
 
+// #362: the finals/toss two-round minimum must count *played* rounds, not `rounds.len()`. A
+// fully soft-cancelled round did not happen, so one real round + one cancelled round must NOT
+// satisfy the minimum — otherwise an organizer starts (and VEKN/ratings silently receive) a
+// finals decided on a single round. Asserted at the StartFinals gate, the shared
+// `count_played_rounds` carrier: SetToss/RandomToss route through the same helper, so this one
+// test guards all three. Reach the state through the real engine (CancelRound a non-last round,
+// land in Waiting), not a hand-built Cancelled fixture. Pre-fix the gate tested rounds.len() (2)
+// and this returned Ok, illegitimately seating a 5-player final; post-fix it counts 1 and refuses.
+#[test]
+fn test_start_finals_rejects_when_only_one_round_survived_cancellation() {
+    let mut t = make_tournament();
+    t["state"] = "Playing".into();
+    // Two parallel pods: round 0 (q-pod) still in progress — the one we cancel; round 1 (p-pod)
+    // a finished, valid single-oust 5-seat table (VP sum == table size).
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 5 },
+        { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 4 },
+        { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 3 },
+        { user_uid: "p4", state: "Checked-in", payment_status: "Pending", toss: 2 },
+        { user_uid: "p5", state: "Checked-in", payment_status: "Pending", toss: 1 },
+        { user_uid: "q1", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q2", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q3", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q4", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q5", state: "Playing", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "q1", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "q2", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "q3", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "q4", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            { player_uid: "q5", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+        ], state: "In Progress", override: json::Null } ],
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+    ];
+
+    let org = make_organizer();
+    // Soft-cancel the non-last round through the real engine; with the other round Finished the
+    // tournament lands in Waiting (finals-reachable) with exactly one *played* round remaining.
+    let cancelled = json::parse(
+        &run_event(&t, &json::object! { type: "CancelRound", round: 0 }, &org).expect("cancel"),
+    )
+    .unwrap();
+    assert_eq!(cancelled["state"].as_str(), Some("Waiting"));
+    assert_eq!(cancelled["rounds"][0][0]["state"].as_str(), Some("Cancelled"));
+    assert_eq!(cancelled["rounds"][1][0]["state"].as_str(), Some("Finished"));
+
+    // The gate counts played rounds (1), not rounds.len() (2), and refuses the finals.
+    let err = run_event(&cancelled, &json::object! { type: "StartFinals" }, &org).unwrap_err();
+    assert!(matches!(err, EngineError::FinalsMinRounds));
+}
+
 // Open rounds: CancelFinals reverts a seated finals back to Waiting so a no-show finalist can be
 // dropped and the field re-seated. Capped finalists must return to Completed (not Checked-in) so
 // they aren't re-armed for another preliminary round.

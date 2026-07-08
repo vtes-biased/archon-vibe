@@ -140,6 +140,21 @@ pub(super) fn collect_previous_rounds(tournament: &JsonValue) -> Vec<Vec<Vec<Str
         .collect()
 }
 
+/// Rounds that actually happened, for the finals/toss two-round minimum. A round
+/// counts only while it still has a non-`Cancelled` table — a fully soft-cancelled
+/// round did not really happen. Mirrors the `Cancelled` filter in
+/// [`collect_previous_rounds`], so `rounds.len()` can't be gamed by a voided round.
+pub(super) fn count_played_rounds(tournament: &JsonValue) -> usize {
+    tournament["rounds"]
+        .members()
+        .filter(|round| {
+            round
+                .members()
+                .any(|table| table["state"].as_str() != Some("Cancelled"))
+        })
+        .count()
+}
+
 /// Collect user UIDs of players still playing in rounds other than `exclude_round`.
 pub(super) fn players_in_other_active_rounds(
     tournament: &JsonValue,
