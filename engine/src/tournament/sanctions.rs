@@ -115,11 +115,29 @@ pub(super) fn has_dq_sanction(sanctions: &JsonValue, player_uid: &str) -> bool {
     })
 }
 
-/// Check if a player has an active suspension.
-pub(super) fn has_active_suspension(sanctions: &JsonValue, player_uid: &str) -> bool {
+/// Check if a player has an active suspension. Active = not lifted, not deleted,
+/// and either no expiry or `expires_at` still in the future relative to `now`.
+///
+/// `now` is the request timestamp from the actor context; it and `expires_at` are
+/// emitted in the same ISO-8601 UTC format per caller (backend `+00:00`, frontend
+/// `…Z`), so lexicographic order equals chronological order (fixed-width
+/// `YYYY-MM-DDTHH:MM:SS` prefix). An absent `expires_at` (permanent suspension) or
+/// an empty `now` (no clock supplied) both keep the suspension active — never
+/// auto-lift without a reference time.
+pub(super) fn has_active_suspension(sanctions: &JsonValue, player_uid: &str, now: &str) -> bool {
     sanctions.members().any(|s| {
         is_sanction_active(s)
             && s["level"].as_str() == Some("suspension")
             && s["user_uid"].as_str() == Some(player_uid)
+            && !suspension_expired(s, now)
     })
+}
+
+/// A suspension is expired when it carries an `expires_at` at or before `now`.
+/// Absent expiry (permanent) or empty `now` (no clock) → not expired.
+fn suspension_expired(s: &JsonValue, now: &str) -> bool {
+    match s["expires_at"].as_str() {
+        Some(exp) if !now.is_empty() => exp <= now,
+        _ => false,
+    }
 }

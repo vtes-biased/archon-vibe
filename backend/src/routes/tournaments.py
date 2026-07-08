@@ -387,6 +387,8 @@ def _build_actor_context(
         "roles": [r.value if hasattr(r, "value") else str(r) for r in user.roles],
         "is_organizer": permissions.is_organizer(user, tournament),
         "can_organize_league_uids": can_organize_league_uids or [],
+        # Request clock: lets the engine resolve suspension expiry (expires_at vs now).
+        "now": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1262,6 +1264,10 @@ async def tournament_action(
                 "round_number": s.round_number,
                 "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
                 "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+                # UTC-canonical to match actor.now's format for the engine's expiry compare.
+                "expires_at": (
+                    s.expires_at.astimezone(UTC).isoformat() if s.expires_at else None
+                ),
             }
             for s in tournament_sanctions
         ]

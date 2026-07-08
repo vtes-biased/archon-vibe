@@ -281,6 +281,9 @@ pub struct ActorContext {
     pub roles: Vec<String>,
     pub is_organizer: bool,
     pub can_organize_league_uids: Vec<String>,
+    /// Request timestamp (ISO-8601 UTC), used to resolve time-derived sanction
+    /// state (suspension expiry). Empty when the caller supplies no clock.
+    pub now: String,
 }
 
 impl ActorContext {
@@ -298,11 +301,13 @@ impl ActorContext {
             .members()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
+        let now = value["now"].as_str().unwrap_or("").to_string();
         Ok(Self {
             uid,
             roles,
             is_organizer,
             can_organize_league_uids,
+            now,
         })
     }
 

@@ -316,7 +316,7 @@ fn apply_event(
             if has_dq_sanction(sanctions, user_uid) {
                 return Err(EngineError::PlayerDisqualified);
             }
-            if has_active_suspension(sanctions, user_uid) {
+            if has_active_suspension(sanctions, user_uid, &actor.now) {
                 return Err(EngineError::PlayerSuspended);
             }
 
@@ -381,7 +381,7 @@ fn apply_event(
             if has_dq_sanction(sanctions, user_uid) {
                 return Err(EngineError::PlayerDisqualified);
             }
-            if has_active_suspension(sanctions, user_uid) {
+            if has_active_suspension(sanctions, user_uid, &actor.now) {
                 return Err(EngineError::PlayerSuspended);
             }
 
@@ -485,7 +485,7 @@ fn apply_event(
                     if has_dq_sanction(sanctions, player_uid) {
                         return Err(EngineError::PlayerDisqualified);
                     }
-                    if has_active_suspension(sanctions, player_uid) {
+                    if has_active_suspension(sanctions, player_uid, &actor.now) {
                         return Err(EngineError::PlayerSuspended);
                     }
                     let mut player = json::object! {
@@ -516,7 +516,7 @@ fn apply_event(
             if has_dq_sanction(sanctions, player_uid) {
                 return Err(EngineError::PlayerDisqualified);
             }
-            if has_active_suspension(sanctions, player_uid) {
+            if has_active_suspension(sanctions, player_uid, &actor.now) {
                 return Err(EngineError::PlayerSuspended);
             }
 
@@ -593,7 +593,9 @@ fn apply_event(
                     continue;
                 }
                 let uid = players[i]["user_uid"].as_str().unwrap_or("");
-                if has_dq_sanction(sanctions, uid) || has_active_suspension(sanctions, uid) {
+                if has_dq_sanction(sanctions, uid)
+                    || has_active_suspension(sanctions, uid, &actor.now)
+                {
                     continue;
                 }
                 if capped.contains(uid) {

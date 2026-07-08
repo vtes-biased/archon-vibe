@@ -172,6 +172,7 @@ export interface ActorContext {
   roles: string[];
   is_organizer: boolean;
   can_organize_league_uids: string[];
+  now?: string; // request timestamp (ISO-8601 UTC); resolves suspension expiry in the engine
 }
 
 /**
@@ -188,6 +189,9 @@ export function buildSanctionsPayload(sanctions: Sanction[]): string {
         round_number: s.round_number ?? null,
         lifted_at: s.lifted_at ?? null,
         deleted_at: s.deleted_at ?? null,
+        // Canonicalize to match actor.now's toISOString() format so the engine's
+        // lexicographic expires_at vs now compare is chronological (suspension expiry).
+        expires_at: s.expires_at ? new Date(s.expires_at).toISOString() : null,
       }))
   );
 }
@@ -560,7 +564,7 @@ export async function buildActorContext(
   user: User | null, tournament: Tournament, actionType?: string
 ): Promise<ActorContext> {
   if (!user) {
-    return { uid: '', roles: [], is_organizer: false, can_organize_league_uids: [] };
+    return { uid: '', roles: [], is_organizer: false, can_organize_league_uids: [], now: new Date().toISOString() };
   }
   // This context feeds engine action validation, so the checks must be
   // authoritative — ensure WASM is loaded rather than fail-closed.
@@ -578,6 +582,7 @@ export async function buildActorContext(
     roles: user.roles || [],
     is_organizer: isOrganizer(user, tournament),
     can_organize_league_uids: canOrganize,
+    now: new Date().toISOString(),
   };
 }
 

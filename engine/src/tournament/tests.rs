@@ -1576,6 +1576,48 @@ fn test_suspension_blocks_checkin() {
 }
 
 #[test]
+fn test_expired_suspension_does_not_block_checkin() {
+    // The engine honors expires_at (via actor.now): a suspension expired at/before
+    // now is auto-lifted so CheckIn passes, while one expiring in the future still
+    // rejects. Guards the payload-builder → actor.now → has_active_suspension wiring.
+    let mut tournament = make_tournament();
+    tournament["state"] = "Waiting".into();
+    tournament["players"] = json::array![
+        { user_uid: "p1", state: "Registered", payment_status: "Pending", toss: 0 },
+    ];
+    let event = json::object! { type: "CheckIn", player_uid: "p1" };
+    let mut actor = make_organizer();
+    actor["now"] = "2026-07-08T00:00:00+00:00".into();
+
+    let expired = json::array![
+        { user_uid: "p1", level: "suspension", expires_at: "2026-06-01T00:00:00+00:00", lifted_at: json::Null, deleted_at: json::Null }
+    ];
+    let ok = process_tournament_event(
+        &tournament.dump(),
+        &event.dump(),
+        &actor.dump(),
+        &expired.dump(),
+        &no_decks(),
+    );
+    assert!(ok.is_ok(), "expired suspension must not block check-in");
+
+    let active = json::array![
+        { user_uid: "p1", level: "suspension", expires_at: "2026-08-01T00:00:00+00:00", lifted_at: json::Null, deleted_at: json::Null }
+    ];
+    let err = process_tournament_event(
+        &tournament.dump(),
+        &event.dump(),
+        &actor.dump(),
+        &active.dump(),
+        &no_decks(),
+    );
+    assert!(
+        err.is_err() && err.unwrap_err().to_string().contains("suspended"),
+        "unexpired suspension must still block check-in"
+    );
+}
+
+#[test]
 fn test_checkinall_skips_dq_players() {
     let mut tournament = make_tournament();
     tournament["state"] = "Waiting".into();
