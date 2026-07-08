@@ -1978,8 +1978,14 @@ fn test_start_finals_rejects_when_only_one_round_survived_cancellation() {
     )
     .unwrap();
     assert_eq!(cancelled["state"].as_str(), Some("Waiting"));
-    assert_eq!(cancelled["rounds"][0][0]["state"].as_str(), Some("Cancelled"));
-    assert_eq!(cancelled["rounds"][1][0]["state"].as_str(), Some("Finished"));
+    assert_eq!(
+        cancelled["rounds"][0][0]["state"].as_str(),
+        Some("Cancelled")
+    );
+    assert_eq!(
+        cancelled["rounds"][1][0]["state"].as_str(),
+        Some("Finished")
+    );
 
     // The gate counts played rounds (1), not rounds.len() (2), and refuses the finals.
     let err = run_event(&cancelled, &json::object! { type: "StartFinals" }, &org).unwrap_err();
