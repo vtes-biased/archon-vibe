@@ -1379,33 +1379,11 @@ fn apply_event(
 
                 // R1 check: reject predator-prey repeats
                 {
-                    let mut check_rounds: Vec<Vec<Vec<String>>> = Vec::new();
-                    for r in 0..rounds_len {
-                        if r == *round {
-                            check_rounds.push(seating.clone());
-                        } else {
-                            let rd = &tournament["rounds"][r];
-                            let mut tables = Vec::new();
-                            for t in 0..rd.len() {
-                                // A soft-cancelled table's pairing was voided — it must
-                                // not constrain R1 (mirrors collect_previous_rounds).
-                                if rd[t]["state"].as_str() == Some("Cancelled") {
-                                    continue;
-                                }
-                                let mut tbl = Vec::new();
-                                for s in 0..rd[t]["seating"].len() {
-                                    tbl.push(
-                                        rd[t]["seating"][s]["player_uid"]
-                                            .as_str()
-                                            .unwrap_or("")
-                                            .to_string(),
-                                    );
-                                }
-                                tables.push(tbl);
-                            }
-                            check_rounds.push(tables);
-                        }
-                    }
+                    // Reuse collect_previous_rounds (already Cancelled-filtered) and swap in
+                    // the proposed seating for the round being altered. *round < rounds_len
+                    // was validated above, so the index is in range.
+                    let mut check_rounds = collect_previous_rounds(tournament);
+                    check_rounds[*round] = seating.clone();
                     let issues = seating::compute_player_issues(&check_rounds);
                     if issues.iter().any(|i| i.rule == 0) {
                         return Err(EngineError::SeatingViolatesR1);
