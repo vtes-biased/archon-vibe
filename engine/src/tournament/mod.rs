@@ -1535,8 +1535,14 @@ fn apply_event(
             }
             rounds[last][*table]["seating"] = JsonValue::Array(new_seating);
 
-            // Set player state to Playing
-            tournament["players"][player_idx]["state"] = "Playing".into();
+            // Set player state — mirror CheckOut/UnseatPlayer: a Finished tournament
+            // keeps the player Finished, otherwise they join the live round as Playing.
+            tournament["players"][player_idx]["state"] = if state == TournamentState::Finished {
+                "Finished"
+            } else {
+                "Playing"
+            }
+            .into();
             update_standings(tournament, sanctions);
             Ok(())
         }
