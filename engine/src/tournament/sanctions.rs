@@ -30,10 +30,11 @@ pub(super) fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
 /// §1.1.3: the player's current game if one is in progress, else their most
 /// recently played game — never a future round. The stored `round_number` is the
 /// fixed issue-time record of the game the judge ruled on; we honor it when the
-/// player was seated in that round, otherwise we redirect to the player's
-/// most-recently-*seated* round (highest round index with a seat). An SA whose
-/// player was never seated in any round contributes nothing and is dropped (a
-/// player who has yet to play has no game to penalize).
+/// player was seated in a non-cancelled table of that round, otherwise we redirect
+/// to the player's most-recently-*seated* round (highest round index with a
+/// non-cancelled seat). An SA whose player was never seated in a non-cancelled
+/// round contributes nothing and is dropped (a player who has yet to play — or
+/// whose only game was soft-cancelled — has no game to penalize).
 ///
 /// One entry per active SA — two SAs on one player stack to `-2`; do not dedup.
 /// This is the SINGLE source both consumers read (`table_sa_adjustments` for the
@@ -45,11 +46,16 @@ pub(super) fn resolve_sa_effective_rounds(
 ) -> Vec<(String, usize)> {
     let rounds = &tournament["rounds"];
     let nrounds = rounds.len();
+    // A soft-cancelled table is not a played game, so a seat there can't anchor an
+    // SA — both the honor-stored check and the redirect fallback skip Cancelled
+    // tables, keeping the effective round one the GW/TP cascade actually visits
+    // (standings skips Cancelled tables) so VP and GW/TP land on the same round.
     let seated_in = |uid: &str, r: usize| -> bool {
         rounds[r].members().any(|table| {
-            table["seating"]
-                .members()
-                .any(|s| s["player_uid"].as_str() == Some(uid))
+            table["state"].as_str() != Some("Cancelled")
+                && table["seating"]
+                    .members()
+                    .any(|s| s["player_uid"].as_str() == Some(uid))
         })
     };
     let mut out = Vec::new();

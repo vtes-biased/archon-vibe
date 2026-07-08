@@ -14,6 +14,7 @@
 - [Flaky test_update_user (RESOLVED)](trap_flaky_update_user_mock_officials.md) — fixed: unseeded mock data fabricated vekn-less officials (engine-impossible); worked example of the fixture class.
 - [OAuth consent test infra](project_oauth_consent_test_infra.md) — how to mint first-party vs third-party OAuth tokens in backend tests, `/oauth` root mount, oauth tables not auto-cleaned; first-party-only + consent-authoritative invariants.
 - [TWDA participation floor](trap_twda_participation_floor.md) — `_maybe_submit_twda` gates on TWDA_MIN_PLAYERS distinct SEATED players; roundless/finals-less fixtures silently no-op (broke all of `test_twda_submit.py`).
+- [SA standings test design](project_sa_standings_test_design.md) — SA effective-round: single shared resolver (test once), `gw` is the discriminator (`vp` doesn't move), GW threshold `>=2.0` inclusive, cancel a NON-LAST round to get a Cancelled table.
 
 ## How to Run Tests
 - **Backend**: `cd backend && uv run python3 -m pytest tests/ -v --tb=short`. Some suites need a test Postgres on port 5433 — skip with `--ignore` if unavailable (e.g. `test_users.py`). Pure-unit suites (SSE filters, offline mode, organizer access, access levels) need no DB.

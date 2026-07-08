@@ -1,17 +1,18 @@
 ---
 name: sa-round-targeting-two-consumers
-description: SA −1 VP has two engine consumers (per-table GW/TP cascade, VP total); both now route through resolve_sa_effective_rounds — do not re-derive the effective round independently in either consumer.
+description: SA −1 VP has THREE engine consumers (prelim-standings + rating GW/TP cascades, VP total, SetScore); all route through resolve_sa_effective_rounds — do not re-derive the effective round independently in any of them.
 metadata:
   type: project
 ---
 
-The SA (standings_adjustment) −1 VP penalty feeds two engine consumers in `engine/src/tournament/sanctions.rs`:
-- `table_sa_adjustments(seating, round_index, sanctions)` — per-seat −1.0 vector for the GW/TP cascade, applied per table. Also called from **SetScore score-time scoring** — grep all callers before changing its signature.
-- `sa_vp_penalty(sanctions, user_uid)` — VP-total penalty.
+The SA (standings_adjustment) −1 VP penalty resolves via `resolve_sa_effective_rounds(tournament, sanctions)` in `engine/src/tournament/sanctions.rs`. THREE call sites consume that resolver (grep before changing the resolver or `table_sa_adjustments`/`sa_vp_penalty` signatures):
+- `compute_preliminary_standings` (standings.rs) — GW/TP cascade via `table_sa_adjustments`, VP total via `sa_vp_penalty`.
+- `compute_rating_vp_gw` (standings.rs) — same pair, prelim rounds only (finals VP/GW read from the finals seat's stored `result`, where SA never lands).
+- **SetScore** (mod.rs ~1636/1715) — score-time `table_sa_adjustments` for the frozen `result.gw`/`result.tp`. Those frozen values are display-only; standings/rating always RECOMPUTE from raw VP, so a later cancel/round-add that staleifies them is harmless.
 
-Both consume `resolve_sa_effective_rounds(tournament, sanctions)` (same file), which resolves each active SA to its effective round once. This shared resolver is the fix for the old divergence hazard — do NOT re-derive the effective round independently in either consumer.
+The shared resolver is the fix for the old divergence hazard — do NOT re-derive the effective round independently in any consumer.
 
-**Effective round rule (JG v2 §1.1.3):** the round the player is **currently seated in** if a game is in progress, else the **highest round index they are seated in** (most recently played). Never a future round. An SA whose stored `round_number` the player wasn't seated in (drop/sit-out/import) is redirected to their most-recently-seated round. A player not seated in any round contributes nothing — do NOT fall back to round 0.
+**Effective round rule (JG v2 §1.1.3):** the round the player is **currently seated in a NON-cancelled table** if a game is in progress, else the **highest round index they are seated in non-cancelled** (most recently played). Never a future round. A seat in a soft-cancelled table does NOT anchor an SA — `seated_in` filters `state == "Cancelled"` so the effective round is provably one both cascades visit (they `continue` past Cancelled), keeping VP and GW/TP on the same round. `None`/state-less tables count (not Cancelled). An SA whose stored `round_number` the player wasn't seated non-cancelled in (drop/sit-out/import/soft-cancel) redirects to their most-recently-seated non-cancelled round — which for a soft-cancelled MIDDLE round (#295) can be LATER than the stored round; that is rule-correct, not a bug. A player with NO non-cancelled seat contributes nothing — do NOT fall back to round 0.
 
 **Invariants:**
 - Two SAs on one player stack to −2 (don't dedup to a per-player set).

@@ -1341,6 +1341,85 @@ fn test_standings_recompute_picks_up_late_sa() {
     assert_eq!(get("p3").tp, 24.0);
 }
 
+// An SA whose stored round gets soft-cancelled must penalize VP and the GW/TP cascade on the
+// SAME surviving round — never diverge. The bug (#472): `resolve_sa_effective_rounds` counted a
+// seat in a Cancelled table, so the SA parked on the cancelled round; `sa_vp_penalty` (applied
+// unconditionally) still took VP -1, but the GW/TP loop `continue`s past Cancelled tables, so the
+// cascade never got the -1 — VP was penalized while the game win was silently kept, corrupting the
+// standings/ratings pushed to VEKN. Fix: `seated_in` skips Cancelled, redirecting the SA to the
+// player's most-recent non-cancelled round (here round 1, the in-progress "current game" of JG v2
+// §1.1.3), so both consumers land there. Reach Cancelled through the real engine (CancelRound a
+// non-last round, which soft-cancels in place and keeps the round-0 seating that tagged the SA),
+// not a hand-built fixture. `gw` is the pre/post witness: pre-fix the SA sat on the cancelled
+// round 0, leaving round 1 unadjusted → p1's raw 2.5 keeps the GW (>= 2.0, JG threshold); post-fix
+// the -1 lands on round 1 → adjusted 1.5 (< 2.0) removes it. `vp` is 1.5 either way (documents the
+// VP side; it is `gw` that flips), so this asserts the two now AGREE on the surviving round.
+#[test]
+fn test_sa_on_soft_cancelled_round_penalizes_vp_and_gw_together() {
+    let mut t = make_tournament();
+    t["state"] = "Playing".into();
+    // Sequential rounds, same field: round 0 finished (later soft-cancelled), round 1 the live
+    // "current game". p1..p5 are seated in both, so the SA tagged on round 0 has a surviving
+    // non-cancelled round to redirect onto. Distinct toss for deterministic ranking.
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Playing", payment_status: "Pending", toss: 5 },
+        { user_uid: "p2", state: "Playing", payment_status: "Pending", toss: 4 },
+        { user_uid: "p3", state: "Playing", payment_status: "Pending", toss: 3 },
+        { user_uid: "p4", state: "Playing", payment_status: "Pending", toss: 2 },
+        { user_uid: "p5", state: "Playing", payment_status: "Pending", toss: 1 },
+    ];
+    // Both tables single-oust, VP sum == 5 (engine-valid). p1 raw 2.5 takes the GW at 0 adjustment.
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
+        ], state: "In Progress", override: json::Null } ],
+    ];
+
+    // Soft-cancel round 0 through the real engine: round 1 stays live so the tournament stays
+    // Playing, round 0's tables flip to Cancelled with their seating intact.
+    let cancelled = json::parse(
+        &run_event(
+            &t,
+            &json::object! { type: "CancelRound", round: 0 },
+            &make_organizer(),
+        )
+        .expect("cancel"),
+    )
+    .unwrap();
+    assert_eq!(
+        cancelled["rounds"][0][0]["state"].as_str(),
+        Some("Cancelled"),
+        "precondition: round 0 soft-cancelled, seating preserved"
+    );
+    assert_eq!(cancelled["state"].as_str(), Some("Playing"));
+
+    // SA recorded against round 0 — the round that just got cancelled.
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let standings = super::standings::compute_preliminary_standings(&cancelled, &sanctions);
+    let p1 = standings.iter().find(|s| s.user_uid == "p1").unwrap();
+    assert_eq!(
+        p1.vp, 1.5,
+        "round 1 raw 2.5 - 1.0 SA (round 0 cancelled, contributes nothing)"
+    );
+    assert_eq!(
+        p1.gw, 0.0,
+        "SA redirected onto surviving round 1: adjusted 1.5 (< 2.0) removes the GW, agreeing with the VP penalty (pre-fix it parked on cancelled round 0 and p1 wrongly kept the GW)"
+    );
+}
+
 #[test]
 fn test_gw_finals_clear_winner() {
     // Clear winner with highest VP -- gets the GW regardless of seed
