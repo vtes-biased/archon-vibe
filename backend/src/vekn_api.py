@@ -439,12 +439,20 @@ class VEKNAPIClient:
             return None
 
     async def fetch_all_events(
-        self, max_id: int = 14000, batch_size: int = 10
+        self, batch_size: int = 10, empty_run_limit: int = 200
     ) -> AsyncIterator[dict]:
-        """Enumerate event IDs 1..max_id in parallel batches.
+        """Enumerate event IDs upward from 1 until the ID space is exhausted.
 
-        Yields event dicts (venue info is embedded in the event response).
-        Filters: events with players OR future events without players.
+        Probe-until-dry: stop once `empty_run_limit` consecutive IDs return no
+        event from the API. vekn.net IDs are dense in the modern range (worst
+        historical gap ~50 IDs), so 200 gives ~4x margin over the largest known
+        gap. Yields event dicts (venue info is embedded) that have players
+        (finished) OR are future-dated (planned).
+
+        Only 'API returned no event' advances the empty run — an event that
+        exists but is filtered out (e.g. a past event with no players) still
+        resets the counter, so a cluster of skipped-but-present events never
+        ends the scan prematurely.
         """
         import asyncio
         from datetime import UTC, datetime
@@ -453,14 +461,20 @@ class VEKNAPIClient:
         await self._ensure_authenticated()
 
         found = 0
-        for start in range(1, max_id + 1, batch_size):
-            end = min(start + batch_size, max_id + 1)
+        consecutive_empty = 0
+        start = 1
+        while consecutive_empty < empty_run_limit:
+            end = start + batch_size
             tasks = [self.fetch_event(eid) for eid in range(start, end)]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for event_data in results:
                 if isinstance(event_data, BaseException) or event_data is None:
+                    consecutive_empty += 1
                     continue
+
+                # A real event exists here — the ID space is not exhausted.
+                consecutive_empty = 0
 
                 players = event_data.get("players", [])
                 # Check if future event
@@ -486,8 +500,17 @@ class VEKNAPIClient:
             if start % 1000 == 1:
                 logger.info(
                     f"VEKN event scan: checked IDs {start}-{end - 1}, "
-                    f"{found} events found so far"
+                    f"{found} events found, run of {consecutive_empty} empty IDs"
                 )
+
+            start = end
+
+        # Always log the terminating point — makes 'reached end of ID space'
+        # distinguishable from a premature stop after the fact.
+        logger.info(
+            f"VEKN event scan complete: stopped at ID {start - 1} after "
+            f"{consecutive_empty} consecutive empty IDs, {found} events found"
+        )
 
     async def _fetch_by_prefix(
         self, prefix: str, seen_ids: set[str], depth: int = 0
