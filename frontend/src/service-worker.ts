@@ -31,13 +31,23 @@ sw.addEventListener('fetch', (event) => {
   // Only handle http(s) requests — chrome-extension:// etc. can't be cached
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
 
-  // Skip API calls and SSE stream — these are mutations/live connections
-  if (url.pathname.startsWith('/api') || url.pathname === '/stream') return;
+  if (url.origin === location.origin) {
+    // Same-origin allow-list: only precached assets (cache-first) and SPA
+    // navigations (200.html fallback) are served from Cache Storage. Every
+    // other same-origin GET — /api, /stream, /snapshot?token=JWT, /auth,
+    // /oauth, /vekn, /sanctions, /admin — passes through untouched so
+    // JWT-bearing / authenticated responses never land in the cache.
+    if (ASSETS.includes(url.pathname) || event.request.mode === 'navigate') {
+      event.respondWith(respondFromCache(event.request, url));
+    }
+    return;
+  }
 
-  event.respondWith(respond(event.request, url));
+  // Cross-origin (card images): network-first, cache fallback.
+  event.respondWith(networkFirst(event.request));
 });
 
-async function respond(request: Request, url: URL): Promise<Response> {
+async function respondFromCache(request: Request, url: URL): Promise<Response> {
   const cache = await caches.open(CACHE);
 
   // Precached assets: serve from cache (cache-first)
@@ -52,7 +62,12 @@ async function respond(request: Request, url: URL): Promise<Response> {
     if (fallback) return fallback;
   }
 
-  // Everything else: network-first, cache fallback
+  // Precached asset / shell missing from cache: fall back to the network.
+  return networkFirst(request);
+}
+
+async function networkFirst(request: Request): Promise<Response> {
+  const cache = await caches.open(CACHE);
   try {
     const response = await fetch(request);
     if (response.status === 200) {
