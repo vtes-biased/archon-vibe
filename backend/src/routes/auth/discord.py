@@ -239,20 +239,26 @@ async def discord_callback(
             )
             await insert_auth_method(auth_method)
 
-        # Update user's discord_id, contact_discord and nickname from Discord
+        # Pin in local_modifications: these fields are in the legacy merge's
+        # ARCHON_USER_FIELDS, so untracked values get reverted by the nightly merge.
         user = await get_user_by_uid(user_uid_from_state)
         if user:
             changed = False
+            local_mods = set(user.local_modifications)
             if user.discord_id != discord_id:
                 user.discord_id = discord_id
+                local_mods.add("discord_id")
                 changed = True
             if not user.contact_discord:
                 user.contact_discord = discord_username
+                local_mods.add("contact_discord")
                 changed = True
             if not user.nickname and discord_global_name:
                 user.nickname = discord_global_name
+                local_mods.add("nickname")
                 changed = True
             if changed:
+                user.local_modifications = local_mods
                 user.modified = datetime.now(UTC)
                 broadcast_precomputed(await save_user(user))
 
@@ -285,10 +291,13 @@ async def discord_callback(
             )
             await update_auth_method(updated_auth)
 
-            # Backfill discord_id for existing users
+            # Pin discord_id (in ARCHON_USER_FIELDS) so the nightly merge won't revert it.
             user = await get_user_by_uid(user_uid)
             if user and user.discord_id != discord_id:
                 user.discord_id = discord_id
+                user.local_modifications = set(user.local_modifications) | {
+                    "discord_id"
+                }
                 user.modified = now
                 await save_user(user)
         else:
@@ -320,20 +329,26 @@ async def discord_callback(
                 )
                 await insert_auth_method(auth_method)
 
-                # Update user's discord_id, contact_discord and nickname if not set
+                # Pin in local_modifications (fields in ARCHON_USER_FIELDS) so the
+                # nightly merge won't revert them.
                 user = await get_user_by_uid(user_uid)
                 if user:
                     changed = False
+                    local_mods = set(user.local_modifications)
                     if user.discord_id != discord_id:
                         user.discord_id = discord_id
+                        local_mods.add("discord_id")
                         changed = True
                     if not user.contact_discord:
                         user.contact_discord = discord_username
+                        local_mods.add("contact_discord")
                         changed = True
                     if not user.nickname and discord_global_name:
                         user.nickname = discord_global_name
+                        local_mods.add("nickname")
                         changed = True
                     if changed:
+                        user.local_modifications = local_mods
                         user.modified = now
                         await save_user(user)
             else:
