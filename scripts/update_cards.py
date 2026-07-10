@@ -24,12 +24,25 @@ from pathlib import Path
 import aiohttp
 from krcg import loader
 from krcg.collections import CardDict
-from krcg.models import Card
+from krcg.models import Card, Format
 
 OUTPUT = Path(
     os.getenv("CARDS_JSON_OUT")
     or Path(__file__).resolve().parent.parent / "engine" / "data" / "cards.json"
 )
+
+# VEKN "V5" constructed format (Tournament Rules §6.4) — a fixed product allowlist,
+# NOT a company/date cutoff: V5A/V5C/EoG are Paradox-published yet OUT, so matching on
+# a "Fifth Edition" name substring is wrong. A card is V5-legal if any legal print is
+# in a listed set (reprints included) OR it's one of the 19 individually-whitelisted
+# promos krcg flags with Format.V5 (PP3/PP4 — unrecoverable from set membership).
+V5_LEGAL_SETS = {"V5", "NB", "NB2", "NB3", "FoL", "SoB", "30th", "SV5"}
+
+
+def _is_v5(card: Card) -> bool:
+    if Format.V5 in card.formats:
+        return True
+    return any(p.set.code in V5_LEGAL_SETS for p in card.prints)
 
 
 def _group(card: Card) -> str:
@@ -76,6 +89,7 @@ def transform(card: Card, cards: CardDict) -> dict:
         "group": _group(card) if crypt else "",
         "capacity": (card.capacity or 0) if crypt else 0,
         "adv": bool(getattr(card, "advanced", False)),
+        "v5": _is_v5(card),
         "banned": card.banned.isoformat() if card.banned else "",
         "sets": _sets(card, cards),
         "name_variants": list(dict.fromkeys(nv.name for nv in card.name_variants)),

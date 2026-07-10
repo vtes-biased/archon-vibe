@@ -542,25 +542,15 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
         });
     }
 
-    // V5 format: only V5-legal cards
+    // V5 format: only V5-legal cards (legality precomputed at build time from the
+    // VEKN set allowlist + promo whitelist — see scripts/update_cards.py).
     if format == "V5" {
         for &id in deck.cards.keys() {
             if let Some(card) = card_map.by_id(id) {
-                // V5 cards have V5 or newer sets
-                let has_v5_print = card.sets.iter().any(|s| {
-                    s.starts_with("V5")
-                        || s.starts_with("New Blood")
-                        || s == "Shadows of Berlin"
-                        || s.starts_with("Sabbat")
-                        || s == "Promo"
-                        || s == "Print on Demand"
-                        || s == "Fall of London"
-                        || s.starts_with("Echoes")
-                });
-                if !has_v5_print {
+                if !card.v5 {
                     errors.push(ValidationError {
                         severity: Severity::Warning,
-                        message: format!("{} may not be V5-legal", card.unique_name),
+                        message: format!("{} is not V5-legal", card.unique_name),
                     });
                 }
             }
@@ -806,7 +796,7 @@ mod tests {
             "100001": {
                 "id": 100001, "printed_name": ".44 Magnum", "unique_name": ".44 Magnum", "full_name": ".44 Magnum",
                 "kind": "library", "types": ["Equipment"], "disciplines": [],
-                "clan": "", "group": "", "capacity": 0, "adv": false,
+                "clan": "", "group": "", "capacity": 0, "adv": false, "v5": true,
                 "banned": "", "sets": ["Jyhad"], "name_variants": ["44 Magnum"]
             },
             "100002": {
@@ -979,5 +969,31 @@ mod tests {
         // Should have errors for insufficient crypt and library
         assert!(errors.iter().any(|e| e.message.contains("Crypt")));
         assert!(errors.iter().any(|e| e.message.contains("Library")));
+    }
+
+    #[test]
+    fn test_v5_format_flags_non_v5_cards() {
+        // V5 format warns on cards not flagged v5-legal (flag precomputed at build);
+        // Standard never emits a V5 warning. Fixture marks 100001 v5:true, 100002 not.
+        let cm = CardMap::load(test_cards_json()).unwrap();
+        let mut deck = Deck::new();
+        deck.cards.insert(100001, 2);
+        deck.cards.insert(100002, 2);
+        let v5 = validate_deck(&deck, &cm, "V5");
+        let v5_msgs: Vec<&str> = v5.iter().map(|e| e.message.as_str()).collect();
+        assert!(
+            v5_msgs.iter().any(|m| m.contains("419 Operation") && m.contains("V5-legal")),
+            "non-v5 card warns"
+        );
+        assert!(
+            !v5_msgs.iter().any(|m| m.contains(".44 Magnum")),
+            "v5-legal card does not warn"
+        );
+        assert!(
+            !validate_deck(&deck, &cm, "Standard")
+                .iter()
+                .any(|e| e.message.contains("V5-legal")),
+            "Standard emits no V5 warning"
+        );
     }
 }

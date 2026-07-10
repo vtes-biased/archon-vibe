@@ -46,6 +46,8 @@ pub struct Card {
     pub group: String,
     pub capacity: u32,
     pub adv: bool,
+    /// Legal in the VEKN "V5" constructed format (precomputed at build time).
+    pub v5: bool,
     pub banned: String,
     pub sets: Vec<String>,
 }
@@ -252,6 +254,7 @@ fn parse_card(id: u32, value: &JsonValue) -> Result<Card, EngineError> {
         group: value["group"].as_str().unwrap_or("").to_string(),
         capacity: value["capacity"].as_u32().unwrap_or(0),
         adv: value["adv"].as_bool().unwrap_or(false),
+        v5: value["v5"].as_bool().unwrap_or(false),
         banned: value["banned"].as_str().unwrap_or("").to_string(),
         sets,
     })
