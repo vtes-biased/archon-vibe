@@ -185,14 +185,26 @@ fn try_count_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         return None;
     }
 
-    // Skip separator: x, X, *, spaces, tabs, commas
-    while i < bytes.len()
-        && matches!(
-            bytes[i],
-            b'x' | b'X' | b'*' | b' ' | b'\t' | b',' | b'.' | b'-'
-        )
-    {
-        i += 1;
+    // Skip the count→name separator: whitespace, '*', minor punctuation, and an
+    // x/X multiplier marker. An x/X run is a marker only when whitespace follows
+    // it; otherwise it is the card name's first letter — "1x Xaviar" is count 1 of
+    // "Xaviar", not "aviar" (every X-named crypt card broke on the old greedy skip).
+    while i < bytes.len() {
+        match bytes[i] {
+            b'*' | b' ' | b'\t' | b',' | b'.' | b'-' => i += 1,
+            b'x' | b'X' => {
+                let mut j = i;
+                while j < bytes.len() && matches!(bytes[j], b'x' | b'X') {
+                    j += 1;
+                }
+                if j < bytes.len() && matches!(bytes[j], b' ' | b'\t') {
+                    i = j;
+                } else {
+                    break;
+                }
+            }
+            _ => break,
+        }
     }
 
     let name = line[i..].trim();
@@ -834,6 +846,12 @@ mod tests {
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["aus", "cel", "pre"],
                 "clan": "Toreador", "group": "6", "capacity": 9, "adv": false,
                 "banned": "", "sets": ["Fall of London"], "name_variants": []
+            },
+            "201477": {
+                "id": 201477, "name": "Xaviar (G3)", "printed_name": "Xaviar",
+                "kind": "crypt", "types": ["Vampire"], "disciplines": ["ani", "for", "pot"],
+                "clan": "Gangrel", "group": "3", "capacity": 10, "adv": false,
+                "banned": "", "sets": ["Jyhad"], "name_variants": ["Xaviar"]
             }
         }"#
     }
@@ -851,6 +869,19 @@ mod tests {
         );
         // With asterisk: "1 * 419 Operation"
         assert_eq!(parse_card_line("1 * 419 Operation", &cm), Some((100002, 1)));
+    }
+
+    #[test]
+    fn test_count_marker_keeps_x_name() {
+        // The x/X count marker must not swallow the leading 'x' of a card name:
+        // "1x Xaviar" is count 1 of Xaviar, not "aviar". Regression: the greedy
+        // separator skip ate x/X, so every X-named crypt card failed to parse.
+        let cm = CardMap::load(test_cards_json()).unwrap();
+        assert_eq!(parse_card_line("1x Xaviar", &cm), Some((201477, 1)));
+        assert_eq!(parse_card_line("2x Xaviar (G3)", &cm), Some((201477, 2)));
+        assert_eq!(parse_card_line("1 Xaviar", &cm), Some((201477, 1)));
+        // a normal x-marker line (with a following card name) still parses
+        assert_eq!(parse_card_line("2xx .44 Magnum", &cm), Some((100001, 2)));
     }
 
     #[test]
