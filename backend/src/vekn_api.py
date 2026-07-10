@@ -395,9 +395,12 @@ class VEKNAPIClient:
             return {}
 
     async def fetch_event(self, event_id: int) -> dict | None:
-        """Fetch a single event by ID. Returns event dict or None if not found.
+        """Fetch a single event by ID.
 
-        VEKN API returns: data.events = [{...}] for valid events.
+        Returns the event dict, or None when the API confirms no event (404,
+        empty body, code != 200, empty events list). Raises VEKNAPIConnectionError
+        on a transient failure (network / 5xx / unparseable) so fetch_all_events
+        can tell 'no event' from 'could not read' and not end its scan on an outage.
         """
         try:
             params = {
@@ -421,8 +424,11 @@ class VEKNAPIClient:
                     return None
                 try:
                     data = await response.json()
-                except Exception:
-                    return None
+                except Exception as e:
+                    # Unparseable 200 = transient garble, not a confirmed no-event.
+                    raise VEKNAPIConnectionError(
+                        f"Unparseable event response for id {event_id}"
+                    ) from e
                 inner = data.get("data", {})
                 if "code" in inner:
                     code = inner.get("code", 200)
@@ -435,11 +441,18 @@ class VEKNAPIClient:
                 if not events:
                     return None
                 return events[0]
-        except aiohttp.ClientError:
-            return None
+        except (aiohttp.ClientError, TimeoutError) as e:
+            # Transient (network / 5xx): raise vs return None so the scan doesn't
+            # count an outage as the end of the ID space.
+            raise VEKNAPIConnectionError(
+                f"Transient error fetching event {event_id}: {e}"
+            ) from e
 
     async def fetch_all_events(
-        self, batch_size: int = 10, empty_run_limit: int = 200
+        self,
+        batch_size: int = 10,
+        empty_run_limit: int = 200,
+        transient_limit: int = 200,
     ) -> AsyncIterator[dict]:
         """Enumerate event IDs upward from 1 until the ID space is exhausted.
 
@@ -449,10 +462,13 @@ class VEKNAPIClient:
         gap. Yields event dicts (venue info is embedded) that have players
         (finished) OR are future-dated (planned).
 
-        Only 'API returned no event' advances the empty run — an event that
-        exists but is filtered out (e.g. a past event with no players) still
-        resets the counter, so a cluster of skipped-but-present events never
-        ends the scan prematurely.
+        Only 'API confirmed no event' (404/empty/code!=200) advances the empty
+        run — an event that exists but is filtered out (e.g. a past event with no
+        players) still resets the counter, so a cluster of skipped-but-present
+        events never ends the scan prematurely. A transient failure
+        (network/5xx/unparseable) confirms nothing: it never advances the empty run,
+        and `transient_limit` consecutive ones abort the scan so the daily retry
+        recovers instead of silently dropping later events.
         """
         import asyncio
         from datetime import UTC, datetime
@@ -462,6 +478,7 @@ class VEKNAPIClient:
 
         found = 0
         consecutive_empty = 0
+        consecutive_transient = 0
         start = 1
         while consecutive_empty < empty_run_limit:
             end = start + batch_size
@@ -469,7 +486,22 @@ class VEKNAPIClient:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for event_data in results:
-                if isinstance(event_data, BaseException) or event_data is None:
+                if isinstance(event_data, BaseException):
+                    # Transient failure must not count as empty (that let an outage
+                    # end the scan); abort if the API stays down — the daily rescan
+                    # from ID 1 backfills.
+                    consecutive_transient += 1
+                    if consecutive_transient >= transient_limit:
+                        raise VEKNAPIError(
+                            f"VEKN event scan aborted near ID {start}: "
+                            f"{consecutive_transient} consecutive transient failures "
+                            f"(API unavailable)"
+                        )
+                    continue
+
+                consecutive_transient = 0  # API reachable (event or confirmed-empty)
+
+                if event_data is None:
                     consecutive_empty += 1
                     continue
 
