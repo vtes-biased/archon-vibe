@@ -142,6 +142,7 @@
   "deck_upload_uploading": "Cargando...",
   "deck_upload_submit": "Cargar Deck",
   "deck_upload_scan_qr": "Escanear QR",
+  "deck_upload_online_only": "La importación por URL y QR requiere conexión — pegue una lista de deck para importar sin conexión.",
   "deck_upload_qr_starting": "Iniciando cámara...",
   "deck_upload_qr_hint": "Apunte la cámara al código QR de un deck VDB",
   "deck_upload_attribution": "Atribución",

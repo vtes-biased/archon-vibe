@@ -23,7 +23,7 @@
     onuploaded?: () => void;
   } = $props();
 
-  let mode = $state<'text' | 'url' | 'qr'>('url');
+  let mode = $state<'text' | 'url' | 'qr'>(navigator.onLine ? 'url' : 'text');
   let deckText = $state('');
   let deckUrl = $state('');
   let deckName = $state('');
@@ -39,6 +39,24 @@
   let error = $state<string | null>(null);
   let warnings = $state<string[]>([]);
   let success = $state(false);
+
+  // URL/QR import fetch through the backend proxy, so gate them on connectivity;
+  // text import stays local. `navigator.onLine` isn't reactive — mirror it (same
+  // pattern as +layout / FeedbackModal) and fall back to text if we drop offline.
+  let online = $state(navigator.onLine);
+  $effect(() => {
+    const on = () => (online = true);
+    const off = () => (online = false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  });
+  $effect(() => {
+    if (!online && mode !== 'text') mode = 'text';
+  });
 
   // Attribution autocomplete
   async function searchAttribution() {
@@ -215,7 +233,8 @@
   <div class="flex gap-2 flex-wrap">
     <button
       onclick={() => mode = 'url'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-accent-strong-hover text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
+      disabled={!online}
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'url' ? 'bg-accent-strong-hover text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'} {!online ? 'opacity-40 cursor-not-allowed' : ''}"
     >{m.deck_upload_from_url()}</button>
     <button
       onclick={() => mode = 'text'}
@@ -223,9 +242,13 @@
     >{m.deck_upload_paste()}</button>
     <button
       onclick={() => mode = 'qr'}
-      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-accent-strong-hover text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
+      disabled={!online}
+      class="px-3 py-1.5 text-sm rounded-lg transition-colors {mode === 'qr' ? 'bg-accent-strong-hover text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'} {!online ? 'opacity-40 cursor-not-allowed' : ''}"
     >{m.deck_upload_scan_qr()}</button>
   </div>
+  {#if !online}
+    <p class="text-xs text-ink-faint">{m.deck_upload_online_only()}</p>
+  {/if}
 
   {#if mode === 'qr'}
     <div class="relative rounded-lg overflow-hidden bg-black">

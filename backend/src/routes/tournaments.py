@@ -935,18 +935,17 @@ async def fetch_deck_proxy(
 ) -> Response:
     """Proxy to fetch deck data from external URLs (VDB, VTESDecks, Amaranth).
 
-    Read-only — no mutation. Works around CORS restrictions on external APIs.
+    Read-only — no mutation. Works around CORS restrictions on external APIs and
+    maps provider-native card ids (notably Amaranth's) to VEKN ids via krcg.
     Returns parsed deck: {name, author, comments, cards}.
     """
-    import asyncio
-
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     from ..providers import DeckFetchError, fetch_deck_from_url
 
     try:
-        result = await asyncio.to_thread(fetch_deck_from_url, url)
+        result = await fetch_deck_from_url(url)
     except DeckFetchError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
