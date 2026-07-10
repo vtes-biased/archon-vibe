@@ -122,32 +122,51 @@ def _finalist_position(t: Tournament, user_uid: str) -> int:
     return 0
 
 
-def _compute_entry_sync(
-    t: Tournament, user_uid: str, sanctions: list | None = None
+def _compute_entry(
+    t: Tournament,
+    t_json: str,
+    sanctions_json: str,
+    user_uid: str,
+    player_count: int,
 ) -> TournamentRatingEntry:
-    """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions).
+    """Core entry computation from pre-encoded JSON + precomputed player count.
 
     VP/GW (including finals and the SA penalty) come from the Rust engine so the
     standings-adjustment scoring rule lives in one place — not re-implemented here.
+    The daily recompute hoists the encode/count out of its per-user loop and calls
+    this directly; the single-tournament push path uses _compute_entry_sync below.
     """
     engine = _engine
-    t_json = msgspec.json.encode(t).decode()
-    sanctions_json = msgspec.json.encode(sanctions or []).decode()
     vp, gw = engine.compute_rating_vp_gw(t_json, sanctions_json, user_uid)
     gw = int(gw)
     fp = _finalist_position(t, user_uid)
-    pc = _player_count(t)
-    points = engine.compute_rating_points(vp, gw, fp, pc, t.rank.value)
+    points = engine.compute_rating_points(vp, gw, fp, player_count, t.rank.value)
     return TournamentRatingEntry(
         tournament_uid=t.uid,
         tournament_name=t.name,
         date=(t.finish or t.start or t.modified).date().isoformat(),
-        player_count=pc,
+        player_count=player_count,
         rank=t.rank.value,
         vp=vp,
         gw=gw,
         finalist_position=fp,
         points=points,
+    )
+
+
+def _compute_entry_sync(
+    t: Tournament, user_uid: str, sanctions: list | None = None
+) -> TournamentRatingEntry:
+    """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions).
+
+    Convenience wrapper that encodes + counts on the spot; delegates to _compute_entry.
+    """
+    return _compute_entry(
+        t,
+        msgspec.json.encode(t).decode(),
+        msgspec.json.encode(sanctions or []).decode(),
+        user_uid,
+        _player_count(t),
     )
 
 
@@ -195,12 +214,25 @@ async def recompute_ratings_for_players(
         t for t in all_tournaments if not (t.open_rounds or t.self_organized_rounds)
     ]
 
+    # Precompute per-tournament data once, not per (user, tournament): the played
+    # set, encoded JSON, and player count are user-independent. Avoids re-scanning
+    # rounds and re-encoding the full tournament O(players) times.
+    played_by_t: dict[str, set[str]] = {}
+    json_by_t: dict[str, str] = {}
+    count_by_t: dict[str, int] = {}
+    for t in all_tournaments:
+        played = _players_with_rounds(t)
+        played_by_t[t.uid] = played
+        json_by_t[t.uid] = msgspec.json.encode(t).decode()
+        count_by_t[t.uid] = len(played)
+
     # Fetch wins + the player User objects in batch (one query each, not N).
     wins_map = await get_tournament_wins_for_users(player_uids)
     users_by_uid = await get_users_by_uids(player_uids)
 
     updated_users: list[tuple[User, BroadcastData]] = []
     sanctions_cache: dict[str, list] = {}
+    sanctions_json_cache: dict[str, str] = {}
 
     for user_uid in player_uids:
         user = users_by_uid.get(user_uid)
@@ -209,25 +241,44 @@ async def recompute_ratings_for_players(
 
         entries: list[TournamentRatingEntry] = []
         for t in all_tournaments:
-            played = _players_with_rounds(t)
-            if user_uid in played:
-                if t.uid not in sanctions_cache:
-                    sanctions_cache[t.uid] = await get_sanctions_for_tournament(t.uid)
-                if _is_disqualified(t, sanctions_cache[t.uid], user_uid):
-                    continue  # DQ'd: no rating entry, no participation base
-                if _is_non_competing(t, user_uid):
-                    continue  # proxy: non-competing official stood in — no rating
-                entries.append(_compute_entry_sync(t, user_uid, sanctions_cache[t.uid]))
+            if user_uid not in played_by_t[t.uid]:
+                continue
+            if t.uid not in sanctions_cache:
+                sanc = await get_sanctions_for_tournament(t.uid)
+                sanctions_cache[t.uid] = sanc
+                sanctions_json_cache[t.uid] = msgspec.json.encode(sanc).decode()
+            if _is_disqualified(t, sanctions_cache[t.uid], user_uid):
+                continue  # DQ'd: no rating entry, no participation base
+            if _is_non_competing(t, user_uid):
+                continue  # proxy: non-competing official stood in — no rating
+            entries.append(
+                _compute_entry(
+                    t,
+                    json_by_t[t.uid],
+                    sanctions_json_cache[t.uid],
+                    user_uid,
+                    count_by_t[t.uid],
+                )
+            )
 
-        entries.sort(key=lambda e: e.points, reverse=True)
+        # Explicit tie-break so the no-change comparison below isn't fooled by the
+        # unordered tournament fetch varying row order between runs.
+        entries.sort(key=lambda e: (-e.points, e.tournament_uid))
         top_entries = entries[:TOP_N]
         total = sum(e.points for e in top_entries)
 
         cat_rating = CategoryRating(total=total, tournaments=entries)
+        new_wins = sorted(wins_map.get(user_uid, []))
+
+        # No-change guard: skip the JSONB upsert + SSE delta when neither the
+        # category rating nor the wins moved. Keeps `modified` meaningful and
+        # avoids churning the whole rated corpus daily for unchanged data.
+        if cat_rating == getattr(user, category.value) and new_wins == user.wins:
+            continue
 
         # Embed rating into user
         setattr(user, category.value, cat_rating)
-        user.wins = wins_map.get(user_uid, [])
+        user.wins = new_wins
         user.modified = now
 
         bd = await save_user(user)

@@ -100,6 +100,9 @@
 - [aiohttp timeout escapes ClientError](aiohttp-timeout-escapes-clienterror.md) — ClientTimeout breach raises asyncio.TimeoutError, NOT aiohttp.ClientError; `except aiohttp.ClientError` misses timeouts (→ 500 not 502) on every external-proxy route (feedback/twda/webpush).
 - [Error-codes contract](error-codes-contract.md) — `EngineError` enum = single error taxonomy; `{code,params,message}` wire JSON across WASM/PyO3/HTTP; domain rejection MUST be an explicit variant (From-impls silently demote to internal); EngineRejection-in-transaction is sound FastAPI.
 
+## Ratings recompute
+- [No-change guard bounded by denormalized inputs](ratings-nochange-guard-denormalized-inputs.md) — the skip-if-unchanged guard only converges if the entry's embedded tournament_name + date(finish/start/modified fallback) are stable; meta flip-flop + both-null date are the two daily re-save vectors.
+
 ## Migration / legacy-archon merge (residual hazards)
 - [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; tournament meta + officials' contact_email oscillate daily unless single-writer enforced (member side is, tournament side isn't).
 - [Vekn-less drop is NOT ref-free (measured)](migration-veknless-orphan-measured.md) — dropping the 142 vekn-less members orphans 9 refs (4 players + 5 seats) in 3 Finished tournaments; old archon never enforced vekn at registration. Reusable probe recipe in file.
