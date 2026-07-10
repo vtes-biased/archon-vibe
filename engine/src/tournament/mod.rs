@@ -2025,31 +2025,38 @@ fn apply_event(
                 return Err(EngineError::FinalsTableUnfinished);
             }
 
-            // Determine winner: highest VP in finals, tiebreak by seed order
+            // Winner = the highest SA-adjusted finals VP, tiebroken by seed order.
+            // VEKN finals have no prelim-style 2VP threshold and always yield exactly
+            // one winner (even an all-timeout 0.5 table, or an unscored override table
+            // — then the top seed). compute_gw_finals is the single source of that
+            // rule — the same call SetScore uses to award the finals GW — so the
+            // winner can never diverge from the scored GW, and it accounts for any
+            // finals-round SAs (relevant once those become creatable, a separate
+            // ticket). With no finals SA it is the highest raw-VP seat, unchanged.
+            let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
+            let finals_round = tournament["rounds"].len();
+            let seating = &tournament["finals"]["seating"];
+            let vps: Vec<f64> = seating
+                .members()
+                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                .collect();
+            let seating_uids: Vec<&str> = seating
+                .members()
+                .map(|s| s["player_uid"].as_str().unwrap_or(""))
+                .collect();
+            let adjustments = table_sa_adjustments(seating, finals_round, &effective_sas);
             let seed_order: Vec<String> = tournament["finals"]["seed_order"]
                 .members()
                 .filter_map(|s| s.as_str().map(|v| v.to_string()))
                 .collect();
-            let seating = &tournament["finals"]["seating"];
-            let mut best_uid = String::new();
-            let mut best_vp = -1.0f64;
-            let mut best_seed = usize::MAX;
+            let gws = compute_gw_finals(&vps, &adjustments, &seating_uids, &seed_order);
+            let winner = gws
+                .iter()
+                .position(|&g| g == 1.0)
+                .map(|i| seating_uids[i].to_string())
+                .unwrap_or_default();
 
-            for seat in seating.members() {
-                let uid = seat["player_uid"].as_str().unwrap_or("").to_string();
-                let vp = seat["result"]["vp"].as_f64().unwrap_or(0.0);
-                let seed_pos = seed_order
-                    .iter()
-                    .position(|s| s == &uid)
-                    .unwrap_or(usize::MAX);
-                if vp > best_vp || (vp == best_vp && seed_pos < best_seed) {
-                    best_vp = vp;
-                    best_uid = uid;
-                    best_seed = seed_pos;
-                }
-            }
-
-            tournament["winner"] = best_uid.as_str().into();
+            tournament["winner"] = winner.as_str().into();
             if state != TournamentState::Finished {
                 tournament["state"] = "Finished".into();
             }
