@@ -6,6 +6,7 @@
   import AttributionPicker from "./AttributionPicker.svelte";
   import { validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
+  import CardName from "./CardName.svelte";
   import { CircleX, TriangleAlert } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
@@ -173,7 +174,7 @@
       const card = cards.get(id);
       if (card?.kind === 'crypt') entries.push({ id, count, card });
     }
-    return entries.sort((a, b) => (b.card?.capacity ?? 0) - (a.card?.capacity ?? 0) || (a.card?.name ?? '').localeCompare(b.card?.name ?? ''));
+    return entries.sort((a, b) => (b.card?.capacity ?? 0) - (a.card?.capacity ?? 0) || (a.card?.unique_name ?? '').localeCompare(b.card?.unique_name ?? ''));
   });
 
   const libraryEntries = $derived.by(() => {
@@ -186,7 +187,7 @@
     return entries.sort((a, b) => {
       const ta = a.card?.types[0] ?? '';
       const tb = b.card?.types[0] ?? '';
-      return ta.localeCompare(tb) || (a.card?.name ?? '').localeCompare(b.card?.name ?? '');
+      return ta.localeCompare(tb) || (a.card?.unique_name ?? '').localeCompare(b.card?.unique_name ?? '');
     });
   });
 
@@ -222,7 +223,7 @@
       return;
     }
     // Fallback for stale IndexedDB card data predating the img field
-    const normalized = card.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
+    const normalized = card.printed_name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
     cardImageUrl = `https://static.krcg.org/card/${normalized}`;
   }
 </script>
@@ -291,7 +292,11 @@
             onclick={() => showCard(entry.card)}
           >
             <span class="text-ink-muted w-4 text-right shrink-0">{entry.count}x</span>
-            <span class="text-ink-bright flex-1 truncate">{entry.card?.name ?? `#${entry.id}`}</span>
+            {#if entry.card}
+              <CardName card={entry.card} class="text-ink-bright flex-1" />
+            {:else}
+              <span class="text-ink-bright flex-1 truncate">#{entry.id}</span>
+            {/if}
             {#if entry.card?.capacity}
               <span class="text-ink-faint text-xs">{entry.card.capacity}</span>
             {/if}
@@ -333,7 +338,11 @@
                 onclick={() => showCard(entry.card)}
               >
                 <span class="text-ink-muted w-4 text-right shrink-0">{entry.count}x</span>
-                <span class="text-ink-bright flex-1 truncate">{entry.card?.name ?? `#${entry.id}`}</span>
+                {#if entry.card}
+              <CardName card={entry.card} class="text-ink-bright flex-1" />
+            {:else}
+              <span class="text-ink-bright flex-1 truncate">#{entry.id}</span>
+            {/if}
               </button>
               {#if editing}
                 <button

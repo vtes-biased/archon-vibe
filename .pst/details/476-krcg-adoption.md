@@ -173,3 +173,62 @@ krcg-quality results (URL imports incl. Amaranth), it routes through the backend
 - Add the dep in `backend/pyproject.toml` (backend already has aiohttp + msgspec)
 - Verification spike (throwaway): fetch `https://amaranth.vtes.co.nz/api/cards`,
   compare Amaranth names to `cards.json` name index → measure match rate before/after.
+
+## PROGRESS + RESOLUTION (2026-07)
+
+### #408 — DONE (commit 653c41c)
+`providers.py` rewritten on krcg providers (Amaranth id→VEKN mapping fixed, the
+core bug); `/fetch-deck` async; frontend routes all url/QR through the backend,
+gates them offline, keeps raw-text local. krcg added as backend dep. i18n ×5 done.
+
+### Findings that reshaped the epic
+- The old "cards.json drops adv/name_variants" premise was **stale**: the shipped
+  build already carried `adv`, `name_variants`, group/ADV-suffixed `name`. The one
+  real data gap is **ASCII folding** (69–73 accented crypt names have no fold).
+- Card *matching* lives in the **Rust engine** (offline text import; WASM can't call
+  krcg). Measured: the engine already resolves ADV/group/accented names correctly;
+  the only real gaps are (a) an **X-name count bug** and (b) **ASCII folding**.
+- **X-name bug FIXED** (commit 3f9ad42, ticket #479): `try_count_first` greedily ate
+  the count marker's `x`/`X` into the name, so every X-named crypt card failed.
+- **krcg parser bug FIXED upstream** (`../krcg` commit 7c725d3): `(G3 ADV)`/`(G6)`
+  parentheticals were stripped as comments → resolved to base/wrong group. Now kept.
+
+### #477 — RESOLVED naming model (owner spec, 2026-07): three names + folding parser
+cards.json replaces the single `name` with three krcg-sourced names (raw vtes.json
+can't supply `unique_name` — it's a krcg computed property, so the build MUST use
+`krcg.loader`):
+- `printed_name` — bare (krcg `printed_name`) → **frontend display** (adv/group shown
+  as separate badges, NOT baked into the displayed string).
+- `unique_name` — krcg `unique_name` (minimal disambiguator; most vampires bare, later
+  groups/advanced get the suffix) → **text decklist output** + a parse key.
+- `full_name` — krcg `full_name` (always group/adv suffix) → a parse key.
+Keep: kind, types, disciplines, clan, group, capacity, adv, banned, sets (names via
+`CardDict.sets`), img (krcg `url`), name_variants (aliases/i18n — extra parse keys).
+
+Parser: index printed+unique+full+variants; Rust `normalize_name` folds non-ASCII→ASCII
+on BOTH index and query so accent-free typing matches (owner: "the parser folds
+accents") — NOT baked as data folds.
+
+Parser format coverage (owner, 2026-07): the Rust engine parser must handle **any**
+decklist format, INCLUDING the TWDA-style crypt line where the group is at the END of
+the line (after capacity/disciplines/clan/title — no group-in-parenthesis), e.g.
+`2x Theo Bell   8 aus cel dom for pot pre  justicar  Brujah:6`. Study krcg's
+`parser.py` + `tests/test_parser.py` (and the TWDA snapshot fixtures) and match its
+capability. The engine already has `parse_crypt_tail_group`/`try_strip_crypt_tail` —
+audit vs krcg for gaps.
+
+Badge display (owner, 2026-07):
+- ADV → the **advanced icon from the krcg/VTES icon font** (not the text "ADV"). Find
+  the font used by krcg-static / the existing frontend discipline+clan icons.
+- Group → a **circled number** (①②③…); group **"any"** (e.g. group-independent /
+  merged crypt) gets **no** badge.
+
+Migration (lockstep — no red build): (1) `update_cards.py` → krcg loader → new schema;
+(2) engine `cards.rs` Card struct + name_index over the three names + ascii-folding
+`normalize_name`, `deck.rs` text export via `unique_name` (V5 check keeps set names);
+(3) frontend `VtesCard` + display printed_name + adv/group badges (CardSearch:64,
+DeckDisplay, PlayerDecksSection); (4) backend `/api/cards` passthrough; (5) i18n badges.
+Open micro-decisions during impl: transitional `name` alias?; V5 check via krcg
+`formats` vs set-name strings; the Rust fold impl (cover ł/ø/æ beyond NFD).
+Agents to consult: principal-engineer (Rust/WASM + data-model), staff-frontend-engineer
+(badge display), product-manager (naming/display UX), senior-qa.

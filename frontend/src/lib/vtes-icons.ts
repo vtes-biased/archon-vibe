@@ -76,3 +76,15 @@ export function typeIcon(type: string): string | undefined {
   return TYPE_ICONS[type];
 }
 
+/** Advanced-vampire glyph in the Ankha VTES font (render with `.vtes-d`). */
+export const ADVANCED_ICON = '|';
+
+/**
+ * Circled-number badge for a crypt group ("3" → "③"). Groups are 1–7; the
+ * group-independent "any" (and anything unexpected) gets no badge.
+ */
+export function groupCircle(group: string): string {
+  const n = Number(group);
+  return Number.isInteger(n) && n >= 1 && n <= 7 ? String.fromCharCode(0x245f + n) : '';
+}
+

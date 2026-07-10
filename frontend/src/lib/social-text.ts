@@ -31,7 +31,7 @@ function formatDeckText(deck: Deck, cardsMap: Map<number, VtesCard>): string[] {
   for (const [idStr, count] of Object.entries(deck.cards)) {
     const card = cardsMap.get(parseInt(idStr));
     if (!card) continue;
-    const entry = { name: card.name, count, type: card.types[0] ?? "", capacity: card.capacity };
+    const entry = { name: card.unique_name, count, type: card.types[0] ?? "", capacity: card.capacity };
     if (card.kind === "crypt") crypt.push(entry);
     else library.push(entry);
   }

@@ -160,8 +160,10 @@ fn try_count_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
     let bytes = line.as_bytes();
     let mut i = 0;
 
-    // Skip leading markers: *, -, _
-    while i < bytes.len() && matches!(bytes[i], b'*' | b'-' | b'_' | b' ') {
+    // Skip leading markers: *, -, _, and an x/X multiplier before the count ("x2",
+    // "xx2"). A card name starting with x can't precede the count here, so a bare
+    // x-name (no count) just falls through to the bare-name lookup on the full line.
+    while i < bytes.len() && matches!(bytes[i], b'*' | b'-' | b'_' | b' ' | b'x' | b'X') {
         i += 1;
     }
 
@@ -505,7 +507,7 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
             if !card.banned.is_empty() {
                 errors.push(ValidationError {
                     severity: Severity::Error,
-                    message: format!("{} is banned (since {})", card.name, card.banned),
+                    message: format!("{} is banned (since {})", card.unique_name, card.banned),
                 });
             }
         }
@@ -558,7 +560,7 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
                 if !has_v5_print {
                     errors.push(ValidationError {
                         severity: Severity::Warning,
-                        message: format!("{} may not be V5-legal", card.name),
+                        message: format!("{} may not be V5-legal", card.unique_name),
                     });
                 }
             }
@@ -582,13 +584,15 @@ pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
             let entry = json::object! {
                 id: id,
                 count: count,
-                name: card.name.as_str(),
                 printed_name: card.printed_name.as_str(),
+                unique_name: card.unique_name.as_str(),
+                full_name: card.full_name.as_str(),
                 types: JsonValue::Array(card.types.iter().map(|t| t.as_str().into()).collect()),
                 disciplines: JsonValue::Array(card.disciplines.iter().map(|d| d.as_str().into()).collect()),
                 clan: card.clan.as_str(),
                 group: card.group.as_str(),
                 capacity: card.capacity,
+                adv: card.adv,
             };
             match card.kind {
                 CardKind::Crypt => crypt.push(entry),
@@ -601,7 +605,7 @@ pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
     crypt.sort_by(|a, b| {
         let cap_cmp = b["capacity"].as_u32().cmp(&a["capacity"].as_u32());
         if cap_cmp == std::cmp::Ordering::Equal {
-            a["name"].as_str().cmp(&b["name"].as_str())
+            a["unique_name"].as_str().cmp(&b["unique_name"].as_str())
         } else {
             cap_cmp
         }
@@ -613,7 +617,7 @@ pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
         let type_b = b["types"][0].as_str().unwrap_or("");
         library_type_index(type_a)
             .cmp(&library_type_index(type_b))
-            .then_with(|| a["name"].as_str().cmp(&b["name"].as_str()))
+            .then_with(|| a["unique_name"].as_str().cmp(&b["unique_name"].as_str()))
     });
 
     let crypt_count: u32 = crypt.iter().map(|c| c["count"].as_u32().unwrap_or(0)).sum();
@@ -731,7 +735,7 @@ pub fn export_twda(
     crypt_entries.sort_by(|a, b| {
         b.0.capacity
             .cmp(&a.0.capacity)
-            .then_with(|| a.0.name.cmp(&b.0.name))
+            .then_with(|| a.0.unique_name.cmp(&b.0.unique_name))
     });
 
     let crypt_total: u32 = crypt_entries.iter().map(|(_, c)| c).sum();
@@ -747,7 +751,7 @@ pub fn export_twda(
         };
         lines.push(format!(
             "{}x {:30} {:>2}  {:20} {}:{}",
-            count, card.name, card.capacity, disc, card.clan, card.group
+            count, card.unique_name, card.capacity, disc, card.clan, card.group
         ));
     }
 
@@ -767,7 +771,7 @@ pub fn export_twda(
         let type_b = b.0.types.first().map(|s| s.as_str()).unwrap_or("");
         library_type_index(type_a)
             .cmp(&library_type_index(type_b))
-            .then_with(|| a.0.name.cmp(&b.0.name))
+            .then_with(|| a.0.unique_name.cmp(&b.0.unique_name))
     });
 
     let lib_total: u32 = lib_entries.iter().map(|(_, c)| c).sum();
@@ -787,7 +791,7 @@ pub fn export_twda(
             // TODO: Add trifle counts when card data includes trifle flag
             lines.push(format!("{card_type} ({type_count})"));
         }
-        lines.push(format!("{}x {}", count, card.name));
+        lines.push(format!("{}x {}", count, card.unique_name));
     }
 
     lines.join("\n")
@@ -800,55 +804,55 @@ mod tests {
     fn test_cards_json() -> &'static str {
         r#"{
             "100001": {
-                "id": 100001, "name": ".44 Magnum", "printed_name": ".44 Magnum",
+                "id": 100001, "printed_name": ".44 Magnum", "unique_name": ".44 Magnum", "full_name": ".44 Magnum",
                 "kind": "library", "types": ["Equipment"], "disciplines": [],
                 "clan": "", "group": "", "capacity": 0, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": ["44 Magnum"]
             },
             "100002": {
-                "id": 100002, "name": "419 Operation", "printed_name": "419 Operation",
+                "id": 100002, "printed_name": "419 Operation", "unique_name": "419 Operation", "full_name": "419 Operation",
                 "kind": "library", "types": ["Action"], "disciplines": [],
                 "clan": "", "group": "", "capacity": 0, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": []
             },
             "100519": {
-                "id": 100519, "name": "Delaying Tactics", "printed_name": "Delaying Tactics",
+                "id": 100519, "printed_name": "Delaying Tactics", "unique_name": "Delaying Tactics", "full_name": "Delaying Tactics",
                 "kind": "library", "types": ["Reaction"], "disciplines": [],
                 "clan": "", "group": "", "capacity": 0, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": ["Delaying"]
             },
             "100010": {
-                "id": 100010, "name": "Channel 10", "printed_name": "Channel 10",
+                "id": 100010, "printed_name": "Channel 10", "unique_name": "Channel 10", "full_name": "Channel 10",
                 "kind": "library", "types": ["Master"], "disciplines": [],
                 "clan": "", "group": "", "capacity": 0, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": []
             },
             "200001": {
-                "id": 200001, "name": "Aabbt Kindred (G2)", "printed_name": "Aabbt Kindred",
+                "id": 200001, "printed_name": "Aabbt Kindred", "unique_name": "Aabbt Kindred", "full_name": "Aabbt Kindred (G2)",
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["for", "pre", "ser"],
                 "clan": "Ministry", "group": "2", "capacity": 4, "adv": false,
                 "banned": "", "sets": ["Final Nights"], "name_variants": ["Aabbt Kindred"]
             },
             "200002": {
-                "id": 200002, "name": "Test Vampire (G3)", "printed_name": "Test Vampire",
+                "id": 200002, "printed_name": "Test Vampire", "unique_name": "Test Vampire", "full_name": "Test Vampire (G3)",
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["dom"],
                 "clan": "Ventrue", "group": "3", "capacity": 7, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": ["Test Vampire"]
             },
             "200103": {
-                "id": 200103, "name": "Annabelle Triabell (G3)", "printed_name": "Annabelle Triabell",
+                "id": 200103, "printed_name": "Annabelle Triabell", "unique_name": "Annabelle Triabell (G3)", "full_name": "Annabelle Triabell (G3)",
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["aus", "cel", "pre"],
                 "clan": "Toreador", "group": "3", "capacity": 9, "adv": false,
                 "banned": "", "sets": ["Camarilla Edition"], "name_variants": ["Annabelle Triabell"]
             },
             "201693": {
-                "id": 201693, "name": "Annabelle Triabell (G6)", "printed_name": "Annabelle Triabell",
+                "id": 201693, "printed_name": "Annabelle Triabell", "unique_name": "Annabelle Triabell (G6)", "full_name": "Annabelle Triabell (G6)",
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["aus", "cel", "pre"],
                 "clan": "Toreador", "group": "6", "capacity": 9, "adv": false,
                 "banned": "", "sets": ["Fall of London"], "name_variants": []
             },
             "201477": {
-                "id": 201477, "name": "Xaviar (G3)", "printed_name": "Xaviar",
+                "id": 201477, "printed_name": "Xaviar", "unique_name": "Xaviar", "full_name": "Xaviar (G3)",
                 "kind": "crypt", "types": ["Vampire"], "disciplines": ["ani", "for", "pot"],
                 "clan": "Gangrel", "group": "3", "capacity": 10, "adv": false,
                 "banned": "", "sets": ["Jyhad"], "name_variants": ["Xaviar"]
@@ -882,6 +886,9 @@ mod tests {
         assert_eq!(parse_card_line("1 Xaviar", &cm), Some((201477, 1)));
         // a normal x-marker line (with a following card name) still parses
         assert_eq!(parse_card_line("2xx .44 Magnum", &cm), Some((100001, 2)));
+        // leading x/X multiplier before the count ("x2", "xx2")
+        assert_eq!(parse_card_line("x2 Xaviar", &cm), Some((201477, 2)));
+        assert_eq!(parse_card_line("xx2 .44 Magnum", &cm), Some((100001, 2)));
     }
 
     #[test]

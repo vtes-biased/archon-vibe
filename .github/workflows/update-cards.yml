@@ -18,8 +18,11 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install uv
+        run: pip install uv
+
       - name: Run cards update script
-        run: python3 scripts/update_cards.py
+        run: uv run python scripts/update_cards.py
 
       - name: Check for changes
         id: diff

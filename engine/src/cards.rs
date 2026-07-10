@@ -3,12 +3,42 @@
 use crate::error::EngineError;
 use json::JsonValue;
 use std::collections::HashMap;
+use unicode_normalization::UnicodeNormalization;
+
+/// Fold Latin accents to ASCII so an accent-free spelling matches: NFD-decompose
+/// (é → e + combining mark), drop the combining marks, and map the few letters that
+/// don't decompose (ł, ø, æ, …). Small on purpose — VTES names are Latin-script.
+fn fold_ascii(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.nfd() {
+        match c {
+            '\u{0300}'..='\u{036F}' => {} // combining diacritical mark — drop
+            'ł' | 'Ł' => out.push('l'),
+            'ø' | 'Ø' => out.push('o'),
+            'đ' | 'Đ' | 'ð' | 'Ð' => out.push('d'),
+            'ħ' | 'Ħ' => out.push('h'),
+            'ı' => out.push('i'),
+            'ŧ' | 'Ŧ' => out.push('t'),
+            'æ' | 'Æ' => out.push_str("ae"),
+            'œ' | 'Œ' => out.push_str("oe"),
+            'þ' | 'Þ' => out.push_str("th"),
+            'ß' => out.push_str("ss"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
 
 #[derive(Debug, Clone)]
 pub struct Card {
     pub id: u32,
-    pub name: String,
+    /// Bare name, for display (group/advanced are shown as separate badges).
     pub printed_name: String,
+    /// Minimal disambiguator (most vampires bare; later groups/advanced suffixed);
+    /// used for text decklist export.
+    pub unique_name: String,
+    /// Always group/advanced suffixed.
+    pub full_name: String,
     pub kind: CardKind,
     pub types: Vec<String>,
     pub disciplines: Vec<String>,
@@ -26,9 +56,13 @@ pub enum CardKind {
     Library,
 }
 
-/// Normalize a card name for fuzzy lookup: lowercase, strip non-alphanumeric.
+/// Normalize a card name for fuzzy lookup: fold accents to ASCII, lowercase, strip
+/// non-alphanumeric. Folding lets an accent-free spelling match ("Francois Villon"
+/// for "François Villon"); the index and the query both pass through here, so both
+/// sides fold identically.
 pub fn normalize_name(name: &str) -> String {
-    name.chars()
+    fold_ascii(name)
+        .chars()
         .filter_map(|c| {
             if c.is_alphanumeric() || c == ' ' {
                 Some(c.to_ascii_lowercase())
@@ -63,8 +97,9 @@ impl CardMap {
 
             // Collect every normalized name this card answers to.
             let mut keys = vec![
-                normalize_name(&card.name),
                 normalize_name(&card.printed_name),
+                normalize_name(&card.unique_name),
+                normalize_name(&card.full_name),
             ];
             if let JsonValue::Array(ref variants) = value["name_variants"] {
                 for v in variants {
@@ -207,8 +242,9 @@ fn parse_card(id: u32, value: &JsonValue) -> Result<Card, EngineError> {
 
     Ok(Card {
         id,
-        name: value["name"].as_str().unwrap_or("").to_string(),
         printed_name: value["printed_name"].as_str().unwrap_or("").to_string(),
+        unique_name: value["unique_name"].as_str().unwrap_or("").to_string(),
+        full_name: value["full_name"].as_str().unwrap_or("").to_string(),
         kind,
         types,
         disciplines,
@@ -229,8 +265,9 @@ mod tests {
         r#"{
             "100001": {
                 "id": 100001,
-                "name": ".44 Magnum",
                 "printed_name": ".44 Magnum",
+                "unique_name": ".44 Magnum",
+                "full_name": ".44 Magnum",
                 "kind": "library",
                 "types": ["Equipment"],
                 "disciplines": [],
@@ -244,8 +281,9 @@ mod tests {
             },
             "200001": {
                 "id": 200001,
-                "name": "Aabbt Kindred (G2)",
                 "printed_name": "Aabbt Kindred",
+                "unique_name": "Aabbt Kindred",
+                "full_name": "Aabbt Kindred (G2)",
                 "kind": "crypt",
                 "types": ["Vampire"],
                 "disciplines": ["for", "pre", "ser"],
@@ -266,7 +304,7 @@ mod tests {
         assert_eq!(cm.len(), 2);
 
         let magnum = cm.by_id(100001).unwrap();
-        assert_eq!(magnum.name, ".44 Magnum");
+        assert_eq!(magnum.printed_name, ".44 Magnum");
         assert_eq!(magnum.kind, CardKind::Library);
 
         let aabbt = cm.by_name("Aabbt Kindred").unwrap();
@@ -279,15 +317,28 @@ mod tests {
     }
 
     #[test]
+    fn test_accent_folding() {
+        // An accent-free spelling must resolve the accented card: normalize_name
+        // folds both the index and the query to ASCII.
+        let json = r#"{
+            "200478": {"printed_name":"François Villon","unique_name":"François Villon (G2)","full_name":"François Villon (G2)","name_variants":[]}
+        }"#;
+        let cm = CardMap::load(json).unwrap();
+        assert_eq!(cm.by_name("Francois Villon").unwrap().id, 200478);
+        assert_eq!(cm.by_name("François Villon").unwrap().id, 200478);
+        assert_eq!(cm.by_name("francois villon g2").unwrap().id, 200478);
+    }
+
+    #[test]
     fn test_prefix_lookup_is_deterministic() {
         // Several names share the "gov"/"abc" prefixes. HashMap iteration order is
         // nondeterministic, so the lookup must pick a stable winner: shortest
         // matching name, then lowest id.
         let json = r#"{
-            "10": { "name": "Govern" },
-            "20": { "name": "Governing" },
-            "5":  { "name": "Abcd" },
-            "9":  { "name": "Abce" }
+            "10": { "unique_name": "Govern", "full_name": "Govern" },
+            "20": { "unique_name": "Governing", "full_name": "Governing" },
+            "5":  { "unique_name": "Abcd", "full_name": "Abcd" },
+            "9":  { "unique_name": "Abce", "full_name": "Abce" }
         }"#;
         let cm = CardMap::load(json).unwrap();
         // Shortest match wins: "govern" (6) over "governing" (9).
@@ -306,9 +357,9 @@ mod tests {
         // = G2 here). The (ADV) and (G6) qualifiers still resolve via their unique
         // exact keys.
         let json = r#"{
-            "201362": {"name":"Theo Bell (G2)","printed_name":"Theo Bell","adv":false,"group":"2","name_variants":["Theo Bell"]},
-            "201363": {"name":"Theo Bell (G2 ADV)","printed_name":"Theo Bell","adv":true,"group":"2","name_variants":["Theo Bell (ADV)"]},
-            "201613": {"name":"Theo Bell (G6)","printed_name":"Theo Bell","adv":false,"group":"6","name_variants":[]}
+            "201362": {"printed_name":"Theo Bell","unique_name":"Theo Bell (G2)","full_name":"Theo Bell (G2)","adv":false,"group":"2","name_variants":["Theo Bell"]},
+            "201363": {"printed_name":"Theo Bell","unique_name":"Theo Bell (G2 ADV)","full_name":"Theo Bell (G2 ADV)","adv":true,"group":"2","name_variants":["Theo Bell (ADV)"]},
+            "201613": {"printed_name":"Theo Bell","unique_name":"Theo Bell (G6)","full_name":"Theo Bell (G6)","adv":false,"group":"6","name_variants":[]}
         }"#;
         let cm = CardMap::load(json).unwrap();
         assert_eq!(

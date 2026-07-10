@@ -478,8 +478,12 @@ export interface CategoryRating {
 // Card types (VTES card database)
 export interface VtesCard {
   id: number;
-  name: string;
+  /** Bare name, for display (group/advanced shown as separate badges). */
   printed_name: string;
+  /** Minimal disambiguator (bare for most; later groups/advanced suffixed); text export. */
+  unique_name: string;
+  /** Always group/advanced suffixed. */
+  full_name: string;
   img: string;
   kind: 'crypt' | 'library';
   types: string[];

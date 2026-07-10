@@ -107,8 +107,8 @@ export async function searchCards(query: string, limit = 20): Promise<VtesCard[]
   for (const card of cards.values()) {
     if (results.length >= limit) break;
     if (
-      normalizeSearch(card.name).includes(norm) ||
-      normalizeSearch(card.printed_name).includes(norm)
+      normalizeSearch(card.printed_name).includes(norm) ||
+      normalizeSearch(card.unique_name).includes(norm)
     ) {
       results.push(card);
     }
@@ -116,9 +116,9 @@ export async function searchCards(query: string, limit = 20): Promise<VtesCard[]
 
   // Sort: exact prefix matches first, then by name
   results.sort((a, b) => {
-    const aStarts = normalizeSearch(a.name).startsWith(norm) ? 0 : 1;
-    const bStarts = normalizeSearch(b.name).startsWith(norm) ? 0 : 1;
-    return aStarts - bStarts || a.name.localeCompare(b.name);
+    const aStarts = normalizeSearch(a.unique_name).startsWith(norm) ? 0 : 1;
+    const bStarts = normalizeSearch(b.unique_name).startsWith(norm) ? 0 : 1;
+    return aStarts - bStarts || a.unique_name.localeCompare(b.unique_name);
   });
 
   return results;

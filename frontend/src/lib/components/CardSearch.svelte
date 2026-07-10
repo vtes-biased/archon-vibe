@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { VtesCard } from "$lib/types";
   import { searchCards } from "$lib/cards";
+  import CardName from "$lib/components/CardName.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -61,7 +62,7 @@
           class="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors {i === selectedIndex ? 'bg-surface-active text-ink-strong' : 'text-ink-bright hover:bg-surface-hover'}"
           onclick={() => select(card)}
         >
-          <span class="flex-1 truncate">{card.name}</span>
+          <CardName {card} class="flex-1" />
           <span class="text-xs text-ink-faint">{card.types.join('/')}</span>
           {#if card.kind === 'crypt' && card.capacity}
             <span class="text-xs text-ink-faint">{card.capacity}</span>
