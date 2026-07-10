@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   engine:
-    name: Engine wheel (PyO3, manylinux_2_28, cp313)
+    name: Engine wheel (PyO3, manylinux_2_28, cp314)
     runs-on: ubuntu-latest
     permissions:
       contents: write

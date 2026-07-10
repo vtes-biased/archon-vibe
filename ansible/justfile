@@ -44,14 +44,18 @@ clean:
     rm -rf {{build_dir}}
     mkdir -p {{build_dir}}
 
-# Build the PyO3 engine wheel for linux x86_64 (manylinux_2_28, cp313)
+# Build the PyO3 engine wheel for linux x86_64 (manylinux_2_28; interpreter from .python-version)
 build-engine-wheel:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p {{build_dir}}
     cd {{repo_root}} && python scripts/update_cards.py
     # manylinux_2_28 ships pythons at /opt/python/cp3XX-cp3XX/bin/python3.XX (not on
-    # PATH), so we pass the full path. Both servers run the same uv-managed 3.13.
+    # PATH), so we pass the full path — derived from .python-version so it can't drift
+    # from the servers' python_version or CI's `-i python3.XX`.
+    pyver="$(cut -d. -f1,2 {{repo_root}}/.python-version)"   # e.g. 3.14
+    cptag="cp${pyver//./}"                                    # e.g. cp314
+    interp="/opt/python/${cptag}-${cptag}/bin/python${pyver}"
     docker run --rm --platform=linux/amd64 \
       -v {{repo_root}}:/io \
       -w /io/engine \
@@ -60,7 +64,7 @@ build-engine-wheel:
                /root/.local/bin/uv tool install maturin && \
                /root/.local/bin/maturin build --release \
                  --compatibility manylinux_2_28 \
-                 --interpreter /opt/python/cp313-cp313/bin/python3.13 \
+                 --interpreter ${interp} \
                  --out /io/ansible/build"
 
 # Build the backend wheel + export pinned requirements
@@ -121,6 +125,10 @@ deploy-beta:
     #!/usr/bin/env bash
     set -euo pipefail
     export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}"
+    # Refresh galaxy collections (incl. the git-sourced foundation) as the sibling
+    # provision/lint recipes do — a full deploy runs collection-backed roles. Skip on
+    # QUICK=1: the artifact-only lane (--tags app) touches no such roles.
+    if [ -z "${QUICK:-}" ]; then just galaxy; fi
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
@@ -132,6 +140,10 @@ deploy-prod:
     #!/usr/bin/env bash
     set -euo pipefail
     export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}"
+    # Refresh galaxy collections (incl. the git-sourced foundation) as the sibling
+    # provision/lint recipes do — a full deploy runs collection-backed roles. Skip on
+    # QUICK=1: the artifact-only lane (--tags app) touches no such roles.
+    if [ -z "${QUICK:-}" ]; then just galaxy; fi
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi

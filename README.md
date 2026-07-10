@@ -78,7 +78,7 @@ Install these tools before setting up the project:
 | Tool | Install | Purpose |
 |------|---------|---------|
 | **Rust** | [rustup.rs](https://rustup.rs/) | Shared engine (business logic) |
-| **Node.js** 18+ | [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org/) | Frontend tooling |
+| **Node.js** 24+ | [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org/) | Frontend tooling |
 | **uv** | [docs.astral.sh/uv](https://docs.astral.sh/uv/) | Python package manager (auto-installs Python) |
 | **just** | [github.com/casey/just](https://github.com/casey/just#installation) | Task runner |
 | **Docker** | [Docker Desktop](https://www.docker.com/) or [OrbStack](https://orbstack.dev/) | Database (dev) and deployment |

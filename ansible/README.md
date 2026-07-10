@@ -23,7 +23,7 @@ The `just build-*` recipes still build everything locally for development, and
 (handy for testing an un-released change on beta).
 
 Runtime Python is managed by **uv** (same version on both hosts, pinned via
-`python_version` in `group_vars/all/vars.yml` — currently `3.13`). uv downloads
+`python_version` in `group_vars/all/vars.yml` — currently `3.14`). uv downloads
 python-build-standalone binaries into `/opt/uv/python`, independent of the
 distro. No third-party PPAs; no abi3 tricks in the Rust engine build.
 
@@ -34,13 +34,13 @@ the same major version.
 ## Prerequisites
 
 On your workstation:
-- Python 3.13 + `uv` (`brew install uv`)
+- Python 3.14 + `uv` (`brew install uv`)
 - `uv sync --group dev` from the repo root — installs pinned `ansible-core`,
   `ansible-lint`, `yamllint` and everything else the deploy recipes need.
 - `just` (`brew install just`) — the ansible task runner (recipes in `ansible/justfile`).
 - Network access to GitHub (the deploy playbook downloads Release assets).
 - Only for `SOURCE=local` builds: Docker Desktop (manylinux PyO3 wheel),
-  Node 22 (matches CI), and `wasm-pack` (frontend WASM engine).
+  Node 24 (matches CI), and `wasm-pack` (frontend WASM engine).
 
 On each server (first time only):
 - **prod** (before `just bootstrap-prod`): a non-root admin user with
@@ -189,7 +189,9 @@ From there:
    to build and attach the wheel / frontend dist assets — no `release:
    published` event handoff (a `github.token`-created Release never fires it),
    so no PAT/token is needed.
-4. Deploy is manual + approval-gated (`deploy.yml`) — nothing auto-deploys.
+4. Deploy is a separate manual step — run `just deploy-beta` / `deploy-prod`
+   from the laptop (see [Routine updates](#routine-updates) below); nothing
+   auto-deploys.
 
 To run the E2E suite without cutting a release (e.g. on `main`), use
 `workflow_dispatch` on `release.yml` in the Actions tab.
@@ -214,41 +216,6 @@ lift the API rate limit. Note: re-running the release workflow re-uploads
 (`--clobber`) a release's attached artifacts — treat a published release's assets
 as the deployed bytes and cut a new release rather than re-running to change what
 ships.
-
-## Deploy from CI (GitHub Actions)
-
-`.github/workflows/deploy.yml` runs the deploy from a runner — `beta` →
-`deploy-beta.yml` (server-setup host), `production` → `deploy.yml` (standalone,
-inventory dir `prod`). It is
-**manual-only** (`workflow_dispatch`, pick `beta`/`prod` + an optional
-`release_tag`) and **approval-gated**: the job binds to a GitHub Environment whose
-required-reviewer rule pauses the run until someone approves. Nothing
-auto-deploys.
-
-For **beta**, server-setup owns the config — `just sync` (from the server-setup
-repo) pushes `DEPLOY_HOST` + `DEPLOY_HOST_KEY` and `just sync-key ~/.ssh/deploy`
-pushes `DEPLOY_SSH_KEY` to this repo's `beta` environment. One-time setup:
-
-1. **Environments** (Settings → Environments): create `beta` and `production`,
-   each with **Required reviewers** enabled.
-2. **Per-environment variables** (Variables — not sensitive; `just sync` sets these
-   for beta):
-   - `DEPLOY_HOST` — the real server host/IP (the committed inventory ships a
-     placeholder; CI overrides it via `-e ansible_host`).
-   - `DEPLOY_HOST_KEY` — a `known_hosts` line for `DEPLOY_HOST` (e.g.
-     `ssh-keyscan "$DEPLOY_HOST"`); its host field must match `DEPLOY_HOST`
-     **exactly** (same hostname-or-IP form) — a mismatch is a hard connect failure
-     since `host_key_checking` is on.
-3. **Per-environment secrets** (Secrets):
-   - `DEPLOY_SSH_KEY` — the deploy keypair's private half (LF newlines); its public
-     half is in the deploy user's `authorized_keys` (`just sync-key` for beta).
-   - `ANSIBLE_VAULT_PASSWORD` — the vault password for that env's `vault.yml`
-     (set it with `gh secret set` — see [Vault passwords](#vault-passwords)).
-4. The VPS must accept SSH from GitHub-hosted runner IPs (port 22 open).
-
-`production` deploys require an explicit `release_tag` (a pre-check fails a
-blank production dispatch before the approval gate), so the reviewer sees the
-exact tag being shipped; `beta` allows blank (= latest).
 
 ## System updates / kernel upgrades
 
