@@ -232,3 +232,21 @@ Open micro-decisions during impl: transitional `name` alias?; V5 check via krcg
 `formats` vs set-name strings; the Rust fold impl (cover ł/ø/æ beyond NFD).
 Agents to consult: principal-engineer (Rust/WASM + data-model), staff-frontend-engineer
 (badge display), product-manager (naming/display UX), senior-qa.
+
+### #478 — evaluated, NO CHANGE (keep twda_import.py)
+krcg.twda would replace only a ~18-line crypt/library flatten with **no correctness
+gain**: `static.krcg.org/data/twda.json` already carries resolved VEKN card ids (unlike
+the providers/parser, where krcg's *resolution* fixed real bugs). Against that, switching
+to `krcg.twda.load_online` (a) **drops the ETag 304 optimization** (it unconditionally
+refetches + parses ~12MB / 4.5k Deck objects each run) and (b) **doesn't expose the VEKN
+event id** the import matches on — krcg's `Deck.event` has no `id`, and its `url` varies
+(recent entries link to `archon.vekn.net/tournament/<uuid>`), so `_extract_vekn_event_id`
+would have to be re-derived. Not worth it. `twda.py` (GitHub-App auto-PR) was never a
+krcg overlap — kept.
+
+### Spun-off fixes (found during the epic, fixed separately)
+- **#479** — deck text-parse dropped X-named crypt cards (count parser ate the leading x).
+- **#480** — V5-legality now a precomputed `cards.json` flag (VEKN §6.4 set allowlist +
+  Format.V5 promo whitelist), replacing the broken `starts_with("V5")` set-name check.
+- **upstream ../krcg** — parser now keeps `(G3 ADV)`/`(G6)` group/adv parentheticals
+  (were stripped as comments → resolved to base/wrong group).
