@@ -112,6 +112,26 @@ def _validate_expiry(
             )
 
 
+async def _has_active_dq(tournament_uid: str, user_uid: str) -> bool:
+    """True if the player carries an active DQ on this tournament (get_sanctions_
+    for_tournament already drops deleted rows, so only lifted needs excluding)."""
+    return any(
+        s.user_uid == user_uid
+        and s.level == SanctionLevel.DISQUALIFICATION
+        and s.lifted_at is None
+        for s in await get_sanctions_for_tournament(tournament_uid)
+    )
+
+
+async def _dq_restore_state(tournament_uid: str, user_uid: str) -> PlayerState:
+    """State after removing one DQ — call AFTER saving the removal so it no longer
+    counts: DISQUALIFIED if another active DQ still remains (else the zeroed score
+    and a FINISHED state would diverge), otherwise FINISHED."""
+    if await _has_active_dq(tournament_uid, user_uid):
+        return PlayerState.DISQUALIFIED
+    return PlayerState.FINISHED
+
+
 async def _apply_sanction_to_tournament(
     tournament_uid: str,
     *,
@@ -290,6 +310,18 @@ async def create_sanction(
             ) from e
 
     _validate_expiry(level, expires_at, issued_at)
+
+    # One active DQ per player per tournament: a second is meaningless and, once one
+    # is lifted, would strand the player zeroed. Re-DQ after a lift is still allowed.
+    if (
+        level == SanctionLevel.DISQUALIFICATION
+        and request.tournament_uid
+        and await _has_active_dq(request.tournament_uid, request.user_uid)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Player already has an active disqualification in this tournament",
+        )
 
     # Create sanction
     sanction = Sanction(
@@ -489,24 +521,41 @@ async def update_sanction_endpoint(
         lifted_by_uid=lifted_by_uid,
     )
 
-    bd = await save_sanction(updated)
-    logger.info(f"Sanction {uid} updated by {current_user.uid}")
-
     # Standings zero a player off player.state=="Disqualified" OR an active DQ
     # sanction, so entering/leaving an active DQ (by lift or level edit) must flip
-    # state + recompute here — else a downgraded/lifted DQ stays zeroed forever.
+    # state + recompute below — else a downgraded/lifted DQ stays zeroed forever.
     was_active_dq = (
         sanction.level == SanctionLevel.DISQUALIFICATION and sanction.lifted_at is None
     )
     is_active_dq = (
         updated.level == SanctionLevel.DISQUALIFICATION and updated.lifted_at is None
     )
+    # One active DQ per player per tournament: a level edit can't mint a second one.
+    if (
+        is_active_dq
+        and not was_active_dq
+        and sanction.tournament_uid
+        and await _has_active_dq(sanction.tournament_uid, sanction.user_uid)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Player already has an active disqualification in this tournament",
+        )
+
+    bd = await save_sanction(updated)
+    logger.info(f"Sanction {uid} updated by {current_user.uid}")
+
     if sanction.tournament_uid and was_active_dq != is_active_dq:
+        # became → DISQUALIFIED; ceased → FINISHED unless another active DQ remains.
         # Recompute covers any new SA level on the row too, hence the elif below.
         await _apply_sanction_to_tournament(
             sanction.tournament_uid,
             dq_user_uid=sanction.user_uid,
-            dq_state=PlayerState.DISQUALIFIED if is_active_dq else PlayerState.FINISHED,
+            dq_state=(
+                PlayerState.DISQUALIFIED
+                if is_active_dq
+                else await _dq_restore_state(sanction.tournament_uid, sanction.user_uid)
+            ),
         )
     # SA touched (round changed, or level changed to/from SA): refresh standings so
     # the -1 VP penalty appears/clears immediately.
@@ -564,18 +613,19 @@ async def delete_sanction_endpoint(
     bd = await save_sanction(updated)
     logger.info(f"Sanction {uid} soft-deleted by {current_user.uid}")
 
-    # Deleting an active DQ sanction restores the player on the tournament,
-    # mirroring the lift path
+    # Deleting an active DQ restores the player on the tournament, mirroring the
+    # lift path — FINISHED unless another active DQ still keeps them zeroed.
     if (
         sanction.level == SanctionLevel.DISQUALIFICATION
         and sanction.lifted_at is None
         and sanction.tournament_uid
     ):
-        # Restore the un-zeroed scores (mirrors the lift path above).
         await _apply_sanction_to_tournament(
             sanction.tournament_uid,
             dq_user_uid=sanction.user_uid,
-            dq_state=PlayerState.FINISHED,
+            dq_state=await _dq_restore_state(
+                sanction.tournament_uid, sanction.user_uid
+            ),
         )
 
     # Deleting an active SA drops its -1 VP penalty: refresh standings

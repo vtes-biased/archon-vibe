@@ -1,16 +1,19 @@
-"""Regression test for PUT /sanctions/{uid} expiry validation on level-only edits.
+"""Regression tests for /sanctions endpoint invariants.
 
-The bug (pst #365): `_validate_expiry` used to run only inside `if expires_at is
-not None`, so editing *just the level* SUSPENSION->PROBATION skipped it and
-persisted a PROBATION with expires_at=None. That is not cosmetic: a null-expiry
-PROBATION reads as PERMANENTLY active in `user_has_active_suspension`
-(accounts.py — `expires_at is None` -> active forever), permanently blocking the
-member from abandoning their VEKN ID. The 18-month cap exists to bound exactly
-this. The fix hoisted the validation to run on the resulting level+expires_at
-pair unconditionally; this pins that at the HTTP interface.
+1. Level-only edit expiry validation. `_validate_expiry` used to run only inside
+   `if expires_at is not None`, so editing *just the level* SUSPENSION->PROBATION
+   skipped it and persisted a PROBATION with expires_at=None. That is not cosmetic:
+   a null-expiry PROBATION reads as PERMANENTLY active in
+   `user_has_active_suspension` (accounts.py — `expires_at is None` -> active
+   forever), permanently blocking the member from abandoning their VEKN ID. The
+   fix validates the resulting level+expires_at pair unconditionally.
 
-Runs real: real Postgres, real route/auth, no tournament/engine (sanction has no
-tournament_uid, so the DQ/SA recompute branches never fire). One user, one row.
+2. One active DQ per player per tournament. A second concurrent DQ is meaningless
+   and, once one is lifted, would strand the player zeroed with a FINISHED state.
+   create now 409s on a duplicate.
+
+Runs real: real Postgres, real route/auth, no engine (the DQ/SA recompute branches
+are gated on the tournament existing, and the guards reject before reaching them).
 """
 
 from datetime import UTC, datetime
@@ -60,6 +63,54 @@ async def test_level_only_edit_to_probation_without_expiry_rejected(test_client)
         stored = await db.get_sanction_by_uid(sanction.uid)
         assert stored.level == SanctionLevel.SUSPENSION
         assert stored.expires_at is None
+    finally:
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE type = 'sanction'")
+
+
+@pytest.mark.asyncio
+async def test_create_second_active_dq_rejected(test_client):
+    """A second concurrent DQ for the same player+tournament must 409, not persist."""
+    ic = User(uid=str(uuid7()), modified=datetime.now(UTC), name="IC", roles=[Role.IC])
+    target = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Player")
+    await db.save_user(ic)
+    await db.save_user(target)
+
+    tournament_uid = str(uuid7())
+    existing = Sanction(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        user_uid=target.uid,
+        issued_by_uid=ic.uid,
+        tournament_uid=tournament_uid,
+        level=SanctionLevel.DISQUALIFICATION,
+        category=SanctionCategory.UNSPORTSMANLIKE_CONDUCT,
+        description="first dq",
+        issued_at=datetime.now(UTC),
+    )
+    try:
+        await db.save_sanction(existing)
+
+        resp = await test_client.post(
+            "/sanctions/",
+            json={
+                "user_uid": target.uid,
+                "level": "disqualification",
+                "category": SanctionCategory.UNSPORTSMANLIKE_CONDUCT.value,
+                "description": "second dq",
+                "tournament_uid": tournament_uid,
+            },
+            headers=make_auth_header(ic.uid),
+        )
+        assert resp.status_code == 409
+
+        # Still exactly one DQ for this player+tournament.
+        dqs = [
+            s
+            for s in await db.get_sanctions_for_tournament(tournament_uid)
+            if s.level == SanctionLevel.DISQUALIFICATION
+        ]
+        assert len(dqs) == 1
     finally:
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE type = 'sanction'")
