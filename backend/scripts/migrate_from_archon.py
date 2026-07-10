@@ -70,6 +70,7 @@ import argparse
 import asyncio
 import importlib.util
 import os
+import secrets
 import subprocess
 import sys
 import uuid
@@ -1139,7 +1140,15 @@ def build_tournament(
         decklists_mode=decklists_mode,
         max_rounds=int(d.get("max_rounds", 0) or 0),
         external_ids=external_ids,
-        checkin_code=d.get("checkin_code") or "",
+        # Carry forward the existing new-app code (organizers may have printed the
+        # QR) → legacy code (never set — new-app concept) → generate. An empty
+        # existing code (previously-migrated under the old `or ""`) is falsy, so
+        # the next nightly run self-backfills it with a stable random code.
+        checkin_code=(
+            (existing.checkin_code if existing else None)
+            or d.get("checkin_code")
+            or secrets.token_urlsafe(16)
+        ),
         players=players,
         rounds=new_rounds,
         finals=finals,

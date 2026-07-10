@@ -1463,7 +1463,10 @@ async def qr_checkin(
     tournament = await get_tournament_by_uid(uid)
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
-    if request.code != tournament.checkin_code:
+    # Defense-in-depth: an empty stored code must never authorize check-in (a
+    # migrated/legacy event that slipped through with checkin_code='' would let
+    # request.code='' pass). Real codes are always non-empty.
+    if not tournament.checkin_code or request.code != tournament.checkin_code:
         raise HTTPException(status_code=403, detail="Invalid check-in code")
     return await tournament_action(
         uid,
