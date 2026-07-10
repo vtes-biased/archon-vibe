@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid7
 
+from .broadcast import broadcast_precomputed
 from .data.vekn_roster import ADMINS, JUDGES
 from .db import (
     decode_json,
@@ -653,7 +654,8 @@ class VEKNSyncService:
             **vekn_data,
         )
 
-        await save_user(user)
+        bd = await save_user(user)
+        broadcast_precomputed(bd)
         return user
 
     async def _update_user(
@@ -720,7 +722,8 @@ class VEKNSyncService:
         existing_user.vekn_synced_at = now
         existing_user.modified = now
 
-        await save_user(existing_user)
+        bd = await save_user(existing_user)
+        broadcast_precomputed(bd)
 
         return existing_user, True
 
@@ -833,7 +836,8 @@ class VEKNSyncService:
                 user.coopted_by = sponsor.uid
                 user.coopted_at = None
                 user.modified = now
-                await save_user(user)
+                bd = await save_user(user)
+                broadcast_precomputed(bd)
                 count += 1
 
         return count
@@ -889,7 +893,8 @@ class VEKNSyncService:
                 if sponsor_uid and sponsor_uid != user.uid:
                     user.coopted_by = sponsor_uid
                     user.modified = now
-                    await save_user(user)
+                    bd = await save_user(user)
+                    broadcast_precomputed(bd)
                     count += 1
                     continue
             still_orphan.append(user)
@@ -901,7 +906,8 @@ class VEKNSyncService:
                 if sponsor_uid and sponsor_uid != user.uid:
                     user.coopted_by = sponsor_uid
                     user.modified = now
-                    await save_user(user)
+                    bd = await save_user(user)
+                    broadcast_precomputed(bd)
                     count += 1
 
         return count
