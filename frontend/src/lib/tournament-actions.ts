@@ -152,6 +152,13 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
 
       // Queue server POST (serialized per tournament, prevents concurrent races)
       const hadDeckOps = (result.deckOps?.length ?? 0) > 0;
+      // Snapshot our optimistic 'modified' stamps so rollback can tell our own
+      // write apart from a foreign SSE update (co-judge action, server job) that
+      // landed between the optimistic write and the rejection.
+      const optimisticModified = result.tournament.modified;
+      const optimisticDeckMods = hadDeckOps
+        ? new Map((await getDecksByTournament(uid)).map((d) => [d.uid, d.modified]))
+        : undefined;
       enqueueServerAction(uid, async () => {
         try {
           await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
@@ -162,7 +169,7 @@ export async function tournamentAction(uid: string, action: string, data?: Recor
           // A rejected action emits no SSE event, so the optimistic IDB write
           // won't self-correct — roll back to the pre-action state locally.
           console.error('Server rejected action, rolling back optimistic update:', e);
-          await rollbackTournamentAction(uid, current, decks, hadDeckOps);
+          await rollbackTournamentAction(uid, current, decks, hadDeckOps, optimisticModified, optimisticDeckMods);
           // apiRequest already toasts HTTP errors with the server's reason;
           // surface network-level failures (which don't toast) too.
           if (!(e instanceof ApiError)) {
@@ -246,15 +253,26 @@ async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDe
  * from the server — reads are offline-first (IndexedDB only). Server actions are
  * transactional (all-or-nothing), so on rejection the authoritative state equals
  * the pre-action state we already held in memory: restore it locally.
+ *
+ * Guard against clobbering a newer foreign write: a co-judge action or server
+ * job whose SSE landed between our optimistic write and the rejection already
+ * replaced our stored state (and its cursor advanced, so it won't be redelivered).
+ * Since our rejected action emits no SSE, any change to the stored `modified`
+ * means that foreign update is the correct post-rejection state — skip the restore.
  */
 async function rollbackTournamentAction(
   uid: string,
   preActionTournament: Tournament,
   preActionDecks: DeckObject[],
   hadDeckOps: boolean,
+  optimisticModified: string,
+  optimisticDeckMods?: Map<string, string>,
 ): Promise<void> {
   try {
-    await saveTournament(preActionTournament);
+    const stored = await getTournament(uid);
+    if (!stored || stored.modified === optimisticModified) {
+      await saveTournament(preActionTournament);
+    }
   } catch (e) {
     console.error('Failed to roll back optimistic tournament state:', e);
   }
@@ -262,12 +280,20 @@ async function rollbackTournamentAction(
   try {
     const current = await getDecksByTournament(uid);
     const originalUids = new Set(preActionDecks.map((d) => d.uid));
-    // Remove decks the optimistic op newly created.
+    // Remove decks the optimistic op newly created — unless a foreign update
+    // has since replaced our optimistic write for that deck.
     for (const d of current) {
-      if (!originalUids.has(d.uid)) await deleteDeck(d.uid);
+      if (originalUids.has(d.uid)) continue;
+      if (optimisticDeckMods?.get(d.uid) === d.modified) await deleteDeck(d.uid);
     }
-    // Restore prior versions (also re-creates any optimistically deleted decks).
-    for (const d of preActionDecks) await saveDeck(d);
+    // Restore prior versions (also re-creates any optimistically deleted decks),
+    // skipping decks a foreign update has since replaced.
+    for (const d of preActionDecks) {
+      const storedDeck = current.find((c) => c.uid === d.uid);
+      if (!storedDeck || optimisticDeckMods?.get(d.uid) === storedDeck.modified) {
+        await saveDeck(d);
+      }
+    }
   } catch (e) {
     console.error('Failed to roll back optimistic deck changes:', e);
   }
