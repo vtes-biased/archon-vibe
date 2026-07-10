@@ -20,12 +20,14 @@
 - Abbreviations: SSE, CRUD, PWA, WASM, PyO3, IC (Inner Circle), NC (National Coordinator), VEKN, VTES.
 - Data model: `BaseObject` (uid/modified/deleted_at), always say **UUID v7** (not generic UUID), `deleted_at` = soft-delete timestamp, access **levels** = public/member/full.
 - Synced object types: User, Sanction, Tournament, DeckObject, League (via SSE). VtesCard is static data. DeckObject is standalone (not embedded in Tournament).
+- VtesCard has **three name fields**, not one `name`: `printed_name` (bare, display), `unique_name` (minimal disambiguator, text export), `full_name` (always group/adv-suffixed), plus `name_variants` — all four are engine parser lookup keys (see [[card-data-pipeline]]).
 
 ## Which Docs Update Together
 - New object type → ARCHITECTURE.md (data model) + SYNC.md ("adding a new object type") + maybe CLAUDE.md summary.
 - Sync pattern change → SYNC.md (primary), ARCHITECTURE.md (only if fundamental).
 - Rust engine capability change → ARCHITECTURE.md (Rust Integration) + TOURNAMENTS.md (if tournament-related) + engine/README.md.
 - Architecture fact that affects mutations/reads → confirm CLAUDE.md's terse summary still matches (it intentionally stays high-level).
+- **Card data / deck-import pipeline change → check PRODUCT.md's "Decks" feature bullet too, not just ARCHITECTURE.md.** PRODUCT.md restates the same flow in its own terse phrasing (deck upload modes, provider list); it drifts silently because it's easy to forget as a second copy of the same fact. See [[card-data-pipeline]].
 
 ## Documented Invariants (verify before re-stating)
 - Mutation pipeline: business event → Rust engine → CRUD → SSE → IndexedDB; ALL business events via `POST /{uid}/action` (no per-event REST routes). Optimistic: WASM first, server confirms via SSE.

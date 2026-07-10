@@ -1,20 +1,23 @@
 <script lang="ts">
   import { ADVANCED_ICON, groupCircle } from '$lib/vtes-icons';
+  import type { VtesCard } from '$lib/types';
 
   let { card, class: cls = '' }: {
-    card: { printed_name: string; group?: string; adv?: boolean };
+    card: Pick<VtesCard, 'printed_name' | 'full_name' | 'group' | 'adv'>;
     class?: string;
   } = $props();
 
   const circle = $derived(groupCircle(card.group ?? ''));
 </script>
 
-<span class="inline-flex items-baseline gap-1 min-w-0 {cls}">
-  <span class="truncate">{card.printed_name}</span>
+<!-- full_name is the disambiguated accessible name; the printed_name + badges are
+     decorative (two cards can share printed_name, differing only by group/adv). -->
+<span class="inline-flex items-baseline gap-1 min-w-0 {cls}" aria-label={card.full_name} title={card.full_name}>
+  <span class="truncate" aria-hidden="true">{card.printed_name}</span>
   {#if circle}
-    <span class="text-ink-faint shrink-0" title={`Group ${card.group}`}>{circle}</span>
+    <span class="text-ink-muted shrink-0" aria-hidden="true">{circle}</span>
   {/if}
   {#if card.adv}
-    <span class="vtes-d text-ink-faint shrink-0" title="Advanced">{ADVANCED_ICON}</span>
+    <span class="vtes-d text-ink-muted shrink-0" aria-hidden="true">{ADVANCED_ICON}</span>
   {/if}
 </span>

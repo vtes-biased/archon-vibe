@@ -102,9 +102,13 @@ Seating is seeded and value-stable: `seating::seed_for_round(tournament_uid, rou
 
 ## Card/Deck System
 
-- **Card database**: VTES card data loaded from JSON into IndexedDB (`cards` store, keyed by card ID); the Rust engine does lookup and deck validation (crypt/library counts, banned cards, multideck rules).
+- **Card database build**: `scripts/update_cards.py` sources canonical card data via `krcg.loader.load_online` (krcg is a backend dependency) and writes `engine/data/cards.json`. Refresh is build-time, not boot: `update-cards.yml` runs daily, commits + tags `cards-<date>`; the file ships bundled in the wheel and the frontend build.
+- **Card schema** (`cards.json`, `VtesCard` in `types.ts`, engine `Card` in `cards.rs`): three krcg name forms — `printed_name` (bare, frontend display), `unique_name` (minimal group/adv disambiguator, text decklist export), `full_name` (always group/adv-suffixed) — plus `name_variants` (aliases/ordinals/accents). All four are engine parser lookup keys; `normalize_name` folds Latin accents to ASCII on both the index and the query, so an accent-free spelling still resolves.
+- **Card display**: frontend shows `printed_name` with separate badges — a circled group number (group `"any"` gets none) and an advanced glyph — via `CardName.svelte`/`vtes-icons.ts`, instead of a suffixed name string.
+- **Card database (runtime)**: loaded from JSON into IndexedDB (`cards` store, keyed by card ID); the Rust engine does lookup and deck validation (crypt/library counts, banned cards, multideck rules).
 - **DeckObject**: a standalone synced object (not embedded in Tournament). Fields: `tournament_uid`, `user_uid`, `round`, `name`, `author`, `comments`, `cards` (card_id → count), `attribution`, `public`. The `public` flag is set by the engine from `decklists_mode` + tournament state (Winner/Finalists/All).
-- No REST endpoints for decks — all mutations via `POST /{uid}/action` → engine `deck_ops` (`upsert` / `delete` / `set_public`). The client fetches deck URLs directly; the backend offers a CORS proxy fallback.
+- No REST endpoints for decks — all mutations via `POST /{uid}/action` → engine `deck_ops` (`upsert` / `delete` / `set_public`).
+- **Deck import**: raw-text paste parses locally via the WASM engine (`parseDeckText`, offline-capable). URL import (VDB/VTESDecks/Amaranth) and QR (a URL-scan shortcut into URL mode) go through the backend `GET /fetch-deck` proxy (`backend/src/providers.py`), which uses krcg providers to fetch and resolve provider-native card ids — notably Amaranth's own ids — to VEKN ids, against krcg's own bundled card DB (independent of our `cards.json`). URL/QR import is disabled while offline; text import isn't.
 - **SSE reactivity**: the tournament page listens for `type === "deck"` sync events → re-queries `getDecksByTournamentGrouped()` → updates `decksByUser` state (passed as a prop to PlayersTab / PlayerView / DecksTab). Decks are not bundled into the tournament SSE event.
 
 ## League System

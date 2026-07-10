@@ -321,12 +321,45 @@ mod tests {
         // An accent-free spelling must resolve the accented card: normalize_name
         // folds both the index and the query to ASCII.
         let json = r#"{
-            "200478": {"printed_name":"François Villon","unique_name":"François Villon (G2)","full_name":"François Villon (G2)","name_variants":[]}
+            "200478": {"printed_name":"François Villon","unique_name":"François Villon (G2)","full_name":"François Villon (G2)","name_variants":[]},
+            "201528": {"printed_name":"Bolesław Gutowski","unique_name":"Bolesław Gutowski","full_name":"Bolesław Gutowski","name_variants":[]}
         }"#;
         let cm = CardMap::load(json).unwrap();
         assert_eq!(cm.by_name("Francois Villon").unwrap().id, 200478);
         assert_eq!(cm.by_name("François Villon").unwrap().id, 200478);
         assert_eq!(cm.by_name("francois villon g2").unwrap().id, 200478);
+        // ł has no NFD decomposition, so it folds only via the explicit map arm —
+        // a branch the François (ç/ô) case never exercises.
+        assert_eq!(cm.by_name("Boleslaw Gutowski").unwrap().id, 201528);
+    }
+
+    #[test]
+    fn test_shipped_names_normalize_to_ascii() {
+        // Invariant guard over the shipped card DB: every name's normalized index
+        // key must be pure ASCII, or an accent-free query silently misses it. A
+        // non-ASCII *letter* fold_ascii doesn't map survives normalize_name's
+        // alphanumeric filter and trips this (non-letter punctuation is stripped, so
+        // it can't). Property test — no ids/names pinned, survives daily rebuilds.
+        let parsed = json::parse(include_str!("../data/cards.json")).unwrap();
+        for (id, card) in parsed.entries() {
+            for key in ["printed_name", "unique_name", "full_name"] {
+                if let Some(name) = card[key].as_str() {
+                    assert!(
+                        normalize_name(name).is_ascii(),
+                        "{id} {key} {name:?} normalizes to non-ASCII {:?}",
+                        normalize_name(name)
+                    );
+                }
+            }
+            if let JsonValue::Array(ref variants) = card["name_variants"] {
+                for v in variants.iter().filter_map(|v| v.as_str()) {
+                    assert!(
+                        normalize_name(v).is_ascii(),
+                        "{id} variant {v:?} normalizes to non-ASCII"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

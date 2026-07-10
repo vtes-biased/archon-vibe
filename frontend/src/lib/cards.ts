@@ -104,11 +104,14 @@ export async function searchCards(query: string, limit = 20): Promise<VtesCard[]
   const norm = normalizeSearch(query);
   const results: VtesCard[] = [];
 
+  // Collect every match first — matching the engine's parser keys (printed/unique
+  // names + variants: aliases, ordinals) — then sort and cap, so a prefix hit is
+  // never dropped by an incidental substring match ordered ahead of it.
   for (const card of cards.values()) {
-    if (results.length >= limit) break;
     if (
       normalizeSearch(card.printed_name).includes(norm) ||
-      normalizeSearch(card.unique_name).includes(norm)
+      normalizeSearch(card.unique_name).includes(norm) ||
+      card.name_variants.some((v) => normalizeSearch(v).includes(norm))
     ) {
       results.push(card);
     }
@@ -121,5 +124,5 @@ export async function searchCards(query: string, limit = 20): Promise<VtesCard[]
     return aStarts - bStarts || a.unique_name.localeCompare(b.unique_name);
   });
 
-  return results;
+  return results.slice(0, limit);
 }

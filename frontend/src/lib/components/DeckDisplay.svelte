@@ -222,8 +222,9 @@
       cardImageUrl = card.img;
       return;
     }
-    // Fallback for stale IndexedDB card data predating the img field
-    const normalized = card.printed_name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
+    // Fallback for stale IndexedDB card data predating the img field. krcg's image
+    // filename derives from the full (group/advanced-suffixed) name, not the bare one.
+    const normalized = card.full_name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
     cardImageUrl = `https://static.krcg.org/card/${normalized}`;
   }
 </script>
@@ -339,10 +340,10 @@
               >
                 <span class="text-ink-muted w-4 text-right shrink-0">{entry.count}x</span>
                 {#if entry.card}
-              <CardName card={entry.card} class="text-ink-bright flex-1" />
-            {:else}
-              <span class="text-ink-bright flex-1 truncate">#{entry.id}</span>
-            {/if}
+                  <CardName card={entry.card} class="text-ink-bright flex-1" />
+                {:else}
+                  <span class="text-ink-bright flex-1 truncate">#{entry.id}</span>
+                {/if}
               </button>
               {#if editing}
                 <button

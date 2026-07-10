@@ -65,6 +65,7 @@
 
 ## Deck Parsing
 - [Deck parser prefix-match trap](deck-parser-prefix-match-trap.md) — try_name_first count-strip + by_name prefix match miscount count-less lines (Channel 10/AK-47/Kpist m/45); group-from-tail (Annabelle G3 vs G6) untested bug; fix = exact-key gating, not krcg regex.
+- [Card three-name model + set-names traps](card-three-name-model-traps.md) — printed(display)/unique(text export)/full(image filename = normalize(full_name)) roles; sets are display NAMES not codes so deck.rs V5 `starts_with("V5")` matches nothing; accent fold has no CI ASCII guard; enrich_deck is a dead export.
 
 ## Formats
 - [Open rounds per-player cap](open-rounds-per-player-cap.md) — max_rounds as per-player cap (computed rounds-played gate); resting-state hazard; UpdateConfig/multideck/is_deck_locked/vekn_push ripple sites.
