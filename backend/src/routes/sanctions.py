@@ -441,6 +441,14 @@ async def update_sanction_endpoint(
                     detail=f"round_number {round_number} exceeds tournament rounds ({len(tournament.rounds)})",
                 )
 
+    # Mirror create: a resulting SA needs a round_number, else the engine silently
+    # no-ops the -1 VP penalty (e.g. a DQ→SA edit without one).
+    if level == SanctionLevel.STANDINGS_ADJUSTMENT and round_number is None:
+        raise HTTPException(
+            status_code=400,
+            detail="round_number is required for standings_adjustment sanctions",
+        )
+
     # Update description if provided
     if request.description is not None:
         description = request.description.strip()
@@ -457,7 +465,10 @@ async def update_sanction_endpoint(
                 status_code=400,
                 detail=f"Invalid expires_at format (expected YYYY-MM-DD): {e}",
             ) from e
-        _validate_expiry(level, expires_at, sanction.issued_at)
+
+    # Validate the resulting pair unconditionally: a level-only change (e.g.
+    # SUSPENSION→PROBATION) must not persist PROBATION with expires_at=None.
+    _validate_expiry(level, expires_at, sanction.issued_at)
 
     # Lift sanction if requested
     if request.lifted is True and sanction.lifted_at is None:
@@ -481,25 +492,25 @@ async def update_sanction_endpoint(
     bd = await save_sanction(updated)
     logger.info(f"Sanction {uid} updated by {current_user.uid}")
 
-    # If a DQ sanction was lifted, restore player state on the tournament
-    if (
-        request.lifted is True
-        and sanction.lifted_at is None
-        and sanction.level == SanctionLevel.DISQUALIFICATION
-        and sanction.tournament_uid
-    ):
-        # Restore the un-zeroed scores: the player is no longer DQ'd, so standings
-        # recompute (the stored standings carry the zeroed totals otherwise) — the
-        # merged helper sets FINISHED and recomputes under one lock.
+    # Standings zero a player off player.state=="Disqualified" OR an active DQ
+    # sanction, so entering/leaving an active DQ (by lift or level edit) must flip
+    # state + recompute here — else a downgraded/lifted DQ stays zeroed forever.
+    was_active_dq = (
+        sanction.level == SanctionLevel.DISQUALIFICATION and sanction.lifted_at is None
+    )
+    is_active_dq = (
+        updated.level == SanctionLevel.DISQUALIFICATION and updated.lifted_at is None
+    )
+    if sanction.tournament_uid and was_active_dq != is_active_dq:
+        # Recompute covers any new SA level on the row too, hence the elif below.
         await _apply_sanction_to_tournament(
             sanction.tournament_uid,
             dq_user_uid=sanction.user_uid,
-            dq_state=PlayerState.FINISHED,
+            dq_state=PlayerState.DISQUALIFIED if is_active_dq else PlayerState.FINISHED,
         )
-
-    # SA touched (lifted, round changed, or level changed to/from SA): refresh
-    # standings so the -1 VP penalty appears/clears immediately.
-    if sanction.tournament_uid and (
+    # SA touched (round changed, or level changed to/from SA): refresh standings so
+    # the -1 VP penalty appears/clears immediately.
+    elif sanction.tournament_uid and (
         updated.level == SanctionLevel.STANDINGS_ADJUSTMENT
         or sanction.level == SanctionLevel.STANDINGS_ADJUSTMENT
     ):
