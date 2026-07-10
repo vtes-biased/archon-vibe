@@ -109,6 +109,28 @@ async def test_update_user(test_client: AsyncClient, populated_db):
 
 
 @pytest.mark.asyncio
+async def test_update_user_tracks_nickname_local_modification(
+    test_client: AsyncClient, populated_db
+):
+    """An official-set nickname must land in local_modifications, else the nightly
+    legacy merge (nickname is in ARCHON_USER_FIELDS) silently reverts it."""
+    admin = next(u for u in populated_db if Role.IC in u.roles)
+    target = next(u for u in populated_db if u.uid != admin.uid)
+
+    response = await test_client.put(
+        f"/api/users/{target.uid}",
+        json={"nickname": "SetByOfficial"},
+        headers=make_auth_header(admin.uid),
+    )
+    assert response.status_code == 200
+
+    saved = await db.get_user_by_uid(target.uid)
+    assert saved is not None
+    assert saved.nickname == "SetByOfficial"
+    assert "nickname" in saved.local_modifications
+
+
+@pytest.mark.asyncio
 async def test_role_change_resyncs_only_for_access_roles(
     test_client: AsyncClient, populated_db
 ):

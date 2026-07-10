@@ -272,6 +272,11 @@ async def update_user(
             local_mods.add("city_geoname_id")
         if state is not None:
             local_mods.add("state")
+        # nickname is in the legacy merge's ARCHON_USER_FIELDS, so an untracked
+        # official-set nickname is reverted at the next nightly merge (the twin
+        # PATCH /auth/me tracks it for the same reason).
+        if nickname is not None:
+            local_mods.add("nickname")
 
         user = msgspec.structs.replace(
             user,
