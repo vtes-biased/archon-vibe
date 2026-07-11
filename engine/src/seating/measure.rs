@@ -114,29 +114,15 @@ pub(crate) fn build_mapping(rounds: &[Vec<Vec<String>>]) -> HashMap<String, usiz
     mapping
 }
 
-/// Measure a single round (optionally only specific tables via hints)
-pub(crate) fn measure_round(mapping: &HashMap<String, usize>, round: &[Vec<String>]) -> Measure {
-    measure_round_with_hints(mapping, round, None)
-}
-
-/// Measure a round with optional hints for which tables to process
+/// Measure a single round. Full-round only: every remaining caller scores
+/// complete rounds (the annealer's hot loop does incremental measurement via
+/// the index-based `measure_round_idx` path instead).
 #[allow(clippy::needless_range_loop)]
-pub(crate) fn measure_round_with_hints(
-    mapping: &HashMap<String, usize>,
-    round: &[Vec<String>],
-    hints: Option<&[usize]>,
-) -> Measure {
+pub(crate) fn measure_round(mapping: &HashMap<String, usize>, round: &[Vec<String>]) -> Measure {
     let n = mapping.len();
     let mut m = Measure::new(n);
 
-    for (table_idx, table) in round.iter().enumerate() {
-        // Skip tables not in hints
-        if let Some(h) = hints {
-            if !h.contains(&table_idx) {
-                continue;
-            }
-        }
-
+    for table in round.iter() {
         let table_size = table.len();
         if !(4..=5).contains(&table_size) {
             continue;
