@@ -312,8 +312,11 @@ impl ActorContext {
     }
 
     pub fn can_manage_tournaments(&self) -> bool {
-        self.roles
-            .iter()
-            .any(|r| r == "IC" || r == "NC" || r == "Prince")
+        // Same official-roles list permissions::is_official gates on — the
+        // shared const keeps create (here) and manage (permissions.rs) aligned.
+        self.roles.iter().any(|r| {
+            crate::permissions::Role::from_str(r)
+                .is_some_and(|role| crate::permissions::OFFICIAL_ROLES.contains(&role))
+        })
     }
 }

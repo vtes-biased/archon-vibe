@@ -231,8 +231,13 @@ impl OwnedResource {
 }
 
 /// The "official" roles that can create/manage tournaments and members.
+/// Single source for that list — consumed here (Role enum) and by
+/// ActorContext::can_manage_tournaments (raw role strings); a role
+/// addition/rename must not diverge who can create vs manage tournaments.
+pub const OFFICIAL_ROLES: [Role; 3] = [Role::IC, Role::NC, Role::Prince];
+
 pub fn is_official(actor: &UserContext) -> bool {
-    actor.has_role(Role::IC) || actor.has_role(Role::NC) || actor.has_role(Role::Prince)
+    OFFICIAL_ROLES.iter().any(|&r| actor.has_role(r))
 }
 
 /// IC manages any country; NC/Prince only their own (and must have one).
