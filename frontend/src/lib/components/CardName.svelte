@@ -8,6 +8,19 @@
   } = $props();
 
   const circle = $derived(groupCircle(card.group ?? ''));
+
+  // Advanced badge uses the Ankha-font glyph; until that font is ready show a plain
+  // "A". The font is bundled + service-worker-precached, so this only covers the
+  // brief first-paint FOUT — offline it's always there.
+  let fontReady = $state(false);
+  $effect(() => {
+    const fonts = document.fonts;
+    if (!fonts || fonts.check('1em "Ankha VTES"')) {
+      fontReady = true;
+      return;
+    }
+    fonts.load('1em "Ankha VTES"').then(() => (fontReady = true)).catch(() => {});
+  });
 </script>
 
 <!-- full_name is the disambiguated accessible name; the printed_name + badges are
@@ -18,6 +31,10 @@
     <span class="text-ink-muted shrink-0" aria-hidden="true">{circle}</span>
   {/if}
   {#if card.adv}
-    <span class="vtes-d text-ink-muted shrink-0" aria-hidden="true">{ADVANCED_ICON}</span>
+    {#if fontReady}
+      <span class="vtes-d text-ink-muted shrink-0" aria-hidden="true">{ADVANCED_ICON}</span>
+    {:else}
+      <span class="text-ink-muted shrink-0 font-semibold" aria-hidden="true">A</span>
+    {/if}
   {/if}
 </span>
