@@ -74,36 +74,6 @@ impl PlayerState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableState {
-    InProgress,
-    Finished,
-    Invalid,
-    Cancelled,
-}
-
-impl TableState {
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "In Progress" => Some(Self::InProgress),
-            "Finished" => Some(Self::Finished),
-            "Invalid" => Some(Self::Invalid),
-            "Cancelled" => Some(Self::Cancelled),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::InProgress => "In Progress",
-            Self::Finished => "Finished",
-            Self::Invalid => "Invalid",
-            Self::Cancelled => "Cancelled",
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum TournamentEvent {
     // State transitions
@@ -250,11 +220,6 @@ pub enum TournamentEvent {
 
     // Config update (partial fields)
     UpdateConfig {
-        config: JsonValue,
-    },
-
-    // Tournament creation
-    CreateTournament {
         config: JsonValue,
     },
 }

@@ -59,11 +59,6 @@ updated_tournament = engine.process_tournament_event(
     '{"type": "StartRound"}',
     '{"uid": "...", "roles": ["Prince"], "is_organizer": true}'
 )
-
-# Compute seating
-seating = engine.compute_seating(
-    '{"players": ["p1", "p2", "p3", "p4", "p5"], "rounds": 3}'
-)
 ```
 
 ### TypeScript (Frontend)
@@ -79,11 +74,6 @@ const updatedTournament = engine.processTournamentEvent(
   tournamentJson,
   '{"type": "StartRound"}',
   '{"uid": "...", "roles": ["Prince"], "is_organizer": true}'
-);
-
-// Compute seating
-const seating = engine.computeSeating(
-  '{"players": ["p1", "p2", "p3", "p4", "p5"], "rounds": 3}'
 );
 ```
 
@@ -121,13 +111,12 @@ VEKN tournament seating algorithm per official rules:
 
 Features:
 - **Simulated annealing** optimization for large player counts
-- **Precomputed optimal seatings** for 4-25 players (instant results)
 - **Violation scoring**: same-table, position adjacency, predator-prey tracking
 - **Stochastic fallback** when SA exceeds iteration limit
 - **Dropout/addition** handling between rounds
 
 Entry points:
-- `compute_seating(players, rounds, history)` - Main seating computation
+- `compute_next_round(players, previous_rounds, seed)` - Seating for the next round (the StartRound path)
 - `score_seating(seating, history)` - Evaluate seating quality
 
 ### Tournament (`src/tournament/`)

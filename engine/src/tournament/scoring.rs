@@ -140,7 +140,8 @@ pub fn compute_tp(table_size: usize, vps: &[f64], adjustments: &[f64]) -> Vec<f6
     let base: &[f64] = match table_size {
         5 => &[60.0, 48.0, 36.0, 24.0, 12.0],
         4 => &[60.0, 48.0, 24.0, 12.0],
-        3 => &[60.0, 36.0, 12.0],
+        // Seating + check_table_vps enforce 4-5 seats; the zero fallback is
+        // defense against malformed imports, not a real table size.
         _ => return vec![0.0; vps.len()],
     };
 

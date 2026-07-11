@@ -52,7 +52,6 @@ pub enum EngineError {
     NoRoundInProgress,
     NoRoundToFinish,
     NoRoundToCancel,
-    OnlyLastRoundCancellable,
     RoundNotCancelled,
     CannotRestoreRound,
     TablesNotFinished { tables: String },
@@ -149,7 +148,6 @@ impl EngineError {
             NoRoundInProgress => "tournament.no_round_in_progress",
             NoRoundToFinish => "tournament.no_round_to_finish",
             NoRoundToCancel => "tournament.no_round_to_cancel",
-            OnlyLastRoundCancellable => "tournament.only_last_round_cancellable",
             RoundNotCancelled => "tournament.round_not_cancelled",
             CannotRestoreRound => "tournament.cannot_restore_round",
             TablesNotFinished { .. } => "tournament.tables_not_finished",
@@ -289,7 +287,6 @@ impl fmt::Display for EngineError {
             NoRoundInProgress => write!(f, "No rounds in progress"),
             NoRoundToFinish => write!(f, "No rounds to finish"),
             NoRoundToCancel => write!(f, "No rounds to cancel"),
-            OnlyLastRoundCancellable => write!(f, "Can only cancel the last round"),
             RoundNotCancelled => write!(f, "Round is not cancelled"),
             CannotRestoreRound => write!(
                 f,

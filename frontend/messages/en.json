@@ -1238,7 +1238,6 @@
   "err_tournament_no_round_in_progress": "No rounds in progress",
   "err_tournament_no_round_to_finish": "No rounds to finish",
   "err_tournament_no_round_to_cancel": "No rounds to cancel",
-  "err_tournament_only_last_round_cancellable": "Can only cancel the last round",
   "err_tournament_round_not_cancelled": "Round is not cancelled",
   "err_tournament_cannot_restore_round": "This round can't be restored as it was — a player seated in it has dropped out, been disqualified, or reached their round cap. Resolve that first, or leave the round cancelled.",
   "err_tournament_tables_not_finished": "Tables {tables} not finished yet",

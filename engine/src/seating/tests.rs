@@ -94,17 +94,14 @@ fn test_compute_seating_small() {
 #[test]
 fn test_compute_seating_is_deterministic() {
     // Same players + same seed => byte-identical seating (WASM/PyO3/offline/bot agree).
-    // Use a non-precomputed size (e.g. 13) so the SA path actually runs.
     let players = make_players(13);
     let a = compute_seating(&players, 3, None, 12345).unwrap().0;
     let b = compute_seating(&players, 3, None, 12345).unwrap().0;
     assert_eq!(a, b, "same seed must reproduce identical seating");
 
-    // Staggered path (6/7/11 players) is also seed-deterministic.
-    let stag = make_players(7);
-    let s1 = compute_seating(&stag, 3, None, 999).unwrap().0;
-    let s2 = compute_seating(&stag, 3, None, 999).unwrap().0;
-    assert_eq!(s1, s2, "staggered seating must be deterministic");
+    // Awkward counts (6/7/11) are rejected — production filters them through
+    // select_players_for_round before seating.
+    assert!(compute_seating(&make_players(7), 3, None, 999).is_err());
 
     // seed_for_round is stable for a given uid+round, and round-dependent.
     let s0 = seed_for_round("tournament-xyz", 0);

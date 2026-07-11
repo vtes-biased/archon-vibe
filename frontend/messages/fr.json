@@ -1238,7 +1238,6 @@
   "err_tournament_no_round_in_progress": "Aucune ronde en cours",
   "err_tournament_no_round_to_finish": "Aucune ronde à terminer",
   "err_tournament_no_round_to_cancel": "Aucune ronde à annuler",
-  "err_tournament_only_last_round_cancellable": "Seule la dernière ronde peut être annulée",
   "err_tournament_round_not_cancelled": "La ronde n'est pas annulée",
   "err_tournament_cannot_restore_round": "Cette ronde ne peut pas être restaurée telle quelle — un joueur qui y était assis a abandonné, a été disqualifié ou a atteint son plafond de rondes. Réglez cela d'abord, ou laissez la ronde annulée.",
   "err_tournament_tables_not_finished": "Tables {tables} pas encore terminées",

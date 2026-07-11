@@ -7,12 +7,10 @@
 //! - [`measure`]: the N×N×8 relationship matrix and round/table primitives
 //! - [`score`]: lexicographic / detailed scoring, per-player issues, minimums
 //! - [`anneal`]: multi-restart simulated annealing
-//! - [`precomputed`]: exhaustive-search optimal seatings for ≤25 players
 //! - [`stagger`]: awkward player counts (6, 7, 11)
 
 mod anneal;
 mod measure;
-mod precomputed;
 mod score;
 mod stagger;
 
@@ -30,9 +28,7 @@ pub use stagger::select_players_for_round;
 use crate::error::EngineError;
 use anneal::{get_sa_params, optimize_sa_multi};
 use measure::build_round;
-use precomputed::{apply_precomputed, get_precomputed_seating};
 use score::score_total;
-use stagger::get_staggered_rounds;
 
 /// Derive a deterministic PRNG seed for a round's seating from the tournament
 /// uid and the (0-based) round index. The same uid+round always yields the same
@@ -92,21 +88,18 @@ pub fn compute_seating(
     }
 
     let n = players.len();
-    let has_previous = previous_rounds.map(|p| !p.is_empty()).unwrap_or(false);
 
-    // Use precomputed optimal seatings when applicable:
-    // - No previous rounds (fresh tournament, same players throughout)
-    // - Exactly 3 rounds
-    // - Player count has precomputed solution (4-25, excluding 6,7,11)
-    if !has_previous && rounds_count == 3 {
-        if let Some(precomputed) = get_precomputed_seating(n) {
-            let rounds = apply_precomputed(players, &precomputed);
-            let score = score_total(&rounds);
-            return Ok((rounds, score));
-        }
+    // Awkward counts (6, 7, 11) never reach this point in production —
+    // StartRound filters via select_players_for_round first. Guard anyway:
+    // build_round would panic on them, and a panic poisons the WASM instance.
+    if !stagger::is_valid_table_count(n) {
+        return Err(EngineError::internal(format!(
+            "{n} players cannot be split into tables of 4-5; \
+             filter via select_players_for_round first"
+        )));
     }
 
-    // Build initial rounds
+    // Build initial rounds.
     let mut rounds = match previous_rounds {
         Some(prev) if !prev.is_empty() => {
             // Start with previous rounds, add new ones
@@ -117,14 +110,7 @@ pub fn compute_seating(
             }
             r
         }
-        _ => {
-            // Check for staggered rounds
-            if [6, 7, 11].contains(&n) {
-                get_staggered_rounds(players, rounds_count)
-            } else {
-                (0..rounds_count).map(|_| build_round(players)).collect()
-            }
-        }
+        _ => (0..rounds_count).map(|_| build_round(players)).collect(),
     };
 
     if rounds.is_empty() {

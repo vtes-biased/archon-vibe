@@ -164,57 +164,6 @@ mod shared {
             .dump())
     }
 
-    pub fn compute_seating_json(config_json: &str) -> Result<String, EngineError> {
-        let config = json::parse(config_json)?;
-        let players: Vec<String> = config["players"]
-            .members()
-            .filter_map(|p| p.as_str().map(|s| s.to_string()))
-            .collect();
-        let rounds_count = config["rounds"].as_usize().unwrap_or(3);
-        let previous_rounds: Option<Vec<Vec<Vec<String>>>> = if config["previous_rounds"].is_null()
-        {
-            None
-        } else {
-            Some(
-                config["previous_rounds"]
-                    .members()
-                    .map(|r| {
-                        r.members()
-                            .map(|t| {
-                                t.members()
-                                    .filter_map(|p| p.as_str().map(|s| s.to_string()))
-                                    .collect()
-                            })
-                            .collect()
-                    })
-                    .collect(),
-            )
-        };
-        // Seed: derive from tournament_uid + round so previews match what
-        // StartRound computes; fall back to an explicit `seed` or 0.
-        let seed = if let Some(uid) = config["tournament_uid"].as_str() {
-            let round_index = config["round"]
-                .as_usize()
-                .unwrap_or_else(|| previous_rounds.as_ref().map(|p| p.len()).unwrap_or(0));
-            seating::seed_for_round(uid, round_index)
-        } else {
-            config["seed"].as_u64().unwrap_or(0)
-        };
-        let (rounds, score) =
-            seating::compute_seating(&players, rounds_count, previous_rounds.as_deref(), seed)?;
-        let rounds_json: Vec<JsonValue> = rounds
-            .iter()
-            .map(|r| {
-                JsonValue::Array(
-                    r.iter()
-                        .map(|t| JsonValue::Array(t.iter().map(|p| p.as_str().into()).collect()))
-                        .collect(),
-                )
-            })
-            .collect();
-        Ok(json::object! { rounds: rounds_json, score: score.to_json() }.dump())
-    }
-
     pub fn score_seating_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
@@ -281,13 +230,6 @@ mod shared {
         let d = deck_from_json(&value, false)?;
         let errors = deck::validate_deck(&d, &card_map, format);
         Ok(JsonValue::Array(errors.iter().map(|e| e.to_json()).collect()).dump())
-    }
-
-    pub fn enrich_deck_json(deck_json: &str, cards_json: &str) -> Result<String, EngineError> {
-        let card_map = cards::CardMap::load(cards_json)?;
-        let value = json::parse(deck_json)?;
-        let d = deck_from_json(&value, true)?;
-        Ok(deck::enrich_deck(&d, &card_map).dump())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -508,11 +450,6 @@ mod wasm {
             js_str(can_delete_sanction_json(actor_json, actor_uid, ctx_json))
         }
 
-        #[wasm_bindgen(js_name = computeSeating)]
-        pub fn compute_seating(&self, config_json: &str) -> Result<String, String> {
-            js_str(compute_seating_json(config_json))
-        }
-
         #[wasm_bindgen(js_name = scoreSeating)]
         pub fn score_seating(&self, config_json: &str) -> Result<String, String> {
             js_str(score_seating_json(config_json))
@@ -566,11 +503,6 @@ mod wasm {
             format: &str,
         ) -> Result<String, String> {
             js_str(validate_deck_json(deck_json, cards_json, format))
-        }
-
-        #[wasm_bindgen(js_name = enrichDeck)]
-        pub fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> Result<String, String> {
-            js_str(enrich_deck_json(deck_json, cards_json))
         }
 
         #[wasm_bindgen(js_name = createTournament)]
@@ -722,10 +654,6 @@ mod python {
             py_str(can_delete_sanction_json(actor_json, actor_uid, ctx_json))
         }
 
-        fn compute_seating(&self, config_json: &str) -> PyResult<String> {
-            py_str(compute_seating_json(config_json))
-        }
-
         fn score_seating(&self, config_json: &str) -> PyResult<String> {
             py_str(score_seating_json(config_json))
         }
@@ -809,10 +737,6 @@ mod python {
             format: &str,
         ) -> PyResult<String> {
             py_str(validate_deck_json(deck_json, cards_json, format))
-        }
-
-        fn enrich_deck(&self, deck_json: &str, cards_json: &str) -> PyResult<String> {
-            py_str(enrich_deck_json(deck_json, cards_json))
         }
 
         fn create_tournament(&self, config_json: &str, actor_json: &str) -> PyResult<String> {

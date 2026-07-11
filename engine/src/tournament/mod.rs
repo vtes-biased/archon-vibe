@@ -20,9 +20,7 @@ mod types;
 // Re-export items used by lib.rs
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
 pub use standings::{compute_final_standings, compute_rating_vp_gw};
-pub use types::{
-    ActorContext, PlayerState, SeatScore, TableState, TournamentEvent, TournamentState,
-};
+pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState};
 
 // Used within the module
 use types::VpError;
@@ -2413,9 +2411,5 @@ fn apply_event(
 
             Ok(())
         }
-
-        TournamentEvent::CreateTournament { .. } => Err(EngineError::internal(
-            "CreateTournament is not a tournament event — use create_tournament() instead",
-        )),
     }
 }

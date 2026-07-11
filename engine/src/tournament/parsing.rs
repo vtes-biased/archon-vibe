@@ -276,13 +276,6 @@ impl TournamentEvent {
                 }
                 Ok(Self::UpdateConfig { config })
             }
-            "CreateTournament" => {
-                let config = value["config"].clone();
-                if config.is_null() || !config.is_object() {
-                    return Err(EngineError::internal("config object required"));
-                }
-                Ok(Self::CreateTournament { config })
-            }
             _ => Err(EngineError::internal(format!(
                 "Unknown event type: {}",
                 event_type

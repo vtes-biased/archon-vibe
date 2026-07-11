@@ -1238,7 +1238,6 @@
   "err_tournament_no_round_in_progress": "Nenhuma rodada em andamento",
   "err_tournament_no_round_to_finish": "Nenhuma rodada para encerrar",
   "err_tournament_no_round_to_cancel": "Nenhuma rodada para cancelar",
-  "err_tournament_only_last_round_cancellable": "Somente a última rodada pode ser cancelada",
   "err_tournament_round_not_cancelled": "A rodada não está cancelada",
   "err_tournament_cannot_restore_round": "Esta rodada não pode ser restaurada como estava — um jogador sentado nela desistiu, foi desqualificado ou atingiu seu limite de rodadas. Resolva isso primeiro, ou deixe a rodada cancelada.",
   "err_tournament_tables_not_finished": "Mesas {tables} ainda não finalizadas",

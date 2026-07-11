@@ -319,11 +319,11 @@ The engine uses simulated annealing to compute optimal seating:
 1. **Constraints**: Tables of 4-5 players, impossible counts (6, 7, 11) rejected
 2. **Optimization**: Minimize repeated opponents across rounds, considering previous-round history
 
-Frontend entry point: `computeSeating(playerUids, roundCount, previousRounds)` in `engine.ts` → player UIDs per table per round.
+Seating is computed inside the engine's `StartRound` handler (`processTournamentEvent`); there is no separate seating entry point — the seed derives from tournament uid + round, so every stack computes identical seating.
 
 ## Frontend Integration
 
-- **Offline mode**: `frontend/src/lib/engine.ts` wraps the WASM engine — `processTournamentEvent(tournament, event, actor, sanctions, decks)` and `computeSeating(players, rounds, previousRounds)`.
+- **Offline mode**: `frontend/src/lib/engine.ts` wraps the WASM engine — `processTournamentEvent(tournament, event, actor, sanctions, decks)`.
 - **Online mode**: `tournamentAction()` in `frontend/src/lib/api.ts` POSTs the event to the backend (which runs the same engine via PyO3) and applies the optimistic update. See ARCHITECTURE.md (Mutation Pipeline).
 
 ## Permission Model

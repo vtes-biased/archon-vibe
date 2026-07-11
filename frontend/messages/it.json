@@ -1238,7 +1238,6 @@
   "err_tournament_no_round_in_progress": "Nessun round in corso",
   "err_tournament_no_round_to_finish": "Nessun round da terminare",
   "err_tournament_no_round_to_cancel": "Nessun round da annullare",
-  "err_tournament_only_last_round_cancellable": "È possibile annullare solo l'ultimo round",
   "err_tournament_round_not_cancelled": "Il round non è annullato",
   "err_tournament_cannot_restore_round": "Questo round non può essere ripristinato com'era — un giocatore seduto al tavolo si è ritirato, è stato squalificato o ha raggiunto il limite di round. Risolvi prima questo, oppure lascia il round annullato.",
   "err_tournament_tables_not_finished": "I tavoli {tables} non sono ancora terminati",

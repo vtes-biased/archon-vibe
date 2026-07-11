@@ -73,7 +73,6 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.no_round_in_progress': () => m.err_tournament_no_round_in_progress(),
   'tournament.no_round_to_finish': () => m.err_tournament_no_round_to_finish(),
   'tournament.no_round_to_cancel': () => m.err_tournament_no_round_to_cancel(),
-  'tournament.only_last_round_cancellable': () => m.err_tournament_only_last_round_cancellable(),
   'tournament.round_not_cancelled': () => m.err_tournament_round_not_cancelled(),
   'tournament.cannot_restore_round': () => m.err_tournament_cannot_restore_round(),
   'tournament.tables_not_finished': (p) => m.err_tournament_tables_not_finished({ tables: p.tables ?? '' }),

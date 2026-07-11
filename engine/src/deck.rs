@@ -13,8 +13,7 @@ pub struct Deck {
     pub name: String,
     pub author: String,
     pub comments: String,
-    pub cards: HashMap<u32, u32>,    // card_id → count
-    pub attribution: Option<String>, // None = anonymous, Some(vekn_id) = attributed to member
+    pub cards: HashMap<u32, u32>, // card_id → count
 }
 
 impl Deck {
@@ -53,16 +52,12 @@ impl Deck {
         for (&id, &count) in &self.cards {
             cards[id.to_string()] = count.into();
         }
-        let mut obj = json::object! {
+        json::object! {
             name: self.name.as_str(),
             author: self.author.as_str(),
             comments: self.comments.as_str(),
             cards: cards
-        };
-        if let Some(ref attr) = self.attribution {
-            obj["attribution"] = attr.as_str().into();
         }
-        obj
     }
 }
 
@@ -558,77 +553,6 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
     }
 
     errors
-}
-
-// ============================================================================
-// Enrichment
-// ============================================================================
-
-/// Enrich a deck with card details for display.
-pub fn enrich_deck(deck: &Deck, card_map: &CardMap) -> JsonValue {
-    let mut crypt = Vec::new();
-    let mut library = Vec::new();
-
-    for (&id, &count) in &deck.cards {
-        if let Some(card) = card_map.by_id(id) {
-            let entry = json::object! {
-                id: id,
-                count: count,
-                printed_name: card.printed_name.as_str(),
-                unique_name: card.unique_name.as_str(),
-                full_name: card.full_name.as_str(),
-                types: JsonValue::Array(card.types.iter().map(|t| t.as_str().into()).collect()),
-                disciplines: JsonValue::Array(card.disciplines.iter().map(|d| d.as_str().into()).collect()),
-                clan: card.clan.as_str(),
-                group: card.group.as_str(),
-                capacity: card.capacity,
-                adv: card.adv,
-            };
-            match card.kind {
-                CardKind::Crypt => crypt.push(entry),
-                CardKind::Library => library.push(entry),
-            }
-        }
-    }
-
-    // Sort crypt by capacity descending, then name
-    crypt.sort_by(|a, b| {
-        let cap_cmp = b["capacity"].as_u32().cmp(&a["capacity"].as_u32());
-        if cap_cmp == std::cmp::Ordering::Equal {
-            a["unique_name"].as_str().cmp(&b["unique_name"].as_str())
-        } else {
-            cap_cmp
-        }
-    });
-
-    // Sort library by canonical TWDA type order, then name
-    library.sort_by(|a, b| {
-        let type_a = a["types"][0].as_str().unwrap_or("");
-        let type_b = b["types"][0].as_str().unwrap_or("");
-        library_type_index(type_a)
-            .cmp(&library_type_index(type_b))
-            .then_with(|| a["unique_name"].as_str().cmp(&b["unique_name"].as_str()))
-    });
-
-    let crypt_count: u32 = crypt.iter().map(|c| c["count"].as_u32().unwrap_or(0)).sum();
-    let library_count: u32 = library
-        .iter()
-        .map(|c| c["count"].as_u32().unwrap_or(0))
-        .sum();
-
-    json::object! {
-        name: deck.name.as_str(),
-        author: deck.author.as_str(),
-        comments: deck.comments.as_str(),
-        crypt: {
-            count: crypt_count,
-            cards: JsonValue::Array(crypt)
-        },
-        library: {
-            count: library_count,
-            cards: JsonValue::Array(library)
-        }
-    }
 }
 
 // ============================================================================
