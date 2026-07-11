@@ -12,6 +12,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 
 from ..db_oauth import (
     delete_oauth_consent,
@@ -191,15 +192,27 @@ async def authorize_get(
     }
 
 
+class AuthorizeApprovalRequest(BaseModel):
+    """POST /authorize body (first-party consent screen). Fields default empty
+    so missing values fail the endpoint's own 400s, not as a 422."""
+
+    client_id: str = ""
+    redirect_uri: str = ""
+    scope: str = ""
+    state: str = ""
+    code_challenge: str = ""
+    approved: bool = True
+
+
 @router.post("/authorize")
-async def authorize_post(user: CurrentUser, body: dict):
+async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
     """User approves or denies the authorization request."""
-    client_id = body.get("client_id", "")
-    redirect_uri = body.get("redirect_uri", "")
-    scope = body.get("scope", "")
-    state = body.get("state", "")
-    code_challenge = body.get("code_challenge", "")
-    approved = body.get("approved", True)
+    client_id = body.client_id
+    redirect_uri = body.redirect_uri
+    scope = body.scope
+    state = body.state
+    code_challenge = body.code_challenge
+    approved = body.approved
 
     # Validate client
     client = await get_oauth_client_by_client_id(client_id)
@@ -257,23 +270,38 @@ async def authorize_post(user: CurrentUser, body: dict):
 # --- Token Endpoint ---
 
 
+class TokenRequest(BaseModel):
+    """POST /token body. JSON, not the RFC 6749 form encoding — a deliberate
+    first-party divergence (the Discord bot is the only client today; revisit
+    with the public third-party API). Optional fields gate on grant_type:
+    authorization_code uses code/redirect_uri/code_verifier, refresh_token
+    uses refresh_token. Fields default empty so a missing value fails the
+    endpoint's own 400/401s, not as a 422."""
+
+    grant_type: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    code: str = ""
+    redirect_uri: str = ""
+    code_verifier: str = ""
+    refresh_token: str = ""
+
+
 @router.post("/token")
-async def token_endpoint(body: dict):
+async def token_endpoint(body: TokenRequest):
     """Exchange authorization code for tokens, or refresh tokens.
 
     Client authenticates via client_id + client_secret in the body.
     """
-    grant_type = body.get("grant_type", "")
-    client_id = body.get("client_id", "")
-    client_secret = body.get("client_secret", "")
+    grant_type = body.grant_type
 
     # Authenticate client
-    client = await get_oauth_client_by_client_id(client_id)
+    client = await get_oauth_client_by_client_id(body.client_id)
     if not client or not client.active:
         raise HTTPException(401, "Invalid client credentials")
 
     try:
-        ph.verify(client.client_secret_hash, client_secret)
+        ph.verify(client.client_secret_hash, body.client_secret)
     except VerifyMismatchError:
         raise HTTPException(401, "Invalid client credentials") from None
 
@@ -285,10 +313,10 @@ async def token_endpoint(body: dict):
         raise HTTPException(400, "Unsupported grant_type")
 
 
-async def _handle_authorization_code(body: dict, client: OAuthClient) -> dict:
-    code_value = body.get("code", "")
-    redirect_uri = body.get("redirect_uri", "")
-    code_verifier = body.get("code_verifier", "")
+async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) -> dict:
+    code_value = body.code
+    redirect_uri = body.redirect_uri
+    code_verifier = body.code_verifier
 
     if not code_value or not redirect_uri or not code_verifier:
         raise HTTPException(400, "Missing required parameters")
@@ -345,8 +373,8 @@ async def _handle_authorization_code(body: dict, client: OAuthClient) -> dict:
     )
 
 
-async def _handle_refresh_token(body: dict, client: OAuthClient) -> dict:
-    refresh_token_str = body.get("refresh_token", "")
+async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict:
+    refresh_token_str = body.refresh_token
     if not refresh_token_str:
         raise HTTPException(400, "Missing refresh_token")
 
@@ -537,15 +565,24 @@ async def revoke_consent(client_id: str, user: CurrentUser, request: Request):
 # --- Client Management (DEV role) ---
 
 
+class RegisterClientRequest(BaseModel):
+    """POST /clients body (DEV role). Fields default empty so missing values
+    fail the endpoint's own 400s, not as a 422."""
+
+    name: str = ""
+    redirect_uris: list[str] = []
+    scopes: list[str] = []
+
+
 @router.post("/clients")
 async def register_client(
-    body: dict,
+    body: RegisterClientRequest,
     user: User = Depends(require_role(Role.DEV)),
 ):
     """Register a new OAuth client. Returns client_secret once."""
-    name = body.get("name", "").strip()
-    redirect_uris = body.get("redirect_uris", [])
-    scope_strs = body.get("scopes", [])
+    name = body.name.strip()
+    redirect_uris = body.redirect_uris
+    scope_strs = body.scopes
 
     if not name:
         raise HTTPException(400, "Client name is required")
