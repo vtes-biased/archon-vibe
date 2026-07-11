@@ -8,7 +8,6 @@ from urllib.parse import urlencode
 from uuid import uuid7
 
 import jwt
-import msgspec
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -190,15 +189,6 @@ async def authorize_get(
         "client_id": client_id,
         "code_challenge": code_challenge,
     }
-
-
-class AuthorizeApproval(msgspec.Struct):
-    client_id: str
-    redirect_uri: str
-    scope: str
-    state: str = ""
-    code_challenge: str = ""
-    approved: bool = True
 
 
 @router.post("/authorize")
@@ -545,12 +535,6 @@ async def revoke_consent(client_id: str, user: CurrentUser, request: Request):
 
 
 # --- Client Management (DEV role) ---
-
-
-class RegisterClientRequest(msgspec.Struct):
-    name: str
-    redirect_uris: list[str]
-    scopes: list[str]
 
 
 @router.post("/clients")

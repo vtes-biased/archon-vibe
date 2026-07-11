@@ -1555,7 +1555,6 @@ def parse_args() -> argparse.Namespace:
         default=os.getenv("NEW_DATABASE_URL") or os.getenv("DATABASE_URL"),
         help="target archon-vibe DSN",
     )
-    p.add_argument("--batch-size", type=int, default=500)
     p.add_argument(
         "--limit", type=int, default=None, help="cap members & tournaments (smoke test)"
     )

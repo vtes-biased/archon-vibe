@@ -414,8 +414,6 @@ async def _check_player_barred(
     - Player has an active suspension
     - Player is DQ'd in a sibling league tournament (league-wide DQ)
     """
-    from datetime import UTC, datetime
-
     # Check active suspensions
     user_sanctions = await get_sanctions_for_user(player_uid, conn=conn)
     now = datetime.now(UTC)
@@ -1246,7 +1244,6 @@ async def tournament_action(
         tournament_sanctions = await get_sanctions_for_tournament(uid, conn=tx_conn)
         seen_uids = {s.uid for s in tournament_sanctions}
         player_uids = {p.user_uid for p in tournament.players if p.user_uid}
-        # Single batched query (was one round-trip per player while locked)
         for s in await get_sanctions_for_users(player_uids, conn=tx_conn):
             if s.uid in seen_uids or s.deleted_at or s.lifted_at:
                 continue

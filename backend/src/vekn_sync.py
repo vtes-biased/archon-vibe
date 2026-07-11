@@ -13,8 +13,8 @@ from .data.vekn_roster import ADMINS, JUDGES
 from .db import (
     decode_json,
     get_connection,
-    get_princes_and_ncs,
     get_users_by_vekn_prefix,
+    get_users_with_vekn_prefix,
     get_users_without_coopted_by,
     save_user,
 )
@@ -810,7 +810,7 @@ class VEKNSyncService:
 
         Returns the number of users updated.
         """
-        sponsors = await get_princes_and_ncs()
+        sponsors = await get_users_with_vekn_prefix()
         if not sponsors:
             return 0
 
@@ -851,7 +851,7 @@ class VEKNSyncService:
 
         Returns the number of users updated.
         """
-        sponsors = await get_princes_and_ncs()
+        sponsors = await get_users_with_vekn_prefix()
         orphans = await get_users_without_coopted_by()
         if not sponsors or not orphans:
             return 0

@@ -71,22 +71,6 @@ def load_cities() -> list[City]:
     return json.loads(data_file.read_text(encoding="utf-8"))
 
 
-def get_city_by_id(geoname_id: int) -> City | None:
-    """Get a city by its GeoNames ID.
-
-    Args:
-        geoname_id: The GeoNames ID of the city
-
-    Returns:
-        City object or None if not found
-    """
-    cities = load_cities()
-    for city in cities:
-        if city["geoname_id"] == geoname_id:
-            return city
-    return None
-
-
 def get_country(iso_code: str) -> Country | None:
     """Get a country by its ISO code.
 
@@ -113,41 +97,6 @@ def get_countries_on_continent(country_code: str) -> list[str]:
         return []
     countries = load_countries()
     return [c["iso_code"] for c in countries.values() if c["continent"] == continent]
-
-
-def search_cities(
-    query: str, country_code: str | None = None, limit: int = 10
-) -> list[City]:
-    """Search cities by name.
-
-    Args:
-        query: Search term (case-insensitive)
-        country_code: Optional country code to filter by
-        limit: Maximum number of results
-
-    Returns:
-        List of matching cities
-    """
-    cities = load_cities()
-    query_lower = query.lower()
-    results = []
-
-    for city in cities:
-        if len(results) >= limit:
-            break
-
-        # Filter by country if specified
-        if country_code and city["country_code"] != country_code.upper():
-            continue
-
-        # Match query against name or ASCII name
-        if (
-            query_lower in city["name"].lower()
-            or query_lower in city["ascii_name"].lower()
-        ):
-            results.append(city)
-
-    return results
 
 
 def _strip_diacritics(s: str) -> str:

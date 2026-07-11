@@ -390,7 +390,7 @@ class VEKNAPIClient:
                     logger.warning(f"No data for venue #{venue_id}")
                     return {}
                 return venues[0] or {}
-        except (aiohttp.ClientError, Exception) as e:
+        except (aiohttp.ClientError, TimeoutError, ValueError) as e:
             logger.warning(f"Error fetching venue #{venue_id}: {e}")
             return {}
 

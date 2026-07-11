@@ -467,8 +467,6 @@ async def apply_archon_import(
         winner_uid = standings_list[0].user_uid
 
     # 5. Atomic update within transaction
-    _encoder = msgspec.json.Encoder()
-
     async with tournament_transaction(tournament_uid) as (tournament, tx_conn):
         if not tournament:
             return ImportResult(success=False, errors=["Tournament not found"])

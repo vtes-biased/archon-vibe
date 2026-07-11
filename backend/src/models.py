@@ -375,18 +375,6 @@ class Sanction(BaseObject, kw_only=True):
     lifted_by_uid: str | None = None
 
 
-class Rating(BaseObject, kw_only=True):
-    user_uid: str
-    country: str | None = None
-    constructed_online: CategoryRating | None = None
-    constructed_offline: CategoryRating | None = None
-    limited_online: CategoryRating | None = None
-    limited_offline: CategoryRating | None = None
-    wins: list[str] = msgspec.field(
-        default_factory=list
-    )  # All-time tournament UIDs won
-
-
 class LeagueKind(StrEnum):
     LEAGUE = "League"
     META = "Meta-League"
@@ -551,15 +539,6 @@ class Table(msgspec.Struct, kw_only=True):
 class FinalsTable(Table, kw_only=True):
     seating: list[Seat]
     seed_order: list[str]
-
-
-class Deck(msgspec.Struct, kw_only=True):
-    round: int | None = None
-    name: str = ""
-    author: str = ""  # for attribution
-    comments: str = ""
-    cards: dict[str, int] = msgspec.field(default_factory=dict)  # card_uid: count
-    attribution: str | None = None  # None = anonymous, vekn_id = attributed to member
 
 
 class DeckObject(BaseObject, kw_only=True):

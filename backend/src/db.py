@@ -457,24 +457,6 @@ def _level_col(level: str) -> str:
     return {"public": '"public"', "member": '"member"', "full": '"full"'}[level]
 
 
-async def get_object(uid: str, *, level: str = "full") -> dict | None:
-    """Get an object from the objects table at a given access level.
-
-    Returns the raw dict (parsed from JSONB), or None if not found
-    or not visible at the requested level.
-    """
-    col = _level_col(level)
-    async with get_connection() as conn:
-        result = await conn.execute(
-            f"SELECT {col} FROM objects WHERE uid = %s",  # ty: ignore[invalid-argument-type]
-            (uid,),
-        )
-        row = await result.fetchone()
-        if row and row[0] is not None:
-            return row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
-        return None
-
-
 # Model class -> stored `type` string. Lets get_object_full constrain its read to
 # the type it will decode into, so a uid of the wrong type reads as absent instead
 # of decoding a foreign row (msgspec fills the defaults) and being written back
@@ -502,27 +484,6 @@ async def get_object_full[T](
         if row and row[0] is not None:
             return decode_json(row[0], type_)
         return None
-
-
-async def get_objects_by_type(
-    obj_type: str, *, level: str = "full", where: str = "", params: tuple = ()
-) -> list[dict]:
-    """Query objects table by type. Returns list of dicts at the given level."""
-    col = _level_col(level)
-    query = f"SELECT {col} FROM objects WHERE type = %s AND {col} IS NOT NULL"
-    if where:
-        query += f" AND {where}"
-    all_params = (obj_type, *params)
-    async with get_connection() as conn:
-        result = await conn.execute(
-            query,  # ty: ignore[invalid-argument-type]
-            all_params,
-        )
-        rows = await result.fetchall()
-        return [
-            row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
-            for row in rows
-        ]
 
 
 async def stream_objects_new(
@@ -661,11 +622,6 @@ async def get_users_by_uids(uids: set[str]) -> dict[str, User]:
     return {u.uid: u for u in (decode_json(row[0], User) for row in rows)}
 
 
-async def delete_user(uid: str) -> None:
-    """Delete a user from the database (hard delete)."""
-    await delete_object(uid)
-
-
 async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
     """Soft-delete a user by setting deleted_at. Returns (user, BroadcastData) for SSE."""
     user = await get_user_by_uid(uid)
@@ -784,8 +740,9 @@ async def get_users_by_vekn_prefix(prefix: str) -> list[User]:
         return [decode_json(row[0], User) for row in rows]
 
 
-async def get_princes_and_ncs() -> list[User]:
-    """Get all users with Prince or NC roles who have a vekn_prefix."""
+async def get_users_with_vekn_prefix() -> list[User]:
+    """Get all users with a non-empty vekn_prefix (in practice Princes and NCs,
+    but the query filters on the prefix alone — no role predicate)."""
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -818,16 +775,13 @@ async def allocate_next_vekn_id() -> str:
     Uses advisory lock to ensure atomic allocation across concurrent requests.
     Returns the allocated VEKN ID as a string (7 digits).
     """
-    if not _pool:
-        raise RuntimeError("Database not initialized")
-
     # Minimum VEKN ID to avoid leading zeros (7 digits)
     min_vekn_id = 1000000
 
-    conn = await _pool.getconn()
-    try:
-        await conn.execute("BEGIN")
-        try:
+    if not _pool:
+        raise RuntimeError("Database not initialized")
+    async with _pool.connection() as conn:
+        async with conn.transaction():
             # Advisory lock to prevent concurrent allocations
             await conn.execute("SELECT pg_advisory_xact_lock(1)")
 
@@ -851,19 +805,7 @@ async def allocate_next_vekn_id() -> str:
                 (min_vekn_id, min_vekn_id, min_vekn_id),
             )
             row = await result.fetchone()
-
-            if not row or row[0] is None:
-                next_id = min_vekn_id
-            else:
-                next_id = row[0]
-
-            await conn.execute("COMMIT")
-            return str(next_id)
-        except Exception:
-            await conn.execute("ROLLBACK")
-            raise
-    finally:
-        await _pool.putconn(conn)
+            return str(row[0]) if row and row[0] is not None else str(min_vekn_id)
 
 
 # Auth methods CRUD
@@ -1048,11 +990,6 @@ async def get_tournament_by_uid(
     return await get_object_full(uid, Tournament, conn=conn)
 
 
-async def delete_tournament_db(uid: str) -> None:
-    """Delete a tournament from the database."""
-    await delete_object(uid)
-
-
 async def get_tournament_public_projection(uid: str) -> dict | None:
     """Public-level projection of a tournament, as a raw dict.
 
@@ -1193,18 +1130,6 @@ async def get_child_leagues(parent_uid: str) -> list[League]:
         )
         rows = await result.fetchall()
         return [decode_json(row[0], League) for row in rows]
-
-
-async def get_tournaments_for_league(league_uid: str) -> list[Tournament]:
-    """Get all tournaments associated with a league."""
-    async with get_connection() as conn:
-        result = await conn.execute(
-            """SELECT "full" FROM objects
-            WHERE type = 'tournament' AND "full"->>'league_uid' = %s""",
-            (league_uid,),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], Tournament) for row in rows]
 
 
 # ---------------------------------------------------------------------------
