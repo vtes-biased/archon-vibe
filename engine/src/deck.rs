@@ -982,7 +982,9 @@ mod tests {
         let v5 = validate_deck(&deck, &cm, "V5");
         let v5_msgs: Vec<&str> = v5.iter().map(|e| e.message.as_str()).collect();
         assert!(
-            v5_msgs.iter().any(|m| m.contains("419 Operation") && m.contains("V5-legal")),
+            v5_msgs
+                .iter()
+                .any(|m| m.contains("419 Operation") && m.contains("V5-legal")),
             "non-v5 card warns"
         );
         assert!(
