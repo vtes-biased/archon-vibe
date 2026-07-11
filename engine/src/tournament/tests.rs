@@ -1251,13 +1251,12 @@ fn test_standings_sa_redirects_to_most_recent_seated_round() {
 }
 
 #[test]
-fn test_rating_vp_gw_sa_never_lands_on_finals() {
-    // An SA can never penalize the finals table. p1 plays one prelim round and the
-    // finals; the SA's stored round_number points at the finals slot (index 1 ==
-    // rounds_len), but the resolver only scans prelim rounds, so it redirects to
-    // p1's last prelim round (round 0). Finals VP/GW are read from the stored seat,
-    // untouched. VP = prelim 2.0 + finals 3.0 - 1.0 SA = 4.0; GW = 0 (round 0
-    // recomputed: adjusted 1.0 < 2) + 1 (finals, stored) = 1.0.
+fn test_rating_vp_gw_finals_sa_lands_on_finals() {
+    // A finals-round SA (stored round_number == rounds_len, the finals sentinel)
+    // sticks on the finals for a seated finalist: the prelim round is recomputed
+    // WITHOUT the penalty (p1 keeps that GW) and the -1 VP still hits the rating
+    // total (which includes finals VP). VP = prelim 2.0 + finals 3.0 - 1.0 SA =
+    // 4.0; GW = 1 (round 0: adjusted 2.0 holds) + 1 (finals, stored) = 2.0.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -1281,13 +1280,77 @@ fn test_rating_vp_gw_sa_never_lands_on_finals() {
         { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
     ];
     let (vp, gw) = super::compute_rating_vp_gw(&tournament, &sanctions, "p1");
+    assert_eq!(vp, 4.0, "prelim 2.0 + finals 3.0 - 1.0 finals SA");
     assert_eq!(
-        vp, 4.0,
-        "prelim 2.0 + finals 3.0 - 1.0 SA (redirected to prelim)"
+        gw, 2.0,
+        "prelim GW kept (SA no longer redirected there) + finals GW (stored)"
+    );
+}
+
+#[test]
+fn test_finals_sa_rescores_finals_and_rederives_winner() {
+    // Finals were scored BEFORE the SA: p1's top raw VP (2.5) holds the stored
+    // finals GW and FinishFinals crowned p1. An SA then lands on the finals
+    // (sentinel round 1): adjusted p1 1.5 < p2 2.0, so update_standings — the
+    // out-of-band sanction recompute path — must rewrite the stored finals GW
+    // and re-derive the winner, while prelim standings keep their VP (the
+    // penalty is finals-only).
+    let mut tournament = make_tournament();
+    tournament["rounds"] = json::array![json::array![json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+        ],
+    }]];
+    tournament["finals"] = json::object! {
+        state: "Finished",
+        seed_order: ["p1", "p2", "p3", "p4", "p5"],
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 2.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 24 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 } },
+        ],
+    };
+    tournament["winner"] = "p1".into();
+    tournament["players"] = json::array![
+        { user_uid: "p1", toss: 0 },
+        { user_uid: "p2", toss: 0 },
+        { user_uid: "p3", toss: 0 },
+        { user_uid: "p4", toss: 0 },
+        { user_uid: "p5", toss: 0 },
+    ];
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    super::standings::update_standings(&mut tournament, &sanctions);
+    assert_eq!(
+        tournament["winner"].as_str(),
+        Some("p2"),
+        "adjusted finals VP re-derives the winner"
     );
     assert_eq!(
-        gw, 1.0,
-        "round 0 GW removed by SA; finals GW (stored) intact"
+        tournament["finals"]["seating"][0]["result"]["gw"].as_f64(),
+        Some(0.0),
+        "p1's stored finals GW rewritten"
+    );
+    assert_eq!(
+        tournament["finals"]["seating"][1]["result"]["gw"].as_f64(),
+        Some(1.0),
+        "p2 holds the refreshed finals GW"
+    );
+    let p1 = tournament["standings"]
+        .members()
+        .find(|s| s["user_uid"].as_str() == Some("p1"))
+        .unwrap();
+    assert_eq!(
+        p1["vp"].as_f64(),
+        Some(2.0),
+        "prelim standings VP untouched by a finals-round SA"
     );
 }
 

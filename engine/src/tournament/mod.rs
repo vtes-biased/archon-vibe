@@ -18,7 +18,7 @@ mod tests;
 mod types;
 
 // Re-export items used by lib.rs
-pub use scoring::{check_table_vps, compute_gw, compute_tp};
+pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
 pub use standings::{compute_final_standings, compute_rating_vp_gw};
 pub use types::{
     ActorContext, PlayerState, SeatScore, TableState, TournamentEvent, TournamentState,
@@ -37,7 +37,6 @@ use helpers::{
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
-use scoring::compute_gw_finals;
 use standings::{compute_preliminary_standings, top5_has_ties, update_standings};
 
 // ============================================================================
@@ -199,9 +198,10 @@ pub fn process_tournament_event(
 /// Issuing, lifting, or deleting a standings_adjustment is NOT a `TournamentEvent`
 /// (sanctions are their own object type), so those paths can't recompute standings
 /// through `process_tournament_event`. This is the recompute they call instead —
-/// the same `update_standings` that every event ends with — so the SA VP penalty
-/// and per-table GW/TP refresh live, not only on the next tournament action.
-/// No-op when rounds are empty (guarded in `update_standings` to preserve
+/// the same `update_standings` that every event ends with — so the SA VP penalty,
+/// per-table GW/TP refresh, and the finals re-score + winner re-derivation (a
+/// finals-round SA can flip who won) apply live, not only on the next tournament
+/// action. No-op when rounds are empty (guarded in `update_standings` to preserve
 /// VEKN-synced standings). Returns the bare tournament object (no `deck_ops`).
 pub fn update_standings_json(
     tournament_json: &str,
@@ -2029,10 +2029,11 @@ fn apply_event(
             // VEKN finals have no prelim-style 2VP threshold and always yield exactly
             // one winner (even an all-timeout 0.5 table, or an unscored override table
             // — then the top seed). compute_gw_finals is the single source of that
-            // rule — the same call SetScore uses to award the finals GW — so the
-            // winner can never diverge from the scored GW, and it accounts for any
-            // finals-round SAs (relevant once those become creatable, a separate
-            // ticket). With no finals SA it is the highest raw-VP seat, unchanged.
+            // rule — the same call SetScore uses to award the finals GW and
+            // update_standings uses to refresh a Finished finals after a sanction
+            // change — so the winner can never diverge from the scored GW, and a
+            // finals-round SA counts. With no finals SA it is the highest raw-VP
+            // seat, unchanged.
             let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
             let finals_round = tournament["rounds"].len();
             let seating = &tournament["finals"]["seating"];

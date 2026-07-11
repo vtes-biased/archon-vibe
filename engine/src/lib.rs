@@ -867,6 +867,19 @@ mod python {
             super::tournament::compute_gw(&vps, &adjustments)
         }
 
+        /// Compute finals game wins: exactly one winner — highest adjusted VP,
+        /// tiebroken by seed order (no prelim 2-VP threshold).
+        fn compute_gw_finals(
+            &self,
+            vps: Vec<f64>,
+            adjustments: Vec<f64>,
+            seating_uids: Vec<String>,
+            seed_order: Vec<String>,
+        ) -> Vec<f64> {
+            let uid_refs: Vec<&str> = seating_uids.iter().map(String::as_str).collect();
+            super::tournament::compute_gw_finals(&vps, &adjustments, &uid_refs, &seed_order)
+        }
+
         /// Compute tournament points for each player at a table.
         fn compute_tp(&self, table_size: usize, vps: Vec<f64>, adjustments: Vec<f64>) -> Vec<f64> {
             super::tournament::compute_tp(table_size, &vps, &adjustments)

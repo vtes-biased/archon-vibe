@@ -5,7 +5,7 @@ use json::JsonValue;
 use super::sanctions::{
     has_dq_sanction, resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments,
 };
-use super::scoring::{compute_gw, compute_tp};
+use super::scoring::{compute_gw, compute_gw_finals, compute_tp};
 
 /// Player standing: (user_uid, gw, vp, tp, toss, finalist, disqualified)
 pub(super) struct Standing {
@@ -72,8 +72,16 @@ pub(super) fn compute_preliminary_standings(
     // penalized player, per JG v2 1.1.3. The per-round result.vp stays raw; the
     // penalty lives only in the standings total. Same resolved-SA list the GW/TP
     // cascade above used, so VP and GW/TP agree on every effective round.
+    // Finals-round SAs (index nrounds) are excluded: they penalize the finals
+    // result (finals GW/winner + rating VP), not the preliminary totals.
+    let nrounds = tournament["rounds"].len();
+    let prelim_sas: Vec<(String, usize)> = effective_sas
+        .iter()
+        .filter(|(_, r)| *r < nrounds)
+        .cloned()
+        .collect();
     for uid in map.keys().cloned().collect::<Vec<_>>() {
-        let penalty = sa_vp_penalty(&effective_sas, &uid);
+        let penalty = sa_vp_penalty(&prelim_sas, &uid);
         if penalty != 0.0 {
             if let Some(entry) = map.get_mut(&uid) {
                 entry.1 -= penalty;
@@ -164,6 +172,51 @@ pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue
         })
         .collect();
     tournament["standings"] = JsonValue::Array(arr);
+    refresh_finals_scoring(tournament, sanctions);
+}
+
+/// Re-score a Finished finals table from raw VPs + current sanctions, and re-derive
+/// `tournament.winner` when one is already set (post-FinishFinals). Prelim seat
+/// results may go stale harmlessly (standings recompute per table on the fly), but
+/// the finals seat `result.gw`/`result.tp` and `winner` ARE the stored truth that
+/// ratings ([`compute_rating_vp_gw`]) and final placement consume — so a
+/// finals-round SA issued or lifted after the finals were scored must rewrite them.
+/// Uses the same [`compute_gw_finals`] call SetScore and FinishFinals use, so all
+/// three paths always agree.
+fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
+    if tournament["finals"]["state"].as_str() != Some("Finished") {
+        return;
+    }
+    let finals_round = tournament["rounds"].len();
+    let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
+    let seating = &tournament["finals"]["seating"];
+    let vps: Vec<f64> = seating
+        .members()
+        .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+        .collect();
+    let seating_uids: Vec<String> = seating
+        .members()
+        .map(|s| s["player_uid"].as_str().unwrap_or("").to_string())
+        .collect();
+    let uid_refs: Vec<&str> = seating_uids.iter().map(String::as_str).collect();
+    let adjustments = table_sa_adjustments(seating, finals_round, &effective_sas);
+    let seed_order: Vec<String> = tournament["finals"]["seed_order"]
+        .members()
+        .filter_map(|s| s.as_str().map(String::from))
+        .collect();
+    let gws = compute_gw_finals(&vps, &adjustments, &uid_refs, &seed_order);
+    let tps = compute_tp(vps.len(), &vps, &adjustments);
+    for i in 0..vps.len() {
+        tournament["finals"]["seating"][i]["result"]["gw"] = gws[i].into();
+        tournament["finals"]["seating"][i]["result"]["tp"] = tps[i].into();
+    }
+    // Re-derive the winner only once FinishFinals set one (never crown early),
+    // and never blank it (an empty derivation means an empty table).
+    if !tournament["winner"].as_str().unwrap_or("").is_empty() {
+        if let Some(w) = gws.iter().position(|&g| g == 1.0) {
+            tournament["winner"] = uid_refs[w].into();
+        }
+    }
 }
 
 /// Clone a preliminary standing entry and tag it with a 1-based final `rank`.

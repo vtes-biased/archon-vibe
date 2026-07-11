@@ -39,7 +39,11 @@ pub(super) fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
 /// One entry per active SA — two SAs on one player stack to `-2`; do not dedup.
 /// This is the SINGLE source both consumers read (`table_sa_adjustments` for the
 /// per-table GW/TP cascade and `sa_vp_penalty` for the VP total), so they always
-/// agree on the effective round. Finals is never scanned, so SA never lands there.
+/// agree on the effective round. The finals table participates as round index
+/// `nrounds` (the same sentinel SetScore uses): an SA stored there sticks when the
+/// player is a seated finalist, and the most-recent-game fallback scans finals
+/// first — a finals-round SA lands on the finals GW/winner, never on prelim rows
+/// (prelim standings filter it out of their VP penalty).
 pub(super) fn resolve_sa_effective_rounds(
     tournament: &JsonValue,
     sanctions: &JsonValue,
@@ -50,7 +54,15 @@ pub(super) fn resolve_sa_effective_rounds(
     // SA — both the honor-stored check and the redirect fallback skip Cancelled
     // tables, keeping the effective round one the GW/TP cascade actually visits
     // (standings skips Cancelled tables) so VP and GW/TP land on the same round.
+    // Index nrounds is the finals: CancelFinals nulls `finals` wholesale, so a
+    // lingering cancelled finals table cannot exist — presence in the seating is
+    // enough.
     let seated_in = |uid: &str, r: usize| -> bool {
+        if r == nrounds {
+            return tournament["finals"]["seating"]
+                .members()
+                .any(|s| s["player_uid"].as_str() == Some(uid));
+        }
         rounds[r].members().any(|table| {
             table["state"].as_str() != Some("Cancelled")
                 && table["seating"]
@@ -60,10 +72,10 @@ pub(super) fn resolve_sa_effective_rounds(
     };
     let mut out = Vec::new();
     for (uid, stored) in get_sa_sanctions(sanctions) {
-        let effective = if stored < nrounds && seated_in(&uid, stored) {
+        let effective = if stored <= nrounds && seated_in(&uid, stored) {
             Some(stored)
         } else {
-            (0..nrounds).rev().find(|&r| seated_in(&uid, r))
+            (0..=nrounds).rev().find(|&r| seated_in(&uid, r))
         };
         if let Some(r) = effective {
             out.push((uid, r));

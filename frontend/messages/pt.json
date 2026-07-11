@@ -248,6 +248,7 @@
   "sanction_round": "Rodada",
   "sanction_round_label": "Rodada {round}",
   "sanction_sa_applies_to": "Aplica-se à partida atual/mais recente do jogador: Rodada {round}",
+  "sanction_sa_applies_to_finals": "Aplica-se à partida atual/mais recente do jogador: as finais",
   "sanction_sa_no_round": "Este jogador ainda não disputou nenhuma rodada, portanto não é possível aplicar um Ajuste de Classificação.",
   "sanction_baseline_hint": "Penalidade base: {level}",
   "sanction_escalation_hint": "{count} infração/ões anterior/es deste tipo — nível sugerido: {suggested}",

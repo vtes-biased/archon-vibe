@@ -95,7 +95,7 @@ pub fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
 
 /// Compute GW for finals: always awards 1 GW to the winner (highest adjusted VP,
 /// tiebroken by seed order). No 2VP threshold -- finals always produce a winner.
-pub(crate) fn compute_gw_finals(
+pub fn compute_gw_finals(
     vps: &[f64],
     adjustments: &[f64],
     seating_uids: &[&str],

@@ -4,9 +4,10 @@
   import { formatScore } from "$lib/utils";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
+  import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import VpInput from "./VpInput.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ArrowRightLeft, ShieldCheck, Lock } from "@lucide/svelte";
+  import { ArrowRightLeft, ShieldCheck, Lock, TriangleAlert } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -62,6 +63,7 @@
   let overrideTable_ = $state<number | null>(null);
   let overrideComment = $state("");
   let overrideSaving = $state(false);
+  let sanctionTarget = $state<{ uid: string; name: string } | null>(null);
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo, tournament.online);
@@ -137,8 +139,11 @@
       <div class="divide-y divide-line">
         {#each tournament.finals.seating as seat, j}
           {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-          {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
-          {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
+          <!-- Finished finals: stored gw/tp are the engine-refreshed, SA-adjusted truth;
+               the local recompute is SA-blind (full preview binding is its own ticket). -->
+          {@const scored = tournament.finals.state === 'Finished'}
+          {@const tGws = scored ? tournament.finals.seating.map(s => s.result.gw) : computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
+          {@const tTps = scored ? tournament.finals.seating.map(s => s.result.tp) : computeTpLocal(tournament.finals.seating.length, tVps)}
           {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
           {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
           <div class="py-2.5">
@@ -147,7 +152,18 @@
                 <span class="text-ink truncate">{seatDisplay(seat.player_uid)}</span>
                 <div class="text-xs text-ink-faint">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
               </div>
-              <span class="text-ink-faint text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
+              <div class="flex items-center gap-2 shrink-0">
+                <span class="text-ink-faint text-xs">{tGws[j]}GW {tTps[j]}TP</span>
+                {#if isOrganizer}
+                  <button
+                    onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid) }}
+                    class="p-2 sm:p-0.5 text-ink-faint hover:text-warn transition-colors"
+                    title={m.players_sanction_btn()}
+                  >
+                    <TriangleAlert class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
+                  </button>
+                {/if}
+              </div>
             </div>
             <div class="mt-1.5">
               {#if !isOrganizer && tournament.finals.seating.some(s => s.judge_uid)}
@@ -213,6 +229,15 @@
             </button>
           </div>
         {/if}
+      {/if}
+      {#if sanctionTarget && isOrganizer}
+        <TournamentSanctionModal
+          {tournament}
+          playerUid={sanctionTarget.uid}
+          playerName={sanctionTarget.name}
+          currentRound={tournament.rounds!.length}
+          onClose={() => sanctionTarget = null}
+        />
       {/if}
       {#if isOrganizer && tournament.finals.override}
         <div class="mt-2 pt-2 border-t border-line flex items-center justify-between">

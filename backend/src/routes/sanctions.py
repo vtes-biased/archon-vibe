@@ -278,7 +278,12 @@ async def create_sanction(
         )
     if round_number is not None and request.tournament_uid:
         tournament = await get_tournament_by_uid(request.tournament_uid)
-        if tournament and round_number >= len(tournament.rounds):
+        # len(rounds) is the finals sentinel (same as setTableScore) — valid
+        # only once a finals table exists.
+        if tournament and (
+            round_number > len(tournament.rounds)
+            or (round_number == len(tournament.rounds) and tournament.finals is None)
+        ):
             raise HTTPException(
                 status_code=400,
                 detail=f"round_number {round_number} exceeds tournament rounds ({len(tournament.rounds)})",
@@ -462,12 +467,18 @@ async def update_sanction_endpoint(
             )
 
     # Update round_number if provided (mirror create: must reference an existing
-    # round, else the SA is silently inert — the engine recompute no-ops it).
+    # round — or the finals sentinel len(rounds) once a finals table exists —
+    # else the SA is silently inert; the engine recompute no-ops it).
     if request.round_number is not None:
         round_number = request.round_number
         if sanction.tournament_uid is not None:
             tournament = await get_tournament_by_uid(sanction.tournament_uid)
-            if tournament and round_number >= len(tournament.rounds):
+            if tournament and (
+                round_number > len(tournament.rounds)
+                or (
+                    round_number == len(tournament.rounds) and tournament.finals is None
+                )
+            ):
                 raise HTTPException(
                     status_code=400,
                     detail=f"round_number {round_number} exceeds tournament rounds ({len(tournament.rounds)})",

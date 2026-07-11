@@ -388,12 +388,16 @@ async def apply_archon_import(
         fvps = [s[1] for s in data.finals.seats]
         fsize = len(fvps)
         f_adjustments = [0.0] * fsize
-        f_gws = engine.compute_gw(fvps, f_adjustments)
+        # Finals rule, not the prelim compute_gw (no 2-VP threshold, exactly one
+        # winner): the engine's finals refresh rewrites these seats with
+        # compute_gw_finals on any standings recompute, so the import must store
+        # the same values or the GW would silently drift later.
+        f_uids = [uid_by_number[pn] for pn, _ in data.finals.seats]
+        f_gws = engine.compute_gw_finals(fvps, f_adjustments, f_uids, f_uids)
         f_tps = engine.compute_tp(fsize, fvps, f_adjustments)
 
         finals_seats: list[Seat] = []
         seed_order: list[str] = []
-        max_vp = -1.0
         for i, (player_num, vp) in enumerate(data.finals.seats):
             user_uid = uid_by_number[player_num]
             gw = int(f_gws[i])
@@ -409,8 +413,7 @@ async def apply_archon_import(
             player_scores[user_uid]["gw"] += gw
             player_scores[user_uid]["vp"] += vp
             player_scores[user_uid]["tp"] += tp
-            if vp > max_vp:
-                max_vp = vp
+            if gw == 1:
                 finals_winner_uid = user_uid
 
         built_finals = FinalsTable(

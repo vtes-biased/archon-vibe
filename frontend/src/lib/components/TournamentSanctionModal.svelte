@@ -95,12 +95,15 @@
     highestExisting !== null && LEVEL_SEVERITY[level] < LEVEL_SEVERITY[highestExisting]
   );
 
-  // Round options
+  // Round options; len(rounds) is the finals sentinel, offered once finals exist
   const roundOptions = $derived.by(() => {
     const opts: { value: number; label: string }[] = [];
     const numRounds = tournament.rounds?.length ?? 0;
     for (let i = 0; i < numRounds; i++) {
       opts.push({ value: i, label: m.sanction_round_label({ round: String(i + 1) }) });
+    }
+    if (tournament.finals) {
+      opts.push({ value: numRounds, label: m.finals_title() });
     }
     return opts;
   });
@@ -110,15 +113,20 @@
 
   // SA round is determined by tournament state, not chosen (JG v2 §1.1.3): the −1 VP
   // lands on the player's current game if one is in progress, else their most-recently
-  // played game — i.e. the highest round index in which they are seated. Frozen at issue
-  // time onto the sanction; null when the player has not been seated in any round yet.
+  // played game — i.e. the finals when the player is a seated finalist (sentinel
+  // len(rounds)), else the highest round index in which they are seated. Frozen at
+  // issue time onto the sanction; null when the player has not been seated yet.
   const saTargetRound = $derived.by(() => {
     const rounds = tournament.rounds ?? [];
+    if (tournament.finals?.seating?.some(s => s.player_uid === playerUid)) {
+      return rounds.length;
+    }
     for (let i = rounds.length - 1; i >= 0; i--) {
       if (rounds[i]?.some(t => t.seating?.some(s => s.player_uid === playerUid))) return i;
     }
     return null;
   });
+  const saTargetIsFinals = $derived(saTargetRound !== null && saTargetRound === (tournament.rounds?.length ?? 0));
 
   // Level label helper
   function levelLabel(lv: SanctionLevel): string {
@@ -307,7 +315,11 @@
         <!-- SA target round is determined by state, not chosen (JG v2 §1.1.3). -->
         <div>
           <span class="block text-sm font-medium text-ink-muted mb-1">{m.sanction_round()}</span>
-          {#if saTargetRound !== null}
+          {#if saTargetIsFinals}
+            <p class="px-3 py-2 rounded bg-accent-soft/30 border border-accent-soft-border/50 text-sm text-ink-bright">
+              {m.sanction_sa_applies_to_finals()}
+            </p>
+          {:else if saTargetRound !== null}
             <p class="px-3 py-2 rounded bg-accent-soft/30 border border-accent-soft-border/50 text-sm text-ink-bright">
               {m.sanction_sa_applies_to({ round: String(saTargetRound + 1) })}
             </p>
