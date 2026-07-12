@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, seatedPlayerCount } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
-  import { type ValidationError, type TournamentEventType } from "$lib/engine";
+  import { previewScoresSync, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
@@ -138,7 +138,7 @@
   const showDeckWarn = $derived(notCheckedIn && tournament.decklist_required && !playerHasValidDeck);
   const previousRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.rounds.length < 1) return [];
-    const result: { round: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
+    const result: { round: number; roundIdx: number; tableIdx: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
     for (let r = 0; r < tournament.rounds.length; r++) {
       const round = tournament.rounds[r]!;
       // Skip in-progress rounds (shown as "Your Table(s)")
@@ -147,6 +147,8 @@
       if (tIdx >= 0) {
         result.push({
           round: r + 1,
+          roundIdx: r,
+          tableIdx: tIdx,
           tableLabel: resolveTableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
           table: round[tIdx]!,
         });
@@ -381,8 +383,9 @@
         <div class="space-y-1.5">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-            {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
-            {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
+            {@const preview = previewScoresSync(tournament, tournamentSanctions, tournament.rounds?.length ?? 0, 0, tVps)}
+            {@const tGws = preview ? preview.gw : tournament.finals.seating.map(s => s.result.gw)}
+            {@const tTps = preview ? preview.tp : tournament.finals.seating.map(s => s.result.tp)}
             {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
             {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
             {@const isMe = seat.player_uid === userUid}
@@ -447,8 +450,9 @@
             <div class="space-y-1.5">
               {#each myTable.seating as seat, j}
                 {@const tVps = myTable.seating.map(s => s.result.vp)}
-                {@const tGws = computeGwLocal(tVps)}
-                {@const tTps = computeTpLocal(myTable.seating.length, tVps)}
+                {@const preview = previewScoresSync(tournament, tournamentSanctions, roundIdx, myTableIdx, tVps)}
+                {@const tGws = preview ? preview.gw : myTable.seating.map(s => s.result.gw)}
+                {@const tTps = preview ? preview.tp : myTable.seating.map(s => s.result.tp)}
                 {@const isMe = seat.player_uid === userUid}
                 {@const isPrey = mySeatIdx >= 0 && j === (mySeatIdx + 1) % tableSize}
                 {@const isPredator = mySeatIdx >= 0 && j === (mySeatIdx - 1 + tableSize) % tableSize}
@@ -559,8 +563,9 @@
                 <div class="divide-y divide-line">
                   {#each prev.table.seating as seat, j}
                     {@const tVps = prev.table.seating.map(s => s.result.vp)}
-                    {@const tGws = computeGwLocal(tVps)}
-                    {@const tTps = computeTpLocal(prev.table.seating.length, tVps)}
+                    {@const preview = previewScoresSync(tournament, tournamentSanctions, prev.roundIdx, prev.tableIdx, tVps)}
+                    {@const tGws = preview ? preview.gw : prev.table.seating.map(s => s.result.gw)}
+                    {@const tTps = preview ? preview.tp : prev.table.seating.map(s => s.result.tp)}
                     <div class="py-1 flex items-center justify-between text-sm {seat.player_uid === userUid ? 'text-ink-strong' : 'text-ink-muted'}">
                       <span>{seatDisplay(seat.player_uid)}</span>
                       <span class="text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
@@ -702,9 +707,9 @@
         <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_finals_table()}</h3>
         <div class="divide-y divide-line">
           {#each tournament.finals.seating as seat, j}
-            {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-            {@const tGws = computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
-            {@const tTps = computeTpLocal(tournament.finals.seating.length, tVps)}
+            <!-- Finished: stored gw/tp are the engine-refreshed, SA-adjusted truth. -->
+            {@const tGws = tournament.finals.seating.map(s => s.result.gw)}
+            {@const tTps = tournament.finals.seating.map(s => s.result.tp)}
             {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
             {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
             <div class="py-1.5 flex items-center justify-between text-sm">

@@ -2,7 +2,7 @@
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
-  import { scoreSeatingSync, computePlayerIssuesSync, type TournamentEventType } from "$lib/engine";
+  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, type TournamentEventType } from "$lib/engine";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
@@ -11,7 +11,7 @@
   import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2 } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";
 
@@ -724,8 +724,9 @@
                 <div class="divide-y divide-line">
                   {#each table.seating as seat, j}
                     {@const tVps = table.seating.map(s => s.result.vp)}
-                    {@const tGws = computeGwLocal(tVps)}
-                    {@const tTps = computeTpLocal(table.seating.length, tVps)}
+                    {@const preview = previewScoresSync(tournament, tournamentSanctions, r, i, tVps)}
+                    {@const tGws = preview ? preview.gw : table.seating.map(s => s.result.gw)}
+                    {@const tTps = preview ? preview.tp : table.seating.map(s => s.result.tp)}
                     <div class="py-2.5">
                       <div class="flex items-center justify-between gap-2 text-sm">
                         <span class="text-ink inline-flex items-center gap-1 min-w-0">

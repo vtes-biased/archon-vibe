@@ -81,58 +81,6 @@ export function vpOptions(tableSize: number, allowImpossible: boolean): number[]
   return opts;
 }
 
-export function computeGwLocal(vps: number[]): number[] {
-  if (vps.length === 0) return [];
-  const max = Math.max(...vps);
-  const maxCount = vps.filter(v => v === max).length;
-  return vps.map(v => (v >= 2 && v === max && maxCount === 1 ? 1 : 0));
-}
-
-/** Finals GW: always awards 1 GW to the winner (highest VP, tiebroken by seed order). */
-export function computeGwFinals(vps: number[], seedOrder: string[], seatingUids: string[]): number[] {
-  if (vps.length === 0) return [];
-  let bestIdx = 0;
-  let bestVp = vps[0]!;
-  let bestSeed = seedOrder.indexOf(seatingUids[0]!);
-  if (bestSeed < 0) bestSeed = Infinity;
-  for (let i = 1; i < vps.length; i++) {
-    const vp = vps[i]!;
-    let seed = seedOrder.indexOf(seatingUids[i]!);
-    if (seed < 0) seed = Infinity;
-    if (vp > bestVp || (vp === bestVp && seed < bestSeed)) {
-      bestVp = vp;
-      bestIdx = i;
-      bestSeed = seed;
-    }
-  }
-  const gws = new Array(vps.length).fill(0);
-  gws[bestIdx] = 1;
-  return gws;
-}
-
-export function computeTpLocal(tableSize: number, vps: number[]): number[] {
-  const base: Record<number, number[]> = {
-    5: [60, 48, 36, 24, 12],
-    4: [60, 48, 24, 12],
-    3: [60, 36, 12],
-  };
-  const b = base[tableSize];
-  if (!b) return vps.map(() => 0);
-  const indices = vps.map((_, i) => i).sort((a, c) => (vps[c] ?? 0) - (vps[a] ?? 0));
-  const result = new Array(vps.length).fill(0);
-  let i = 0;
-  while (i < indices.length) {
-    let j = i + 1;
-    while (j < indices.length && vps[indices[j]!] === vps[indices[i]!]) j++;
-    let sum = 0;
-    for (let k = i; k < j; k++) sum += b[k] ?? 0;
-    const avg = sum / (j - i);
-    for (let k = i; k < j; k++) result[indices[k]!] = avg;
-    i = j;
-  }
-  return result;
-}
-
 export function top5HasTies(standings: StandingEntry[]): boolean {
   if (standings.length < 5) return false;
   for (let i = 0; i < 5; i++) {

@@ -211,6 +211,61 @@ pub fn update_standings_json(
     Ok(tournament.dump())
 }
 
+/// Preview GW/TP for one table exactly as `SetScore` computes them — the same
+/// SA cascade (`resolve_sa_effective_rounds` + `table_sa_adjustments`), so live
+/// UI previews can never drift from persisted results.
+///
+/// Config: `{ tournament, sanctions, round, table, vps }` where `round ==
+/// rounds.len()` is the finals sentinel (`table` ignored) and `vps` are the
+/// seat-ordered raw VPs. Returns `{ "gw": [...], "tp": [...] }`.
+pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
+    let config = json::parse(config_json)?;
+    let tournament = &config["tournament"];
+    let sanctions = &config["sanctions"];
+    let round = config["round"]
+        .as_usize()
+        .ok_or_else(|| EngineError::internal("round required"))?;
+    let rounds_len = tournament["rounds"].len();
+    let is_finals = round >= rounds_len;
+    let table = if is_finals {
+        &tournament["finals"]
+    } else {
+        let table_idx = config["table"]
+            .as_usize()
+            .ok_or_else(|| EngineError::internal("table required"))?;
+        &tournament["rounds"][round][table_idx]
+    };
+    let seating = &table["seating"];
+    let vps: Vec<f64> = config["vps"]
+        .members()
+        .map(|v| v.as_f64().unwrap_or(0.0))
+        .collect();
+    if seating.is_empty() || vps.len() != seating.len() {
+        return Err(EngineError::internal("vps/seating length mismatch"));
+    }
+    let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
+    let adjustments = table_sa_adjustments(seating, round, &effective_sas);
+    let gws = if is_finals {
+        let seating_uids: Vec<&str> = seating
+            .members()
+            .map(|s| s["player_uid"].as_str().unwrap_or(""))
+            .collect();
+        let seed_order: Vec<String> = table["seed_order"]
+            .members()
+            .filter_map(|s| s.as_str().map(|v| v.to_string()))
+            .collect();
+        compute_gw_finals(&vps, &adjustments, &seating_uids, &seed_order)
+    } else {
+        compute_gw(&vps, &adjustments)
+    };
+    let tps = compute_tp(seating.len(), &vps, &adjustments);
+    Ok(json::object! {
+        "gw" => JsonValue::Array(gws.into_iter().map(Into::into).collect()),
+        "tp" => JsonValue::Array(tps.into_iter().map(Into::into).collect()),
+    }
+    .dump())
+}
+
 fn apply_event(
     tournament: &mut JsonValue,
     event: &TournamentEvent,

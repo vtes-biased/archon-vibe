@@ -990,6 +990,7 @@ import TournamentModals from "./TournamentModals.svelte";
                 {setFinalsVp}
                 {scoreSaving}
                 {scoreSavingSeat}
+                {tournamentSanctions}
               />
             {:else if activeTab === 'config'}
               <ConfigTab

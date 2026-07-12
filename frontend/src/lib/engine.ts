@@ -87,6 +87,54 @@ export function scoreSeatingSync(
   }
 }
 
+// Preview memo: template {@const}s call previewScoresSync once per rendered
+// seat, so key on object identity (tournament/sanctions are replaced wholesale
+// on every update) and serialize the tournament only once per table per update.
+let previewCache: {
+  tournament: Tournament;
+  sanctions: Sanction[] | undefined;
+  results: Map<string, { gw: number[]; tp: number[] } | null>;
+} | null = null;
+
+/**
+ * Preview GW/TP for one table exactly as the engine's SetScore computes them —
+ * including standings-adjustment penalties — so the live preview can never
+ * drift from persisted results. `round === tournament.rounds.length` previews
+ * the finals table (`table` ignored). Returns null if the engine isn't
+ * initialized (callers fall back to stored results).
+ */
+export function previewScoresSync(
+  tournament: Tournament,
+  sanctions: Sanction[] | undefined,
+  round: number,
+  table: number,
+  vps: number[],
+): { gw: number[]; tp: number[] } | null {
+  const engine = getEngineReactive();
+  if (!engine) return null;
+  if (!previewCache || previewCache.tournament !== tournament || previewCache.sanctions !== sanctions) {
+    previewCache = { tournament, sanctions, results: new Map() };
+  }
+  const key = `${round}:${table}:${vps.join(',')}`;
+  const hit = previewCache.results.get(key);
+  if (hit !== undefined) return hit;
+  let result: { gw: number[]; tp: number[] } | null = null;
+  try {
+    const config = JSON.stringify({
+      tournament,
+      sanctions: JSON.parse(buildSanctionsPayload(sanctions ?? [])),
+      round,
+      table,
+      vps,
+    });
+    result = JSON.parse(callEngine(() => engine.previewScores(config)));
+  } catch {
+    result = null;
+  }
+  previewCache.results.set(key, result);
+  return result;
+}
+
 export type TournamentEventType =
   | 'OpenRegistration'
   | 'CloseRegistration'

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { TournamentEventType } from "$lib/engine";
+  import { previewScoresSync, type TournamentEventType } from "$lib/engine";
   import { toUserMessage } from '$lib/errors';
-  import type { Tournament } from "$lib/types";
+  import type { Tournament, Sanction } from "$lib/types";
   import { formatScore } from "$lib/utils";
   import { tournamentAction } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
@@ -9,7 +9,7 @@
   import VpInput from "./VpInput.svelte";
   import Button from '$lib/components/Button.svelte';
   import { ArrowRightLeft, ShieldCheck, Lock, TriangleAlert } from "@lucide/svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwFinals, computeTpLocal, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -23,6 +23,7 @@
     setFinalsVp,
     scoreSaving,
     scoreSavingSeat,
+    tournamentSanctions,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
@@ -34,6 +35,7 @@
     setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
     scoreSaving: number | null;
     scoreSavingSeat: string | null;
+    tournamentSanctions?: Sanction[];
   } = $props();
 
   let error = $state<string | null>(null);
@@ -123,11 +125,11 @@
       <div class="divide-y divide-line">
         {#each tournament.finals.seating as seat, j}
           {@const tVps = tournament.finals.seating.map(s => s.result.vp)}
-          <!-- Finished finals: stored gw/tp are the engine-refreshed, SA-adjusted truth;
-               the local recompute is SA-blind (full preview binding is its own ticket). -->
+          <!-- Finished finals: stored gw/tp are the engine-refreshed, SA-adjusted truth. -->
           {@const scored = tournament.finals.state === 'Finished'}
-          {@const tGws = scored ? tournament.finals.seating.map(s => s.result.gw) : computeGwFinals(tVps, tournament.finals.seed_order, tournament.finals.seating.map(s => s.player_uid))}
-          {@const tTps = scored ? tournament.finals.seating.map(s => s.result.tp) : computeTpLocal(tournament.finals.seating.length, tVps)}
+          {@const preview = scored ? null : previewScoresSync(tournament, tournamentSanctions, tournament.rounds?.length ?? 0, 0, tVps)}
+          {@const tGws = preview ? preview.gw : tournament.finals.seating.map(s => s.result.gw)}
+          {@const tTps = preview ? preview.tp : tournament.finals.seating.map(s => s.result.tp)}
           {@const seedIdx = tournament.finals.seed_order.indexOf(seat.player_uid) + 1}
           {@const seedStanding = standings.find(s => s.user_uid === seat.player_uid)}
           <div class="py-2.5">

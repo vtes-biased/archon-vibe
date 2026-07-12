@@ -271,6 +271,12 @@ mod shared {
         league::compute_league_standings(config_json)
     }
 
+    /// Preview GW/TP for one table exactly as SetScore computes them (SA cascade
+    /// included) — keeps UI previews in lockstep with persisted results.
+    pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
+        super::tournament::preview_scores_json(config_json)
+    }
+
     /// Reorder preliminary standings into final placement (winner first, other
     /// finalists tied for 2nd, then non-finalists), tagging each with `rank`.
     /// Input: `{ "standings": [...], "winner": "<uid>" }`. Used by the
@@ -453,6 +459,11 @@ mod wasm {
         #[wasm_bindgen(js_name = scoreSeating)]
         pub fn score_seating(&self, config_json: &str) -> Result<String, String> {
             js_str(score_seating_json(config_json))
+        }
+
+        #[wasm_bindgen(js_name = previewScores)]
+        pub fn preview_scores(&self, config_json: &str) -> Result<String, String> {
+            js_str(preview_scores_json(config_json))
         }
 
         #[wasm_bindgen(js_name = processTournamentEvent)]
