@@ -229,11 +229,22 @@ async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDe
       await saveDeck(deckObj);
       affectedUids.push(deckObj.uid);
     } else if (op.op === 'delete' && op.player_uid) {
+      const offline = isOffline(tournamentUid);
       for (const d of existingDecks) {
         if (d.user_uid !== op.player_uid) continue;
         // Mirror the backend: a multideck delete tombstones only the matching round-deck
         if (op.multideck && op.deck_index != null && d.round !== op.deck_index) continue;
-        await deleteDeck(d.uid);
+        if (offline) {
+          // Soft-delete: go-online pushes offline_decks as upserts only, so the
+          // deletion must travel as a tombstoned row — a local hard delete would
+          // leave the server copy live and the deck would resurrect on resync.
+          d.deleted_at = new Date().toISOString();
+          d.modified = new Date().toISOString();
+          await saveDeck(d);
+          affectedUids.push(d.uid);
+        } else {
+          await deleteDeck(d.uid);
+        }
       }
     } else if (op.op === 'set_public' && op.deck_uid) {
       const target = existingDecks.find(d => d.uid === op.deck_uid);

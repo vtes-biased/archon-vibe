@@ -743,7 +743,11 @@ export async function getDeck(uid: string): Promise<DeckObject | undefined> {
 
 export async function getDecksByTournament(tournamentUid: string): Promise<DeckObject[]> {
   const db = await getDB();
-  return db.getAllFromIndex('decks', 'by-tournament', tournamentUid);
+  const decks = await db.getAllFromIndex('decks', 'by-tournament', tournamentUid);
+  // Offline-deleted decks are kept as local tombstones until go-online pushes
+  // them (getDeck stays unfiltered — the push payload needs them); hide them
+  // from every UI/engine read.
+  return decks.filter(d => !d.deleted_at);
 }
 
 /** Get decks for a tournament, grouped by user_uid (same shape as old tournament.decks). */
@@ -764,10 +768,12 @@ export async function saveDeck(deck: DeckObject): Promise<void> {
   const db = await getDB();
   const tx = db.transaction('decks', 'readwrite');
   // Deduplicate: remove any deck with same (tournament_uid, user_uid, round) but different uid
-  // This cleans up optimistic decks when authoritative SSE arrives
+  // This cleans up optimistic decks when authoritative SSE arrives. Spare offline
+  // tombstones (deleted_at): they must survive until go-online pushes them —
+  // authoritative deletions arrive as del-frames by uid, never through here.
   const existing = await tx.store.index('by-tournament').getAll(deck.tournament_uid);
   for (const d of existing) {
-    if (d.uid !== deck.uid && d.user_uid === deck.user_uid && d.round === deck.round) {
+    if (d.uid !== deck.uid && d.user_uid === deck.user_uid && d.round === deck.round && !d.deleted_at) {
       tx.store.delete(d.uid);
     }
   }
