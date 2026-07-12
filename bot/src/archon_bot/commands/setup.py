@@ -141,6 +141,7 @@ class SetupCommand(
                 ctx.client.app,
                 ctx.guild_id,
                 tournament.get("name") or tournament_uid[:8],
+                int(discord_id),
             )
         except Exception as e:
             await ctx.respond(

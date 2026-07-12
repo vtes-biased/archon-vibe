@@ -17,6 +17,13 @@ PLAYER_ALLOW = hikari.Permissions.CONNECT | hikari.Permissions.SPEAK
 # lets the bot post in the voice channel's text chat.
 BOT_ALLOW = hikari.Permissions.CONNECT | hikari.Permissions.SEND_MESSAGES
 
+# #judges is private: sanction details (member-level data in the app) post there,
+# so @everyone must neither see nor join it. Organizers win VIEW+CONNECT back;
+# SPEAK isn't denied, so it inherits for anyone who can connect.
+JUDGE_DENY = hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.CONNECT
+JUDGE_ALLOW = hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.CONNECT
+JUDGES_BOT_ALLOW = JUDGE_ALLOW | hikari.Permissions.SEND_MESSAGES
+
 # Table voice-channel name: round-prefixed "R{n} - Table {m}". The optional
 # legacy "Table {m}" form (no prefix) is still matched so tournaments mid-flight
 # when this shipped are discovered/cleaned correctly.
@@ -81,19 +88,27 @@ def structure_signature(obj: dict) -> tuple:
 
     Keyed on each desired channel's name and full member set (per-table membership,
     organizers, finals/prelim mode), NOT on table count: a same-size seat swap must
-    still flip it. Equal between two snapshots ⇒ no reconcile needed.
+    still flip it. Also keyed on the organizer set directly: the judges channel's
+    membership follows it in EVERY state, not just Playing. Equal between two
+    snapshots ⇒ no reconcile needed.
     """
-    return tuple((dc.name, dc.member_uids) for dc in desired_channels(obj))
+    return (
+        frozenset(obj.get("organizers_uids", [])),
+        tuple((dc.name, dc.member_uids) for dc in desired_channels(obj)),
+    )
 
 
 async def create_tournament_channels(
     bot: hikari.GatewayBot,
     guild_id: int,
     tournament_name: str,
+    organizer_discord_id: int,
 ) -> dict:
     """Create tournament channels (category, announcement, lobby, judges).
 
-    Returns dict with channel IDs.
+    ``organizer_discord_id`` (the /setup runner) is granted on the private
+    #judges channel; the other organizers are synced from the tournament
+    object on every reconcile. Returns dict with channel IDs.
     """
     logger.info("Creating tournament channels in guild=%s", guild_id)
     guild = await bot.rest.fetch_guild(guild_id)
@@ -132,11 +147,28 @@ async def create_tournament_channels(
         category=category.id,
     )
 
-    # #judges — voice channel for judges/organizers
+    # #judges — private voice channel for judges/organizers
     judges = await bot.rest.create_guild_voice_channel(
         guild_id,
         name="judges",
         category=category.id,
+        permission_overwrites=[
+            hikari.PermissionOverwrite(
+                id=guild_id,  # @everyone
+                type=hikari.PermissionOverwriteType.ROLE,
+                deny=JUDGE_DENY,
+            ),
+            hikari.PermissionOverwrite(
+                id=me.id,
+                type=hikari.PermissionOverwriteType.MEMBER,
+                allow=JUDGES_BOT_ALLOW,
+            ),
+            hikari.PermissionOverwrite(
+                id=organizer_discord_id,
+                type=hikari.PermissionOverwriteType.MEMBER,
+                allow=JUDGE_ALLOW,
+            ),
+        ],
     )
 
     return {
@@ -193,6 +225,19 @@ async def sync_table_permissions(
         channel = await bot.rest.fetch_channel(channel_id)
         current_member_ids = member_override_ids(channel)
 
+    await sync_member_overrides(
+        bot, channel_id, desired_discord_ids, current_member_ids, PLAYER_ALLOW
+    )
+
+
+async def sync_member_overrides(
+    bot: hikari.GatewayBot,
+    channel_id: int,
+    desired_discord_ids: set[int],
+    current_member_ids: set[int],
+    allow: hikari.Permissions,
+) -> None:
+    """Add-missing/remove-stale MEMBER overrides on a channel, at ``allow``."""
     # Remove stale overrides — but never the bot's own self-allow: its CONNECT is
     # what lets teardown delete the voice channel, so reconcile must not reap it.
     stale = current_member_ids - desired_discord_ids
@@ -226,12 +271,65 @@ async def sync_table_permissions(
                 channel_id,
                 hikari.Snowflake(did),
                 target_type=hikari.PermissionOverwriteType.MEMBER,
-                allow=PLAYER_ALLOW,
+                allow=allow,
             )
         except Exception as e:
             logger.warning(
                 "Failed to add override for %s on %s: %s", did, channel_id, e
             )
+
+
+async def sync_judges_channel(
+    bot: hikari.GatewayBot,
+    guild_id: int,
+    channel: object,
+    desired_discord_ids: set[int],
+) -> None:
+    """Idempotently enforce the judges channel's privacy and membership.
+
+    Ensures the ``@everyone`` VIEW+CONNECT deny and the bot's own allow — which
+    also retrofits pre-privacy judges channels on their next reconcile — then
+    add-missing/remove-stale member overrides at ``JUDGE_ALLOW``. Works off the
+    already-fetched channel payload (no per-channel fetch).
+    """
+    channel_id = int(channel.id)  # type: ignore[attr-defined]
+    overrides = getattr(channel, "permission_overwrites", None) or {}
+
+    everyone = overrides.get(guild_id)
+    if (
+        everyone is None
+        or (getattr(everyone, "deny", hikari.Permissions.NONE) & JUDGE_DENY)
+        != JUDGE_DENY
+    ):
+        await bot.rest.edit_permission_overwrite(
+            channel_id,
+            hikari.Snowflake(guild_id),
+            target_type=hikari.PermissionOverwriteType.ROLE,
+            deny=JUDGE_DENY,
+        )
+
+    me = bot.get_me()
+    if me is not None:
+        mine = overrides.get(int(me.id))
+        if (
+            mine is None
+            or (getattr(mine, "allow", hikari.Permissions.NONE) & JUDGES_BOT_ALLOW)
+            != JUDGES_BOT_ALLOW
+        ):
+            await bot.rest.edit_permission_overwrite(
+                channel_id,
+                hikari.Snowflake(me.id),
+                target_type=hikari.PermissionOverwriteType.MEMBER,
+                allow=JUDGES_BOT_ALLOW,
+            )
+
+    await sync_member_overrides(
+        bot,
+        channel_id,
+        desired_discord_ids,
+        member_override_ids(channel),
+        JUDGE_ALLOW,
+    )
 
 
 async def create_round_voice_channel(

@@ -232,3 +232,27 @@ async def test_reconcile_preserves_the_bots_own_overwrite() -> None:
 
     assert (201, BOT_ID) not in rest.removed_overwrites
     assert rest.removed_overwrites == []
+
+
+@pytest.mark.asyncio
+async def test_judges_channel_privacy_and_membership_sync() -> None:
+    # A pre-privacy judges channel (world-visible, a stale member override):
+    # reconcile must retrofit the @everyone VIEW+CONNECT deny and the bot's own
+    # allow, grant the organizers + setup runner, and reap the stale member —
+    # sanction details (member-level data) post here.
+    judges = FakeChannel(
+        JUDGES_ID,
+        "judges",
+        hikari.ChannelType.GUILD_VOICE,
+        CATEGORY_ID,
+        _member_ovw(4242),  # stale member + the @everyone ROLE override (no deny)
+    )
+    rest = FakeRest([_category(), judges])
+    obj = _playing()  # Playing, no tables — judges sync runs regardless
+
+    await reconcile_channels(FakeBot(rest), FakeStore(), GUILD, TUID, obj)
+
+    assert (JUDGES_ID, int(GUILD)) in rest.edited_overwrites  # @everyone deny
+    assert (JUDGES_ID, BOT_ID) in rest.edited_overwrites  # bot self-allow
+    assert (JUDGES_ID, DISCORD["org1"]) in rest.edited_overwrites  # organizer
+    assert (JUDGES_ID, 4242) in rest.removed_overwrites  # stale member reaped

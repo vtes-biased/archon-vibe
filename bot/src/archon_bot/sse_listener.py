@@ -30,6 +30,7 @@ from .channel_manager import (
     member_override_ids,
     round_channels_by_name,
     structure_signature,
+    sync_judges_channel,
     sync_table_permissions,
 )
 from .scheduled_events import ensure_scheduled_event, event_signature
@@ -77,11 +78,17 @@ _last_tournament: dict[str, dict] = {}
 # lock, and a torn-down link makes every holder no-op after its re-read anyway.
 _structural_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-# Cache participant identities (uid → {"name", "nickname"}) per tournament,
-# seeded from `user` SSE events (the scoped stream now pushes the tournament's
-# participants alongside the tournament object). Lets seating/standings resolve a
-# name for players not linked to Discord. Popped in stop_sse.
+# Cache participant identities (uid → {"name", "nickname", "discord_id"}) per
+# tournament, seeded from `user` SSE events (the scoped stream now pushes the
+# tournament's participants alongside the tournament object). Lets seating/
+# standings resolve a name for players not linked to Discord, and the judges
+# sync resolve organizers who linked Discord on the webapp but never ran
+# /register (User.discord_id is in the member projection). Popped in stop_sse.
 _user_names: dict[str, dict[str, dict]] = defaultdict(dict)
+
+# key → organizer uids already flagged in #judges as having no known Discord
+# account (so the notice fires once per listener lifetime). Popped in stop_sse.
+_warned_unlinked_organizers: dict[str, set[str]] = defaultdict(set)
 
 
 # key → pending asyncio.Task for scheduled round-timer reminders. Cancelled and
@@ -107,6 +114,7 @@ def _cache_user_identity(key: str, user_obj: dict) -> None:
         _user_names[key][uid] = {
             "name": user_obj.get("name"),
             "nickname": user_obj.get("nickname"),
+            "discord_id": user_obj.get("discord_id"),
         }
 
 
@@ -197,6 +205,7 @@ async def stop_sse(guild_id: str, tournament_uid: str) -> None:
     _table_channels.pop(key, None)
     _last_tournament.pop(key, None)
     _user_names.pop(key, None)
+    _warned_unlinked_organizers.pop(key, None)
     _cancel_timer_tasks(key)
     _timer_tasks.pop(key, None)
     _timer_fired.pop(key, None)
@@ -915,6 +924,30 @@ async def _warn_unlinked_players(
     )
 
 
+async def _warn_unlinked_organizers(
+    bot, key: str, judges_id: int, unlinked_uids: set[str], players: list
+) -> None:
+    """One-time #judges notice for organizers with no known Discord account.
+
+    They can't see the (private) judges channel until they run ``/register``
+    once or link Discord on the webapp; the notice tells the linked organizers
+    who to nudge. Fires once per organizer per listener lifetime.
+    """
+    new = unlinked_uids - _warned_unlinked_organizers[key]
+    if not new:
+        return
+    _warned_unlinked_organizers[key] |= new
+    names = [player_display(uid, players, user_names=_user_names[key]) for uid in new]
+    await _post(
+        bot,
+        judges_id,
+        f"**Warning:** {len(new)} organizer{'s have' if len(new) != 1 else ' has'} "
+        f"no linked Discord account and cannot see this channel: "
+        f"{', '.join(names)}. Ask them to run `/register` here once, or link "
+        f"Discord on the webapp.",
+    )
+
+
 @dataclass
 class ReconcileSummary:
     """What a ``reconcile_channels`` run changed — surfaced by ``/sync``."""
@@ -1023,6 +1056,38 @@ async def reconcile_channels(
             except Exception as e:
                 logger.warning("Reconcile %s: sync '%s' failed: %s", key, dc.name, e)
             name_to_id[dc.name] = int(ch.id)
+
+    # Judges channel: privacy + membership. Desired = the /setup runner plus the
+    # tournament's organizers, so a web-app organizer add/remove propagates on
+    # the next reconcile (structure_signature is keyed on the organizer set).
+    judges_ch = next((ch for ch in channels if int(ch.id) == judges_id), None)
+    if judges_ch is None:
+        logger.warning(
+            "Reconcile %s: judges channel %s not found; skipping judges sync",
+            key,
+            judges_id,
+        )
+    else:
+        organizer_uids = set(obj.get("organizers_uids", []))
+        judge_map = await _build_discord_id_map(store, organizer_uids)
+        # Fallback for organizers who never ran /register: the backend
+        # User.discord_id, delivered by the scoped stream's participant frames.
+        for uid in organizer_uids - set(judge_map):
+            did = (_user_names[key].get(uid) or {}).get("discord_id")
+            if did:
+                judge_map[uid] = int(did)
+        desired_judges = set(judge_map.values()) | {int(link["organizer_discord_id"])}
+        try:
+            await sync_judges_channel(bot, int(guild_id), judges_ch, desired_judges)
+        except Exception as e:
+            logger.warning("Reconcile %s: judges sync failed: %s", key, e)
+        await _warn_unlinked_organizers(
+            bot,
+            key,
+            judges_id,
+            organizer_uids - set(judge_map),
+            obj.get("players", []),
+        )
 
     # Positional: index i ↔ desired table i, the contract the announcement layer
     # (score + sanction routing) indexes into. A failed create leaves a 0 sentinel
