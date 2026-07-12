@@ -5,7 +5,7 @@
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League } from '$lib/types';
 import { saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
-import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
+import { authorizedFetch, getAuthState } from '$lib/stores/auth.svelte';
 import { errorCodeToMessage } from './error-codes';
 import * as m from './paraglide/messages.js';
 
@@ -51,14 +51,9 @@ export async function apiRequest<T>(
     throw new ApiError(message, 0);
   }
 
-  const token = getAccessToken();
   const headers: Record<string, string> = {
     ...((options.headers as Record<string, string>) || {}),
   };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   if (options.body && typeof options.body === 'string') {
     headers['Content-Type'] = 'application/json';
@@ -66,7 +61,10 @@ export async function apiRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    // authorizedFetch attaches the bearer and retries once on 401 after a
+    // single-flighted refresh — the backstop for laptop-wake/suspended-tab
+    // mutations whose proactive refresh timer died with the tab.
+    response = await authorizedFetch(`${API_URL}${path}`, {
       ...options,
       headers,
     });
@@ -463,13 +461,11 @@ export interface ArchonImportResult {
 export async function importArchonFile(tournamentUid: string, file: File): Promise<ArchonImportResult> {
   requireOnline();
 
-  const token = getAccessToken();
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_URL}/api/tournaments/${tournamentUid}/archon-import`, {
+  const response = await authorizedFetch(`${API_URL}/api/tournaments/${tournamentUid}/archon-import`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
 

@@ -247,6 +247,27 @@ export async function refreshTokens(): Promise<boolean> {
   }
 }
 
+/**
+ * Fetch with the bearer token attached; on a 401, do one single-flighted
+ * refresh (refreshTokens dedupes concurrent callers) and one retry with the
+ * new token. Returns the final Response — callers handle non-401 errors as
+ * usual. Never loops: if the endpoint keeps 401ing after a successful
+ * refresh, that 401 is returned rather than hammering the refresh endpoint.
+ */
+export async function authorizedFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const doFetch = () => {
+    const token = getAccessToken();
+    const headers = new Headers(init.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers });
+  };
+  const response = await doFetch();
+  if (response.status !== 401) return response;
+  const refreshed = await refreshTokens();
+  if (!refreshed || !getAccessToken()) return response;
+  return doFetch();
+}
+
 async function doRefreshTokens(): Promise<boolean> {
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
   if (!refreshToken) {
@@ -317,34 +338,11 @@ export async function ensureSyncToken(): Promise<SyncToken> {
  * Fetch the current user from the API. Exported for passkey module.
  */
 export async function fetchCurrentUser(): Promise<MeResponse | null> {
-  const token = getAccessToken();
-  if (!token) return null;
+  if (!getAccessToken()) return null;
 
   try {
-    const response = await fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (response.status === 401) {
-      // Token expired, try to refresh
-      const refreshed = await refreshTokens();
-      if (!refreshed) return null;
-
-      // Retry with new token
-      const newToken = getAccessToken();
-      if (!newToken) return null;
-
-      const retryResponse = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${newToken}` },
-      });
-
-      if (!retryResponse.ok) return null;
-
-      return await retryResponse.json();
-    }
-
+    const response = await authorizedFetch(`${API_BASE}/auth/me`);
     if (!response.ok) return null;
-
     return await response.json();
   } catch {
     return null;
@@ -521,29 +519,21 @@ export interface ProfileUpdate {
  * Update the current user's profile.
  */
 export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
-  const token = getAccessToken();
-  if (!token) {
+  if (!getAccessToken()) {
     setAuthState({ error: m.auth_error_not_authenticated() });
     return false;
   }
 
   try {
-    const response = await fetch(`${API_BASE}/auth/me`, {
+    const response = await authorizedFetch(`${API_BASE}/auth/me`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
 
     if (response.status === 401) {
-      const refreshed = await refreshTokens();
-      if (!refreshed) {
-        setAuthState({ error: m.auth_error_session_expired() });
-        return false;
-      }
-      return updateProfile(data);
+      setAuthState({ error: m.auth_error_session_expired() });
+      return false;
     }
 
     if (!response.ok) {
@@ -732,20 +722,12 @@ export async function setPassword(token: string, password: string): Promise<bool
  * Returns { calendar_token, calendar_url } on success, null on failure.
  */
 export async function generateCalendarToken(): Promise<{ calendar_token: string; calendar_url: string } | null> {
-  const token = getAccessToken();
-  if (!token) return null;
+  if (!getAccessToken()) return null;
 
   try {
-    const response = await fetch(`${API_BASE}/auth/me/calendar-token`, {
+    const response = await authorizedFetch(`${API_BASE}/auth/me/calendar-token`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
     });
-
-    if (response.status === 401) {
-      const refreshed = await refreshTokens();
-      if (!refreshed) return null;
-      return generateCalendarToken();
-    }
 
     if (!response.ok) return null;
 
