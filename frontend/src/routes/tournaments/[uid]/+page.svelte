@@ -9,7 +9,7 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
+  import { initEngine, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
@@ -400,7 +400,7 @@ import TournamentModals from "./TournamentModals.svelte";
     }
   }
 
-  async function doAction(action: string, data?: Record<string, unknown>) {
+  async function doAction(action: TournamentEventType, data?: Record<string, unknown>) {
     actionLoading = true;
     try {
       tournament = await tournamentAction(uid, action, data);

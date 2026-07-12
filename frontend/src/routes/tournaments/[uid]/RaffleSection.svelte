@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { TournamentEventType } from "$lib/engine";
   import type { Tournament, RafflePool } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
   import { Dices, Undo2, Trash2 } from "@lucide/svelte";
@@ -15,7 +16,7 @@
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
     isOrganizer: boolean;
-    doAction?: (action: string, body?: any) => Promise<void>;
+    doAction?: (action: TournamentEventType, body?: any) => Promise<void>;
     actionLoading?: boolean;
   } = $props();
 

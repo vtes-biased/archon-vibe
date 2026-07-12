@@ -17,7 +17,7 @@
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import Button from "$lib/components/Button.svelte";
-  import { validateDeck, computeRatingPoints, type ValidationError } from "$lib/engine";
+  import { validateDeck, computeRatingPoints, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { sponsorVeknMember, createUser, isOnline, ApiError } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
@@ -41,7 +41,7 @@
     standings: StandingEntry[];
     isOrganizer: boolean;
     actionLoading: boolean;
-    doAction: (action: string, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
     tournamentSanctions?: Sanction[];
     isOfflineMode?: boolean;
     decksByUser: DeckMap;

@@ -86,8 +86,8 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
   }
 }
 
-export async function tournamentAction(uid: string, action: string, data?: Record<string, unknown>): Promise<Tournament> {
-  const event: Record<string, unknown> & { type: TournamentEventType } = { type: action as TournamentEventType, ...data };
+export async function tournamentAction(uid: string, action: TournamentEventType, data?: Record<string, unknown>): Promise<Tournament> {
+  const event: Record<string, unknown> & { type: TournamentEventType } = { type: action, ...data };
 
   // Inject vekn_id for CheckIn auto-registration (WASM engine requires it)
   if (action === 'CheckIn' && data?.player_uid && !data.vekn_id) {

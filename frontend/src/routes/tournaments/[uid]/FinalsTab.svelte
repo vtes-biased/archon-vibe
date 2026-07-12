@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { TournamentEventType } from "$lib/engine";
   import { toUserMessage } from '$lib/errors';
   import type { Tournament } from "$lib/types";
   import { formatScore } from "$lib/utils";
@@ -25,7 +26,7 @@
     standings: StandingEntry[];
     isOrganizer: boolean;
     actionLoading: boolean;
-    doAction: (action: string, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
     loadPlayerNames: () => Promise<void>;
   } = $props();
 

@@ -2,7 +2,7 @@
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
-  import { scoreSeatingSync, computePlayerIssuesSync } from "$lib/engine";
+  import { scoreSeatingSync, computePlayerIssuesSync, type TournamentEventType } from "$lib/engine";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
@@ -28,7 +28,7 @@
     playerInfo: PlayerInfoMap;
     isOrganizer: boolean;
     actionLoading: boolean;
-    doAction: (action: string, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
     loadPlayerNames: () => Promise<void>;
     tournamentSanctions?: Sanction[];
   } = $props();

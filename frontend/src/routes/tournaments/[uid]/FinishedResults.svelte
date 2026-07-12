@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { TournamentEventType } from "$lib/engine";
   import type { Tournament } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { generateResultsCard } from "$lib/social-card";
@@ -25,7 +26,7 @@
     playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     winnerHasDeck?: boolean;
-    doAction?: (action: string, body?: any) => Promise<void>;
+    doAction?: (action: TournamentEventType, body?: any) => Promise<void>;
     actionLoading?: boolean;
     onImportArchon?: () => void;
   } = $props();

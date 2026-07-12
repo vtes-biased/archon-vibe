@@ -3,7 +3,7 @@
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
   import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
-  import { computeRatingPoints, type ValidationError } from "$lib/engine";
+  import { computeRatingPoints, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
@@ -58,7 +58,7 @@
     actionLoading: boolean;
     scoreSaving: number | null;
     scoreSavingSeat: string | null;
-    doAction: (action: string, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
     dropPlayer: (uid: string) => Promise<void>;
     setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
     setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;

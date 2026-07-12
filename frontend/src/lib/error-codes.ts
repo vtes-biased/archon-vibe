@@ -66,6 +66,7 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.wrong_state': (p) => m.err_tournament_wrong_state({ expected: p.expected ?? '', current: p.current ?? '' }),
   'tournament.cannot_add_players': () => m.err_tournament_cannot_add_players(),
   'tournament.cannot_remove_players': () => m.err_tournament_cannot_remove_players(),
+  'tournament.cannot_set_non_competing': () => m.err_tournament_cannot_set_non_competing(),
   'tournament.use_drop_out': () => m.err_tournament_use_drop_out(),
   'tournament.cannot_drop_out': () => m.err_tournament_cannot_drop_out(),
   'tournament.cannot_finish': () => m.err_tournament_cannot_finish(),

@@ -100,6 +100,7 @@ export type TournamentEventType =
   | 'RemovePlayer'
   | 'DropOut'
   | 'CheckIn'
+  | 'CheckOut'
   | 'CheckInAll'
   | 'ResetCheckIn'
   | 'SetPaymentStatus'
@@ -135,6 +136,7 @@ export interface TournamentEvent {
   type: TournamentEventType;
   user_uid?: string;
   player_uid?: string;
+  display_name?: string; // Register/AddPlayer/CheckIn: offline name-only player
   round?: number;
   table?: number;
   table1?: number;
