@@ -70,6 +70,10 @@ _USER_MEMBER_FIELDS = (
     # In-memoriam marker — members see the flag/date (not deceased_by_uid, which
     # is administrative and stays full-only).
     | {"deceased_at"}
+    # Discord snowflake (an opaque id, not contact info — owner: needs no
+    # protecting): the bot's judges-channel sync maps organizers through it, and
+    # organizers need no NC/Prince role, so it can't stay contact-set-only.
+    | {"discord_id"}
     # Rating fields (embedded in user after merge)
     | {
         "constructed_online",
