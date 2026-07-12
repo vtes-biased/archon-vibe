@@ -204,6 +204,82 @@ async def stop_sse(guild_id: str, tournament_uid: str) -> None:
     # _structural_locks intentionally NOT popped — see structural_lock.
 
 
+async def probe_tournament(
+    api,  # shared ArchonAPI instance
+    store: TokenStore,
+    organizer_discord_id: str,
+    tournament_uid: str,
+) -> dict | None:
+    """One-shot scoped-stream probe: return the tournament object, or None.
+
+    ``/setup`` calls this BEFORE creating channels/link/listener so a typo'd or
+    inaccessible uid creates nothing. The backend answers 200 regardless and
+    simply omits the tournament frame when the uid is unknown or unreadable, so
+    absence before ``sync_complete`` — like any connection failure — means
+    "not found / no access".
+    """
+    tokens = await store.get_tokens(organizer_discord_id)
+    if not tokens:
+        return None
+    if _access_token_expired(tokens["access_token"]):
+        refreshed = await api.refresh_tokens(
+            organizer_discord_id, stale_access_token=tokens["access_token"]
+        )
+        if not refreshed:
+            return None
+        tokens = refreshed
+    try:
+        async with aiohttp.ClientSession() as session:
+            for attempt in range(2):
+                async with session.get(
+                    f"{config.ARCHON_URL}/stream",
+                    params={"tournament": tournament_uid},
+                    headers={"Authorization": f"Bearer {tokens['access_token']}"},
+                    # Bounds the whole probe incl. the body read — the scoped
+                    # catch-up is small and the tournament frame comes first.
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp:
+                    if resp.status == 401 and attempt == 0:
+                        refreshed = await api.refresh_tokens(
+                            organizer_discord_id,
+                            stale_access_token=tokens["access_token"],
+                        )
+                        if not refreshed:
+                            return None
+                        tokens = refreshed
+                        continue
+                    if resp.status != 200:
+                        return None
+                    return await _read_probe_frames(resp, tournament_uid)
+    except (aiohttp.ClientError, TimeoutError):
+        return None
+    return None
+
+
+async def _read_probe_frames(resp, tournament_uid: str) -> dict | None:
+    """Read catch-up frames until the tournament object or ``sync_complete``."""
+    data_lines: list[str] = []
+    async for line_bytes in resp.content:
+        line = line_bytes.decode("utf-8").rstrip("\n\r")
+        if line.startswith("data:"):
+            data_lines.append(line[5:].strip())
+            continue
+        if line != "" or not data_lines:
+            continue  # `:`-comment lines, or a blank between frames
+        try:
+            data = json.loads("\n".join(data_lines))
+        except json.JSONDecodeError:
+            data = {}
+        data_lines = []
+        if data.get("type") == "sync_complete":
+            return None  # catch-up ended without the tournament frame
+        for ev in _normalize_events(data):
+            obj = ev.get("data") or {}
+            if ev.get("type") == "tournament" and obj.get("uid") == tournament_uid:
+                return obj
+    return None
+
+
 async def _sse_loop(
     bot,
     api,  # shared ArchonAPI instance

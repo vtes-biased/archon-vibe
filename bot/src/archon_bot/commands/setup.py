@@ -12,6 +12,7 @@ from ..channel_manager import create_tournament_channels, teardown_tournament
 from ..oauth_utils import generate_pkce, make_oauth_url
 from ..scheduled_events import delete_scheduled_event
 from ..sse_listener import (
+    probe_tournament,
     start_sse,
     stop_sse,
     structural_lock,
@@ -112,6 +113,24 @@ class SetupCommand(
             )
             return
 
+        # Probe BEFORE any side effect: a typo'd or inaccessible uid must not
+        # leave a dead category plus a listener reconnecting forever. Also the
+        # only way the bot learns the tournament's real name and state.
+        tournament = await probe_tournament(api, store, discord_id, tournament_uid)
+        if tournament is None:
+            await ctx.respond(
+                "Tournament not found or no access — check the URL (and that "
+                "Archon is reachable), then try again.",
+                flags=hikari.MessageFlag.EPHEMERAL,
+            )
+            return
+        if tournament.get("state") == "Finished":
+            await ctx.respond(
+                "This tournament is already finished — nothing to set up.",
+                flags=hikari.MessageFlag.EPHEMERAL,
+            )
+            return
+
         await ctx.respond(
             "Setting up tournament channels...", flags=hikari.MessageFlag.EPHEMERAL
         )
@@ -121,7 +140,7 @@ class SetupCommand(
             channels = await create_tournament_channels(
                 ctx.client.app,
                 ctx.guild_id,
-                tournament_uid[:8],
+                tournament.get("name") or tournament_uid[:8],
             )
         except Exception as e:
             await ctx.respond(
