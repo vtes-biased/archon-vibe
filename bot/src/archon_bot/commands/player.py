@@ -17,9 +17,7 @@ from ._common import fetch_userinfo
 logger = logging.getLogger(__name__)
 
 
-async def _ensure_auth(
-    ctx: lightbulb.Context, store: TokenStore, action: str, extra: str = ""
-) -> dict | None:
+async def _ensure_auth(ctx: lightbulb.Context, store: TokenStore) -> dict | None:
     """Ensure the user is authenticated. Returns tokens or sends OAuth link."""
     discord_id = str(ctx.user.id)
     tokens = await store.get_tokens(discord_id)
@@ -31,10 +29,6 @@ async def _ensure_auth(
     await store.store_pending_oauth(
         state=state,
         discord_id=discord_id,
-        guild_id=str(ctx.guild_id or 0),
-        channel_id=str(ctx.channel_id),
-        action=action,
-        extra=extra,
         code_verifier=code_verifier,
     )
     url = make_oauth_url(state, code_challenge)
@@ -160,7 +154,7 @@ async def _handle_registration_pipeline(
     discord_id = str(ctx.user.id)
 
     # Step 1: Check authentication
-    tokens = await _ensure_auth(ctx, store, action, tournament_uid)
+    tokens = await _ensure_auth(ctx, store)
     if not tokens:
         return
 
@@ -302,7 +296,7 @@ class ReportCommand(
         discord_id = str(ctx.user.id)
 
         # Check authentication
-        tokens = await _ensure_auth(ctx, store, "report", tournament_uid)
+        tokens = await _ensure_auth(ctx, store)
         if not tokens:
             return
 

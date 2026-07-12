@@ -77,10 +77,6 @@ class SetupCommand(
             await store.store_pending_oauth(
                 state=state,
                 discord_id=discord_id,
-                guild_id=str(ctx.guild_id),
-                channel_id=str(ctx.channel_id),
-                action="setup",
-                extra=tournament_uid,
                 code_verifier=code_verifier,
             )
             url = make_oauth_url(state, code_challenge)

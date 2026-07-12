@@ -54,19 +54,24 @@ class TokenStore:
             )
         except aiosqlite.OperationalError:
             pass
-        # Pending OAuth flows (state → context)
+        # Pending OAuth flows (state → PKCE verifier + who started it)
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS pending_oauth (
                 state TEXT PRIMARY KEY,
                 discord_id TEXT NOT NULL,
-                guild_id TEXT NOT NULL,
-                channel_id TEXT NOT NULL,
-                action TEXT NOT NULL,
-                extra TEXT DEFAULT '',
                 code_verifier TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Migration: the pending-OAuth resume vestige is gone — the flow context
+        # (action/extra/guild_id/channel_id) was written but never acted on;
+        # users re-run the command, and respawn-on-reauth is the recovery.
+        # Ignore the does-not-exist error on re-run (same pattern as ADD above).
+        for col in ("action", "extra", "guild_id", "channel_id"):
+            try:
+                await self._db.execute(f"ALTER TABLE pending_oauth DROP COLUMN {col}")
+            except aiosqlite.OperationalError:
+                pass
         await self._db.commit()
 
     async def close(self) -> None:
@@ -282,17 +287,13 @@ class TokenStore:
         self,
         state: str,
         discord_id: str,
-        guild_id: str,
-        channel_id: str,
-        action: str,
-        extra: str,
         code_verifier: str,
     ) -> None:
         assert self._db
         await self._db.execute(
-            """INSERT INTO pending_oauth (state, discord_id, guild_id, channel_id, action, extra, code_verifier)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (state, discord_id, guild_id, channel_id, action, extra, code_verifier),
+            """INSERT INTO pending_oauth (state, discord_id, code_verifier)
+               VALUES (?, ?, ?)""",
+            (state, discord_id, code_verifier),
         )
         await self._db.commit()
 
@@ -306,7 +307,7 @@ class TokenStore:
         )
         await self._db.commit()
         async with self._db.execute(
-            "SELECT discord_id, guild_id, channel_id, action, extra, code_verifier FROM pending_oauth WHERE state = ?",
+            "SELECT discord_id, code_verifier FROM pending_oauth WHERE state = ?",
             (state,),
         ) as cur:
             row = await cur.fetchone()
@@ -314,11 +315,7 @@ class TokenStore:
                 return None
             return {
                 "discord_id": row[0],
-                "guild_id": row[1],
-                "channel_id": row[2],
-                "action": row[3],
-                "extra": row[4],
-                "code_verifier": row[5],
+                "code_verifier": row[1],
             }
 
     async def remove_pending_oauth(self, state: str) -> None:

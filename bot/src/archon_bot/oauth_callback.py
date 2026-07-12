@@ -90,14 +90,6 @@ async def handle_callback(request: web.Request) -> web.Response:
     except Exception:
         logger.debug("Could not DM user %s after OAuth", discord_id)
 
-    # Process the pending action
-    action = pending["action"]
-
-    if action == "setup":
-        # The setup command will be completed by the SSE listener
-        # For now, just confirm
-        pass
-
     return web.Response(
         text="<html><body><h2>Authorization successful!</h2>"
         "<p>You can close this window and return to Discord.</p>"
