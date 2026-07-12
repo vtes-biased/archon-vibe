@@ -109,7 +109,7 @@ Seating is seeded and value-stable: `seating::seed_for_round(tournament_uid, rou
 - **DeckObject**: a standalone synced object (not embedded in Tournament). Fields: `tournament_uid`, `user_uid`, `round`, `name`, `author`, `comments`, `cards` (card_id → count), `attribution`, `public`. The `public` flag is set by the engine from `decklists_mode` + tournament state (Winner/Finalists/All).
 - No REST endpoints for decks — all mutations via `POST /{uid}/action` → engine `deck_ops` (`upsert` / `delete` / `set_public`).
 - **Deck import**: raw-text paste parses locally via the WASM engine (`parseDeckText`, offline-capable). URL import (VDB/VTESDecks/Amaranth) and QR (a URL-scan shortcut into URL mode) go through the backend `GET /fetch-deck` proxy (`backend/src/providers.py`), which uses krcg providers to fetch and resolve provider-native card ids — notably Amaranth's own ids — to VEKN ids, against krcg's own bundled card DB (independent of our `cards.json`). URL/QR import is disabled while offline; text import isn't.
-- **SSE reactivity**: the tournament page listens for `type === "deck"` sync events → re-queries `getDecksByTournamentGrouped()` → updates `decksByUser` state (passed as a prop to PlayersTab / PlayerView / DecksTab). Decks are not bundled into the tournament SSE event.
+- **SSE reactivity**: the tournament page listens for `type === "deck"` sync events → re-queries `getDecksByTournamentGrouped()` → updates `decksByUser` state (passed as a prop to PlayersTab / PlayerView / PlayerDecksSection). Decks are not bundled into the tournament SSE event.
 
 ## League System
 
@@ -241,7 +241,7 @@ Member-contributed links to external community resources, with moderator oversig
 
 ## Internationalization (i18n)
 
-Paraglide JS (inlang), client-only (no SSR for the SPA). Locales `en` (default), `fr`, `es`, `pt`, `it` in `frontend/messages/*.json`; a Vite plugin compiles them to TypeScript (`$lib/paraglide/messages`). Browser auto-detection (`preferredLanguage`) + cookie persistence; manual `LocaleSwitcher.svelte` in the desktop sidebar.
+Paraglide JS (inlang), client-only (no SSR for the SPA). Locales `en` (default), `fr`, `es`, `pt`, `it` in `frontend/messages/*.json`; a Vite plugin compiles them to TypeScript (`$lib/paraglide/messages`). Browser auto-detection (`preferredLanguage`) + cookie persistence; manual switcher in `AppSettings.svelte` (profile page).
 
 ## Web Push Notifications
 

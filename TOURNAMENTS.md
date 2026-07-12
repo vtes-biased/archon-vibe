@@ -268,7 +268,7 @@ Proxy signal: `player.non_competing == true` (judges-guide §5.1.1).
 
 ## Data Model
 
-Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `TournamentConfig`, `Player`, `Table`, `Seat`, `Score`) and `backend/src/models.py`. Non-obvious structure:
+Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `Player`, `Table`, `Seat`, `Score`) and `backend/src/models.py`. Non-obvious structure:
 
 - `rounds: Table[][]` — outer index = round, inner = tables in that round; `finals` is a separate field (not a round).
 - `Table` carries `seating: Seat[]`, a derived `state` (`In Progress`/`Finished`/`Invalid`/`Cancelled`), an optional `override`, and an optional `organized_by` (user UID of the player who called `SelfOrganizeRound` — audit trail only).

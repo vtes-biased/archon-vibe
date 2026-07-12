@@ -122,9 +122,9 @@ Every colour role is a single `--color-<role>: light-dark(LIGHT, DARK)` entry in
 
 **Adding new colors**: add one `light-dark()` rule — a role token in `@theme` or a semantic component class — and verify AA in both themes. Do not add a numeric ramp or an `html.light` override block.
 
-**Theme toggle**: Users can cycle system / light / dark via the toggle in the sidebar (desktop) or bottom nav (mobile). Preference is stored in `localStorage.theme` and applied before first paint via an inline script in `app.html` to prevent FOUC.
+**Theme toggle**: Users pick system / light / dark via a three-way button group in profile settings (`AppSettings.svelte`). Preference is stored in `localStorage.theme` and applied before first paint via an inline script in `app.html` to prevent FOUC.
 
-**Store**: `$lib/stores/theme.svelte.ts` — `cycleTheme()`, `getTheme()`, `initTheme()`.
+**Store**: `$lib/stores/theme.svelte.ts` — `getTheme()`, `setTheme()`, `initTheme()`.
 
 ## Typography
 
