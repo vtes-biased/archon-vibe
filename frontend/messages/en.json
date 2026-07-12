@@ -502,6 +502,7 @@
   "tournament_new_error_start_required": "Start date is required",
   "tournament_new_error_country_required": "Country is required for in-person tournaments",
   "tournament_new_error_max_rounds": "Max rounds must be 2, 3, or 4",
+  "tournament_new_offline_notice": "You're offline — the tournament will be created on this device only, locked to it, and synced to the server when you reconnect.",
   "tournament_new_creating": "Creating...",
   "tournament_new_create_btn": "Create Tournament",
   "tfield_name_label": "Name",

@@ -502,6 +502,7 @@
   "tournament_new_error_start_required": "La date de début est requise",
   "tournament_new_error_country_required": "Le pays est requis pour les tournois en présentiel",
   "tournament_new_error_max_rounds": "Le nombre maximum de rondes doit être 2, 3 ou 4",
+  "tournament_new_offline_notice": "Hors ligne — le tournoi sera créé sur cet appareil uniquement et y restera verrouillé, puis synchronisé avec le serveur lors de la reconnexion.",
   "tournament_new_creating": "Création...",
   "tournament_new_create_btn": "Créer le tournoi",
   "tfield_name_label": "Nom",

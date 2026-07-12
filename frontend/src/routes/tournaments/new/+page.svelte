@@ -1,12 +1,12 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { goto } from "$app/navigation";
-  import { createTournament } from "$lib/api";
+  import { createTournament, createTournamentOffline, isOnline } from "$lib/api";
   import { saveTournament } from "$lib/db";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import { hasAnyRole } from "$lib/stores/auth.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ArrowLeft } from "@lucide/svelte";
+  import { ArrowLeft, WifiOff } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
@@ -43,6 +43,21 @@
   let isSubmitting = $state(false);
   let error = $state<string | null>(null);
 
+  // Detect-and-adapt: when the device is offline, creation routes to the local
+  // WASM engine and the tournament is born locked to this device (pushed at
+  // go-online). No offline-while-online option — actual connectivity decides.
+  let offline = $state(!isOnline());
+  $effect(() => {
+    const on = () => (offline = false);
+    const off = () => (offline = true);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  });
+
   async function handleSubmit() {
     if (!values.name.trim()) {
       error = m.tournament_new_error_name_required();
@@ -65,7 +80,7 @@
     error = null;
 
     try {
-      const tournament = await createTournament({
+      const data = {
         name: values.name.trim(),
         format: values.format,
         rank: values.rank,
@@ -90,8 +105,12 @@
         league_uid: values.league_uid || null,
         round_time: values.round_time,
         finals_time: values.finals_time,
-      }, { suppressErrorToast: true });
-      await saveTournament(tournament);
+      };
+      // createTournamentOffline saves to IndexedDB and marks the device lock itself
+      const tournament = offline
+        ? await createTournamentOffline(data)
+        : await createTournament(data, { suppressErrorToast: true });
+      if (!offline) await saveTournament(tournament);
       goto(`/tournaments/${tournament.uid}`);
     } catch (e) {
       error = toUserMessage(e, m.tournament_error_create());
@@ -121,6 +140,12 @@
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
         <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-4">
+          {#if offline}
+            <div class="banner-warn border rounded-lg p-3 flex items-start gap-2">
+              <WifiOff class="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+              <p class="text-sm">{m.tournament_new_offline_notice()}</p>
+            </div>
+          {/if}
           {#if error}
             <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
               <p class="text-link-soft text-sm">{error}</p>
