@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Table, Sanction } from "$lib/types";
-  import { tournamentAction, setTableScore } from "$lib/tournament-actions";
+  import { tournamentAction } from "$lib/tournament-actions";
   import { scoreSeatingSync, computePlayerIssuesSync, type TournamentEventType } from "$lib/engine";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
@@ -23,6 +23,9 @@
     doAction,
     loadPlayerNames,
     tournamentSanctions,
+    setVp,
+    scoreSaving,
+    scoreSavingSeat,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
@@ -31,6 +34,9 @@
     doAction: (action: TournamentEventType, body?: any) => Promise<void>;
     loadPlayerNames: () => Promise<void>;
     tournamentSanctions?: Sanction[];
+    setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
+    scoreSaving: number | null;
+    scoreSavingSeat: string | null;
   } = $props();
 
   // Sanction modal state
@@ -65,8 +71,6 @@
   let alterRoundIdx = $state(-1);
   let playerIssues = $state<Map<string, { level: number; message: string }>>(new Map());
   let showScoreDetails = $state(false);
-  let scoreSaving = $state<number | null>(null);
-  let scoreSavingSeat = $state<string | null>(null);
   let overrideTable_ = $state<number | null>(null);
   let overrideComment = $state("");
   let overrideSaving = $state(false);
@@ -268,24 +272,6 @@
     playerIssues = map;
   }
 
-  async function setVp(roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
-    const scores = seating.map(s => ({
-      player_uid: s.player_uid,
-      vp: s.player_uid === playerUid ? vp : s.result.vp,
-    }));
-    scoreSaving = tableIndex;
-    scoreSavingSeat = playerUid;
-    try {
-      tournament = await setTableScore(tournament.uid, roundIndex, tableIndex, scores);
-      await loadPlayerNames();
-      computeSeatingScore();
-    } catch (e) {
-      error = toUserMessage(e, m.rounds_error_save());
-    } finally {
-      scoreSaving = null;
-      scoreSavingSeat = null;
-    }
-  }
 
   async function submitOverride(roundIndex: number, tableIndex: number) {
     if (!overrideComment.trim()) return;

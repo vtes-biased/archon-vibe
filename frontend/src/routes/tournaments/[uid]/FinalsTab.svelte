@@ -3,7 +3,7 @@
   import { toUserMessage } from '$lib/errors';
   import type { Tournament } from "$lib/types";
   import { formatScore } from "$lib/utils";
-  import { tournamentAction, setTableScore } from "$lib/tournament-actions";
+  import { tournamentAction } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import VpInput from "./VpInput.svelte";
@@ -20,6 +20,9 @@
     actionLoading,
     doAction,
     loadPlayerNames,
+    setFinalsVp,
+    scoreSaving,
+    scoreSavingSeat,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
@@ -28,11 +31,12 @@
     actionLoading: boolean;
     doAction: (action: TournamentEventType, body?: any) => Promise<void>;
     loadPlayerNames: () => Promise<void>;
+    setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
+    scoreSaving: number | null;
+    scoreSavingSeat: string | null;
   } = $props();
 
   let error = $state<string | null>(null);
-  let scoreSaving = $state<number | null>(null);
-  let scoreSavingSeat = $state<string | null>(null);
 
   // Alter seating mode
   let alterMode = $state(false);
@@ -67,24 +71,6 @@
     return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
-  async function setFinalsVp(playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
-    const roundIndex = tournament.rounds!.length; // sentinel for finals
-    const scores = seating.map(s => ({
-      player_uid: s.player_uid,
-      vp: s.player_uid === playerUid ? vp : s.result.vp,
-    }));
-    scoreSaving = -1;
-    scoreSavingSeat = playerUid;
-    try {
-      tournament = await setTableScore(tournament.uid, roundIndex, 0, scores);
-      await loadPlayerNames();
-    } catch (e) {
-      error = toUserMessage(e, m.finals_error_save());
-    } finally {
-      scoreSaving = null;
-      scoreSavingSeat = null;
-    }
-  }
 
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
 </script>

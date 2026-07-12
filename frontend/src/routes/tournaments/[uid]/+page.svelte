@@ -974,6 +974,9 @@ import TournamentModals from "./TournamentModals.svelte";
                 {doAction}
                 {loadPlayerNames}
                 {tournamentSanctions}
+                {setVp}
+                {scoreSaving}
+                {scoreSavingSeat}
               />
             {:else if activeTab === 'finals'}
               <FinalsTab
@@ -984,6 +987,9 @@ import TournamentModals from "./TournamentModals.svelte";
                 {actionLoading}
                 {doAction}
                 {loadPlayerNames}
+                {setFinalsVp}
+                {scoreSaving}
+                {scoreSavingSeat}
               />
             {:else if activeTab === 'config'}
               <ConfigTab
