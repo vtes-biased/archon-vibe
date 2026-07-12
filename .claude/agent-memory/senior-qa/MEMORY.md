@@ -17,6 +17,7 @@
 - [SA standings test design](project_sa_standings_test_design.md) — SA effective-round: single shared resolver (test once), `gw` is the discriminator (`vp` doesn't move), GW threshold `>=2.0` inclusive, cancel a NON-LAST round to get a Cancelled table.
 - [Sanction-update test infra](project_sanction_update_test_infra.md) — PUT /sanctions is testable with NO engine when `tournament_uid=None`; null-expiry PROBATION = permanent suspension (why expiry validation matters); DQ zeroing math is the engine's, not the route's.
 - [Card-name resolution tests](project_card_name_resolution_tests.md) — fold/disambiguation live in engine cards.rs/deck.rs, inline-fixture pattern (don't pin real cards.json); the non-NFD fold branch (ł/ø/œ, 12 real cards) is untested.
+- [Preview-scores cascade copy](project_preview_scores_cascade_copy.md) — `preview_scores_json` (WASM previewScores) duplicates the SetScore GW/TP cascade; drift hazard pinned by one equality test in tests.rs (with a load-bearing SA). Don't add a second.
 
 ## How to Run Tests
 - **Backend**: `cd backend && uv run python3 -m pytest tests/ -v --tb=short`. Some suites need a test Postgres on port 5433 — skip with `--ignore` if unavailable (e.g. `test_users.py`). Pure-unit suites (SSE filters, offline mode, organizer access, access levels) need no DB.

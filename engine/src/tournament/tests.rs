@@ -3012,6 +3012,94 @@ fn test_player_cannot_score_while_waiting() {
 }
 
 #[test]
+fn test_preview_scores_match_setscore_including_sa_cascade() {
+    // The WASM `previewScores` binding (`preview_scores_json`) and the `SetScore`
+    // event are two separate copies of the GW/TP scoring cascade. The regression
+    // this pins: a UI preview silently diverging from the score actually persisted.
+    // We drive BOTH shipped entry points on the same table + candidate VPs and
+    // assert equality — with an active SA landing on the scored round so the SA
+    // cascade (resolve_sa_effective_rounds + table_sa_adjustments) is exercised.
+    let t = waiting_after_round();
+    // Table 0 seat order is p1,p2,p3,p4; p2 sweeps to the table win (VPs [0,2,1,1]).
+    let sanctions = json::array![
+        { user_uid: "p2", level: "standings_adjustment", round_number: 0, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+
+    // Persisted path: SetScore through the real engine, with the SA in effect.
+    let event = json::object! {
+        type: "SetScore",
+        round: 0,
+        table: 0,
+        scores: [
+            { player_uid: "p1", vp: 0.0 },
+            { player_uid: "p2", vp: 2.0 },
+            { player_uid: "p3", vp: 1.0 },
+            { player_uid: "p4", vp: 1.0 },
+        ],
+    };
+    let scored = json::parse(
+        &process_tournament_event(
+            &t.dump(),
+            &event.dump(),
+            &make_organizer().dump(),
+            &sanctions.dump(),
+            &no_decks(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let seating = &scored["tournament"]["rounds"][0][0]["seating"];
+    let stored_gw: Vec<f64> = seating
+        .members()
+        .map(|s| s["result"]["gw"].as_f64().unwrap())
+        .collect();
+    let stored_tp: Vec<f64> = seating
+        .members()
+        .map(|s| s["result"]["tp"].as_f64().unwrap())
+        .collect();
+
+    // Preview path: same table, same VPs, same sanctions, on the pre-score state
+    // (the live-preview scenario — scores not yet persisted).
+    let preview_cfg = json::object! {
+        tournament: t.clone(),
+        sanctions: sanctions.clone(),
+        round: 0,
+        table: 0,
+        vps: [0.0, 2.0, 1.0, 1.0],
+    };
+    let preview = json::parse(&preview_scores_json(&preview_cfg.dump()).unwrap()).unwrap();
+    let preview_gw: Vec<f64> = preview["gw"]
+        .members()
+        .map(|v| v.as_f64().unwrap())
+        .collect();
+    let preview_tp: Vec<f64> = preview["tp"]
+        .members()
+        .map(|v| v.as_f64().unwrap())
+        .collect();
+
+    assert_eq!(preview_gw, stored_gw, "preview GW must match persisted GW");
+    assert_eq!(preview_tp, stored_tp, "preview TP must match persisted TP");
+
+    // The SA must be load-bearing: it strips p2's would-be GW, so the equality
+    // above is exercising the cascade, not passing on a no-op. Same table with no
+    // SA leaves p2 (adjusted 2.0, table-high) the winner.
+    assert_eq!(stored_gw[1], 0.0, "SA drops p2 below the 2VP GW threshold");
+    let no_sa_cfg = json::object! {
+        tournament: t.clone(),
+        sanctions: json::array![],
+        round: 0,
+        table: 0,
+        vps: [0.0, 2.0, 1.0, 1.0],
+    };
+    let no_sa = json::parse(&preview_scores_json(&no_sa_cfg.dump()).unwrap()).unwrap();
+    assert_eq!(
+        no_sa["gw"][1].as_f64(),
+        Some(1.0),
+        "without the SA p2 wins the table GW"
+    );
+}
+
+#[test]
 fn test_organizer_corrects_earlier_round_during_parallel_round_refreshes_standings() {
     // Online parallel rounds: round 0 finished, round 1 still in progress, tournament
     // stays Playing. Correcting a VP in the already-finished round 0 must refresh stored
