@@ -235,7 +235,7 @@ Two real server-side boundaries do exist within the member level:
 - **Decks** are a separate object type with their own per-deck member projection — a deck
   is shipped only when the engine sets its `public` flag (from `decklists_mode` +
   tournament state + winner/finalist status). This row *is* an access control.
-- **`checkin_code` / `vekn_pushed_at`** are stripped from the member projection.
+- **`checkin_code` / `vekn_pushed_at` / `vekn_results_stale`** are stripped from the member projection.
 
 Everything else below is a **frontend display default**, not an access boundary —
 `standings_mode` (Private/Cutoff/Top 10/Public), the "my tables" view, and the
@@ -251,7 +251,7 @@ already holds. They shape the UI; they do not gate what a member can read from I
 | Finals | No (shipped) | hidden until finished |
 | My tables | No (all tables shipped) | only the viewer's own tables shown |
 | Rounds | No (shipped) | hidden |
-| checkin_code / vekn_pushed_at | **Yes** — stripped | — |
+| checkin_code / vekn_pushed_at / vekn_results_stale | **Yes** — stripped | — |
 
 This is an accepted tradeoff: viewer-specific visibility ("my tables") cannot be expressed
 in pre-computed per-row columns, and frontend hiding suits the threat model (a local-event
@@ -308,7 +308,7 @@ A compact map of what exists; implementation detail lives in code and the docs i
 - **Printable views**: round seating, QR (`@media print`, page breaks).
 - **Help**: in-app VTES rulebook, VEKN tournament rules, Judges Guide v1+v2, Code of Ethics, player/organizer guides (source in `frontend/src/lib/help-content/`), paginated viewer with TOC.
 - **Feedback**: members with a VEKN ID submit bug/feature/question reports from the Help page (no VEKN id → no feedback, so every issue carries an identifiable reporter); filed as GitHub issues on `vtes-biased/archon-vibe` via a dedicated server-side GitHub App (Issues-only, separate from TWDA's). Rate-limited (60s cooldown, 10/day). Issue body includes the VEKN ID only (public on vekn.net); never name, email, or Discord. Unconfigured → 503 (graceful degradation).
-- **VEKN integration**: outbound push (calendar on create, results on finish, hourly catch-up), inbound member sync (~6h, infers coopted_by), inbound tournament sync (venue seeding), member push on sponsor; format→event-type mapping; `external_ids["vekn"]`/`vekn_pushed_at`; `max_rounds` immutable once pushed (Open Rounds is non-VEKN and not pushed to VEKN). The results push is **write-once**: once successfully pushed, vekn.net cannot be updated or corrected through the API — post-push corrections require manual admin fixes on vekn.net.
+- **VEKN integration**: outbound push (calendar on create, results on finish, hourly catch-up), inbound member sync (~6h, infers coopted_by), inbound tournament sync (venue seeding), member push on sponsor; format→event-type mapping; `external_ids["vekn"]`/`vekn_pushed_at`; `max_rounds` immutable once pushed (Open Rounds is non-VEKN and not pushed to VEKN). The results push is **write-once**: once successfully pushed, vekn.net cannot be updated or corrected through the API — post-push corrections require manual admin fixes on vekn.net. A post-push result change (reopen + rescoring, or an SA/DQ-driven standings recompute) sets the sticky `vekn_results_stale` flag, surfaced to organizers as an "Out of sync with vekn.net" header badge (see VEKN_SYNC.md).
 - **OAuth2 provider**: PKCE auth-code flow, OIDC userinfo, client management (DEV role), consent persistence, scopes `profile:read` / `user:impersonate`, Argon2 secrets + refresh-token rotation + revocation, scheduled token cleanup.
 - **Offline mode**: single primary-device ownership; others read-only "offline"; force-takeover (data-loss warning) + IC force-unlock; go-online pushes full authoritative state (no CRUD log); offline member creation with temp UIDs (`TEMP-` placeholder VEKN ids) remapped on sync; SSE suppressed while offline.
 - **Infrastructure**: PWA + service workers (update detection); IndexedDB for all reads (5 stores + cards); SSE with 3 precomputed access levels (public/member/full); personal/role overlays; optimistic WASM updates; resync on role/VEKN-ID change; 15-min gzip snapshot endpoint; Web Push (VAPID, opt-in, server-side `push_subscriptions` side table); i18n EN/FR/ES/PT-BR/IT (Paraglide, browser auto-detect) + locale switcher; GeoNames autocomplete; scheduled jobs (VEKN sync/push, sanction cleanup, rating recompute, OAuth cleanup, snapshot, deleted-objects purge).

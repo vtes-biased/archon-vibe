@@ -605,6 +605,10 @@ class Tournament(TournamentConfig, kw_only=True):
     raffles: list[RaffleDraw] = msgspec.field(default_factory=list)
     # VEKN push tracking
     vekn_pushed_at: datetime | None = None  # When results were pushed to vekn.net
+    # Results diverged after the push (reopen or result-affecting edit). The push
+    # is write-once — corrections never reach vekn.net via API, so this is sticky;
+    # only a manual admin fix (there and here) clears it.
+    vekn_results_stale: bool = False
     # Offline mode: device-level locking for offline tournament management
     offline_mode: bool = False
     offline_device_id: str = (

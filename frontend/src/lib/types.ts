@@ -334,7 +334,7 @@ export interface Deck {
 /**
  * Unified Tournament type. Fields are optional based on the data level:
  * - public: uid, modified, name, format, rank, online, start, finish, timezone, country, state
- * - member: everything except checkin_code, vekn_pushed_at
+ * - member: everything except checkin_code and VEKN push bookkeeping
  * - full: everything
  * Decks are now separate DeckObject entities (not embedded in tournament).
  */
@@ -371,6 +371,7 @@ export interface Tournament extends BaseObject {
   // Full data (varies by level)
   external_ids?: Record<string, string>;
   vekn_pushed_at?: string | null;
+  vekn_results_stale?: boolean; // results diverged after the write-once VEKN push
   checkin_code?: string;
   players?: Player[];
   rounds?: Table[][];

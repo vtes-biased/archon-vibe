@@ -14,7 +14,7 @@
   import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, Trash2, Upload, CloudUpload, Share2 } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2 } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import TournamentBanner from "$lib/components/TournamentBanner.svelte";
@@ -618,6 +618,13 @@ import TournamentModals from "./TournamentModals.svelte";
                     title={m.vekn_sync_pending_hint()}>
                 <CloudOff class="w-3 h-3" aria-hidden="true" />
                 {m.vekn_sync_pending_results()}
+              </span>
+            {/if}
+            {#if isOrganizer && tournament.vekn_results_stale}
+              <span class="px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1"
+                    title={m.vekn_out_of_sync_hint()}>
+                <CloudAlert class="w-3 h-3" aria-hidden="true" />
+                {m.vekn_out_of_sync()}
               </span>
             {/if}
             {#if tournament.league_uid && leagueName}

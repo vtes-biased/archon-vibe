@@ -166,6 +166,18 @@ async def _apply_sanction_to_tournament(
                     player.state = dq_state
                     changed = True
                     break
+        # Same divergence detection as the /action endpoint: SA recomputes can
+        # move standings, stored round/finals scores, and the winner.
+        pre_results = (
+            (
+                tournament.winner,
+                encoder.encode(tournament.standings),
+                encoder.encode(tournament.finals),
+                encoder.encode(tournament.rounds),
+            )
+            if tournament.vekn_pushed_at and not tournament.vekn_results_stale
+            else None
+        )
         if tournament.rounds:
             sanctions = await get_sanctions_for_tournament(tournament_uid)
             sanctions_data = [
@@ -191,6 +203,15 @@ async def _apply_sanction_to_tournament(
             changed = True
         if not changed:
             return
+        # Sanction recompute moved pushed results: the VEKN push is write-once,
+        # so mark the divergence.
+        if pre_results is not None and pre_results != (
+            tournament.winner,
+            encoder.encode(tournament.standings),
+            encoder.encode(tournament.finals),
+            encoder.encode(tournament.rounds),
+        ):
+            tournament.vekn_results_stale = True
         tournament.modified = datetime.now(UTC)
         bd = await save_tournament(tournament, conn=tx_conn)
     broadcast_precomputed(bd)

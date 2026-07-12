@@ -157,8 +157,8 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "banner_path",  # public hero / og:image — visible pre-login
 }
 
-# Member gets everything EXCEPT checkin_code, vekn_pushed_at
-_TOURNAMENT_MEMBER_EXCLUDE = {"checkin_code", "vekn_pushed_at"}
+# Member gets everything EXCEPT checkin_code and the VEKN push bookkeeping
+_TOURNAMENT_MEMBER_EXCLUDE = {"checkin_code", "vekn_pushed_at", "vekn_results_stale"}
 
 
 def compute_tournament_public(d: dict) -> dict:
@@ -167,7 +167,7 @@ def compute_tournament_public(d: dict) -> dict:
 
 
 def compute_tournament_member(d: dict) -> dict:
-    """Member projection: everything except checkin_code and vekn_pushed_at.
+    """Member projection: everything except checkin_code and VEKN push bookkeeping.
 
     No per-viewer filtering — all members see all data.
     """

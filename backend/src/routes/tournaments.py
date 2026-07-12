@@ -1364,6 +1364,21 @@ async def tournament_action(
             updated.timer = TimerState()
             updated.table_extra_time = {}
 
+        # Once results are on vekn.net (write-once push), any change to the
+        # result-bearing content diverges from vekn.net permanently. Detect by
+        # content, not event type: reopen clears winner/finalist data, score
+        # edits touch rounds/finals — while post-push config typo fixes stay
+        # clean. Sticky, so the compare runs at most once per pushed tournament.
+        if updated.vekn_pushed_at and not updated.vekn_results_stale:
+            if (
+                tournament.winner != updated.winner
+                or encoder.encode(tournament.standings)
+                != encoder.encode(updated.standings)
+                or encoder.encode(tournament.finals) != encoder.encode(updated.finals)
+                or encoder.encode(tournament.rounds) != encoder.encode(updated.rounds)
+            ):
+                updated.vekn_results_stale = True
+
         # Save within the same transaction (row is still locked)
         tournament_bd = await save_object(
             ObjectType.TOURNAMENT,
@@ -2265,6 +2280,7 @@ async def go_online(
                 if tournament.vekn_pushed_at
                 else None
             )
+            request.tournament["vekn_results_stale"] = tournament.vekn_results_stale
 
         # Remap temp UIDs → real user UIDs throughout tournament data
         tournament_data = request.tournament
@@ -2285,6 +2301,23 @@ async def go_online(
         # engine never stamps it) — use the sync time as the actual end time
         if updated.state == TournamentState.FINISHED and updated.finish is None:
             updated.finish = datetime.now(UTC)
+        # Offline edits to already-pushed results diverge from vekn.net just
+        # like online ones — same compare as the /action endpoint, against the
+        # locked server pre-image (the restore above only carries the flag over;
+        # it can't see what the offline session changed).
+        if (
+            tournament
+            and tournament.vekn_pushed_at
+            and not updated.vekn_results_stale
+            and (
+                tournament.winner != updated.winner
+                or encoder.encode(tournament.standings)
+                != encoder.encode(updated.standings)
+                or encoder.encode(tournament.finals) != encoder.encode(updated.finals)
+                or encoder.encode(tournament.rounds) != encoder.encode(updated.rounds)
+            )
+        ):
+            updated.vekn_results_stale = True
         tournament_bd = await save_object(
             ObjectType.TOURNAMENT,
             updated.uid,

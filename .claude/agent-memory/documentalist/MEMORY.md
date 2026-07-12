@@ -28,6 +28,7 @@
 - Rust engine capability change → ARCHITECTURE.md (Rust Integration) + TOURNAMENTS.md (if tournament-related) + engine/README.md.
 - Architecture fact that affects mutations/reads → confirm CLAUDE.md's terse summary still matches (it intentionally stays high-level).
 - **Card data / deck-import pipeline change → check PRODUCT.md's "Decks" feature bullet too, not just ARCHITECTURE.md.** PRODUCT.md restates the same flow in its own terse phrasing (deck upload modes, provider list); it drifts silently because it's easy to forget as a second copy of the same fact. See [[card-data-pipeline]].
+- **New Tournament field excluded from the member projection (`_TOURNAMENT_MEMBER_EXCLUDE` in `access_levels.py`) → update the exclusion list in THREE places, not just SYNC.md**: SYNC.md (Access-Level Projections table + "go-online server-managed field re-pull" list if server-managed), PRODUCT.md (§4 both the prose line and the Tournament Field Visibility table). If the field is VEKN-push bookkeeping specifically, also add/extend a subsection in **VEKN_SYNC.md** — it's the full-mechanics doc for that domain even though it's easy to forget (it wasn't in an explicit "check these docs" list once and turned out to be the best home for the behavioral detail).
 
 ## Documented Invariants (verify before re-stating)
 - Mutation pipeline: business event → Rust engine → CRUD → SSE → IndexedDB; ALL business events via `POST /{uid}/action` (no per-event REST routes). Optimistic: WASM first, server confirms via SSE.

@@ -5,7 +5,7 @@
   import { generateResultsCard } from "$lib/social-card";
   import { generateResultsText } from "$lib/social-text";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { Share2, ClipboardCopy, Download, Upload } from "@lucide/svelte";
+  import { Share2, ClipboardCopy, Download, Upload, TriangleAlert } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -37,6 +37,10 @@
 
   const hasStandings = $derived(standings.length > 0);
 
+  function focusOnMount(node: HTMLElement) {
+    node.focus();
+  }
+
   function downloadReport(format: "json" | "text" = "json") {
     const a = document.createElement("a");
     const qs = format === "json" ? "" : `?fmt=${format}`;
@@ -48,6 +52,7 @@
   }
 
   let sharingImage = $state(false);
+  let showReopenConfirm = $state(false);
 
   async function shareImage() {
     sharingImage = true;
@@ -101,6 +106,15 @@
     </div>
   {/if}
 
+  <!-- Out-of-sync explanation inline (the header badge's title= is hover-only,
+       unreadable on touch — the organizer at the venue is exactly who needs it) -->
+  {#if tournament.vekn_results_stale}
+    <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
+      <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+      <span>{m.vekn_out_of_sync_hint()}</span>
+    </div>
+  {/if}
+
   <!-- Results actions. With standings: share + copy + More (report download) on one
        line. Without (empty finished shell): a direct Archon-import button, per #256. -->
   <div class="flex flex-wrap items-center gap-2">
@@ -127,8 +141,57 @@
 
   <!-- Reopen: rare, semi-destructive rollback — set apart below the results -->
   <div class="pt-3 border-t border-line">
-    <Button variant="ghost" size="md" disabled={actionLoading} onclick={() => doAction?.("ReopenTournament")}>
+    <Button variant="ghost" size="md" disabled={actionLoading} onclick={() => (showReopenConfirm = true)}>
       {m.overview_reopen_tournament()}
     </Button>
   </div>
 </div>
+
+{#if showReopenConfirm}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    role="presentation"
+    onclick={() => (showReopenConfirm = false)}
+  >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.key === 'Escape' && (showReopenConfirm = false)}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reopen-confirm-title"
+      tabindex="-1"
+      use:focusOnMount
+    >
+      <div class="p-6 border-b border-line">
+        <h2 id="reopen-confirm-title" class="text-xl font-medium text-link">{m.reopen_confirm_title()}</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ink mb-4">{m.reopen_confirm_msg()}</p>
+        {#if tournament.vekn_pushed_at}
+          <!-- The VEKN results push is write-once: corrections never reach
+               vekn.net via API — manual admin fixes only. -->
+          <div class="banner-warn border rounded-lg p-3 mb-4 text-sm flex items-start gap-2">
+            <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{m.reopen_confirm_vekn_warn()}</span>
+          </div>
+        {/if}
+        <div class="flex gap-2">
+          <Button
+            variant="danger"
+            size="lg"
+            class="flex-1 min-h-[44px]"
+            loading={actionLoading}
+            onclick={async () => { await doAction?.("ReopenTournament"); showReopenConfirm = false; }}
+          >
+            <TriangleAlert class="w-4 h-4" aria-hidden="true" />
+            {actionLoading ? m.common_loading() : m.overview_reopen_tournament()}
+          </Button>
+          <Button variant="secondary" size="lg" class="min-h-[44px]" disabled={actionLoading} onclick={() => (showReopenConfirm = false)}>{m.common_cancel()}</Button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
