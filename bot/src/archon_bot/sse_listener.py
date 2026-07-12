@@ -1428,6 +1428,29 @@ async def _reconcile(
         logger.error("Timer reschedule failed for %s: %s", key, e)
 
 
+def sanction_table_channel(
+    tournament: dict | None, round_number: int, user_uid: str, table_chs: list[int]
+) -> int | None:
+    """Pure: the table voice channel to notify of a sanction, or None (→ lobby).
+
+    ``table_chs`` maps the LIVE context's channels (reconcile's contract), so a
+    sanction routes to a table only when its round IS that context — a past
+    round's same-index table would seat strangers, and a live finals replaces
+    the prelim channels. Everything else falls back to the lobby.
+    """
+    if not tournament or not table_chs:
+        return None
+    tag, live_tables = _active_tables(tournament)
+    if tag != f"round{round_number + 1}":
+        return None
+    for ti, table in enumerate(live_tables):
+        if any(s.get("player_uid") == user_uid for s in table.get("seating", [])):
+            if ti < len(table_chs) and table_chs[ti]:  # skip 0 sentinel
+                return table_chs[ti]
+            return None
+    return None
+
+
 async def _handle_sanction_update(
     bot,
     store: TokenStore,
@@ -1438,7 +1461,8 @@ async def _handle_sanction_update(
     """Handle a sanction SSE event.
 
     - Always posts to #judges channel
-    - If round_number set and table channels exist: posts to the player's table channel
+    - If the sanction targets the live round and the player's table channel
+      exists: posts to that table channel
     - Otherwise: posts to #lobby
     """
     obj = data.get("data", data)
@@ -1488,40 +1512,28 @@ async def _handle_sanction_update(
         logger.warning("Failed to post sanction to judges: %s", e)
 
     # Notify the player in the appropriate channel:
-    # - If there are active table channels (ongoing round), post to the table
+    # - If the sanction targets the live round, post to the player's table
     # - Otherwise, post to lobby
     key = _task_key(guild_id, tournament_uid)
-    table_chs = _table_channels.get(key, [])
 
-    # Find the player's table channel if round is active
     posted_to_table = False
-    if round_number is not None and table_chs:
-        # Look up which table the player is at using cached tournament data
-        tournament_data = _last_tournament.get(key)
-        if tournament_data:
-            rounds = tournament_data.get("rounds", [])
-            if round_number < len(rounds):
-                current_round = rounds[round_number]
-                for ti, table in enumerate(current_round):
-                    seating = table.get("seating", [])
-                    if any(s.get("player_uid") == user_uid for s in seating):
-                        if ti < len(table_chs) and table_chs[ti]:  # skip 0 sentinel
-                            try:
-                                logger.info(
-                                    "→ create_message sanction→table %d channel=%s",
-                                    ti + 1,
-                                    table_chs[ti],
-                                )
-                                await bot.rest.create_message(table_chs[ti], player_msg)
-                                posted_to_table = True
-                            except Exception as e:
-                                logger.warning(
-                                    "Failed to post sanction to table %d: %s", ti, e
-                                )
-                        break
+    if round_number is not None:
+        target = sanction_table_channel(
+            _last_tournament.get(key),
+            round_number,
+            user_uid,
+            _table_channels.get(key, []),
+        )
+        if target:
+            try:
+                logger.info("→ create_message sanction→table channel=%s", target)
+                await bot.rest.create_message(target, player_msg)
+                posted_to_table = True
+            except Exception as e:
+                logger.warning("Failed to post sanction to table %s: %s", target, e)
 
     if not posted_to_table:
-        # No active round, no table channels, or player not found at a table — post to lobby
+        # Past-round correction, no live tables, or player not seated — post to lobby
         try:
             logger.info("→ create_message sanction→lobby channel=%s", lobby_id)
             await bot.rest.create_message(lobby_id, player_msg)
