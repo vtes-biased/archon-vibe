@@ -6,6 +6,7 @@
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import FinishedResults from "./FinishedResults.svelte";
+  import FinishConfirmModal from "./FinishConfirmModal.svelte";
   import { QrCode, Undo2, CheckCheck, Banknote, RotateCcw, TriangleAlert } from "@lucide/svelte";
   import { translateTournamentState, top5HasTies as top5HasTiesFn, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
@@ -35,6 +36,7 @@
   } = $props();
 
   let showQrCode = $state(false);
+  let showFinishConfirm = $state(false);
 
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
 
@@ -230,11 +232,23 @@
   <!-- Danger action (Waiting state): destructive, set apart with its own hue + icon -->
   {#if tournament.state === "Waiting"}
     <div class="pt-2 border-t border-line">
-      <Button variant="danger" size="md" disabled={actionLoading} onclick={() => doAction("FinishTournament")}>
+      <Button variant="danger" size="md" disabled={actionLoading} onclick={() => (showFinishConfirm = true)}>
         <TriangleAlert class="w-4 h-4" aria-hidden="true" />
         {m.overview_finish_tournament()}
       </Button>
     </div>
+  {/if}
+
+  {#if showFinishConfirm}
+    <FinishConfirmModal
+      {tournament}
+      {standings}
+      {playerInfo}
+      {decksByUser}
+      {actionLoading}
+      onConfirm={async () => { await doAction("FinishTournament"); showFinishConfirm = false; }}
+      onClose={() => (showFinishConfirm = false)}
+    />
   {/if}
 
   <!-- QR Check-in display -->
