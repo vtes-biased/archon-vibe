@@ -228,6 +228,29 @@ class ArchonAPI:
             "POST", "/vekn/claim", discord_id, json_body={"vekn_id": vekn_id}
         )
 
+    async def tournament_action_with_token(
+        self, access_token: str, tournament_uid: str, action: str, **kwargs: object
+    ) -> ApiResult:
+        """Send a tournament action with an explicit bearer (no store, no refresh).
+
+        One-shot escape hatch for the post-claim window: /vekn/claim merges the
+        bot-linked account away (tombstoning the uid the stored OAuth tokens
+        authenticate), and its response's fresh first-party access token is the
+        only credential that can act for the merged user in this interaction.
+        """
+        assert self._session
+        payload = {"type": action, **kwargs}
+        async with self._session.post(
+            f"/api/tournaments/{tournament_uid}/action",
+            json=payload,
+            headers={"Authorization": f"Bearer {access_token}"},
+        ) as resp:
+            if resp.status >= 400:
+                text = await resp.text()
+                logger.error("API error POST action: %s %s", resp.status, text)
+                return ApiResult.fail(self._extract_error(resp.status, text))
+            return ApiResult.success(await resp.json())
+
     async def create_sanction(
         self,
         discord_id: str,

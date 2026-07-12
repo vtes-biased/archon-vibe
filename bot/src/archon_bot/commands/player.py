@@ -59,11 +59,14 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
         max_length=20,
     )
 
-    def __init__(self, store: TokenStore, api: ArchonAPI, tournament_uid: str) -> None:
+    def __init__(
+        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, action: str
+    ) -> None:
         super().__init__()
         self._store = store
         self._api = api
         self._tournament_uid = tournament_uid
+        self._action = action
 
     async def callback(self, ctx: miru.ModalContext) -> None:
         discord_id = str(ctx.user.id)
@@ -75,25 +78,40 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
             )
             return
 
-        # Now try to check in
+        # The claim MERGES the bot-linked account into the VEKN one and
+        # tombstones the old uid — the stored OAuth tokens now authenticate a
+        # dead account (refresh keeps "succeeding" but every call 401s), so drop
+        # them; the next command re-links cleanly. The claim response carries a
+        # fresh first-party token pair for the merged account: use its access
+        # token once for the immediate follow-up action (it can't be stored —
+        # it's not an OAuth-client token and can't be refreshed as one).
+        await self._store.remove_tokens(discord_id)
+
+        # Mirror the has-VEKN mapping: Register during Registration, CheckIn
+        # during check-in — the engine rejects the wrong event for the phase.
         display_name = _get_display_name(ctx)
-        archon_uid = claim.data.get("user", {}).get("uid", "")
-        reg = await self._api.tournament_action(
-            discord_id,
+        merged = claim.data.get("user", {})
+        event_name = "CheckIn" if self._action == "checkin" else "Register"
+        reg = await self._api.tournament_action_with_token(
+            claim.data.get("access_token", ""),
             self._tournament_uid,
-            "CheckIn",
-            player_uid=archon_uid,
+            event_name,
+            player_uid=merged.get("uid") if event_name == "CheckIn" else None,
+            user_uid=merged.get("uid") if event_name == "Register" else None,
+            vekn_id=merged.get("vekn_id"),
             display_name=display_name,
         )
         if reg.ok:
+            verb = "checked in" if self._action == "checkin" else "registered"
             await ctx.respond(
-                "VEKN ID claimed and you're checked in!",
+                f"VEKN ID claimed and you're {verb}!",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
         else:
+            noun = "check-in" if self._action == "checkin" else "registration"
             await ctx.respond(
-                f"VEKN ID claimed, but check-in failed: {reg.error}\n"
-                f"Try `/checkin` again.",
+                f"VEKN ID claimed, but {noun} failed: {reg.error}\n"
+                f"Run `/{self._action}` again.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
 
@@ -102,15 +120,18 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
 
 
 class VeknChoiceView(miru.View):
-    def __init__(self, store: TokenStore, api: ArchonAPI, tournament_uid: str) -> None:
+    def __init__(
+        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, action: str
+    ) -> None:
         super().__init__(timeout=300)
         self._store = store
         self._api = api
         self._tournament_uid = tournament_uid
+        self._action = action
 
     @miru.button(label="I have a VEKN ID", style=hikari.ButtonStyle.PRIMARY)
     async def has_vekn(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        modal = VeknIdModal(self._store, self._api, self._tournament_uid)
+        modal = VeknIdModal(self._store, self._api, self._tournament_uid, self._action)
         await ctx.respond_with_modal(modal)
         self.stop()
 
@@ -200,7 +221,7 @@ async def _handle_registration_pipeline(
         # No VEKN ID linked. If they already have one, let them claim it here;
         # new players are created at the door by an official (sponsorship is no
         # longer a bot flow — the desk curates the member list).
-        view = VeknChoiceView(store, api, tournament_uid)
+        view = VeknChoiceView(store, api, tournament_uid, action)
         await ctx.respond(
             "**You need a VEKN ID to play.**\n"
             "If you already have one, tap the button below to link it.\n"
