@@ -17,10 +17,10 @@
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import Button from "$lib/components/Button.svelte";
-  import { validateDeck, computeRatingPoints, type ValidationError, type TournamentEventType } from "$lib/engine";
+  import { validateDeck, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { sponsorVeknMember, createUser, isOnline, ApiError } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, seatedPlayerCount, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -497,14 +497,7 @@
   // Proxy is settled once the event is decided — mirror the engine guard.
   const canSetProxy = $derived(!tournament.finals && tournament.state !== "Finished");
 
-  function getRatingPts(entry: StandingEntry): number {
-    if (!isFinished || entry.disqualified || entry.non_competing) return 0; // DQ'd/proxy earn no RTP, not even the base
-    const isWinner = entry.user_uid === tournament.winner;
-    const finalistPos = isWinner ? 1
-      : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
-    const gw = isWinner ? entry.gw + 1 : entry.gw;
-    return computeRatingPoints(entry.vp, gw, finalistPos, standings.length, tournament.rank);
-  }
+  const seatedCount = $derived(seatedPlayerCount(tournament));
 
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const hasFinals = $derived(standings.some(e => e.finals));
@@ -789,7 +782,7 @@
             <div class="mt-1 flex items-center gap-3 text-xs text-ink-muted">
               <span>{formatScore(entry.gw, entry.vp, entry.tp)}</span>
               {#if hasFinals && entry.finals}<span>{entry.finals}</span>{/if}
-              {#if isFinished && playerSort === 'standings'}<span class="text-ink-faint">{getRatingPts(entry)} RP</span>{/if}
+              {#if isFinished && playerSort === 'standings'}<span class="text-ink-faint">{getRatingPts(entry, tournament, seatedCount)} RP</span>{/if}
               {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
                 {#if editingToss && isOrganizer}
                   <span class="text-ink-faint">{m.tournament_toss_label()}</span>
@@ -979,7 +972,7 @@
                   <td class="text-right py-1.5 px-2">{entry?.finals ?? ""}</td>
                 {/if}
                 {#if isFinished && playerSort === 'standings'}
-                  <td class="text-right py-1.5 px-2 text-ink-muted">{entry ? getRatingPts(entry) : "—"}</td>
+                  <td class="text-right py-1.5 px-2 text-ink-muted">{entry ? getRatingPts(entry, tournament, seatedCount) : "—"}</td>
                 {/if}
               {/if}
               {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}

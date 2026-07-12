@@ -1,5 +1,5 @@
 import type { Tournament, TournamentState } from "./types";
-import { computeFinalStandings } from "./engine";
+import { computeFinalStandings, computeRatingPoints } from "./engine";
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
@@ -349,6 +349,19 @@ export function seatedPlayerCount(tournament: Tournament): number {
     return played.size;
   }
   return (tournament.standings ?? []).filter((s) => s.gw || s.vp || s.tp).length;
+}
+
+/** Rating points a Finished tournament awards a standings entry — the single copy.
+ *  DQ'd/proxy players earn none (not even the base); the winner gains the +1 GW and
+ *  finalist position 1. `playedCount` is seatedPlayerCount(tournament) — the field
+ *  size backend ratings.py uses — NOT standings.length (over-counts no-shows). */
+export function getRatingPts(entry: StandingEntry, tournament: Tournament, playedCount: number): number {
+  if (tournament.state !== "Finished" || entry.disqualified || entry.non_competing) return 0;
+  const isWinner = entry.user_uid === tournament.winner;
+  const finalistPos = isWinner ? 1
+    : (tournament.finals?.seating.some((s) => s.player_uid === entry.user_uid) ? 2 : 0);
+  const gw = isWinner ? entry.gw + 1 : entry.gw;
+  return computeRatingPoints(entry.vp, gw, finalistPos, playedCount, tournament.rank);
 }
 
 export function translateStandingsMode(mode: string | undefined): string {

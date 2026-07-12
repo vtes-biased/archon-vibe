@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeGwFinals, computeTpLocal, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
-  import { computeRatingPoints, type ValidationError, type TournamentEventType } from "$lib/engine";
+  import { type ValidationError, type TournamentEventType } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
@@ -200,14 +200,7 @@
     return tournamentSanctions.filter(s => s.user_uid === uid);
   }
 
-  function getRatingPts(entry: StandingEntry): number {
-    if (!isFinished) return 0;
-    const isWinner = entry.user_uid === tournament.winner;
-    const finalistPos = isWinner ? 1
-      : (tournament.finals?.seating.some(s => s.player_uid === entry.user_uid) ? 2 : 0);
-    const gw = isWinner ? entry.gw + 1 : entry.gw;
-    return computeRatingPoints(entry.vp, gw, finalistPos, standings.length, tournament.rank);
-  }
+  const seatedCount = $derived(seatedPlayerCount(tournament));
 </script>
 
 <!-- Missing/invalid decklist no longer hides the check-in button (engine treats it
@@ -695,7 +688,7 @@
                     <td class="text-right py-1 px-2">{entry.finals ?? ""}</td>
                   {/if}
                   {#if isFinished}
-                    <td class="text-right py-1 px-2 text-ink-muted">{getRatingPts(entry)}</td>
+                    <td class="text-right py-1 px-2 text-ink-muted">{getRatingPts(entry, tournament, seatedCount)}</td>
                   {/if}
                 </tr>
               {/each}
