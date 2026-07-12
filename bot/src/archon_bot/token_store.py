@@ -298,10 +298,13 @@ class TokenStore:
 
     async def get_pending_oauth(self, state: str) -> dict | None:
         assert self._db
-        # Expire entries older than 15 minutes
+        # Expire entries older than 15 minutes. Commit immediately: without it the
+        # DELETE's implicit write transaction dangles on the shared connection
+        # until some unrelated commit, and is lost entirely on crash.
         await self._db.execute(
             "DELETE FROM pending_oauth WHERE created_at < datetime('now', '-15 minutes')"
         )
+        await self._db.commit()
         async with self._db.execute(
             "SELECT discord_id, guild_id, channel_id, action, extra, code_verifier FROM pending_oauth WHERE state = ?",
             (state,),
