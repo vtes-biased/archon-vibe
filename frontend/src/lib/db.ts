@@ -611,16 +611,39 @@ export async function clearAllTournaments(): Promise<void> {
 export interface FilteredTournamentsResult {
   items: Tournament[];
   total: number;
+  /** Size of the leading upcoming/current cluster (see sortUpcomingFirst). */
+  upcomingCount: number;
 }
 
 const ONGOING_STATES: Set<string> = new Set(['Registration', 'Waiting', 'Playing']);
 
-function sortByDateDesc(items: Tournament[]): void {
+/**
+ * Sort in place: upcoming/current events ascending (soonest first), then past
+ * events descending (most recent first). Returns the upcoming cluster size so
+ * callers can render an Upcoming/Past divider. "Upcoming" = not Finished and
+ * dated today or later — plus actually-running events (Playing/Waiting) from an
+ * earlier date, which belong above the divider while live.
+ */
+export function sortUpcomingFirst(items: Tournament[]): number {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // Naive local wall-clock cutoff, same format as Tournament.start.
+  const cutoff = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00`;
+  const date = (t: Tournament) => t.start || t.modified;
+  const isUpcoming = (t: Tournament) =>
+    t.state !== 'Finished' &&
+    (date(t) >= cutoff || t.state === 'Playing' || t.state === 'Waiting');
+  let upcomingCount = 0;
   items.sort((a, b) => {
-    const da = a.start || a.modified;
-    const db_ = b.start || b.modified;
-    return db_.localeCompare(da);
+    const ua = isUpcoming(a);
+    if (ua !== isUpcoming(b)) return ua ? -1 : 1;
+    return ua ? date(a).localeCompare(date(b)) : date(b).localeCompare(date(a));
   });
+  for (const t of items) {
+    if (!isUpcoming(t)) break;
+    upcomingCount++;
+  }
+  return upcomingCount;
 }
 
 export async function getFilteredTournaments(
@@ -669,12 +692,11 @@ export async function getFilteredTournaments(
     items = items.filter(t => normalizeSearch(t.name).includes(q));
   }
 
-  // Always sort by date desc
-  sortByDateDesc(items);
+  const upcomingCount = sortUpcomingFirst(items);
 
   const total = items.length;
   const start = page * pageSize;
-  return { items: items.slice(start, start + pageSize), total };
+  return { items: items.slice(start, start + pageSize), total, upcomingCount };
 }
 
 /**
@@ -728,11 +750,11 @@ export async function getAgendaTournaments(
     items = items.filter(t => normalizeSearch(t.name).includes(q));
   }
 
-  sortByDateDesc(items);
+  const upcomingCount = sortUpcomingFirst(items);
 
   const total = items.length;
   const start = page * pageSize;
-  return { items: items.slice(start, start + pageSize), total };
+  return { items: items.slice(start, start + pageSize), total, upcomingCount };
 }
 
 // Deck operations (standalone DeckObject, extracted from tournaments)

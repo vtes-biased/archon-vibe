@@ -19,6 +19,7 @@
 
   let tournaments = $state<Tournament[]>([]);
   let totalCount = $state(0);
+  let upcomingCount = $state(0);
   let loaded = $state(false);
   let showLoading = $state(false);
   // Delay showing spinner to avoid flash on fast IDB reads
@@ -115,6 +116,7 @@
         );
         tournaments = result.items;
         totalCount = result.total;
+        upcomingCount = result.upcomingCount;
       } else {
         const result = await getFilteredTournaments(
           {
@@ -131,6 +133,7 @@
         );
         tournaments = result.items;
         totalCount = result.total;
+        upcomingCount = result.upcomingCount;
       }
     } catch (e) {
       error = toUserMessage(e, m.tournament_error_load_list());
@@ -389,7 +392,12 @@
         </div>
 
         <div class="divide-y divide-line">
-          {#each tournaments as tournament (tournament.uid)}
+          {#each tournaments as tournament, i (tournament.uid)}
+            {#if i === upcomingCount - page * PAGE_SIZE}
+              <div class="px-6 py-2 bg-surface-muted text-xs font-medium text-ink-faint uppercase tracking-wide">
+                {m.tournaments_past_divider()}
+              </div>
+            {/if}
             <a
               href="/tournaments/{tournament.uid}"
               class="block px-6 py-4 hover:bg-surface-muted/50 transition-colors"
@@ -500,10 +508,17 @@
         <p class="text-ink-muted">
           {#if searchQuery.trim() || selectedCountry !== "all" || selectedFormat !== "all"}
             {m.tournaments_adjust_filters()}
+          {:else if viewMode === "agenda"}
+            {m.tournaments_agenda_empty()}
           {:else}
             {m.tournaments_none_yet()}
           {/if}
         </p>
+        {#if viewMode === "agenda" && !searchQuery.trim() && selectedFormat === "all"}
+          <Button variant="secondary" size="md" class="mt-4" onclick={() => viewMode = "all"}>
+            {m.tournaments_agenda_show_all()}
+          </Button>
+        {/if}
       </div>
     {/if}
   </div>

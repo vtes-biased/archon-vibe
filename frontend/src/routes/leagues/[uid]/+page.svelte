@@ -2,7 +2,7 @@
   import { toUserMessage } from '$lib/errors';
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { getLeague, getAllTournaments, getAllLeagues } from "$lib/db";
+  import { getLeague, getAllTournaments, getAllLeagues, sortUpcomingFirst } from "$lib/db";
   import { updateLeague, deleteLeagueApi, addLeagueOrganizer, removeLeagueOrganizer } from "$lib/api";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
@@ -25,6 +25,7 @@
   let league = $state<League | null>(null);
   let parentLeague = $state<{ uid: string; name: string } | null>(null);
   let leagueTournaments = $state<Tournament[]>([]);
+  let upcomingTournamentCount = $state(0);
   let childLeagues = $state<League[]>([]);
   let orphanLeagues = $state<League[]>([]);
   let addChildUid = $state("");
@@ -86,9 +87,8 @@
 
     // Load associated tournaments
     const allTournaments = await getAllTournaments();
-    leagueTournaments = allTournaments
-      .filter(t => t.league_uid === uid && !t.deleted_at)
-      .sort((a, b) => (b.start || b.modified).localeCompare(a.start || a.modified));
+    leagueTournaments = allTournaments.filter(t => t.league_uid === uid && !t.deleted_at);
+    upcomingTournamentCount = sortUpcomingFirst(leagueTournaments);
 
     // Load child leagues if meta-league
     if (l.kind === "Meta-League") {
@@ -104,8 +104,8 @@
       const childTournaments = allTournaments.filter(
         t => childUids.includes(t.league_uid ?? "") && !t.deleted_at
       );
-      leagueTournaments = [...leagueTournaments, ...childTournaments]
-        .sort((a, b) => (b.start || b.modified).localeCompare(a.start || a.modified));
+      leagueTournaments = [...leagueTournaments, ...childTournaments];
+      upcomingTournamentCount = sortUpcomingFirst(leagueTournaments);
     } else {
       childLeagues = [];
       orphanLeagues = [];
@@ -494,7 +494,12 @@
         {#if leagueTournaments.length > 0}
           <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
             <div class="divide-y divide-line">
-              {#each leagueTournaments as t (t.uid)}
+              {#each leagueTournaments as t, i (t.uid)}
+                {#if i === upcomingTournamentCount && i > 0}
+                  <div class="px-6 py-2 bg-surface-muted text-xs font-medium text-ink-faint uppercase tracking-wide">
+                    {m.tournaments_past_divider()}
+                  </div>
+                {/if}
                 <a href="/tournaments/{t.uid}" class="block px-6 py-3 hover:bg-surface-muted/50 transition-colors">
                   <div class="flex items-center justify-between">
                     <div>
