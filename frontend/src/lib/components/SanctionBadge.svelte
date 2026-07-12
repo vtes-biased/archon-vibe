@@ -7,14 +7,14 @@
 
   // Check if sanction is lifted or expired
   const isLifted = $derived(sanction.lifted_at !== null);
-  const isExpired = $derived(() => {
+  const isExpired = $derived.by(() => {
     if (!sanction.expires_at) return false;
     return new Date(sanction.expires_at) < new Date();
   });
   const isPermanent = $derived(
     sanction.level === "suspension" && !sanction.expires_at
   );
-  const isInactive = $derived(isLifted || isExpired());
+  const isInactive = $derived(isLifted || isExpired);
 
   // Ordinal severity ramp (amethyst → fuchsia → crimson) — semantic badge-* classes from app.css
   const SANCTION_CLASSES: Record<SanctionLevel, string> = {
@@ -43,7 +43,7 @@
     return new Date(dateStr).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const tooltipText = $derived(() => {
+  const tooltipText = $derived.by(() => {
     let text = `${label}: ${sanction.description}\n${m.sanction_issued({ date: formatDate(sanction.issued_at) })}`;
     if (sanction.expires_at) {
       text += `\n${m.sanction_expires({ date: formatDate(sanction.expires_at) })}`;
@@ -62,7 +62,7 @@
   class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium {badgeClass} {isInactive
     ? 'line-through opacity-60'
     : ''}"
-  title={tooltipText()}
+  title={tooltipText}
 >
   {#if isPermanent}
     <Ban class="w-3 h-3" />
@@ -70,7 +70,7 @@
   {label}
   {#if isLifted}
     <span title={m.sanction_lifted()}><Check class="w-3 h-3" /></span>
-  {:else if isExpired()}
+  {:else if isExpired}
     <span title={m.sanction_expired()}><Clock class="w-3 h-3" /></span>
   {/if}
 </span>

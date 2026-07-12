@@ -2,6 +2,7 @@
   import Button from '$lib/components/Button.svelte';
   import { ImagePlus, ZoomOut, ZoomIn } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { showToast } from '$lib/stores/toast.svelte';
 
   // Props
   interface Props {
@@ -47,7 +48,7 @@
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert(m.avatar_select_image_file());
+      showToast({ type: 'error', message: m.avatar_select_image_file() });
       return;
     }
 
@@ -164,7 +165,7 @@
       await onSave(blob);
     } catch (error) {
       console.error('Failed to save avatar:', error);
-      alert(m.avatar_save_failed());
+      showToast({ type: 'error', message: m.avatar_save_failed() });
     } finally {
       saving = false;
     }

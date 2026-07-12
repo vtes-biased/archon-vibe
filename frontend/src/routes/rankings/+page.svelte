@@ -38,7 +38,7 @@
       .sort((a, b) => a.name.localeCompare(b.name))
   );
 
-  let filtered = $derived(() => {
+  let filtered = $derived.by(() => {
     if (isHof) {
       let result = users.filter(u => {
         if ((u.wins?.length ?? 0) < 5) return false;
@@ -63,8 +63,8 @@
     return result;
   });
 
-  let totalPages = $derived(Math.ceil(filtered().length / pageSize));
-  let paged = $derived(filtered().slice(page * pageSize, (page + 1) * pageSize));
+  let totalPages = $derived(Math.ceil(filtered.length / pageSize));
+  let paged = $derived(filtered.slice(page * pageSize, (page + 1) * pageSize));
 
   async function loadData() {
     const [allUsers, suspended] = await Promise.all([
@@ -142,7 +142,7 @@
         <Loader2 class="w-6 h-6 animate-spin inline-block" />
         <span class="ml-2">{isHof ? m.hof_loading() : m.rankings_loading()}</span>
       </div>
-    {:else if filtered().length === 0}
+    {:else if filtered.length === 0}
       <div class="text-center text-ink-faint py-8">{isHof ? m.hof_no_results() : m.rankings_no_results()}</div>
     {:else}
       <div class="overflow-x-auto">

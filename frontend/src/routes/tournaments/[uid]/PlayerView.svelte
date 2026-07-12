@@ -24,11 +24,8 @@
     tournament,
     playerInfo,
     standings,
-    currentPlayerEntry,
     playerStandings,
     cutoffScore,
-    isFinals,
-    isFinished,
     playerHasValidDeck,
     myDeckErrors,
     userUid,
@@ -46,11 +43,8 @@
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
-    currentPlayerEntry: Player | null;
     playerStandings: StandingEntry[];
     cutoffScore: { gw: number; vp: number; tp: number } | null;
-    isFinals: boolean;
-    isFinished: boolean;
     playerHasValidDeck: boolean;
     myDeckErrors?: ValidationError[] | null;
     userUid: string;
@@ -65,6 +59,11 @@
     tournamentSanctions: Sanction[];
     decksByUser?: Record<string, DeckObject[]>;
   } = $props();
+
+  // Cheap page-level derivations replicated locally rather than threaded as props
+  const isFinished = $derived(tournament.state === "Finished");
+  const isFinals = $derived(tournament.finals != null && (tournament.state === "Playing" || tournament.state === "Finished"));
+  const currentPlayerEntry = $derived(tournament.players?.find(p => p.user_uid === userUid) ?? null);
 
   let showRegisteredPlayers = $state(false);
   let showPreviousRounds = $state(false);

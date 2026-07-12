@@ -70,7 +70,7 @@
   let showAvatarCropper = $state(false);
 
   // Check if current user can edit this user's avatar (only own avatar)
-  const canEditAvatar = $derived(() => {
+  const canEditAvatar = $derived.by(() => {
     if (!auth.user || !user) return false;
     return auth.user.uid === user.uid;
   });
@@ -513,7 +513,7 @@
     <div class="flex items-start justify-between">
       <!-- Avatar -->
       <div class="mr-4 flex-shrink-0">
-        {#if canEditAvatar()}
+        {#if canEditAvatar}
           <div class="flex flex-col items-center gap-1">
             <button
               onclick={(e) => { e.stopPropagation(); showAvatarCropper = true; }}

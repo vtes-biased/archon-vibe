@@ -65,7 +65,7 @@
   ];
 
   // Paginate users (filtering happens in IndexedDB query)
-  let paginatedUsers = $derived(() => {
+  let paginatedUsers = $derived.by(() => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     return filteredUsers.slice(start, end);
@@ -534,7 +534,7 @@
 
         <!-- User Rows -->
         <div id="users-rows-container" class="divide-y divide-line">
-          {#each paginatedUsers() as user (user.uid)}
+          {#each paginatedUsers as user (user.uid)}
               <div
                 class="user-row px-6 py-4 hover:bg-surface-muted/50 transition-colors cursor-pointer"
                 onclick={() => goto(`/users/${user.uid}`)}

@@ -41,7 +41,7 @@
 
   // initEngine() runs once in +layout.svelte; the permission wrappers below read
   // engineReady() internally, so canEdit/canManage recompute when WASM lands.
-  const canEdit = $derived(() => {
+  const canEdit = $derived.by(() => {
     if (!auth.user || !user || !engineReady()) return false;
     try {
       return canEditUser(auth.user, auth.user.uid, user.uid, user).allowed;
@@ -50,7 +50,7 @@
     }
   });
 
-  const canManage = $derived(() => {
+  const canManage = $derived.by(() => {
     if (!auth.user || !user || !isOnline) return false;
     try {
       return canManageVekn(auth.user, user).allowed;
@@ -59,7 +59,7 @@
     }
   });
 
-  const canManageDeceased = $derived(() => {
+  const canManageDeceased = $derived.by(() => {
     if (!auth.user || !user || !isOnline || !engineReady()) return false;
     if (auth.user.uid === user.uid) return false;
     try {
@@ -71,7 +71,7 @@
 
   // Soft-delete is IC-only; the button itself only shows for VEKN-less members
   // (handled in VeknManagement) — VEKN members are removed via deceased status.
-  const canDelete = $derived(() => {
+  const canDelete = $derived.by(() => {
     if (!auth.user || !user || !isOnline || !engineReady()) return false;
     if (auth.user.uid === user.uid) return false;
     try {
@@ -81,7 +81,7 @@
     }
   });
 
-  const canIssueSanctions = $derived(() => {
+  const canIssueSanctions = $derived.by(() => {
     if (!auth.user || !user || !isOnline) return false;
     if (auth.user.uid === user.uid) return false;
     return auth.user.roles.includes("IC") || auth.user.roles.includes("Ethics");
@@ -172,7 +172,7 @@
     <UserComponent
       {user}
       mode="view"
-      editable={canEdit() && isOnline}
+      editable={canEdit && isOnline}
       onupdated={handleUserUpdated}
     />
 
@@ -187,13 +187,13 @@
       </p>
     {/if}
 
-    {#if canManage()}
+    {#if canManage}
       <div class="mt-6">
-        <VeknManagement {user} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased()} canDelete={canDelete()} />
+        <VeknManagement {user} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
       </div>
     {/if}
 
-    <SanctionsManager {user} canIssueSanctions={canIssueSanctions()} />
+    <SanctionsManager {user} canIssueSanctions={canIssueSanctions} />
 
     <div class="mt-6">
       <PlayerRatings {user} />
