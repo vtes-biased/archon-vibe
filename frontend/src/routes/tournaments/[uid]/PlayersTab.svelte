@@ -12,7 +12,7 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff, Trash2, Ellipsis, Dices, Printer, Flower2, Ban } from "@lucide/svelte";
+  import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff, Trash2, Ellipsis, Dices, Printer, Flower2, Ban } from "@lucide/svelte";
   import { slide } from "svelte/transition";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import RaffleSection from "./RaffleSection.svelte";
@@ -138,7 +138,8 @@
   let expandedDeckRound = $state<number | null>(null);
   let uploadingFor = $state<string | null>(null);
   let uploadingRound = $state<number | undefined>(undefined);
-  let validationCache = $state<Record<string, ValidationError[]>>({});
+  // null = validation unavailable for at least one of the player's decks (not a pass)
+  let validationCache = $state<Record<string, ValidationError[] | null>>({});
 
   function togglePlayer(uid: string) {
     expandedPlayer = expandedPlayer === uid ? null : uid;
@@ -188,12 +189,13 @@
   }
 
   // Compute deck status for a player (aggregate across all decks)
-  type DeckStatus = 'valid' | 'warning' | 'error' | 'none';
+  type DeckStatus = 'valid' | 'warning' | 'error' | 'none' | 'unknown';
   function getDeckStatus(uid: string): DeckStatus {
     const decks = getPlayerDecks(uid);
     if (decks.length === 0) return 'none';
     const errors = validationCache[uid];
-    if (!errors) return 'valid'; // Not validated yet, assume valid
+    if (errors === undefined) return 'valid'; // Not validated yet, assume valid
+    if (errors === null) return 'unknown'; // Validation unavailable — not a pass
     const hasError = errors.some(e => e.severity === 'error');
     const hasWarning = errors.some(e => e.severity === 'warning');
     if (hasError) return 'error';
@@ -208,11 +210,16 @@
     if (!Object.keys(decks).length) return;
 
     for (const [uid, playerDecks] of Object.entries(decks)) {
-      if (playerDecks.length > 0 && !validationCache[uid]) {
+      // Presence check (not truthiness): a cached null must not re-trigger this
+      // effect, which reads validationCache and would loop on re-assignment.
+      if (playerDecks.length > 0 && validationCache[uid] === undefined) {
         Promise.all(
           playerDecks.filter(Boolean).map(d => validateDeck(d, format))
         ).then(results => {
-          validationCache = { ...validationCache, [uid]: results.flat() };
+          validationCache = {
+            ...validationCache,
+            [uid]: results.some(r => r === null) ? null : results.flat().filter(e => e !== null),
+          };
         });
       }
     }
@@ -809,6 +816,7 @@
                   {:else if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-info" /><span class="text-info">{m.players_view_deck()}</span>
                   {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-warn" /><span class="text-warn">{m.players_view_deck()}</span>
                   {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-link" /><span class="text-link">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'unknown'}<CircleHelp class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_view_deck()}</span>
                   {:else}<FileX class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_no_deck()}</span>{/if}
                 </button>
               {/if}
@@ -1028,6 +1036,7 @@
                     {:else if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-info" />
                     {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-warn" />
                     {:else if deckStatus === 'error'}<CircleX class="w-4 h-4 text-link" />
+                    {:else if deckStatus === 'unknown'}<CircleHelp class="w-4 h-4 text-ink-faint" />
                     {:else}<FileX class="w-4 h-4 text-ink-faint" />{/if}
                   </button>
                 </td>

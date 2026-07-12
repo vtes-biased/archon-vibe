@@ -1179,6 +1179,7 @@
   "deck_error_upload": "Caricamento fallito.",
   "deck_error_camera": "Impossibile accedere alla fotocamera.",
   "deck_error_save": "Impossibile salvare il mazzo.",
+  "deck_validation_unavailable": "Non è stato ancora possibile verificare la legalità di questo mazzo — i dati delle carte sono ancora in fase di caricamento.",
   "user_error_save_user": "Impossibile salvare l'utente.",
   "user_error_save": "Impossibile salvare le modifiche.",
   "user_error_load_users": "Impossibile caricare gli utenti.",

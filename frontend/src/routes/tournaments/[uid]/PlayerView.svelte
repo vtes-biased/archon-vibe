@@ -52,7 +52,7 @@
     isFinals: boolean;
     isFinished: boolean;
     playerHasValidDeck: boolean;
-    myDeckErrors?: ValidationError[];
+    myDeckErrors?: ValidationError[] | null;
     userUid: string;
     userVeknId: string | null;
     actionLoading: boolean;

@@ -22,7 +22,8 @@
   import * as m from '$lib/paraglide/messages.js';
 
   // Deck validation state for player's own deck
-  let myDeckErrors = $state<ValidationError[]>([]);
+  // null = validation unavailable (treated as no blocking errors — never gates)
+  let myDeckErrors = $state<ValidationError[] | null>([]);
 
   import FinishedResults from "./FinishedResults.svelte";
   import ArchonImportModal from "./ArchonImportModal.svelte";
@@ -130,7 +131,7 @@ import TournamentModals from "./TournamentModals.svelte";
     (auth.user?.uid && decksByUser[auth.user.uid]?.[0]) ?? null
   );
   const playerHasValidDeck = $derived(
-    !tournament?.decklist_required || (myDeck !== null && !myDeckErrors.some(e => e.severity === 'error'))
+    !tournament?.decklist_required || (myDeck !== null && !(myDeckErrors ?? []).some(e => e.severity === 'error'))
   );
 
   // Validate player's deck when it changes

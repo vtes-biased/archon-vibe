@@ -48,7 +48,7 @@
   let editing = $state(false);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
-  let validationErrors = $state<ValidationError[]>([]);
+  let validationErrors = $state<ValidationError[] | null>([]);
 
   $effect(() => {
     getCards().then(c => cards = c);
@@ -359,7 +359,12 @@
   </div>
 </div>
 
-{#if validationErrors.length > 0}
+{#if validationErrors === null}
+  <p class="mt-3 text-sm text-ink-muted">
+    <TriangleAlert class="w-4 h-4 inline mr-1" />
+    {m.deck_validation_unavailable()}
+  </p>
+{:else if validationErrors.length > 0}
   <div class="mt-3 space-y-1">
     {#each validationErrors as err}
       <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-warn'}">

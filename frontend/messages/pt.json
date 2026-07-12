@@ -1179,6 +1179,7 @@
   "deck_error_upload": "Falha no envio.",
   "deck_error_camera": "Não foi possível acessar a câmera.",
   "deck_error_save": "Não foi possível salvar o deck.",
+  "deck_validation_unavailable": "Ainda não foi possível verificar a legalidade deste deck — os dados das cartas ainda estão carregando.",
   "user_error_save_user": "Não foi possível salvar o usuário.",
   "user_error_save": "Não foi possível salvar as alterações.",
   "user_error_load_users": "Não foi possível carregar os usuários.",

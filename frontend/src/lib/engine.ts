@@ -590,24 +590,26 @@ export interface ValidationError {
 
 /**
  * Validate a deck against format rules using WASM engine.
- * Returns empty array if engine not initialized or on error.
+ * Returns null when validation is unavailable (cards not hydrated yet, engine
+ * failure) — the scoreSeatingSync convention. [] means genuinely valid, so
+ * callers must not read null as a pass.
  */
 export async function validateDeck(
   deck: { cards: Record<string, number>; name?: string },
   format: string
-): Promise<ValidationError[]> {
+): Promise<ValidationError[] | null> {
   const engine = await initEngine();
   try {
     // Get cards JSON from cards module
     const { getCardsJson } = await import('./cards');
     const cardsJson = await getCardsJson();
-    if (!cardsJson) return [];
+    if (!cardsJson) return null;
 
     const deckJson = JSON.stringify({ name: deck.name || '', cards: deck.cards });
     const resultJson = callEngine(() => engine.validateDeck(deckJson, cardsJson, format));
     return JSON.parse(resultJson);
   } catch {
-    return [];
+    return null;
   }
 }
 

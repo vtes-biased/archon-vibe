@@ -1179,6 +1179,7 @@
   "deck_error_upload": "Échec du téléchargement.",
   "deck_error_camera": "Impossible d'accéder à la caméra.",
   "deck_error_save": "Impossible d'enregistrer le deck.",
+  "deck_validation_unavailable": "Impossible de vérifier la légalité de ce deck pour le moment — les données des cartes sont encore en cours de chargement.",
   "user_error_save_user": "Impossible d'enregistrer l'utilisateur.",
   "user_error_save": "Impossible d'enregistrer les modifications.",
   "user_error_load_users": "Impossible de charger les utilisateurs.",

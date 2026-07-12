@@ -1179,6 +1179,7 @@
   "deck_error_upload": "Upload failed.",
   "deck_error_camera": "Couldn't access the camera.",
   "deck_error_save": "Couldn't save the deck.",
+  "deck_validation_unavailable": "Couldn't check this deck's legality yet — card data is still loading.",
   "user_error_save_user": "Couldn't save the user.",
   "user_error_save": "Couldn't save changes.",
   "user_error_load_users": "Couldn't load users.",
