@@ -398,6 +398,56 @@ async def test_finished_go_online_recomputes_ratings(test_client, test_db):
 
 
 @pytest.mark.asyncio
+async def test_sync_offline_insert_gated_on_official(test_client, test_db):
+    """sync-offline inserts a server-unknown tournament (offline-created backup),
+    so it must run the same creation gates as the go-online insert — the later
+    go-online finds the row and skips them."""
+    nobody = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Nobody")
+    await db.save_user(nobody)
+    uid = str(uuid7())  # never seeded server-side
+
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/sync-offline",
+        json={
+            "device_id": "devA",
+            "tournament": _offline_tournament_payload(uid, nobody.uid, "TEMP-x"),
+        },
+        headers=make_auth_header(nobody.uid),
+    )
+    assert resp.status_code == 403
+    assert await db.get_tournament_by_uid(uid) is None  # nothing inserted
+
+
+@pytest.mark.asyncio
+async def test_sync_offline_inserts_offline_created_backup(test_client, test_db):
+    """An official's offline-created tournament gets its crash-insurance backup:
+    sync-offline inserts the snapshot, still offline and locked to the device."""
+    prince = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Prince",
+        roles=[Role.PRINCE],
+    )
+    await db.save_user(prince)
+    uid = str(uuid7())  # never seeded server-side
+
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/sync-offline",
+        json={
+            "device_id": "devA",
+            "tournament": _offline_tournament_payload(uid, prince.uid, "TEMP-y"),
+        },
+        headers=make_auth_header(prince.uid),
+    )
+    assert resp.status_code == 200
+    saved = await db.get_tournament_by_uid(uid)
+    assert saved is not None
+    assert saved.offline_mode is True  # a backup, not a go-online
+    assert saved.offline_device_id == "devA"
+    assert prince.uid in saved.organizers_uids
+
+
+@pytest.mark.asyncio
 async def test_sync_offline_rejects_non_organizer(test_client, test_db):
     """sync-offline must gate on organizer, not just the device lock: the intruder
     here holds the CORRECT device_id (offline_device_id is member-visible), yet must

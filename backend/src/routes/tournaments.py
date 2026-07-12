@@ -2076,6 +2076,41 @@ def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) ->
     return msgspec.json.decode(raw)
 
 
+async def _gate_offline_created_insert(
+    current_user: User, tournament_data: dict
+) -> None:
+    """Authorize inserting a tournament the server has never seen (created
+    offline): mirror create_tournament's gates — the WASM engine enforced them
+    client-side, but the payload is client-supplied. Shared by go_online and
+    sync_offline; whichever inserts first is the creation, and the other then
+    takes its existing-row path.
+    """
+    if not permissions.is_official(current_user):
+        raise HTTPException(
+            status_code=403, detail="Only IC, NC, or Prince can create tournaments"
+        )
+    if current_user.uid not in (tournament_data.get("organizers_uids") or []):
+        raise HTTPException(
+            status_code=403,
+            detail="Caller is not an organizer of the submitted tournament",
+        )
+    league_uid = tournament_data.get("league_uid")
+    if league_uid:
+        league = await get_league_by_uid(league_uid)
+        if not league:
+            raise HTTPException(status_code=400, detail="League not found")
+        if Role.IC not in current_user.roles:
+            is_nc_same_country = (
+                Role.NC in current_user.roles and league.country == current_user.country
+            )
+            is_league_organizer = current_user.uid in league.organizers_uids
+            if not (is_nc_same_country or is_league_organizer):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only league organizers can link tournaments to this league",
+                )
+
+
 @router.post("/{uid}/go-online")
 async def go_online(
     uid: str,
@@ -2121,33 +2156,9 @@ async def go_online(
                 detail="Tournament owned by another device. Use force to override.",
             )
     else:
-        # Offline-CREATED tournament — the server first learns of it here, so this
-        # insert is a creation: mirror create_tournament's gates. The WASM engine
-        # enforced them client-side, but the payload is client-supplied.
-        if not permissions.is_official(current_user):
-            raise HTTPException(
-                status_code=403, detail="Only IC, NC, or Prince can create tournaments"
-            )
-        if current_user.uid not in (request.tournament.get("organizers_uids") or []):
-            raise HTTPException(
-                status_code=403, detail="Only organizers can bring a tournament online"
-            )
-        league_uid = request.tournament.get("league_uid")
-        if league_uid:
-            league = await get_league_by_uid(league_uid)
-            if not league:
-                raise HTTPException(status_code=400, detail="League not found")
-            if Role.IC not in current_user.roles:
-                is_nc_same_country = (
-                    Role.NC in current_user.roles
-                    and league.country == current_user.country
-                )
-                is_league_organizer = current_user.uid in league.organizers_uids
-                if not (is_nc_same_country or is_league_organizer):
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Only league organizers can link tournaments to this league",
-                    )
+        # Offline-CREATED tournament — the server first learns of it here, so
+        # this insert is a creation.
+        await _gate_offline_created_insert(current_user, request.tournament)
 
     # Resolve offline players → real user accounts. Done OUTSIDE the lock: each
     # resolution may create a user and allocate a VEKN ID (its own advisory-locked
@@ -2388,26 +2399,32 @@ async def sync_offline(
 
     # SELECT FOR UPDATE: serialize device-lock check with the snapshot write (TOCTOU)
     async with tournament_transaction(uid) as (tournament, tx_conn):
-        if not tournament:
-            raise HTTPException(status_code=404, detail="Tournament not found")
+        if tournament:
+            if not tournament.offline_mode:
+                raise HTTPException(
+                    status_code=400, detail="Tournament is not in offline mode"
+                )
 
-        if not tournament.offline_mode:
-            raise HTTPException(
-                status_code=400, detail="Tournament is not in offline mode"
-            )
+            # offline_device_id is member-visible, so the device-lock check alone
+            # lets any member overwrite the snapshot — gate on organizer like the
+            # go_offline/go_online/force_takeover siblings.
+            if not permissions.is_organizer(current_user, tournament):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only organizers can sync an offline tournament",
+                )
 
-        # offline_device_id is member-visible, so the device-lock check alone
-        # lets any member overwrite the snapshot — gate on organizer like the
-        # go_offline/go_online/force_takeover siblings.
-        if not permissions.is_organizer(current_user, tournament):
-            raise HTTPException(
-                status_code=403, detail="Only organizers can sync an offline tournament"
-            )
-
-        if tournament.offline_device_id != request.device_id:
-            raise HTTPException(
-                status_code=409, detail="Device does not hold the offline lock"
-            )
+            if tournament.offline_device_id != request.device_id:
+                raise HTTPException(
+                    status_code=409, detail="Device does not hold the offline lock"
+                )
+        else:
+            # Offline-CREATED tournament: the backup snapshot is exactly the
+            # crash insurance that motivates offline creation, so insert rather
+            # than 404 — gated like the go-online insert (the later go-online
+            # then finds the row and takes its existing-row path, so these
+            # gates MUST run here).
+            await _gate_offline_created_insert(current_user, request.tournament)
 
         # Pin the write to the locked row: the FOR UPDATE lock and device-lock
         # check are keyed on the URL uid, so the snapshot must save there too.
@@ -2418,10 +2435,18 @@ async def sync_offline(
         # Save tournament snapshot (keep offline_mode=True)
         tournament_data = request.tournament
         tournament_data["offline_mode"] = True
-        tournament_data["offline_device_id"] = tournament.offline_device_id
-        tournament_data["offline_user_uid"] = tournament.offline_user_uid
-        if tournament.offline_since:
-            tournament_data["offline_since"] = tournament.offline_since.isoformat()
+        if tournament:
+            tournament_data["offline_device_id"] = tournament.offline_device_id
+            tournament_data["offline_user_uid"] = tournament.offline_user_uid
+            if tournament.offline_since:
+                tournament_data["offline_since"] = tournament.offline_since.isoformat()
+        else:
+            # Insert: no server-side lock fields to preserve — the snapshot stays
+            # locked to the device that created it offline.
+            tournament_data["offline_device_id"] = request.device_id
+            tournament_data["offline_user_uid"] = current_user.uid
+            if not tournament_data.get("offline_since"):
+                tournament_data["offline_since"] = datetime.now(UTC).isoformat()
         tournament_data["modified"] = datetime.now(UTC).isoformat()
 
         updated = msgspec.convert(tournament_data, Tournament)
