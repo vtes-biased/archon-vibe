@@ -109,6 +109,10 @@
       {#if alterMode}
         <!-- In-place alter seating mode -->
         <p class="text-sm text-ink mb-2">{m.rounds_alter_hint()}</p>
+        <p class="text-xs text-ink-muted mb-2">
+          {m.finals_seating_procedure_hint()}
+          <a href="/help/tournament-rules#313-final-round-seating" class="text-link hover:underline">{m.finals_seating_procedure_link()}</a>
+        </p>
         <SeatingSortable
           bind:tables={alterTables}
           {playerInfo}

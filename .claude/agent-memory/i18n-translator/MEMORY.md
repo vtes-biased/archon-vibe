@@ -22,11 +22,14 @@
 | standings | Classement | clasificación | classificação | classifica |
 | standings adjustment | — | ajuste de clasificación | ajuste de classificação | aggiustamento di classifica |
 | finals | Finale | final | final | finale† |
-| seating | Placement | distribución | assentos | disposizione |
-| seat (position) | Placement | asiento | assento | posto |
+| seating | Placement | asientos | assentos | disposizione / seduta (finals-specific)** |
+| seat (position) | Siège (unit) / Placement (concept) | asiento | assento | posto |
 | open seat | Placement libre | asiento libre | assento livre | posto libero |
 | move here | Déplacer ici | mover aquí | mover aqui | sposta qui |
-| seed | — | cabeza de serie | cabeça de chave | testa di serie |
+| seed (noun, ranking) | Tête de série | cabeza de serie†† | cabeça de chave | testa di serie |
+| name card (finals seating ritual) | carte nominative | tarjeta (con su nombre) | cartão (com seu nome) | cartellino (con il nome) |
+| row / gap (finals seating ritual) | rangée / espace | fila / hueco | fileira / espaço | fila / spazio |
+| lowest qualifier (finals seating start order) | tête de série la plus basse | cabeza de serie más baja | cabeça de chave mais baixa | testa di serie più bassa |
 | toss | — | sorteo | sorteio | sorteggio |
 | raffle | — | sorteo | sorteio | estrazione |
 | check-in | Enregistrement / Pointer | registro (de asistencia) / registrarse | check-in | check-in |
@@ -73,6 +76,8 @@
 ‡ judge it: giudice — never "arbitro".
 ¶ deck: "mazo"(es)/"mazzo"(it) exist but UI labels keep "deck".
 ‖ predator es: an older table cell had "Predador" (likely a pt copy) — "depredador" is the correct Spanish; verify before reuse.
+†† es "seed": the visible UI label `finals_seed` is literally "Semilla #{n}" (a literal, non-official rendering) while `og_finals_toss` prose already used the correct official term "cabeza de serie" before this note was written — the two disagree within the same file (checked 2026-07-12, not fixed since out of scope for that task; `finals_seed` may be worth flagging to the team). For new prose, use "cabeza de serie" (official term, matches existing prose); don't silently "fix" `finals_seed` without being asked. fr/pt/it don't have this split (fr `finals_seed`="Tête de série #{n}" already matches; pt/it UI label is the bare loanword "Seed #{n}" but prose uses the official term, which reads as a deliberate short-label-vs-descriptive-prose split, not a bug).
+** it "seating": `rounds_alter_seating`/`rounds_seating_*` (regular rounds) use "posti"/"disposizione"; the finals-specific og_finals_toss section uses "seduta" for the finals seating ritual specifically (`Seduta delle Finali`, `Modifica Seduta Finale`) — keep "seduta" for finals-seating prose, "disposizione"/"posti" for regular-round seating UI.
 - Clock stop has two keys: `timer_clock_stop` (imperative/button) vs `timer_policy_clock_stop` (noun/policy) — es/pt/it differ per the two cells above; fr is identical for both.
 - Keep in English (all langs): VEKN, VP, GW, TP, TWDA, VDB, Archon, Discord, Markdown, IndexedDB, QR, Constructed, Limited, Standard, Grand Prix, Inner Circle (IC), NC, Prince, passkey, multideck.
 - NOTE/TIP callout titles per locale: fr NOTE→NOTE, TIP→CONSEIL; es NOTE→NOTA, TIP→CONSEJO; it NOTE→NOTA, TIP→CONSIGLIO (pg_ context) / SUGGERIMENTO (first-install); pt NOTE→NOTA, TIP→DICA. AVERTISSEMENT(fr)/ADVERTENCIA(es)/ATTENZIONE(it) for warnings.
@@ -91,3 +96,4 @@
 2. Build translations dict, `xx.update(translations)`, write with `json.dump(..., ensure_ascii=False, indent=2)` + trailing `'\n'`
 3. Validate: `python3 -c "import json; json.load(open('xx.json')); print('ok')"`
 4. Compile + check: `npx @inlang/paraglide-js compile --project project.inlang --outdir src/lib/paraglide` then `npm run check`
+5. To edit one paragraph inside a long markdown string safely (e.g. `og_finals_toss`, `og_force_takeover`): `txt.split('\n\n')` gives numbered segments (headings and paragraphs are separated by blank lines) — print them, find the target index, replace `segs[i]`, rejoin with `'\n\n'`. The segment split is stable across en/fr/es/pt/it since structure (heading/paragraph/list count) mirrors the source even when wording differs — safer than manual multi-line string matching for markdown bodies. Checked 2026-07-12 on a 4-locale `og_finals_toss` edit (15 segments each).
