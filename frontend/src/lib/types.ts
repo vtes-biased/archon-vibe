@@ -18,7 +18,6 @@ export type Role =
   | "Judgekin"
   | "DEV"; // Developer (can register OAuth clients)
 
-export type AuthMethodType = "email" | "discord" | "passkey";
 
 export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | "facebook" | "website" | "twitch" | "youtube" | "reddit" | "instagram" | "blog" | "other";
 
@@ -151,16 +150,6 @@ export interface BaseObject {
   uid: string; // UUID v7
   modified: string; // ISO datetime string
   deleted_at?: string | null; // Soft delete timestamp
-}
-
-export interface AuthMethod extends BaseObject {
-  user_uid: string;
-  method_type: AuthMethodType;
-  identifier: string; // email address, discord ID, or passkey credential ID
-  credential_hash: string | null; // password hash or passkey public key
-  verified: boolean;
-  created_at: string | null;
-  last_used_at: string | null;
 }
 
 export interface User extends BaseObject {
@@ -409,36 +398,6 @@ export interface OfflinePlayer {
   name: string;
   vekn_id?: string;
   email?: string;
-}
-
-/**
- * TournamentConfig — used as payload type for create/update API calls only.
- * NOT stored in IndexedDB.
- */
-export interface TournamentConfig {
-  name: string;
-  format: TournamentFormat;
-  rank: TournamentRank;
-  online: boolean;
-  start: string | null;
-  finish: string | null;
-  timezone: string;
-  country: string | null;
-  league_uid: string | null;
-  state: TournamentState;
-  organizers_uids: string[];
-  venue: string;
-  venue_url: string;
-  address: string;
-  map_url: string;
-  proxies: boolean;
-  multideck: boolean;
-  decklist_required: boolean;
-  description: string;
-  standings_mode: StandingsMode;
-  decklists_mode: DeckListsMode;
-  max_rounds: number;
-  self_organized_rounds: boolean;
 }
 
 // Standalone deck object (synced separately from tournament)

@@ -11,8 +11,7 @@ import {
   getCountries, 
   getCountry, 
   loadCities, 
-  searchCities,
-  getCitiesByCountry 
+  searchCities 
 } from './lib/geonames';
 
 // Countries are loaded immediately (small file)
@@ -24,9 +23,6 @@ const cities = await loadCities();
 
 // Search for cities
 const parisResults = await searchCities('Paris', 'FR', 5);
-
-// Get cities in a country
-const usaCities = await getCitiesByCountry('US', 50);
 ```
 
 ### Performance

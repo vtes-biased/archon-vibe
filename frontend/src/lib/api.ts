@@ -3,7 +3,7 @@
  */
 
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League } from '$lib/types';
-import { getAllUsers, saveTournament, saveLeague } from './db';
+import { saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
 import { getAccessToken, getAuthState } from '$lib/stores/auth.svelte';
 import { errorCodeToMessage } from './error-codes';
@@ -175,19 +175,11 @@ export async function submitFeedback(
   data: FeedbackSubmission,
   opts?: { suppressErrorToast?: boolean }
 ): Promise<{ issue_url: string; issue_number: number }> {
-  requireOnline(opts);
   return apiRequest<{ issue_url: string; issue_number: number }>(
     '/api/feedback/',
     { method: 'POST', body: JSON.stringify(data) },
     opts
   );
-}
-
-/**
- * Fetch users - always use IndexedDB for offline-first approach.
- */
-export async function fetchUsers(): Promise<User[]> {
-  return getAllUsers();
 }
 
 export async function createUser(
@@ -201,8 +193,6 @@ export async function createUser(
   // Pass { suppressErrorToast: true } from callers that render the error inline.
   opts?: { suppressErrorToast?: boolean },
 ): Promise<User> {
-  requireOnline(opts);
-
   const body: Record<string, unknown> = { name, country };
   if (city) body.city = city;
   if (city_geoname_id != null) body.city_geoname_id = city_geoname_id;
@@ -224,8 +214,6 @@ export async function updateUser(
   // Pass { suppressErrorToast: true } from callers that render the error inline.
   opts?: { suppressErrorToast?: boolean },
 ): Promise<User> {
-  requireOnline(opts);
-
   // Omit a field to leave it unchanged; '' clears a string, [] clears roles.
   const body: Record<string, unknown> = {};
   if (name) body.name = name;
@@ -240,7 +228,6 @@ export async function updateUser(
 
 /** Mark or clear a member's deceased status (IC or same-country NC). */
 export async function setMemberDeceased(uid: string, deceased: boolean): Promise<User> {
-  requireOnline();
   return apiRequest<User>(
     `/api/users/${uid}/deceased`,
     { method: 'PATCH', body: JSON.stringify({ deceased }) },
@@ -249,7 +236,6 @@ export async function setMemberDeceased(uid: string, deceased: boolean): Promise
 
 /** Soft-delete a VEKN-less member (IC only). Returns the soft-deleted user. */
 export async function deleteMember(uid: string): Promise<User> {
-  requireOnline();
   return apiRequest<User>(`/api/users/${uid}`, { method: 'DELETE' });
 }
 
@@ -291,7 +277,6 @@ export interface VeknAbandonResponse {
  * Claim an unclaimed VEKN ID for the current user.
  */
 export async function claimVeknId(vekn_id: string): Promise<VeknClaimResponse> {
-  requireOnline();
   return apiRequest<VeknClaimResponse>('/vekn/claim', {
     method: 'POST',
     body: JSON.stringify({ vekn_id }),
@@ -302,7 +287,6 @@ export async function claimVeknId(vekn_id: string): Promise<VeknClaimResponse> {
  * Abandon the current user's VEKN ID.
  */
 export async function abandonVeknId(): Promise<VeknAbandonResponse> {
-  requireOnline();
   return apiRequest<VeknAbandonResponse>('/vekn/abandon', {
     method: 'POST',
   });
@@ -312,7 +296,6 @@ export async function abandonVeknId(): Promise<VeknAbandonResponse> {
  * Sponsor a new VEKN member (allocates new sequential VEKN ID).
  */
 export async function sponsorVeknMember(user_uid: string): Promise<VeknSponsorResponse> {
-  requireOnline();
   return apiRequest<VeknSponsorResponse>('/vekn/sponsor', {
     method: 'POST',
     body: JSON.stringify({ user_uid }),
@@ -323,7 +306,6 @@ export async function sponsorVeknMember(user_uid: string): Promise<VeknSponsorRe
  * Link a VEKN ID to a user (may displace current holder).
  */
 export async function linkVeknId(vekn_id: string, user_uid: string): Promise<VeknLinkResponse> {
-  requireOnline();
   return apiRequest<VeknLinkResponse>('/vekn/link', {
     method: 'POST',
     body: JSON.stringify({ vekn_id, user_uid }),
@@ -334,7 +316,6 @@ export async function linkVeknId(vekn_id: string, user_uid: string): Promise<Vek
  * Force-abandon a user's VEKN ID (for NC/Prince/IC).
  */
 export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageResponse> {
-  requireOnline();
   return apiRequest<VeknMessageResponse>('/vekn/force-abandon', {
     method: 'POST',
     body: JSON.stringify({ user_uid }),
@@ -345,7 +326,6 @@ export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageR
  * Merge two user accounts (for NC/Prince/IC).
  */
 export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<{ user: User; message: string }> {
-  requireOnline();
   return apiRequest<{ user: User; message: string }>('/admin/users/merge', {
     method: 'POST',
     body: JSON.stringify({ keep_uid, delete_uid }),
@@ -362,20 +342,17 @@ export interface AdminSyncResult {
 
 /** IC-only: dispatch a VEKN member sync in the background (also runs on a 6h schedule). */
 export async function syncVeknMembers(): Promise<AdminSyncResult> {
-  requireOnline({ suppressErrorToast: true });
   // Errors surface inline in ConfirmActionModal — suppress the duplicate toast.
   return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 /** IC-only: dispatch a VEKN tournament sync in the background (also runs on a 6h schedule). */
 export async function syncVeknTournaments(): Promise<AdminSyncResult> {
-  requireOnline({ suppressErrorToast: true });
   return apiRequest<AdminSyncResult>('/admin/sync-vekn-tournaments', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 /** IC-only: dispatch a TWDA decklist import in the background (also runs on a 24h schedule). */
 export async function syncTwdaDecks(): Promise<AdminSyncResult> {
-  requireOnline({ suppressErrorToast: true });
   return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });
 }
 
@@ -396,7 +373,6 @@ export interface VeknStatusResponse {
  * justified GET (like the sync triggers above, it can't come from IndexedDB).
  */
 export async function getVeknStatus(): Promise<VeknStatusResponse> {
-  requireOnline({ suppressErrorToast: true });
   return apiRequest<VeknStatusResponse>('/admin/vekn-status', { method: 'GET' }, { suppressErrorToast: true });
 }
 
@@ -417,21 +393,9 @@ export interface CreateSanctionData {
  * Create a new sanction (IC/Ethics only for SUSPENSION/PROBATION).
  */
 export async function createSanction(data: CreateSanctionData): Promise<Sanction> {
-  requireOnline();
   return apiRequest<Sanction>('/sanctions/', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
-}
-
-/**
- * Lift a sanction (sets lifted_at and lifted_by_uid).
- */
-export async function liftSanction(uid: string): Promise<Sanction> {
-  requireOnline();
-  return apiRequest<Sanction>(`/sanctions/${uid}`, {
-    method: 'PUT',
-    body: JSON.stringify({ lifted: true }),
   });
 }
 
@@ -449,7 +413,6 @@ export interface UpdateSanctionData {
  * Update a sanction (level, category, description, expiry, or lift it).
  */
 export async function updateSanction(uid: string, data: UpdateSanctionData): Promise<Sanction> {
-  requireOnline();
   return apiRequest<Sanction>(`/sanctions/${uid}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -460,7 +423,6 @@ export async function updateSanction(uid: string, data: UpdateSanctionData): Pro
  * Soft delete a sanction.
  */
 export async function deleteSanctionApi(uid: string): Promise<{ message: string }> {
-  requireOnline();
   return apiRequest<{ message: string }>(`/sanctions/${uid}`, {
     method: 'DELETE',
   });
@@ -474,8 +436,6 @@ export async function deleteSanctionApi(uid: string): Promise<{ message: string 
  * @param blob - The image blob (should be webp, max 1MB)
  */
 export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ success: boolean }> {
-  requireOnline();
-
   // apiRequest passes FormData through untouched (no JSON content-type) and
   // handles auth + error extraction; the browser sets the multipart boundary.
   const formData = new FormData();
@@ -553,7 +513,6 @@ export interface CreateTournamentData {
 }
 
 export async function createTournament(data: CreateTournamentData, opts?: { suppressErrorToast?: boolean }): Promise<Tournament> {
-  requireOnline(opts);
   return apiRequest<Tournament>('/api/tournaments/', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -601,7 +560,6 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
 }
 
 export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<{ message: string }> {
-  requireOnline(opts);
   const result = await apiRequest<{ message: string }>(`/api/tournaments/${uid}`, {
     method: 'DELETE',
   }, opts);
@@ -613,7 +571,6 @@ export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToa
 
 /** Register a tournament with the VEKN calendar on demand (organizer action). */
 export async function syncTournamentVekn(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<Tournament> {
-  requireOnline(opts);
   return apiRequest<Tournament>(`/api/tournaments/${uid}/push-vekn`, {
     method: 'POST',
   }, opts);
@@ -623,16 +580,12 @@ export async function syncTournamentVekn(uid: string, opts?: { suppressErrorToas
  * Self check-in via QR code (server-only, no optimistic path).
  */
 export async function qrCheckin(tournamentUid: string, code: string): Promise<Tournament> {
-  requireOnline();
   return apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/qr-checkin`, {
     method: 'POST',
     body: JSON.stringify({ code }),
   });
 }
 
-/**
- * Delete user avatar.
- */
 // League API
 
 export interface CreateLeagueData {
@@ -648,7 +601,6 @@ export interface CreateLeagueData {
 }
 
 export async function createLeague(data: CreateLeagueData, opts?: { suppressErrorToast?: boolean }): Promise<League> {
-  requireOnline(opts);
   const created = await apiRequest<League>('/api/leagues/', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -658,7 +610,6 @@ export async function createLeague(data: CreateLeagueData, opts?: { suppressErro
 }
 
 export async function updateLeague(uid: string, data: Partial<CreateLeagueData>, opts?: { suppressErrorToast?: boolean }): Promise<League> {
-  requireOnline(opts);
   const updated = await apiRequest<League>(`/api/leagues/${uid}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -668,7 +619,6 @@ export async function updateLeague(uid: string, data: Partial<CreateLeagueData>,
 }
 
 export async function deleteLeagueApi(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<void> {
-  requireOnline(opts);
   await apiRequest<void>(`/api/leagues/${uid}`, {
     method: 'DELETE',
   }, opts);
@@ -746,17 +696,6 @@ export async function callJudge(uid: string, table: number): Promise<void> {
   });
 }
 
-export async function deleteAvatar(userUid: string): Promise<{ success: boolean }> {
-  requireOnline();
-
-  const result = await apiRequest<{ success: boolean }>(`/api/users/${userUid}/avatar`, {
-    method: 'DELETE',
-  });
-
-  showToast({ type: 'success', message: m.profile_avatar_removed() });
-  return result;
-}
-
 /**
  * Upload a tournament banner (organizer only). The new versioned banner_path
  * arrives via SSE — no need to return it here.
@@ -766,8 +705,6 @@ export async function uploadTournamentBanner(
   tournamentUid: string,
   blob: Blob
 ): Promise<{ success: boolean }> {
-  requireOnline();
-
   const formData = new FormData();
   formData.append('file', blob, 'banner.webp');
 
@@ -782,8 +719,6 @@ export async function uploadTournamentBanner(
 export async function deleteTournamentBanner(
   tournamentUid: string
 ): Promise<{ success: boolean }> {
-  requireOnline();
-
   const result = await apiRequest<{ success: boolean }>(
     `/api/tournaments/${tournamentUid}/banner`,
     { method: 'DELETE' }

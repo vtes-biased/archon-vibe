@@ -30,10 +30,6 @@ export function setTheme(p: ThemePref) {
   apply(p);
 }
 
-export function cycleTheme() {
-  const next: ThemePref = pref === 'system' ? 'light' : pref === 'light' ? 'dark' : 'system';
-  setTheme(next);
-}
 
 export function initTheme() {
   apply(pref);

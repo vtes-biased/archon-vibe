@@ -46,20 +46,6 @@ export const TYPE_ICONS: Record<string, string> = {
   'Merged': 'µ',
 };
 
-/** Full discipline name → lowercase trigram (for lookups) */
-export const DISCIPLINE_NAME_TO_TRIGRAM: Record<string, string> = {
-  'Abombwe': 'abo', 'Animalism': 'ani', 'Auspex': 'aus',
-  'Blood Sorcery': 'tha', 'Celerity': 'cel', 'Chimerstry': 'chi',
-  'Daimoinon': 'dai', 'Dementation': 'dem', 'Dominate': 'dom',
-  'Fortitude': 'for', 'Maleficia': 'mal', 'Melpominee': 'mel',
-  'Mytherceria': 'myt', 'Necromancy': 'nec', 'Obeah': 'obe',
-  'Obfuscate': 'obf', 'Oblivion': 'obl', 'Obtenebration': 'obt',
-  'Potence': 'pot', 'Presence': 'pre', 'Protean': 'pro',
-  'Quietus': 'qui', 'Sanguinus': 'san', 'Serpentis': 'ser',
-  'Spiritus': 'spi', 'Striga': 'str', 'Temporis': 'tem',
-  'Thanatosis': 'thn', 'Thaumaturgy': 'tha', 'Valeren': 'val',
-  'Vicissitude': 'vic', 'Visceratika': 'vis',
-};
 
 /**
  * Get the font character for a discipline trigram.

@@ -58,16 +58,6 @@ export function dismissToast(id: string): void {
   toasts = toasts.filter((t) => t.id !== id);
 }
 
-/**
- * Dismiss all toasts.
- */
-export function dismissAllToasts(): void {
-  // Clear all timers
-  timers.forEach((timer) => clearTimeout(timer));
-  timers.clear();
-
-  toasts = [];
-}
 
 /**
  * Get the current toasts (reactive).

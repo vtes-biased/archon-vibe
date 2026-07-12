@@ -299,14 +299,6 @@ export async function deleteUser(uid: string): Promise<void> {
   await db.delete('users', uid);
 }
 
-export async function getUsersByCountry(country: string): Promise<User[]> {
-  const db = await getDB();
-  // Use compound index to get sorted by name
-  const range = IDBKeyRange.bound([country, ''], [country, '\uffff']);
-  const users = await db.getAllFromIndex('users', 'by-country-name', range);
-  return users.filter(u => !u.deleted_at);
-}
-
 /**
  * Check if a user matches a search query.
  * Supports multiple search terms: "vin rip" matches "Vincent Ripoll".
@@ -766,11 +758,6 @@ export async function getDecksByTournamentGrouped(tournamentUid: string): Promis
     arr.sort((a, b) => (a.round ?? 0) - (b.round ?? 0));
   }
   return grouped;
-}
-
-export async function getDecksByUser(userUid: string): Promise<DeckObject[]> {
-  const db = await getDB();
-  return db.getAllFromIndex('decks', 'by-user', userUid);
 }
 
 export async function saveDeck(deck: DeckObject): Promise<void> {

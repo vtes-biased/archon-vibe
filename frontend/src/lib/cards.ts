@@ -49,13 +49,6 @@ export async function getCardsJson(): Promise<string> {
   return JSON.stringify(obj);
 }
 
-/**
- * Look up a card by ID.
- */
-export async function getCard(id: number): Promise<VtesCard | undefined> {
-  const cards = await getCards();
-  return cards.get(id);
-}
 
 /**
  * Fetch fresh cards from the API, using ETag for caching.

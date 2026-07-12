@@ -9,9 +9,9 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { scoreSeatingSync, computeRatingPoints, initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
+  import { initEngine, validateDeck, isOrganizer as engineIsOrganizer, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
-  import { getStateBadgeClass, seatDisplay as seatDisplayUtil, vpOptions, computeGwLocal, computeTpLocal, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { getStateBadgeClass, translateTournamentState, top5HasTies as top5HasTiesFn, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, QrCode, CloudOff, CheckCheck, Banknote, RotateCcw, Undo2, Trash2, Upload, CloudUpload } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
@@ -209,15 +209,6 @@ import TournamentModals from "./TournamentModals.svelte";
     return computeStandings(tournament);
   });
 
-  // Rating points per player (only for finished tournaments)
-  // Finals GW counts toward total GW for rating computation (VEKN rules)
-  function getRatingPts(entry: StandingEntry): number {
-    if (!tournament || tournament.state !== "Finished") return 0;
-    const isWinner = entry.rank === 1;
-    const finalistPos = isWinner ? 1 : (entry.finalist ? 2 : 0);
-    const gw = isWinner ? entry.gw + 1 : entry.gw;
-    return computeRatingPoints(entry.vp, gw, finalistPos, standings.length, tournament.rank);
-  }
 
   const isFinished = $derived(tournament?.state === "Finished");
 
@@ -340,21 +331,11 @@ import TournamentModals from "./TournamentModals.svelte";
       : null
   );
 
-  // Player DQ state and sanctions helpers for standings display
-  function isPlayerDQ(userUid: string): boolean {
-    return tournament?.players?.some(p => p.user_uid === userUid && p.state === "Disqualified") ?? false;
-  }
-  function sanctionsForPlayer(userUid: string): Sanction[] {
-    return tournamentSanctions.filter(s => s.user_uid === userUid);
-  }
 
   function playerUidsOf(t: Tournament | null | undefined): string[] {
     return (t?.players ?? []).map(p => p.user_uid).filter((u): u is string => !!u);
   }
 
-  function seatDisplay(uid: string): string {
-    return seatDisplayUtil(uid, playerInfo, tournament?.online ?? false);
-  }
 
   let scoreSaving = $state<number | null>(null);
   let scoreSavingSeat = $state<string | null>(null);

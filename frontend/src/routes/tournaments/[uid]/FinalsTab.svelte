@@ -35,21 +35,18 @@
 
   // Alter seating mode
   let alterMode = $state(false);
-  let alterSeating = $state<string[]>([]);
 
   const canEditSeating = $derived(
     isOrganizer && (tournament.state === "Playing" || tournament.state === "Finished" || tournament.state === "Waiting")
   );
 
   function enterAlterMode() {
-    alterSeating = tournament.finals!.seating.map(s => s.player_uid);
-    alterTables = [alterSeating];
+    alterTables = [tournament.finals!.seating.map(s => s.player_uid)];
     alterMode = true;
   }
 
   function cancelAlterMode() {
     alterMode = false;
-    alterSeating = [];
     alterTables = [];
   }
 
@@ -129,7 +126,7 @@
           playerIssues={new Map()}
           isFinals={true}
           online={tournament.online}
-          onchange={() => { alterSeating = alterTables[0] ?? []; }}
+          onchange={() => {}}
         />
         <div class="flex gap-2 mt-3">
           <Button variant="primary" size="lg" onclick={saveAlterSeating} disabled={actionLoading}>{m.rounds_save_seating()}</Button>

@@ -72,9 +72,6 @@ export async function initEngine(): Promise<WasmEngine> {
 }
 
 /**
- * Tournament event types for the Rust engine.
- */
-/**
  * Score seating synchronously (returns null if engine not initialized).
  */
 export function scoreSeatingSync(
@@ -257,14 +254,6 @@ export async function processTournamentEvent(
   };
 }
 
-/**
- * Compute optimal seating for a tournament round.
- *
- * @param players Player UIDs for seating
- * @param roundsCount Total rounds to compute
- * @param previousRounds Previous rounds (for optimization)
- * @returns Computed rounds and score
- */
 /**
  * Permission result from the engine.
  */

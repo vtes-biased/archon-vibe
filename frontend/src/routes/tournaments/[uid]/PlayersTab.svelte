@@ -119,8 +119,7 @@
   const currentRound = $derived.by(() => {
     const numRounds = tournament.rounds?.length ?? 0;
     if (numRounds === 0) return null;
-    if (tournament.state === "Playing") return numRounds - 1;
-    return numRounds - 1; // default to last round
+    return numRounds - 1;
   });
 
   let editingToss = $state(false);

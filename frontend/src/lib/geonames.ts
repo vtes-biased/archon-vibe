@@ -91,13 +91,6 @@ export async function loadCities(): Promise<City[]> {
     return citiesLoadingPromise;
 }
 
-/**
- * Get a city by its GeoNames ID.
- */
-export async function getCityById(geonameId: number): Promise<City | undefined> {
-    const cities = await loadCities();
-    return cities.find((city) => city.geoname_id === geonameId);
-}
 
 /**
  * Search cities by name.
@@ -137,30 +130,4 @@ export async function searchCities(
     return results;
 }
 
-/**
- * Get cities for a specific country.
- * 
- * @param countryCode - ISO 3166-1 alpha-2 country code
- * @param limit - Maximum number of results (default: 100)
- */
-export async function getCitiesByCountry(
-    countryCode: string,
-    limit: number = 100
-): Promise<City[]> {
-    const cities = await loadCities();
-    const results: City[] = [];
-    const code = countryCode.toUpperCase();
-
-    for (const city of cities) {
-        if (results.length >= limit) {
-            break;
-        }
-
-        if (city.country_code === code) {
-            results.push(city);
-        }
-    }
-
-    return results;
-}
 

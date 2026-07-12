@@ -572,7 +572,6 @@ class SyncManager {
    */
   private async handleError(transient = false): Promise<void> {
     await this.disconnect();
-    const { getOfflineTournamentUids } = await import('$lib/stores/offline.svelte');
     const hasOfflineTournaments = getOfflineTournamentUids().size > 0;
     const maxAttempts = transient || hasOfflineTournaments ? Infinity : this.maxReconnectAttempts;
 

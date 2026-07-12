@@ -563,12 +563,6 @@ export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
   }
 }
 
-/**
- * Clear any auth error.
- */
-export function clearError(): void {
-  setAuthState({ error: null });
-}
 
 /**
  * Get the current auth state (reactive).
