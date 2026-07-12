@@ -14,7 +14,7 @@ import msgspec
 import pytest
 import pytest_asyncio
 import src.db as db
-from src.models import Player, Seat, Table, Tournament, TournamentState, User
+from src.models import Player, Role, Seat, Table, Tournament, TournamentState, User
 
 from tests.conftest import make_auth_header, seed_tournament
 
@@ -106,6 +106,62 @@ async def test_wrong_device_rejected_without_creating_users(test_client, test_db
     )
     assert resp.status_code == 409
     assert await _count_users() == before
+
+
+@pytest.mark.asyncio
+async def test_offline_created_insert_gated_on_official(test_client, test_db):
+    """A tournament the server has never seen (created offline) is a CREATION:
+    the insert path must enforce create_tournament's is_official gate, else any
+    authenticated user could mint tournaments (and fabricate rating points by
+    posting a FINISHED payload)."""
+    nobody = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Nobody")
+    await db.save_user(nobody)
+    uid = str(uuid7())  # never seeded server-side
+
+    body = {
+        "device_id": "devA",
+        "tournament": _offline_tournament_payload(uid, nobody.uid, "TEMP-x"),
+        "offline_players": [],
+    }
+    before = await _count_users()
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/go-online",
+        json=body,
+        headers=make_auth_header(nobody.uid),
+    )
+    assert resp.status_code == 403
+    assert await db.get_tournament_by_uid(uid) is None  # nothing inserted
+    assert await _count_users() == before
+
+
+@pytest.mark.asyncio
+async def test_offline_created_insert_works_for_official(test_client, test_db):
+    """The offline-creation happy path: an official brings a tournament the
+    server has never seen online, and the insert lands with the lock released."""
+    prince = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Prince",
+        roles=[Role.PRINCE],
+    )
+    await db.save_user(prince)
+    uid = str(uuid7())  # never seeded server-side
+
+    body = {
+        "device_id": "devA",
+        "tournament": _offline_tournament_payload(uid, prince.uid, "TEMP-y"),
+        "offline_players": [],
+    }
+    resp = await test_client.post(
+        f"/api/tournaments/{uid}/go-online",
+        json=body,
+        headers=make_auth_header(prince.uid),
+    )
+    assert resp.status_code == 200
+    created = await db.get_tournament_by_uid(uid)
+    assert created is not None
+    assert created.offline_mode is False
+    assert prince.uid in created.organizers_uids
 
 
 @pytest.mark.asyncio

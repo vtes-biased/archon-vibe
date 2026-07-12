@@ -2095,9 +2095,7 @@ async def go_online(
     # state BEFORE creating any users, so player resolution (save_user /
     # allocate_next_vekn_id / invite emails) never runs for an unauthorized or
     # wrong-device request. Re-checked authoritatively under the lock below; this
-    # unlocked read only fails fast and gates side effects. A tournament created
-    # offline may not exist server-side yet (existing is None → no org check, as
-    # before).
+    # unlocked read only fails fast and gates side effects.
     existing = await get_tournament_by_uid(uid)
     if existing:
         if not permissions.is_organizer(current_user, existing):
@@ -2122,6 +2120,34 @@ async def go_online(
                 status_code=409,
                 detail="Tournament owned by another device. Use force to override.",
             )
+    else:
+        # Offline-CREATED tournament — the server first learns of it here, so this
+        # insert is a creation: mirror create_tournament's gates. The WASM engine
+        # enforced them client-side, but the payload is client-supplied.
+        if not permissions.is_official(current_user):
+            raise HTTPException(
+                status_code=403, detail="Only IC, NC, or Prince can create tournaments"
+            )
+        if current_user.uid not in (request.tournament.get("organizers_uids") or []):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can bring a tournament online"
+            )
+        league_uid = request.tournament.get("league_uid")
+        if league_uid:
+            league = await get_league_by_uid(league_uid)
+            if not league:
+                raise HTTPException(status_code=400, detail="League not found")
+            if Role.IC not in current_user.roles:
+                is_nc_same_country = (
+                    Role.NC in current_user.roles
+                    and league.country == current_user.country
+                )
+                is_league_organizer = current_user.uid in league.organizers_uids
+                if not (is_nc_same_country or is_league_organizer):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Only league organizers can link tournaments to this league",
+                    )
 
     # Resolve offline players → real user accounts. Done OUTSIDE the lock: each
     # resolution may create a user and allocate a VEKN ID (its own advisory-locked
