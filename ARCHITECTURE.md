@@ -69,7 +69,7 @@ Action → backend Rust engine → PostgreSQL → CRUD event → SSE broadcast �
 
 Primary-device ownership — no CRUD log or conflict resolution needed:
 
-1. Organizer takes the tournament offline (`go-offline`) → locked to their device.
+1. Organizer takes the tournament offline (`go-offline`) → locked to their device. A tournament can also be *created* while offline (same form, detect-and-adapt): the WASM engine creates it born device-locked; the server first learns of it at go-online (insert path).
 2. Other devices see an "offline" message — no mutations.
 3. The WASM Rust engine processes business events locally → writes IndexedDB directly.
 4. Offline-created players get temp UIDs (remapped to real UIDs on sync).

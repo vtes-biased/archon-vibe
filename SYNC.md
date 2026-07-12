@@ -211,7 +211,7 @@ Minimal indexes only:
 Offline tournaments use a device-lock model (no changes log needed):
 - Tournament locked to one device via `go-offline` endpoint
 - WASM engine processes all actions locally, updating IndexedDB directly
-- On `go-online`, full tournament state (including offline-created players, decks, sanctions) is sent to server
+- On `go-online`, full tournament state (including offline-created players, decks, sanctions) is sent to server; an offline deck *deletion* travels in the same payload as a soft-delete tombstone (`deleted_at` row) — the payload is upsert-only, so a locally hard-deleted deck would resurrect
 - Server overwrites its state with the primary device's authoritative data
 - Temp UIDs (offline-created players) are remapped to real UIDs on sync
 
