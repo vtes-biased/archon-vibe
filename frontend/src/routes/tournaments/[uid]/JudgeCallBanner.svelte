@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import type { JudgeCallData } from "$lib/sync";
   import { X, Gavel } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -11,6 +12,7 @@
 
   let calls = $state<(JudgeCallData & { id: number; ts: number })[]>([]);
   let nextId = 0;
+  const dismissTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
   export function addCall(data: JudgeCallData) {
     if (data.tournament_uid !== tournamentUid) return;
@@ -20,12 +22,20 @@
     // Play audio chime
     playChime();
     // Auto-dismiss after 120s
-    setTimeout(() => dismiss(id), 120_000);
+    dismissTimers.set(id, setTimeout(() => dismiss(id), 120_000));
   }
 
   function dismiss(id: number) {
+    const t = dismissTimers.get(id);
+    if (t) clearTimeout(t);
+    dismissTimers.delete(id);
     calls = calls.filter(c => c.id !== id);
   }
+
+  onDestroy(() => {
+    dismissTimers.forEach((t) => clearTimeout(t));
+    dismissTimers.clear();
+  });
 
   function playChime() {
     try {

@@ -334,6 +334,9 @@
       if (displayRefreshTimer) {
         clearTimeout(displayRefreshTimer);
       }
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+      }
     };
   });
 </script>

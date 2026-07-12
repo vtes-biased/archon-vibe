@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import type { VtesCard } from "$lib/types";
   import { searchCards } from "$lib/cards";
   import CardName from "$lib/components/CardName.svelte";
@@ -14,6 +15,8 @@
   let results = $state<VtesCard[]>([]);
   let selectedIndex = $state(-1);
   let debounceTimer: ReturnType<typeof setTimeout>;
+
+  onDestroy(() => clearTimeout(debounceTimer));
 
   function onInput() {
     clearTimeout(debounceTimer);

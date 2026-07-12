@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { toUserMessage } from '$lib/errors';
   import type { User, Role } from "$lib/types";
   import { createUser, updateUser, uploadAvatar } from "$lib/api";
@@ -154,9 +155,23 @@
   function debouncedAutoSave() {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
+      debounceTimer = null;
       autoSave();
     }, DEBOUNCE_MS);
   }
+
+  // Flush a pending debounced save so closing the card (or unmounting) never
+  // drops the last keystrokes or saves them after the card is gone — the
+  // Close button must not lie (DESIGN.md auto-save pattern).
+  function flushPendingSave() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+      void autoSave();
+    }
+  }
+
+  onDestroy(flushPendingSave);
 
   // Immediate auto-save for select/role changes
   function immediateAutoSave() {
@@ -235,10 +250,11 @@
     oneditingchange?.(true);
   }
 
-  function cancelEdit() {
+  function closeEdit() {
     if (mode === "create") {
       oncancel?.();
     } else {
+      flushPendingSave();
       _isEditingLocal = false;
       editInitialized = false;
       error = "";
@@ -322,7 +338,7 @@
           {/if}
           <button
             type="button"
-            onclick={cancelEdit}
+            onclick={closeEdit}
             class="p-2 text-ink-faint hover:text-link transition-colors"
             title={m.common_close()}
           >
@@ -483,7 +499,7 @@
           <Button
             variant="secondary"
             size="lg"
-            onclick={cancelEdit}
+            onclick={closeEdit}
             disabled={saving}
           >
             {m.common_cancel()}
