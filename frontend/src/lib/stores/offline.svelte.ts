@@ -278,6 +278,10 @@ export async function syncOffline(tournamentUid: string): Promise<void> {
         method: 'POST',
         body: JSON.stringify({ device_id: deviceId, tournament }),
       },
+      // Opportunistic backup: failures must stay silent (the catch below is the
+      // contract) — notably the 404 an offline-CREATED tournament gets until
+      // go-online inserts it server-side.
+      { suppressErrorToast: true },
     );
     await setMetadata(`offline_last_sync:${tournamentUid}`, result.synced_at);
     const newTimes = new Map(lastSyncTimes);
