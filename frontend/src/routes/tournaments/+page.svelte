@@ -51,6 +51,15 @@
 
   // Filters
   let searchQuery = $state("");
+  // Debounced mirror of searchQuery: the search path scans the whole tournaments
+  // table per query, so don't re-query on every keystroke (country/format filters
+  // use narrower indexes and stay immediate).
+  let debouncedSearch = $state("");
+  $effect(() => {
+    const q = searchQuery;
+    const timer = setTimeout(() => { debouncedSearch = q; }, 250);
+    return () => clearTimeout(timer);
+  });
   let ongoing = $state(false);
   let selectedCountry = $state<string>("all");
   let selectedFormat = $state<string>("all");
@@ -100,7 +109,7 @@
           user.uid,
           user.country!,
           continentCountries,
-          { ongoing, includeOnline, format: selectedFormat, search: searchQuery },
+          { ongoing, includeOnline, format: selectedFormat, search: debouncedSearch },
           page,
           PAGE_SIZE,
         );
@@ -113,7 +122,7 @@
             includeOnline,
             country: selectedCountry,
             format: selectedFormat,
-            search: searchQuery,
+            search: debouncedSearch,
             // Logged-out visitors see current + upcoming only, not past events.
             excludePast: !auth.isAuthenticated,
           },
@@ -148,7 +157,7 @@
 
   // Re-query when filters or page change
   $effect(() => {
-    const _s = searchQuery;
+    const _s = debouncedSearch;
     const _o = ongoing;
     const _c = selectedCountry;
     const _f = selectedFormat;
@@ -161,7 +170,7 @@
 
   // Reset page when filters change
   $effect(() => {
-    const _s = searchQuery;
+    const _s = debouncedSearch;
     const _o = ongoing;
     const _c = selectedCountry;
     const _f = selectedFormat;
