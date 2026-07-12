@@ -1,8 +1,11 @@
 """Tests for rating computation helpers."""
 
 import msgspec
+import pytest
 from archon_engine import PyEngine
+from src import db
 from src.models import (
+    ObjectType,
     Sanction,
     Tournament,
 )
@@ -307,3 +310,26 @@ class TestFinalistPosition:
             ],
         )
         assert _finalist_position(t, "p3") == 0
+
+
+# ---------------------------------------------------------------------------
+# Hall of Fame win counting (get_tournament_wins_for_users)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_hof_wins_exclude_online_and_house_formats(test_db):
+    """HoF convention: only finished IRL VEKN-format wins count."""
+    cases = [
+        ("w-irl", {}, True),
+        ("w-online", {"online": True}, False),
+        ("w-open", {"open_rounds": True}, False),
+        ("w-self", {"self_organized_rounds": True}, False),
+        ("w-running", {"state": "Playing"}, False),
+    ]
+    for uid, overrides, _ in cases:
+        t = _make_tournament(uid=uid, winner="champ", **overrides)
+        await db.save_object_from_model(ObjectType.TOURNAMENT, t)
+
+    wins = await db.get_tournament_wins_for_users({"champ"})
+    assert set(wins.get("champ", [])) == {uid for uid, _, counts in cases if counts}

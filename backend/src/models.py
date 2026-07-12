@@ -341,7 +341,7 @@ class User(BaseObject, kw_only=True):
     limited_offline: CategoryRating | None = None
     wins: list[str] = msgspec.field(
         default_factory=list
-    )  # All-time tournament UIDs won
+    )  # All-time IRL tournament UIDs won (HoF convention: online excluded)
 
 
 class Score(msgspec.Struct, kw_only=True, frozen=True):

@@ -204,7 +204,7 @@ export interface User extends BaseObject {
   constructed_offline?: CategoryRating | null;
   limited_online?: CategoryRating | null;
   limited_offline?: CategoryRating | null;
-  wins?: string[]; // All-time tournament UIDs won
+  wins?: string[]; // All-time IRL tournament UIDs won (HoF convention: online excluded)
 }
 
 export interface Sanction extends BaseObject {

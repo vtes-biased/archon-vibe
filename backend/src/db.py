@@ -1042,7 +1042,7 @@ async def get_tournament_by_external_id(
 
 
 async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[str]]:
-    """Get all-time tournament win UIDs for multiple users at once.
+    """Get all-time IRL tournament win UIDs for multiple users at once.
 
     Returns: {user_uid: [tournament_uid, ...]}
     """
@@ -1059,6 +1059,8 @@ async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[s
             # toward the Hall of Fame (mirrors their exclusion from ratings/push).
             f"AND (\"full\"->>'open_rounds') IS DISTINCT FROM 'true' "
             f"AND (\"full\"->>'self_organized_rounds') IS DISTINCT FROM 'true' "
+            # Official VEKN HoF convention counts IRL wins only.
+            f"AND (\"full\"->>'online') IS DISTINCT FROM 'true' "
             f"AND deleted_at IS NULL",
             tuple(user_uids),
         )
