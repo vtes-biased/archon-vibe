@@ -70,17 +70,22 @@
     priorSanctions.filter(s => !s.lifted_at && !s.deleted_at)
   );
 
-  // Escalation hint: count prior sanctions for same subcategory (v2 §1.2.1)
-  const sameInfractionPrior = $derived(
-    subcategory
-      ? activePrior.filter(s => s.subcategory === subcategory)
-      : activePrior
+  // Escalation hint (v2 §1.2.1): the ladder enters at the subcategory baseline
+  // and climbs one rung per prior offence of the same type, clamped at DQ.
+  const sameInfractionCount = $derived(
+    subcategory ? activePrior.filter(s => s.subcategory === subcategory).length : 0
   );
-  const sameInfractionCount = $derived(sameInfractionPrior.length);
-  const suggestedLevel = $derived<SanctionLevel>(
-    sameInfractionCount < ESCALATION_SEQUENCE.length
-      ? ESCALATION_SEQUENCE[sameInfractionCount]!
-      : "disqualification"
+  const suggestedLevel = $derived.by<SanctionLevel>(() => {
+    if (!subcategory) return "caution";
+    // A baseline outside the ladder (none today) would give indexOf -1: clamp to 0.
+    const start = Math.max(0, ESCALATION_SEQUENCE.indexOf(BASELINE_PENALTIES[subcategory]));
+    const idx = Math.min(start + sameInfractionCount, ESCALATION_SEQUENCE.length - 1);
+    return ESCALATION_SEQUENCE[idx]!;
+  });
+  // Blank-subcategory sanctions are invisible to escalation tracking — flag
+  // same-category priors so the judge picks a subcategory instead.
+  const sameCategoryPriorCount = $derived(
+    activePrior.filter(s => s.category === category).length
   );
 
   // Warn if selected level is lower than the highest existing sanction
@@ -238,11 +243,18 @@
             <TriangleAlert class="w-4 h-4 shrink-0" />
             {m.sanction_escalation_hint({ count: String(sameInfractionCount), suggested: levelLabel(suggestedLevel) })}
           </div>
-          {#if subcategory && activePrior.length > sameInfractionCount}
+          {#if activePrior.length > sameInfractionCount}
             <p class="mt-1 text-xs opacity-75">
               {m.sanction_other_infractions({ count: String(activePrior.length - sameInfractionCount) })}
             </p>
           {/if}
+        </div>
+      {:else if !subcategory && sameCategoryPriorCount > 0}
+        <div class="p-3 rounded banner-warn border text-sm">
+          <div class="flex items-center gap-2">
+            <TriangleAlert class="w-4 h-4 shrink-0" />
+            {m.sanction_escalation_needs_subcategory({ count: String(sameCategoryPriorCount) })}
+          </div>
         </div>
       {/if}
       <!-- Downgrade warning -->

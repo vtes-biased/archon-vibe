@@ -252,6 +252,7 @@
   "sanction_sa_no_round": "This player has not played a round yet, so a Standings Adjustment cannot be applied.",
   "sanction_baseline_hint": "Baseline penalty: {level}",
   "sanction_escalation_hint": "{count} prior offence(s) of this type — suggested level: {suggested}",
+  "sanction_escalation_needs_subcategory": "{count} prior sanction(s) in this category — select a subcategory to track escalation",
   "sanction_other_infractions": "{count} other sanction(s) for different infractions in this event",
   "sanction_downgrade_warning": "Selected level is lower than existing {existing} sanction",
   "sanction_tournament_issue_title": "Issue Tournament Sanction",
