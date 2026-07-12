@@ -172,9 +172,14 @@ import TournamentModals from "./TournamentModals.svelte";
   // Player display info keyed by uid
   let playerInfo = $state<PlayerInfoMap>({});
 
+  // Supersession guard: SSE bursts fire load()/loadPlayerNames concurrently and
+  // the runs finish out of order — only the newest run may assign state (the
+  // sync.ts epoch pattern), else the display rolls back mid-round.
+  let playerNamesEpoch = 0;
+
   async function loadPlayerNames() {
     if (!tournament) return;
-    const info: PlayerInfoMap = {};
+    const epoch = ++playerNamesEpoch;
     // Build display_name lookup from tournament players
     const displayNames: Record<string, string | null> = {};
     for (const p of tournament.players ?? []) {
@@ -191,15 +196,19 @@ import TournamentModals from "./TournamentModals.svelte";
         }
       }
     }
-    for (const uid of uids) {
-      const user = await getUser(uid);
-      info[uid] = {
-        name: user?.name || uid,
+    const uidList = [...uids];
+    const users = await Promise.all(uidList.map(u => getUser(u)));
+    if (epoch !== playerNamesEpoch) return; // superseded by a newer run
+    const info: PlayerInfoMap = {};
+    uidList.forEach((u, i) => {
+      const user = users[i];
+      info[u] = {
+        name: user?.name || u,
         nickname: user?.nickname ?? null,
         vekn: user?.vekn_id ?? null,
-        display_name: displayNames[uid] ?? null,
+        display_name: displayNames[u] ?? null,
       };
-    }
+    });
     playerInfo = info;
   }
 
@@ -380,24 +389,33 @@ import TournamentModals from "./TournamentModals.svelte";
     }
   }
 
+  let loadEpoch = 0;
+
   async function load() {
+    const epoch = ++loadEpoch;
     if (!tournament) loading = true;
     error = null;
     try {
       await initEngine(); // standings ranking is engine-computed; ensure it's ready
       const t = await getTournament(uid);
+      if (epoch !== loadEpoch) return; // superseded by a newer run
       if (t) {
         tournament = t;
-        await loadPlayerNames();
-        tournamentSanctions = await getTournamentContextSanctions(uid, playerUidsOf(t));
+        const [, sanctions] = await Promise.all([
+          loadPlayerNames(), // self-guarded by playerNamesEpoch
+          getTournamentContextSanctions(uid, playerUidsOf(t)),
+        ]);
+        if (epoch !== loadEpoch) return;
+        tournamentSanctions = sanctions;
       } else if (!tournament) {
         // No data in IndexedDB yet — will arrive via SSE
         error = m.tournament_error_not_synced();
       }
     } catch (e) {
+      if (epoch !== loadEpoch) return;
       error = toUserMessage(e, m.tournament_error_load());
     } finally {
-      loading = false;
+      if (epoch === loadEpoch) loading = false;
     }
   }
 
