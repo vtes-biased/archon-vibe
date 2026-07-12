@@ -1081,12 +1081,17 @@ async def reconcile_channels(
             await sync_judges_channel(bot, int(guild_id), judges_ch, desired_judges)
         except Exception as e:
             logger.warning("Reconcile %s: judges sync failed: %s", key, e)
+        # Warn only organizers whose identity is cached WITHOUT a discord_id: a
+        # uid with no cached user frame yet is likely a live add whose
+        # participant frame is still in flight — the user-event re-sync in
+        # _handle_update grants (or a later reconcile warns) when it lands.
+        known_unlinked = {
+            uid
+            for uid in organizer_uids - set(judge_map)
+            if _user_names[key].get(uid) is not None
+        }
         await _warn_unlinked_organizers(
-            bot,
-            key,
-            judges_id,
-            organizer_uids - set(judge_map),
-            obj.get("players", []),
+            bot, key, judges_id, known_unlinked, obj.get("players", [])
         )
 
     # Positional: index i ↔ desired table i, the contract the announcement layer
@@ -1145,9 +1150,31 @@ async def _handle_update(
     if obj_type == "user":
         # Participant identity pushed alongside the tournament — cache it for name
         # resolution; never announced directly.
-        _cache_user_identity(
-            _task_key(guild_id, tournament_uid), data.get("data") or {}
-        )
+        key = _task_key(guild_id, tournament_uid)
+        user_obj = data.get("data") or {}
+        uid = user_obj.get("uid")
+        had_discord = bool((_user_names[key].get(uid) or {}).get("discord_id"))
+        _cache_user_identity(key, user_obj)
+        # Live-path ordering: a tournament frame reconciles BEFORE its
+        # participant user frames arrive, so an organizer added on the webapp
+        # can be unresolvable at that reconcile. Their late-arriving identity
+        # is the trigger to sync the judges channel again.
+        obj = _last_tournament.get(key)
+        if (
+            uid
+            and user_obj.get("discord_id")
+            and not had_discord
+            and obj
+            and uid in (obj.get("organizers_uids") or [])
+        ):
+            _warned_unlinked_organizers[key].discard(uid)
+            async with structural_lock(guild_id, tournament_uid):
+                try:
+                    await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
+                except Exception as e:
+                    logger.error(
+                        "Organizer re-grant reconcile failed for %s: %s", key, e
+                    )
         return
 
     if obj_type != "tournament":

@@ -67,6 +67,8 @@ class TokenStore:
         # (action/extra/guild_id/channel_id) was written but never acted on;
         # users re-run the command, and respawn-on-reauth is the recovery.
         # Ignore the does-not-exist error on re-run (same pattern as ADD above).
+        # Needs SQLite ≥ 3.35 (2021): older swallows "unsupported" here and the
+        # leftover NOT NULL columns make the next INSERT fail loudly.
         for col in ("action", "extra", "guild_id", "channel_id"):
             try:
                 await self._db.execute(f"ALTER TABLE pending_oauth DROP COLUMN {col}")

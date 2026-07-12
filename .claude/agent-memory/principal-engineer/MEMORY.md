@@ -93,6 +93,9 @@
 - [Round lifecycle traps](reference_round_lifecycle_traps.md) — engine round/finals state quirks (RestoreRound re-derives to fully Finished, finals not in `rounds`, table states, timer online-only) to check when reviewing round-lifecycle hooks.
 - [bot _active_tables finals-seating trap](bot-active-tables-finals-seating-trap.md) — bot _active_tables tags "finals" on seating-truthiness, NOT completion; consumers that should stop at table/finals completion (timer reminders) over-trigger. There is NO top-level table.result (find_player_table's guard is a no-op) — gate on _table_pending (NOT Finished/Invalid/Cancelled/override).
 
+## Discord bot (scoped SSE consumer)
+- [Bot scoped-stream frame ordering](bot-scoped-stream-frame-ordering.md) — tournament frame precedes participant User frames on the LIVE path; reconcile logic using the `_user_names` discord_id fallback for a just-added organizer/player is one message stale (bites #judges organizer sync); catch-up is safe.
+
 ## Authorization (cross-stack)
 - Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).
 - [Projection tier: column vs content split](projection-tier-column-vs-content-split.md) — new precomputed access column ONLY when projection CONTENT must vary by viewer at the same level (else collapse onto existing column + shrink lower one); base64 contact obfuscation is a harvester speed-bump, not access control.

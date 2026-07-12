@@ -110,7 +110,10 @@ async def claim_vekn_id(
     # Update Discord Linked Roles (vekn_id changes org level)
     asyncio.create_task(sync_user_discord_roles(merged.uid))
 
-    # Issue new tokens for the VEKN user's uid (different from the old user)
+    # Issue new tokens for the VEKN user's uid (different from the old user).
+    # Consumed by the SPA (session rotation) AND the Discord bot, which fires
+    # one follow-up tournament action with this access_token after a bot-side
+    # claim tombstones its stored OAuth identity (bot commands/player.py).
     access_token, expires_in = create_access_token(merged.uid)
     refresh_token = create_refresh_token(merged.uid)
 
