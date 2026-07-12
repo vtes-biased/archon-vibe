@@ -556,12 +556,23 @@ export async function createTournamentOffline(data: CreateTournamentData): Promi
 }
 
 export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<{ message: string }> {
-  const result = await apiRequest<{ message: string }>(`/api/tournaments/${uid}`, {
-    method: 'DELETE',
-  }, opts);
+  let result: { message: string };
+  try {
+    result = await apiRequest<{ message: string }>(`/api/tournaments/${uid}`, {
+      method: 'DELETE',
+    }, opts);
+  } catch (e) {
+    // 404 = the server never knew this tournament (created offline, not yet
+    // pushed at go-online) — the local delete below IS the deletion.
+    if (!(e instanceof ApiError && e.status === 404)) throw e;
+    result = { message: 'Tournament deleted' };
+  }
   // Optimistic IDB delete so UI updates immediately instead of waiting for SSE
   const { deleteTournament } = await import('./db');
   await deleteTournament(uid);
+  // Drop any offline lock/metadata (no-op for ordinary online tournaments)
+  const { clearOfflineState } = await import('$lib/stores/offline.svelte');
+  await clearOfflineState(uid);
   return result;
 }
 
