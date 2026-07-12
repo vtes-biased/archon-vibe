@@ -850,6 +850,8 @@
   "organizers_no_results": "No matching users found",
   "organizers_added": "Organizer added",
   "organizers_removed": "Organizer removed",
+  "tournament_share": "Share",
+  "tournament_share_copied": "Event link copied to clipboard",
   "share_results_image": "Share Image",
   "share_results_text": "Copy Text",
   "share_results_copied": "Results copied to clipboard",

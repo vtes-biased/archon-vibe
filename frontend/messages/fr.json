@@ -850,6 +850,8 @@
   "organizers_no_results": "Aucun utilisateur correspondant trouvé",
   "organizers_added": "Organisateur ajouté",
   "organizers_removed": "Organisateur retiré",
+  "tournament_share": "Partager",
+  "tournament_share_copied": "Lien de l'événement copié dans le presse-papier",
   "share_results_image": "Partager l'image",
   "share_results_text": "Copier le texte",
   "share_results_copied": "Résultats copiés dans le presse-papier",

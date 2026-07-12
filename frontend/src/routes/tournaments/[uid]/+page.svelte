@@ -14,7 +14,7 @@
   import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, Trash2, Upload, CloudUpload } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, Trash2, Upload, CloudUpload, Share2 } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import TournamentBanner from "$lib/components/TournamentBanner.svelte";
@@ -404,6 +404,24 @@ import TournamentModals from "./TournamentModals.svelte";
     }
   }
 
+  async function shareEvent() {
+    const url = `${window.location.origin}/tournaments/${uid}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: tournament?.name, url });
+        return;
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return; // user cancelled
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast({ type: "success", message: m.tournament_share_copied() });
+    } catch {
+      showToast({ type: "error", message: m.share_results_error() });
+    }
+  }
+
   async function handleGoOnline() {
     offlineActionLoading = true;
     try {
@@ -618,6 +636,10 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
 
         <div class="flex items-center gap-2">
+          <Button variant="ghost" size="md" onclick={shareEvent} title={m.tournament_share()}>
+            <Share2 class="w-4 h-4" aria-hidden="true" />
+            {m.tournament_share()}
+          </Button>
           {#if showOrganizerView && !tournament.offline_mode}
             <Button variant="ghost" size="md" onclick={() => showGoOfflineConfirm = true}>
               <WifiOff class="w-4 h-4" />

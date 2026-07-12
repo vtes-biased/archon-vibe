@@ -850,6 +850,8 @@
   "organizers_no_results": "Nenhum usuário correspondente encontrado",
   "organizers_added": "Organizador adicionado",
   "organizers_removed": "Organizador removido",
+  "tournament_share": "Compartilhar",
+  "tournament_share_copied": "Link do evento copiado para a área de transferência",
   "share_results_image": "Compartilhar imagem",
   "share_results_text": "Copiar texto",
   "share_results_copied": "Resultados copiados para a área de transferência",
