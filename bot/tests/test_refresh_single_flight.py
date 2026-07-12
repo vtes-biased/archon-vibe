@@ -74,10 +74,13 @@ class _Resp:
 class FakeBackend:
     """Models /oauth/token refresh: rotation + reuse-detection chain revocation."""
 
-    def __init__(self, initial_refresh: str, *, fail_all: bool = False) -> None:
+    def __init__(
+        self, initial_refresh: str, *, fail_all: bool = False, fail_status: int = 400
+    ) -> None:
         self._current_refresh = initial_refresh
         self._revoked: set[str] = set()
         self._fail_all = fail_all
+        self._fail_status = fail_status
         self.chain_revoked = False
         self.post_count = 0
         self._seq = 0
@@ -87,7 +90,7 @@ class FakeBackend:
         token = json["refresh_token"]
 
         if self._fail_all:
-            return _Resp(400, {"detail": "Refresh token expired"})
+            return _Resp(self._fail_status, {"detail": "Refresh token expired"})
 
         # Replay of a rotated-out token → backend nukes the entire chain.
         if token in self._revoked:
@@ -210,6 +213,27 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         # First POST fails+clears under the lock; the second waiter then finds no
         # tokens and returns without a second POST.
         self.assertEqual(backend.post_count, 1)
+
+    async def test_transient_failure_keeps_tokens(self) -> None:
+        """A 5xx during refresh (backend restart) must NOT destroy the stored
+        pair — invalid-grant is signalled exclusively via 400. The caller gets
+        None (transient) and retries with the same, still-valid tokens."""
+        store = FakeStore(
+            {
+                "archon_uid": ARCHON_UID,
+                "access_token": "access-0",
+                "refresh_token": "refresh-0",
+            }
+        )
+        backend = FakeBackend("refresh-0", fail_all=True, fail_status=503)
+        api = _make_api(backend, store)
+
+        result = await api._refresh_tokens(DISCORD_ID, stale_access_token="access-0")
+
+        self.assertIsNone(result)
+        stored = await store.get_tokens(DISCORD_ID)
+        self.assertIsNotNone(stored, "5xx must keep the stored pair")
+        self.assertEqual(stored["refresh_token"], "refresh-0")
 
     async def test_per_discord_id_locks_do_not_serialize_across_organizers(
         self,

@@ -50,7 +50,13 @@ class ArchonAPI:
         self._refresh_locks: dict[str, asyncio.Lock] = {}
 
     async def init(self) -> None:
-        self._session = aiohttp.ClientSession(base_url=config.ARCHON_URL)
+        # total=30 bounds every backend call (aiohttp defaults to 300s): a hung
+        # backend must surface as an error, not wedge callers — the SSE loop's
+        # pre-connect refresh in particular runs outside its dispatch-timeout
+        # guard. (The SSE stream itself uses its own unbounded session.)
+        self._session = aiohttp.ClientSession(
+            base_url=config.ARCHON_URL, timeout=aiohttp.ClientTimeout(total=30)
+        )
 
     async def close(self) -> None:
         if self._session:
@@ -103,20 +109,45 @@ class ArchonAPI:
     async def _do_refresh(self, discord_id: str, tokens: dict) -> dict | None:
         """POST the refresh grant and persist the rotated pair. Lock held."""
         assert self._session
-        async with self._session.post(
-            "/oauth/token",
-            json={
-                "grant_type": "refresh_token",
-                "refresh_token": tokens["refresh_token"],
-                "client_id": config.OAUTH_CLIENT_ID,
-                "client_secret": config.OAUTH_CLIENT_SECRET,
-            },
-        ) as resp:
-            if resp.status != 200:
-                logger.warning("Token refresh failed for discord_id=%s", discord_id)
-                await self._store.remove_tokens(discord_id)
-                return None
-            data = await resp.json()
+        try:
+            async with self._session.post(
+                "/oauth/token",
+                json={
+                    "grant_type": "refresh_token",
+                    "refresh_token": tokens["refresh_token"],
+                    "client_id": config.OAUTH_CLIENT_ID,
+                    "client_secret": config.OAUTH_CLIENT_SECRET,
+                },
+            ) as resp:
+                if resp.status in (400, 401):
+                    # The backend signals invalid-grant exclusively via 400
+                    # (oauth._handle_refresh_token; 401 = bad client creds) —
+                    # only then is the stored pair genuinely dead.
+                    logger.warning(
+                        "Refresh token rejected (%s) for discord_id=%s",
+                        resp.status,
+                        discord_id,
+                    )
+                    await self._store.remove_tokens(discord_id)
+                    return None
+                if resp.status != 200:
+                    # 5xx / proxy blip (e.g. the backend's daily restart): the
+                    # stored pair is still valid — keep it, let callers retry.
+                    logger.warning(
+                        "Transient token refresh failure (%s) for discord_id=%s; "
+                        "keeping tokens",
+                        resp.status,
+                        discord_id,
+                    )
+                    return None
+                data = await resp.json()
+        except (aiohttp.ClientError, TimeoutError) as e:
+            logger.warning(
+                "Token refresh network failure for discord_id=%s: %s; keeping tokens",
+                discord_id,
+                e,
+            )
+            return None
 
         await self._store.store_tokens(
             discord_id=discord_id,

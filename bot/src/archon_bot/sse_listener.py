@@ -256,12 +256,21 @@ async def _sse_loop(
                             organizer_discord_id,
                             stale_access_token=tokens["access_token"],
                         )
-                        if not refreshed:
-                            logger.error("Token refresh failed for SSE, stopping")
+                        if refreshed:
+                            # Fresh token: retry at once (token renewal is
+                            # one-shot, not a failure to back off from).
+                            continue
+                        if not await store.get_tokens(organizer_discord_id):
+                            # Invalid grant — the pair was removed. Stop; a
+                            # fresh /register OAuth grant respawns this listener.
+                            logger.error("Refresh token rejected for SSE, stopping")
                             return
-                        # Fresh token: retry at once (token renewal is one-shot,
-                        # not a failure to back off from).
-                        continue
+                        # Transient refresh failure (backend restart, timeout):
+                        # tokens kept — fall through to the backoff sleep.
+                        logger.warning(
+                            "Transient token refresh failure for SSE %s; will retry",
+                            key,
+                        )
 
                     if resp.status != 200:
                         logger.error("SSE connection failed: %s", resp.status)

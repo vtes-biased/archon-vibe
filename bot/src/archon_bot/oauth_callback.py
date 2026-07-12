@@ -5,6 +5,7 @@ import logging
 from aiohttp import web
 
 from .archon_api import ArchonAPI
+from .sse_listener import start_sse
 from .token_store import TokenStore
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,15 @@ async def handle_callback(request: web.Request) -> web.Response:
         access_token=token_data["access_token"],
         refresh_token=token_data["refresh_token"],
     )
+
+    # Respawn SSE listeners for this organizer's links whose tasks died —
+    # genuine token death stops a listener permanently, and this fresh grant is
+    # the self-service recovery (start_sse no-ops for listeners still alive).
+    for gt in await _store.get_all_guild_tournaments():
+        if gt["organizer_discord_id"] == discord_id:
+            await start_sse(
+                _bot, _api, _store, gt["guild_id"], gt["tournament_uid"], discord_id
+            )
 
     # Notify the user in Discord that auth succeeded
     try:
