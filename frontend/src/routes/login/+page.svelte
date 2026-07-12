@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto, replaceState } from "$app/navigation";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import {
     getAuthState,
     storeTokensFromCallback,
@@ -11,6 +11,8 @@
     isPasskeySupported,
     createAccountWithPasskey,
     loginWithPasskey,
+    startConditionalUI,
+    stopConditionalUI,
   } from "$lib/stores/passkeys.svelte";
   import { Mail, KeyRound } from '@lucide/svelte';
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
@@ -52,6 +54,7 @@
 
   async function handleCreateAccount() {
     if (!consentChecked) return;
+    stopConditionalUI(); // a pending conditional get() blocks the modal create()
     const success = await createAccountWithPasskey();
     if (success) {
       goto("/");
@@ -59,6 +62,7 @@
   }
 
   async function handlePasskeyLogin() {
+    stopConditionalUI(); // a pending conditional get() blocks the modal get()
     const success = await loginWithPasskey();
     if (success) {
       goto("/");
@@ -131,8 +135,17 @@
       await storeTokensFromCallback(token, refresh);
       replaceState("/login", {});
       goto("/");
+      return;
     }
+
+    // Passkey autofill (conditional UI): surface stored passkeys in the
+    // identifier input's autofill dropdown. Internally gated on
+    // isConditionalUISupported; resolves when the user picks one (then
+    // authenticates) and aborts silently on unmount or explicit-flow start.
+    startConditionalUI(() => goto("/"));
   });
+
+  onDestroy(stopConditionalUI);
 
   // Redirect if already authenticated
   $effect(() => {
@@ -285,7 +298,7 @@
                 type="email"
                 id="login-email"
                 name="email"
-                autocomplete="username"
+                autocomplete="username webauthn"
                 bind:value={email}
                 placeholder={m.login_placeholder_email()}
                 disabled={auth.isLoading}
