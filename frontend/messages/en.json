@@ -594,6 +594,8 @@
   "tournament_registration_not_open": "Registration is not open.",
   "tournament_registered_players": "Registered players ({count})",
   "tournament_winner": "Winner",
+  "tournament_event_in_progress": "This event is currently being played.",
+  "tournament_event_finished": "This event has finished.",
   "tournament_finalist": "Finalist",
   "tournament_status_finished": "Finished",
   "tournament_status_dropped": "Dropped",

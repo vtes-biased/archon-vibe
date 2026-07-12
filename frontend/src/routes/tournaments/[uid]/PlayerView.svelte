@@ -4,7 +4,7 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { previewScoresSync, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users } from "@lucide/svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
@@ -283,7 +283,7 @@
         {m.tournament_register_checkin_btn()}
       </Button>
     {/if}
-  {:else if currentPlayerEntry}
+  {:else if currentPlayerEntry || tournament.state === "Playing"}
     <!-- Prominent check-in call: during the check-in window this is the loudest
          message a not-yet-checked-in player sees — above status and deck notes. -->
     {#if notCheckedIn}
@@ -292,6 +292,12 @@
         <p class="text-ink-muted">{tournament.online ? m.tournament_checkin_call_player_online() : m.tournament_checkin_call_player_qr()}</p>
       </div>
     {/if}
+    {#if !currentPlayerEntry}
+      <!-- Spectator (no entry) during play: neutral copy, then finals/standings below. -->
+      <div class="banner-info border rounded-lg p-3 mb-3 text-sm">
+        <p>{m.tournament_event_in_progress()}</p>
+      </div>
+    {:else}
     <div class="text-sm mb-3 flex items-center justify-between">
       <div>
         <span class="text-ink-faint">{m.tournament_your_status()}</span>
@@ -325,6 +331,7 @@
         ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.tournament_drop_out_btn()}</Button>
       {/if}
     </div>
+    {/if}
     <!-- Online check-in is server-side (bot self-serve or organizer). The check-in
          call banner above carries the instruction; here we just surface the Join link. -->
     {#if tournament.online && notCheckedIn}
@@ -403,14 +410,24 @@
                   <div class="text-xs text-ink-faint">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if} · {tGws[j]}GW {tTps[j]}TP</div>
                 </div>
               </div>
-              <VpInput
-                value={seat.result.vp}
-                options={vpOptions(tournament.finals.seating.length, false)}
-                label={seatDisplay(seat.player_uid)}
-                disabled={scoreSaving === -1}
-                saving={scoreSavingSeat === seat.player_uid && scoreSaving === -1}
-                onchange={(v) => setFinalsVp(seat.player_uid, v, tournament.finals!.seating)}
-              />
+              {#if finalsSeatIdx >= 0}
+                <VpInput
+                  value={seat.result.vp}
+                  options={vpOptions(tournament.finals.seating.length, false)}
+                  label={seatDisplay(seat.player_uid)}
+                  disabled={scoreSaving === -1}
+                  saving={scoreSavingSeat === seat.player_uid && scoreSaving === -1}
+                  onchange={(v) => setFinalsVp(seat.player_uid, v, tournament.finals!.seating)}
+                />
+              {:else}
+                <!-- Non-finalists spectate: the engine rejects their VP edits, so
+                     show read-only values instead of tappable chips (FinalsTab
+                     judge-lock pattern). -->
+                <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
+                  {seat.result.vp}
+                  <Lock class="w-3.5 h-3.5" aria-hidden="true" />
+                </span>
+              {/if}
             </div>
           {/each}
         </div>
@@ -577,6 +594,9 @@
         {/if}
       </div>
     {/if}
+  {:else if tournament.state === "Finished"}
+    <!-- Results render right below; no misleading registration copy. -->
+    <p class="text-ink-muted text-sm">{m.tournament_event_finished()}</p>
   {:else}
     <p class="text-ink-muted text-sm">{m.tournament_registration_not_open()}</p>
   {/if}
@@ -647,8 +667,8 @@
   </div>
 {/if}
 
-<!-- Finished tournament results (VEKN members only) -->
-{#if tournament.state === "Finished" && userVeknId}
+<!-- Finished tournament results — public once finished, no VEKN-ID gate -->
+{#if tournament.state === "Finished"}
   {@const hasFinals = standings.some(e => e.finals)}
   <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
     {#if tournament.winner}

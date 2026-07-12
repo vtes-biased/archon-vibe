@@ -159,7 +159,7 @@
               {#if !isOrganizer && tournament.finals.seating.some(s => s.judge_uid)}
                 <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
                   {seat.result.vp}
-                  <Lock class="w-3.5 h-3.5" />
+                  <Lock class="w-3.5 h-3.5" aria-hidden="true" />
                 </span>
               {:else}
                 <VpInput
