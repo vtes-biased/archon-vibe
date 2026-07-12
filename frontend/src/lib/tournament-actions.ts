@@ -222,15 +222,18 @@ async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDe
         author: op.deck.author || '',
         comments: op.deck.comments || '',
         cards: op.deck.cards || {},
+        // Mirror the backend: an absent attribution clears it (None), never keeps the old value
+        attribution: op.deck.attribution ?? null,
         public: op.deck.public || false,
       };
       await saveDeck(deckObj);
       affectedUids.push(deckObj.uid);
     } else if (op.op === 'delete' && op.player_uid) {
       for (const d of existingDecks) {
-        if (d.user_uid === op.player_uid) {
-          await deleteDeck(d.uid);
-        }
+        if (d.user_uid !== op.player_uid) continue;
+        // Mirror the backend: a multideck delete tombstones only the matching round-deck
+        if (op.multideck && op.deck_index != null && d.round !== op.deck_index) continue;
+        await deleteDeck(d.uid);
       }
     } else if (op.op === 'set_public' && op.deck_uid) {
       const target = existingDecks.find(d => d.uid === op.deck_uid);

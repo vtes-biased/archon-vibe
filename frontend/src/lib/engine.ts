@@ -155,7 +155,8 @@ export interface TournamentEvent {
   seating?: string[][];
   player_uids?: string[]; // SelfOrganizeRound: the chosen pod
   vekn_id?: string;
-  deck?: { name: string; author: string; comments: string; cards: Record<string, number> };
+  deck?: { name: string; author: string; comments: string; cards: Record<string, number>; round?: number; attribution?: string | null };
+  deck_index?: number | null;
   multideck?: boolean;
   config?: Record<string, unknown>;
   // Raffle
@@ -198,8 +199,10 @@ export function buildSanctionsPayload(sanctions: Sanction[]): string {
 export interface DeckOp {
   op: 'upsert' | 'delete' | 'set_public';
   player_uid?: string;
-  deck?: { name: string; author: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean };
+  deck?: { name: string; author: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; attribution?: string | null };
   deck_uid?: string;
+  deck_index?: number | null; // delete: multideck round-deck selector
+  multideck?: boolean;
   public?: boolean;
 }
 
