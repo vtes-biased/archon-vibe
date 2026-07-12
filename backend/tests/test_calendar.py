@@ -149,6 +149,15 @@ class TestFormatDt:
         naive = datetime(2025, 6, 15, 14, 0, 0)
         assert _format_dt(naive) == "20250615T140000Z"
 
+    def test_naive_anchored_in_tournament_timezone(self):
+        """Naive wall-clock must be anchored in the event tz, not stamped UTC."""
+        naive = datetime(2025, 6, 15, 14, 0, 0)  # 14:00 CEST = 12:00 UTC
+        assert _format_dt(naive, "Europe/Paris") == "20250615T120000Z"
+
+    def test_unknown_timezone_falls_back_to_utc(self):
+        naive = datetime(2025, 6, 15, 14, 0, 0)
+        assert _format_dt(naive, "Not/AZone") == "20250615T140000Z"
+
     def test_none_returns_empty(self):
         assert _format_dt(None) == ""
 
@@ -176,6 +185,15 @@ class TestTournamentToVevent:
         t = _make_tournament(start=JUNE_15_10AM)
         result = _tournament_to_vevent(t, "20250101T000000Z")
         assert "DTEND:20250615T180000Z" in result
+
+    def test_naive_start_uses_tournament_timezone(self):
+        """A 10:00 Paris event must reach subscribers as 08:00 UTC, not 10:00 UTC."""
+        t = _make_tournament(
+            start=datetime(2025, 6, 15, 10, 0, 0), timezone="Europe/Paris"
+        )
+        result = _tournament_to_vevent(t, "20250101T000000Z")
+        assert "DTSTART:20250615T080000Z" in result
+        assert "DTEND:20250615T160000Z" in result
 
     def test_online_location(self):
         t = _make_tournament(start=JUNE_15_10AM, online=True)

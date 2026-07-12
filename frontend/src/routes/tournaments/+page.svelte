@@ -7,6 +7,7 @@
   import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
   import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
+  import { zonedDate } from "$lib/utils";
   import { Loader2, Trophy, Calendar, Copy, Check } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
@@ -139,7 +140,7 @@
         day: "numeric",
         ...(tz ? { timeZone: tz } : {}),
       };
-      return new Date(t.start).toLocaleDateString(undefined, opts);
+      return zonedDate(t.start, t.timezone || "UTC").toLocaleDateString(undefined, opts);
     } catch {
       return t.start;
     }

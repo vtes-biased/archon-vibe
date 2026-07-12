@@ -12,6 +12,7 @@
   import { initEngine, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, Trash2, Upload, CloudUpload } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
@@ -456,7 +457,7 @@ import TournamentModals from "./TournamentModals.svelte";
         timeZoneName: "short",
         ...(tz ? { timeZone: tz } : {}),
       };
-      return new Date(iso).toLocaleString(undefined, opts);
+      return zonedDate(iso, tournament.timezone || "UTC").toLocaleString(undefined, opts);
     } catch { return iso; }
   }
 
@@ -465,7 +466,7 @@ import TournamentModals from "./TournamentModals.svelte";
     const tournamentTz = tournament.timezone || "UTC";
     if (tournamentTz === browserTz) return null;
     try {
-      return new Date(iso).toLocaleString(undefined, {
+      return zonedDate(iso, tournamentTz).toLocaleString(undefined, {
         hour: "2-digit", minute: "2-digit",
         timeZoneName: "short",
       });

@@ -2,6 +2,7 @@
 
 import os
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Query, Response
 
@@ -24,28 +25,40 @@ def _escape_ical(text: str) -> str:
     )
 
 
-def _format_dt(dt: datetime | None) -> str:
+def _as_utc(dt: datetime, tz_name: str) -> datetime:
+    """Anchor a naive wall-clock datetime in the tournament's timezone, then UTC.
+
+    Tournament.start/finish are stored naive (wall-clock in Tournament.timezone).
+    """
+    if dt.tzinfo is None:
+        try:
+            dt = dt.replace(tzinfo=ZoneInfo(tz_name or "UTC"))
+        except (ZoneInfoNotFoundError, ValueError):
+            dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def _format_dt(dt: datetime | None, tz_name: str = "UTC") -> str:
     """Format datetime to iCal DTSTART/DTEND value."""
     if not dt:
         return ""
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.strftime("%Y%m%dT%H%M%SZ")
+    return _as_utc(dt, tz_name).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     """Convert a tournament to an iCal VEVENT string."""
-    dtstart = _format_dt(t.start)
+    dtstart = _format_dt(t.start, t.timezone)
     if not dtstart:
         return ""
 
     # End time: finish or start + 8h default
     if t.finish:
-        dtend = _format_dt(t.finish)
+        dtend = _format_dt(t.finish, t.timezone)
     else:
         assert t.start is not None
-        start_dt = t.start if t.start.tzinfo else t.start.replace(tzinfo=UTC)
-        dtend = (start_dt + timedelta(hours=8)).strftime("%Y%m%dT%H%M%SZ")
+        dtend = (_as_utc(t.start, t.timezone) + timedelta(hours=8)).strftime(
+            "%Y%m%dT%H%M%SZ"
+        )
 
     # Build description
     parts = []
