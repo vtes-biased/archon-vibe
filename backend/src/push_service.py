@@ -31,7 +31,7 @@ from py_vapid import Vapid02
 from pywebpush import WebPushException, webpush_async
 
 from . import db
-from .models import Tournament
+from .models import TableState, Tournament, TournamentState
 
 logger = logging.getLogger(__name__)
 
@@ -80,30 +80,35 @@ _FALLBACK_LOCALE = "en"
 _PUSH_MESSAGES: dict[str, dict[str, str]] = {
     "en": {
         "seating_round": "Round {round} — you're at Table {table}, seat {seat}.",
+        "seating_round_room": "Round {round} — you're at {table}, seat {seat}.",
         "seating_finals": "Finals — you're at the table, seat {seat}.",
         "judge_title": "Judge call",
         "judge_body": "{player} needs a judge at {table}.",
     },
     "fr": {
         "seating_round": "Ronde {round} — vous êtes à la table {table}, siège {seat}.",
+        "seating_round_room": "Ronde {round} — vous êtes à {table}, siège {seat}.",
         "seating_finals": "Finale — vous êtes à la table, siège {seat}.",
         "judge_title": "Appel d'arbitre",
         "judge_body": "{player} demande un arbitre à {table}.",
     },
     "es": {
         "seating_round": "Ronda {round} — estás en la mesa {table}, asiento {seat}.",
+        "seating_round_room": "Ronda {round} — estás en {table}, asiento {seat}.",
         "seating_finals": "Final — estás en la mesa, asiento {seat}.",
         "judge_title": "Llamada al juez",
         "judge_body": "{player} necesita un juez en {table}.",
     },
     "pt": {
         "seating_round": "Rodada {round} — você está na mesa {table}, assento {seat}.",
+        "seating_round_room": "Rodada {round} — você está em {table}, assento {seat}.",
         "seating_finals": "Final — você está na mesa, assento {seat}.",
         "judge_title": "Chamada de juiz",
         "judge_body": "{player} precisa de um juiz em {table}.",
     },
     "it": {
         "seating_round": "Round {round} — sei al tavolo {table}, posto {seat}.",
+        "seating_round_room": "Round {round} — sei a {table}, posto {seat}.",
         "seating_finals": "Finale — sei al tavolo, posto {seat}.",
         "judge_title": "Chiamata giudice",
         "judge_body": "{player} chiede un giudice a {table}.",
@@ -118,6 +123,49 @@ def _loc(locale: str | None) -> str:
 # --- Notification specs (pure data; localized at send time) --------------------
 
 
+def _table_label(t: Tournament, table_idx: int) -> str | None:
+    """Room-aware table label, mirroring the frontend resolveTableLabel: the app and
+    wall signs show e.g. "Main Hall 3", so pushes must not say "Table 3" there.
+    None when no rooms are configured (or the table overflows the room config)."""
+    offset = 0
+    for room in t.table_rooms:
+        if table_idx < offset + room.count:
+            local = table_idx - offset + 1
+            return room.name if room.count == 1 else f"{room.name} {local}"
+        offset += room.count
+    return None
+
+
+def _round_seat_spec(
+    t: Tournament, round_no: int, table_idx: int, seat_idx: int
+) -> dict:
+    # Plain event URL: PlayerView already fronts the viewer's own seat, and no
+    # frontend reader consumes a ?table= param.
+    spec = {
+        "kind": "seating_round",
+        "title": t.name,
+        "round": round_no,
+        "table": table_idx + 1,
+        "seat": seat_idx + 1,
+        "url": f"/tournaments/{t.uid}",
+        "tag": f"seating-{t.uid}-{round_no}",
+    }
+    label = _table_label(t, table_idx)
+    if label:
+        spec["table_label"] = label
+    return spec
+
+
+def _finals_seat_spec(t: Tournament, seat_idx: int) -> dict:
+    return {
+        "kind": "seating_finals",
+        "title": t.name,
+        "seat": seat_idx + 1,
+        "url": f"/tournaments/{t.uid}",
+        "tag": f"seating-{t.uid}-finals",
+    }
+
+
 def build_seating_specs(t: Tournament, event_type: str) -> list[tuple[str, dict]]:
     """(user_uid, spec) for each player seated by a just-started round/finals.
 
@@ -130,43 +178,61 @@ def build_seating_specs(t: Tournament, event_type: str) -> list[tuple[str, dict]
     if event_type == "StartFinals":
         if t.finals is None:
             return []
-        url = f"/tournaments/{t.uid}?finals=1"
-        tag = f"seating-{t.uid}-finals"
         return [
-            (
-                seat.player_uid,
-                {
-                    "kind": "seating_finals",
-                    "title": t.name,
-                    "seat": i + 1,
-                    "url": url,
-                    "tag": tag,
-                },
-            )
+            (seat.player_uid, _finals_seat_spec(t, i))
             for i, seat in enumerate(t.finals.seating)
         ]
 
     if not t.rounds:
         return []
     round_no = len(t.rounds)
-    tag = f"seating-{t.uid}-{round_no}"
+    return [
+        (seat.player_uid, _round_seat_spec(t, round_no, table_idx, seat_idx))
+        for table_idx, table in enumerate(t.rounds[-1])
+        for seat_idx, seat in enumerate(table.seating)
+    ]
+
+
+def build_reseat_specs(old: Tournament, new: Tournament) -> list[tuple[str, dict]]:
+    """(user_uid, spec) for players whose table/seat changed under a re-seat action
+    (AlterSeating / SwapSeats / SeatPlayer / UnseatPlayer): the substitute and every
+    moved player need a fresh notification replacing their stale table assignment,
+    while re-notifying unmoved players is spam — only changed assignments are pushed.
+    Diffs every round pairwise plus the finals (re-seats can target any live round
+    under parallel pods), but only pages players landing on a still-live table:
+    seating corrections to finished tables/events are bookkeeping, not seat calls.
+    Unseated players get nothing — there is no assignment to announce.
+    """
+    if new.state != TournamentState.PLAYING:
+        return []
     out: list[tuple[str, dict]] = []
-    for table_idx, table in enumerate(t.rounds[-1]):
-        for seat_idx, seat in enumerate(table.seating):
-            out.append(
-                (
-                    seat.player_uid,
-                    {
-                        "kind": "seating_round",
-                        "title": t.name,
-                        "round": round_no,
-                        "table": table_idx + 1,
-                        "seat": seat_idx + 1,
-                        "url": f"/tournaments/{t.uid}?table={table_idx + 1}",
-                        "tag": tag,
-                    },
-                )
-            )
+    # Same round count guards against non-re-seat shapes; a re-seat never adds rounds.
+    if len(old.rounds) == len(new.rounds):
+        for r_idx, (old_round, new_round) in enumerate(
+            zip(old.rounds, new.rounds, strict=True)
+        ):
+            old_pos = {
+                seat.player_uid: (ti, si)
+                for ti, table in enumerate(old_round)
+                for si, seat in enumerate(table.seating)
+            }
+            for ti, table in enumerate(new_round):
+                if table.state in (TableState.FINISHED, TableState.CANCELLED):
+                    continue
+                for si, seat in enumerate(table.seating):
+                    if old_pos.get(seat.player_uid) != (ti, si):
+                        out.append(
+                            (seat.player_uid, _round_seat_spec(new, r_idx + 1, ti, si))
+                        )
+    if new.finals is not None and new.finals.state != TableState.FINISHED:
+        old_seats = (
+            {s.player_uid: i for i, s in enumerate(old.finals.seating)}
+            if old.finals is not None
+            else {}
+        )
+        for i, seat in enumerate(new.finals.seating):
+            if old_seats.get(seat.player_uid) != i:
+                out.append((seat.player_uid, _finals_seat_spec(new, i)))
     return out
 
 
@@ -208,9 +274,14 @@ def render_payload(spec: dict, locale: str) -> dict:
     kind = spec["kind"]
     if kind == "seating_round":
         title = spec["title"]
-        body = m["seating_round"].format(
-            round=spec["round"], table=spec["table"], seat=spec["seat"]
-        )
+        if spec.get("table_label"):
+            body = m["seating_round_room"].format(
+                round=spec["round"], table=spec["table_label"], seat=spec["seat"]
+            )
+        else:
+            body = m["seating_round"].format(
+                round=spec["round"], table=spec["table"], seat=spec["seat"]
+            )
     elif kind == "seating_finals":
         title = spec["title"]
         body = m["seating_finals"].format(seat=spec["seat"])

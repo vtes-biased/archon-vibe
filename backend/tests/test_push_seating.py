@@ -14,8 +14,16 @@ Asserts the structured routing/numbers; deliberately does not snapshot wording.
 
 from datetime import UTC, datetime
 
-from src.models import FinalsTable, Seat, Table, Tournament
-from src.push_service import build_seating_specs, render_payload
+from src.models import (
+    FinalsTable,
+    Room,
+    Seat,
+    Table,
+    TableState,
+    Tournament,
+    TournamentState,
+)
+from src.push_service import build_reseat_specs, build_seating_specs, render_payload
 
 NOW = datetime.now(UTC)
 
@@ -39,7 +47,7 @@ def test_start_round_numbers_each_seat_by_table_and_seat() -> None:
 
     assert len(specs) == 10  # every seated player, once
     # Table 1 seat 1 and table 2 seat 3 pin the per-table 1-based numbering.
-    assert specs["a0"]["url"] == "/tournaments/trn-1?table=1"
+    assert specs["a0"]["url"] == "/tournaments/trn-1"
     assert (specs["a0"]["round"], specs["a0"]["table"], specs["a0"]["seat"]) == (
         1,
         1,
@@ -84,7 +92,7 @@ def test_start_finals_reads_finals_seating_with_finals_url() -> None:
     specs = dict(build_seating_specs(t, "StartFinals"))
 
     assert set(specs) == {"f1", "f2"}  # finalists only, not the prelim seat
-    assert specs["f2"]["url"] == "/tournaments/trn-1?finals=1"
+    assert specs["f2"]["url"] == "/tournaments/trn-1"
     assert specs["f2"]["tag"] == "seating-trn-1-finals"
     assert specs["f2"]["seat"] == 2
     assert "seat 2" in render_payload(specs["f2"], "en")["body"]
@@ -93,6 +101,60 @@ def test_start_finals_reads_finals_seating_with_finals_url() -> None:
 def test_no_rounds_and_missing_finals_yield_nothing() -> None:
     assert build_seating_specs(_t(), "StartRound") == []
     assert build_seating_specs(_t(), "StartFinals") == []
+
+
+def _round() -> list[Table]:
+    return [
+        Table(seating=[Seat(player_uid=f"a{i}") for i in range(4)]),
+        Table(
+            seating=[Seat(player_uid=f"b{i}") for i in range(4)],
+            state=TableState.FINISHED,
+        ),
+    ]
+
+
+def test_reseat_pushes_only_moved_players_on_live_tables() -> None:
+    # A substitute replaces a1 on the live table; b0/b1 swap on a FINISHED table
+    # (score correction). Only the substitute is paged — unmoved players and
+    # finished-table corrections are not. The unseated a1 gets nothing.
+    old = _t(state=TournamentState.PLAYING, rounds=[_round()])
+    new = _t(state=TournamentState.PLAYING, rounds=[_round()])
+    new.rounds[0][0].seating[1] = Seat(player_uid="sub")
+    t2 = new.rounds[0][1].seating
+    t2[0], t2[1] = t2[1], t2[0]
+
+    specs = dict(build_reseat_specs(old, new))
+
+    assert set(specs) == {"sub"}
+    assert (specs["sub"]["round"], specs["sub"]["table"], specs["sub"]["seat"]) == (
+        1,
+        1,
+        2,
+    )
+    # Same tag as the StartRound push → the stale assignment gets replaced.
+    assert specs["sub"]["tag"] == "seating-trn-1-1"
+
+
+def test_reseat_skips_non_playing_tournament() -> None:
+    # Post-finish seating corrections are bookkeeping, not seat calls.
+    old = _t(state=TournamentState.FINISHED, rounds=[_round()])
+    new = _t(state=TournamentState.FINISHED, rounds=[_round()])
+    new.rounds[0][0].seating[1] = Seat(player_uid="sub")
+    assert build_reseat_specs(old, new) == []
+
+
+def test_room_label_replaces_table_number_in_body() -> None:
+    # With table_rooms configured the app/wall signs say "Main Hall 2", so the
+    # push must too — not "Table 2".
+    rooms = [Room(name="Main Hall", count=2)]
+    old = _t(state=TournamentState.PLAYING, rounds=[_round()], table_rooms=rooms)
+    new = _t(state=TournamentState.PLAYING, rounds=[_round()], table_rooms=rooms)
+    new.rounds[0][1].state = TableState.IN_PROGRESS
+    new.rounds[0][1].seating[0] = Seat(player_uid="sub")
+
+    specs = dict(build_reseat_specs(old, new))
+    body = render_payload(specs["sub"], "en")["body"]
+    assert "Main Hall 2" in body and "Table" not in body
 
 
 def test_render_payload_falls_back_to_en_for_unknown_locale() -> None:

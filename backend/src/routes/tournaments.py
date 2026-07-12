@@ -215,6 +215,17 @@ async def _maybe_push_seating(tournament: Tournament, event_type: str) -> None:
         logger.exception("Failed to send seating push for %s", tournament.uid)
 
 
+async def _maybe_push_reseat(old: Tournament, new: Tournament) -> None:
+    """Web Push a fresh table/seat to players actually moved by a re-seat action."""
+    try:
+        from .. import push_service
+
+        targets = push_service.build_reseat_specs(old, new)
+        await push_service.send_to_users(targets)
+    except Exception:
+        logger.exception("Failed to send re-seat push for %s", new.uid)
+
+
 async def _maybe_push_announcement(
     tournament: Tournament, body: str, exclude_uid: str
 ) -> None:
@@ -1377,6 +1388,10 @@ async def tournament_action(
     # must not run inside tournament_transaction). RestoreRound re-seats no one → excluded.
     if request.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
         asyncio.create_task(_maybe_push_seating(updated, request.type))
+    elif request.type in ("AlterSeating", "SwapSeats", "SeatPlayer", "UnseatPlayer"):
+        # Re-seat mid-round: only players whose table/seat actually changed are
+        # pushed — the stale seating notification they may act on gets replaced.
+        asyncio.create_task(_maybe_push_reseat(tournament, updated))
 
     # Recompute ratings when the tournament enters/leaves Finished (state change),
     # or when a result-affecting action lands on an already-finished tournament
