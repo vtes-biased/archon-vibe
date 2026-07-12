@@ -13,7 +13,7 @@
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
-  import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime } from "$lib/stores/offline.svelte";
+  import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, Trash2, Upload, CloudUpload } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
@@ -412,7 +412,9 @@ import TournamentModals from "./TournamentModals.svelte";
       showGoOnlineConfirm = false;
       showToast({ type: 'success', message: m.offline_back_online() });
     } catch (e) {
-      showToast({ type: 'error', message: toUserMessage(e, m.offline_error_go_online()) });
+      // Lock-lost already surfaced a persistent toast at the source.
+      if (e instanceof OfflineLockLostError) { showGoOnlineConfirm = false; }
+      else showToast({ type: 'error', message: toUserMessage(e, m.offline_error_go_online()) });
     } finally {
       offlineActionLoading = false;
     }

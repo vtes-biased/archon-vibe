@@ -127,8 +127,12 @@ export function lostOfflineLock(t: {
  */
 export async function handleOfflineLockLost(tournamentUid: string): Promise<void> {
   await clearOfflineState(tournamentUid);
-  showToast({ type: 'error', message: m.offline_lock_lost_warning() });
+  // Irreversible data loss: persist until dismissed, never auto-fade.
+  showToast({ type: 'error', message: m.offline_lock_lost_warning(), duration: 0 });
 }
+
+/** The offline lock was lost during go-online; the loss toast is already shown. */
+export class OfflineLockLostError extends Error {}
 
 /** Request the server to lock a tournament for offline use. */
 export async function goOffline(tournamentUid: string): Promise<void> {
@@ -198,7 +202,9 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
       // silent clobber of the other device from this sync path.
       if (e instanceof ApiError && (e.status === 410 || e.status === 409)) {
         await clearOfflineState(tournamentUid);
-        throw new Error(m.offline_lock_lost_warning());
+        // Irreversible data loss: persist until dismissed, never auto-fade.
+        showToast({ type: 'error', message: m.offline_lock_lost_warning(), duration: 0 });
+        throw new OfflineLockLostError(m.offline_lock_lost_warning());
       }
       throw e;
     }
