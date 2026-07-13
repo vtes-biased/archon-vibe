@@ -1229,6 +1229,7 @@
   "table_rooms_error_save": "Impossible d'enregistrer les salles.",
   "tournament_action_reverted": "L'action n'a pas pu être enregistrée — retour à l'état précédent.",
   "deck_error_upload": "Échec du téléchargement.",
+  "deck_url_import_failed": "Impossible de lire ce lien. Vérifiez qu'il s'agit bien d'un lien de partage de deck depuis vdb.im, vtesdecks.com, ou Amaranth — ou passez à Coller un Deck, qui fonctionne toujours.",
   "deck_error_camera": "Impossible d'accéder à la caméra.",
   "deck_error_save": "Impossible d'enregistrer le deck.",
   "deck_validation_unavailable": "Impossible de vérifier la légalité de ce deck pour le moment — les données des cartes sont encore en cours de chargement.",

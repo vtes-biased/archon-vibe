@@ -1229,6 +1229,7 @@
   "table_rooms_error_save": "Não foi possível salvar as salas.",
   "tournament_action_reverted": "A ação não pôde ser salva — revertido ao estado anterior.",
   "deck_error_upload": "Falha no envio.",
+  "deck_url_import_failed": "Não foi possível ler esse link. Verifique se é um link de compartilhamento de deck do vdb.im, vtesdecks.com, ou Amaranth — ou mude para Colar Deck, que sempre funciona.",
   "deck_error_camera": "Não foi possível acessar a câmera.",
   "deck_error_save": "Não foi possível salvar o deck.",
   "deck_validation_unavailable": "Ainda não foi possível verificar a legalidade deste deck — os dados das cartas ainda estão carregando.",

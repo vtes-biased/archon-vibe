@@ -1229,6 +1229,7 @@
   "table_rooms_error_save": "No se pudieron guardar las salas.",
   "tournament_action_reverted": "La acción no se pudo guardar — se revirtió al estado anterior.",
   "deck_error_upload": "Error al cargar.",
+  "deck_url_import_failed": "No se pudo leer ese enlace. Asegúrese de que sea un enlace para compartir un mazo desde vdb.im, vtesdecks.com o Amaranth — o cambie a Pegar Deck, que siempre funciona.",
   "deck_error_camera": "No se pudo acceder a la cámara.",
   "deck_error_save": "No se pudo guardar el mazo.",
   "deck_validation_unavailable": "Aún no se pudo comprobar la legalidad de este mazo — los datos de las cartas todavía se están cargando.",

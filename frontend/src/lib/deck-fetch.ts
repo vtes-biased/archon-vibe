@@ -17,6 +17,11 @@ export interface ParsedDeck {
   warnings?: string[];
 }
 
+/** URL import failed (bad link, unsupported provider, provider error). The
+ * server detail is developer English — callers show one friendly localized
+ * message instead and nudge toward Paste, which always works. */
+export class DeckFetchError extends Error {}
+
 /**
  * Fetch a deck from a supported URL (VDB, VTESDecks, Amaranth) via the backend
  * proxy, which resolves all card ids to VEKN ids. Requires network.
@@ -31,7 +36,9 @@ export async function fetchDeckFromUrl(url: string): Promise<ParsedDeck> {
   );
   if (!resp.ok) {
     const data = await resp.json().catch(() => ({}));
-    throw new Error(data.detail || `Failed to fetch deck (${resp.status})`);
+    // Keep the real cause findable without surfacing dev copy to the player.
+    console.warn('[deck-fetch]', resp.status, data.detail);
+    throw new DeckFetchError(data.detail || `Failed to fetch deck (${resp.status})`);
   }
   return resp.json();
 }

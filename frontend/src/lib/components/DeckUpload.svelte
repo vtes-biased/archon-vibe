@@ -240,7 +240,10 @@
       deckName = '';
       onuploaded?.();
     } catch (e: any) {
-      error = toUserMessage(e, m.deck_error_upload());
+      const { DeckFetchError } = await import('$lib/deck-fetch');
+      error = e instanceof DeckFetchError
+        ? m.deck_url_import_failed()
+        : toUserMessage(e, m.deck_error_upload());
     } finally {
       loading = false;
     }

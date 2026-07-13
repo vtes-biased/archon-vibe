@@ -1229,6 +1229,7 @@
   "table_rooms_error_save": "Impossibile salvare le sale.",
   "tournament_action_reverted": "Impossibile salvare l'azione — ripristinato allo stato precedente.",
   "deck_error_upload": "Caricamento fallito.",
+  "deck_url_import_failed": "Impossibile leggere quel link. Assicurati che sia un link per condividere un mazzo da vdb.im, vtesdecks.com, o Amaranth — oppure passa a Incolla Deck, che funziona sempre.",
   "deck_error_camera": "Impossibile accedere alla fotocamera.",
   "deck_error_save": "Impossibile salvare il mazzo.",
   "deck_validation_unavailable": "Non è stato ancora possibile verificare la legalità di questo mazzo — i dati delle carte sono ancora in fase di caricamento.",

@@ -1229,6 +1229,7 @@
   "table_rooms_error_save": "Couldn't save rooms.",
   "tournament_action_reverted": "Action could not be saved — reverted to the previous state.",
   "deck_error_upload": "Upload failed.",
+  "deck_url_import_failed": "Could not read that link. Make sure it is a deck share link from vdb.im, vtesdecks.com, or Amaranth — or switch to Paste, which always works.",
   "deck_error_camera": "Couldn't access the camera.",
   "deck_error_save": "Couldn't save the deck.",
   "deck_validation_unavailable": "Couldn't check this deck's legality yet — card data is still loading.",
