@@ -292,9 +292,23 @@
     return players;
   });
 
+  // Deck chase (decklist-required events): mirror of the payment filter —
+  // who still owes a deck, or has one with validation issues.
+  let deckFilter = $state<'all' | 'missing' | 'problems'>('all');
+  const decksSubmittedCount = $derived(
+    tournament.players?.filter(p => getPlayerDecks(p.user_uid ?? '').length > 0).length ?? 0
+  );
+
   const filteredPlayers = $derived.by(() => {
-    if (!isOrganizer || paymentFilter === 'all') return sortedPlayers;
-    return sortedPlayers.filter(p => p.payment_status === paymentFilter);
+    if (!isOrganizer) return sortedPlayers;
+    let players = sortedPlayers;
+    if (paymentFilter !== 'all') players = players.filter(p => p.payment_status === paymentFilter);
+    if (deckFilter === 'missing') {
+      players = players.filter(p => getDeckStatus(p.user_uid ?? '') === 'none');
+    } else if (deckFilter === 'problems') {
+      players = players.filter(p => ['none', 'error', 'warning'].includes(getDeckStatus(p.user_uid ?? '')));
+    }
+    return players;
   });
 
   const auth = getAuthState();
@@ -798,6 +812,25 @@
           </div>
           <span class="text-xs text-ink-faint">{m.payment_summary({ paid: String(paidCount), total: String(totalPlayers) })}</span>
         </div>
+        {#if tournament.decklist_required}
+          <div class="flex items-center gap-2">
+            <div class="flex gap-1">
+              <button
+                class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {deckFilter === 'all' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
+                onclick={() => deckFilter = 'all'}
+              >{m.deck_filter_all()}</button>
+              <button
+                class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {deckFilter === 'missing' ? 'btn-pending' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
+                onclick={() => deckFilter = 'missing'}
+              >{m.decks_missing()}</button>
+              <button
+                class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {deckFilter === 'problems' ? 'btn-pending' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
+                onclick={() => deckFilter = 'problems'}
+              >{m.deck_filter_problems()}</button>
+            </div>
+            <span class="text-xs text-ink-faint">{m.decks_submitted_count({ submitted: String(decksSubmittedCount), total: String(totalPlayers) })}</span>
+          </div>
+        {/if}
       {/if}
     </div>
 
