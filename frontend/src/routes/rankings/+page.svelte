@@ -23,12 +23,12 @@
   const isHof = $derived(activeTab === "halloffame");
   const pageSize = $derived(isHof ? 100 : 50);
 
-  const tabs: { value: Tab; labelFn: () => string }[] = [
-    { value: "constructed_offline", labelFn: () => m.rankings_cat_constructed() },
-    { value: "constructed_online", labelFn: () => m.rankings_cat_constructed_online() },
-    { value: "limited_offline", labelFn: () => m.rankings_cat_limited() },
-    { value: "limited_online", labelFn: () => m.rankings_cat_limited_online() },
-    { value: "halloffame", labelFn: () => m.hof_page_title() },
+  const tabs: { value: Tab; labelFn: () => string; captionFn: () => string }[] = [
+    { value: "constructed_offline", labelFn: () => m.rankings_cat_constructed(), captionFn: () => m.rankings_cat_constructed_desc() },
+    { value: "constructed_online", labelFn: () => m.rankings_cat_constructed_online(), captionFn: () => m.rankings_cat_constructed_online_desc() },
+    { value: "limited_offline", labelFn: () => m.rankings_cat_limited(), captionFn: () => m.rankings_cat_limited_desc() },
+    { value: "limited_online", labelFn: () => m.rankings_cat_limited_online(), captionFn: () => m.rankings_cat_limited_online_desc() },
+    { value: "halloffame", labelFn: () => m.hof_page_title(), captionFn: () => m.hof_description() },
   ];
 
   const countries = getCountries();
@@ -117,9 +117,8 @@
       {/each}
     </div>
 
-    {#if isHof}
-      <p class="text-ink-muted text-sm mb-6">{m.hof_description()}</p>
-    {/if}
+    <!-- One-line caption per tab: what the Points column means on this ranking -->
+    <p class="text-ink-muted text-sm mb-6">{tabs.find(t => t.value === activeTab)?.captionFn()}</p>
 
     <!-- Country filter -->
     <div class="mb-4">
@@ -151,7 +150,9 @@
             <tr class="border-b border-line text-ink-muted">
               <th class="py-2 px-3 text-left w-12">{m.rankings_col_rank()}</th>
               <th class="py-2 px-3 text-left">{m.rankings_col_player()}</th>
-              <th class="py-2 px-3 text-left">{m.common_country()}</th>
+              <!-- Flag-only on phones (DESIGN.md mobile reflow rule) — the name column
+                   is what pushes ~360px viewports into side-scroll. -->
+              <th class="py-2 px-3 text-left"><span class="sr-only sm:not-sr-only">{m.common_country()}</span></th>
               <th class="py-2 px-3 text-right">{isHof ? m.hof_col_wins() : m.rankings_col_points()}</th>
             </tr>
           </thead>
@@ -172,8 +173,8 @@
                 </td>
                 <td class="py-2 px-3 text-ink">
                   {#if user.country}
-                    {getCountryFlag(user.country)}
-                    {countries[user.country]?.name ?? user.country}
+                    <span title={countries[user.country]?.name ?? user.country}>{getCountryFlag(user.country)}</span>
+                    <span class="hidden sm:inline">{countries[user.country]?.name ?? user.country}</span>
                   {/if}
                 </td>
                 <td class="py-2 px-3 text-right font-medium text-ink-strong">
