@@ -84,6 +84,27 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     Ok(())
 }
 
+/// Resolve the round a seat/unseat targets: None = last round (unchecked —
+/// the existing single-round flows). An explicit earlier round must be LIVE
+/// (some table still unfinished): substitutes may join a running pod in
+/// parallel/open-rounds play, but finished/cancelled rounds stay closed.
+fn resolve_live_round(rounds: &JsonValue, round: Option<usize>) -> Result<usize, EngineError> {
+    let last = rounds.len() - 1;
+    let target = round.unwrap_or(last);
+    if target > last {
+        return Err(EngineError::InvalidRound);
+    }
+    if target != last {
+        let live = rounds[target]
+            .members()
+            .any(|t| !matches!(t["state"].as_str().unwrap_or(""), "Finished" | "Cancelled"));
+        if !live {
+            return Err(EngineError::RoundNotLive);
+        }
+    }
+    Ok(target)
+}
+
 /// VEKN legality: ranked events (National/Continental championships) forbid
 /// proxies and multideck. Callers pass the MERGED view (config over current
 /// tournament) so setting either side of an illegal combo is rejected —
@@ -1543,6 +1564,7 @@ fn apply_event(
             player_uid,
             table,
             seat,
+            round,
         } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
@@ -1561,12 +1583,14 @@ fn apply_event(
                 });
             }
 
-            // Verify table exists in current round
+            // Verify table exists in the target round (default: last). With
+            // parallel/open rounds an EARLIER round may take a substitute too,
+            // but only while it is live — finished/cancelled rounds stay closed.
             let rounds = &mut tournament["rounds"];
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundInProgress);
             }
-            let last = rounds.len() - 1;
+            let last = resolve_live_round(rounds, *round)?;
             if *table >= rounds[last].len() {
                 return Err(EngineError::InvalidTable);
             }
@@ -1614,7 +1638,7 @@ fn apply_event(
             Ok(())
         }
 
-        TournamentEvent::UnseatPlayer { player_uid } => {
+        TournamentEvent::UnseatPlayer { player_uid, round } => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
@@ -1622,7 +1646,7 @@ fn apply_event(
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundInProgress);
             }
-            let last = rounds.len() - 1;
+            let last = resolve_live_round(rounds, *round)?;
 
             // Find and remove player from seating
             let mut found = false;

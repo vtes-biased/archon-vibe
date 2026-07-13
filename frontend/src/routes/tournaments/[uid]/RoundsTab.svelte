@@ -75,7 +75,9 @@
   let overrideTable_ = $state<number | null>(null);
   let overrideComment = $state("");
   let overrideSaving = $state(false);
-  let seatTargetTable = $state<number | null>(null);
+  // "round:table" key — the pool can now open on any live round, so a bare
+  // table index would collide across expanded rounds.
+  let seatTargetTable = $state<string | null>(null);
   let expandedRounds = $state<Set<number>>(new Set());
 
   // Auto-expand in-progress rounds. Cancelled rounds stay discreet (collapsed) —
@@ -591,6 +593,7 @@
       {@const isCurrent = isCurrentRound(r)}
       {@const isEditable = canEditSeating}
       {@const isLast = r === tournament.rounds!.length - 1}
+      {@const isRoundLive = round.some(t => t.state !== "Finished" && t.state !== "Cancelled")}
       {@const isExpanded = expandedRounds.has(r)}
       {@const canEndRound = isOrganizer && isRoundEndable(r)}
       {@const allTablesScored = isRoundAllFinished(r)}
@@ -631,6 +634,11 @@
             {#if alterMode && r === alterRoundIdx}
               <!-- In-place alter seating mode -->
               <p class="text-sm text-ink">{m.rounds_alter_hint()}</p>
+              {#if unseatedPlayers.length > 0}
+                <!-- Cross-link: adding a pool player is a separate engine event
+                     (AlterSeating keeps the player set fixed), so point at it. -->
+                <p class="text-sm text-ink-muted">{m.rounds_alter_pool_hint({ count: String(unseatedPlayers.length) })}</p>
+              {/if}
               {#if round.some(t => t.seating.some(s => s.result.vp > 0))}
                 <p class="text-sm text-warn">{m.rounds_alter_scores_warning()}</p>
               {/if}
@@ -773,9 +781,9 @@
                         </span>
                         <div class="flex items-center gap-2 shrink-0">
                           <span class="text-ink-faint text-xs">{#if !isScoring}<span class="text-ink-strong font-medium tabular-nums">{seat.result.vp}VP</span> {/if}{tGws[j]}GW {tTps[j]}TP</span>
-                          {#if isEditable && isLast}
+                          {#if isEditable && (isLast || isRoundLive)}
                             <button
-                              onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid })}
+                              onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid, round: r })}
                               class="p-2 sm:p-0.5 text-ink-faint hover:text-link transition-colors"
                               title={m.rounds_unseat_title()}
                             >
@@ -863,15 +871,15 @@
                     >{m.override_remove()}</button>
                   </div>
                 {/if}
-                <!-- Seat a player -->
-                {#if isEditable && isLast && unseatedPlayers.length > 0 && table.seating.length < 5}
+                <!-- Seat a player (last round, or an earlier still-live round — parallel/open pods take substitutes too) -->
+                {#if isEditable && (isLast || isRoundLive) && unseatedPlayers.length > 0 && table.seating.length < 5 && table.state !== "Finished" && !isCancelled}
                   <div class="mt-2 pt-2 border-t border-line">
-                    {#if seatTargetTable === i}
+                    {#if seatTargetTable === `${r}:${i}`}
                       <div class="flex flex-wrap gap-1">
                         {#each unseatedPlayers as player}
                           {@const puid = player.user_uid ?? ""}
                           <button
-                            onclick={() => { doAction("SeatPlayer", { player_uid: puid, table: i, seat: table.seating.length }); seatTargetTable = null; }}
+                            onclick={() => { doAction("SeatPlayer", { player_uid: puid, table: i, seat: table.seating.length, round: r }); seatTargetTable = null; }}
                             class="px-2 py-1 text-xs bg-surface-hover hover:bg-select-soft/60 text-ink hover:text-select rounded transition-colors"
                           >{seatDisplay(puid)}</button>
                         {/each}
@@ -879,7 +887,7 @@
                       </div>
                     {:else}
                       <button
-                        onclick={() => seatTargetTable = i}
+                        onclick={() => seatTargetTable = `${r}:${i}`}
                         class="text-xs text-ink-faint hover:text-select transition-colors"
                       >
                         <Plus class="w-3.5 h-3.5 inline mr-1" />{m.rounds_seat_player()}

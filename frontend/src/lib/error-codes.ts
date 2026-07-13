@@ -95,6 +95,7 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.seating_violates_r1': () => m.err_tournament_seating_violates_r1(),
   'tournament.player_not_in_round': (p) => m.err_tournament_player_not_in_round({ player: p.player ?? '' }),
   'tournament.table_full': () => m.err_tournament_table_full(),
+  'tournament.round_not_live': () => m.err_tournament_round_not_live(),
   'tournament.table_not_empty': () => m.err_tournament_table_not_empty(),
   'tournament.invalid_score': () => m.err_tournament_invalid_score(),
   'tournament.finals_min_rounds': () => m.err_tournament_finals_min_rounds(),

@@ -148,6 +148,7 @@ impl TournamentEvent {
                     player_uid,
                     table,
                     seat,
+                    round: value["round"].as_usize(),
                 })
             }
             "UnseatPlayer" => Ok(Self::UnseatPlayer {
@@ -155,6 +156,7 @@ impl TournamentEvent {
                     .as_str()
                     .ok_or("player_uid required")?
                     .to_string(),
+                round: value["round"].as_usize(),
             }),
             "AddTable" => Ok(Self::AddTable),
             "RemoveTable" => {

@@ -156,9 +156,13 @@ pub enum TournamentEvent {
         player_uid: String,
         table: usize,
         seat: usize,
+        /// Target round; None = last round. An earlier round must be live.
+        round: Option<usize>,
     },
     UnseatPlayer {
         player_uid: String,
+        /// Target round; None = last round. An earlier round must be live.
+        round: Option<usize>,
     },
     AddTable,
     RemoveTable {

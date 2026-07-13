@@ -74,6 +74,7 @@ pub enum EngineError {
     PlayerNotInRound { player: String },
     TableFull,
     TableNotEmpty,
+    RoundNotLive,
     // Scoring / finals / toss
     InvalidScore,
     FinalsMinRounds,
@@ -173,6 +174,7 @@ impl EngineError {
             PlayerNotInRound { .. } => "tournament.player_not_in_round",
             TableFull => "tournament.table_full",
             TableNotEmpty => "tournament.table_not_empty",
+            RoundNotLive => "tournament.round_not_live",
             InvalidScore => "tournament.invalid_score",
             FinalsMinRounds => "tournament.finals_min_rounds",
             FinalsAlreadyStarted => "tournament.finals_already_started",
@@ -325,6 +327,7 @@ impl fmt::Display for EngineError {
             }
             TableFull => write!(f, "Table already has 5 players"),
             TableNotEmpty => write!(f, "Cannot remove a table with players seated"),
+            RoundNotLive => write!(f, "That round is over — seating can only change in a live round"),
             InvalidScore => {
                 write!(f, "Invalid score: impossible VP combination for this table")
             }

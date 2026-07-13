@@ -1787,6 +1787,47 @@ fn tournament_with_round() -> JsonValue {
     t
 }
 
+#[test]
+fn test_seat_player_earlier_live_round() {
+    // Two rounds in flight (parallel/open play): an EARLIER round that is
+    // still live can take a substitute; a finished earlier round cannot.
+    let mut t = tournament_with_round();
+    t["players"]
+        .push(json::object! { user_uid: "p9", state: "Registered", payment_status: "Pending", toss: 0 })
+        .unwrap();
+    t["rounds"]
+        .push(json::array![{
+            seating: [
+                { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            ],
+            state: "In Progress",
+            override: json::Null,
+        }])
+        .unwrap();
+    let org = make_organizer();
+
+    // Round 0 still has an In Progress table → explicit round: 0 seat works.
+    let event = json::object! { type: "SeatPlayer", player_uid: "p9", table: 1, seat: 4, round: 0 };
+    let updated = json::parse(&run_event(&t, &event, &org).unwrap()).unwrap();
+    assert_eq!(updated["rounds"][0][1]["seating"].len(), 5);
+    assert_eq!(updated["players"][8]["state"].as_str(), Some("Playing"));
+
+    // Once every table of that earlier round is finished, it is closed.
+    let mut done = updated.clone();
+    done["rounds"][0][1]["state"] = "Finished".into();
+    done["players"]
+        .push(json::object! { user_uid: "p10", state: "Registered", payment_status: "Pending", toss: 0 })
+        .unwrap();
+    let event =
+        json::object! { type: "SeatPlayer", player_uid: "p10", table: 0, seat: 4, round: 0 };
+    let result = run_event(&done, &event, &org);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("live round"));
+}
+
 // Open rounds: max_rounds is a PER-PLAYER cap. After a player plays that many rounds they
 // retire to `Completed` (still finals-eligible) and may no longer check in for another round.
 #[test]

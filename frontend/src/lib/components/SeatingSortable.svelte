@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { OctagonX, TriangleAlert, Info, ArrowRightLeft, X } from "@lucide/svelte";
+  import { OctagonX, TriangleAlert, Info, ArrowRightLeft, X, RotateCcw } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, resolveTableLabel } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { tick } from 'svelte';
@@ -48,6 +48,23 @@
     announce = '';
   }
 
+  // Per-move undo: snapshot before each swap/move, so one wrong tap doesn't
+  // force Cancel (which discards ALL draft moves). Component remounts per
+  // alter session, so the stack scopes itself.
+  let undoStack = $state<string[][][]>([]);
+  function snapshot() {
+    undoStack = [...undoStack, tables.map(t => [...t])];
+  }
+  function undo() {
+    const prev = undoStack.at(-1);
+    if (!prev) return;
+    undoStack = undoStack.slice(0, -1);
+    tables = prev.map(t => [...t]);
+    selected = null;
+    announce = m.rounds_seating_undone();
+    onchange();
+  }
+
   function tapSeat(t: number, s: number) {
     const uid = tables[t]![s]!;
     if (!selected) {
@@ -61,6 +78,7 @@
       clearSelection(); // re-tap to deselect
       return;
     }
+    snapshot();
     const src = tables[selected.table]!;
     const dst = tables[t]!;
     const movingUid = src[selected.seat]!;
@@ -75,6 +93,7 @@
 
   function tapOpenSeat(t: number) {
     if (!selected || selected.table === t || tables[t]!.length >= 5) return;
+    snapshot();
     const src = tables[selected.table]!;
     const [movingUid] = src.splice(selected.seat, 1);
     tables[t]!.push(movingUid!);
@@ -99,6 +118,19 @@
 <svelte:window onkeydown={(e) => { if (e.key === 'Escape' && selected) { e.preventDefault(); clearSelection(); } }} />
 
 <div aria-live="polite" class="sr-only">{announce}</div>
+
+{#if undoStack.length > 0}
+  <div class="mb-3">
+    <button
+      type="button"
+      onclick={undo}
+      class="inline-flex items-center gap-1 min-h-[44px] px-3 text-sm text-ink border border-line-strong rounded-lg hover:bg-surface-hover/50 hover:text-ink-strong transition-colors"
+    >
+      <RotateCcw class="w-4 h-4" aria-hidden="true" />
+      {m.rounds_seating_undo({ count: String(undoStack.length) })}
+    </button>
+  </div>
+{/if}
 
 {#if selected}
   {@const selName = seatDisplay(tables[selected.table]?.[selected.seat] ?? '')}
