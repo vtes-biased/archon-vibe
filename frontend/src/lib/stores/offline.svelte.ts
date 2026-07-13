@@ -173,8 +173,12 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
     }
 
     let result: Tournament;
+    let summary: { players_matched: number; accounts_created: number; decks_synced: number; sanctions_synced: number } | null = null;
     try {
-      result = await apiRequest<Tournament>(
+      const resp = await apiRequest<{
+        tournament: Tournament;
+        summary: { players_matched: number; accounts_created: number; decks_synced: number; sanctions_synced: number };
+      }>(
         `/api/tournaments/${tournamentUid}/go-online`,
         {
           method: 'POST',
@@ -190,6 +194,8 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
         // message) and covers network errors — suppress apiRequest's duplicate.
         { suppressErrorToast: true },
       );
+      result = resp.tournament;
+      summary = resp.summary;
     } catch (e) {
       // The offline session ended under this device — 410 (an IC force-unlocked
       // it, or it was already brought online) or 409 (another device force-took
@@ -217,6 +223,20 @@ export async function goOnline(tournamentUid: string): Promise<Tournament> {
     // Update local state with server-reconciled version
     await saveTournament(result);
     await clearOfflineState(tournamentUid);
+
+    // Outcome summary: closes the loop the go-offline modal opened — every
+    // created account is a real coopted VEKN member.
+    if (summary) {
+      showToast({
+        type: 'success',
+        message: m.offline_go_online_summary({
+          matched: String(summary.players_matched),
+          created: String(summary.accounts_created),
+          decks: String(summary.decks_synced),
+        }),
+        duration: 10000,
+      });
+    }
 
     return result;
   } finally {

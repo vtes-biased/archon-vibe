@@ -224,7 +224,11 @@ async def test_organizer_resolves_players_and_goes_online(test_client, test_db):
         headers=make_auth_header(org.uid),
     )
     assert resp.status_code == 200
-    assert resp.json()["offline_mode"] is False
+    body_json = resp.json()
+    assert body_json["tournament"]["offline_mode"] is False
+    # Outcome summary: the one temp player was a brand-new account.
+    assert body_json["summary"]["accounts_created"] == 1
+    assert body_json["summary"]["players_matched"] == 0
 
     # The temp player was resolved to a freshly created user and the tournament's
     # player reference was remapped to the real uid.

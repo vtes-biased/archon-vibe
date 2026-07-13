@@ -883,6 +883,7 @@
   "offline_unlock_success": "Bloqueo sin conexión del torneo eliminado",
   "offline_error_unlock": "Error al desbloquear el torneo",
   "offline_lock_lost_warning": "La sesión sin conexión de este torneo fue terminada por un organizador (desbloqueado o tomado por otro). Los cambios sin conexión no sincronizados no se han podido guardar.",
+  "offline_go_online_summary": "De nuevo en línea — {matched} jugador/es asociados a miembros existentes, {created} nuevos miembro/s creados, {decks} deck(s) sincronizados.",
   "organizers_title": "Organizadores",
   "organizers_search_placeholder": "Buscar usuarios para agregar...",
   "organizers_remove_confirm": "¿Eliminar a {name} de los organizadores?",

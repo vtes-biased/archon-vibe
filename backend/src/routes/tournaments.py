@@ -41,7 +41,6 @@ from ..db import (
     get_users_by_uids,
     save_object,
     save_object_from_model,
-    save_sanction,
     save_tournament,
     save_user,
     soft_delete_tournament,
@@ -2059,13 +2058,17 @@ async def _resolve_or_create_offline_player(
     player_data: OfflinePlayerData,
     tournament_country: str | None,
     organizer_uid: str | None = None,
-) -> tuple[str, User]:
-    """Resolve an offline player to a real user. Returns (temp_uid, real_user)."""
+) -> tuple[str, User, bool]:
+    """Resolve an offline player to a real user.
+
+    Returns (temp_uid, real_user, created) — created=True only for a brand-new
+    account (the go-online outcome summary tells the organizer how many real
+    members were minted at the venue)."""
     # 1. Match by vekn_id (skip temp IDs)
     if player_data.vekn_id and not player_data.vekn_id.startswith("TEMP-"):
         user = await get_user_by_vekn_id(player_data.vekn_id)
         if user:
-            return player_data.temp_uid, user
+            return player_data.temp_uid, user, False
 
     # 2. Match by email
     if player_data.email:
@@ -2081,7 +2084,7 @@ async def _resolve_or_create_offline_player(
                     user.modified = datetime.now(UTC)
                     bd = await save_object_from_model(ObjectType.USER, user)
                     broadcast_precomputed(bd)
-                return player_data.temp_uid, user
+                return player_data.temp_uid, user, False
 
     # 3. Create new user with VEKN ID
     now = datetime.now(UTC)
@@ -2111,7 +2114,7 @@ async def _resolve_or_create_offline_player(
         except Exception:
             logger.warning(f"Failed to send invite email to {player_data.email}")
 
-    return player_data.temp_uid, new_user
+    return player_data.temp_uid, new_user, True
 
 
 def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) -> dict:
@@ -2225,11 +2228,13 @@ async def go_online(
     vekn_remap: dict[
         str, str
     ] = {}  # offline TEMP- vekn → resolved real vekn (deck attribution)
+    accounts_created = 0
     for player_data in request.offline_players:
-        temp_uid, real_user = await _resolve_or_create_offline_player(
+        temp_uid, real_user, created = await _resolve_or_create_offline_player(
             player_data, request.tournament.get("country"), current_user.uid
         )
         uid_map[temp_uid] = real_user.uid
+        accounts_created += created
         if (player_data.vekn_id or "").startswith("TEMP-") and real_user.vekn_id:
             vekn_remap[player_data.vekn_id] = real_user.vekn_id
 
@@ -2363,17 +2368,41 @@ async def go_online(
             conn=tx_conn,
         )
 
+        # 5+6. Save offline sanctions and decks INSIDE the same transaction as
+        # the snapshot: a connection drop mid-push (flaky venue wifi is WHY the
+        # event was offline) must leave the tournament still offline and the
+        # whole push retryable — never a committed online row with the offline
+        # decks/sanctions silently lost. Broadcasts fire after commit.
+        pending_bds: list = []
+        for sanction_data in request.offline_sanctions:
+            sanction = msgspec.convert(sanction_data, Sanction)
+            sanction.user_uid = uid_map.get(sanction.user_uid, sanction.user_uid)
+            pending_bds.append(
+                await save_object_from_model(
+                    ObjectType.SANCTION, sanction, conn=tx_conn
+                )
+            )
+        # Deck attribution is a vekn (the "designed by" credit), so a temp
+        # player's own-deck attribution is their offline TEMP- vekn; repoint it
+        # to their resolved real vekn (or drop it if unresolved).
+        for deck_data in request.offline_decks:
+            deck_obj = msgspec.convert(deck_data, DeckObject)
+            deck_obj.tournament_uid = uid
+            deck_obj.user_uid = uid_map.get(deck_obj.user_uid, deck_obj.user_uid)
+            if deck_obj.attribution and deck_obj.attribution.startswith("TEMP-"):
+                deck_obj.attribution = vekn_remap.get(deck_obj.attribution)
+            bd = await save_object_from_model(ObjectType.DECK, deck_obj, conn=tx_conn)
+            bd.org_uids = updated.organizers_uids
+            pending_bds.append(bd)
+
     # --- Transaction committed, row lock released ---
     logger.info(
         f"Tournament {uid} went back online (user={current_user.uid}, remapped={len(uid_map)} players)"
     )
 
-    # 5. Save offline sanctions, repointing the target to the resolved user
-    for sanction_data in request.offline_sanctions:
-        sanction = msgspec.convert(sanction_data, Sanction)
-        sanction.user_uid = uid_map.get(sanction.user_uid, sanction.user_uid)
-        bd = await save_sanction(sanction)
+    for bd in pending_bds:
         broadcast_precomputed(bd)
+
     if request.offline_sanctions:
         # ONE authoritative standings recompute over the now-saved sanctions
         # (the offline client already recomputed via WASM; this re-derives
@@ -2389,20 +2418,6 @@ async def go_online(
         refreshed = await get_tournament_by_uid(uid)
         if refreshed is not None:
             updated = refreshed
-
-    # 6. Save offline decks, repointing the owner and the attribution. A deck's
-    # attribution is a vekn (the "designed by" credit), so a temp player's own-deck
-    # attribution is their offline TEMP- vekn; repoint it to their resolved real
-    # vekn (or drop it if the temp player wasn't resolved).
-    for deck_data in request.offline_decks:
-        deck_obj = msgspec.convert(deck_data, DeckObject)
-        deck_obj.tournament_uid = uid
-        deck_obj.user_uid = uid_map.get(deck_obj.user_uid, deck_obj.user_uid)
-        if deck_obj.attribution and deck_obj.attribution.startswith("TEMP-"):
-            deck_obj.attribution = vekn_remap.get(deck_obj.attribution)
-        bd = await save_object_from_model(ObjectType.DECK, deck_obj)
-        bd.org_uids = updated.organizers_uids
-        broadcast_precomputed(bd)
 
     # 7. Broadcast updated tournament — but NOT back to the initiating device:
     # it gets the authoritative reconciled tournament in this endpoint's HTTP
@@ -2430,7 +2445,18 @@ async def go_online(
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
-    return Response(content=encoder.encode(updated), media_type="application/json")
+    # Outcome summary closes the loop the go-offline modal opens: each created
+    # account is a real coopted VEKN member the organizer should know about.
+    summary = {
+        "players_matched": len(request.offline_players) - accounts_created,
+        "accounts_created": accounts_created,
+        "decks_synced": len(request.offline_decks),
+        "sanctions_synced": len(request.offline_sanctions),
+    }
+    return Response(
+        content=encoder.encode({"tournament": updated, "summary": summary}),
+        media_type="application/json",
+    )
 
 
 class ForceTakeoverRequest(BaseModel):

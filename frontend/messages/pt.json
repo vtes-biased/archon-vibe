@@ -883,6 +883,7 @@
   "offline_unlock_success": "Bloqueio offline do torneio removido",
   "offline_error_unlock": "Falha ao desbloquear o torneio",
   "offline_lock_lost_warning": "A sessão offline deste torneio foi encerrada por um organizador (desbloqueado ou assumido). As alterações offline não sincronizadas não puderam ser salvas.",
+  "offline_go_online_summary": "De volta online — {matched} jogador/es associados a membros existentes, {created} novos membro/s criados, {decks} deck(s) sincronizados.",
   "organizers_title": "Organizadores",
   "organizers_search_placeholder": "Buscar usuários para adicionar...",
   "organizers_remove_confirm": "Remover {name} dos organizadores?",

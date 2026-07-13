@@ -883,6 +883,7 @@
   "offline_unlock_success": "Tournament offline lock cleared",
   "offline_error_unlock": "Failed to unlock tournament",
   "offline_lock_lost_warning": "This tournament's offline session was ended by an organizer (unlocked or taken over). Your unsynced offline changes could not be saved.",
+  "offline_go_online_summary": "Back online — {matched} player(s) matched to existing members, {created} new member(s) created, {decks} deck(s) synced.",
   "organizers_title": "Organizers",
   "organizers_search_placeholder": "Search users to add...",
   "organizers_remove_confirm": "Remove {name} from organizers?",
