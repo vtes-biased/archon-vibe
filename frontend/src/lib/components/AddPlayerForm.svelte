@@ -22,6 +22,7 @@
   let suspendedUids = $state<Set<string>>(new Set());
   let pendingDeceased = $state<User | null>(null);
   const SEARCH_LIMIT = 10;
+  const dropdownOpen = $derived(searchResults.length > 0 || playerSearch.trim().length >= 2);
 
   async function searchPlayers() {
     selectedIndex = -1;
@@ -87,6 +88,11 @@
   <input
     id="player-search-input"
     type="text"
+    role="combobox"
+    aria-expanded={dropdownOpen}
+    aria-controls="player-search-listbox"
+    aria-autocomplete="list"
+    aria-activedescendant={selectedIndex >= 0 ? `player-search-option-${selectedIndex}` : undefined}
     bind:value={playerSearch}
     oninput={() => searchPlayers()}
     onkeydown={handleSearchKeydown}
@@ -97,11 +103,15 @@
     spellcheck="false"
     class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
   />
-  {#if searchResults.length > 0 || playerSearch.trim().length >= 2}
-    <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
+  {#if dropdownOpen}
+    <div id="player-search-listbox" role="listbox" class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
       {#each searchResults as user, i}
         {@const isSuspended = suspendedUids.has(user.uid)}
         <button
+          id="player-search-option-{i}"
+          role="option"
+          aria-selected={i === selectedIndex}
+          aria-disabled={isSuspended}
           onclick={() => !isSuspended && chooseUser(user)}
           disabled={isSuspended}
           class="w-full px-3 py-2 text-left text-sm transition-colors {isSuspended ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright'} {i === selectedIndex && !isSuspended ? 'bg-surface-active' : isSuspended ? '' : 'hover:bg-surface-hover'}"
@@ -133,6 +143,8 @@
       {/if}
       {#if oncreate}
         <button
+          role="option"
+          aria-selected="false"
           onclick={() => oncreate?.()}
           class="w-full px-3 py-2 text-left text-sm text-warn hover:opacity-80 hover:bg-surface-hover transition-colors {searchResults.length === 0 ? 'font-medium' : ''}"
         >

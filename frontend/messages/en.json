@@ -597,6 +597,7 @@
   "tournament_registered_players": "Registered players ({count})",
   "tournament_winner": "Winner",
   "tournament_event_in_progress": "This event is currently being played.",
+  "tournament_playing_latecomer": "Want to play? The organizer can still add you for the next round — ask at the desk.",
   "tournament_event_finished": "This event has finished.",
   "tournament_finalist": "Finalist",
   "tournament_status_finished": "Finished",

@@ -595,6 +595,7 @@
   "tournament_round_table": "Rodada {round} — {table}",
   "tournament_registration_not_open": "O registro não está aberto.",
   "tournament_event_in_progress": "Este evento está atualmente em andamento.",
+  "tournament_playing_latecomer": "Quer jogar? O organizador ainda pode adicionar você para a próxima rodada — pergunte no balcão de inscrições.",
   "tournament_event_finished": "Este evento foi finalizado.",
   "tournament_registered_players": "Jogadores registrados ({count})",
   "tournament_winner": "Vencedor",

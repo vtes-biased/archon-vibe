@@ -43,6 +43,7 @@
   // Action bar derived values
   const registeredCount = $derived(tournament?.players?.length ?? 0);
   const checkedInCount = $derived(tournament?.players?.filter(p => p.state === "Checked-in").length ?? 0);
+  const uncheckedCount = $derived(tournament?.players?.filter(p => p.state === "Registered").length ?? 0);
   const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
   // QR self-check-in is in-person only — online players can't scan a venue code. checkin_code is always set server-side, so gate on !online.
@@ -173,8 +174,12 @@
       {#if tournament.online && hasRounds}
         <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => doAction("ResetCheckIn")}><RotateCcw class="w-4 h-4" aria-hidden="true" />{m.overview_reset_checkin()}</Button>
       {/if}
+      <!-- Check All In: visible while registrants remain unchecked (the door-desk
+           moment); pointless once everyone is in, so it appears nowhere else. -->
+      {#if uncheckedCount > 0}
+        <Button variant="secondary" size="md" disabled={actionLoading} onclick={() => doAction("CheckInAll")}><CheckCheck class="w-4 h-4" aria-hidden="true" />{m.overview_check_all_in()}</Button>
+      {/if}
       <ActionMenu label={m.common_more()} items={[
-        { label: m.overview_check_all_in(), icon: CheckCheck, onclick: () => doAction("CheckInAll"), disabled: actionLoading },
         { label: m.payment_mark_all_paid(), icon: Banknote, onclick: () => doAction("MarkAllPaid"), disabled: actionLoading },
         ...(hasRounds && !tournament.online ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
         ...(qrCheckin && hasRounds ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),

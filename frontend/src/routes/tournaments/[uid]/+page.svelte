@@ -731,6 +731,12 @@ import TournamentModals from "./TournamentModals.svelte";
       {#if isMinimalView}
         <div class="bg-surface-card rounded-lg shadow border border-line p-6 text-center">
           <p class="text-ink-muted">{m.tournament_sign_in_details()}</p>
+          {#if !auth.isAuthenticated}
+            <a href="/login?redirect={encodeURIComponent(`/tournaments/${uid}`)}"
+               class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+              {m.community_sign_in()}
+            </a>
+          {/if}
         </div>
       {:else}
       <!-- View toggle for organizers -->

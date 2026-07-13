@@ -52,12 +52,19 @@
     }),
   );
 
+  // Post-login destination (?redirect= from e.g. a tournament page sign-in CTA).
+  // Same-origin paths only — never a full URL (open-redirect guard).
+  function successTarget(): string {
+    const r = new URLSearchParams(window.location.search).get("redirect");
+    return r && r.startsWith("/") && !r.startsWith("//") ? r : "/";
+  }
+
   async function handleCreateAccount() {
     if (!consentChecked) return;
     stopConditionalUI(); // a pending conditional get() blocks the modal create()
     const success = await createAccountWithPasskey();
     if (success) {
-      goto("/");
+      goto(successTarget());
     }
   }
 
@@ -65,7 +72,7 @@
     stopConditionalUI(); // a pending conditional get() blocks the modal get()
     const success = await loginWithPasskey();
     if (success) {
-      goto("/");
+      goto(successTarget());
     }
   }
 
@@ -73,7 +80,7 @@
     if (!email.trim() || !password) return;
     const success = await login(email.trim(), password);
     if (success) {
-      goto("/");
+      goto(successTarget());
     }
   }
 
@@ -133,8 +140,9 @@
 
     if (token && refresh) {
       await storeTokensFromCallback(token, refresh);
+      const target = successTarget();
       replaceState("/login", {});
-      goto("/");
+      goto(target);
       return;
     }
 
@@ -142,7 +150,7 @@
     // identifier input's autofill dropdown. Internally gated on
     // isConditionalUISupported; resolves when the user picks one (then
     // authenticates) and aborts silently on unmount or explicit-flow start.
-    startConditionalUI(() => goto("/"));
+    startConditionalUI(() => goto(successTarget()));
   });
 
   onDestroy(stopConditionalUI);
@@ -150,7 +158,7 @@
   // Redirect if already authenticated
   $effect(() => {
     if (auth.isAuthenticated && !auth.isLoading) {
-      goto("/");
+      goto(successTarget());
     }
   });
 </script>

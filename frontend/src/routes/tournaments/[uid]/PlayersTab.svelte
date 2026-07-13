@@ -876,14 +876,15 @@
           <!-- Organizer actions row -->
           {#if isOrganizer}
             <div class="mt-2 flex items-center gap-2 flex-wrap">
+              <!-- Door controls: mobile card is the on-the-floor surface — 44px touch floor. -->
               <button onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
                 disabled={actionLoading}
-                class="px-2 py-1 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-success hover:opacity-80' : 'badge-pending hover:opacity-80'}">
+                class="px-3 py-1 min-h-[44px] text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-success hover:opacity-80' : 'badge-pending hover:opacity-80'}">
                 {player.payment_status === 'Paid' ? m.payment_paid() : m.payment_pending()}
               </button>
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
-                <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors hover:bg-surface-hover" title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
+                <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-3 py-1 min-h-[44px] text-xs rounded transition-colors hover:bg-surface-hover" title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
                   {#if player.non_competing}<Dices class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.proxy_random_deck()}</span>
                   {:else if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-info" /><span class="text-info">{m.players_view_deck()}</span>
                   {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-warn" /><span class="text-warn">{m.players_view_deck()}</span>
@@ -894,15 +895,16 @@
               {/if}
               {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
                 <!-- Open rounds: at cap and not dropped — no check-in, show their played count. -->
-                <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+                <Button variant="ghost" size="sm" class="min-h-[44px]" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
               {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
-                <!-- Finished = dropped out: CheckIn reinstates (Checked-in under cap, Completed at cap). -->
-                <Button variant="ghost" size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
+                <!-- Finished = dropped out: CheckIn reinstates (Checked-in under cap, Completed at cap).
+                     Primary for waiting registrants: check-in is THE door action of the moment. -->
+                <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" class="min-h-[44px]" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
               {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
-                <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
+                <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
               {/if}
               <!-- Rare/destructive tail (drop/remove · sanction · proxy) lives in "More". -->
-              <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} class="ml-auto" aria-expanded={morePlayer === puid}><Ellipsis class="w-4 h-4" aria-hidden="true" />{m.players_more()}</Button>
+              <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} class="ml-auto min-h-[44px]" aria-expanded={morePlayer === puid}><Ellipsis class="w-4 h-4" aria-hidden="true" />{m.players_more()}</Button>
             </div>
             {#if morePlayer === puid}
               <div class="mt-2 pt-2 border-t border-line">
@@ -1052,7 +1054,7 @@
                   {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
                     <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
                   {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
-                    <Button variant="ghost" size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
+                    <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
                   {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
                     <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
                   {/if}

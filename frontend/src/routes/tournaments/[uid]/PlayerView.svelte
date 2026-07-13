@@ -300,9 +300,13 @@
       </div>
     {/if}
     {#if !currentPlayerEntry}
-      <!-- Spectator (no entry) during play: neutral copy, then finals/standings below. -->
+      <!-- Spectator (no entry) during play: neutral copy, then finals/standings below.
+           Before finals, tell a would-be latecomer they can still get in. -->
       <div class="banner-info border rounded-lg p-3 mb-3 text-sm">
         <p>{m.tournament_event_in_progress()}</p>
+        {#if !isFinals}
+          <p class="text-ink-muted mt-1">{m.tournament_playing_latecomer()}</p>
+        {/if}
       </div>
     {:else}
     <div class="text-sm mb-3 flex items-center justify-between">
