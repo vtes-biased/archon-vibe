@@ -30,8 +30,9 @@
     node.focus();
   }
 
+  // No confirm: sanction deletes are soft and IC-recoverable for 30 days
+  // (db cleanup job) — reversibility over confirmation, per the owner ruling.
   async function handleDelete(uid: string) {
-    if (!confirm(m.sanction_delete_confirm())) return;
     deleting = true;
     try {
       await deleteSanctionApi(uid);

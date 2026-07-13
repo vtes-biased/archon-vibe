@@ -782,9 +782,10 @@
                         <div class="flex items-center gap-2 shrink-0">
                           <span class="text-ink-faint text-xs">{#if !isScoring}<span class="text-ink-strong font-medium tabular-nums">{seat.result.vp}VP</span> {/if}{tGws[j]}GW {tTps[j]}TP</span>
                           {#if isEditable && (isLast || isRoundLive)}
+                            <!-- p-3 + 20px icon = 44px touch floor on the on-the-floor issuance path -->
                             <button
                               onclick={() => doAction("UnseatPlayer", { player_uid: seat.player_uid, round: r })}
-                              class="p-2 sm:p-0.5 text-ink-faint hover:text-link transition-colors"
+                              class="p-3 sm:p-0.5 -m-1 sm:m-0 text-ink-faint hover:text-link transition-colors"
                               title={m.rounds_unseat_title()}
                             >
                               <UserMinus class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
@@ -793,7 +794,7 @@
                           {#if isOrganizer && !isCancelled}
                             <button
                               onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid), round: r }}
-                              class="p-2 sm:p-0.5 text-ink-faint hover:text-warn transition-colors"
+                              class="p-3 sm:p-0.5 -m-1 sm:m-0 text-ink-faint hover:text-warn transition-colors"
                               title={m.players_sanction_btn()}
                             >
                               <TriangleAlert class="w-5 h-5 sm:w-3.5 sm:h-3.5" />

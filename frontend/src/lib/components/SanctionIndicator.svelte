@@ -34,6 +34,17 @@
 
   const dotColor = $derived(DOT_COLORS[highestLevel] ?? "dot-pending");
 
+  // VEKN penalty acronyms (domain jargon, deliberately unlocalized): the three
+  // warm dot hues collapse under colourblindness, so the tier gets a letter too.
+  const LEVEL_ABBR: Record<SanctionLevel, string> = {
+    caution: "C",
+    warning: "W",
+    standings_adjustment: "SA",
+    disqualification: "DQ",
+    suspension: "S",
+    probation: "P",
+  };
+
   function levelLabel(lv: SanctionLevel): string {
     const labels: Record<SanctionLevel, () => string> = {
       caution: () => m.sanction_level_caution(),
@@ -59,8 +70,9 @@
 
 {#snippet dot()}
   <span class="w-2 h-2 rounded-full {dotColor}"></span>
+  <span class="text-[10px] font-semibold text-ink-muted leading-none">{LEVEL_ABBR[highestLevel] ?? ""}</span>
   {#if activeSanctions.length > 1}
-    <span class="text-[10px] text-ink-muted">{activeSanctions.length}</span>
+    <span class="text-[10px] text-ink-muted">×{activeSanctions.length}</span>
   {/if}
 {/snippet}
 

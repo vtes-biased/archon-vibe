@@ -270,7 +270,6 @@
   "sanction_mgr_deleted": "Sanction deleted",
   "sanction_mgr_lift": "Lift",
   "sanction_mgr_lifting": "Lifting...",
-  "sanction_delete_confirm": "Delete this sanction?",
   "sanction_list_empty": "No active sanctions.",
   "sanction_other_event": "Other event",
   "user_saving": "Saving",
