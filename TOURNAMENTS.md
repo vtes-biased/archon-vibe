@@ -36,13 +36,13 @@ Online: Frontend → Backend (FastAPI) → Rust engine (PyO3) → updated state 
 
 | State | Description | Key Actions |
 |-------|-------------|-------------|
-| `Planned` | Initial state, config editable | OpenRegistration, UpdateConfig, Delete |
+| `Planned` | Initial state | OpenRegistration, UpdateConfig (available in any state), Delete |
 | `Registration` | Players can register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
 | `Waiting` | Between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
 | `Playing` | Round in progress | SetScore (players + organizers), Override, FinishRound, CancelRound, seating edits |
 | `Finished` | Tournament complete | ReopenTournament, SetScore/Override (organizers only), deck uploads, view results |
 
-Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig available in Planned/Registration and for timer/display settings in later states. SetScore/Override/Unoverride: players only during Playing; organizers may correct any round while Waiting, Playing, or Finished (i.e. whenever rounds exist) — standings recompute after each edit.
+Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig is available in **any** state (mid-event typo fixes matter), with targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds exist, and `rank`/`format`/`start` freeze once the event is published to VEKN (`external_ids.vekn` set — calendar create is write-once, so edits would silently diverge from vekn.net). Championships (National/Continental) reject `proxies`/`multideck` (engine-enforced at create and config-edit). SetScore/Override/Unoverride: players only during Playing; organizers may correct any round while Waiting, Playing, or Finished (i.e. whenever rounds exist) — standings recompute after each edit.
 
 ## Business Events
 

@@ -94,6 +94,9 @@ pub enum EngineError {
     RaffleWrongState,
     NameRequired,
     MaxRoundsBelowCompleted { max: usize, completed: usize },
+    RankForbidsProxies,
+    RankForbidsMultideck,
+    VeknFrozenField { field: String },
     DeckNoCards,
     SeatingMinPlayers,
     SeatingMinRounds,
@@ -188,6 +191,9 @@ impl EngineError {
             RaffleWrongState => "tournament.raffle_wrong_state",
             NameRequired => "tournament.name_required",
             MaxRoundsBelowCompleted { .. } => "tournament.max_rounds_below_completed",
+            RankForbidsProxies => "tournament.rank_forbids_proxies",
+            RankForbidsMultideck => "tournament.rank_forbids_multideck",
+            VeknFrozenField { .. } => "tournament.vekn_frozen_field",
             DeckNoCards => "deck.no_cards",
             SeatingMinPlayers => "seating.min_players",
             SeatingMinRounds => "seating.min_rounds",
@@ -216,6 +222,7 @@ impl EngineError {
                 ("max", max.to_string()),
                 ("completed", completed.to_string()),
             ],
+            VeknFrozenField { field } => vec![("field", field.clone())],
             Internal { detail } => vec![("detail", detail.clone())],
             _ => vec![],
         }
@@ -356,6 +363,19 @@ impl fmt::Display for EngineError {
                 f,
                 "max_rounds ({}) cannot be less than completed rounds ({})",
                 max, completed
+            ),
+            RankForbidsProxies => write!(
+                f,
+                "Proxies are not allowed in National or Continental championships"
+            ),
+            RankForbidsMultideck => write!(
+                f,
+                "Multideck is not allowed in National or Continental championships"
+            ),
+            VeknFrozenField { field } => write!(
+                f,
+                "Cannot change {} after the event is published to VEKN",
+                field
             ),
             DeckNoCards => write!(f, "No cards found in deck list"),
             SeatingMinPlayers => write!(f, "At least 4 players required"),

@@ -579,6 +579,18 @@ mod python {
             py_str(can_manage_vekn_json(actor_json, target_json))
         }
 
+        /// VEKN legality gate for the online create route, which builds the
+        /// Tournament in Python and never runs engine create_tournament.
+        fn validate_rank_legality(
+            &self,
+            rank: &str,
+            proxies: bool,
+            multideck: bool,
+        ) -> PyResult<()> {
+            crate::tournament::validate_rank_legality(rank, proxies, multideck)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
+        }
+
         fn can_edit_user(
             &self,
             actor_json: &str,

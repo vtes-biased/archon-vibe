@@ -2432,6 +2432,55 @@ fn test_update_config_max_rounds_too_low() {
 }
 
 #[test]
+fn test_update_config_rank_forbids_proxies() {
+    // Setting a championship rank while proxies are on (or vice versa) is
+    // VEKN-illegal — the gate must see the MERGED config, not just the patch.
+    let mut tournament = make_tournament();
+    tournament["proxies"] = true.into();
+    let event = json::object! {
+        type: "UpdateConfig",
+        config: { rank: "National Championship" },
+    };
+    let actor = make_organizer();
+    let result = run_event(&tournament, &event, &actor);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Proxies"));
+}
+
+#[test]
+fn test_update_config_vekn_frozen_identity() {
+    // After VEKN publication rank/format/start are frozen; same-value writes
+    // and non-identity fields stay editable.
+    let mut tournament = make_tournament();
+    tournament["external_ids"] = json::object! { vekn: "12345" };
+    let event = json::object! {
+        type: "UpdateConfig",
+        config: { format: "V5" },
+    };
+    let actor = make_organizer();
+    let result = run_event(&tournament, &event, &actor);
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("published to VEKN"));
+
+    // Same value + venue edit passes
+    let format = tournament["format"]
+        .as_str()
+        .unwrap_or("Standard")
+        .to_string();
+    let event = json::object! {
+        type: "UpdateConfig",
+        config: { format: format, venue: "New Venue" },
+    };
+    let result = run_event(&tournament, &event, &actor);
+    assert!(result.is_ok());
+    let updated = json::parse(&result.unwrap()).unwrap();
+    assert_eq!(updated["venue"].as_str(), Some("New Venue"));
+}
+
+#[test]
 fn test_update_config_non_organizer_fails() {
     let tournament = make_tournament();
     let event = json::object! {

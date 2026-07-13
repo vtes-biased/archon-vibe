@@ -84,6 +84,29 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     Ok(())
 }
 
+/// VEKN legality: ranked events (National/Continental championships) forbid
+/// proxies and multideck. Callers pass the MERGED view (config over current
+/// tournament) so setting either side of an illegal combo is rejected —
+/// create/config-edit/offline all share this gate. pub(crate): the PyO3
+/// binding exposes it for the online create route, which builds the
+/// Tournament in Python without running engine create_tournament.
+pub(crate) fn validate_rank_legality(
+    rank: &str,
+    proxies: bool,
+    multideck: bool,
+) -> Result<(), EngineError> {
+    if rank.is_empty() {
+        return Ok(());
+    }
+    if proxies {
+        return Err(EngineError::RankForbidsProxies);
+    }
+    if multideck {
+        return Err(EngineError::RankForbidsMultideck);
+    }
+    Ok(())
+}
+
 /// Create a new tournament from config and actor context.
 /// Returns the tournament JSON string.
 pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, EngineError> {
@@ -95,6 +118,11 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
     }
 
     validate_config_fields(&config)?;
+    validate_rank_legality(
+        config["rank"].as_str().unwrap_or(""),
+        config["proxies"].as_bool().unwrap_or(false),
+        config["multideck"].as_bool().unwrap_or(false),
+    )?;
 
     // Name is required for creation
     let name = config["name"].as_str().ok_or("name is required")?;
@@ -2380,6 +2408,52 @@ fn apply_event(
 
             // Validate shared config fields
             validate_config_fields(config)?;
+
+            // Identity freeze after VEKN publication: the calendar event is
+            // create-once and the results push write-once, so a post-push
+            // rank/format/start edit silently diverges from vekn.net with no
+            // API path to fix it. Venue/description/timers stay editable.
+            let vekn_id = tournament["external_ids"]["vekn"].as_str().unwrap_or("");
+            if !vekn_id.is_empty() {
+                for field in ["rank", "format", "start"] {
+                    // String compare with null ≡ "" (the form posts "" for "no rank")
+                    if config.has_key(field)
+                        && config[field].as_str().unwrap_or("")
+                            != tournament[field].as_str().unwrap_or("")
+                    {
+                        return Err(EngineError::VeknFrozenField {
+                            field: field.to_string(),
+                        });
+                    }
+                }
+            }
+
+            // VEKN legality on the merged view: either side of the illegal
+            // combo (rank vs proxies/multideck) may be the incoming edit.
+            // Only when the edit touches one of the three keys — an already-
+            // illegal stored combo (legacy import) must not block unrelated
+            // edits like venue/description.
+            if config.has_key("rank") || config.has_key("proxies") || config.has_key("multideck") {
+                let merged_str = |field: &str| -> String {
+                    if config.has_key(field) {
+                        config[field].as_str().unwrap_or("").to_string()
+                    } else {
+                        tournament[field].as_str().unwrap_or("").to_string()
+                    }
+                };
+                let merged_bool = |field: &str| -> bool {
+                    if config.has_key(field) {
+                        config[field].as_bool().unwrap_or(false)
+                    } else {
+                        tournament[field].as_bool().unwrap_or(false)
+                    }
+                };
+                validate_rank_legality(
+                    &merged_str("rank"),
+                    merged_bool("proxies"),
+                    merged_bool("multideck"),
+                )?;
+            }
 
             if let Some(mr) = config["max_rounds"].as_usize() {
                 if mr != 0 {

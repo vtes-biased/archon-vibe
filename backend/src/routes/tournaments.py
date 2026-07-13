@@ -871,6 +871,14 @@ async def create_tournament(
                     detail="Only league organizers can link tournaments to this league",
                 )
 
+    # VEKN legality (championships forbid proxies/multideck) — single-sourced
+    # in the engine; this route builds the Tournament in Python rather than
+    # through engine create_tournament, so call the gate explicitly.
+    try:
+        _engine.validate_rank_legality(rank, request.proxies, request.multideck)
+    except ValueError as e:
+        raise EngineRejection.from_engine(e) from e
+
     now = datetime.now(UTC)
     tournament = Tournament(
         uid=str(uuid7()),

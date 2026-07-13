@@ -123,9 +123,14 @@
     tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished"
   );
   const pushedToVekn = $derived(!!tournament.external_ids?.vekn);
-  const disabledFields = $derived(
-    started || pushedToVekn ? new Set(["open_rounds", "max_rounds"]) : new Set<string>()
-  );
+  const disabledFields = $derived.by(() => {
+    const s = new Set<string>();
+    if (started || pushedToVekn) { s.add("open_rounds"); s.add("max_rounds"); }
+    // VEKN identity freeze: calendar create is write-once — post-push edits
+    // to these silently diverge from vekn.net (engine rejects them too).
+    if (pushedToVekn) { s.add("rank"); s.add("format"); s.add("start"); }
+    return s;
+  });
 
   // Debounced save for text inputs
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -150,6 +155,13 @@
     }
     if (field === "online") {
       handleToggleOnline(value);
+      return;
+    }
+    if (field === "rank" && value) {
+      // Selecting a championship rank also clears proxies/multideck (see
+      // TournamentFields rank onchange) — persist together, or the rank-only
+      // save would hit the engine's rank-legality gate against the old flags.
+      saveMultiple({ rank: value, proxies: false, multideck: false });
       return;
     }
     // Normalize empty strings to null for nullable fields

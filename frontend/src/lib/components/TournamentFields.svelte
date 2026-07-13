@@ -132,7 +132,7 @@
     <select
       id={id("format")}
       value={values.format}
-      {disabled}
+      disabled={disabled || disabledFields.has("format")}
       onchange={(e) => handleInput("format", (e.target as HTMLSelectElement).value)}
       class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
@@ -140,20 +140,38 @@
       <option value="V5">V5</option>
       <option value="Limited">Limited</option>
     </select>
+    {#if disabledFields.has("format")}
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+    {/if}
   </div>
   <div>
     <label class="block text-sm text-ink-muted mb-1" for={id("rank")}>{m.tfield_rank()}</label>
     <select
       id={id("rank")}
       value={values.rank}
-      {disabled}
-      onchange={(e) => handleInput("rank", (e.target as HTMLSelectElement).value)}
+      disabled={disabled || disabledFields.has("rank")}
+      onchange={(e) => {
+        const rank = (e.target as HTMLSelectElement).value;
+        // Championships forbid proxies/multideck (engine-enforced): clear the
+        // local values only — persistence is owned by the parent (ConfigTab
+        // bundles rank+proxies+multideck into one save; the create form posts
+        // the whole values object). Emitting per-field clears here would
+        // double-save.
+        if (rank) {
+          values.proxies = false;
+          values.multideck = false;
+        }
+        handleInput("rank", rank);
+      }}
       class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="">{m.tfield_rank_basic()}</option>
       <option value="National Championship">National Championship</option>
       <option value="Continental Championship">Continental Championship</option>
     </select>
+    {#if disabledFields.has("rank")}
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+    {/if}
   </div>
 </div>
 
@@ -262,10 +280,13 @@
       type="datetime-local"
       required
       value={values.start}
-      {disabled}
+      disabled={disabled || disabledFields.has("start")}
       onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
       class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.start ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
     />
+    {#if disabledFields.has("start")}
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+    {/if}
   </div>
   <div>
     <label class="block text-sm text-ink-muted mb-1" for={id("finish")}>{m.tfield_finish()}</label>
@@ -428,28 +449,36 @@
 
 <!-- Boolean toggles -->
 <div class="space-y-3">
+  <!-- Championships forbid proxies/multideck (VEKN rules, engine-enforced):
+       explained-disable when a rank is selected. -->
   {#if !values.online}
-    <label class="flex items-center gap-3 cursor-pointer">
+    <label class="flex items-center gap-3 {disabled || values.rank ? '' : 'cursor-pointer'}">
       <input
         type="checkbox"
         checked={values.proxies}
-        {disabled}
+        disabled={disabled || !!values.rank}
         onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
         class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
       />
-      <span class="text-sm text-ink-bright">{m.tfield_allow_proxies()}</span>
+      <span class="text-sm {values.rank ? 'text-ink-faint' : 'text-ink-bright'}">{m.tfield_allow_proxies()}</span>
     </label>
+    {#if values.rank}
+      <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
+    {/if}
   {/if}
-  <label class="flex items-center gap-3 cursor-pointer">
+  <label class="flex items-center gap-3 {disabled || values.rank ? '' : 'cursor-pointer'}">
     <input
       type="checkbox"
       checked={values.multideck}
-      {disabled}
+      disabled={disabled || !!values.rank}
       onchange={(e) => handleInput("multideck", (e.target as HTMLInputElement).checked)}
       class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
     />
-    <span class="text-sm text-ink-bright">{m.tfield_multideck()}</span>
+    <span class="text-sm {values.rank ? 'text-ink-faint' : 'text-ink-bright'}">{m.tfield_multideck()}</span>
   </label>
+  {#if values.rank}
+    <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
+  {/if}
   <label class="flex items-center gap-3 cursor-pointer">
     <input
       type="checkbox"
