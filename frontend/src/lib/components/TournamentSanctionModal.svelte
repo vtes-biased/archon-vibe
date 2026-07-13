@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tournament, SanctionLevel, SanctionCategory, SanctionSubcategory, Sanction } from "$lib/types";
   import { SUBCATEGORIES_BY_CATEGORY, BASELINE_PENALTIES, ESCALATION_SEQUENCE } from "$lib/types";
-  import { createSanction } from "$lib/api";
+  import { issueTournamentSanction } from "$lib/sanction-actions";
   import { getPlayerSanctionsInTournament } from "$lib/db";
   import { showToast } from "$lib/stores/toast.svelte";
   import { TriangleAlert, CircleArrowDown } from "@lucide/svelte";
@@ -190,7 +190,7 @@
     if (roundRequired && saTargetRound === null) return;
     creating = true;
     try {
-      await createSanction({
+      await issueTournamentSanction({
         user_uid: playerUid,
         level,
         category,

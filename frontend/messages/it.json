@@ -265,6 +265,7 @@
   "sanction_mgr_max_expiry": "Massimo 18 mesi da oggi",
   "sanction_mgr_issuing": "Emissione...",
   "sanction_mgr_issued_success": "Sanzione emessa con successo",
+  "sanction_dq_already_active": "Questo giocatore ha già una squalifica attiva in questo torneo.",
   "sanction_mgr_edit_title": "Modifica Sanzione",
   "sanction_mgr_lifted_success": "Sanzione revocata",
   "sanction_mgr_deleted": "Sanzione eliminata",

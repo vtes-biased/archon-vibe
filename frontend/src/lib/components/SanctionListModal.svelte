@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Sanction } from "$lib/types";
-  import { deleteSanctionApi } from "$lib/api";
+  import { removeTournamentSanction } from "$lib/sanction-actions";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
   import Button from '$lib/components/Button.svelte';
@@ -35,7 +35,7 @@
   async function handleDelete(uid: string) {
     deleting = true;
     try {
-      await deleteSanctionApi(uid);
+      await removeTournamentSanction(tournamentUid, uid);
       showToast({ type: "success", message: m.sanction_mgr_deleted() });
       // The list refreshes via the SSE sanction event -> sanctions prop
     } catch {

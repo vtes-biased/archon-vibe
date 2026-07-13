@@ -560,7 +560,9 @@
         {:else if puid && !hasRounds}
           <Button variant="danger" size="sm" onclick={() => removePlayer(puid)}><X class="w-4 h-4" aria-hidden="true" />{m.players_remove_title()}</Button>
         {/if}
-        {#if puid && hasRounds && !isOfflineMode}
+        <!-- Available offline too: sanctions are offline-manageable on the
+             lock-holding device (saved to IDB, reconciled at go-online). -->
+        {#if puid && hasRounds}
           <Button variant="secondary" size="sm" onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}>
             <TriangleAlert class="w-4 h-4 text-warn" aria-hidden="true" />{m.players_sanction_btn()}
           </Button>

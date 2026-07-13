@@ -634,6 +634,16 @@ class SyncManager {
   private emit(event: SyncEvent): void {
     this.listeners.forEach(callback => callback(event));
   }
+
+  /**
+   * Re-run the same UI refresh hooks SSE events trigger, for LOCAL IndexedDB
+   * mutations on a device-locked offline tournament (no SSE will arrive).
+   * Offline sanction management is the consumer; keep this narrow — online
+   * mutations must keep flowing through the server → SSE path.
+   */
+  notifyLocalMutation(type: 'sanction' | 'deck' | 'tournament', data?: Sanction | DeckObject | Tournament): void {
+    this.emit({ type, data });
+  }
 }
 
 // Singleton instance

@@ -308,6 +308,22 @@ export async function processTournamentEvent(
 }
 
 /**
+ * Recompute standings from current sanctions. Offline sanction management:
+ * the device-locked client mirrors the server's PyEngine.update_standings —
+ * same shared Rust, fed from IDB sanctions instead of Postgres.
+ */
+export async function updateStandings(
+  tournament: Tournament,
+  sanctions: Sanction[]
+): Promise<Tournament> {
+  const engine = await initEngine();
+  const tournamentJson = JSON.stringify(tournament);
+  const sanctionsJson = buildSanctionsPayload(sanctions);
+  const resultJson = callEngine(() => engine.updateStandings(tournamentJson, sanctionsJson));
+  return JSON.parse(resultJson) as Tournament;
+}
+
+/**
  * Permission result from the engine.
  */
 export interface PermissionResult {

@@ -2321,6 +2321,20 @@ async def go_online(
         # Save tournament within the locked transaction (upsert handles insert)
         updated = msgspec.convert(tournament_data, Tournament)
         updated.modified = datetime.now(UTC)
+        # Offline-issued DQs: assert the player state server-side too. The
+        # offline client mirrors the flip, but state gates check-in/StartFinals
+        # — belt and braces before the authoritative save.
+        active_dq_uids = {
+            uid_map.get(s.get("user_uid"), s.get("user_uid"))
+            for s in request.offline_sanctions
+            if s.get("level") == "disqualification"
+            and not s.get("lifted_at")
+            and not s.get("deleted_at")
+        }
+        if active_dq_uids:
+            for player in updated.players:
+                if player.user_uid in active_dq_uids:
+                    player.state = PlayerState.DISQUALIFIED
         # A tournament finished offline arrives without a finish date (the
         # engine never stamps it) — use the sync time as the actual end time
         if updated.state == TournamentState.FINISHED and updated.finish is None:
@@ -2360,6 +2374,21 @@ async def go_online(
         sanction.user_uid = uid_map.get(sanction.user_uid, sanction.user_uid)
         bd = await save_sanction(sanction)
         broadcast_precomputed(bd)
+    if request.offline_sanctions:
+        # ONE authoritative standings recompute over the now-saved sanctions
+        # (the offline client already recomputed via WASM; this re-derives
+        # server-side under the row lock and broadcasts the result).
+        from .sanctions import _apply_sanction_to_tournament
+
+        await _apply_sanction_to_tournament(uid)
+        # The recompute rewrote the row — return the FRESH tournament. The
+        # HTTP response is the initiating device's sole authority (its own
+        # SSE frames are suppressed during go-online), so a stale body would
+        # silently lag the server if sanctions were also issued online during
+        # the offline window.
+        refreshed = await get_tournament_by_uid(uid)
+        if refreshed is not None:
+            updated = refreshed
 
     # 6. Save offline decks, repointing the owner and the attribution. A deck's
     # attribution is a vekn (the "designed by" credit), so a temp player's own-deck

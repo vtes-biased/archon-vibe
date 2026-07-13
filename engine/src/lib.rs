@@ -539,6 +539,20 @@ mod wasm {
         pub fn compute_player_issues(&self, config_json: &str) -> Result<String, String> {
             js_str(compute_player_issues_json(config_json))
         }
+
+        /// Offline sanction management: the device-locked client recomputes
+        /// standings from IDB sanctions (mirrors PyEngine.update_standings).
+        #[wasm_bindgen(js_name = updateStandings)]
+        pub fn update_standings(
+            &self,
+            tournament_json: &str,
+            sanctions_json: &str,
+        ) -> Result<String, String> {
+            js_str(super::tournament::update_standings_json(
+                tournament_json,
+                sanctions_json,
+            ))
+        }
     }
 }
 
