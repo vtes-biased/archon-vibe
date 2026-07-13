@@ -884,6 +884,7 @@
   "offline_error_unlock": "Failed to unlock tournament",
   "offline_lock_lost_warning": "This tournament's offline session was ended by an organizer (unlocked or taken over). Your unsynced offline changes could not be saved.",
   "offline_go_online_summary": "Back online — {matched} player(s) matched to existing members, {created} new member(s) created, {decks} deck(s) synced.",
+  "offline_not_locked_nudge": "You are offline and this event is not locked to this device, so changes cannot be saved. Reconnect briefly and use Go Offline to enable offline mode.",
   "organizers_title": "Organizers",
   "organizers_search_placeholder": "Search users to add...",
   "organizers_remove_confirm": "Remove {name} from organizers?",

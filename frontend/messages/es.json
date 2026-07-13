@@ -884,6 +884,7 @@
   "offline_error_unlock": "Error al desbloquear el torneo",
   "offline_lock_lost_warning": "La sesión sin conexión de este torneo fue terminada por un organizador (desbloqueado o tomado por otro). Los cambios sin conexión no sincronizados no se han podido guardar.",
   "offline_go_online_summary": "De nuevo en línea — {matched} jugador/es asociados a miembros existentes, {created} nuevos miembro/s creados, {decks} deck(s) sincronizados.",
+  "offline_not_locked_nudge": "Está sin conexión y este evento no está bloqueado en este dispositivo, por lo que los cambios no se pueden guardar. Reconéctese brevemente y use Modo sin conexión para activar el modo sin conexión.",
   "organizers_title": "Organizadores",
   "organizers_search_placeholder": "Buscar usuarios para agregar...",
   "organizers_remove_confirm": "¿Eliminar a {name} de los organizadores?",

@@ -90,6 +90,19 @@ import TournamentModals from "./TournamentModals.svelte";
     tournament?.offline_mode === true && tournament?.offline_device_id !== deviceId
   );
   let judgeCallBanner = $state<ReturnType<typeof JudgeCallBanner> | null>(null);
+  // Reactive device connectivity, for the unprepared-at-venue nudge below
+  // (navigator.onLine itself isn't reactive).
+  let deviceOnline = $state(navigator.onLine);
+  $effect(() => {
+    const on = () => (deviceOnline = true);
+    const off = () => (deviceOnline = false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  });
   let showGoOfflineConfirm = $state(false);
   let showGoOnlineConfirm = $state(false);
   let showForceTakeoverConfirm = $state(false);
@@ -609,6 +622,16 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
+      <!-- Unprepared-at-venue wedge: device offline, event NOT locked — every
+           action would optimistically apply then revert, and Go Offline itself
+           needs the server. Explain instead of failing silently. -->
+      {#if showOrganizerView && !deviceOnline && !tournament.offline_mode}
+        <div class="banner-warn border rounded-lg p-3 mb-4 text-sm flex items-start gap-2">
+          <WifiOff class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{m.offline_not_locked_nudge()}</span>
+        </div>
+      {/if}
+
       <!-- Locked by another device banner -->
       {#if isLockedByOtherDevice}
         <div class="bg-surface-muted/50 border border-line-strong rounded-lg p-4 mb-4">
@@ -804,11 +827,13 @@ import TournamentModals from "./TournamentModals.svelte";
         <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
       {/if}
 
-      <!-- Live announcements: organizers compose & manage; everyone else sees the banner -->
+      <!-- Live announcements: organizers compose & manage; everyone else sees the
+           banner. Hidden while offline-locked (announcements are online-only and
+           would just fail) — consistent with the timer/call-judge affordances. -->
       <PushOptIn tournamentUid={uid} eligible={pushEligible} {isOrganizer} />
-      {#if showOrganizerView}
+      {#if showOrganizerView && !tournament.offline_mode}
         <AnnouncementComposer {tournament} />
-      {:else}
+      {:else if !showOrganizerView}
         <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
       {/if}
 

@@ -6,7 +6,7 @@
   import { initEngine } from '$lib/engine';
   import { engineLoadFailed } from '$lib/stores/engine-ready.svelte';
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
-  import { initOfflineState } from '$lib/stores/offline.svelte';
+  import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
   import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
   import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
@@ -21,6 +21,10 @@
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
   let syncError = $state(false);
+  // SW update banner is suppressed while a tournament is offline-locked on
+  // this device (a mid-event refresh is the wrong nudge); resumes after
+  // go-online. Refreshed on sync events since the getter isn't reactive.
+  let hasOfflineLocked = $state(false);
 
   // Manual recovery from a terminal sync failure (the auto-retry gives up after a
   // few attempts) — the banner exposes this so the user isn't stuck on stale data.
@@ -69,10 +73,13 @@
     });
 
     // Restore offline tournament state from IndexedDB
-    initOfflineState().catch(err => console.error('Failed to init offline state:', err));
+    initOfflineState()
+      .then(() => { hasOfflineLocked = getOfflineTournamentUids().size > 0; })
+      .catch(err => console.error('Failed to init offline state:', err));
 
     // Listen for sync events
     const handleSyncEvent = (event: { type: string; error?: string }) => {
+      hasOfflineLocked = getOfflineTournamentUids().size > 0;
       if (event.type === 'syncing') {
         isSyncing = true;
         syncError = false;
@@ -93,11 +100,19 @@
 
     syncManager.addEventListener(handleSyncEvent);
 
+    // Debounced banner clear: flapping venue wifi strobes online/offline —
+    // going offline shows immediately, but the banner only clears after a few
+    // seconds of stable connectivity. Reconnection itself is NOT delayed.
+    let onlineStableTimer: ReturnType<typeof setTimeout> | undefined;
     const handleOnline = () => {
-      isOnline = true;
       syncManager.connect();
+      clearTimeout(onlineStableTimer);
+      onlineStableTimer = setTimeout(() => {
+        isOnline = true;
+      }, 4000);
     };
     const handleOffline = () => {
+      clearTimeout(onlineStableTimer);
       isOnline = false;
     };
 
@@ -107,6 +122,7 @@
     return () => {
       syncManager.removeEventListener(handleSyncEvent);
       syncManager.disconnect();
+      clearTimeout(onlineStableTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -133,7 +149,7 @@
   <!-- Status/update banners: a normal-flow sticky stack so they push content
        down instead of overlaying the page header; multiple banners stack as
        block siblings (no hard-coded per-banner top offsets). -->
-  {#if engineLoadFailed() || !isOnline || syncError || getUpdateAvailable()}
+  {#if engineLoadFailed() || !isOnline || syncError || (getUpdateAvailable() && !hasOfflineLocked)}
     <div class="sticky top-0 z-50">
       <!-- A WASM engine load failure degrades the app (permission checks,
            optimistic writes and standings stop working): a durable banner, not
@@ -163,7 +179,7 @@
         </div>
       {/if}
 
-      {#if getUpdateAvailable()}
+      {#if getUpdateAvailable() && !hasOfflineLocked}
         <div class="px-4 py-2 text-center text-sm status-update">
           <span class="inline-flex items-center gap-2">
             <Download class="w-4 h-4" />

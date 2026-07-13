@@ -884,6 +884,7 @@
   "offline_error_unlock": "Impossibile sbloccare il torneo",
   "offline_lock_lost_warning": "La sessione offline di questo torneo è stata terminata da un organizzatore (sbloccata o rilevata). Le modifiche offline non sincronizzate non hanno potuto essere salvate.",
   "offline_go_online_summary": "Di nuovo online — {matched} giocatore/i associati a membri esistenti, {created} nuovi membro/i creati, {decks} deck sincronizzati.",
+  "offline_not_locked_nudge": "È offline e questo evento non è bloccato su questo dispositivo, quindi le modifiche non possono essere salvate. Si riconnetta brevemente e usi Vai Offline per attivare la modalità offline.",
   "organizers_title": "Organizzatori",
   "organizers_search_placeholder": "Cerca utenti da aggiungere...",
   "organizers_remove_confirm": "Rimuovere {name} dagli organizzatori?",

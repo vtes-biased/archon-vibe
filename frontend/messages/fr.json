@@ -884,6 +884,7 @@
   "offline_error_unlock": "Échec du déverrouillage du tournoi",
   "offline_lock_lost_warning": "La session hors ligne de ce tournoi a été interrompue par un organisateur (déverrouillée ou reprise). Vos modifications hors ligne non synchronisées n'ont pas pu être sauvegardées.",
   "offline_go_online_summary": "De nouveau en ligne — {matched} joueur(s) associés à des membres existants, {created} nouveaux membre(s) créés, {decks} deck(s) synchronisés.",
+  "offline_not_locked_nudge": "Vous êtes hors ligne et cet événement n'est pas verrouillé sur cet appareil, il est donc impossible de sauvegarder les modifications. Reconnectez-vous brièvement et utilisez Passer hors ligne pour activer le mode hors ligne.",
   "organizers_title": "Organisateurs",
   "organizers_search_placeholder": "Rechercher des utilisateurs à ajouter...",
   "organizers_remove_confirm": "Retirer {name} des organisateurs ?",
