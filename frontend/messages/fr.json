@@ -1388,6 +1388,8 @@
   "league_mode_hint_gp": "Points de saison basés sur la position, par événement : Vainqueur 25, autres finalistes 15, puis 10/9/8… en descendant le classement — la convention établie du Grand Prix.",
   "league_points_rtp": "RtP",
   "league_points_gp": "pts GP",
+  "league_meta_mode_note": "C'est le mode propre à la méta-ligue, appliqué à l'ensemble des événements de toutes les ligues enfants — le classement d'une ligue enfant peut utiliser un mode différent.",
+  "tfield_league_format_mismatch": "nécessite {format}",
   "league_finish_hint": "Laisser vide pour une ligue en cours",
   "league_delete_confirm": "Supprimer cette ligue ? Cette action est irréversible.",
   "league_title_fallback": "Ligue",

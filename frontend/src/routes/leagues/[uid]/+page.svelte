@@ -503,16 +503,23 @@
             <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
               <div class="divide-y divide-line">
                 {#each childLeagues as child (child.uid)}
+                  {@const childOver = !!child.finish && new Date(child.finish) < new Date()}
                   <div class="flex items-center justify-between px-6 py-3 hover:bg-surface-muted/50 transition-colors">
-                    <a href="/leagues/{child.uid}" class="flex-1">
-                      <div class="font-semibold text-ink-strong">{child.name}</div>
-                      {#if child.country}
-                        <div class="text-sm text-ink-muted">{getCountryFlag(child.country)} {countries[child.country]?.name}</div>
-                      {/if}
+                    <a href="/leagues/{child.uid}" class="flex-1 min-w-0">
+                      <div class="font-semibold text-ink-strong truncate">{child.name}</div>
+                      <div class="text-sm text-ink-muted flex items-center gap-2 flex-wrap">
+                        {#if child.country}
+                          <span>{getCountryFlag(child.country)} {countries[child.country]?.name}</span>
+                        {/if}
+                        <span class="px-1.5 py-0.5 rounded text-xs {childOver ? 'bg-surface-hover text-ink-muted' : 'badge-success'}">
+                          {childOver ? m.league_status_finished() : m.league_status_active()}
+                        </span>
+                        <span class="text-xs text-ink-faint">{standingsModeLabel(child.standings_mode)}</span>
+                      </div>
                     </a>
                     {#if isOrganizer}
                       <button onclick={() => removeChildLeague(child.uid)}
-                        class="ml-2 p-1 text-ink-faint hover:text-link transition-colors" title={m.league_remove_child_title()}>
+                        class="ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-faint hover:text-link transition-colors" title={m.league_remove_child_title()}>
                         <X class="w-4 h-4" />
                       </button>
                     {/if}
@@ -616,6 +623,8 @@
           <p class="text-sm text-ink-muted mb-3">
             <span class="font-medium text-ink">{standingsModeLabel(league.standings_mode)}</span>
             — {league.standings_mode === "RTP" ? m.league_mode_hint_rtp() : league.standings_mode === "GP" ? m.league_mode_hint_gp() : m.league_mode_hint_score()}
+            {#if league.kind === "Meta-League"}
+              {m.league_meta_mode_note()}
             {/if}
           </p>
         {/if}

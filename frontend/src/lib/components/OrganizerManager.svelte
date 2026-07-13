@@ -116,10 +116,11 @@
         {/if}
         {user?.name || uid.slice(0, 8)}
         {#if organizerUids.length > 1}
+          <!-- 44px tap target padded out; negative margin keeps the chip compact -->
           <button
             onclick={() => handleRemove(uid)}
             disabled={loading}
-            class="ml-1 text-ink-faint hover:text-link transition-colors"
+            class="ml-0 -m-2.5 p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-ink-faint hover:text-link transition-colors"
             title={m.common_delete()}
           >
             <X class="w-3.5 h-3.5" />

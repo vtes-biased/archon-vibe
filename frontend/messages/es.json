@@ -1388,6 +1388,8 @@
   "league_mode_hint_gp": "Puntos de temporada basados en posición, por evento: Ganador 25, otros finalistas 15, luego 10/9/8… bajando en la clasificación — la convención establecida del Grand Prix.",
   "league_points_rtp": "RtP",
   "league_points_gp": "pts GP",
+  "league_meta_mode_note": "Este es el modo propio de la meta-liga, aplicado a los eventos de todas las ligas hijas — la clasificación de una liga hija puede usar un modo diferente.",
+  "tfield_league_format_mismatch": "requiere {format}",
   "league_finish_hint": "Dejar vacío para liga en curso",
   "league_delete_confirm": "¿Eliminar esta liga? Esta acción no se puede deshacer.",
   "league_title_fallback": "Liga",

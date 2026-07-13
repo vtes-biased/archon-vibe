@@ -188,7 +188,12 @@
     >
       <option value="">{m.common_none()}</option>
       {#each myLeagues as league}
-        <option value={league.uid}>{league.name}</option>
+        <!-- Format-restricted league: disabled-with-reason instead of a server 400 -->
+        {#if league.format && values.format !== league.format}
+          <option value={league.uid} disabled>{league.name} — {m.tfield_league_format_mismatch({ format: league.format })}</option>
+        {:else}
+          <option value={league.uid}>{league.name}</option>
+        {/if}
       {/each}
       {#each otherLeagues as league}
         <option value={league.uid} disabled>{league.name} — {m.tfield_league_not_organizer()}</option>

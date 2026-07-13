@@ -1388,6 +1388,8 @@
   "league_mode_hint_gp": "Position-based season points per event: Winner 25, other finalists 15, then 10/9/8… down the standings — the established Grand Prix convention.",
   "league_points_rtp": "RtP",
   "league_points_gp": "GP pts",
+  "league_meta_mode_note": "This is the meta-league's own mode, applied over all child leagues' events — a child league's standings may use a different mode.",
+  "tfield_league_format_mismatch": "requires {format}",
   "league_finish_hint": "Leave empty for ongoing league",
   "league_delete_confirm": "Delete this league? This cannot be undone.",
   "league_title_fallback": "League",
