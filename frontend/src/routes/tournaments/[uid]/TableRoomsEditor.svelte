@@ -23,14 +23,14 @@
 
   const totalCount = $derived(rooms.reduce((sum, r) => sum + r.count, 0));
 
+  // Cleared count binds to null; name may be blank on a fresh row. Saving is
+  // suspended while any row is invalid — say so instead of silently no-oping.
+  const hasInvalidRow = $derived(rooms.some(r => !r.name.trim() || !(r.count >= 1)));
+
   let saving = $state(false);
 
   async function save() {
-    // Validate
-    for (const room of rooms) {
-      if (!room.name.trim()) return;
-      if (room.count < 1) return;
-    }
+    if (hasInvalidRow) return;
     saving = true;
     try {
       const cleaned = rooms.map(r => ({ name: r.name.trim(), count: r.count }));
@@ -87,28 +87,27 @@
   {#if rooms.length > 0}
     <div class="space-y-2 mb-3">
       {#each rooms as room, i}
-        <div class="flex items-center gap-2">
-          <div class="flex flex-col gap-0.5">
-            <button
-              onclick={() => moveUp(i)}
-              disabled={i === 0 || saving}
-              class="p-0.5 text-ink-faint hover:text-ink-strong disabled:opacity-40 transition-colors"
-              aria-label="Move up"
-            ><ChevronUp class="w-3.5 h-3.5" /></button>
-            <button
-              onclick={() => moveDown(i)}
-              disabled={i === rooms.length - 1 || saving}
-              class="p-0.5 text-ink-faint hover:text-ink-strong disabled:opacity-40 transition-colors"
-              aria-label="Move down"
-            ><ChevronDown class="w-3.5 h-3.5" /></button>
-          </div>
+        <!-- Side-by-side 44px reorder + remove targets (DESIGN.md touch floor) -->
+        <div class="flex items-center gap-1">
+          <button
+            onclick={() => moveUp(i)}
+            disabled={i === 0 || saving}
+            class="min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-faint hover:text-ink-strong disabled:opacity-40 transition-colors"
+            aria-label={m.rooms_move_up()}
+          ><ChevronUp class="w-4 h-4" /></button>
+          <button
+            onclick={() => moveDown(i)}
+            disabled={i === rooms.length - 1 || saving}
+            class="min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-faint hover:text-ink-strong disabled:opacity-40 transition-colors"
+            aria-label={m.rooms_move_down()}
+          ><ChevronDown class="w-4 h-4" /></button>
           <input
             type="text"
             bind:value={room.name}
             onblur={() => handleNameBlur(i)}
             placeholder={m.rooms_name()}
             maxlength={50}
-            class="flex-1 min-w-0 px-2 py-1 text-sm bg-surface-muted border border-line-strong rounded text-ink-strong placeholder-ink-faint focus:border-accent-strong-hover focus:outline-none"
+            class="flex-1 min-w-0 px-2 py-1 min-h-[44px] text-sm bg-surface-muted border rounded text-ink-strong placeholder-ink-faint focus:border-accent-strong-hover focus:outline-none {room.name.trim() ? 'border-line-strong' : 'border-warn'}"
           />
           <input
             type="number"
@@ -116,24 +115,29 @@
             onchange={handleCountChange}
             min={1}
             max={99}
-            class="w-16 px-2 py-1 text-sm bg-surface-muted border border-line-strong rounded text-ink-strong text-center focus:border-accent-strong-hover focus:outline-none"
+            class="w-16 px-2 py-1 min-h-[44px] text-sm bg-surface-muted border rounded text-ink-strong text-center focus:border-accent-strong-hover focus:outline-none {room.count >= 1 ? 'border-line-strong' : 'border-warn'}"
           />
           <button
             onclick={() => removeRoom(i)}
             disabled={saving}
-            class="p-1 text-ink-faint hover:text-link transition-colors"
-            aria-label="Remove room"
+            class="min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-faint hover:text-link transition-colors"
+            aria-label={m.rooms_remove()}
           ><X class="w-4 h-4" /></button>
         </div>
       {/each}
     </div>
+    {#if hasInvalidRow}
+      <p class="text-xs text-warn mb-2">{m.rooms_validation_hint()}</p>
+    {/if}
     <p class="text-xs text-ink-faint mb-2">{m.rooms_hint()}</p>
+  {:else}
+    <p class="text-xs text-ink-faint mb-2">{m.rooms_empty_state()}</p>
   {/if}
 
   <button
     onclick={addRoom}
     disabled={saving}
-    class="flex items-center gap-1 text-sm text-ink-muted hover:text-ink-strong transition-colors"
+    class="flex items-center gap-1 min-h-[44px] text-sm text-ink-muted hover:text-ink-strong transition-colors"
   >
     <Plus class="w-4 h-4" />
     {m.rooms_add()}
