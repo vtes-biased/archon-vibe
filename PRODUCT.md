@@ -198,7 +198,7 @@ Single source: `engine/src/permissions.rs` (`can_issue_sanction`, `can_lift_sanc
 
 #### Lifecycle Effects
 
-- **DQ ↔ player state**: issuing a DQ sets the player to Disqualified on the tournament; lifting or deleting an active DQ restores them (Finished). Standings recompute immediately on DQ create (and on lift/delete).
+- **DQ ↔ player state**: issuing a DQ sets the player to Disqualified on the tournament; lifting or deleting an active DQ restores them to a **playable** state — Playing if still seated at a live table, Checked-in otherwise (Finished only on a finished tournament) — so a fat-fingered DQ is fully reversible, no confirmation needed. Standings recompute immediately on DQ create (and on lift/delete).
 - **DQ standings effect**: DQ'd players appear last in standings with VP/GW/TP zeroed (forfeited) and no numeric rank. Opponents keep all scores earned at their table. DQ'd players earn no rating points (no participation base, no finalist bonus, no rating-history entry). Player count for the rating coefficient stays inclusive of DQ'd players (tournament-rules A.2).
 - **Probation requires an expiry** (≤ 18 months); suspension expiry is optional — none means permanent ban.
 - **Cleanup job (daily)**: sanctions expired for over 18 months are soft-deleted; soft-deleted records are hard-deleted after 30 days (a mistaken organizer delete stays recoverable by IC in that window).

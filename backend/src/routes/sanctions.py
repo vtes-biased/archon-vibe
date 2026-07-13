@@ -31,7 +31,9 @@ from ..models import (
     SanctionCategory,
     SanctionLevel,
     SanctionSubcategory,
+    TableState,
     Tournament,
+    TournamentState,
 )
 
 router = APIRouter(prefix="/sanctions", tags=["sanctions"])
@@ -125,11 +127,29 @@ async def _has_active_dq(tournament_uid: str, user_uid: str) -> bool:
 
 async def _dq_restore_state(tournament_uid: str, user_uid: str) -> PlayerState:
     """State after removing one DQ — call AFTER saving the removal so it no longer
-    counts: DISQUALIFIED if another active DQ still remains (else the zeroed score
-    and a FINISHED state would diverge), otherwise FINISHED."""
+    counts. DISQUALIFIED if another active DQ still remains (else the zeroed score
+    and a restored state would diverge). Otherwise a PLAYABLE state — a
+    fat-fingered DQ must be fully reversible, not stranded in Finished
+    (withdrawn): PLAYING if the player sits at a live table (prelim or finals),
+    FINISHED on a finished tournament, CHECKED_IN otherwise so they can resume
+    next round."""
     if await _has_active_dq(tournament_uid, user_uid):
         return PlayerState.DISQUALIFIED
-    return PlayerState.FINISHED
+    tournament = await get_tournament_by_uid(tournament_uid)
+    if tournament is None or tournament.state == TournamentState.FINISHED:
+        return PlayerState.FINISHED
+    live_tables = [
+        table
+        for rnd in tournament.rounds
+        for table in rnd
+        if table.state not in (TableState.FINISHED, TableState.CANCELLED)
+    ]
+    if tournament.finals is not None and tournament.finals.state != TableState.FINISHED:
+        live_tables.append(tournament.finals)
+    for table in live_tables:
+        if any(seat.player_uid == user_uid for seat in table.seating):
+            return PlayerState.PLAYING
+    return PlayerState.CHECKED_IN
 
 
 async def _apply_sanction_to_tournament(
@@ -147,7 +167,8 @@ async def _apply_sanction_to_tournament(
     each clobbering a concurrent /action commit and double-broadcasting.
 
     - dq_user_uid/dq_state: set that player's state (create → DISQUALIFIED,
-      lift/delete → FINISHED). Saved even when the tournament has no rounds.
+      lift/delete → a playable state via _dq_restore_state). Saved even when
+      the tournament has no rounds.
     - Standings recompute (engine update_standings, the single source of truth for
       SA scoring) runs whenever the tournament has rounds, over the CURRENT
       sanctions — so call AFTER the sanction row is saved. No-op without rounds.
@@ -578,7 +599,8 @@ async def update_sanction_endpoint(
     logger.info(f"Sanction {uid} updated by {current_user.uid}")
 
     if sanction.tournament_uid and was_active_dq != is_active_dq:
-        # became → DISQUALIFIED; ceased → FINISHED unless another active DQ remains.
+        # became → DISQUALIFIED; ceased → restored to a playable state unless
+        # another active DQ remains (see _dq_restore_state).
         # Recompute covers any new SA level on the row too, hence the elif below.
         await _apply_sanction_to_tournament(
             sanction.tournament_uid,
@@ -646,7 +668,7 @@ async def delete_sanction_endpoint(
     logger.info(f"Sanction {uid} soft-deleted by {current_user.uid}")
 
     # Deleting an active DQ restores the player on the tournament, mirroring the
-    # lift path — FINISHED unless another active DQ still keeps them zeroed.
+    # lift path — a playable state unless another active DQ still keeps them zeroed.
     if (
         sanction.level == SanctionLevel.DISQUALIFICATION
         and sanction.lifted_at is None

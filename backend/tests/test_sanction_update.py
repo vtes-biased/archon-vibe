@@ -21,7 +21,19 @@ from uuid import uuid7
 
 import pytest
 import src.db as db
-from src.models import Role, Sanction, SanctionCategory, SanctionLevel, User
+from src.models import (
+    Player,
+    PlayerState,
+    Role,
+    Sanction,
+    SanctionCategory,
+    SanctionLevel,
+    Seat,
+    Table,
+    Tournament,
+    TournamentState,
+    User,
+)
 
 from tests.conftest import make_auth_header
 
@@ -114,3 +126,64 @@ async def test_create_second_active_dq_rejected(test_client):
     finally:
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE type = 'sanction'")
+
+
+@pytest.mark.asyncio
+async def test_dq_delete_restores_playable_state(test_client):
+    """Deleting an active DQ mid-event returns the player to a PLAYABLE state
+    (Playing while their table is live), not Finished/withdrawn — a
+    fat-fingered DQ is fully reversible (reversibility over confirmation)."""
+    ic = User(uid=str(uuid7()), modified=datetime.now(UTC), name="IC", roles=[Role.IC])
+    target = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Player")
+    await db.save_user(ic)
+    await db.save_user(target)
+
+    seat_uids = [target.uid, str(uuid7()), str(uuid7()), str(uuid7())]
+    tournament = Tournament(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="DQ Restore",
+        state=TournamentState.PLAYING,
+        organizers_uids=[ic.uid],
+        players=[
+            Player(
+                user_uid=uid,
+                state=(
+                    PlayerState.DISQUALIFIED
+                    if uid == target.uid
+                    else PlayerState.PLAYING
+                ),
+            )
+            for uid in seat_uids
+        ],
+        rounds=[[Table(seating=[Seat(player_uid=uid) for uid in seat_uids])]],
+    )
+    sanction = Sanction(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        user_uid=target.uid,
+        issued_by_uid=ic.uid,
+        tournament_uid=tournament.uid,
+        level=SanctionLevel.DISQUALIFICATION,
+        category=SanctionCategory.UNSPORTSMANLIKE_CONDUCT,
+        description="fat-fingered dq",
+        issued_at=datetime.now(UTC),
+    )
+    try:
+        async with db.get_connection() as conn:
+            await db.save_tournament(tournament, conn=conn)
+        await db.save_sanction(sanction)
+
+        resp = await test_client.delete(
+            f"/sanctions/{sanction.uid}", headers=make_auth_header(ic.uid)
+        )
+        assert resp.status_code == 200
+
+        updated = await db.get_tournament_by_uid(tournament.uid)
+        assert updated is not None
+        entry = next(p for p in updated.players if p.user_uid == target.uid)
+        assert entry.state == PlayerState.PLAYING
+    finally:
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE type = 'sanction'")
+            await conn.execute("DELETE FROM objects WHERE uid = %s", (tournament.uid,))
