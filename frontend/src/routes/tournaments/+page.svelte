@@ -200,20 +200,41 @@
     return () => syncManager.removeEventListener(handleSyncEvent);
   });
 
-  // Calendar helpers
+  // Calendar helpers — the feed URL mirrors the ACTIVE screen filters so the
+  // subscriber gets what the screen shows (format was silently dropped before).
   const calendarUrl = $derived.by(() => {
     if (viewMode === "agenda" && auth.user?.calendar_token) {
-      return `${CALENDAR_BASE}/api/calendar/tournaments.ics?token=${auth.user.calendar_token}`;
+      const params = new URLSearchParams({ token: auth.user.calendar_token });
+      if (!includeOnline) params.set("online", "false");
+      return `${CALENDAR_BASE}/api/calendar/tournaments.ics?${params}`;
     }
     const params = new URLSearchParams();
     if (selectedCountry && selectedCountry !== "all") {
       params.set("country", selectedCountry);
+    }
+    if (selectedFormat && selectedFormat !== "all") {
+      params.set("format", selectedFormat);
     }
     if (!includeOnline) {
       params.set("online", "false");
     }
     const qs = params.toString();
     return `${CALENDAR_BASE}/api/calendar/tournaments.ics${qs ? '?' + qs : ''}`;
+  });
+
+  // webcal:// opens the OS calendar's subscribe dialog directly.
+  const webcalUrl = $derived(calendarUrl.replace(/^https?:\/\//, "webcal://"));
+
+  // Feed-scope summary so the copied URL doesn't read as "everything".
+  const calendarScope = $derived.by(() => {
+    if (viewMode === "agenda" && auth.user?.calendar_token) {
+      return m.tournaments_calendar_scope_agenda();
+    }
+    const parts: string[] = [];
+    parts.push(selectedCountry !== "all" ? (countries[selectedCountry]?.name ?? selectedCountry) : m.rankings_all_countries());
+    if (selectedFormat !== "all") parts.push(selectedFormat);
+    if (includeOnline) parts.push(m.tournaments_calendar_scope_online());
+    return parts.join(" · ");
   });
 
   async function handleGenerateCalendarToken() {
@@ -357,6 +378,7 @@
             type="text"
             readonly
             value={calendarUrl}
+            title={calendarScope}
             class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-line-strong rounded bg-surface-card text-ink-muted select-all"
           />
           <Button variant="secondary" size="sm" class="shrink-0" onclick={() => copyToClipboard(calendarUrl)}>
@@ -368,6 +390,14 @@
               {m.tournaments_calendar_copy()}
             {/if}
           </Button>
+          <a href={webcalUrl}
+             class="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+            <Calendar class="h-3 w-3" aria-hidden="true" />
+            {m.tournaments_calendar_webcal()}
+          </a>
+          <p class="w-full text-xs text-ink-faint">
+            {m.tournaments_calendar_scope_label({ scope: calendarScope })} — {m.tournaments_calendar_howto()}
+          </p>
         {/if}
       </div>
     {/if}

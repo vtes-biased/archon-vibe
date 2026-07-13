@@ -15,10 +15,16 @@
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy } from "@lucide/svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);
+
+  // Per-league .ics feed; webcal:// opens the OS calendar subscribe dialog.
+  const leagueWebcalUrl = $derived.by(() => {
+    const base = (import.meta.env.VITE_API_URL || window.location.origin).replace(/^https?:\/\//, "webcal://");
+    return `${base}/api/calendar/tournaments.ics?league=${uid}`;
+  });
   const countries = getCountries();
   const auth = $derived(getAuthState());
 
@@ -488,9 +494,17 @@
 
       <!-- Tournaments -->
       <div class="mb-6">
-        <h2 class="text-xl font-medium text-ink-strong mb-3">
-          {m.league_tournaments_heading({ count: leagueTournaments.length })}
-        </h2>
+        <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <h2 class="text-xl font-medium text-ink-strong">
+            {m.league_tournaments_heading({ count: leagueTournaments.length })}
+          </h2>
+          <!-- Per-league .ics feed: subscribers get this league's events only -->
+          <a href={leagueWebcalUrl}
+             class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+            <Calendar class="h-3 w-3" aria-hidden="true" />
+            {m.league_calendar_subscribe()}
+          </a>
+        </div>
         {#if leagueTournaments.length > 0}
           <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
             <div class="divide-y divide-line">

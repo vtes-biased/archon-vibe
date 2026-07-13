@@ -71,55 +71,62 @@ class TestMatchesAgenda:
 
     def test_organizer_always_matches(self):
         t = _make_tournament(organizers_uids=["user1"], state=TournamentState.FINISHED)
-        assert _matches_agenda(t, "user1", "US", []) is True
+        assert _matches_agenda(t, "user1", "US", [], True) is True
 
     def test_participant_always_matches(self):
         t = _make_tournament(
             players=[Player(user_uid="user1")],
             state=TournamentState.FINISHED,
         )
-        assert _matches_agenda(t, "user1", "US", []) is True
+        assert _matches_agenda(t, "user1", "US", [], True) is True
 
     def test_same_country_non_finished(self):
         t = _make_tournament(country="FR", state=TournamentState.PLANNED)
-        assert _matches_agenda(t, "user1", "FR", []) is True
+        assert _matches_agenda(t, "user1", "FR", [], True) is True
 
     def test_same_country_finished_no_match(self):
         """Finished tournaments only match if user organizes or participates."""
         t = _make_tournament(country="FR", state=TournamentState.FINISHED)
-        assert _matches_agenda(t, "user1", "FR", []) is False
+        assert _matches_agenda(t, "user1", "FR", [], True) is False
 
     def test_online_matches(self):
         t = _make_tournament(online=True, country="US", state=TournamentState.PLANNED)
-        assert _matches_agenda(t, "user1", "FR", []) is True
+        assert _matches_agenda(t, "user1", "FR", [], True) is True
 
     def test_online_finished_no_match(self):
         t = _make_tournament(online=True, state=TournamentState.FINISHED)
-        assert _matches_agenda(t, "user1", "FR", []) is False
+        assert _matches_agenda(t, "user1", "FR", [], True) is False
 
     def test_nc_same_continent(self):
         """National Championship on same continent should match."""
         t = _make_tournament(country="DE", rank=TournamentRank.NC)
-        assert _matches_agenda(t, "user1", "FR", ["FR", "DE", "ES"]) is True
+        assert _matches_agenda(t, "user1", "FR", ["FR", "DE", "ES"], True) is True
 
     def test_cc_same_continent(self):
         t = _make_tournament(country="DE", rank=TournamentRank.CC)
-        assert _matches_agenda(t, "user1", "FR", ["FR", "DE"]) is True
+        assert _matches_agenda(t, "user1", "FR", ["FR", "DE"], True) is True
 
     def test_basic_different_country_no_match(self):
         """Basic tournament in another country, not organizer/participant."""
         t = _make_tournament(country="US")
-        assert _matches_agenda(t, "user1", "FR", ["FR", "DE"]) is False
+        assert _matches_agenda(t, "user1", "FR", ["FR", "DE"], True) is False
 
     def test_nc_different_continent_no_match(self):
         """NC tournament on different continent should not match."""
         t = _make_tournament(country="US", rank=TournamentRank.NC)
-        assert _matches_agenda(t, "user1", "FR", ["FR", "DE"]) is False
+        assert _matches_agenda(t, "user1", "FR", ["FR", "DE"], True) is False
 
     def test_no_user_country(self):
         """User with no country -- only organizer/participant/online matches."""
         t = _make_tournament(country="FR")
-        assert _matches_agenda(t, "user1", None, []) is False
+        assert _matches_agenda(t, "user1", None, [], True) is False
+
+    def test_online_opt_out_gates_discovery_only(self):
+        """?online=false drops online events from discovery — never own events."""
+        t = _make_tournament(online=True, country="US", state=TournamentState.PLANNED)
+        assert _matches_agenda(t, "user1", "FR", [], False) is False
+        own = _make_tournament(online=True, players=[Player(user_uid="user1")])
+        assert _matches_agenda(own, "user1", "FR", [], False) is True
 
 
 # ============================================================================

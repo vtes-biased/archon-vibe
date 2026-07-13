@@ -109,8 +109,13 @@ def _matches_agenda(
     user_uid: str,
     user_country: str | None,
     continent_countries: list[str],
+    include_online: bool,
 ) -> bool:
-    """Check if tournament matches the user's personal agenda criteria."""
+    """Check if tournament matches the user's personal agenda criteria.
+
+    include_online gates only the DISCOVERY branch below — events the user
+    organizes or plays in always stay in their feed.
+    """
     # User organizes it (any state)
     if t.organizers_uids and user_uid in t.organizers_uids:
         return True
@@ -120,11 +125,11 @@ def _matches_agenda(
     # For non-finished only:
     if t.state == TournamentState.FINISHED:
         return False
+    # Discovery: online events are opt-out via ?online=false
+    if t.online:
+        return include_online
     # Same country
     if user_country and t.country == user_country:
-        return True
-    # Online
-    if t.online:
         return True
     # NC/CC on same continent
     if continent_countries and t.country in continent_countries:
@@ -138,11 +143,15 @@ async def tournament_calendar(
     token: str | None = Query(None, description="Personal calendar token"),
     country: str | None = Query(None, description="Filter by country ISO code"),
     online: bool = Query(True, description="Include online events"),
+    format: str | None = Query(None, description="Filter by format"),
+    league: str | None = Query(None, description="Only events of this league uid"),
 ) -> Response:
     """Generate an iCal feed of upcoming tournaments.
 
-    If token is provided, returns a personalized agenda feed.
-    Otherwise, returns a public feed filtered by country/online params.
+    If league is provided, returns that league's events (public data).
+    Else if token is provided, returns a personalized agenda feed (online
+    discovery honors ?online=false; own events always included).
+    Otherwise, returns a public feed filtered by country/online/format params.
     """
     from ..db import decode_json, get_connection
 
@@ -151,9 +160,9 @@ async def tournament_calendar(
     # Include tournaments from last 7 days
     cutoff = (now - timedelta(days=7)).isoformat()
 
-    # Resolve user for personal feed
+    # Resolve user for personal feed (league feeds are public — no token needed)
     user = None
-    if token:
+    if token and not league:
         user = await get_user_by_calendar_token(token)
 
     # Query tournaments from DB
@@ -174,12 +183,14 @@ async def tournament_calendar(
     tournaments = [decode_json(row[0], Tournament) for row in rows]
 
     # Filter
-    if user and user.country:
+    if league:
+        tournaments = [t for t in tournaments if t.league_uid == league]
+    elif user and user.country:
         continent_countries = get_countries_on_continent(user.country)
         tournaments = [
             t
             for t in tournaments
-            if _matches_agenda(t, user.uid, user.country, continent_countries)
+            if _matches_agenda(t, user.uid, user.country, continent_countries, online)
         ]
     else:
         # Public filtering
@@ -188,6 +199,8 @@ async def tournament_calendar(
             if country and t.country != country.upper() and not t.online:
                 continue
             if not online and t.online:
+                continue
+            if format and t.format != format:
                 continue
             filtered.append(t)
         tournaments = filtered
@@ -200,7 +213,12 @@ async def tournament_calendar(
             vevents.append(vevent)
 
     cal_name = "Archon Tournaments"
-    if user:
+    if league:
+        from ..db import get_league_by_uid
+
+        league_obj = await get_league_by_uid(league)
+        cal_name = f"VEKN League — {league_obj.name}" if league_obj else "VEKN League"
+    elif user:
         cal_name = "My VEKN Tournaments"
     elif country:
         cal_name = f"VEKN Tournaments ({country.upper()})"
