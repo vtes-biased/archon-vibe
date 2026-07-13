@@ -69,7 +69,7 @@ Action → backend Rust engine → PostgreSQL → CRUD event → SSE broadcast �
 
 Primary-device ownership — no CRUD log or conflict resolution needed:
 
-1. Organizer takes the tournament offline (`go-offline`) → locked to their device. A tournament can also be *created* while offline (same form, detect-and-adapt): the WASM engine creates it born device-locked; the server first learns of it at go-online (insert path).
+1. An official organizer (IC/NC/Prince) takes the tournament offline (`go-offline`) → locked to their device. Officials-only because offline play can create new members at go-online. A tournament can also be *created* while offline (same form, detect-and-adapt): the WASM engine creates it born device-locked; the server first learns of it at go-online (insert path).
 2. Other devices see an "offline" message — no mutations.
 3. The WASM Rust engine processes business events locally → writes IndexedDB directly.
 4. Offline-created players get temp UIDs (remapped to real UIDs on sync).
@@ -83,7 +83,7 @@ go-online resolves/creates offline players (`save_user` / `allocate_next_vekn_id
 ### Ownership & Transfer
 
 - **Primary device** is authoritative — the server accepts its full state on go-online.
-- **Force-takeover**: another organizer can claim the lock (warned about losing the primary's unsaved data).
+- **Force-takeover**: another official organizer can claim the lock (warned about losing the primary's unsaved data).
 - **Opportunistic sync**: the primary can background-sync without unlocking (`sync-offline`).
 - **IC force-unlock**: emergency unlock without syncing offline data (first-party IC sessions only — OAuth tokens rejected).
 - **Lock-loss reconciliation**: when a force-unlock or takeover reaches the previously isolated device via SSE/snapshot, it clears local offline state and warns the user their unsynced changes are discarded. `go-online` returns 410 (no longer offline) or 409 (another device took over) so a stale snapshot can't clobber authoritative state, and the server self-excludes the initiating device from its own go-online broadcast so a normal online transition doesn't self-trip that warning. (Full mechanics: SYNC.md.)

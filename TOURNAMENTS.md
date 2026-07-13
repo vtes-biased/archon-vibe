@@ -307,9 +307,9 @@ Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `Player`, `T
 | `POST` | `/{uid}/announce` | Post announcement (organizer-only, online-only, 280-char cap, last 20 kept) |
 | `DELETE` | `/{uid}/announce/{id}` | Delete an announcement |
 | `POST` | `/{uid}/call-judge` | Player requests judge at table |
-| `POST` | `/{uid}/go-offline` | Lock tournament for offline mode |
+| `POST` | `/{uid}/go-offline` | Lock tournament for offline mode (official organizers only) |
 | `POST` | `/{uid}/go-online` | Submit offline changes and unlock |
-| `POST` | `/{uid}/force-takeover` | Force take over offline lock |
+| `POST` | `/{uid}/force-takeover` | Force take over offline lock (official organizers only) |
 | `POST` | `/{uid}/force-unlock` | Force-unlock without syncing |
 
 ## Seating Algorithm

@@ -94,6 +94,9 @@ import TournamentModals from "./TournamentModals.svelte";
   let showForceTakeoverConfirm = $state(false);
   let showForceUnlockConfirm = $state(false);
   const isIC = $derived(hasAnyRole('IC'));
+  // Offline lock implies member-creation power at go-online — officials only
+  // (mirrors the backend gate on go-offline/force-takeover).
+  const isOfficial = $derived(hasAnyRole('IC', 'NC', 'Prince'));
   let offlineActionLoading = $state(false);
   const lastSync = $derived(getLastSyncTime(uid));
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
@@ -577,7 +580,7 @@ import TournamentModals from "./TournamentModals.svelte";
               <span class="text-ink text-sm">{m.offline_locked_banner()}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              {#if isOrganizer}
+              {#if isOrganizer && isOfficial}
                 <Button variant="ghost" size="md" disabled={offlineActionLoading} onclick={() => showForceTakeoverConfirm = true}>
                   {m.offline_force_takeover()}
                 </Button>
@@ -647,7 +650,7 @@ import TournamentModals from "./TournamentModals.svelte";
             <Share2 class="w-4 h-4" aria-hidden="true" />
             {m.tournament_share()}
           </Button>
-          {#if showOrganizerView && !tournament.offline_mode}
+          {#if showOrganizerView && !tournament.offline_mode && isOfficial}
             <Button variant="ghost" size="md" onclick={() => showGoOfflineConfirm = true}>
               <WifiOff class="w-4 h-4" />
               {m.offline_go_offline()}
