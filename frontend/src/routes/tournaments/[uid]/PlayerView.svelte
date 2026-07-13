@@ -244,9 +244,16 @@
     {#if userSuspended}
       <div class="text-sm text-link">{m.error_suspended_cannot_register()}</div>
     {:else if !userVeknId}
-      <div class="banner-warn border rounded-lg p-3 flex items-center gap-2 text-sm">
-        <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
-        <span>{m.tournament_vekn_id_required_to_register()}</span>
+      <div class="banner-warn border rounded-lg p-3 text-sm">
+        <div class="flex items-center gap-2">
+          <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span class="font-medium">{m.tournament_vekn_id_required_to_register()}</span>
+        </div>
+        <p class="mt-2">
+          {m.vekn_guidance_have_id()}
+          <a href="/profile?claim=1" class="underline hover:text-warn">{m.vekn_guidance_claim_link()}</a>
+        </p>
+        <p class="mt-1">{m.vekn_guidance_new_member()}</p>
       </div>
     {:else}
       <Button

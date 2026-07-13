@@ -399,12 +399,13 @@
   </div>
 {/if}
 
-<!-- Sponsorship banner for non-members -->
-{#if !user.vekn_id && user.country}
+<!-- Sponsorship banner for non-members (not gated on country: a brand-new user
+     without one still needs the pointer; the community page prompts for country) -->
+{#if !user.vekn_id}
   <div class="p-6 border-t border-line">
     <div class="p-3 rounded border text-sm banner-warn">
       {m.profile_sponsorship_banner()}
-      <a href="/users?tab=community" class="underline hover:text-warn ml-1">{m.profile_find_coordinator()}</a>
+      <a href="/users?tab=community&sponsor=1" class="underline hover:text-warn ml-1">{m.profile_find_coordinator()}</a>
     </div>
   </div>
 {/if}

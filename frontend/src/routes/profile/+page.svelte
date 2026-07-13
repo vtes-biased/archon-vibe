@@ -94,7 +94,13 @@
       githubError = m.profile_github_error({ error: githubErr });
     }
 
-    if (discordLinked || error || githubLinked || githubErr) {
+    // Deep link from VEKN-ID guidance (e.g. tournament registration block)
+    const claim = params.get("claim");
+    if (claim !== null) {
+      showClaimModal = true;
+    }
+
+    if (discordLinked || error || githubLinked || githubErr || claim !== null) {
       replaceState("/profile", {});
     }
   });

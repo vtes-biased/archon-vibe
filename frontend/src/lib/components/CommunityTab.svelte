@@ -15,6 +15,11 @@
   import { ChevronDown, ChevronRight, Globe, Hash, Pencil, Search, Users, Video } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
+  // Sponsor mode (?sponsor=1): the visitor came to find an official to sponsor
+  // them for a VEKN ID — show only the officials directory, pre-filtered to
+  // their country, with an explicit contact CTA.
+  let { sponsorMode = false }: { sponsorMode?: boolean } = $props();
+
   const auth = $derived(getAuthState());
   const countries = getCountries();
 
@@ -172,6 +177,14 @@
   // data; this is a display gate, see .pst/details/307-anonymous-access-tiering.md).
   const showOfficials = $derived(auth.isAuthenticated && officialGroups.length > 0);
 
+  // In sponsor mode, narrow to the visitor's country; fall back to all countries
+  // when their country has no reachable official (or no country is set).
+  const displayedOfficialGroups = $derived.by(() => {
+    if (!sponsorMode || !auth.user?.country) return officialGroups;
+    const own = officialGroups.filter(g => g.code === auth.user!.country);
+    return own.length > 0 ? own : officialGroups;
+  });
+
   let expandedOfficialCountries = $state<Set<string>>(new Set());
 
   async function loadData() {
@@ -235,8 +248,15 @@
 {#if !loaded}
   <div class="text-center py-8 text-ink-muted">{m.common_loading()}</div>
 {:else}
+  <!-- Sponsor-mode contact CTA -->
+  {#if sponsorMode && auth.isAuthenticated}
+    <div class="p-4 mb-6 rounded-lg border text-sm banner-info">
+      {m.community_sponsor_cta()}
+    </div>
+  {/if}
+
   <!-- Global Resources: links pinned globally by a moderator -->
-  {#if globalLinks.length > 0}
+  {#if !sponsorMode && globalLinks.length > 0}
     <div class="bg-surface-card rounded-lg shadow border border-line p-5 mb-6">
       <div class="flex items-center gap-2 mb-3">
         <Globe class="w-5 h-5 text-accent" />
@@ -271,7 +291,7 @@
   {/if}
 
   <!-- Communities Section (Social links by country) -->
-  {#if socialGroups.length > 0}
+  {#if !sponsorMode && socialGroups.length > 0}
     <div class="mb-8">
       <div class="flex items-center gap-2 mb-3">
         <Hash class="w-5 h-5 text-accent" />
@@ -303,7 +323,7 @@
   {/if}
 
   <!-- Content Section (language-filtered) -->
-  {#if contentItems.length > 0 || contentLanguages.length > 0}
+  {#if !sponsorMode && (contentItems.length > 0 || contentLanguages.length > 0)}
     <div class="mb-8">
       <div class="flex items-center gap-2 mb-3">
         <Video class="w-5 h-5 text-accent" />
@@ -333,7 +353,7 @@
       </div>
 
       <div class="space-y-2">
-        {#each officialGroups as group}
+        {#each displayedOfficialGroups as group}
           {@const isExpanded = expandedOfficialCountries.has(group.code)}
           <div class="bg-surface-card rounded-lg shadow border border-line overflow-hidden">
             <button

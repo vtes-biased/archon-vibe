@@ -9,6 +9,8 @@
 
   // Read tab from URL query param
   const urlTab = $derived($page.url.searchParams.get('tab'));
+  // Sponsor mode: arrived from a "get sponsored" pointer — focus the officials directory
+  const sponsorMode = $derived($page.url.searchParams.get('sponsor') !== null);
   let activeTab = $state<'community' | 'members'>('community');
 
   $effect(() => {
@@ -42,7 +44,7 @@
     </div>
 
     {#if activeTab === 'community'}
-      <CommunityTab />
+      <CommunityTab {sponsorMode} />
     {:else if auth.isAuthenticated}
       <UserList />
     {:else}
