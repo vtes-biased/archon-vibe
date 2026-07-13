@@ -1032,7 +1032,7 @@
   "create_dedup_message": "These members look similar. Register one of them, or create a new account if none match.",
   "create_dedup_create_new": "None match — create new",
   "create_dedup_email_exists_search": "A member already uses this email. Search for them by name or VEKN ID to register them.",
-  "vekn_sponsor_ineligible": "You can't register new members from another country. Ask an IC or a local Prince/NC to sponsor them.",
+  "vekn_sponsor_ineligible": "Only VEKN officials (IC, NC, or Prince) can sponsor new members. Ask an official to add them.",
   "add_player_deceased_warn": "{name} is recorded as deceased. Register them anyway?",
   "add_player_deceased_confirm": "Register anyway",
   "help_player_guide_title": "Player Guide",

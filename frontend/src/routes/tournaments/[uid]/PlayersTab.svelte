@@ -299,19 +299,6 @@
 
   const auth = getAuthState();
 
-  // Sponsor eligibility mirrors backend can_manage_country (vekn.py /sponsor):
-  // IC any country; NC/Prince only their own. Surfaced up front so a
-  // cross-country add explains itself instead of hitting a silent 403.
-  // NOTE: #416 will relax this (officials sponsor cross-country) — loosen both
-  // sides together.
-  function canSponsorCountry(country: string | null | undefined): boolean {
-    const u = auth.user;
-    if (!u) return false;
-    if (u.roles.includes("IC")) return true;
-    if (u.roles.includes("NC") || u.roles.includes("Prince")) return u.country === country;
-    return false;
-  }
-
   function focusOnMount(node: HTMLElement) {
     node.focus();
   }
@@ -319,7 +306,11 @@
   // Sponsor modal state
   let sponsorTarget = $state<User | null>(null);
   let sponsorLoading = $state(false);
-  const sponsorEligible = $derived(!sponsorTarget || canSponsorCountry(sponsorTarget.country));
+  // Sponsor eligibility mirrors backend /vekn/sponsor: any official (IC/NC/
+  // Prince), any country — a visiting official can sponsor newcomers abroad.
+  const sponsorEligible = $derived(
+    (["IC", "NC", "Prince"] as const).some(r => auth.user?.roles.includes(r))
+  );
 
   // Create-and-register modal state
   let showCreateModal = $state(false);

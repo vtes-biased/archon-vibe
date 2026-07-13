@@ -1032,7 +1032,7 @@
   "create_dedup_message": "Estos miembros parecen similares. Inscriba a uno de ellos, o cree una cuenta nueva si ninguno coincide.",
   "create_dedup_create_new": "Ninguno coincide — crear cuenta nueva",
   "create_dedup_email_exists_search": "Un miembro ya usa este correo electrónico. Búsquelo por nombre o ID VEKN para inscribirlo.",
-  "vekn_sponsor_ineligible": "No puede inscribir nuevos miembros de otro país. Pida a un IC o a un Prince/NC local que los patrocine.",
+  "vekn_sponsor_ineligible": "Solo los oficiales de VEKN (IC, NC o Prince) pueden patrocinar nuevos miembros. Pida a un oficial que los añada.",
   "add_player_deceased_warn": "{name} está registrado/a como fallecido/a. ¿Inscribir de todas formas?",
   "add_player_deceased_confirm": "Inscribir de todas formas",
   "help_player_guide_title": "Guía del jugador",

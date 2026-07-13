@@ -196,7 +196,9 @@ async def sponsor_new_member(
     """Sponsor a new VEKN member.
 
     Allocates a new sequential VEKN ID to the target user.
-    Requires IC, or NC/Prince for same country.
+    Requires an official role (IC, NC, or Prince) — any country: a visiting
+    official can sponsor newcomers abroad (they won't be able to edit that
+    member's profile afterwards; profile edits stay country-scoped).
     Target user must not already have a VEKN ID.
     """
 
@@ -210,9 +212,6 @@ async def sponsor_new_member(
     target = await get_user_by_uid(request.user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
-
-    # Check manager can manage target's country
-    _require_manager_for_user(manager, target)
 
     # Check target doesn't already have a VEKN ID
     if target.vekn_id:

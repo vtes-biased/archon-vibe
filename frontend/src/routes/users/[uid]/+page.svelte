@@ -81,6 +81,14 @@
     }
   });
 
+  // Cross-country officials can sponsor (mint a VEKN ID) but not otherwise
+  // manage the member — mount VeknManagement in sponsor-only mode for them.
+  const sponsorOnly = $derived.by(() => {
+    if (!auth.user || !user || !isOnline) return false;
+    if (canManage || user.vekn_id) return false;
+    return (["IC", "NC", "Prince"] as const).some(r => auth.user!.roles.includes(r));
+  });
+
   const canIssueSanctions = $derived.by(() => {
     if (!auth.user || !user || !isOnline) return false;
     if (auth.user.uid === user.uid) return false;
@@ -187,9 +195,9 @@
       </p>
     {/if}
 
-    {#if canManage}
+    {#if canManage || sponsorOnly}
       <div class="mt-6">
-        <VeknManagement {user} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
+        <VeknManagement {user} {sponsorOnly} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
       </div>
     {/if}
 

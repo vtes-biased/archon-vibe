@@ -153,7 +153,9 @@ pub fn can_change_role(actor: &UserContext, target: &UserContext, role: Role) ->
     ))
 }
 
-/// Check if actor can manage VEKN IDs for target user (sponsor, link, force-abandon, merge).
+/// Check if actor can manage VEKN IDs for target user (link, force-abandon, merge).
+/// Sponsoring is NOT covered here: any official may sponsor cross-country
+/// (backend /vekn/sponsor gates on is_official only).
 ///
 /// Rules:
 /// - IC: can manage anyone

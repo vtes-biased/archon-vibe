@@ -12,12 +12,16 @@
     ondelete,
     canMarkDeceased = false,
     canDelete = false,
+    // Cross-country official: sponsoring is allowed anywhere, but link/merge/
+    // delete/abandon stay country-scoped — render only the Sponsor action.
+    sponsorOnly = false,
   }: {
     user: User;
     onaction: (user: User) => void;
     ondelete?: () => void;
     canMarkDeceased?: boolean;
     canDelete?: boolean;
+    sponsorOnly?: boolean;
   } = $props();
 
   const isDeceased = $derived(!!user.deceased_at);
@@ -159,10 +163,12 @@
           <UserPlus class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_sponsor()}
         </Button>
-        <Button variant="secondary" size="md" onclick={() => showLinkModal = true} title={m.vekn_link_modal_title()}>
-          <Link class="inline w-3.5 h-3.5 mr-1" />
-          {m.vekn_link_btn()}
-        </Button>
+        {#if !sponsorOnly}
+          <Button variant="secondary" size="md" onclick={() => showLinkModal = true} title={m.vekn_link_modal_title()}>
+            <Link class="inline w-3.5 h-3.5 mr-1" />
+            {m.vekn_link_btn()}
+          </Button>
+        {/if}
         {#if canDelete}
           <Button variant="danger" size="md" onclick={() => showDeleteConfirm = true} title={m.member_delete_title()}>
             <Trash2 class="inline w-3.5 h-3.5 mr-1" />
@@ -175,10 +181,12 @@
           {m.vekn_force_abandon()}
         </Button>
       {/if}
-      <Button variant="secondary" size="md" onclick={() => showMergeModal = true} title={m.vekn_merge_modal_title()}>
-        <GitMerge class="inline w-3.5 h-3.5 mr-1" />
-        {m.vekn_merge()}
-      </Button>
+      {#if !sponsorOnly}
+        <Button variant="secondary" size="md" onclick={() => showMergeModal = true} title={m.vekn_merge_modal_title()}>
+          <GitMerge class="inline w-3.5 h-3.5 mr-1" />
+          {m.vekn_merge()}
+        </Button>
+      {/if}
     </div>
 
     <!-- Deceased status: VEKN members only (symmetric with delete for VEKN-less);
