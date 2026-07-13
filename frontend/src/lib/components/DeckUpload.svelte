@@ -2,8 +2,10 @@
   import { toUserMessage } from '$lib/errors';
   import { onDestroy } from 'svelte';
   import type { User } from '$lib/types';
-  import { getFilteredUsers } from '$lib/db';
+  import { getFilteredUsers, getTournament } from '$lib/db';
   import { getCountryFlag } from '$lib/geonames';
+  import { validateDeck, type ValidationError } from '$lib/engine';
+  import { CircleX, TriangleAlert } from '@lucide/svelte';
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -39,6 +41,10 @@
   let error = $state<string | null>(null);
   let warnings = $state<string[]>([]);
   let success = $state(false);
+  // Format validation results (count/banned/group/V5), shown right here at the
+  // upload moment — a 90-card paste must not read as a green success. null =
+  // validation unavailable (engine/card DB not ready).
+  let validationErrors = $state<ValidationError[] | null>([]);
 
   // URL/QR import fetch through the backend proxy, so gate them on connectivity;
   // text import stays local. `navigator.onLine` isn't reactive — mirror it (same
@@ -146,6 +152,7 @@
     loading = true;
     error = null;
     warnings = [];
+    validationErrors = [];
     success = false;
 
     try {
@@ -217,6 +224,17 @@
 
       success = true;
       warnings = uploadWarnings;
+      // Store-and-warn: the upload is already saved (never gated); validation
+      // renders inline below so problems surface now, not at check-in.
+      try {
+        const t = await getTournament(tournamentUid);
+        validationErrors = await validateDeck(
+          { cards: deck.cards, name: deck.name },
+          t?.format ?? 'Standard'
+        );
+      } catch {
+        validationErrors = null;
+      }
       deckText = '';
       deckUrl = '';
       deckName = '';
@@ -346,6 +364,21 @@
   {/if}
   {#if success}
     <p class="text-sm text-info">{m.deck_upload_success()}</p>
+    {#if validationErrors === null}
+      <p class="text-sm text-ink-muted">
+        <TriangleAlert class="w-4 h-4 inline mr-1" aria-hidden="true" />
+        {m.deck_validation_unavailable()}
+      </p>
+    {:else if validationErrors.length > 0}
+      <div class="space-y-1">
+        {#each validationErrors as err}
+          <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-warn'}">
+            {#if err.severity === 'error'}<CircleX class="w-4 h-4 inline mr-1" aria-hidden="true" />{:else}<TriangleAlert class="w-4 h-4 inline mr-1" aria-hidden="true" />{/if}
+            {err.message}
+          </p>
+        {/each}
+      </div>
+    {/if}
   {/if}
 
   {#if mode !== 'qr'}
