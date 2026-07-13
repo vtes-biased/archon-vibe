@@ -9,7 +9,8 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
-  import { canEditLeague, computeLeagueStandings } from "$lib/engine";
+  import { canEditLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
+  import { tournamentAction } from "$lib/tournament-actions";
   import { translateTournamentState, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
@@ -35,6 +36,38 @@
   let childLeagues = $state<League[]>([]);
   let orphanLeagues = $state<League[]>([]);
   let addChildUid = $state("");
+  // Add-event picker: the league page gets a linking affordance (association
+  // otherwise lives only in each tournament's Config tab).
+  let addEventOpen = $state(false);
+  let addEventLoading = $state(false);
+  let linkableTournaments = $state<Tournament[]>([]);
+
+  async function openAddEvent() {
+    const all = await getAllTournaments();
+    // Create-form gating inverted: MY tournaments, league-less, format-compatible.
+    linkableTournaments = all
+      .filter(t =>
+        !t.deleted_at &&
+        !t.league_uid &&
+        engineIsOrganizer(auth.user, t) &&
+        (!league?.format || t.format === league.format)
+      )
+      .sort((a, b) => (b.start ?? "").localeCompare(a.start ?? ""));
+    addEventOpen = true;
+  }
+
+  async function linkTournament(t: Tournament) {
+    addEventLoading = true;
+    try {
+      await tournamentAction(t.uid, "UpdateConfig", { config: { league_uid: uid } });
+      addEventOpen = false;
+      await loadLeague();
+    } catch (e) {
+      error = toUserMessage(e, m.league_add_event_error());
+    } finally {
+      addEventLoading = false;
+    }
+  }
   let organizerNames = $state<Record<string, string>>({});
   let loaded = $state(false);
   let editing = $state(false);
@@ -501,13 +534,41 @@
           <h2 class="text-xl font-medium text-ink-strong">
             {m.league_tournaments_heading({ count: leagueTournaments.length })}
           </h2>
-          <!-- Per-league .ics feed: subscribers get this league's events only -->
-          <a href={leagueWebcalUrl}
-             class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
-            <Calendar class="h-3 w-3" aria-hidden="true" />
-            {m.league_calendar_subscribe()}
-          </a>
+          <div class="flex items-center gap-2">
+            {#if isOrganizer && league.kind === "League"}
+              <Button variant="secondary" size="sm" onclick={() => (addEventOpen ? (addEventOpen = false) : openAddEvent())}>
+                <Plus class="h-3 w-3" aria-hidden="true" />
+                {m.league_add_event()}
+              </Button>
+            {/if}
+            <!-- Per-league .ics feed: subscribers get this league's events only -->
+            <a href={leagueWebcalUrl}
+               class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+              <Calendar class="h-3 w-3" aria-hidden="true" />
+              {m.league_calendar_subscribe()}
+            </a>
+          </div>
         </div>
+        {#if addEventOpen}
+          <div class="bg-surface-card rounded-lg shadow border border-line p-4 mb-3">
+            {#if linkableTournaments.length > 0}
+              <div class="divide-y divide-line">
+                {#each linkableTournaments as t (t.uid)}
+                  <button
+                    onclick={() => linkTournament(t)}
+                    disabled={addEventLoading}
+                    class="w-full flex items-center justify-between gap-2 py-2 text-left text-sm text-ink-strong hover:text-link transition-colors disabled:opacity-50"
+                  >
+                    <span class="truncate">{t.name}</span>
+                    <span class="text-xs text-ink-faint shrink-0">{t.start ? new Date(t.start).toLocaleDateString() : ""} · {t.format}</span>
+                  </button>
+                {/each}
+              </div>
+            {:else}
+              <p class="text-sm text-ink-muted">{m.league_add_event_none()}</p>
+            {/if}
+          </div>
+        {/if}
         {#if leagueTournaments.length > 0}
           <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
             <div class="divide-y divide-line">
