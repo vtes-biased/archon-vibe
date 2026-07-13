@@ -268,7 +268,7 @@ Pure builders `build_seating_specs` / `build_reseat_specs` / `build_announcement
 |-------|-------------|-------------|
 | `StartRound` / `SelfOrganizeRound` / `StartFinals` | Each player newly seated in `rounds[-1]` or `finals.seating` | `_maybe_push_seating` in `routes/tournaments.py` |
 | `AlterSeating` / `SwapSeats` / `SeatPlayer` / `UnseatPlayer` | Only players whose table/seat changed (pre/post diff over every round + finals), landing on a still-live table of a Playing tournament — corrections to finished tables/events page no one, unseated players get nothing | `_maybe_push_reseat` in `routes/tournaments.py` |
-| `POST /{uid}/announce` | All checked-in participants except the poster | `_maybe_push_announcement` in `routes/tournaments.py` |
+| `POST /{uid}/announce` | Checked-in/playing/completed participants except the poster; registered players too before round 1 (check-in-window announcements must reach the unchecked) | `_maybe_push_announcement` in `routes/tournaments.py` |
 | `POST /{uid}/call-judge` | The tournament's organizers except the caller (same audience as the ephemeral `judge_call` SSE) | `_maybe_push_judge_call` in `routes/tournaments.py` |
 
 `RestoreRound` is excluded (re-seats no one). Seating bodies resolve `table_rooms` labels (mirroring the frontend `resolveTableLabel`) so a push says "Main Hall 3" exactly like the app and wall signs; a re-seat push reuses the round's `seating-{uid}-{round}` tag, replacing the player's stale assignment notification. The judge-call push fires alongside `broadcast_judge_call` (no transaction — it's an ephemeral event) and carries `renotify: true` so a repeat call at a table re-alerts. Each send is fire-and-forget; delivery failure never delays the action response.

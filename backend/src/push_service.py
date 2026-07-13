@@ -242,8 +242,12 @@ def build_announcement_spec(t: Tournament, body: str) -> dict:
         "kind": "announcement",
         "title": t.name,
         "body": body,
-        "url": f"/tournaments/{t.uid}#announcements",
+        "url": f"/tournaments/{t.uid}",
+        # Shared tag: the latest announcement replaces a stale one (announcements
+        # are one-per-critical-moment); renotify keeps each replacement audible
+        # instead of dead-silent, mirroring the judge-call config.
         "tag": f"announce-{t.uid}",
+        "renotify": True,
     }
 
 
@@ -260,7 +264,9 @@ def build_judge_call_spec(
         "title": tournament_name,
         "player": player_name,
         "table": table_label,
-        "url": f"/tournaments/{tournament_uid}",
+        # ?table= mirrors the seating-push pattern; frontend deep-link
+        # consumption of the param rides the notification-deep-link work.
+        "url": f"/tournaments/{tournament_uid}?table={table}",
         "tag": f"judge-{tournament_uid}-{table}",
         # Re-alert even if a prior call at this table is still on screen — the
         # organizer must not miss a second player flagging the same table.

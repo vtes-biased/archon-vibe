@@ -55,6 +55,7 @@ from ..models import (
     DeckListsMode,
     DeckObject,
     ObjectType,
+    PlayerState,
     Role,
     Sanction,
     SanctionLevel,
@@ -229,15 +230,21 @@ async def _maybe_push_reseat(old: Tournament, new: Tournament) -> None:
 async def _maybe_push_announcement(
     tournament: Tournament, body: str, exclude_uid: str
 ) -> None:
-    """Web Push an organizer announcement to all participants but the poster (#314)."""
+    """Web Push an organizer announcement to the players it can still concern:
+    once rounds exist, checked-in/playing participants (dropped players are
+    done with the event); before round 1, registered players too — check-in-
+    window announcements must reach the not-yet-checked-in."""
     try:
         from .. import push_service
 
         spec = push_service.build_announcement_spec(tournament, body)
+        states = {PlayerState.CHECKED_IN, PlayerState.PLAYING, PlayerState.COMPLETED}
+        if not tournament.rounds:
+            states.add(PlayerState.REGISTERED)
         uids = {
             p.user_uid
             for p in tournament.players
-            if p.user_uid and p.user_uid != exclude_uid
+            if p.user_uid and p.user_uid != exclude_uid and p.state in states
         }
         await push_service.send_to_users([(uid, spec) for uid in uids])
     except Exception:
