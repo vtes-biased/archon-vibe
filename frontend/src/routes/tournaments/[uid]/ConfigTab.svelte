@@ -15,16 +15,22 @@
   let {
     tournament = $bindable(),
     isOrganizer,
+    expandOrganizers = false,
   }: {
     tournament: Tournament;
     isOrganizer: boolean;
+    /** Open the organizers section on mount (header add-co-organizer chip). */
+    expandOrganizers?: boolean;
   } = $props();
 
   let saving = $state(false);
   let error = $state<string | null>(null);
 
-  // Re-homed setup sections (foldable, collapsed by default)
-  let organizersExpanded = $state(false);
+  // Re-homed setup sections (foldable, collapsed by default). Initial-value
+  // capture is intended: the tab remounts on every switch, so the chip's
+  // expand request applies at mount.
+  // svelte-ignore state_referenced_locally
+  let organizersExpanded = $state(expandOrganizers);
   let roomsExpanded = $state(false);
 
   // Stash location fields when toggling online mode, so we can restore on toggle-back

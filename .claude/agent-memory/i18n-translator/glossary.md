@@ -67,6 +67,9 @@ metadata:
 | in-person (vs. online, event modality) | en présentiel | presencial(es) | presencial(is) | in presenza |
 | best N tournaments (rating calc window, e.g. "best 8") | N meilleurs tournois | mejores N torneos | melhores N torneios | migliori N tornei |
 | National/Continental Championship (tournament rank value) | Championnat national / Championnat continental (lowercase adjective; generic prose mid-sentence also lowercases the noun: "le championnat national ou continental") | Campeonato Nacional / Campeonato Continental (both words capitalized, incl. generic mid-sentence use) | National Championship / Continental Championship (kept English, not translated)¶¶ | Campionato Nazionale / Campionato Continentale (both words capitalized) |
+| co-organizer (noun) | co-organisateur | coorganizador (no hyphen) | co-organizador (hyphenated) | Co-organizzatore (capitalized, hyphenated — matches its own `og_co_organizers` bold button reference) |
+| organizer access (noun phrase, "you have/lose organizer access") | accès organisateur (no preposition) | acceso de organizador | acesso de organizador | accesso come organizzatore |
+| remove (from a role/list — organizer, player) vs delete (permanent object deletion) | retirer (role/list) vs supprimer (object, e.g. banner/deck/tournament) | eliminar (both senses share this verb in es — no split) | remover (role/list) vs excluir (object) | rimuovere/rimuovi (role/list) vs eliminare/elimina (object) |
 
 § it "register" for organizer-registers-someone-else keeps "iscrivere" even though it.json glosses self-registration and generic "registrato/a" (deceased/status) with "registrare" — don't conflate; the *action* of registering a player for a tournament is always iscrivere/inscrire/inscribir/inscrever, not registrare/registrarse family, across all four Romance locales.
 

@@ -14,7 +14,7 @@
   import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2 } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, UserPlus, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2 } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import TournamentBanner from "$lib/components/TournamentBanner.svelte";
@@ -82,6 +82,7 @@ import TournamentModals from "./TournamentModals.svelte";
   );
   let viewAsPlayer = $state(false);
   let showDeleteConfirm = $state(false);
+  let configExpandOrganizers = $state(false);
   // Offline mode state
   const tournamentIsOffline = $derived(isOffline(uid));
   const deviceId = getDeviceId();
@@ -679,6 +680,15 @@ import TournamentModals from "./TournamentModals.svelte";
                 {metaLeague.name}
               </a>
             {/if}
+            <!-- Sole organizer, pre-event: surface the add-co-organizer moment
+                 (OrganizerManager itself lives in a Config accordion). -->
+            {#if showOrganizerView && (tournament.state === "Planned" || tournament.state === "Registration") && (tournament.organizers_uids?.length ?? 0) === 1}
+              <button onclick={() => { configExpandOrganizers = true; activeTab = 'config'; }}
+                class="px-2 py-0.5 rounded text-xs font-medium bg-surface-muted text-ink hover:text-ink-strong inline-flex items-center gap-1 min-h-[28px]">
+                <UserPlus class="w-3 h-3" aria-hidden="true" />
+                {m.organizers_add_chip()}
+              </button>
+            {/if}
           </div>
         </div>
 
@@ -878,6 +888,7 @@ import TournamentModals from "./TournamentModals.svelte";
               <ConfigTab
                 bind:tournament={tournament}
                 isOrganizer={true}
+                expandOrganizers={configExpandOrganizers}
               />
             {/if}
           </div>
