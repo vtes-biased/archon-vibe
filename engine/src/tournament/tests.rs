@@ -334,6 +334,72 @@ fn test_start_round_drops_registered_players() {
     assert_eq!(updated["players"][5]["state"].as_str(), Some("Finished"));
 }
 
+#[test]
+fn test_start_round_no_show_drop_scoped_to_standard_round_one() {
+    // Rounds 2+ leave Registered players untouched (a legitimate waiting
+    // state after ResetCheckIn); open-rounds tournaments never auto-drop.
+    let org = make_organizer();
+
+    // Round 2 of a standard tournament: p5 stays Registered.
+    let mut t = tournament_with_round();
+    t["state"] = "Waiting".into();
+    t["rounds"][0][1]["state"] = "Finished".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p5", state: "Registered", payment_status: "Pending", toss: 0 },
+    ];
+    let event =
+        json::parse(r#"{"type": "StartRound", "seating": [["p1","p2","p3","p4"]]}"#).unwrap();
+    let updated = json::parse(&run_event(&t, &event, &org).unwrap()).unwrap();
+    assert_eq!(updated["players"][4]["state"].as_str(), Some("Registered"));
+
+    // Open-rounds round 1: Registered is a normal pool state — no drop.
+    let mut t = make_tournament();
+    t["state"] = "Waiting".into();
+    t["open_rounds"] = true.into();
+    t["players"] = json::array![
+        { user_uid: "p0", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Registered", payment_status: "Pending", toss: 0 },
+    ];
+    let event =
+        json::parse(r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"]]}"#).unwrap();
+    let updated = json::parse(&run_event(&t, &event, &org).unwrap()).unwrap();
+    assert_eq!(updated["players"][4]["state"].as_str(), Some("Registered"));
+}
+
+#[test]
+fn test_seat_player_reinstates_zero_round_no_show() {
+    // A recorded round-1 no-show (Finished, zero rounds played) who walks in
+    // mid-round is seated straight onto a live table; a Finished player who
+    // actually PLAYED stays ineligible.
+    let mut t = tournament_with_round();
+    t["players"]
+        .push(
+            json::object! { user_uid: "p9", state: "Finished", payment_status: "Pending", toss: 0 },
+        )
+        .unwrap();
+    let org = make_organizer();
+
+    let event = json::object! { type: "SeatPlayer", player_uid: "p9", table: 1, seat: 4 };
+    let updated = json::parse(&run_event(&t, &event, &org).unwrap()).unwrap();
+    assert_eq!(updated["rounds"][0][1]["seating"].len(), 5);
+    assert_eq!(updated["players"][8]["state"].as_str(), Some("Playing"));
+
+    // p1 is seated in round 0 (one round played) — Finished + rounds > 0 rejects.
+    let mut t2 = tournament_with_round();
+    t2["players"][0]["state"] = "Finished".into();
+    let event = json::object! { type: "SeatPlayer", player_uid: "p1", table: 1, seat: 4 };
+    let result = run_event(&t2, &event, &org);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Registered"));
+}
+
 // Self-organized rounds (#274): the player-authorized eligibility predicate. One test
 // over the whole invariant — registration is the gate, the initiator must be seated, the
 // abuse vectors (concurrent pod, non-participant, disabled) are rejected, and it works

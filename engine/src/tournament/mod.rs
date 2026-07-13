@@ -901,8 +901,26 @@ fn apply_event(
                 .flat_map(|table| table.iter().cloned())
                 .collect();
 
-            // Mark seated players as Playing, drop registered-but-not-checked-in players
-            // Checked-in players not seated (stagger sit-outs) stay Checked-in
+            // Mark seated players as Playing. Checked-in players not seated
+            // (stagger sit-outs) stay Checked-in.
+            //
+            // No-shows: only ROUND 1 of a standard tournament withdraws
+            // registered-but-not-checked-in players (they never arrived;
+            // reinstatable via CheckIn / SeatPlayer while they have zero
+            // rounds played). Later rounds leave Registered untouched —
+            // it is a legitimate waiting state there (slow re-check-ins
+            // after ResetCheckIn, open-rounds pools); they just miss the
+            // round and resolve at FinishTournament as before.
+            let prior_real_rounds = (0..tournament["rounds"].len().saturating_sub(1))
+                .filter(|&r| {
+                    tournament["rounds"][r]
+                        .members()
+                        .any(|t| t["state"].as_str() != Some("Cancelled"))
+                })
+                .count();
+            let open_rounds = tournament["open_rounds"].as_bool().unwrap_or(false);
+            let drop_no_shows = prior_real_rounds == 0 && !open_rounds;
+
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 match players[i]["state"].as_str() {
@@ -914,7 +932,7 @@ fn apply_event(
                             // else: sitting out, stay Checked-in
                         }
                     }
-                    Some("Registered") => players[i]["state"] = "Finished".into(),
+                    Some("Registered") if drop_no_shows => players[i]["state"] = "Finished".into(),
                     _ => {}
                 }
             }
@@ -1569,14 +1587,19 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            // Verify player exists and is Registered
+            // Verify player exists and is Registered — or a Finished player
+            // with ZERO rounds played: a round-1 no-show who walks in while
+            // players are still sitting down is reinstated by seating them.
             let player_idx = find_player_index(&tournament["players"], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
             let player_state = tournament["players"][player_idx]["state"]
                 .as_str()
                 .unwrap_or("");
+            let reinstatable_no_show = player_state == "Finished"
+                && count_player_rounds_played(tournament, player_uid) == 0;
             if player_state != "Registered"
                 && !(state == TournamentState::Finished && player_state == "Finished")
+                && !reinstatable_no_show
             {
                 return Err(EngineError::PlayerWrongState {
                     current: player_state.to_string(),

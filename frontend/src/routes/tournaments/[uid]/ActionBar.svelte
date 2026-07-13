@@ -8,7 +8,7 @@
   import FinishedResults from "./FinishedResults.svelte";
   import FinishConfirmModal from "./FinishConfirmModal.svelte";
   import { QrCode, Undo2, CheckCheck, Banknote, RotateCcw, TriangleAlert } from "@lucide/svelte";
-  import { translateTournamentState, top5HasTies as top5HasTiesFn, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { translateTournamentState, seatDisplay, top5HasTies as top5HasTiesFn, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   type MenuItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
@@ -92,6 +92,17 @@
   );
   const hasParallelRounds = $derived(inProgressRoundCount > 1);
   const playingCount = $derived(tournament?.players?.filter(p => p.state === "Playing").length ?? 0);
+  // Round-1 no-show notice (standard tournaments): who gets recorded as a
+  // no-show when the round starts. Non-blocking — drops are reinstatable
+  // (CheckIn between rounds, SeatPlayer mid-round), so it informs, no confirm.
+  const prospectiveNoShows = $derived.by(() => {
+    if (tournament?.state !== "Waiting" || tournament?.open_rounds) return [];
+    const priorRealRounds = tournament?.rounds?.filter(r => r.some(t => t.state !== "Cancelled")).length ?? 0;
+    if (priorRealRounds > 0) return [];
+    return (tournament?.players ?? [])
+      .filter(p => p.state === "Registered" && p.user_uid)
+      .map(p => seatDisplay(p.user_uid!, playerInfo, tournament.online));
+  });
 </script>
 
 <!-- Action Bar -->
@@ -225,6 +236,9 @@
   {#if tournament.state === "Waiting"}
     {#if checkedInCount < 4}
       <p class="text-sm text-ink-faint">{m.overview_start_round_hint({ count: String(checkedInCount) })}</p>
+    {/if}
+    {#if prospectiveNoShows.length > 0}
+      <p class="text-sm text-warn">{m.action_bar_noshow_notice({ names: prospectiveNoShows.join(", ") })}</p>
     {/if}
     {#if [6, 7, 11].includes(checkedInCount)}
       <p class="text-sm text-info">{m.overview_stagger_info({ count: String(checkedInCount) })}</p>

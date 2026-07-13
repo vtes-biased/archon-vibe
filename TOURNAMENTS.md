@@ -223,7 +223,7 @@ Config flag `self_organized_rounds` (bool, default false). Settable on any open-
 **Behavior:**
 - Trust-based: registration is the only integrity gate — collusion risk accepted (non-VEKN house format).
 - Engine computes single-table seating (R1 best-effort pred-prey; uses prior rounds).
-- Seated players move to `Playing`; unseated `Registered` players are untouched (unlike `StartRound`).
+- Seated players move to `Playing`; unseated `Registered` players are untouched (`StartRound` only withdraws `Registered` no-shows on round 1 of a standard tournament — rounds 2+ and open-rounds leave them untouched; a zero-rounds no-show is reinstatable via `CheckIn` between rounds or `SeatPlayer` onto a live table).
 - Table stamped `organized_by: <initiator_uid>` for audit.
 - Never for finals (organizer-only); never VEKN-pushed.
 

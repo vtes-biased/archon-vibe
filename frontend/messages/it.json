@@ -661,6 +661,7 @@
   "action_bar_planned": "Configura le impostazioni, poi apri le iscrizioni.",
   "action_bar_registration": "{count} giocatori iscritti. Chiudi le iscrizioni quando sei pronto.",
   "action_bar_waiting_initial": "Registra i giocatori. {checked}/{total} registrati.",
+  "action_bar_noshow_notice": "Non registrati — saranno segnati come assenti quando inizia il round 1 (possono essere reintegrati se arrivano): {names}",
   "action_bar_waiting_after_round": "Round {n} completato. Registra per il prossimo round.",
   "action_bar_waiting_finals_ready": "Round {n} completato. Registra per il prossimo round o avvia la finale.",
   "action_bar_waiting_toss_needed": "Round {n} completato. Risolvi i pareggi del top 5 con un sorteggio prima di avviare la finale.",

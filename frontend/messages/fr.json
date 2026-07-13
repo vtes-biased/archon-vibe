@@ -661,6 +661,7 @@
   "action_bar_planned": "Configurez les paramètres, puis ouvrez les inscriptions.",
   "action_bar_registration": "{count} joueurs inscrits. Fermez les inscriptions quand prêt.",
   "action_bar_waiting_initial": "Enregistrez les joueurs. {checked}/{total} enregistrés.",
+  "action_bar_noshow_notice": "Non enregistrés — seront marqués absents au début de la ronde 1 (réintégrables s'ils arrivent) : {names}",
   "action_bar_waiting_after_round": "Ronde {n} terminée. Enregistrez pour la prochaine ronde.",
   "action_bar_waiting_finals_ready": "Ronde {n} terminée. Enregistrez pour la prochaine ronde ou lancez la finale.",
   "action_bar_waiting_toss_needed": "Ronde {n} terminée. Résolvez les égalités du top 5 par tirage au sort avant de lancer la finale.",

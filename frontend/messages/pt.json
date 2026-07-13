@@ -661,6 +661,7 @@
   "action_bar_planned": "Configure as definições e depois abra as inscrições.",
   "action_bar_registration": "{count} jogadores inscritos. Feche as inscrições quando estiver pronto.",
   "action_bar_waiting_initial": "Faça o check-in dos jogadores. {checked}/{total} registrados.",
+  "action_bar_noshow_notice": "Não registrados — serão marcados como ausentes quando a rodada 1 começar (podem ser reintegrados se chegarem): {names}",
   "action_bar_waiting_after_round": "Rodada {n} completa. Faça o check-in para a próxima rodada.",
   "action_bar_waiting_finals_ready": "Rodada {n} completa. Faça o check-in para a próxima rodada ou inicie a final.",
   "action_bar_waiting_toss_needed": "Rodada {n} completa. Resolva os empates do top 5 com um sorteio antes de iniciar a final.",

@@ -661,6 +661,7 @@
   "action_bar_planned": "Configure settings, then open registration.",
   "action_bar_registration": "{count} players registered. Close registration when ready.",
   "action_bar_waiting_initial": "Check in players. {checked}/{total} checked in.",
+  "action_bar_noshow_notice": "Not checked in — recorded as no-shows when Round 1 starts (reinstatable if they arrive): {names}",
   "action_bar_waiting_after_round": "Round {n} complete. Check in for next round.",
   "action_bar_waiting_finals_ready": "Round {n} complete. Check in for next round or start finals.",
   "action_bar_waiting_toss_needed": "Round {n} complete. Resolve top 5 ties with a toss before starting finals.",
