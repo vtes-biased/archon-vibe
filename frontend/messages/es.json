@@ -770,6 +770,8 @@
   "rounds_alter_scores_warning": "Mover jugadores entre mesas restablecerá sus puntuaciones.",
   "rounds_finish_round_n": "Finalizar ronda {n}",
   "override_judge_comment": "Comentario del juez (obligatorio)",
+  "override_usage_hint": "Use Anular para una decisión del juez sobre una mesa en disputa o abandonada — para un número incorrecto, corrija los VP en su lugar.",
+  "player_table_locked": "Las puntuaciones de esta mesa fueron establecidas por un juez y están bloqueadas.",
   "override_placeholder": "Explique por qué se está anulando este resultado de mesa...",
   "override_save": "Anular → Finalizada",
   "override_overridden": "Anulado: {comment}",

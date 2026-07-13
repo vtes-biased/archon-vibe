@@ -827,6 +827,7 @@
                 {#if isScoring && isOrganizer && (table.state === 'Invalid' || table.state === 'In Progress')}
                   {#if overrideTable_ === i}
                     <div class="mt-2 pt-2 border-t border-line">
+                      <p class="text-xs text-ink-faint mb-1.5">{m.override_usage_hint()}</p>
                       <label class="text-xs text-ink-muted block mb-1">{m.override_judge_comment()}
                         <textarea
                           bind:value={overrideComment}

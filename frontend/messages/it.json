@@ -770,6 +770,8 @@
   "rounds_alter_scores_warning": "Spostare giocatori tra i tavoli azzererà i loro punteggi.",
   "rounds_finish_round_n": "Termina Round {n}",
   "override_judge_comment": "Commento del giudice (obbligatorio)",
+  "override_usage_hint": "Usa Sovrascrivi per una decisione del giudice su un tavolo contestato o abbandonato — per un numero sbagliato, correggi invece il VP.",
+  "player_table_locked": "I punteggi di questo tavolo sono stati impostati da un giudice e sono bloccati.",
   "override_placeholder": "Spiega perché il risultato di questo tavolo viene sovrascritto...",
   "override_save": "Sovrascrivi → Concluso",
   "override_overridden": "Sovrascritto: {comment}",

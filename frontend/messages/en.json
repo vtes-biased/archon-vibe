@@ -770,6 +770,8 @@
   "rounds_alter_scores_warning": "Moving players between tables will reset their scores.",
   "rounds_finish_round_n": "Finish Round {n}",
   "override_judge_comment": "Judge comment (required)",
+  "override_usage_hint": "Use Override for a judge ruling on a disputed or abandoned table — for a wrong number, correct the VPs instead.",
+  "player_table_locked": "Scores on this table were set by a judge and are locked.",
   "override_placeholder": "Explain why this table result is being overridden...",
   "override_save": "Override → Finished",
   "override_overridden": "Overridden: {comment}",

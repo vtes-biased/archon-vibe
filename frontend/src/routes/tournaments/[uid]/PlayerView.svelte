@@ -4,7 +4,7 @@
   import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import { previewScoresSync, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock } from "@lucide/svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
@@ -459,6 +459,7 @@
           {@const roundIdx = active.roundIdx}
           {@const mySeatIdx = myTable.seating.findIndex(s => s.player_uid === userUid)}
           {@const tableSize = myTable.seating.length}
+          {@const tableLocked = myTable.seating.some(s => s.judge_uid) || !!myTable.override}
           <div class="bg-surface-muted/50 rounded-lg p-4">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-sm font-medium text-ink-strong">
@@ -468,6 +469,20 @@
                 {translateTableState(myTable.state)}
               </span>
             </div>
+            <!-- Judge-adjudicated table: scores are locked (the engine rejects
+                 player edits) and the ruling is visible to the seated players. -->
+            {#if tableLocked}
+              <p class="text-xs text-ink-muted mb-2 inline-flex items-center gap-1">
+                <Lock class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                {m.player_table_locked()}
+              </p>
+            {/if}
+            {#if myTable.override}
+              <p class="text-xs text-warn mb-2">
+                <ShieldCheck class="w-3.5 h-3.5 inline mr-1" aria-hidden="true" />
+                {m.override_overridden({ comment: myTable.override.comment })}
+              </p>
+            {/if}
             <!-- Timer for player's table (hidden in offline tournaments and parallel rounds) -->
             {#if !hasParallelRounds && !tournament.offline_mode && (tournament.round_time ?? 0) > 0}
               <div class="mb-2">
@@ -494,14 +509,21 @@
                     </span>
                     <span class="text-ink-faint text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
                   </div>
-                  <VpInput
-                    value={seat.result.vp}
-                    options={vpOptions(myTable.seating.length, false)}
-                    label={seatDisplay(seat.player_uid)}
-                    disabled={scoreSaving === myTableIdx}
-                    saving={scoreSavingSeat === seat.player_uid && scoreSaving === myTableIdx}
-                    onchange={(v) => setVp(roundIdx, myTableIdx, seat.player_uid, v, myTable.seating)}
-                  />
+                  {#if tableLocked}
+                    <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
+                      {seat.result.vp}
+                      <Lock class="w-3.5 h-3.5" aria-hidden="true" />
+                    </span>
+                  {:else}
+                    <VpInput
+                      value={seat.result.vp}
+                      options={vpOptions(myTable.seating.length, false)}
+                      label={seatDisplay(seat.player_uid)}
+                      disabled={scoreSaving === myTableIdx}
+                      saving={scoreSavingSeat === seat.player_uid && scoreSaving === myTableIdx}
+                      onchange={(v) => setVp(roundIdx, myTableIdx, seat.player_uid, v, myTable.seating)}
+                    />
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -587,6 +609,12 @@
             {#each previousRounds as prev}
               <div class="bg-surface-muted/50 rounded-lg p-3">
                 <h4 class="text-xs font-medium text-ink-muted mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
+                {#if prev.table.override}
+                  <p class="text-xs text-warn mb-1.5">
+                    <ShieldCheck class="w-3.5 h-3.5 inline mr-1" aria-hidden="true" />
+                    {m.override_overridden({ comment: prev.table.override.comment })}
+                  </p>
+                {/if}
                 <div class="divide-y divide-line">
                   {#each prev.table.seating as seat, j}
                     {@const tVps = prev.table.seating.map(s => s.result.vp)}

@@ -770,6 +770,8 @@
   "rounds_alter_scores_warning": "Mover jogadores entre mesas redefinirá suas pontuações.",
   "rounds_finish_round_n": "Concluir Rodada {n}",
   "override_judge_comment": "Comentário do juiz (obrigatório)",
+  "override_usage_hint": "Use Substituir para uma decisão do juiz sobre uma mesa em disputa ou abandonada — para um número errado, corrija o VP em vez disso.",
+  "player_table_locked": "As pontuações desta mesa foram definidas por um juiz e estão bloqueadas.",
   "override_placeholder": "Explique por que o resultado desta mesa está sendo substituído...",
   "override_save": "Substituir → Finalizado",
   "override_overridden": "Substituído: {comment}",

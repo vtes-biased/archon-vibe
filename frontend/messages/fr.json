@@ -770,6 +770,8 @@
   "rounds_alter_scores_warning": "Déplacer des joueurs entre les tables réinitialisera leurs scores.",
   "rounds_finish_round_n": "Terminer la ronde {n}",
   "override_judge_comment": "Commentaire de l'arbitre (requis)",
+  "override_usage_hint": "Utilisez Modifier pour une décision d'arbitre sur une table contestée ou abandonnée — pour un chiffre incorrect, corrigez plutôt les VP.",
+  "player_table_locked": "Les scores de cette table ont été saisis par un arbitre et sont verrouillés.",
   "override_placeholder": "Expliquez pourquoi le résultat de cette table est modifié...",
   "override_save": "Modifier → Terminé",
   "override_overridden": "Modifié : {comment}",
