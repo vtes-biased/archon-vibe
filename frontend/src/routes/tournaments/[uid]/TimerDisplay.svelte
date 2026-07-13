@@ -3,7 +3,12 @@
   import { timerStart, timerPause, timerReset, timerAddTime } from "$lib/api";
   import { Play, Pause, RotateCcw, Clock } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
+  import ConfirmActionModal from '$lib/components/ConfirmActionModal.svelte';
   import * as m from '$lib/paraglide/messages.js';
+
+  // VEKN sets no cap on judge-granted extra time; 30 min is a sanity bound,
+  // not a rules limit. Mirrored server-side (timer/add-time).
+  const MAX_EXTRA_TIME = 1800;
 
   let {
     tournament,
@@ -76,9 +81,12 @@
     loading = true;
     try { await timerPause(tournament.uid); } catch {} finally { loading = false; }
   }
+  // Reset wipes the round clock for every table with no undo — confirm first
+  // (it sits one tap away from Pause).
+  let showResetConfirm = $state(false);
   async function doReset() {
     loading = true;
-    try { await timerReset(tournament.uid); } catch {} finally { loading = false; }
+    try { await timerReset(tournament.uid); } finally { loading = false; }
   }
   async function doAddTime(secs: number) {
     loading = true;
@@ -122,7 +130,7 @@
             <Pause class="w-3 h-3" /> {m.timer_pause()}
           </Button>
         {/if}
-        <Button variant="ghost" size="sm" onclick={doReset} disabled={loading} title={m.timer_reset()}>
+        <Button variant="ghost" size="sm" onclick={() => (showResetConfirm = true)} disabled={loading} title={m.timer_reset()}>
           <RotateCcw class="w-3 h-3" /> {m.timer_reset()}
         </Button>
       </div>
@@ -131,12 +139,22 @@
     <!-- Organizer per-table controls -->
     {#if isOrganizer && tableIndex != null}
       <div class="flex items-center gap-1 flex-wrap">
-        {#each [60, 120, 180, 300] as secs}
-          <Button variant="ghost" size="sm" onclick={() => doAddTime(secs)} disabled={loading || tableExtraTime + secs > 600}>
+        {#each [60, 120, 300, 600] as secs}
+          <Button variant="ghost" size="sm" onclick={() => doAddTime(secs)} disabled={loading || tableExtraTime + secs > MAX_EXTRA_TIME}>
             +{secs / 60}min
           </Button>
         {/each}
       </div>
     {/if}
   </div>
+{/if}
+
+{#if showResetConfirm}
+  <ConfirmActionModal
+    title={m.timer_reset_confirm_title()}
+    body={m.timer_reset_confirm_body()}
+    confirmLabel={m.timer_reset()}
+    action={doReset}
+    onClose={() => (showResetConfirm = false)}
+  />
 {/if}

@@ -1798,9 +1798,10 @@ async def timer_add_time(
         if request.seconds <= 0:
             raise HTTPException(status_code=400, detail="Seconds must be positive")
         current = tournament.table_extra_time.get(request.table, 0)
-        if current + request.seconds > 600:
+        # Sanity bound, not a VEKN rule (judges may grant generous extensions).
+        if current + request.seconds > 1800:
             raise HTTPException(
-                status_code=400, detail="Max 600s (10 min) extra time per table"
+                status_code=400, detail="Max 1800s (30 min) extra time per table"
             )
         tournament.table_extra_time[request.table] = current + request.seconds
         bd = await _save_timer_tx(tournament, tx_conn)

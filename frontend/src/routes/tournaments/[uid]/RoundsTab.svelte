@@ -2,6 +2,7 @@
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
+  import { timerAddTime } from "$lib/api";
   import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, type TournamentEventType } from "$lib/engine";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
@@ -272,6 +273,18 @@
     playerIssues = map;
   }
 
+
+  // Folded-row +time chips: extra time is granted mid-play from the table
+  // list without unfolding the Manage panel. Cap mirrors TimerDisplay/server.
+  let addTimeLoading = $state(false);
+  async function addTableTime(tableIdx: number, secs: number) {
+    addTimeLoading = true;
+    try {
+      await timerAddTime(tournament.uid, String(tableIdx), secs);
+    } catch { /* error toast shown by apiRequest */ } finally {
+      addTimeLoading = false;
+    }
+  }
 
   async function submitOverride(roundIndex: number, tableIndex: number) {
     if (!overrideComment.trim()) return;
@@ -693,6 +706,23 @@
                     {#if table.organized_by}
                       <span class="text-xs px-2 py-0.5 rounded badge-blue shrink-0" title={m.self_organize_organized_by({ name: seatDisplay(table.organized_by) })}>
                         <Users class="w-3 h-3 inline -mt-0.5" aria-hidden="true" /> {seatDisplay(table.organized_by)}
+                      </span>
+                    {/if}
+                    {#if isOrganizer && !isScoring && !isCancelled && table.state !== "Finished" && !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1 && tournament.timer && !tournament.timer.paused}
+                      <!-- +time without unfolding: the on-the-floor judge move -->
+                      {@const tExtra = tournament.table_extra_time?.[String(i)] ?? 0}
+                      <span class="flex items-center gap-1 shrink-0">
+                        {#if tExtra > 0}
+                          <span class="text-xs text-ink-muted">+{Math.round(tExtra / 60)}min</span>
+                        {/if}
+                        {#each [60, 300] as secs}
+                          <button
+                            onclick={() => addTableTime(i, secs)}
+                            disabled={addTimeLoading || tExtra + secs > 1800}
+                            class="text-xs px-2 min-h-[44px] sm:min-h-0 sm:py-1 rounded border border-line-strong text-ink-muted hover:text-ink-strong hover:bg-surface-hover/50 disabled:opacity-40 transition-colors"
+                            title={m.timer_add_table_time()}
+                          >+{secs / 60}min</button>
+                        {/each}
                       </span>
                     {/if}
                     {#if isOrganizer && !isScoring && !isCancelled && table.seating.length > 0}
