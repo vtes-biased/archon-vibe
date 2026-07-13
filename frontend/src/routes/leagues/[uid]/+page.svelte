@@ -360,8 +360,11 @@
                 class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
                 <option value="RTP">{m.league_standings_rtp_opt()}</option>
                 <option value="Score">{m.league_standings_score_opt()}</option>
-                <option value="GP">{m.league_standings_gp()}</option>
+                <option value="GP">{m.league_standings_gp_opt()}</option>
               </select>
+              <p class="mt-1 text-xs text-ink-faint">
+                {editStandingsMode === "RTP" ? m.league_mode_hint_rtp() : editStandingsMode === "GP" ? m.league_mode_hint_gp() : m.league_mode_hint_score()}
+              </p>
             </div>
             <div>
               <label for="edit-format" class="block text-sm text-ink-muted mb-1">{m.tfield_format()}</label>
@@ -537,13 +540,24 @@
         {:else}
           <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
             <p class="text-ink-muted">{m.league_no_tournaments()}</p>
+            {#if isOrganizer && league.kind === "League"}
+              <p class="mt-2 text-sm text-ink-faint">{m.league_no_tournaments_hint()}</p>
+            {/if}
           </div>
         {/if}
       </div>
 
       <!-- Standings -->
       <div>
-        <h2 class="text-xl font-medium text-ink-strong mb-3">{m.league_col_standings()}</h2>
+        <h2 class="text-xl font-medium text-ink-strong mb-1">{m.league_col_standings()}</h2>
+        <!-- Mode caption: what the Points column means on THIS league -->
+        {#if league}
+          <p class="text-sm text-ink-muted mb-3">
+            <span class="font-medium text-ink">{standingsModeLabel(league.standings_mode)}</span>
+            — {league.standings_mode === "RTP" ? m.league_mode_hint_rtp() : league.standings_mode === "GP" ? m.league_mode_hint_gp() : m.league_mode_hint_score()}
+            {/if}
+          </p>
+        {/if}
         {#if standings.length > 0}
           <!-- Mobile card layout -->
           <div class="sm:hidden bg-surface-card rounded-lg shadow overflow-hidden border border-line divide-y divide-line">
@@ -560,7 +574,7 @@
                 {#if league?.standings_mode !== "Score"}
                   <div class="shrink-0 text-right">
                     <div class="text-sm font-semibold text-ink-strong leading-tight">{entry.points}</div>
-                    <div class="text-[10px] uppercase tracking-wide text-ink-faint">{m.rankings_col_points()}</div>
+                    <div class="text-[10px] uppercase tracking-wide text-ink-faint">{league?.standings_mode === "GP" ? m.league_points_gp() : m.league_points_rtp()}</div>
                   </div>
                 {/if}
               </div>
@@ -576,7 +590,7 @@
                     <th class="px-4 py-2 text-left w-12">{m.tournament_col_rank()}</th>
                     <th class="px-4 py-2 text-left">{m.tournament_col_player()}</th>
                     {#if league?.standings_mode !== "Score"}
-                      <th class="px-4 py-2 text-right">{m.rankings_col_points()}</th>
+                      <th class="px-4 py-2 text-right">{league?.standings_mode === "GP" ? m.league_points_gp() : m.league_points_rtp()}</th>
                     {/if}
                     <th class="px-4 py-2 text-right whitespace-nowrap">{m.league_standings_score()}</th>
                     <th class="px-4 py-2 text-right">{m.league_standings_events()}</th>

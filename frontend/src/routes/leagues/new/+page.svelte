@@ -142,6 +142,9 @@
               <option value="Score">{m.league_standings_score_opt()}</option>
               <option value="GP">{m.league_standings_gp_opt()}</option>
             </select>
+            <p class="mt-1 text-xs text-ink-faint">
+              {standingsMode === "RTP" ? m.league_mode_hint_rtp() : standingsMode === "GP" ? m.league_mode_hint_gp() : m.league_mode_hint_score()}
+            </p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
