@@ -1108,6 +1108,179 @@ async def archon_import(
     )
 
 
+class BulkRegisterRow(BaseModel):
+    vekn_id: str | None = None
+    email: str | None = None
+    name: str | None = None  # display only (unmatched-row reporting)
+    paid: bool | None = None  # None → request default
+
+
+class BulkRegisterRequest(BaseModel):
+    rows: list[BulkRegisterRow]
+    default_paid: bool = True  # they paid at the ticketing source
+
+
+@router.post("/{uid}/bulk-register")
+async def bulk_register(
+    uid: str,
+    request: BulkRegisterRequest,
+    current_user: OptionalUser = None,
+) -> Response:
+    """Bulk-register externally-ticketed players (big events sell tickets on
+    third-party platforms; the organizer imports the resulting list instead of
+    hand-adding a hundred players at the desk).
+
+    Rows match existing members by VEKN ID first, then email. Matches are
+    registered through the engine (AddPlayer) and get their payment status set
+    (default Paid — they paid at the ticketing source). Unmatched rows are
+    RETURNED for manual resolution through the normal officials-only
+    sponsor/create path — never silently created.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if len(request.rows) > 500:
+        raise HTTPException(status_code=400, detail="Too many rows (max 500)")
+
+    existing = await get_tournament_by_uid(uid)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if not permissions.is_organizer(current_user, existing):
+        raise HTTPException(
+            status_code=403, detail="Only organizers can import registrations"
+        )
+    if existing.state != TournamentState.REGISTRATION:
+        raise HTTPException(
+            status_code=400, detail="Tournament must be in Registration state"
+        )
+
+    # Resolve rows to members (reads only — outside the row lock)
+    matched: list[tuple[User, bool | None]] = []
+    unmatched: list[dict] = []
+    seen_uids: set[str] = set()
+    for i, row in enumerate(request.rows):
+        label = row.name or row.email or row.vekn_id or f"row {i + 1}"
+        user = None
+        if row.vekn_id and row.vekn_id.strip():
+            user = await get_user_by_vekn_id(row.vekn_id.strip())
+        if user is None and row.email and row.email.strip():
+            am = await get_auth_method_by_identifier("email", row.email.strip().lower())
+            if am:
+                user = await get_user_by_uid(am.user_uid)
+        if user is None:
+            unmatched.append({"row": i, "name": label, "reason": "not_found"})
+            continue
+        if not user.vekn_id:
+            unmatched.append({"row": i, "name": user.name, "reason": "no_vekn_id"})
+            continue
+        if user.uid in seen_uids:
+            unmatched.append({"row": i, "name": user.name, "reason": "duplicate_row"})
+            continue
+        seen_uids.add(user.uid)
+        matched.append((user, row.paid))
+
+    registered: list[str] = []
+    already: list[str] = []
+    failed: list[dict] = []
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if tournament is None:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+        if not permissions.is_organizer(current_user, tournament):
+            raise HTTPException(
+                status_code=403, detail="Only organizers can import registrations"
+            )
+        if tournament.state != TournamentState.REGISTRATION:
+            raise HTTPException(
+                status_code=400, detail="Tournament must be in Registration state"
+            )
+
+        actor_json = msgspec.json.encode(
+            _build_actor_context(current_user, tournament)
+        ).decode("utf-8")
+        # Suspension/DQ context for the users being added (engine barrier)
+        sanctions_data = [
+            {
+                "user_uid": s.user_uid,
+                "level": s.level.value,
+                "round_number": s.round_number,
+                "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
+                "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+                "expires_at": (
+                    s.expires_at.astimezone(UTC).isoformat() if s.expires_at else None
+                ),
+            }
+            for s in await get_sanctions_for_users(seen_uids, conn=tx_conn)
+            if not s.deleted_at and not s.lifted_at
+        ]
+        sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+        decks_json = await _build_decks_json(uid, conn=tx_conn)
+
+        t_data = msgspec.to_builtins(tournament)
+        in_tournament = {p.user_uid for p in tournament.players if p.user_uid}
+        for user, paid in matched:
+            if user.uid in in_tournament:
+                already.append(user.name)
+                continue
+            try:
+                await _check_player_barred(user.uid, uid, tournament, conn=tx_conn)
+            except EngineRejection as e:
+                failed.append({"name": user.name, "reason": e.message})
+                continue
+            events: list[dict] = [
+                {"type": "AddPlayer", "user_uid": user.uid, "vekn_id": user.vekn_id}
+            ]
+            effective_paid = request.default_paid if paid is None else paid
+            if effective_paid:
+                events.append(
+                    {
+                        "type": "SetPaymentStatus",
+                        "player_uid": user.uid,
+                        "status": "Paid",
+                    }
+                )
+            try:
+                for event in events:
+                    result_json = _engine.process_tournament_event(
+                        msgspec.json.encode(t_data).decode("utf-8"),
+                        msgspec.json.encode(event).decode("utf-8"),
+                        actor_json,
+                        sanctions_json,
+                        decks_json,
+                    )
+                    t_data = json.loads(result_json)["tournament"]
+            except ValueError as e:
+                rejection = EngineRejection.from_engine(e)
+                failed.append({"name": user.name, "reason": rejection.message})
+                continue
+            in_tournament.add(user.uid)
+            registered.append(user.name)
+
+        updated = msgspec.convert(t_data, Tournament)
+        updated.modified = datetime.now(UTC)
+        bd = await save_object(
+            ObjectType.TOURNAMENT,
+            updated.uid,
+            msgspec.to_builtins(updated),
+            conn=tx_conn,
+        )
+
+    broadcast_precomputed(bd)
+    logger.info(
+        f"Bulk-registered {len(registered)} players on {uid} "
+        f"({len(already)} already in, {len(unmatched)} unmatched, {len(failed)} failed)"
+    )
+    return Response(
+        content=msgspec.json.encode(
+            {
+                "registered": registered,
+                "already_registered": already,
+                "unmatched": unmatched,
+                "failed": failed,
+            }
+        ).decode(),
+        media_type="application/json",
+    )
+
+
 # --- Tournament Action Endpoint (Rust Engine) ---
 
 

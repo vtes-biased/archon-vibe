@@ -27,6 +27,7 @@
 
   import ActionBar from "./ActionBar.svelte";
   import ArchonImportModal from "./ArchonImportModal.svelte";
+  import CsvRegisterModal from "./CsvRegisterModal.svelte";
   import PlayersTab from "./PlayersTab.svelte";
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
@@ -167,6 +168,7 @@ import TournamentModals from "./TournamentModals.svelte";
   let activeTab = $state<TabId>('players');
   // Archon import modal (organizer; opened from the action-bar More menu)
   let showArchonImport = $state(false);
+  let showCsvImport = $state(false);
 
   const tabs = $derived.by(() => {
     const t: { id: TabId; label: string; icon: typeof Users }[] = [
@@ -268,6 +270,7 @@ import TournamentModals from "./TournamentModals.svelte";
 
   // Archon import lives in the action-bar More menu across every organizer state.
   const archonImportItem = $derived({ label: m.archon_import_title(), icon: Upload, onclick: () => (showArchonImport = true) });
+  const csvImportItem = $derived({ label: m.csv_import_title(), icon: Upload, onclick: () => (showCsvImport = true) });
 
   let syncingVekn = $state(false);
   // VEKN needs a round count to register an event: require it configured (a
@@ -863,6 +866,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {doAction}
             {syncVeknItem}
             {archonImportItem}
+            {csvImportItem}
             onImportArchon={() => (showArchonImport = true)}
           />
 
@@ -963,3 +967,4 @@ import TournamentModals from "./TournamentModals.svelte";
 />
 
 <ArchonImportModal bind:show={showArchonImport} tournamentUid={uid} {hasRounds} />
+<CsvRegisterModal bind:show={showCsvImport} tournamentUid={uid} onImported={() => load()} />

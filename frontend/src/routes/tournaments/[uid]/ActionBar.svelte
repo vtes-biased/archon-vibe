@@ -22,6 +22,7 @@
     doAction,
     syncVeknItem,
     archonImportItem,
+    csvImportItem,
     onImportArchon,
   }: {
     tournament: Tournament;
@@ -32,6 +33,7 @@
     doAction: (action: TournamentEventType, body?: any) => Promise<void>;
     syncVeknItem: MenuItem | null;
     archonImportItem: MenuItem;
+    csvImportItem: MenuItem;
     onImportArchon: () => void;
   } = $props();
 
@@ -161,6 +163,7 @@
       <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("CloseRegistration")}>{m.overview_close_registration()}</Button>
       <ActionMenu label={m.common_more()} items={[
         ...(qrCheckin ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
+        csvImportItem,
         { label: m.overview_back_to_planning(), icon: Undo2, onclick: () => doAction("CancelRegistration"), disabled: actionLoading },
         ...(syncVeknItem ? [syncVeknItem] : []),
         archonImportItem,
