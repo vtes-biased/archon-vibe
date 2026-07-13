@@ -893,7 +893,7 @@
   "checkin_qr_hide_code": "Ocultar código QR",
   "checkin_qr_organizer_hint": "Mostre este código QR para os jogadores fazerem check-in",
   "checkin_qr_print": "Imprimir",
-  "checkin_qr_scan_instruction": "Escaneie com o aplicativo Archon para fazer check-in",
+  "checkin_qr_scan_instruction": "Escaneie com a câmera do seu celular para fazer check-in",
   "nav_help": "Ajuda",
   "profile_settings": "Configurações",
   "profile_theme_label": "Tema",

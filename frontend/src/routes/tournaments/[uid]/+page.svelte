@@ -1,8 +1,8 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { untrack } from "svelte";
-  import { deleteTournamentApi, syncTournamentVekn } from "$lib/api";
+  import { deleteTournamentApi, syncTournamentVekn, qrCheckin } from "$lib/api";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
@@ -499,6 +499,43 @@ import TournamentModals from "./TournamentModals.svelte";
   async function dropPlayer(playerUid: string) {
     await doAction("DropOut", { player_uid: playerUid });
   }
+
+  // QR self-check-in (?checkin=CODE from a native-camera scan of the printed QR).
+  // Stash the code and IMMEDIATELY strip the param from the address bar and
+  // history — after consumption the code must not be retrievable via copy-link,
+  // share sheet, or back-history (it never renders in the UI; full-projection
+  // only). Anonymous visitors keep the stash (NOT in the login redirect URL)
+  // and it is consumed on login-return.
+  const QR_STASH_KEY = "archon-qr-checkin";
+  $effect(() => {
+    const code = $page.url.searchParams.get("checkin");
+    if (!code) return;
+    try {
+      sessionStorage.setItem(QR_STASH_KEY, JSON.stringify({ uid, code }));
+    } catch { /* storage unavailable — the in-app scanner still works */ }
+    replaceState(`/tournaments/${uid}`, {});
+  });
+
+  let qrCheckinFired = false; // one-shot per page life; stash removal is the durable guard
+  $effect(() => {
+    if (!auth.isAuthenticated || !tournament || qrCheckinFired) return;
+    let stash: { uid: string; code: string } | null = null;
+    try {
+      stash = JSON.parse(sessionStorage.getItem(QR_STASH_KEY) ?? "null");
+    } catch { /* corrupted stash */ }
+    if (!stash || stash.uid !== uid) return;
+    qrCheckinFired = true;
+    sessionStorage.removeItem(QR_STASH_KEY);
+    qrCheckin(uid, stash.code)
+      .then(async (updated) => {
+        await saveTournament(updated);
+        tournament = updated;
+        showToast({ type: "success", message: m.checkin_qr_success() });
+      })
+      .catch((e) => {
+        showToast({ type: "error", message: toUserMessage(e, m.checkin_qr_error()) });
+      });
+  });
 
   $effect(() => {
     const _currentUid = uid; // explicit dependency on uid
