@@ -14,6 +14,7 @@
     rank: TournamentRank;
     open_rounds: boolean;
     max_rounds: number;
+    max_players: number;
     self_organized_rounds: boolean;
     online: boolean;
     country: string;
@@ -254,6 +255,22 @@
     {#if disabledFields.has("max_rounds")}
       <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_locked_hint()}</p>
     {/if}
+  </div>
+
+  <!-- Soft registration cap: warn-only (venue seat limits are advisory) -->
+  <div class="mt-3">
+    <label class="block text-sm text-ink-muted mb-1" for={id("max-players")}>{m.tfield_max_players()}</label>
+    <input
+      id={id("max-players")}
+      type="number"
+      min="0"
+      value={values.max_players || ""}
+      {disabled}
+      placeholder={m.tfield_max_players_none()}
+      onchange={(e) => handleInput("max_players", parseInt((e.target as HTMLInputElement).value) || 0)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+    />
+    <p class="text-xs text-ink-faint mt-1">{m.tfield_max_players_desc()}</p>
   </div>
 
   <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite

@@ -78,6 +78,8 @@ metadata:
 | event (= tournament, interchangeable in league-linking UI) | événement | evento | evento | evento |
 | ranked/unranked (VEKN rating-eligibility badge — NOT the `tfield_rank` tournament-category sense) | Classé / Non classé | Clasificado / No clasificado | Classificado / Não classificado | Classificato / Non classificato |
 | casual (house format) | décontracté | casual | casual | casual (English loanword) |
+| registration cap (soft, non-blocking venue-capacity limit — distinct from the hard round "limit") | plafond (des inscriptions) | tope (de inscripciones) | teto (de inscrições) | tetto (iscrizioni) |
+| seats/spots (generic venue-capacity sense, NOT the game-table "seat" row above) | places | plazas | vagas | posti |
 
 § it "register" for organizer-registers-someone-else keeps "iscrivere" even though it.json glosses self-registration and generic "registrato/a" (deceased/status) with "registrare" — don't conflate; the *action* of registering a player for a tournament is always iscrivere/inscrire/inscribir/inscrever, not registrare/registrarse family, across all four Romance locales.
 

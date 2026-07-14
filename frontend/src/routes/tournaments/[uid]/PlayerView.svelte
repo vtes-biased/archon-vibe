@@ -86,6 +86,12 @@
   const atCap = $derived(
     (tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, userUid) >= (tournament.max_rounds ?? 0),
   );
+  // Soft registration cap (max_players): warn-only, never blocks (venue seat caps
+  // are advisory; no waitlist by design).
+  const registrationCapReached = $derived(
+    (tournament.max_players ?? 0) > 0 &&
+    (tournament.players?.length ?? 0) >= (tournament.max_players ?? 0),
+  );
 
   // Self-organized rounds (open-rounds): a registered participant can seat their own
   // 4-5 pod without an organizer — no online or per-player-cap requirement. Mirrors the
@@ -257,6 +263,12 @@
         <p class="mt-1">{m.vekn_guidance_new_member()}</p>
       </div>
     {:else}
+      {#if registrationCapReached}
+        <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
+          <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{m.tournament_cap_warning_player({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players ?? 0) })}</span>
+        </div>
+      {/if}
       <Button
         variant="primary"
         size="lg"
@@ -281,6 +293,12 @@
       {@render onlineJoin()}
       <p class="text-sm text-ink-muted">{m.tournament_online_checkin_unregistered()}</p>
     {:else}
+      {#if registrationCapReached}
+        <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
+          <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{m.tournament_cap_warning_player({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players ?? 0) })}</span>
+        </div>
+      {/if}
       <Button
         variant="primary"
         size="lg"

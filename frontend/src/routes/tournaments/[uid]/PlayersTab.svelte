@@ -516,11 +516,24 @@
   <!-- Header + Add Player -->
   <div class="space-y-2">
     <div class="flex items-center gap-3">
-      <p class="text-ink-muted shrink-0">{m.players_count({ count: String(tournament.players?.length ?? 0) })}</p>
+      <p class="text-ink-muted shrink-0">
+        {#if (tournament.max_players ?? 0) > 0}
+          {m.players_count_capped({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players) })}
+        {:else}
+          {m.players_count({ count: String(tournament.players?.length ?? 0) })}
+        {/if}
+      </p>
       {#if isOrganizer}
         <AddPlayerForm {tournament} onadd={addPlayerByUser} oncreate={() => showCreateModal = true} />
       {/if}
     </div>
+    <!-- Soft cap reached: warn-only — adding players is never blocked -->
+    {#if isOrganizer && (tournament.max_players ?? 0) > 0 && (tournament.players?.length ?? 0) >= (tournament.max_players ?? 0)}
+      <div class="banner-warn border rounded-lg p-2 text-xs flex items-start gap-2">
+        <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span>{m.players_cap_warning_organizer({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players) })}</span>
+      </div>
+    {/if}
     {#if isOrganizer && isOfflineMode}
       <div class="border-t border-line pt-2">
         <button

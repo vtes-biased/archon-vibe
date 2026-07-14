@@ -800,6 +800,7 @@ class CreateTournamentRequest(BaseModel):
     standings_mode: str = "Private"
     decklists_mode: str = "Winner"
     max_rounds: int = 0
+    max_players: int = 0
     open_rounds: bool = False
     self_organized_rounds: bool = False
     league_uid: str | None = None
@@ -908,6 +909,7 @@ async def create_tournament(
         standings_mode=standings,
         decklists_mode=decklists,
         max_rounds=request.max_rounds,
+        max_players=request.max_players,
         open_rounds=request.open_rounds,
         self_organized_rounds=request.self_organized_rounds,
         league_uid=request.league_uid or None,
