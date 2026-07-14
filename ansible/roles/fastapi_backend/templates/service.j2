@@ -13,6 +13,10 @@ ExecStart={{ _venv_dir }}/bin/uvicorn --host 127.0.0.1 --port {{ r.port }} --log
 Restart=always
 RestartSec=3
 TimeoutStartSec=30
+# Daily restart: primarily to re-fetch upstream assets loaded at startup
+# (krcg-static card data etc.) so upstream updates arrive without a redeploy;
+# also a low-key memory-leak defense. Relative to start, so the restart hour
+# drifts with deploys — accepted over a fixed-hour timer to keep one mechanism.
 RuntimeMaxSec=1d
 # Restart/stop speed: the app sets _shutdown_event on SIGTERM so the SSE streams
 # self-close in ~1s; --timeout-graceful-shutdown caps the drain at 5s, and these
