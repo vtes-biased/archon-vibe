@@ -4,7 +4,7 @@ import os
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from ..db import get_user_by_calendar_token
 from ..geonames import get_countries_on_continent
@@ -149,6 +149,47 @@ def _matches_agenda(
         if t.rank in ("National Championship", "Continental Championship"):
             return True
     return False
+
+
+@router.get("/tournaments/{uid}.ics")
+async def tournament_event_ics(uid: str) -> Response:
+    """Single-VEVENT .ics download for one tournament (per-event add-to-calendar).
+
+    Public like the feeds — and like them it renders venue/address (the
+    deliberate projection exception documented above).
+    """
+    from ..db import get_tournament_by_uid
+
+    t = await get_tournament_by_uid(uid)
+    if t is None or t.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    now_str = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    vevent = _tournament_to_vevent(t, now_str)
+    if not vevent:  # no start date — nothing to put on a calendar
+        raise HTTPException(status_code=404, detail="Tournament has no start date")
+
+    ical_content = (
+        "\r\n".join(
+            [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//VEKN//Archon//EN",
+                "CALSCALE:GREGORIAN",
+                "METHOD:PUBLISH",
+                vevent,
+                "END:VCALENDAR",
+            ]
+        )
+        + "\r\n"
+    )
+    return Response(
+        content=ical_content,
+        media_type="text/calendar",
+        headers={
+            "Content-Disposition": f'attachment; filename="{t.uid}.ics"',
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
 
 
 @router.get("/tournaments.ics")

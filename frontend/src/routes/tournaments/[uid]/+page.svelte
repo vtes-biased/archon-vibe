@@ -14,7 +14,7 @@
   import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, UserPlus, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2 } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, UserPlus, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2, CalendarPlus } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import TournamentBanner from "$lib/components/TournamentBanner.svelte";
@@ -43,6 +43,7 @@ import TournamentModals from "./TournamentModals.svelte";
   import type { JudgeCallData } from "$lib/sync";
 
   const countries = getCountries();
+  const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
   let tournament = $state<Tournament | null>(null);
   let tournamentSanctions = $state<Sanction[]>([]);
@@ -749,6 +750,13 @@ import TournamentModals from "./TournamentModals.svelte";
             <div class="text-ink-bright">{formatDate(tournament.start)}</div>
             {#if formatDateLocal(tournament.start)}
               <div class="text-xs text-ink-faint">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
+            {/if}
+            {#if tournament.start && tournament.state !== "Finished"}
+              <a href="{API_BASE}/api/calendar/tournaments/{uid}.ics" download
+                 class="text-xs text-link hover:text-link-soft inline-flex items-center gap-1 mt-1">
+                <CalendarPlus class="w-3 h-3" aria-hidden="true" />
+                {m.tournament_add_to_calendar()}
+              </a>
             {/if}
           </div>
           <div>

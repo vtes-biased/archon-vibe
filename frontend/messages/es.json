@@ -566,6 +566,7 @@
   "tournament_info_players": "Jugadores",
   "tournament_registered_count": "{count} registrados",
   "tournament_in_timezone": "en su zona horaria",
+  "tournament_add_to_calendar": "Añadir al calendario",
   "tournament_sign_in_details": "Inicie sesión para ver los detalles completos del torneo.",
   "tournament_view_organizer": "Vista de organizador",
   "tournament_view_player": "Vista de jugador",

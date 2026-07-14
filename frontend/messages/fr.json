@@ -566,6 +566,7 @@
   "tournament_info_players": "Joueurs",
   "tournament_registered_count": "{count} inscrits",
   "tournament_in_timezone": "dans votre fuseau horaire",
+  "tournament_add_to_calendar": "Ajouter au calendrier",
   "tournament_sign_in_details": "Connectez-vous pour voir tous les détails du tournoi.",
   "tournament_view_organizer": "Vue organisateur",
   "tournament_view_player": "Vue joueur",
