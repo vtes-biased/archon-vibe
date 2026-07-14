@@ -30,6 +30,7 @@ from .db import (
     compute_access_version,
     delete_sanction_hard,
     get_expired_sanctions,
+    get_league_public_projection,
     get_sanctions_for_cleanup,
     get_tournament_public_projection,
     init_db,
@@ -559,6 +560,20 @@ async def tournament_og_stub(uid: str, request: Request) -> Response:
     host = request.headers.get("host") or request.url.netloc
     pub = await get_tournament_public_projection(uid)
     html = render_og_html(f"{proto}://{host}", uid, pub)
+    return Response(content=html, media_type="text/html")
+
+
+@app.get("/leagues/{uid}")
+async def league_og_stub(uid: str, request: Request) -> Response:
+    """Open Graph stub for a league share link — same crawler-only UA-split
+    as the tournament stub above; unknown/deleted uid → site-wide card."""
+    from .og import render_league_og_html
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    pub_count = await get_league_public_projection(uid)
+    pub, count = pub_count if pub_count else (None, 0)
+    html = render_league_og_html(f"{proto}://{host}", uid, pub, count)
     return Response(content=html, media_type="text/html")
 
 

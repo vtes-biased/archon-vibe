@@ -82,13 +82,14 @@ server {
     proxy_pass http://127.0.0.1:{{ r.backend_port }};
   }
 
-  # ---- Tournament share links: UA-split for og:image --------------------
+  # ---- Tournament/league share links: UA-split for og:image -------------
   # Humans get the static SPA shell (offline/SW intact); social crawlers are
-  # proxied to FastAPI's per-tournament og stub (they don't run JS, so the SPA's
+  # proxied to FastAPI's per-object og stubs (they don't run JS, so the SPA's
   # client-set meta is invisible to them). `if`+`return` is the safe escape from
   # a location (NOT proxy_pass inside if); the named @og_stub does the proxy.
-  # Only the bare /tournaments/{uid} share URL — sub-routes fall through to SPA.
-  location ~ ^/tournaments/[0-9a-fA-F-]+$ {
+  # Only the bare /tournaments/{uid} and /leagues/{uid} share URLs — sub-routes
+  # fall through to SPA.
+  location ~ ^/(tournaments|leagues)/[0-9a-fA-F-]+$ {
     error_page 418 = @og_stub;
     if ($is_social_bot) { return 418; }
     try_files $uri $uri.html /200.html;

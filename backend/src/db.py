@@ -1007,6 +1007,31 @@ async def get_tournament_public_projection(uid: str) -> dict | None:
         return None
 
 
+async def get_league_public_projection(uid: str) -> tuple[dict, int] | None:
+    """Public-level projection of a league + its live tournament count.
+
+    For the unauthenticated OG share-stub: type-filtered so a non-league uid
+    can't leak another object's public projection through /leagues/{uid}.
+    """
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT \"public\" FROM objects WHERE uid = %s AND type = 'league'",
+            (uid,),
+        )
+        row = await result.fetchone()
+        if not row or row[0] is None:
+            return None
+        pub = row[0] if isinstance(row[0], dict) else msgspec.json.decode(row[0])
+        result = await conn.execute(
+            """SELECT COUNT(*) FROM objects
+               WHERE type = 'tournament' AND deleted_at IS NULL
+                 AND "full"->>'league_uid' = %s""",
+            (uid,),
+        )
+        count = (await result.fetchone())[0]
+        return pub, count
+
+
 async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] | None:
     """Soft-delete a tournament under a row lock. Returns (tournament, BroadcastData)."""
     async with tournament_transaction(uid) as (tournament, tx_conn):

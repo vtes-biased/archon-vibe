@@ -1,12 +1,13 @@
-"""Server-rendered Open Graph stub for shared tournament links.
+"""Server-rendered Open Graph stubs for shared tournament and league links.
 
 Social link-preview crawlers (Discord, Facebook, Reddit, WhatsApp, …) don't run
 JavaScript, so the SPA's client-set <meta> tags are invisible to them — every
 share would fall back to the static app.html site-wide card. nginx UA-splits
-``/tournaments/{uid}``: humans get the static SPA shell, crawlers are proxied to
-the route that renders this HTML with per-tournament og:title/description/image.
+``/tournaments/{uid}`` and ``/leagues/{uid}``: humans get the static SPA shell,
+crawlers are proxied to the routes that render this HTML with per-object
+og:title/description/image.
 
-Pure render here (no request/db); the route in main.py supplies the public-level
+Pure render here (no request/db); the routes in main.py supply the public-level
 projection dict so this stays unit-testable and can't over-expose member fields.
 """
 
@@ -46,21 +47,41 @@ def _description(pub: dict) -> str:
     return " · ".join(parts) or SITE_DESCRIPTION
 
 
-def render_og_html(base_url: str, uid: str, pub: dict | None) -> str:
-    """Render the og-tagged HTML stub for /tournaments/{uid}.
+def _league_description(pub: dict, event_count: int) -> str:
+    """League share description: kind/format · where · when · size, then blurb."""
+    parts: list[str] = []
+    if pub.get("kind") == "Meta-League":
+        parts.append("Meta-League")
+    if fmt := pub.get("format"):
+        parts.append(str(fmt))
+    if country := pub.get("country"):
+        parts.append(str(country))
+    start = _format_date(pub.get("start"))
+    finish = _format_date(pub.get("finish"))
+    if start and finish:
+        parts.append(f"{start} – {finish}")
+    elif start:
+        parts.append(f"from {start}")
+    if event_count:
+        parts.append(f"{event_count} event{'s' if event_count != 1 else ''}")
+    teaser = " · ".join(parts)
+    blurb = str(pub.get("description") or "").strip()
+    if blurb:
+        if len(blurb) > 140:
+            blurb = blurb[:139].rstrip() + "…"
+        teaser = f"{teaser} — {blurb}" if teaser else blurb
+    return teaser or SITE_DESCRIPTION
 
-    `base_url` is the absolute origin (scheme://host) — og:image MUST be absolute
-    for crawlers. `pub` is the tournament's public projection (or None / deleted →
-    site-wide card, never an error). A banner yields a large card; the square
-    fallback icon a summary card.
-    """
-    canonical = f"{base_url}/tournaments/{uid}"
-    title, description, banner = SITE_TITLE, SITE_DESCRIPTION, None
-    if pub and not pub.get("deleted_at"):
-        title = pub.get("name") or SITE_TITLE
-        description = _description(pub)
-        banner = pub.get("banner_path")
 
+def _render_stub(
+    base_url: str,
+    canonical_path: str,
+    title: str,
+    description: str,
+    banner: str | None,
+) -> str:
+    """Render the og-tagged HTML stub shared by all object types."""
+    canonical = f"{base_url}{canonical_path}"
     if banner:
         image, img_w, img_h = f"{base_url}{banner}", BANNER_W, BANNER_H
         card = "summary_large_image"
@@ -97,3 +118,33 @@ def render_og_html(base_url: str, uid: str, pub: dict | None) -> str:
 <body><h1>{e(title)}</h1><p>{e(description)}</p></body>
 </html>
 """
+
+
+def render_og_html(base_url: str, uid: str, pub: dict | None) -> str:
+    """Render the og-tagged HTML stub for /tournaments/{uid}.
+
+    `base_url` is the absolute origin (scheme://host) — og:image MUST be absolute
+    for crawlers. `pub` is the tournament's public projection (or None / deleted →
+    site-wide card, never an error). A banner yields a large card; the square
+    fallback icon a summary card.
+    """
+    title, description, banner = SITE_TITLE, SITE_DESCRIPTION, None
+    if pub and not pub.get("deleted_at"):
+        title = pub.get("name") or SITE_TITLE
+        description = _description(pub)
+        banner = pub.get("banner_path")
+    return _render_stub(base_url, f"/tournaments/{uid}", title, description, banner)
+
+
+def render_league_og_html(
+    base_url: str, uid: str, pub: dict | None, event_count: int = 0
+) -> str:
+    """Render the og-tagged HTML stub for /leagues/{uid}.
+
+    Leagues carry no banner — always the square site icon summary card.
+    """
+    title, description = SITE_TITLE, SITE_DESCRIPTION
+    if pub and not pub.get("deleted_at"):
+        title = pub.get("name") or SITE_TITLE
+        description = _league_description(pub, event_count)
+    return _render_stub(base_url, f"/leagues/{uid}", title, description, None)

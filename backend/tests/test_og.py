@@ -19,8 +19,16 @@ from datetime import UTC, datetime
 
 import msgspec
 from src.access_levels import compute_tournament_public
-from src.models import Tournament
-from src.og import BANNER_H, BANNER_W, FALLBACK_IMAGE, ICON_H, ICON_W, render_og_html
+from src.models import League, Tournament
+from src.og import (
+    BANNER_H,
+    BANNER_W,
+    FALLBACK_IMAGE,
+    ICON_H,
+    ICON_W,
+    render_league_og_html,
+    render_og_html,
+)
 
 BASE = "https://archon.example"
 
@@ -68,3 +76,28 @@ def test_og_escapes_user_content_and_tracks_banner():
 
     # None (unknown uid) is the same site-wide fallback, never an error.
     assert 'name="twitter:card" content="summary"' in render_og_html(BASE, "x", None)
+
+
+def test_league_og_escapes_user_content():
+    """Same unauthenticated-render invariants for the league stub: hostile
+    name/description must be escaped; unknown/deleted → site-wide card."""
+    hostile = '"><script>alert(1)</script>'
+    league = League(
+        uid="l-uid",
+        modified=datetime.now(UTC),
+        name=hostile,
+        country="FR",
+        description="Monthly series",
+    )
+    pub = msgspec.to_builtins(league)  # leagues project as identity (fully public)
+    out = render_league_og_html(BASE, "l-uid", pub, event_count=3)
+    assert hostile not in out and "<script>" not in out
+    assert "&lt;script&gt;" in out
+    assert "3 events" in out and "Monthly series" in out
+    assert f'href="{BASE}/leagues/l-uid"' in out
+    # Leagues have no banner: always the square summary card.
+    assert 'name="twitter:card" content="summary"' in out
+
+    deleted = msgspec.to_builtins(league) | {"deleted_at": datetime.now(UTC)}
+    assert hostile not in render_league_og_html(BASE, "l-uid", deleted, 3)
+    assert 'content="Archon"' in render_league_og_html(BASE, "x", None)
