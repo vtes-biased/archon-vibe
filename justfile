@@ -136,6 +136,22 @@ lint-check:
 lint:
     uv run ruff check --fix . && uv run ruff format .
     (cd engine && cargo fmt && cargo clippy --all-targets --all-features -- -D warnings)
+    @just _backup-drift
+
+# Warn (never fail) when the hand-synced backup scripts drift from server-setup's
+# copies (script headers document the contract). Comment wording and the
+# documented createdb encoding divergence are sanctioned; anything else warns.
+# The upstream checkout lands via the ansible justfile's `galaxy` recipe.
+_backup-drift:
+    #!/usr/bin/env bash
+    up=ansible/galaxy_collections/server-setup/files
+    ours=ansible/roles/db_backup/files
+    [ -d "$up" ] || { echo "backup-drift: no server-setup checkout (cd ansible && just galaxy) — check skipped"; exit 0; }
+    for s in pg-backup.sh pg-backup-check.sh; do
+        if diff <(grep -vE '^[[:space:]]*(#|$)' "$up/$s") <(grep -vE '^[[:space:]]*(#|$)' "$ours/$s") | grep '^[<>]' | grep -vq createdb; then
+            echo "⚠️  WARNING: $s drifted from server-setup files/$s — resync or document the divergence in its header"
+        fi
+    done
 
 # Install git hooks (pre-commit: pst tickets lint + ruff auto-format of staged Python)
 hooks:

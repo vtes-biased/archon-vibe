@@ -38,6 +38,10 @@ default:
 # picked up on every run while the pin stays on a branch)
 galaxy:
     uv run --project {{repo_root}} ansible-galaxy collection install -r requirements.yml -p galaxy_collections
+    # build_ignore excludes files/ from the built collection, so keep a raw
+    # checkout too: root `just lint` diffs the hand-synced backup scripts against it.
+    rm -rf galaxy_collections/server-setup
+    git clone -q --depth 1 https://github.com/lionel-panhaleux/server-setup.git galaxy_collections/server-setup
 
 # Remove local build artifacts
 clean:
