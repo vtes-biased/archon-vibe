@@ -113,7 +113,7 @@ Seating is seeded and value-stable: `seating::seed_for_round(tournament_uid, rou
 
 ## League System
 
-Aggregates tournaments into leagues with standings. Synced via SSE like tournaments/users; stored in IndexedDB `leagues` (indexes `by-country`, `by-start`). Fields: `name`, `kind` (League/Meta-League), `standings_mode` (RTP/Score/GP), `format`, `online`, `country`, `start`/`finish`, `description`, `organizers_uids`, `parent_uid`, `allow_no_finals`. GP and RTP modes use `compute_final_standings` to derive final placement (winner=1, other finalists=2).
+Aggregates tournaments into leagues with standings. Synced via SSE like tournaments/users; stored in IndexedDB `leagues` (indexes `by-country`, `by-start`). Fields: `name`, `kind` (League/Meta-League), `standings_mode` (RTP/Score/GP), `format`, `country`, `start`/`finish`, `description`, `organizers_uids`, `parent_uid`. GP and RTP modes use `compute_final_standings` to derive final placement (winner=1, other finalists=2).
 
 ## Serialization & Rust Integration
 

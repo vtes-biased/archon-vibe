@@ -550,15 +550,12 @@ def _make_league(**overrides) -> dict:
         "kind": "League",
         "standings_mode": "RTP",
         "format": "Standard",
-        "online": False,
         "country": "FR",
         "start": "2026-01-01T00:00:00",
         "finish": "2026-12-31T23:59:59",
-        "timezone": "Europe/Paris",
         "description": "Year-long league",
         "organizers_uids": ["u-nc-fr"],
         "parent_uid": None,
-        "allow_no_finals": False,
     }
     base.update(overrides)
     return base

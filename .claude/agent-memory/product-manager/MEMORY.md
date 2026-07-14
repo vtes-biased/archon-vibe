@@ -31,7 +31,7 @@
 ## Leagues — Key Decisions
 - Standings modes: RTP, Score, GP (GP is an app house rule, not VEKN — see PRODUCT.md Leagues).
 - Standings computed at read time via the Rust engine (WASM frontend / PyO3 backend); league SSE payload is **config only**, standings derived client-side from IndexedDB tournaments.
-- Meta-leagues: 2-level hierarchy max. (`allow_no_finals` was a dead never-wired field — removal ticketed in the area-12 product pass, 2026-07.)
+- Meta-leagues: 2-level hierarchy max. (`allow_no_finals` was a dead never-wired field — removed 2026-07.)
 
 ## Roadmap Status (as of 2026-06)
 Core features have shipped; `PRODUCT.md` + pst tickets are the source of truth — don't re-track shipped features here. Still outstanding / forward-looking:
