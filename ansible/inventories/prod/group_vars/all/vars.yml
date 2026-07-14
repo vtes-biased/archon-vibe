@@ -5,7 +5,6 @@
 # ----------------------------------------------------------------------------
 
 # --- identity -------------------------------------------------------------
-admin_user: lpanhaleux
 archon_user: archon
 archon_group: archon
 contact_email: "lionel.panhaleux@gmail.com"

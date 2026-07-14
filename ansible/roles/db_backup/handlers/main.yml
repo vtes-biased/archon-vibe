@@ -1,4 +1,0 @@
----
-- name: Reload systemd (db_backup)
-  ansible.builtin.systemd:
-    daemon_reload: true

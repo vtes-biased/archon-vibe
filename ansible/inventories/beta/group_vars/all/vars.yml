@@ -8,7 +8,6 @@
 # Beta runs alongside the legacy `archon` on the server-setup frankfurt host, so
 # everything is namespaced `new_archon` to avoid collisions (user, paths, db,
 # services, domain). service_name flows to the shared nginx_site role.
-admin_user: lpanhaleux           # sudo-capable human account used by ansible
 service_name: new_archon         # shared identifier (nginx_site tag, db name)
 archon_user: new_archon          # unprivileged runtime user (== db role for PG peer auth)
 archon_group: new_archon

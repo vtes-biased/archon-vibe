@@ -53,7 +53,6 @@
     owner: root
     group: "{{ r.group }}"
     mode: "0640"
-  notify: Reload systemd (legacy_sync)
 
 - name: Render legacy-sync service unit (oneshot)
   ansible.builtin.template:
@@ -62,7 +61,6 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Reload systemd (legacy_sync)
 
 - name: Render legacy-sync timer unit (daily)
   ansible.builtin.template:
@@ -71,7 +69,6 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Reload systemd (legacy_sync)
 
 # Enable the daily timer. The first (C-3) merge is run by hand —
 # `systemctl start {{ r.service_name }}.service` — and watched before the 04:00

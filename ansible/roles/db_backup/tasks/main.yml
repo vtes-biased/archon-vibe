@@ -108,7 +108,6 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Reload systemd (db_backup)
 
 - name: Render backup timer unit (daily)
   ansible.builtin.template:
@@ -117,7 +116,6 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Reload systemd (db_backup)
 
 - name: Render backup-check service unit (oneshot)
   ansible.builtin.template:
@@ -126,7 +124,6 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Reload systemd (db_backup)
 
 - name: Render backup-check timer unit (weekly)
   ansible.builtin.template:
@@ -135,7 +132,6 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Reload systemd (db_backup)
 
 - name: Enable + start the backup timer
   ansible.builtin.systemd:

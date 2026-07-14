@@ -1,7 +1,7 @@
 name: CI
 
 # Fast pre-merge gate — the high-signal, deterministic checks that run in minutes,
-# complementing the slow full-stack E2E suite (e2e.yml). Mirrors `just test` /
+# complementing the slow full-stack E2E suite (the e2e job in release.yml). Mirrors `just test` /
 # `just lint-check`, split into independent parallel jobs so each layer fails and
 # reports on its own: python lint, the Rust engine, backend pytest, frontend types,
 # bot pytest.

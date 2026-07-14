@@ -1,4 +1,0 @@
----
-# Caller (deploy.yml) passes all r.* inputs; this default only covers the
-# optional timer schedule when the inventory doesn't override it.
-legacy_sync_oncalendar_default: "*-*-* 04:00:00"
