@@ -89,7 +89,9 @@ services:
     depends_on:
       db-test:
         condition: service_healthy
-    command: [ "sh", "-c", "uv sync --frozen --dev && uv run python backend/scripts/seed_e2e.py --output /shared/e2e-seed.json" ]
+    # --no-sync: seed needs only main deps (argon2 + backend src), all baked into
+    # the image — a runtime sync would pull the whole dev tree over the network.
+    command: [ "uv", "run", "--no-sync", "python", "backend/scripts/seed_e2e.py", "--output", "/shared/e2e-seed.json" ]
     volumes:
       - e2e-shared:/shared
     profiles:

@@ -19,10 +19,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Install maturin for building Python extension
 RUN uv tool install maturin
 
-# Copy and build the Rust engine
+# Copy and build the Rust engine (engine/data/cards.json is the committed copy,
+# refreshed daily by the update-cards workflow — never regenerated at build time)
 COPY engine/ ./engine/
 COPY scripts/ ./scripts/
-RUN python scripts/update_cards.py
 RUN cd engine && /root/.local/bin/maturin build --release
 
 # Copy Python dependency files
@@ -41,5 +41,7 @@ COPY backend/ ./backend/
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uv", "run", "uvicorn", "backend.src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application. --no-sync: the env is fully built above (deps + engine
+# wheel); without it, uv run re-syncs at container start — pulling dev deps over
+# the network, which can outlast the compose healthcheck window.
+CMD ["uv", "run", "--no-sync", "uvicorn", "backend.src.main:app", "--host", "0.0.0.0", "--port", "8000"]
