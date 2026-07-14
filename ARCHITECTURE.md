@@ -239,6 +239,7 @@ Member-contributed links to external community resources, with moderator oversig
 - `calendar_token` (User, nullable, generated on demand via `POST /auth/me/calendar-token`); stripped from SSE, only visible via `/auth/me`; partial DB index (WHERE NOT NULL).
 - Anonymous (no-token) feeds deliberately render venue/address into LOCATION from the **full** column, bypassing the member-level projection — the `.ics` is an advertising artifact mirroring vekn.net's public event calendar; venue granularity is the organizer's data-entry choice. Do not "fix" by stripping location.
 - Agenda matching (`_matches_agenda()`): the user organizes (any state), participates (any state), or — non-finished only — same country / online / NC-CC on the user's continent.
+- Personal feeds keep recently-finished own events for `FINISHED_WINDOW_DAYS` (90, keyed on `finish`): subscribed calendars reconcile on every poll, so an event leaving the feed is *deleted* from the subscriber's calendar — history must not vanish at finish. Country/global discovery and league feeds stay upcoming-only.
 - Frontend: `getAgendaTournaments()` / `getFilteredTournaments()` (db.ts, IndexedDB mirrors of the agenda logic), `generateCalendarToken()` (auth.svelte.ts), `getContinent()` / `getCountriesOnContinent()` (geonames.ts). The tournament list uses a "My Agenda" toggle (logged-in) plus an "Include online" toggle.
 
 ## Internationalization (i18n)

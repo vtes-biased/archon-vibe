@@ -6,7 +6,7 @@ Focuses on:
 - _tournament_to_vevent: event generation
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
 import pytest
@@ -20,10 +20,12 @@ from src.models import (
     User,
 )
 from src.routes.calendar import (
+    FINISHED_WINDOW_DAYS,
     _escape_ical,
     _format_dt,
     _matches_agenda,
     _tournament_to_vevent,
+    tournament_calendar,
 )
 
 NOW = datetime.now(UTC)
@@ -337,3 +339,55 @@ async def test_calendar_token_not_resolved_for_deleted_user(test_db):
     await db.soft_delete_user(user.uid)
 
     assert await db.get_user_by_calendar_token("ghost") is None
+
+
+@pytest.mark.asyncio
+async def test_personal_feed_keeps_recently_finished_own_events(test_db):
+    """Recently-finished own events stay in the personal feed (bounded window);
+    finished discovery events and out-of-window own events do not — and the
+    anonymous feed stays upcoming-only entirely."""
+    user = _make_user(token="feed-window")
+    await db.save_user(user)
+    played = [Player(user_uid=user.uid)]
+    now = datetime.now(UTC)
+
+    recent_own = _make_tournament(
+        uid=str(uuid7()),
+        state=TournamentState.FINISHED,
+        country="US",
+        players=played,
+        start=now - timedelta(days=10),
+        finish=now - timedelta(days=9),
+    )
+    old_own = _make_tournament(
+        uid=str(uuid7()),
+        state=TournamentState.FINISHED,
+        country="US",
+        players=played,
+        start=now - timedelta(days=FINISHED_WINDOW_DAYS + 10),
+        finish=now - timedelta(days=FINISHED_WINDOW_DAYS + 9),
+    )
+    recent_other = _make_tournament(
+        uid=str(uuid7()),
+        state=TournamentState.FINISHED,
+        country="US",
+        start=now - timedelta(days=10),
+        finish=now - timedelta(days=9),
+    )
+    async with db.get_connection() as conn:
+        for t in (recent_own, old_own, recent_other):
+            await db.save_tournament(t, conn=conn)
+
+    async def feed(token):
+        resp = await tournament_calendar(
+            token=token, country=None, online=True, format=None, league=None
+        )
+        return resp.body.decode()
+
+    personal = await feed("feed-window")
+    assert recent_own.uid in personal
+    assert old_own.uid not in personal
+    assert recent_other.uid not in personal
+
+    anonymous = await feed(None)
+    assert recent_own.uid not in anonymous

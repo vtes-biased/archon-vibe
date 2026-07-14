@@ -14,6 +14,13 @@ router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+# How long a finished event stays in a PERSONAL feed (keyed on finish).
+# Subscribed calendars reconcile on every poll: an event leaving the feed is
+# DELETED from the subscriber's calendar, so a player's own history must not
+# vanish the moment the event finishes. Discovery/league/public feeds stay
+# upcoming-only.
+FINISHED_WINDOW_DAYS = 90
+
 
 def _escape_ical(text: str) -> str:
     """Escape text for iCal format."""
@@ -71,7 +78,11 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     url = f"{FRONTEND_URL}/tournaments/{t.uid}"
     description = _escape_ical(" ".join(parts) if parts else t.name)
 
-    # Location
+    # Location: venue/address render even in anonymous no-token feeds — a
+    # deliberate projection exception (the .ics is an advertising artifact
+    # mirroring vekn.net's public event calendar; granularity is the
+    # organizer's data-entry choice). See ARCHITECTURE.md "Calendar System";
+    # do not "fix" by stripping to the member projection.
     if t.online:
         location = "Online"
     elif t.venue or t.address:
@@ -116,13 +127,15 @@ def _matches_agenda(
     include_online gates only the DISCOVERY branch below — events the user
     organizes or plays in always stay in their feed.
     """
-    # User organizes it (any state)
+    # User organizes it (any state; the feed SQL bounds Finished events to
+    # the FINISHED_WINDOW_DAYS window before they reach this function)
     if t.organizers_uids and user_uid in t.organizers_uids:
         return True
-    # User participates (any state)
+    # User participates (any state, same window)
     if t.players and any(p.user_uid == user_uid for p in t.players):
         return True
-    # For non-finished only:
+    # Discovery below is upcoming-only: finished events never match by
+    # geography/online — only the own-event branches above keep them.
     if t.state == TournamentState.FINISHED:
         return False
     # Discovery: online events are opt-out via ?online=false
@@ -150,7 +163,8 @@ async def tournament_calendar(
 
     If league is provided, returns that league's events (public data).
     Else if token is provided, returns a personalized agenda feed (online
-    discovery honors ?online=false; own events always included).
+    discovery honors ?online=false; own events always included, and
+    recently-finished ones stay for FINISHED_WINDOW_DAYS).
     Otherwise, returns a public feed filtered by country/online/format params.
     """
     from ..db import decode_json, get_connection
@@ -159,24 +173,31 @@ async def tournament_calendar(
     now_str = now.strftime("%Y%m%dT%H%M%SZ")
     # Include tournaments from last 7 days
     cutoff = (now - timedelta(days=7)).isoformat()
+    finished_cutoff = (now - timedelta(days=FINISHED_WINDOW_DAYS)).isoformat()
 
     # Resolve user for personal feed (league feeds are public — no token needed)
     user = None
     if token and not league:
         user = await get_user_by_calendar_token(token)
 
-    # Query tournaments from DB
+    # Query tournaments from DB. Finished events are excluded except for
+    # personal feeds, which keep them within FINISHED_WINDOW_DAYS (keyed on
+    # finish); _matches_agenda then restricts them to own events.
     async with get_connection() as conn:
         result = await conn.execute(
             """
             SELECT "full" FROM objects
             WHERE type = %s
               AND deleted_at IS NULL
-              AND "full"->>'state' != 'Finished'
-              AND ("full"->>'start' IS NULL OR ("full"->>'start')::timestamp >= %s::timestamp)
+              AND (
+                ("full"->>'state' != 'Finished'
+                  AND ("full"->>'start' IS NULL OR ("full"->>'start')::timestamp >= %s::timestamp))
+                OR (%s AND "full"->>'state' = 'Finished'
+                  AND ("full"->>'finish')::timestamp >= %s::timestamp)
+              )
             ORDER BY "full"->>'start' ASC
             """,
-            (ObjectType.TOURNAMENT, cutoff),
+            (ObjectType.TOURNAMENT, cutoff, user is not None, finished_cutoff),
         )
         rows = await result.fetchall()
 
