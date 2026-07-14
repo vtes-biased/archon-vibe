@@ -47,6 +47,7 @@ import TournamentModals from "./TournamentModals.svelte";
 
   let tournament = $state<Tournament | null>(null);
   let tournamentSanctions = $state<Sanction[]>([]);
+  let organizerNames = $state<Record<string, string>>({});
   let loading = $state(true);
   let error = $state<string | null>(null);
   let actionLoading = $state(false);
@@ -230,6 +231,14 @@ import TournamentModals from "./TournamentModals.svelte";
     playerInfo = info;
   }
 
+  // Info-card organizer names (organizers may not be players, so playerInfo
+  // can't serve them); resolved from IndexedDB like the league page does.
+  async function fetchOrganizerNames(t: Tournament): Promise<Record<string, string>> {
+    const uids = t.organizers_uids ?? [];
+    const users = await Promise.all(uids.map(u => getUser(u)));
+    return Object.fromEntries(uids.map((u, i) => [u, users[i]?.name || u.slice(0, 8)]));
+  }
+
   // Standings — pure computation lives in tournament-utils; read engineReady() here
   // so placement recomputes once the WASM engine finishes loading.
   const standings = $derived.by(() => {
@@ -369,12 +378,14 @@ import TournamentModals from "./TournamentModals.svelte";
       if (epoch !== loadEpoch) return; // superseded by a newer run
       if (t) {
         tournament = t;
-        const [, sanctions] = await Promise.all([
+        const [, sanctions, orgNames] = await Promise.all([
           loadPlayerNames(), // self-guarded by playerNamesEpoch
           getTournamentContextSanctions(uid, playerUidsOf(t)),
+          fetchOrganizerNames(t),
         ]);
         if (epoch !== loadEpoch) return;
         tournamentSanctions = sanctions;
+        organizerNames = orgNames;
       } else if (!tournament) {
         // No data in IndexedDB yet — will arrive via SSE
         error = m.tournament_error_not_synced();
@@ -799,6 +810,14 @@ import TournamentModals from "./TournamentModals.svelte";
           <div>
             <div class="text-ink-faint">{m.tournament_info_players()}</div>
             <div class="text-ink-bright">{m.tournament_registered_count({ count: String(tournament.players.length) })}</div>
+          </div>
+          {/if}
+          {#if tournament.organizers_uids?.length}
+          <div>
+            <div class="text-ink-faint">{m.tournament_info_organizers()}</div>
+            <div class="text-ink-bright">
+              {#each tournament.organizers_uids as ouid, i}{#if i > 0}<span>, </span>{/if}<a href="/users/{ouid}" class="text-link hover:text-link-soft">{organizerNames[ouid] || "…"}</a>{/each}
+            </div>
           </div>
           {/if}
         </div>

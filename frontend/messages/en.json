@@ -564,6 +564,7 @@
   "tournament_info_date": "Date",
   "tournament_info_location": "Location",
   "tournament_info_players": "Players",
+  "tournament_info_organizers": "Organizers",
   "tournament_registered_count": "{count} registered",
   "tournament_in_timezone": "in your timezone",
   "tournament_add_to_calendar": "Add to calendar",
