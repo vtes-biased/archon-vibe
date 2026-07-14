@@ -5,7 +5,7 @@
  * It enables identical business logic in browser (offline) and server (online).
  */
 
-import type { DeckObject, Sanction, Tournament, User } from './types';
+import type { DeckObject, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { engineReady, markEngineReady, markEngineLoadFailed } from './stores/engine-ready.svelte';
 import { engineErrorFromThrown } from './error-codes';
@@ -352,6 +352,36 @@ function getEngineSync(): WasmEngine | null {
 function getEngineReactive(): WasmEngine | null {
   engineReady();
   return getEngineSync();
+}
+
+// Judges-Guide penalty tables, owned by engine/src/sanctions.rs.
+export interface SanctionReference {
+  subcategoriesByCategory: Record<SanctionCategory, SanctionSubcategory[]>;
+  baselinePenalties: Record<SanctionSubcategory, SanctionLevel>;
+  escalationSequence: SanctionLevel[];
+}
+
+let sanctionReference: SanctionReference | null = null;
+
+/**
+ * Judges-Guide penalty reference from the engine (sync; null until the
+ * engine is initialized). Static data — parsed once, then cached.
+ */
+export function getSanctionReference(): SanctionReference | null {
+  if (sanctionReference) return sanctionReference;
+  const engine = getEngineReactive();
+  if (!engine) return null;
+  const raw = JSON.parse(callEngine(() => engine.sanctionReference()));
+  sanctionReference = {
+    subcategoriesByCategory: Object.fromEntries(
+      raw.categories.map((c: any) => [c.key, c.subcategories.map((s: any) => s.key)])
+    ) as Record<SanctionCategory, SanctionSubcategory[]>,
+    baselinePenalties: Object.fromEntries(
+      raw.categories.flatMap((c: any) => c.subcategories.map((s: any) => [s.key, s.baseline]))
+    ) as Record<SanctionSubcategory, SanctionLevel>,
+    escalationSequence: raw.escalation,
+  };
+  return sanctionReference;
 }
 
 // Type for user context in permission checks

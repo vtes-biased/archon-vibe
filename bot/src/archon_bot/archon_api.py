@@ -241,6 +241,15 @@ class ArchonAPI:
         """Get user profile via /oauth/userinfo."""
         return await self._request("GET", "/oauth/userinfo", discord_id)
 
+    async def get_sanction_reference(self) -> dict:
+        """Judges-Guide penalty reference (public endpoint, no auth) —
+        engine-owned tables the /sanction UI is built from. Raises on failure;
+        callers surface the error and retry on the next command."""
+        assert self._session
+        async with self._session.get("/sanctions/reference") as resp:
+            resp.raise_for_status()
+            return await resp.json()
+
     async def tournament_action(
         self, discord_id: str, tournament_uid: str, action: str, **kwargs: object
     ) -> ApiResult:

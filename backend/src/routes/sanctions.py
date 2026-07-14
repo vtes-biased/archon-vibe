@@ -45,6 +45,15 @@ _engine = PyEngine()
 MAX_EXPIRY_MONTHS = 18
 
 
+@router.get("/reference")
+async def get_sanction_reference() -> Response:
+    """Judges-Guide penalty reference: categories/subcategories with English
+    labels and baselines, levels, escalation ladder. Public static data owned
+    by the Rust engine (engine/src/sanctions.rs); the Discord bot builds its
+    sanction UI from this instead of hand-copying the tables."""
+    return Response(content=_engine.sanction_reference(), media_type="application/json")
+
+
 async def _can_issue_sanction(
     issuer, level: SanctionLevel, tournament_uid: str | None
 ) -> bool:

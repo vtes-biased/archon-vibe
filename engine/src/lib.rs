@@ -7,6 +7,7 @@ pub mod error;
 pub mod league;
 mod permissions;
 pub mod ratings;
+pub mod sanctions;
 pub mod seating;
 pub mod tournament;
 
@@ -540,6 +541,13 @@ mod wasm {
             js_str(compute_player_issues_json(config_json))
         }
 
+        /// Judges-Guide penalty reference (categories, baselines, levels,
+        /// escalation) — static data owned by engine/src/sanctions.rs.
+        #[wasm_bindgen(js_name = sanctionReference)]
+        pub fn sanction_reference(&self) -> String {
+            crate::sanctions::sanction_reference_json()
+        }
+
         /// Offline sanction management: the device-locked client recomputes
         /// standings from IDB sanctions (mirrors PyEngine.update_standings).
         #[wasm_bindgen(js_name = updateStandings)]
@@ -761,6 +769,12 @@ mod python {
                 tournament_json,
                 sanctions_json,
             ))
+        }
+
+        /// Judges-Guide penalty reference (categories, baselines, levels,
+        /// escalation) — static data owned by engine/src/sanctions.rs.
+        fn sanction_reference(&self) -> String {
+            crate::sanctions::sanction_reference_json()
         }
 
         fn parse_deck(&self, text: &str, cards_json: &str) -> PyResult<String> {

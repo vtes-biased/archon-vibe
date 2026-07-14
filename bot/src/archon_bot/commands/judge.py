@@ -16,87 +16,77 @@ logger = logging.getLogger(__name__)
 
 ORGANIZER_ROLES = config.SANCTION_ROLES
 
-# Sanction categories and subcategories (mirrors VEKN Judges Guide v2)
-CATEGORIES = {
-    "procedural_error": "Procedural Error",
-    "tournament_error": "Tournament Error",
-    "unsportsmanlike_conduct": "Unsportsmanlike Conduct",
-}
+# Judges-Guide tables (categories/subcategories with labels, levels, baselines)
+# come from the backend's public /sanctions/reference endpoint — owned by the
+# Rust engine, never hand-copied here. Fetched once per process.
+_TABLES: dict | None = None
 
-SUBCATEGORIES = {
-    "procedural_error": {
-        "missed_mandatory_effect": "Missed Mandatory Effect",
-        "card_access_error": "Card Access Error",
-        "game_rule_violation": "Game Rule Violation",
-        "failure_to_maintain_game_state": "Failure to Maintain Game State",
-    },
-    "tournament_error": {
-        "illegal_decklist": "Illegal Decklist",
-        "illegal_main_deck_legal_decklist": "Illegal Main Deck (Legal Decklist)",
-        "illegal_main_deck_no_decklist": "Illegal Main Deck (No Decklist)",
-        "outside_assistance": "Outside Assistance",
-        "slow_play": "Slow Play",
-        "limited_procedure_violation": "Limited Procedure Violation",
-        "public_info_miscommunication": "Public Info Miscommunication",
-        "obscuring_game_state": "Obscuring Game State",
-        "marked_cards": "Marked Cards",
-        "insufficient_shuffling": "Insufficient Shuffling",
-    },
-    "unsportsmanlike_conduct": {
-        "minor": "Minor",
-        "major": "Major",
-        "aggressive_behaviour": "Aggressive Behaviour",
-        "bribery_and_wagering": "Bribery and Wagering",
-        "theft_of_tournament_material": "Theft of Tournament Material",
-        "stalling": "Stalling",
-        "cheating": "Cheating",
-        "fraud": "Fraud",
-        "collusion": "Collusion",
-        "health_and_safety_disruption": "Health and Safety Disruption",
-        "rage_quitting": "Rage Quitting",
-        "failure_to_play_to_win": "Failure to Play to Win",
-    },
-}
 
-LEVELS = {
-    "caution": "Caution",
-    "warning": "Warning",
-    "standings_adjustment": "Standings Adjustment",
-    "disqualification": "Disqualification",
-}
-
-# Baseline penalties per subcategory
-BASELINE_PENALTIES = {
-    "missed_mandatory_effect": "caution",
-    "card_access_error": "caution",
-    "game_rule_violation": "caution",
-    "failure_to_maintain_game_state": "standings_adjustment",
-    "illegal_decklist": "warning",
-    "illegal_main_deck_legal_decklist": "standings_adjustment",
-    "illegal_main_deck_no_decklist": "standings_adjustment",
-    "outside_assistance": "standings_adjustment",
-    "slow_play": "caution",
-    "limited_procedure_violation": "caution",
-    "public_info_miscommunication": "warning",
-    "obscuring_game_state": "caution",
-    "marked_cards": "warning",
-    "insufficient_shuffling": "warning",
-    "minor": "warning",
-    "major": "standings_adjustment",
-    "aggressive_behaviour": "disqualification",
-    "bribery_and_wagering": "disqualification",
-    "theft_of_tournament_material": "disqualification",
-    "stalling": "disqualification",
-    "cheating": "disqualification",
-    "fraud": "disqualification",
-    "collusion": "disqualification",
-    "health_and_safety_disruption": "warning",
-    "rage_quitting": "disqualification",
-    "failure_to_play_to_win": "warning",
-}
+async def get_sanction_tables(api: ArchonAPI) -> dict:
+    """Cached penalty tables: categories, subcategories (by category), levels
+    (all key → English label) and baselines (subcategory key → level key)."""
+    global _TABLES
+    if _TABLES is None:
+        ref = await api.get_sanction_reference()
+        _TABLES = {
+            "categories": {c["key"]: c["label"] for c in ref["categories"]},
+            "subcategories": {
+                c["key"]: {s["key"]: s["label"] for s in c["subcategories"]}
+                for c in ref["categories"]
+            },
+            "levels": {lv["key"]: lv["label"] for lv in ref["levels"]},
+            "baselines": {
+                s["key"]: s["baseline"]
+                for c in ref["categories"]
+                for s in c["subcategories"]
+            },
+        }
+    return _TABLES
 
 
 # --- Step 1: Category select ---
+
+
+class _CategorySelect(miru.TextSelect):
+    """Category select; options come from the fetched reference tables."""
+
+    def __init__(self, categories: dict[str, str], **kwargs) -> None:
+        super().__init__(
+            placeholder="Select infraction category...",
+            options=[
+                miru.SelectOption(label=v, value=k) for k, v in categories.items()
+            ],
+            **kwargs,
+        )
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        view: CategorySelectView = self.view  # type: ignore
+        category = self.values[0]
+        tables = view._tables
+
+        # Build subcategory options for the modal
+        subs = tables["subcategories"].get(category, {})
+        sub_options = [miru.SelectOption(label=v, value=k) for k, v in subs.items()]
+
+        next_view = SubcategorySelectView(
+            view._store,
+            view._api,
+            view._tournament_uid,
+            view._target_uid,
+            view._target_display,
+            category,
+            sub_options,
+            tables,
+        )
+        await ctx.edit_response(
+            f"**Sanction for {view._target_display}**\n"
+            f"Category: {tables['categories'][category]}\n"
+            f"Select subcategory:",
+            components=next_view,
+        )
+        miru_client = ctx.client
+        miru_client.start_view(next_view)
+        view.stop()
 
 
 class CategorySelectView(miru.View):
@@ -109,6 +99,7 @@ class CategorySelectView(miru.View):
         tournament_uid: str,
         target_archon_uid: str,
         target_display: str,
+        tables: dict,
     ) -> None:
         super().__init__(timeout=300)
         self._store = store
@@ -116,38 +107,8 @@ class CategorySelectView(miru.View):
         self._tournament_uid = tournament_uid
         self._target_uid = target_archon_uid
         self._target_display = target_display
-
-    @miru.text_select(
-        placeholder="Select infraction category...",
-        options=[miru.SelectOption(label=v, value=k) for k, v in CATEGORIES.items()],
-    )
-    async def category_select(
-        self, ctx: miru.ViewContext, select: miru.TextSelect
-    ) -> None:
-        category = select.values[0]
-
-        # Build subcategory options for the modal
-        subs = SUBCATEGORIES.get(category, {})
-        sub_options = [miru.SelectOption(label=v, value=k) for k, v in subs.items()]
-
-        view = SubcategorySelectView(
-            self._store,
-            self._api,
-            self._tournament_uid,
-            self._target_uid,
-            self._target_display,
-            category,
-            sub_options,
-        )
-        await ctx.edit_response(
-            f"**Sanction for {self._target_display}**\n"
-            f"Category: {CATEGORIES[category]}\n"
-            f"Select subcategory:",
-            components=view,
-        )
-        miru_client = ctx.client
-        miru_client.start_view(view)
-        self.stop()
+        self._tables = tables
+        self.add_item(_CategorySelect(tables["categories"]))
 
 
 # --- Step 2: Subcategory select ---
@@ -162,7 +123,7 @@ class _SubcategorySelect(miru.TextSelect):
     async def callback(self, ctx: miru.ViewContext) -> None:
         view: SubcategorySelectView = self.view  # type: ignore
         subcategory = self.values[0]
-        baseline = BASELINE_PENALTIES.get(subcategory, "")
+        baseline = view._tables["baselines"].get(subcategory, "")
         await _open_level_select(ctx, view, subcategory, baseline)
 
 
@@ -176,6 +137,7 @@ class SubcategorySelectView(miru.View):
         target_display: str,
         category: str,
         sub_options: list,
+        tables: dict,
     ) -> None:
         super().__init__(timeout=300)
         self._store = store
@@ -184,6 +146,7 @@ class SubcategorySelectView(miru.View):
         self._target_uid = target_uid
         self._target_display = target_display
         self._category = category
+        self._tables = tables
         options = sub_options or [miru.SelectOption(label="(none)", value="none")]
         self.add_item(_SubcategorySelect(options))
 
@@ -198,10 +161,10 @@ class SubcategorySelectView(miru.View):
 class _LevelSelect(miru.TextSelect):
     """Penalty-level select; opens the details modal once a level is chosen."""
 
-    def __init__(self, baseline: str, **kwargs) -> None:
+    def __init__(self, baseline: str, levels: dict[str, str], **kwargs) -> None:
         options = [
             miru.SelectOption(label=label, value=value, is_default=(value == baseline))
-            for value, label in LEVELS.items()
+            for value, label in levels.items()
         ]
         super().__init__(
             placeholder="Select penalty level...", options=options, **kwargs
@@ -209,6 +172,7 @@ class _LevelSelect(miru.TextSelect):
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         view: LevelSelectView = self.view  # type: ignore
+        level = self.values[0]
         modal = SanctionDetailsModal(
             view._store,
             view._api,
@@ -217,7 +181,8 @@ class _LevelSelect(miru.TextSelect):
             view._target_display,
             view._category,
             view._subcategory,
-            self.values[0],
+            level,
+            view._tables["levels"].get(level, level),
         )
         await ctx.respond_with_modal(modal)
         view.stop()
@@ -234,6 +199,7 @@ class LevelSelectView(miru.View):
         category: str,
         subcategory: str | None,
         baseline: str,
+        tables: dict,
     ) -> None:
         super().__init__(timeout=300)
         self._store = store
@@ -243,7 +209,8 @@ class LevelSelectView(miru.View):
         self._target_display = target_display
         self._category = category
         self._subcategory = subcategory
-        self.add_item(_LevelSelect(baseline))
+        self._tables = tables
+        self.add_item(_LevelSelect(baseline, tables["levels"]))
 
 
 async def _open_level_select(
@@ -262,6 +229,7 @@ async def _open_level_select(
         prev._category,
         subcategory,
         baseline,
+        prev._tables,
     )
     await ctx.edit_response(
         f"**Sanction for {prev._target_display}**\nSelect penalty level:",
@@ -285,6 +253,7 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
         category: str,
         subcategory: str | None,
         level: str,
+        level_label: str,
     ) -> None:
         super().__init__()
         self._store = store
@@ -295,6 +264,7 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
         self._category = category
         self._subcategory = subcategory
         self._level = level
+        self._level_label = level_label
         # Round only applies to standings adjustments — show the field solely then.
         self._round_input: miru.TextInput | None = None
         if level == "standings_adjustment":
@@ -342,9 +312,8 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
         )
 
         if result.ok:
-            level_label = LEVELS.get(self._level, self._level)
             await ctx.respond(
-                f"**{level_label}** issued to {self._target_display}.",
+                f"**{self._level_label}** issued to {self._target_display}.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
         else:
@@ -408,9 +377,20 @@ class SanctionCommand(
         target_uid = target_tokens["archon_uid"]
         target_display = self.player.username
 
+        try:
+            tables = await get_sanction_tables(api)
+        except Exception:
+            logger.exception("Failed to fetch the sanction reference")
+            await ctx.respond(
+                "Could not load the sanction reference from the backend. "
+                "Try again in a moment.",
+                flags=hikari.MessageFlag.EPHEMERAL,
+            )
+            return
+
         # Show category selection (step 1 of the flow)
         view = CategorySelectView(
-            store, api, tournament_uid, target_uid, target_display
+            store, api, tournament_uid, target_uid, target_display, tables
         )
         await ctx.respond(
             f"**Sanction for {target_display}**\nSelect infraction category:",

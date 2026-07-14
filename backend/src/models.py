@@ -5,11 +5,13 @@ always run the python-to-typescript-models rule to keep TypeScript
 definitions in frontend/src/lib/types.ts synchronized.
 """
 
+import json
 import secrets
 from datetime import datetime
 from enum import StrEnum
 
 import msgspec
+from archon_engine import PyEngine
 
 
 class ObjectType(StrEnum):
@@ -106,73 +108,25 @@ class SanctionSubcategory(StrEnum):
     FAILURE_TO_PLAY_TO_WIN = "failure_to_play_to_win"
 
 
-# Mapping: subcategory → parent category
+# Judges-Guide tables come from the Rust engine (engine/src/sanctions.rs, the
+# single source shared with the frontend WASM build and the bot's reference
+# endpoint). The enum constructors raise at import if the engine data and the
+# enums above drift, so a Judges-Guide revision missed here fails loudly.
+_SANCTION_REFERENCE = json.loads(PyEngine().sanction_reference())
+
+# Mapping: category → subcategories
 SUBCATEGORIES_BY_CATEGORY: dict[SanctionCategory, list[SanctionSubcategory]] = {
-    SanctionCategory.PROCEDURAL_ERROR: [
-        SanctionSubcategory.MISSED_MANDATORY_EFFECT,
-        SanctionSubcategory.CARD_ACCESS_ERROR,
-        SanctionSubcategory.GAME_RULE_VIOLATION,
-        SanctionSubcategory.FAILURE_TO_MAINTAIN_GAME_STATE,
-    ],
-    SanctionCategory.TOURNAMENT_ERROR: [
-        SanctionSubcategory.ILLEGAL_DECKLIST,
-        SanctionSubcategory.ILLEGAL_MAIN_DECK_LEGAL_DECKLIST,
-        SanctionSubcategory.ILLEGAL_MAIN_DECK_NO_DECKLIST,
-        SanctionSubcategory.OUTSIDE_ASSISTANCE,
-        SanctionSubcategory.SLOW_PLAY,
-        SanctionSubcategory.LIMITED_PROCEDURE_VIOLATION,
-        SanctionSubcategory.PUBLIC_INFO_MISCOMMUNICATION,
-        SanctionSubcategory.OBSCURING_GAME_STATE,
-        SanctionSubcategory.MARKED_CARDS,
-        SanctionSubcategory.INSUFFICIENT_SHUFFLING,
-    ],
-    SanctionCategory.UNSPORTSMANLIKE_CONDUCT: [
-        SanctionSubcategory.MINOR,
-        SanctionSubcategory.MAJOR,
-        SanctionSubcategory.AGGRESSIVE_BEHAVIOUR,
-        SanctionSubcategory.BRIBERY_AND_WAGERING,
-        SanctionSubcategory.THEFT_OF_TOURNAMENT_MATERIAL,
-        SanctionSubcategory.STALLING,
-        SanctionSubcategory.CHEATING,
-        SanctionSubcategory.FRAUD,
-        SanctionSubcategory.COLLUSION,
-        SanctionSubcategory.HEALTH_AND_SAFETY_DISRUPTION,
-        SanctionSubcategory.RAGE_QUITTING,
-        SanctionSubcategory.FAILURE_TO_PLAY_TO_WIN,
-    ],
+    SanctionCategory(c["key"]): [
+        SanctionSubcategory(s["key"]) for s in c["subcategories"]
+    ]
+    for c in _SANCTION_REFERENCE["categories"]
 }
 
 # Baseline penalties from Judges Guide v2
 BASELINE_PENALTIES: dict[SanctionSubcategory, SanctionLevel] = {
-    # Procedural Errors (v2 §2)
-    SanctionSubcategory.MISSED_MANDATORY_EFFECT: SanctionLevel.CAUTION,
-    SanctionSubcategory.CARD_ACCESS_ERROR: SanctionLevel.CAUTION,
-    SanctionSubcategory.GAME_RULE_VIOLATION: SanctionLevel.CAUTION,
-    SanctionSubcategory.FAILURE_TO_MAINTAIN_GAME_STATE: SanctionLevel.STANDINGS_ADJUSTMENT,
-    # Tournament Errors (v2 §3)
-    SanctionSubcategory.ILLEGAL_DECKLIST: SanctionLevel.WARNING,
-    SanctionSubcategory.ILLEGAL_MAIN_DECK_LEGAL_DECKLIST: SanctionLevel.STANDINGS_ADJUSTMENT,
-    SanctionSubcategory.ILLEGAL_MAIN_DECK_NO_DECKLIST: SanctionLevel.STANDINGS_ADJUSTMENT,
-    SanctionSubcategory.OUTSIDE_ASSISTANCE: SanctionLevel.STANDINGS_ADJUSTMENT,
-    SanctionSubcategory.SLOW_PLAY: SanctionLevel.CAUTION,
-    SanctionSubcategory.LIMITED_PROCEDURE_VIOLATION: SanctionLevel.CAUTION,
-    SanctionSubcategory.PUBLIC_INFO_MISCOMMUNICATION: SanctionLevel.WARNING,
-    SanctionSubcategory.OBSCURING_GAME_STATE: SanctionLevel.CAUTION,
-    SanctionSubcategory.MARKED_CARDS: SanctionLevel.WARNING,
-    SanctionSubcategory.INSUFFICIENT_SHUFFLING: SanctionLevel.WARNING,
-    # Unsportsmanlike Conduct (v2 §4)
-    SanctionSubcategory.MINOR: SanctionLevel.WARNING,
-    SanctionSubcategory.MAJOR: SanctionLevel.STANDINGS_ADJUSTMENT,
-    SanctionSubcategory.AGGRESSIVE_BEHAVIOUR: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.BRIBERY_AND_WAGERING: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.THEFT_OF_TOURNAMENT_MATERIAL: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.STALLING: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.CHEATING: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.FRAUD: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.COLLUSION: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.HEALTH_AND_SAFETY_DISRUPTION: SanctionLevel.WARNING,
-    SanctionSubcategory.RAGE_QUITTING: SanctionLevel.DISQUALIFICATION,
-    SanctionSubcategory.FAILURE_TO_PLAY_TO_WIN: SanctionLevel.WARNING,
+    SanctionSubcategory(s["key"]): SanctionLevel(s["baseline"])
+    for c in _SANCTION_REFERENCE["categories"]
+    for s in c["subcategories"]
 }
 
 

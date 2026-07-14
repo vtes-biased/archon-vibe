@@ -43,6 +43,9 @@ export type SanctionCategory =
   | "tournament_error"
   | "unsportsmanlike_conduct";
 
+// Category/subcategory vocabulary mirrors engine/src/sanctions.rs, which owns
+// the Judges-Guide tables (grouping, baselines, escalation) — read them at
+// runtime via getSanctionReference() in $lib/engine.
 export type SanctionSubcategory =
   // Procedural Errors
   | "missed_mandatory_effect"
@@ -73,78 +76,6 @@ export type SanctionSubcategory =
   | "health_and_safety_disruption"
   | "rage_quitting"
   | "failure_to_play_to_win";
-
-export const SUBCATEGORIES_BY_CATEGORY: Record<SanctionCategory, SanctionSubcategory[]> = {
-  procedural_error: [
-    "missed_mandatory_effect",
-    "card_access_error",
-    "game_rule_violation",
-    "failure_to_maintain_game_state",
-  ],
-  tournament_error: [
-    "illegal_decklist",
-    "illegal_main_deck_legal_decklist",
-    "illegal_main_deck_no_decklist",
-    "outside_assistance",
-    "slow_play",
-    "limited_procedure_violation",
-    "public_info_miscommunication",
-    "obscuring_game_state",
-    "marked_cards",
-    "insufficient_shuffling",
-  ],
-  unsportsmanlike_conduct: [
-    "minor",
-    "major",
-    "aggressive_behaviour",
-    "bribery_and_wagering",
-    "theft_of_tournament_material",
-    "stalling",
-    "cheating",
-    "fraud",
-    "collusion",
-    "health_and_safety_disruption",
-    "rage_quitting",
-    "failure_to_play_to_win",
-  ],
-};
-
-export const BASELINE_PENALTIES: Record<SanctionSubcategory, SanctionLevel> = {
-  // Procedural Errors (v2 §2)
-  missed_mandatory_effect: "caution",
-  card_access_error: "caution",
-  game_rule_violation: "caution",
-  failure_to_maintain_game_state: "standings_adjustment",
-  // Tournament Errors (v2 §3)
-  illegal_decklist: "warning",
-  illegal_main_deck_legal_decklist: "standings_adjustment",
-  illegal_main_deck_no_decklist: "standings_adjustment",
-  outside_assistance: "standings_adjustment",
-  slow_play: "caution",
-  limited_procedure_violation: "caution",
-  public_info_miscommunication: "warning",
-  obscuring_game_state: "caution",
-  marked_cards: "warning",
-  insufficient_shuffling: "warning",
-  // Unsportsmanlike Conduct (v2 §4)
-  minor: "warning",
-  major: "standings_adjustment",
-  aggressive_behaviour: "disqualification",
-  bribery_and_wagering: "disqualification",
-  theft_of_tournament_material: "disqualification",
-  stalling: "disqualification",
-  cheating: "disqualification",
-  fraud: "disqualification",
-  collusion: "disqualification",
-  health_and_safety_disruption: "warning",
-  rage_quitting: "disqualification",
-  failure_to_play_to_win: "warning",
-};
-
-export const ESCALATION_SEQUENCE: SanctionLevel[] = [
-  "caution", "caution", "warning", "warning",
-  "standings_adjustment", "standings_adjustment", "disqualification",
-];
 
 export interface BaseObject {
   uid: string; // UUID v7

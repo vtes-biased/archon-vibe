@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament, SanctionLevel, SanctionCategory, SanctionSubcategory, Sanction } from "$lib/types";
-  import { SUBCATEGORIES_BY_CATEGORY, BASELINE_PENALTIES, ESCALATION_SEQUENCE } from "$lib/types";
+  import { getSanctionReference } from "$lib/engine";
   import { issueTournamentSanction } from "$lib/sanction-actions";
   import { getPlayerSanctionsInTournament } from "$lib/db";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -41,14 +41,18 @@
     });
   });
 
+  // Judges-Guide tables from the engine (WASM is initialized well before a
+  // judge can open this modal; null only in the engine-failed degraded state).
+  const sanctionRef = getSanctionReference();
+
   // Available subcategories for selected category
   const availableSubcategories = $derived(
-    SUBCATEGORIES_BY_CATEGORY[category] ?? []
+    sanctionRef?.subcategoriesByCategory[category] ?? []
   );
 
   // Reset subcategory when category changes
   $effect(() => {
-    const subs = SUBCATEGORIES_BY_CATEGORY[category];
+    const subs = sanctionRef?.subcategoriesByCategory[category];
     if (subs && subcategory && !subs.includes(subcategory)) {
       subcategory = null;
     }
@@ -56,7 +60,7 @@
 
   // Baseline penalty hint
   const baselinePenalty = $derived(
-    subcategory ? BASELINE_PENALTIES[subcategory] : null
+    subcategory ? (sanctionRef?.baselinePenalties[subcategory] ?? null) : null
   );
 
   // Severity ordering for level comparison
@@ -76,11 +80,12 @@
     subcategory ? activePrior.filter(s => s.subcategory === subcategory).length : 0
   );
   const suggestedLevel = $derived.by<SanctionLevel>(() => {
-    if (!subcategory) return "caution";
+    if (!subcategory || !sanctionRef) return "caution";
+    const ladder = sanctionRef.escalationSequence;
     // A baseline outside the ladder (none today) would give indexOf -1: clamp to 0.
-    const start = Math.max(0, ESCALATION_SEQUENCE.indexOf(BASELINE_PENALTIES[subcategory]));
-    const idx = Math.min(start + sameInfractionCount, ESCALATION_SEQUENCE.length - 1);
-    return ESCALATION_SEQUENCE[idx]!;
+    const start = Math.max(0, ladder.indexOf(sanctionRef.baselinePenalties[subcategory]));
+    const idx = Math.min(start + sameInfractionCount, ladder.length - 1);
+    return ladder[idx]!;
   });
   // Blank-subcategory sanctions are invisible to escalation tracking — flag
   // same-category priors so the judge picks a subcategory instead.

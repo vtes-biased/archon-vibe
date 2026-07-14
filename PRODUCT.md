@@ -168,6 +168,8 @@ Published preliminary standings rank GW > VP > TP using competition ranking with
 - Tournament Errors (3.x): Deck Problems, Outside Assistance, Slow Play, Limited Procedure Violation, Public Info Miscommunication, Obscuring Game State, Marked Cards, Insufficient Shuffling
 - Unsportsmanlike Conduct (4.x): Minor, Major, Aggressive Behaviour, Bribery & Wagering, Theft, Stalling, Cheating, Fraud, Collusion, Health & Safety, Rage-Quitting, Failure to Play to Win
 
+Canonical source (exact keys, labels, baselines, escalation ladder): `engine/src/sanctions.rs`, served live via `GET /sanctions/reference`.
+
 #### VEKN-Wide Sanctions (issued by Ethics Committee)
 
 | Level | Scope | Effect |
