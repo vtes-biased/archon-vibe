@@ -40,6 +40,7 @@ import TournamentModals from "./TournamentModals.svelte";
   import PushOptIn from "./PushOptIn.svelte";
   import AnnouncementComposer from "./AnnouncementComposer.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import RankedBadge from "./RankedBadge.svelte";
   import type { JudgeCallData } from "$lib/sync";
 
   const countries = getCountries();
@@ -684,6 +685,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {#if tournament.rank}
               <span class="text-sm text-ink-muted">· {tournament.rank}</span>
             {/if}
+            <RankedBadge {tournament} />
             {#if tournament.external_ids?.vekn}
               <a href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
                  target="_blank" rel="noopener noreferrer"

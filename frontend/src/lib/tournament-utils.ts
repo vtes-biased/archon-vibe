@@ -299,6 +299,35 @@ export function seatedPlayerCount(tournament: Tournament): number {
   return (tournament.standings ?? []).filter((s) => s.gw || s.vp || s.tp).length;
 }
 
+export type RankedStatus =
+  | { ranked: true }
+  | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" }
+  | null;
+
+/** Ranked/unranked eligibility (VEKN rules 3.1/3.1.6): international ranking
+ *  needs ≥8 players AND a played final; open-rounds / self-organized events are
+ *  the non-VEKN house format, never rated (mirrors their exclusion in backend
+ *  ratings.py). Finished is definitive (players who played, finals-or-winner —
+ *  the winner fallback covers VEKN imports that carry no finals object); live
+ *  events derive optimistically from checked-in players, assuming a final will
+ *  be played. null = indeterminate: registration still open, or the viewer's
+ *  projection lacks the data (anonymous). */
+export function rankedStatus(t: Tournament): RankedStatus {
+  if (t.open_rounds || t.self_organized_rounds) return { ranked: false, reason: "open_rounds" };
+  if (t.state === "Finished") {
+    if (!t.rounds && !t.standings) return null;
+    if (seatedPlayerCount(t) < 8) return { ranked: false, reason: "few_players" };
+    if (!t.finals && !t.winner) return { ranked: false, reason: "no_final" };
+    return { ranked: true };
+  }
+  if (t.state === "Waiting" || t.state === "Playing") {
+    if (!t.players) return null;
+    const checkedIn = t.players.filter((p) => p.state !== "Registered").length;
+    return checkedIn >= 8 ? { ranked: true } : { ranked: false, reason: "few_players" };
+  }
+  return null; // Planned/Registration: too early to call
+}
+
 /** Rating points a Finished tournament awards a standings entry — the single copy.
  *  DQ'd/proxy players earn none (not even the base); the winner gains the +1 GW and
  *  finalist position 1. `playedCount` is seatedPlayerCount(tournament) — the field

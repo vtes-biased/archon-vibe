@@ -76,6 +76,8 @@ metadata:
 | remove (from a role/list — organizer, player) vs delete (permanent object deletion) | retirer (role/list) vs supprimer (object, e.g. banner/deck/tournament) | eliminar (both senses share this verb in es — no split) | remover (role/list) vs excluir (object) | rimuovere/rimuovi (role/list) vs eliminare/elimina (object) |
 | link (a tournament to a league) | lier | vincular | vincular | collegare |
 | event (= tournament, interchangeable in league-linking UI) | événement | evento | evento | evento |
+| ranked/unranked (VEKN rating-eligibility badge — NOT the `tfield_rank` tournament-category sense) | Classé / Non classé | Clasificado / No clasificado | Classificado / Não classificado | Classificato / Non classificato |
+| casual (house format) | décontracté | casual | casual | casual (English loanword) |
 
 § it "register" for organizer-registers-someone-else keeps "iscrivere" even though it.json glosses self-registration and generic "registrato/a" (deceased/status) with "registrare" — don't conflate; the *action* of registering a player for a tournament is always iscrivere/inscrire/inscribir/inscrever, not registrare/registrarse family, across all four Romance locales.
 

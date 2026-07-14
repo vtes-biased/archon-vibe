@@ -8,6 +8,7 @@
   import { Share2, ClipboardCopy, Download, Upload, TriangleAlert } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
+  import RankedBadge from "./RankedBadge.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -105,6 +106,10 @@
       {m.decks_winner_nudge_organizer({ name: seatDisplay(tournament.winner) })}
     </div>
   {/if}
+
+  <!-- Unranked events: state the rule inline so a missing winner/finalist
+       bonus reads as a rule, not a bug -->
+  <RankedBadge {tournament} variant="note" />
 
   <!-- Out-of-sync explanation inline (the header badge's title= is hover-only,
        unreadable on touch — the organizer at the venue is exactly who needs it) -->

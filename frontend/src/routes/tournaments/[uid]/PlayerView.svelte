@@ -9,6 +9,7 @@
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import ScoreLegend from "$lib/components/ScoreLegend.svelte";
+  import RankedBadge from "./RankedBadge.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import Button from '$lib/components/Button.svelte';
   import TimerDisplay from "./TimerDisplay.svelte";
@@ -716,6 +717,9 @@
         <div class="text-xl font-medium text-ink-strong">{seatDisplay(tournament.winner)}</div>
       </div>
     {/if}
+    <!-- Unranked events: state the rule inline (a player's missing winner/
+         finalist bonus must read as a rule, not a bug) -->
+    <RankedBadge {tournament} variant="note" />
     {#if standings.length > 0}
       <div class="bg-surface-muted/50 rounded-lg p-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
