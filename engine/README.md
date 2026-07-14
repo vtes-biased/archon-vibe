@@ -29,7 +29,7 @@ wasm-pack build --no-opt --target web --release --features wasm
 # Output will be in pkg/ directory
 ```
 
-> `wasm-pack` needs the **rustup** toolchain (it has the `wasm32-unknown-unknown` target); a Homebrew `cargo` lacks it. The `just dev` / `just build` recipes already prepend `~/.cargo/bin`, but a standalone `wasm-pack`/`cargo` invocation needs `PATH="$HOME/.cargo/bin:$PATH"`. (The PyO3 `maturin develop` build is fine with either toolchain.)
+> `wasm-pack` needs the **rustup** toolchain (it has the `wasm32-unknown-unknown` target); a Homebrew `cargo` lacks it. The `just dev` recipe already prepends `~/.cargo/bin`, but a standalone `wasm-pack`/`cargo` invocation needs `PATH="$HOME/.cargo/bin:$PATH"`. (The PyO3 `maturin develop` build is fine with either toolchain.)
 
 ### Run Tests
 ```bash

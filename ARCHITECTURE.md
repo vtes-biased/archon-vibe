@@ -356,7 +356,7 @@ The FastAPI route (`main.py`) calls `get_tournament_public_projection(uid)` (typ
 
 `/tournaments/{uid}` is **not** in the `_backend_paths` proxied-prefix list. It is served statically for humans and reaches FastAPI only via the named-location bot proxy — the offline-first SPA is unaffected.
 
-Search engines (Googlebot, Bingbot) are deliberately excluded from the UA list — they render JS and should index the real SPA route. The UA list lives in `frontend/nginx.conf` (Docker/local) and `ansible/roles/static_site/templates/https.conf.j2` (prod) so beta and prod stay in sync. An unlisted crawler gets the generic site-wide card (today's pre-existing behavior), never an error.
+Search engines (Googlebot, Bingbot) are deliberately excluded from the UA list — they render JS and should index the real SPA route. The UA list lives in `ansible/roles/static_site/templates/https.conf.j2`, the single owner — beta and prod render the same template. An unlisted crawler gets the generic site-wide card (today's pre-existing behavior), never an error.
 
 ## User Account Surgery
 

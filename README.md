@@ -113,21 +113,19 @@ just dev-stop
 just              # List all commands
 just test         # Run all tests (engine + backend + frontend)
 just lint         # Lint and auto-fix
-just build        # Production build (Docker images)
 just dev-reset    # Reset dev database
 ```
 
 ### Deployment
 
-In dev, only the **database** runs in Docker (`localhost:5433`); the backend and frontend run natively (`just dev`). For the full containerized stack, `just build` builds the engine and the production images, then `docker compose up -d` runs all three. Each image self-builds the engine — no host artifacts needed (`frontend/Dockerfile` compiles WASM in a `rust:slim` stage; `backend/Dockerfile` runs `maturin build --release`).
+In dev, only the **database** runs in Docker (`localhost:5433`); the backend and frontend run natively (`just dev`). Real deployment is wheels + systemd via Ansible under `ansible/` — there is no Docker production path. The compose backend image self-builds the engine (`backend/Dockerfile` runs `maturin build --release`); the `test` profile services back `just test-e2e`.
 
 | Service | Host port | |
 |---|---|---|
-| frontend | 3000 → 80 | nginx serving the built PWA |
 | backend | 8000 | FastAPI (`DATABASE_URL` → `db:5432`) |
 | db | 5433 → 5432 | PostgreSQL 17, volume `postgres_data` |
 
-This compose file is **not** production-hardened (uvicorn reload, default DB password); real production deployment is handled by Ansible under `ansible/`. If a container port (3000/8000/5433) is already in use, change the mapping in `docker-compose.yml`.
+This compose file is **not** production-hardened (uvicorn reload, default DB password). If a container port (8000/5433) is already in use, change the mapping in `docker-compose.yml`.
 
 ## Configuration
 

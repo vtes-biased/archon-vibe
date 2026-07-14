@@ -122,16 +122,6 @@ test-backend *ARGS='-v':
     if $needs_stop; then docker compose stop db > /dev/null 2>&1; fi
     exit $rc
 
-# Build production (Docker images)
-build:
-    #!/usr/bin/env bash
-    set -e
-    # Force rustup's toolchain (has wasm32) ahead of any Homebrew rust on PATH.
-    export PATH="$HOME/.cargo/bin:$PATH"
-    (cd engine && wasm-pack build --target web --release -- --features wasm)
-    uv run maturin develop --release --manifest-path engine/Cargo.toml
-    docker compose build
-
 # ============================================================================
 # Utility
 # ============================================================================

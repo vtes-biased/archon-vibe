@@ -35,17 +35,6 @@ services:
       timeout: 5s
       retries: 3
 
-  # Frontend Web App
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-
   # ── Test services (profile: test) ────────────────────────────────────
   # Fully isolated from the dev stack: a throwaway tmpfs-backed Postgres and
   # its own backend. `just test-e2e` never starts `db`/`backend` and never
