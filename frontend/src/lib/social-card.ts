@@ -7,6 +7,8 @@ import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
 import { seatDisplay } from "$lib/tournament-utils";
 import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
+import { getLocale } from "$lib/paraglide/runtime.js";
+import * as m from "$lib/paraglide/messages.js";
 
 // Colors from app.css
 const BG = "#1C1A1E";
@@ -86,7 +88,7 @@ function formatDateLine(tournament: Tournament): string {
   const parts: string[] = [];
   if (tournament.start) {
     const d = new Date(tournament.start);
-    parts.push(d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }));
+    parts.push(d.toLocaleDateString(getLocale(), { year: "numeric", month: "long", day: "numeric" }));
   }
   const loc: string[] = [];
   if (tournament.country) {
@@ -208,10 +210,10 @@ export async function generateResultsCard(
 
     ctx.textAlign = "left";
     ctx.fillText("#", colRank, y);
-    ctx.fillText("Player", colName, y);
+    ctx.fillText(m.tournament_col_player(), colName, y);
     ctx.textAlign = "right";
-    ctx.fillText("Score", hasFinals ? colFinals - 20 : colScore, y);
-    if (hasFinals) ctx.fillText("Finals", colScore, y);
+    ctx.fillText(m.tournament_col_score(), hasFinals ? colFinals - 20 : colScore, y);
+    if (hasFinals) ctx.fillText(m.tournament_col_finals(), colScore, y);
     y += 12;
 
     // Header line
@@ -264,7 +266,7 @@ export async function generateResultsCard(
   ctx.textAlign = "left";
   const playerCount = tournament.players?.length ?? 0;
   if (playerCount > 0) {
-    ctx.fillText(`${playerCount} players`, pad, footerY);
+    ctx.fillText(m.players_count({ count: String(playerCount) }), pad, footerY);
   }
   ctx.textAlign = "right";
   ctx.fillText("archon.vekn.net", W - pad, footerY);

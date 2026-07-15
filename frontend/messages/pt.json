@@ -920,6 +920,7 @@
   "share_results_image": "Compartilhar imagem",
   "share_results_text": "Copiar texto",
   "share_results_copied": "Resultados copiados para a área de transferência",
+  "share_text_deck_heading": "Deck de {name}:",
   "share_results_downloaded": "Imagem baixada",
   "share_results_error": "Falha ao compartilhar os resultados",
   "offline_add_new_player": "Adicionar jogador (offline)",

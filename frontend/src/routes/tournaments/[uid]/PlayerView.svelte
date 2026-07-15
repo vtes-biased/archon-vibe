@@ -10,6 +10,7 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import ScoreLegend from "$lib/components/ScoreLegend.svelte";
   import RankedBadge from "./RankedBadge.svelte";
+  import ShareResultsButtons from "./ShareResultsButtons.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import Button from '$lib/components/Button.svelte';
   import TimerDisplay from "./TimerDisplay.svelte";
@@ -743,6 +744,11 @@
         <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
         <ScoreLegend showRtp />
         <div class="overflow-x-auto">
+      <!-- Players are the ones motivated to post their placement: share stays
+           here too, not only on the organizer view (reports stay organizer-only) -->
+      <div class="flex flex-wrap items-center gap-2">
+        <ShareResultsButtons {tournament} {playerInfo} {standings} />
+      </div>
           <table class="w-full text-sm">
             <thead>
               <tr class="text-ink-faint text-xs">

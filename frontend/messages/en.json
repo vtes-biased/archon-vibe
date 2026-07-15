@@ -936,6 +936,7 @@
   "checkin_qr_hide_code": "Hide QR Code",
   "checkin_qr_organizer_hint": "Show this QR code for players to scan and check in",
   "checkin_qr_print": "Print",
+  "share_text_deck_heading": "{name}'s deck:",
   "checkin_qr_scan_instruction": "Scan with your phone camera to check in",
   "nav_help": "Help",
   "profile_settings": "Settings",

@@ -2,13 +2,11 @@
   import type { TournamentEventType } from "$lib/engine";
   import type { Tournament } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { generateResultsCard } from "$lib/social-card";
-  import { generateResultsText } from "$lib/social-text";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { Share2, ClipboardCopy, Download, Upload, TriangleAlert } from "@lucide/svelte";
+  import { Download, Upload, TriangleAlert } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import RankedBadge from "./RankedBadge.svelte";
+  import ShareResultsButtons from "./ShareResultsButtons.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -52,43 +50,7 @@
     a.remove();
   }
 
-  let sharingImage = $state(false);
   let showReopenConfirm = $state(false);
-
-  async function shareImage() {
-    sharingImage = true;
-    try {
-      const blob = await generateResultsCard(tournament, playerInfo, standings);
-      const file = new File([blob], `${tournament.name.replace(/[^a-z0-9]/gi, "_")}.png`, { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] });
-      } else {
-        // Desktop fallback: download
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = file.name;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast({ type: "success", message: m.share_results_downloaded() });
-      }
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return; // user cancelled share sheet
-      showToast({ type: "error", message: m.share_results_error() });
-    } finally {
-      sharingImage = false;
-    }
-  }
-
-  async function copyText() {
-    try {
-      const text = await generateResultsText(tournament, playerInfo, standings);
-      await navigator.clipboard.writeText(text);
-      showToast({ type: "success", message: m.share_results_copied() });
-    } catch {
-      showToast({ type: "error", message: m.share_results_error() });
-    }
-  }
 </script>
 
 <div class="space-y-3">
@@ -124,14 +86,7 @@
        line. Without (empty finished shell): a direct Archon-import button, per #256. -->
   <div class="flex flex-wrap items-center gap-2">
     {#if hasStandings}
-      <Button variant="secondary" size="md" loading={sharingImage} onclick={shareImage}>
-        <Share2 class="w-4 h-4" />
-        {sharingImage ? m.common_loading() : m.share_results_image()}
-      </Button>
-      <Button variant="secondary" size="md" onclick={copyText}>
-        <ClipboardCopy class="w-4 h-4" />
-        {m.share_results_text()}
-      </Button>
+      <ShareResultsButtons {tournament} {playerInfo} {standings} />
       <ActionMenu label={m.common_more()} items={[
         { label: m.decks_download_report_json(), icon: Download, onclick: () => downloadReport("json") },
         { label: m.decks_download_report_text(), icon: Download, onclick: () => downloadReport("text") },

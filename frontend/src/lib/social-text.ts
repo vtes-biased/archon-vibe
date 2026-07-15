@@ -8,6 +8,8 @@ import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
 import { getCards } from "$lib/cards";
 import { getDecksByTournamentGrouped } from "$lib/db";
+import { getLocale } from "$lib/paraglide/runtime.js";
+import * as m from "$lib/paraglide/messages.js";
 
 // Standard TWDA library type ordering (from krcg config, matches DeckDisplay.svelte)
 const LIBRARY_TYPE_ORDER = [
@@ -82,7 +84,7 @@ export async function generateResultsText(
   const parts: string[] = [];
   if (tournament.start) {
     const d = new Date(tournament.start);
-    parts.push(d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }));
+    parts.push(d.toLocaleDateString(getLocale(), { year: "numeric", month: "long", day: "numeric" }));
   }
   if (tournament.country) {
     const c = getCountry(tournament.country);
@@ -97,7 +99,7 @@ export async function generateResultsText(
   if (typeParts.length) lines.push(typeParts.join(" \u00B7 "));
 
   const playerCount = tournament.players?.length ?? 0;
-  if (playerCount > 0) lines.push(`${playerCount} players`);
+  if (playerCount > 0) lines.push(m.players_count({ count: String(playerCount) }));
 
   lines.push("");
 
@@ -106,13 +108,13 @@ export async function generateResultsText(
     const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
     const winnerEntry = standings.find((e) => e.user_uid === tournament.winner);
     const score = winnerEntry ? ` \u2014 ${formatScore(winnerEntry.gw, winnerEntry.vp, winnerEntry.tp)}` : "";
-    lines.push(`\u{1F947} Winner: ${winnerName}${score}`);
+    lines.push(`\u{1F947} ${m.tournament_winner()}: ${winnerName}${score}`);
     lines.push("");
   }
 
   // All standings
   if (standings.length > 0) {
-    lines.push("Standings:");
+    lines.push(`${m.tournament_standings()}:`);
     for (const entry of standings) {
       const name = seatDisplay(entry.user_uid, playerInfo, tournament.online);
       const score = formatScore(entry.gw, entry.vp, entry.tp);
@@ -131,7 +133,9 @@ export async function generateResultsText(
       if (Object.keys(deck.cards).length > 0) {
         const cardsMap = await getCards();
         const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
-        lines.push(`\u{1F0CF} ${winnerName}'s deck:`);
+        // The decklist itself stays in TWDA English convention (card names,
+        // Crypt/Library headers) — only the prose heading is localized.
+        lines.push(`\u{1F0CF} ${m.share_text_deck_heading({ name: winnerName })}`);
         lines.push(...formatDeckText(deck, cardsMap));
       }
     }
