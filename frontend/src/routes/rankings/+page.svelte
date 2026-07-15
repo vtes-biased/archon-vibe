@@ -5,18 +5,23 @@
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import type { User, RatingCategory } from "$lib/types";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
+  import { page as pageStore } from "$app/stores";
+  import { get } from "svelte/store";
   import * as m from '$lib/paraglide/messages.js';
 
   type Tab = RatingCategory | "halloffame";
+  const TAB_VALUES: Tab[] = ["constructed_offline", "constructed_online", "limited_offline", "limited_online", "halloffame"];
 
   // Single exclusion policy: straight suspensions are hidden from every tab; probations stay visible.
   let users = $state<User[]>([]);
   let suspendedUids = $state<Set<string>>(new Set());
   let isSyncing = $state(!syncManager.isSynced);
 
-  // Filters
-  let activeTab = $state<Tab>("constructed_offline");
+  // Filters. Tab is deep-linkable (?tab=halloffame — the guide and the profile
+  // HoF chip land there); switching keeps the URL in sync via replaceState.
+  const urlTab = get(pageStore).url.searchParams.get("tab") as Tab | null;
+  let activeTab = $state<Tab>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : "constructed_offline");
   let selectedCountry = $state<string>("all");
   let page = $state(0);
 
@@ -109,7 +114,7 @@
     <div class="flex flex-wrap gap-y-1 mb-6 bg-surface-card rounded-lg border border-line p-1 w-fit max-w-full">
       {#each tabs as tab}
         <button
-          onclick={() => { activeTab = tab.value; }}
+          onclick={() => { activeTab = tab.value; replaceState(`/rankings?tab=${tab.value}`, {}); }}
           class="px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors {activeTab === tab.value ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
         >
           {tab.labelFn()}
