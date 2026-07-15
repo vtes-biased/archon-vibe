@@ -116,10 +116,12 @@
       {@const currentIdx = states.indexOf(tournament.state)}
       {@const isDone = i < currentIdx}
       {@const isCurrent = i === currentIdx}
-      {#if i > 0}<span class="text-ink-faint">—</span>{/if}
-      <span class="whitespace-nowrap {isDone ? 'text-info' : isCurrent ? 'text-link font-medium' : 'text-ink-faint'}">
-        <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-info' : isCurrent ? 'bg-accent' : 'bg-surface-active'}"></span>
-        <span class="hidden sm:inline">{translateTournamentState(step as TournamentState)}</span>
+      {#if i > 0}<span class="text-ink-faint" aria-hidden="true">—</span>{/if}
+      <!-- Phones: only the current step keeps its visible label; the rest stay
+           sr-only (not display:none) so the lifecycle reads for screen readers -->
+      <span class="whitespace-nowrap {isDone ? 'text-info' : isCurrent ? 'text-link font-medium' : 'text-ink-faint'}" aria-current={isCurrent ? "step" : undefined}>
+        <span class="inline-block w-2 h-2 rounded-full mr-1 align-middle {isDone ? 'bg-info' : isCurrent ? 'bg-accent' : 'bg-surface-active'}" aria-hidden="true"></span>
+        <span class={isCurrent ? "inline" : "sr-only sm:not-sr-only"}>{translateTournamentState(step as TournamentState)}</span>
       </span>
     {/each}
   </div>

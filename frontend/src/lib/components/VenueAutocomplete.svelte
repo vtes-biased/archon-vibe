@@ -10,6 +10,7 @@
         id,
         onselect,
         oninput,
+        countryHint = true,
     }: {
         value?: string;
         country: string;
@@ -17,6 +18,9 @@
         id?: string;
         onselect?: (venue: VenueInfo) => void;
         oninput?: () => void;
+        // Suggestions are country-scoped; the hint explains the empty dropdown.
+        // Off for online events, where no country is expected.
+        countryHint?: boolean;
     } = $props();
 
     let inputValue = $state(value);
@@ -99,6 +103,10 @@
         placeholder={m.tfield_venue_placeholder()}
         class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
     />
+
+    {#if countryHint && !country && !disabled}
+        <p class="text-xs text-ink-faint mt-1">{m.venue_pick_country_hint()}</p>
+    {/if}
 
     {#if showSuggestions && filtered.length > 0}
         <div class="absolute z-10 w-full mt-1 bg-surface-card border border-line-strong rounded shadow-lg max-h-60 overflow-auto">

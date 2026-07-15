@@ -44,6 +44,14 @@
   let isSubmitting = $state(false);
   let error = $state<string | null>(null);
 
+  // Required-path fields still empty — names the reason the create button is
+  // disabled instead of leaving it silently grey.
+  const missingFields = $derived([
+    ...(!values.name.trim() ? [m.tfield_name_label()] : []),
+    ...(!values.start ? [m.tfield_start()] : []),
+    ...(!values.online && !values.country ? [m.common_country()] : []),
+  ]);
+
   // Detect-and-adapt: when the device is offline, creation routes to the local
   // WASM engine and the tournament is born locked to this device (pushed at
   // go-online). No offline-while-online option — actual connectivity decides.
@@ -158,20 +166,25 @@
         </div>
 
         <!-- Actions -->
-        <div class="flex gap-3 justify-end">
-          <a href="/tournaments" class="px-4 py-2 text-sm font-medium text-ink bg-surface-hover hover:bg-surface-active rounded-lg transition-colors">
-            {m.common_cancel()}
-          </a>
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            class="shadow-md"
-            loading={isSubmitting}
-            disabled={!values.name.trim() || !values.start || (!values.online && !values.country)}
-          >
-            {isSubmitting ? m.tournament_new_creating() : m.tournament_new_create_btn()}
-          </Button>
+        <div class="flex flex-col items-end gap-1.5">
+          {#if missingFields.length > 0}
+            <p class="text-xs text-ink-faint">{m.tournament_new_missing_fields({ fields: missingFields.join(", ") })}</p>
+          {/if}
+          <div class="flex gap-3 justify-end">
+            <a href="/tournaments" class="px-4 py-2 text-sm font-medium text-ink bg-surface-hover hover:bg-surface-active rounded-lg transition-colors">
+              {m.common_cancel()}
+            </a>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              class="shadow-md"
+              loading={isSubmitting}
+              disabled={missingFields.length > 0}
+            >
+              {isSubmitting ? m.tournament_new_creating() : m.tournament_new_create_btn()}
+            </Button>
+          </div>
         </div>
       </form>
     {/if}

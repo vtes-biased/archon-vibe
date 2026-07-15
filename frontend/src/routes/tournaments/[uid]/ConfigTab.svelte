@@ -6,7 +6,7 @@
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
-  import { RefreshCw, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import { RefreshCw, Check, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const DISCORD_VENUE = "Official Discord";
@@ -25,6 +25,15 @@
 
   let saving = $state(false);
   let error = $state<string | null>(null);
+  // Transient saved-confirmation for the sticky chip (auto-save has no submit
+  // button, so without it a successful save is silent).
+  let savedFlash = $state(false);
+  let savedTimer: ReturnType<typeof setTimeout> | undefined;
+  function flashSaved() {
+    savedFlash = true;
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => (savedFlash = false), 2000);
+  }
 
   // Re-homed setup sections (foldable, collapsed by default). Initial-value
   // capture is intended: the tab remounts on every switch, so the chip's
@@ -107,6 +116,7 @@
     error = null;
     try {
       tournament = await tournamentAction(tournament.uid, 'UpdateConfig', { config: { [field]: value } });
+      flashSaved();
     } catch (e) {
       error = toUserMessage(e, m.config_error_save());
     } finally {
@@ -120,6 +130,7 @@
     error = null;
     try {
       tournament = await tournamentAction(tournament.uid, 'UpdateConfig', { config: fields });
+      flashSaved();
     } catch (e) {
       error = toUserMessage(e, m.config_error_save());
     } finally {
@@ -283,10 +294,19 @@
       />
     </div>
 
-    {#if saving}
-      <div class="text-xs text-ink-faint flex items-center gap-1">
-        <RefreshCw class="w-3 h-3 animate-spin" />
-        {m.config_saving()}
+    <!-- Sticky save chip: visible wherever the edited field is, not only at the
+         form bottom; confirms success (auto-save has no submit moment) -->
+    {#if saving || savedFlash}
+      <div class="sticky bottom-4 flex justify-end pointer-events-none">
+        <div class="bg-surface-card border border-line rounded-full shadow px-3 py-1.5 text-xs text-ink-muted flex items-center gap-1.5">
+          {#if saving}
+            <RefreshCw class="w-3 h-3 animate-spin" aria-hidden="true" />
+            {m.config_saving()}
+          {:else}
+            <Check class="w-3 h-3 text-info" aria-hidden="true" />
+            {m.config_saved()}
+          {/if}
+        </div>
       </div>
     {/if}
   {/if}

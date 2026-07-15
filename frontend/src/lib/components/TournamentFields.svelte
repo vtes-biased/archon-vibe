@@ -5,7 +5,7 @@
   import { getAllLeagues } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
-  import { Info } from "@lucide/svelte";
+  import { Info, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   export interface TournamentFieldValues {
@@ -79,6 +79,30 @@
     return idPrefix ? `${idPrefix}-${name}` : name;
   }
 
+  // Rare fields live behind disclosures so the required path (Name/Start/
+  // Country/Venue) reads at a glance for a first-time organizer.
+  let visibilityExpanded = $state(false);
+  let advancedExpanded = $state(false);
+
+  // What-players-see helpers: name when the reveal happens, per selected mode.
+  function standingsHelp(mode: string): string {
+    switch (mode) {
+      case "Private": return m.tfield_standings_help_private();
+      case "Cutoff": return m.tfield_standings_help_cutoff();
+      case "Top 10": return m.tfield_standings_help_top10();
+      case "Public": return m.tfield_standings_help_public();
+      default: return "";
+    }
+  }
+  function decklistsHelp(mode: string): string {
+    switch (mode) {
+      case "Winner": return m.tfield_decklists_help_winner();
+      case "Finalists": return m.tfield_decklists_help_finalists();
+      case "All": return m.tfield_decklists_help_all();
+      default: return "";
+    }
+  }
+
   function handleInput(field: string, value: any) {
     (values as any)[field] = value;
     onchange?.(field, value);
@@ -110,6 +134,8 @@
     });
   }
 </script>
+
+<h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.tfield_section_basics()}</h3>
 
 <!-- Name -->
 <div>
@@ -203,6 +229,154 @@
   </div>
 {/if}
 
+<!-- Dates & Timezone -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("start")}>{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
+    <input
+      id={id("start")}
+      type="datetime-local"
+      required
+      value={values.start}
+      disabled={disabled || disabledFields.has("start")}
+      onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.start ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
+    />
+    {#if disabledFields.has("start")}
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+    {/if}
+  </div>
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("finish")}>{m.tfield_finish()}</label>
+    <input
+      id={id("finish")}
+      type="datetime-local"
+      value={values.finish}
+      {disabled}
+      onchange={(e) => handleInput("finish", (e.target as HTMLInputElement).value)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+    />
+  </div>
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("timezone")}>{m.tfield_timezone()}</label>
+    <select
+      id={id("timezone")}
+      value={values.timezone}
+      {disabled}
+      onchange={(e) => handleInput("timezone", (e.target as HTMLSelectElement).value)}
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+    >
+      {#each timezones as tz}
+        <option value={tz}>{tz.replace(/_/g, " ")}</option>
+      {/each}
+    </select>
+  </div>
+</div>
+
+<h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide border-t border-line pt-4">{m.tfield_section_location()}</h3>
+
+<!-- Online toggle -->
+<label class="flex items-center gap-3 cursor-pointer">
+  <input
+    type="checkbox"
+    checked={values.online}
+    {disabled}
+    onchange={(e) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      handleInput("online", checked);
+      if (checked) {
+        handleInput("proxies", false);
+      }
+      if (checked && !values.venue) {
+        handleInput("venue", "VEKN Discord");
+        handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
+      }
+    }}
+    class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+  />
+  <span class="text-sm text-ink-bright">{m.tfield_online()}</span>
+</label>
+
+<!-- Location fields (hidden when online) -->
+{#if !values.online}
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("country")}>{m.common_country()} <span class="text-link text-xs">({m.common_required()})</span></label>
+    <select
+      id={id("country")}
+      required
+      value={values.country}
+      {disabled}
+      onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright {values.country ? 'border-line-strong' : 'border-accent-strong/50'}"
+    >
+      <option value="">{m.tfield_select_country()}</option>
+      {#each Object.entries(countries) as [code, c]}
+        <option value={code}>{c.name} {getCountryFlag(code)}</option>
+      {/each}
+    </select>
+  </div>
+{/if}
+
+<!-- Venue (always shown) -->
+<div>
+  <label class="block text-sm text-ink-muted mb-1" for={id("venue")}>{m.tfield_venue()}</label>
+  <VenueAutocomplete
+    id={id("venue")}
+    bind:value={values.venue}
+    country={values.country}
+    countryHint={!values.online}
+    {disabled}
+    onselect={handleVenueSelect}
+    oninput={() => onchange?.("venue", values.venue)}
+  />
+</div>
+
+<!-- Venue URL (always shown) -->
+<div>
+  <label class="block text-sm text-ink-muted mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
+  <input
+    id={id("venue-url")}
+    type="url"
+    value={values.venue_url}
+    {disabled}
+    oninput={(e) => handleInput("venue_url", (e.target as HTMLInputElement).value)}
+    class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+    placeholder="https://..."
+  />
+</div>
+
+{#if !values.online}
+  <!-- Address -->
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("address")}>{m.tfield_address()}</label>
+    <input
+      id={id("address")}
+      type="text"
+      value={values.address}
+      {disabled}
+      oninput={(e) => handleInput("address", (e.target as HTMLInputElement).value)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+      placeholder={m.tfield_address_placeholder()}
+    />
+  </div>
+
+  <!-- Map URL -->
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
+    <input
+      id={id("map-url")}
+      type="url"
+      value={values.map_url}
+      {disabled}
+      oninput={(e) => handleInput("map_url", (e.target as HTMLInputElement).value)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+      placeholder="https://..."
+    />
+  </div>
+{/if}
+
+<h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide border-t border-line pt-4">{m.tfield_section_rounds()}</h3>
+
 <!-- Rounds: open-rounds opt-in + round count / per-player cap (always shown) -->
 <fieldset class="border-0 p-0 m-0">
   <legend class="sr-only">{m.tfield_round_settings()}</legend>
@@ -293,149 +467,16 @@
   {/if}
 </fieldset>
 
-<!-- Dates & Timezone -->
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("start")}>{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
-    <input
-      id={id("start")}
-      type="datetime-local"
-      required
-      value={values.start}
-      disabled={disabled || disabledFields.has("start")}
-      onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.start ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
-    />
-    {#if disabledFields.has("start")}
-      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
-    {/if}
-  </div>
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("finish")}>{m.tfield_finish()}</label>
-    <input
-      id={id("finish")}
-      type="datetime-local"
-      value={values.finish}
-      {disabled}
-      onchange={(e) => handleInput("finish", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-    />
-  </div>
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("timezone")}>{m.tfield_timezone()}</label>
-    <select
-      id={id("timezone")}
-      value={values.timezone}
-      {disabled}
-      onchange={(e) => handleInput("timezone", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      {#each timezones as tz}
-        <option value={tz}>{tz.replace(/_/g, " ")}</option>
-      {/each}
-    </select>
-  </div>
-</div>
-
-<!-- Online toggle -->
-<label class="flex items-center gap-3 cursor-pointer">
-  <input
-    type="checkbox"
-    checked={values.online}
-    {disabled}
-    onchange={(e) => {
-      const checked = (e.target as HTMLInputElement).checked;
-      handleInput("online", checked);
-      if (checked) {
-        handleInput("proxies", false);
-      }
-      if (checked && !values.venue) {
-        handleInput("venue", "VEKN Discord");
-        handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
-      }
-    }}
-    class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-  />
-  <span class="text-sm text-ink-bright">{m.tfield_online()}</span>
-</label>
-
-<!-- Location fields (hidden when online) -->
-{#if !values.online}
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("country")}>{m.common_country()} <span class="text-link text-xs">({m.common_required()})</span></label>
-    <select
-      id={id("country")}
-      required
-      value={values.country}
-      {disabled}
-      onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright {values.country ? 'border-line-strong' : 'border-accent-strong/50'}"
-    >
-      <option value="">{m.tfield_select_country()}</option>
-      {#each Object.entries(countries) as [code, c]}
-        <option value={code}>{c.name} {getCountryFlag(code)}</option>
-      {/each}
-    </select>
-  </div>
-{/if}
-
-<!-- Venue (always shown) -->
-<div>
-  <label class="block text-sm text-ink-muted mb-1" for={id("venue")}>{m.tfield_venue()}</label>
-  <VenueAutocomplete
-    id={id("venue")}
-    bind:value={values.venue}
-    country={values.country}
-    {disabled}
-    onselect={handleVenueSelect}
-    oninput={() => onchange?.("venue", values.venue)}
-  />
-</div>
-
-<!-- Venue URL (always shown) -->
-<div>
-  <label class="block text-sm text-ink-muted mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
-  <input
-    id={id("venue-url")}
-    type="url"
-    value={values.venue_url}
-    {disabled}
-    oninput={(e) => handleInput("venue_url", (e.target as HTMLInputElement).value)}
-    class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-    placeholder="https://..."
-  />
-</div>
-
-{#if !values.online}
-  <!-- Address -->
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("address")}>{m.tfield_address()}</label>
-    <input
-      id={id("address")}
-      type="text"
-      value={values.address}
-      {disabled}
-      oninput={(e) => handleInput("address", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-      placeholder={m.tfield_address_placeholder()}
-    />
-  </div>
-
-  <!-- Map URL -->
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
-    <input
-      id={id("map-url")}
-      type="url"
-      value={values.map_url}
-      {disabled}
-      oninput={(e) => handleInput("map_url", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-      placeholder="https://..."
-    />
-  </div>
-{/if}
-
+<!-- Rare fields behind disclosures: the required path stays scannable -->
+<div class="bg-surface-muted/30 rounded-lg p-4">
+  <button type="button" onclick={() => visibilityExpanded = !visibilityExpanded}
+    aria-expanded={visibilityExpanded}
+    class="flex items-center gap-2 py-1 text-sm font-medium text-ink w-full text-left">
+    {#if visibilityExpanded}<ChevronDown class="w-4 h-4" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4" aria-hidden="true" />{/if}
+    {m.tfield_section_visibility()}
+  </button>
+  {#if visibilityExpanded}
+    <div class="mt-3 space-y-4">
 <!-- Standings & Decklists -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
   <div>
@@ -452,6 +493,7 @@
       <option value="Top 10">{m.tournament_standings_top10()}</option>
       <option value="Public">{m.tournament_standings_public()}</option>
     </select>
+    <p class="text-xs text-ink-faint mt-1">{standingsHelp(values.standings_mode)}</p>
   </div>
   <div>
     <label class="block text-sm text-ink-muted mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
@@ -466,9 +508,22 @@
       <option value="Finalists">{m.tfield_decklists_finalists()}</option>
       <option value="All">{m.tfield_decklists_all()}</option>
     </select>
+    <p class="text-xs text-ink-faint mt-1">{decklistsHelp(values.decklists_mode)}</p>
   </div>
 </div>
+    </div>
+  {/if}
+</div>
 
+<div class="bg-surface-muted/30 rounded-lg p-4">
+  <button type="button" onclick={() => advancedExpanded = !advancedExpanded}
+    aria-expanded={advancedExpanded}
+    class="flex items-center gap-2 py-1 text-sm font-medium text-ink w-full text-left">
+    {#if advancedExpanded}<ChevronDown class="w-4 h-4" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4" aria-hidden="true" />{/if}
+    {m.tfield_section_advanced()}
+  </button>
+  {#if advancedExpanded}
+    <div class="mt-3 space-y-4">
 <!-- Boolean toggles -->
 <div class="space-y-3">
   <!-- Championships forbid proxies/multideck (VEKN rules, engine-enforced):
@@ -552,6 +607,9 @@
       </select>
     </div>
   </div>
+</div>
+    </div>
+  {/if}
 </div>
 
 <!-- Description -->
