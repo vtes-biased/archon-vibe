@@ -36,6 +36,8 @@ Each function SSE-broadcasts the updated object after saving so clients reflect 
 
 Results that did not originate in-app must never be re-uploaded. The `rounds` guard excludes round-less VEKN imports (an import has summary results only — no per-round detail — and re-pushing the source of record is pointless); rich ETL/archon-merged history has rounds, so both importers also stamp `vekn_pushed_at` on every finished tournament they write (old archon already pushed those results).
 
+A successful results push here also retries the TWDA submission for events that missed it at finish time (finished offline, or whose VEKN event id only just arrived via this same batch) — see ARCHITECTURE.md § TWDA Outbound for the full trigger list.
+
 ### Outage resilience
 
 The app keeps working through hours/days of vekn.net downtime and self-heals on recovery (local saves + SSE broadcast always precede the push; the next hourly `batch_push` drains the backlog). Hardening on top of that:

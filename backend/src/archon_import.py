@@ -515,9 +515,9 @@ async def apply_archon_import(
 
     # TWDA + VEKN push
     try:
-        from .routes.tournaments import _maybe_push_vekn, _maybe_submit_twda
+        from .routes.tournaments import _maybe_push_vekn, maybe_submit_twda
 
-        await _maybe_submit_twda(tournament)
+        await maybe_submit_twda(tournament)
         await _maybe_push_vekn(tournament)
     except Exception:
         logger.exception(f"Error in post-import effects for {tournament_uid}")

@@ -1,11 +1,11 @@
 ---
 name: trap-twda-participation-floor
-description: TWDA auto-submit has a seated-player floor (TWDA_MIN_PLAYERS); any test fixture on the TWDA path must seat >= that many DISTINCT players or _maybe_submit_twda silently no-ops.
+description: TWDA auto-submit has a seated-player floor (TWDA_MIN_PLAYERS); any test fixture on the TWDA path must seat >= that many DISTINCT players or maybe_submit_twda silently no-ops.
 metadata:
   type: project
 ---
 
-`_maybe_submit_twda` (backend/src/routes/tournaments.py) gates on
+`maybe_submit_twda` (backend/src/routes/tournaments.py) gates on
 `_played_player_count(tournament) >= TWDA_MIN_PLAYERS` — DISTINCT players seated
 across `tournament.rounds[*][*].seating` + `tournament.finals.seating`
 (participation, NOT the registered roster).
@@ -22,14 +22,14 @@ tables (9 = [5,4], 10 = [5,5]).
 Callers of the gate: finish-tournament route, `push_vekn` endpoint,
 `archon_import` — all share this single floor. See [[project_archon_merge]].
 
-**Refactor (2026-07, twda_status feature):** `_maybe_submit_twda` no longer
+**Refactor (2026-07, twda_status feature):** `maybe_submit_twda` no longer
 early-returns per skip reason — it now computes an `outcome` tuple
 (`TwdaOutcome`, reason_code, pr_url) through an if/elif chain and always calls
 `_record_twda_status(uid, *outcome)` at the end (locked fetch-modify-save that
 writes `Tournament.twda_status`, broadcast over SSE, organizer-only projection).
 Three test-infra consequences for anything on this path:
   1. Patch `src.twda.is_configured` (-> `True`) AND `src.twda.submit_twda_pr` —
-     NOT `src.routes.tournaments.*`. `_maybe_submit_twda` does a *local*
+     NOT `src.routes.tournaments.*`. `maybe_submit_twda` does a *local*
      `from ..twda import is_configured, submit_twda_pr` at call time, so the
      effective patch target is the `src.twda` module attribute.
   2. Patch `src.routes.tournaments._record_twda_status` with an `AsyncMock` in

@@ -10,13 +10,13 @@ routes write them) must be re-pulled from the locked server row on the offline
 write-back paths, or a stale client snapshot reverts them on go-online.
 
 The canonical set today: `banner_path`, `external_ids`, `checkin_code`,
-`vekn_pushed_at`, `vekn_results_stale` — re-pulled in `routes/tournaments.py`
-`go_online` right before `msgspec.convert(tournament_data, Tournament)` (the block
-commented "Server wins for non-engine fields"). `twda_status` (organizer TWDA
-transparency) is the SAME class but was NOT added there — reachable revert:
-online-finished tournament records twda_status, gets taken offline on a device whose
-cached snapshot predates the record, comes back online → server value blanked;
-go-online does NOT re-run `_maybe_submit_twda`, so it does not self-heal.
+`vekn_pushed_at`, `vekn_results_stale`, `twda_status` — re-pulled in
+`routes/tournaments.py` `go_online` right before
+`msgspec.convert(tournament_data, Tournament)` (the block commented "Server wins
+for non-engine fields"). `twda_status` was initially missed exactly this way
+(review caught it): the reachable revert was an online-finished tournament
+recording twda_status, taken offline on a device whose cached snapshot predates
+the record, coming back online → server value blanked.
 
 Two offline write paths reconstruct the tournament from the CLIENT snapshot via
 `msgspec.convert(..., Tournament)`:

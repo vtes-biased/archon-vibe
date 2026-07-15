@@ -555,7 +555,7 @@ class TwdaOutcome(StrEnum):
 
 class TwdaStatus(msgspec.Struct, kw_only=True):
     """Last TWDA auto-submission outcome — organizer-facing transparency for
-    the otherwise fire-and-forget PR flow (routes/tournaments._maybe_submit_twda)."""
+    the otherwise fire-and-forget PR flow (routes/tournaments.maybe_submit_twda)."""
 
     outcome: TwdaOutcome
     reason: str = ""  # skip reason code, mapped to i18n frontend-side

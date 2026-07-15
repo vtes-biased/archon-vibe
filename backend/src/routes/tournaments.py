@@ -292,7 +292,7 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
 async def _winner_deck_twda(tournament: Tournament) -> str | None:
     """TWDA-formatted winner decklist — self-contained (event header + deck in TWD
     layout), ready to paste into the TWDA. None if the winner has no stored deck.
-    Shared by the auto-TWDA PR (_maybe_submit_twda) and the text report download."""
+    Shared by the auto-TWDA PR (maybe_submit_twda) and the text report download."""
     if not tournament.winner:
         return None
 
@@ -394,7 +394,7 @@ async def _record_twda_status(
     broadcast_precomputed(bd)
 
 
-async def _maybe_submit_twda(tournament: Tournament) -> None:
+async def maybe_submit_twda(tournament: Tournament) -> None:
     """Submit winner's deck to TWDA if conditions are met, and record the
     outcome — submitted (PR URL) / skipped (reason) / failed — on the
     tournament for organizer transparency. Self-contains its errors.
@@ -590,8 +590,7 @@ async def push_vekn(
 
     Registers the calendar event if needed; for a FINISHED event it also uploads
     results (once) and submits the winner's deck to the TWDA. Lets an organizer
-    publish immediately instead of waiting for the hourly batch_push (which never
-    retries the TWDA submission, so a same-session event could otherwise miss it).
+    publish immediately instead of waiting for the next hourly batch_push.
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -654,7 +653,7 @@ async def push_vekn(
                             ),
                         )
                     tournament = await get_tournament_by_uid(uid) or tournament
-                await _maybe_submit_twda(tournament)
+                await maybe_submit_twda(tournament)
     except VEKNAPIConnectionError as e:
         raise HTTPException(
             status_code=502, detail="VEKN API is unavailable, try again later"
@@ -1673,7 +1672,7 @@ async def tournament_action(
     # in the background — the response must not wait on vekn.net (30-120s
     # timeouts when it is down); batch_push retries.
     if is_finished and not was_finished:
-        await _maybe_submit_twda(updated)
+        await maybe_submit_twda(updated)
         asyncio.create_task(_maybe_push_vekn(updated))
     elif (
         is_finished
@@ -1687,8 +1686,8 @@ async def tournament_action(
         # only — players are deck-locked post-finish). Re-submit so the
         # idempotent TWDA PR (branch/file keyed on the vekn event id) picks up
         # the change, e.g. an added strategy writeup. Background: the deck save
-        # already committed and _maybe_submit_twda self-contains its errors.
-        asyncio.create_task(_maybe_submit_twda(updated))
+        # already committed and maybe_submit_twda self-contains its errors.
+        asyncio.create_task(maybe_submit_twda(updated))
 
     return Response(
         content=encoder.encode(updated),
@@ -2658,6 +2657,10 @@ async def go_online(
                 broadcast_precomputed(bd)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
+        # Mirror the finish action for an event finished offline: attempt/record
+        # the TWDA submission. Usually skips on no_vekn_event here; batch_push
+        # retries after it creates the event and pushes results.
+        asyncio.create_task(maybe_submit_twda(updated))
 
     # Outcome summary closes the loop the go-offline modal opens: each created
     # account is a real coopted VEKN member the organizer should know about.

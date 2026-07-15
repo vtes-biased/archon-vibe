@@ -26,7 +26,7 @@ from src.models import (
     TwdaOutcome,
     User,
 )
-from src.routes.tournaments import TWDA_MIN_PLAYERS, _maybe_submit_twda
+from src.routes.tournaments import TWDA_MIN_PLAYERS, maybe_submit_twda
 
 
 def _user(uid: str, name: str, vekn_id: str = "") -> User:
@@ -84,7 +84,7 @@ def _deck(*, author: str, attribution: str | None) -> DeckObject:
 async def _captured_credit(
     *, winner: User, deck: DeckObject, designer: User | None
 ) -> str:
-    """Run _maybe_submit_twda with mocked deps; return the `author` (credit)
+    """Run maybe_submit_twda with mocked deps; return the `author` (credit)
     that was serialized into the deck_json passed to engine.export_twda."""
     tournament = _tournament(winner.uid)
     engine = MagicMock()
@@ -109,7 +109,7 @@ async def _captured_credit(
         patch("src.twda.submit_twda_pr", AsyncMock(return_value="http://pr")),
         patch("src.routes.tournaments._record_twda_status", AsyncMock()),
     ):
-        await _maybe_submit_twda(tournament)
+        await maybe_submit_twda(tournament)
 
     engine.export_twda.assert_called_once()
     deck_json = engine.export_twda.call_args.args[0]
@@ -185,7 +185,7 @@ async def test_below_participation_floor_skips_twda():
         patch("src.twda.submit_twda_pr", submit),
         patch("src.routes.tournaments._record_twda_status", record),
     ):
-        await _maybe_submit_twda(tournament)
+        await maybe_submit_twda(tournament)
     submit.assert_not_called()
     # The skip is not silent anymore: the reason lands on the tournament.
     record.assert_called_once_with("t-001", TwdaOutcome.SKIPPED, "too_few_players", "")

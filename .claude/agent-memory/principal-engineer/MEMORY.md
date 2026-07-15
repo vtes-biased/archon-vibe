@@ -41,6 +41,9 @@
 - Visibility: `public` column always NULL for decks; `member` non-NULL only when `deck.public == True`; `full` always present. Own decks + organizer's tournament decks sent at full via personal/organizer overlay. NC/Prince same-country get NO deck access.
 - Dedup is consistent across stack: `saveDeck()` (db.ts) and `_process_deck_ops()` upsert both key on `(tournament_uid, user_uid, round)`.
 
+## Recurring trap: lazy-import renames
+- [Lazy-import rename trap](lazy-import-rename-trap.md) — renaming a symbol can silently break function-level (lazy) import callers (used across routes.tournaments/vekn_push/archon_import to break cycles); invisible to module-load AND a green test suite, and swallowed by try/except post-effect blocks. Grep ALL refs incl. in-function imports.
+
 ## Recurring trap: manual object reconstruction
 - Several call sites hand-rebuild a `Sanction(...)` / `User(...)` from fields (sanction cleanup in `main.py`, sanctions delete endpoint, merge/detach in `db.py`). When a model gains a field, grep ALL manual constructors — prefer `msgspec.structs.replace` over hand-listing fields (hand-listing silently drops new fields, e.g. `resync_after`).
 - Two from-scratch `User(...)` rebuilds of an EXISTING user silently drop unlisted fields on a routine path: `vekn_sync.py` `_infer_coopted_by` prefix branch (nightly job — already drops `city_geoname_id`/`phone_is_whatsapp`/`community_links`/ratings; github_login/github_id were the latest victims) and the `accounts.py` `detach_user_from_vekn` `vekn_record` *null-list* (the inverse trap: a NEW personal/login field must be ADDED to the null-list or it leaks onto the abandoned VEKN record for the next claimant — github_login/github_id were missed there). All other `User(...)` sites are fresh-uid creates (nothing to drop).

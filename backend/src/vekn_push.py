@@ -10,6 +10,7 @@ from .broadcast import broadcast_precomputed
 from .db import (
     get_connection,
     get_sanctions_for_tournament,
+    get_tournament_by_uid,
     get_user_by_uid,
     save_tournament,
     save_user,
@@ -482,6 +483,16 @@ async def batch_push(client: VEKNAPIClient) -> dict:
             try:
                 if await push_tournament_results(client, t):
                     stats["results_pushed"] += 1
+                    # First-push TWDA trigger: events finished offline (or whose
+                    # VEKN id only just got created above) never saw the
+                    # finish-time submission — retry now that external_ids.vekn
+                    # and results exist. Re-fetch: the push just rewrote the row.
+                    # Late import — routes.tournaments imports this module.
+                    from .routes.tournaments import maybe_submit_twda
+
+                    fresh = await get_tournament_by_uid(t.uid)
+                    if fresh:
+                        await maybe_submit_twda(fresh)
             except VEKNAPIConnectionError:
                 raise
             except Exception:
