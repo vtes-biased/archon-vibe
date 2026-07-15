@@ -5,6 +5,7 @@
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
   import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
+  import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
@@ -364,8 +365,9 @@
       </div>
     </div>
 
-    <!-- Calendar Subscribe -->
-    {#if auth.isAuthenticated}
+    <!-- Calendar Subscribe — hidden offline: token generation is an API call
+         and webcal makes the OS calendar fetch the feed immediately -->
+    {#if auth.isAuthenticated && isBrowserOnline()}
       <div class="flex items-center gap-2 flex-wrap mb-6 px-1">
         <Calendar class="h-4 w-4 text-ink-faint shrink-0" />
         <span class="text-xs text-ink-faint">{m.tournaments_calendar_subscribe()}:</span>

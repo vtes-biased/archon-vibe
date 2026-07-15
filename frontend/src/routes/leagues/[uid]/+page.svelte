@@ -7,6 +7,7 @@
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { canEditLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
@@ -548,12 +549,15 @@
                 {m.league_add_event()}
               </Button>
             {/if}
-            <!-- Per-league .ics feed: subscribers get this league's events only -->
-            <a href={leagueWebcalUrl}
-               class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
-              <Calendar class="h-3 w-3" aria-hidden="true" />
-              {m.league_calendar_subscribe()}
-            </a>
+            <!-- Per-league .ics feed: subscribers get this league's events only.
+                 Hidden offline — webcal makes the OS calendar fetch immediately. -->
+            {#if isBrowserOnline()}
+              <a href={leagueWebcalUrl}
+                 class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+                <Calendar class="h-3 w-3" aria-hidden="true" />
+                {m.league_calendar_subscribe()}
+              </a>
+            {/if}
           </div>
         </div>
         {#if addEventOpen}

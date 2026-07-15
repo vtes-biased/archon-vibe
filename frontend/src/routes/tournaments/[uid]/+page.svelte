@@ -14,6 +14,7 @@
   import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
+  import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, UserPlus, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2, CalendarPlus } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
@@ -771,7 +772,8 @@ import TournamentModals from "./TournamentModals.svelte";
             {#if formatDateLocal(tournament.start)}
               <div class="text-xs text-ink-faint">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
             {/if}
-            {#if tournament.start && tournament.state !== "Finished"}
+            <!-- Server-generated download — hidden offline (dead link otherwise) -->
+            {#if tournament.start && tournament.state !== "Finished" && isBrowserOnline()}
               <a href="{API_BASE}/api/calendar/tournaments/{uid}.ics" download
                  class="text-xs text-link hover:text-link-soft inline-flex items-center gap-1 mt-1">
                 <CalendarPlus class="w-3 h-3" aria-hidden="true" />
