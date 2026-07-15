@@ -12,8 +12,9 @@
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
-  import { User, TriangleAlert } from "@lucide/svelte";
+  import { User, TriangleAlert, Trophy } from "@lucide/svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
+  import PlayerRatings from "$lib/components/PlayerRatings.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -244,6 +245,20 @@
           onClaimVekn={() => (showClaimModal = true)}
         />
         {/key}
+        <!-- Own ratings + HoF: the what-did-this-event-do-to-my-number path
+             used to dead-end (PlayerRatings only mounted on public /users/[uid]) -->
+        <div class="p-6 border-t border-line space-y-4">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.user_detail_ratings()}</h3>
+            {#if (user.wins?.length ?? 0) >= 5}
+              <a href="/rankings" class="px-2 py-0.5 rounded text-xs font-medium badge-highlight inline-flex items-center gap-1 hover:opacity-80 transition-opacity">
+                <Trophy class="w-3 h-3" aria-hidden="true" />
+                {m.profile_hof_member({ wins: String(user.wins?.length ?? 0) })}
+              </a>
+            {/if}
+          </div>
+          <PlayerRatings {user} showHeading={false} />
+        </div>
         <LinkedAccounts
           {hasEmail}
           {emailIdentifier}

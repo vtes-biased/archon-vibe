@@ -741,7 +741,7 @@
     {#if standings.length > 0}
       <div class="bg-surface-muted/50 rounded-lg p-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
-        <ScoreLegend />
+        <ScoreLegend showRtp />
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>

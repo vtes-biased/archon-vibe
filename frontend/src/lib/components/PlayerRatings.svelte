@@ -1,9 +1,11 @@
 <script lang="ts">
   import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
   import { ChevronDown, Crown, Medal } from "@lucide/svelte";
+  import { getLocale } from '$lib/paraglide/runtime.js';
   import * as m from '$lib/paraglide/messages.js';
 
-  let { user }: { user: User | undefined } = $props();
+  // showHeading=false when the parent supplies its own section header (profile).
+  let { user, showHeading = true }: { user: User | undefined; showHeading?: boolean } = $props();
 
   let expandedCategories = $state<Set<RatingCategory>>(new Set());
 
@@ -39,10 +41,19 @@
     else next.add(cat);
     expandedCategories = next;
   }
+
+  // Rating entries age out of the ranking 18 months after the event.
+  function expiryMonth(date: string): string {
+    const d = new Date(date);
+    d.setMonth(d.getMonth() + 18);
+    return d.toLocaleDateString(getLocale(), { year: "numeric", month: "short" });
+  }
 </script>
 
 {#if availableCategories.length > 0}
-  <h2 class="text-lg font-semibold text-ink-bright mb-3">{m.user_detail_ratings()}</h2>
+  {#if showHeading}
+    <h2 class="text-lg font-semibold text-ink-bright mb-3">{m.user_detail_ratings()}</h2>
+  {/if}
   <div class="space-y-2">
     {#each availableCategories as cat}
       {@const catRating = user?.[cat] as CategoryRating}
@@ -87,6 +98,7 @@
                         {/if}
                       </a>
                       <span class="text-xs text-ink-faint ml-1">{entry.date}</span>
+                      <span class="text-xs text-ink-faint ml-1">· {m.user_detail_expires({ date: expiryMonth(entry.date) })}</span>
                       {#if entry.finalist_position === 1}
                         <Crown class="w-3 h-3 inline text-highlight ml-1" />
                       {:else if entry.finalist_position === 2}
