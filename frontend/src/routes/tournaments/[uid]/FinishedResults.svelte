@@ -25,7 +25,7 @@
     playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     winnerHasDeck?: boolean;
-    doAction?: (action: TournamentEventType, body?: any) => Promise<void>;
+    doAction?: (action: TournamentEventType, body?: any) => Promise<string | null>;
     actionLoading?: boolean;
     onImportArchon?: () => void;
   } = $props();

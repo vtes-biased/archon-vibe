@@ -54,7 +54,7 @@
     actionLoading: boolean;
     scoreSaving: number | null;
     scoreSavingSeat: string | null;
-    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any, opts?: { silent?: boolean }) => Promise<string | null>;
     dropPlayer: (uid: string) => Promise<void>;
     setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
     setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
@@ -121,9 +121,12 @@
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
 
+  let selfOrganizeError = $state<string | null>(null);
   async function submitSelfOrganize(picked: string[]) {
-    await doAction("SelfOrganizeRound", { player_uids: [userUid, ...picked] });
-    showSelfOrganize = false;
+    // On failure keep the dialog open with the error inline — the page banner
+    // is at the top, likely scrolled out of view.
+    selfOrganizeError = await doAction("SelfOrganizeRound", { player_uids: [userUid, ...picked] }, { silent: true });
+    if (!selfOrganizeError) showSelfOrganize = false;
   }
 
   // Deck check-in CTA: distinguish "no deck" from "deck present but invalid",
@@ -671,8 +674,9 @@
       selfName={seatDisplay(userUid)}
       candidates={selfOrganizeCandidates}
       submitting={actionLoading}
+      error={selfOrganizeError}
       onSubmit={submitSelfOrganize}
-      onClose={() => showSelfOrganize = false}
+      onClose={() => { showSelfOrganize = false; selfOrganizeError = null; }}
     />
   {/if}
 
@@ -740,15 +744,15 @@
          finalist bonus must read as a rule, not a bug) -->
     <RankedBadge {tournament} variant="note" />
     {#if standings.length > 0}
-      <div class="bg-surface-muted/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
-        <ScoreLegend showRtp />
-        <div class="overflow-x-auto">
       <!-- Players are the ones motivated to post their placement: share stays
            here too, not only on the organizer view (reports stay organizer-only) -->
       <div class="flex flex-wrap items-center gap-2">
         <ShareResultsButtons {tournament} {playerInfo} {standings} />
       </div>
+      <div class="bg-surface-muted/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
+        <ScoreLegend showRtp />
+        <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-ink-faint text-xs">

@@ -399,15 +399,22 @@ import TournamentModals from "./TournamentModals.svelte";
     }
   }
 
-  async function doAction(action: TournamentEventType, data?: Record<string, unknown>) {
+  // Returns the user-facing error message on failure (null on success) so a
+  // caller with its own inline surface (e.g. the self-organize dialog) can show
+  // it in place; `silent` skips the top-of-page banner, which is likely
+  // scrolled out of view from where the action was triggered.
+  async function doAction(action: TournamentEventType, data?: Record<string, unknown>, opts?: { silent?: boolean }): Promise<string | null> {
     actionLoading = true;
     try {
       tournament = await tournamentAction(uid, action, data);
       await loadPlayerNames();
       if (action === 'StartRound') activeTab = 'rounds';
       else if (action === 'StartFinals') activeTab = 'finals';
+      return null;
     } catch (e) {
-      error = toUserMessage(e, m.tournament_error_action());
+      const msg = toUserMessage(e, m.tournament_error_action());
+      if (!opts?.silent) error = msg;
+      return msg;
     } finally {
       actionLoading = false;
     }

@@ -30,7 +30,7 @@
     playerInfo: PlayerInfoMap;
     decksByUser: Record<string, DeckObject[]>;
     actionLoading: boolean;
-    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     syncVeknItem: MenuItem | null;
     archonImportItem: MenuItem;
     csvImportItem: MenuItem;
@@ -171,12 +171,12 @@
 
     {:else if tournament.state === "Waiting"}
       {#if finalsReady}
-        <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
-        <Button variant="secondary" size="md" disabled={actionLoading || checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+        <Button variant="primary" size="lg" loading={actionLoading} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
+        <Button variant="secondary" size="md" loading={actionLoading} disabled={checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
       {:else}
-        <Button variant="primary" size="lg" disabled={actionLoading || checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+        <Button variant="primary" size="lg" loading={actionLoading} disabled={checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
         {#if hasFinalsCandidate}
-          <Button variant="secondary" size="md" disabled={actionLoading || !finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
+          <Button variant="secondary" size="md" loading={actionLoading} disabled={!finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
         {/if}
       {/if}
       <!-- In-person first check-in: surface the QR directly (players self-check-in by scanning) instead of burying it in More -->
@@ -204,18 +204,18 @@
 
     {:else if tournament.state === "Playing"}
       {#if isFinals}
-        <Button variant="primary" size="lg" disabled={actionLoading || !finalsTableFinished} onclick={() => doAction("FinishFinals")}>{m.finals_finish()}</Button>
+        <Button variant="primary" size="lg" loading={actionLoading} disabled={!finalsTableFinished} onclick={() => doAction("FinishFinals")}>{m.finals_finish()}</Button>
         <!-- Revert finals seating (e.g. a finalist no-showed): back to Waiting to drop them and re-seat. -->
         <Button variant="ghost" size="md" disabled={actionLoading} onclick={() => doAction("CancelFinals")}><Undo2 class="w-4 h-4" aria-hidden="true" />{m.finals_cancel()}</Button>
       {:else if !hasParallelRounds}
-        <Button variant="primary" size="lg" disabled={actionLoading || !allTablesFinished} onclick={() => doAction("FinishRound", { round: activeRoundIdx })}>{m.rounds_end_round()}</Button>
+        <Button variant="primary" size="lg" loading={actionLoading} disabled={!allTablesFinished} onclick={() => doAction("FinishRound", { round: activeRoundIdx })}>{m.rounds_end_round()}</Button>
         {#if tournament.online}
           {@const canStartNext = (checkedInCount + playingCount) >= 4}
-          <Button variant="secondary" size="md" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+          <Button variant="secondary" size="md" loading={actionLoading} disabled={!canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
         {/if}
       {:else if tournament.online}
         {@const canStartNext = (checkedInCount + playingCount) >= 4}
-        <Button variant="primary" size="lg" disabled={actionLoading || !canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+        <Button variant="primary" size="lg" loading={actionLoading} disabled={!canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
       {/if}
       <ActionMenu label={m.common_more()} items={[...(syncVeknItem ? [syncVeknItem] : []), archonImportItem]} />
     {/if}
@@ -244,7 +244,10 @@
       <p class="text-sm text-warn">{m.action_bar_noshow_notice({ names: prospectiveNoShows.join(", ") })}</p>
     {/if}
     {#if [6, 7, 11].includes(checkedInCount)}
-      <p class="text-sm text-info">{m.overview_stagger_info({ count: String(checkedInCount) })}</p>
+      <p class="text-sm text-info">
+        {m.overview_stagger_info({ count: String(checkedInCount) })}
+        <a href="/help/judges-guide#51-event-organization-unexpected-drop" class="text-link hover:text-link-soft underline">{m.overview_stagger_guide_link()}</a>
+      </p>
     {/if}
     {#if hasFinalsCandidate && hasUnequalRounds}
       <p class="text-sm text-warn">{m.overview_stagger_finals_warning()}</p>

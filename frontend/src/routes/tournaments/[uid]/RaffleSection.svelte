@@ -16,7 +16,7 @@
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
     isOrganizer: boolean;
-    doAction?: (action: TournamentEventType, body?: any) => Promise<void>;
+    doAction?: (action: TournamentEventType, body?: any) => Promise<string | null>;
     actionLoading?: boolean;
   } = $props();
 

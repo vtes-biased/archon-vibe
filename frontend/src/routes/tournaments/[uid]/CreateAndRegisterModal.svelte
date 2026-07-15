@@ -18,7 +18,7 @@
     sponsorTarget = $bindable(),
   }: {
     tournament: Tournament;
-    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     // Parent add path: register, or route a no-VEKN member here as sponsorTarget.
     addPlayerByUser: (user: User) => Promise<void>;
     showCreateModal: boolean;

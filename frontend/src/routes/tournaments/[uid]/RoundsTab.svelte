@@ -32,7 +32,7 @@
     playerInfo: PlayerInfoMap;
     isOrganizer: boolean;
     actionLoading: boolean;
-    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     loadPlayerNames: () => Promise<void>;
     tournamentSanctions?: Sanction[];
     setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;

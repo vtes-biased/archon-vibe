@@ -36,7 +36,7 @@
     standings: StandingEntry[];
     isOrganizer: boolean;
     actionLoading: boolean;
-    doAction: (action: TournamentEventType, body?: any) => Promise<void>;
+    doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     tournamentSanctions?: Sanction[];
     isOfflineMode?: boolean;
     decksByUser: DeckMap;

@@ -7,6 +7,7 @@
     selfName,
     candidates,
     submitting = false,
+    error = null,
     onSubmit,
     onClose,
   }: {
@@ -14,6 +15,9 @@
     // Other eligible players the initiator can seat (already filtered upstream).
     candidates: { uid: string; name: string }[];
     submitting?: boolean;
+    // Failure message shown inline — the dialog stays open so the initiator
+    // can adjust the pod (the page banner is scrolled out of view here).
+    error?: string | null;
     // picked = the chosen others; the initiator is added by the caller.
     onSubmit: (picked: string[]) => void;
     onClose: () => void;
@@ -104,6 +108,11 @@
     </div>
 
     <div class="p-6 border-t border-line space-y-3">
+      {#if error}
+        <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+          <p class="text-link-soft text-sm">{error}</p>
+        </div>
+      {/if}
       <p class="text-xs text-ink-faint">{m.self_organize_count_hint({ count: String(total) })}</p>
       <div class="flex gap-2">
         <Button variant="ghost" size="lg" class="flex-1" onclick={onClose} disabled={submitting}>
