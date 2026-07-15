@@ -80,6 +80,9 @@ metadata:
 | casual (house format) | décontracté | casual | casual | casual (English loanword) |
 | registration cap (soft, non-blocking venue-capacity limit — distinct from the hard round "limit") | plafond (des inscriptions) | tope (de inscripciones) | teto (de inscrições) | tetto (iscrizioni) |
 | seats/spots (generic venue-capacity sense, NOT the game-table "seat" row above) | places | plazas | vagas | posti |
+| league champion (badge crowning the rank-1 standings player) | Champion | Campeón | Campeão | Campione |
+| season (a league's points/scoring period) | saison | temporada | temporada | stagione |
+| crowned (verb, "crowned Champion") | couronné | coronado | coroado | incoronato |
 
 § it "register" for organizer-registers-someone-else keeps "iscrivere" even though it.json glosses self-registration and generic "registrato/a" (deceased/status) with "registrare" — don't conflate; the *action* of registering a player for a tournament is always iscrivere/inscrire/inscribir/inscrever, not registrare/registrarse family, across all four Romance locales.
 

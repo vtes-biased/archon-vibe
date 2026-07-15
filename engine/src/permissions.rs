@@ -218,6 +218,9 @@ pub fn can_edit_user(
 pub struct OwnedResource {
     pub country: Option<String>,
     pub organizers_uids: Vec<String>,
+    /// League-only: same-country Princes may attach their own tournaments
+    /// (attach-only — grants no other league rights).
+    pub open_to_country_princes: bool,
 }
 
 impl OwnedResource {
@@ -228,6 +231,7 @@ impl OwnedResource {
                 .members()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect(),
+            open_to_country_princes: value["open_to_country_princes"].as_bool().unwrap_or(false),
         }
     }
 }
@@ -345,6 +349,28 @@ pub fn can_edit_league(
     } else {
         PermissionResult::deny("You don't have permission to edit this league")
     }
+}
+
+/// Check if actor can attach a tournament to a league: anyone who can edit the
+/// league, or — when the league is open to country princes — a Prince of the
+/// league's country. Attach-only: this never grants league edit rights, and a
+/// worldwide league (no country) has no "country princes" to open up to.
+pub fn can_link_tournament_to_league(
+    actor: &UserContext,
+    actor_uid: &str,
+    league: &OwnedResource,
+) -> PermissionResult {
+    if can_edit_league(actor, actor_uid, league).allowed {
+        return PermissionResult::allow();
+    }
+    if league.open_to_country_princes
+        && actor.has_role(Role::Prince)
+        && actor.country.is_some()
+        && actor.country.as_deref() == league.country.as_deref()
+    {
+        return PermissionResult::allow();
+    }
+    PermissionResult::deny("You don't have permission to attach tournaments to this league")
 }
 
 /// Context for a sanction lift/delete decision: the sanction level plus the
@@ -683,6 +709,7 @@ mod tests {
         let tournament = OwnedResource {
             country: Some("FR".to_string()),
             organizers_uids: vec!["org-1".to_string()],
+            ..Default::default()
         };
         // Explicit organizer
         assert!(is_organizer(&ctx(vec![], Some("US")), "org-1", &tournament));
@@ -723,6 +750,7 @@ mod tests {
         let league = OwnedResource {
             country: Some("FR".to_string()),
             organizers_uids: vec!["org-1".to_string()],
+            ..Default::default()
         };
         assert!(can_edit_league(&ctx(vec![Role::IC], Some("US")), "x", &league).allowed);
         assert!(can_edit_league(&ctx(vec![Role::NC], Some("FR")), "x", &league).allowed);
@@ -735,11 +763,87 @@ mod tests {
     }
 
     #[test]
+    fn test_can_link_tournament_to_league() {
+        let league = |country: Option<&str>, open: bool| OwnedResource {
+            country: country.map(|s| s.to_string()),
+            organizers_uids: vec!["org-1".to_string()],
+            open_to_country_princes: open,
+        };
+        // League editors (IC/NC-same-country/organizer) can always link
+        assert!(
+            can_link_tournament_to_league(
+                &ctx(vec![Role::IC], Some("US")),
+                "x",
+                &league(Some("FR"), false)
+            )
+            .allowed
+        );
+        assert!(
+            can_link_tournament_to_league(&ctx(vec![], None), "org-1", &league(Some("FR"), false))
+                .allowed
+        );
+        // Prince same-country: only with the flag
+        assert!(
+            can_link_tournament_to_league(
+                &ctx(vec![Role::Prince], Some("FR")),
+                "x",
+                &league(Some("FR"), true)
+            )
+            .allowed
+        );
+        assert!(
+            !can_link_tournament_to_league(
+                &ctx(vec![Role::Prince], Some("FR")),
+                "x",
+                &league(Some("FR"), false)
+            )
+            .allowed
+        );
+        // Prince other-country: never
+        assert!(
+            !can_link_tournament_to_league(
+                &ctx(vec![Role::Prince], Some("US")),
+                "x",
+                &league(Some("FR"), true)
+            )
+            .allowed
+        );
+        // Worldwide league (no country): the flag is inert
+        assert!(
+            !can_link_tournament_to_league(
+                &ctx(vec![Role::Prince], Some("FR")),
+                "x",
+                &league(None, true)
+            )
+            .allowed
+        );
+        // Non-prince, non-editor: never, flag or not
+        assert!(
+            !can_link_tournament_to_league(
+                &ctx(vec![], Some("FR")),
+                "x",
+                &league(Some("FR"), true)
+            )
+            .allowed
+        );
+        // The flag never grants edit rights
+        assert!(
+            !can_edit_league(
+                &ctx(vec![Role::Prince], Some("FR")),
+                "x",
+                &league(Some("FR"), true)
+            )
+            .allowed
+        );
+    }
+
+    #[test]
     fn test_can_issue_sanction() {
         let no_t = OwnedResource::default();
         let t = OwnedResource {
             country: None,
             organizers_uids: vec!["org-1".to_string()],
+            ..Default::default()
         };
         // Suspension/probation: IC or Ethics only
         assert!(can_issue_sanction(&ctx(vec![Role::IC], None), "x", "suspension", &no_t).allowed);

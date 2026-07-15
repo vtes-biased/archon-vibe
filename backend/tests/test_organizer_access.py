@@ -5,12 +5,15 @@ Covers:
 - _is_organizer: NC same-country grants implicit organizer access
 - _build_actor_context: IC/NC role sets is_organizer=True
 - _map_vekn_to_tournament: organizer_veknid mapped to organizers_uids
+- can_link_tournament_to_league: the open_to_country_princes flag round-trips
+  through the real backend→engine marshalling boundary
 """
 
 from datetime import UTC, datetime
 
 from src import permissions
 from src.models import (
+    League,
     Role,
     Tournament,
     TournamentState,
@@ -24,6 +27,17 @@ NOW = datetime.now(UTC)
 
 def _user(uid="u1", roles=None, country=None):
     return User(uid=uid, modified=NOW, name="Test", roles=roles or [], country=country)
+
+
+def _league(country=None, organizers_uids=None, open_to_country_princes=False):
+    return League(
+        uid="lg1",
+        modified=NOW,
+        name="Test",
+        country=country,
+        organizers_uids=organizers_uids or [],
+        open_to_country_princes=open_to_country_princes,
+    )
 
 
 def _tournament(organizers_uids=None, country=None):
@@ -109,6 +123,30 @@ class TestBuildActorContext:
         t = _tournament(organizers_uids=["someone-else"])
         ctx = _build_actor_context(user, t)
         assert ctx["is_organizer"] is False
+
+
+# ============================================================================
+# can_link_tournament_to_league: flag round-trips backend → engine
+# ============================================================================
+
+
+class TestCanLinkTournamentToLeague:
+    """The open_to_country_princes flag governs the same-country Prince attach
+    grant. Engine logic is covered in permissions.rs; this pins the ONE seam the
+    engine test can't reach — the flag's new JSON key surviving the bespoke
+    descriptor build in permissions.py and OwnedResource::from_json. If that
+    marshalling drifts (or a DRY consolidation drops the flag), the grant fails
+    closed silently; here it fails loudly instead."""
+
+    def test_prince_attach_gated_by_flag(self):
+        prince = _user("p", roles=[Role.PRINCE], country="France")
+        assert permissions.can_link_tournament_to_league(
+            prince, _league(country="France", open_to_country_princes=True)
+        )
+        # Same Prince, msgspec default (flag unset) → denied
+        assert not permissions.can_link_tournament_to_league(
+            prince, _league(country="France")
+        )
 
 
 # ============================================================================

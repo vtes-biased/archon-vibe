@@ -120,6 +120,22 @@ def can_edit_league(user: User, league: League) -> bool:
     )
 
 
+def can_link_tournament_to_league(user: User, league: League) -> bool:
+    """A league editor, or a same-country Prince when the league is open to them."""
+    descriptor = json.dumps(
+        {
+            "country": league.country,
+            "organizers_uids": league.organizers_uids,
+            "open_to_country_princes": league.open_to_country_princes,
+        }
+    )
+    return _allowed(
+        _engine.can_link_tournament_to_league(
+            json.dumps(user_to_context(user)), user.uid, descriptor
+        )
+    )
+
+
 def can_issue_sanction(
     issuer: User, level: SanctionLevel, tournament: Tournament | None
 ) -> bool:

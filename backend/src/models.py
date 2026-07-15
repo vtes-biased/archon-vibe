@@ -353,6 +353,9 @@ class League(BaseObject, kw_only=True):
     description: str = ""
     organizers_uids: list[str] = msgspec.field(default_factory=list)
     parent_uid: str | None = None  # FK → leagues (child of meta-league)
+    # Same-country Princes may attach their own tournaments (attach-only,
+    # no other league rights). Inert without a country.
+    open_to_country_princes: bool = False
 
 
 class TournamentState(StrEnum):

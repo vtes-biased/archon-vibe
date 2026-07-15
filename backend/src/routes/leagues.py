@@ -33,6 +33,7 @@ class LeagueCreate(BaseModel):
     finish: datetime | None = None
     description: str = ""
     parent_uid: str | None = None
+    open_to_country_princes: bool = False
 
 
 class LeagueUpdate(BaseModel):
@@ -44,6 +45,7 @@ class LeagueUpdate(BaseModel):
     finish: datetime | None = None
     description: str | None = None
     parent_uid: str | None = None
+    open_to_country_princes: bool | None = None
 
 
 @router.post("/")
@@ -85,6 +87,10 @@ async def create_league(
         description=body.description,
         organizers_uids=[user.uid],
         parent_uid=body.parent_uid,
+        # Inert without a country — keep stored state canonical.
+        open_to_country_princes=(
+            body.open_to_country_princes if body.country else False
+        ),
     )
     bd = await save_league(league)
     broadcast_precomputed(bd)
@@ -130,6 +136,10 @@ async def update_league_endpoint(
     # Apply updates
     for field, value in updates.items():
         setattr(league, field, value)
+
+    # Inert without a country — keep stored state canonical.
+    if not league.country:
+        league.open_to_country_princes = False
 
     league.modified = datetime.now(UTC)
     bd = await save_league(league)

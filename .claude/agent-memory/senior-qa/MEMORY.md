@@ -19,6 +19,7 @@
 - [Card-name resolution tests](project_card_name_resolution_tests.md) — fold/disambiguation live in engine cards.rs/deck.rs, inline-fixture pattern (don't pin real cards.json); the non-NFD fold branch (ł/ø/œ, 12 real cards) is untested.
 - [Preview-scores cascade copy](project_preview_scores_cascade_copy.md) — `preview_scores_json` (WASM previewScores) duplicates the SetScore GW/TP cascade; drift hazard pinned by one equality test in tests.rs (with a load-bearing SA). Don't add a second.
 - [Bot test topology](project_bot_test_topology.md) — bot/ has no real backend/Discord, so validated fakes (+ a guard test proving the fake) are legit here; token_store is the one real-artifact seam. Don't misapply the never-mock rule.
+- [Permission marshalling gap](project_permission_marshalling_gap.md) — engine permission tests use struct literals, bypassing `from_json`; a new descriptor JSON key has zero coverage until a backend `permissions.py` wrapper test pins it.
 
 ## How to Run Tests
 - **Backend**: `cd backend && uv run python3 -m pytest tests/ -v --tb=short`. Some suites need a test Postgres on port 5433 — skip with `--ignore` if unavailable (e.g. `test_users.py`). Pure-unit suites (SSE filters, offline mode, organizer access, access levels) need no DB.

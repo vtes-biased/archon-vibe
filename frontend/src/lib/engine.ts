@@ -549,6 +549,27 @@ export function canEditLeague(
 }
 
 /**
+ * Check if a user can attach a tournament to a league (sync): league editors,
+ * or a same-country Prince when the league is open to them.
+ * Fail-closed (false) until the WASM engine is loaded.
+ */
+export function canLinkTournamentToLeague(
+  user: { uid: string; roles?: string[]; country?: string | null } | null,
+  league: { country?: string | null; organizers_uids?: string[]; open_to_country_princes?: boolean }
+): boolean {
+  if (!user) return false;
+  const engine = getEngineReactive();
+  if (!engine) return false;
+  const actorJson = JSON.stringify({ uid: user.uid, roles: user.roles ?? [], country: user.country });
+  const leagueJson = JSON.stringify({
+    country: league.country ?? null,
+    organizers_uids: league.organizers_uids ?? [],
+    open_to_country_princes: league.open_to_country_princes ?? false,
+  });
+  return JSON.parse(callEngine(() => engine.canLinkTournamentToLeague(actorJson, user.uid, leagueJson))).allowed;
+}
+
+/**
  * Compute rating points for a single tournament entry using the WASM engine.
  * Returns 0 if engine is not initialized.
  */
@@ -675,7 +696,7 @@ export async function buildActorContext(
   // entirely (empty list signals "no restriction") — keep the !isIC guard.
   if (actionType === 'UpdateConfig' && !isIC) {
     const leagues = await getAllLeagues();
-    canOrganize = leagues.filter(l => canEditLeague(user, l)).map(l => l.uid);
+    canOrganize = leagues.filter(l => canLinkTournamentToLeague(user, l)).map(l => l.uid);
   }
   return {
     uid: user.uid,

@@ -605,6 +605,7 @@ export interface CreateLeagueData {
   finish?: string | null;
   description?: string;
   parent_uid?: string | null;
+  open_to_country_princes?: boolean;
 }
 
 export async function createLeague(data: CreateLeagueData, opts?: { suppressErrorToast?: boolean }): Promise<League> {

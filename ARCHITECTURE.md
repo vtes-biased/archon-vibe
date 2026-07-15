@@ -113,7 +113,7 @@ Seating is seeded and value-stable: `seating::seed_for_round(tournament_uid, rou
 
 ## League System
 
-Aggregates tournaments into leagues with standings. Synced via SSE like tournaments/users; stored in IndexedDB `leagues` (indexes `by-country`, `by-start`). Fields: `name`, `kind` (League/Meta-League), `standings_mode` (RTP/Score/GP), `format`, `country`, `start`/`finish`, `description`, `organizers_uids`, `parent_uid`. GP and RTP modes use `compute_final_standings` to derive final placement (winner=1, other finalists=2).
+Aggregates tournaments into leagues with standings. Synced via SSE like tournaments/users; stored in IndexedDB `leagues` (indexes `by-country`, `by-start`). Fields: `name`, `kind` (League/Meta-League), `standings_mode` (RTP/Score/GP), `format`, `country`, `start`/`finish`, `description`, `organizers_uids`, `parent_uid`, `open_to_country_princes` (country leagues only: same-country Princes may attach their own tournaments without becoming organizers — attach-only, gated by `can_link_tournament_to_league`; inert on a worldwide league). GP and RTP modes use `compute_final_standings` to derive final placement (winner=1, other finalists=2).
 
 ## Serialization & Rust Integration
 
@@ -139,7 +139,7 @@ Wire shapes per surface: WASM throws a JS string `{"code","params","message"}` (
 
 Frontend fallback order (`toUserMessage` in `errors.ts`; the same mapping localizes `apiRequest` toasts): `code` present → `errorCodeToMessage(code, params)` → paraglide `err_*` key (5 locales); else server `detail` (English); else `"Request failed: <statusText>"`. An `internal` code yields a generic localized message + `console.error` of the raw detail (parse/invariant noise never shown); an unknown future code (version skew) falls through to `detail`. App-level checks that mirror engine rules reuse the engine codes so the same condition localizes identically on every path — the backend `_check_player_barred` raises `EngineRejection` and its frontend twin `checkPlayerBarred` (tournament-actions.ts) throws a coded `EngineError`, keeping the offline path localized.
 
-**Authorization (single source of truth)**: all role/country/uid/ownership predicates live in `engine/src/permissions.rs`, consumed by both stacks — backend via PyO3 (`backend/src/permissions.py` is a thin marshalling adapter with no logic; each route keeps its own `HTTPException(403, ...)` detail), frontend via WASM (`isOrganizer()`, `canEditLeague()`, `canMarkDeceased()` in `engine.ts` are UX-only and fail closed to `false` until WASM loads). The backend remains the authoritative enforcement point.
+**Authorization (single source of truth)**: all role/country/uid/ownership predicates live in `engine/src/permissions.rs`, consumed by both stacks — backend via PyO3 (`backend/src/permissions.py` is a thin marshalling adapter with no logic; each route keeps its own `HTTPException(403, ...)` detail), frontend via WASM (`isOrganizer()`, `canEditLeague()`, `canLinkTournamentToLeague()`, `canMarkDeceased()` in `engine.ts` are UX-only and fail closed to `false` until WASM loads). The backend remains the authoritative enforcement point.
 
 ## API & Data Conventions
 

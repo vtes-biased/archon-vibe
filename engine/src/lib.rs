@@ -16,9 +16,9 @@ pub use error::EngineError;
 // Re-export permissions module items
 pub use permissions::{
     can_change_role, can_delete_member, can_delete_sanction, can_edit_league, can_edit_user,
-    can_issue_sanction, can_lift_sanction, can_manage_country, can_manage_leagues,
-    can_manage_tournaments, can_manage_vekn, can_mark_deceased, is_organizer, OwnedResource,
-    PermissionResult, Role, SanctionContext, UserContext,
+    can_issue_sanction, can_lift_sanction, can_link_tournament_to_league, can_manage_country,
+    can_manage_leagues, can_manage_tournaments, can_manage_vekn, can_mark_deceased, is_organizer,
+    OwnedResource, PermissionResult, Role, SanctionContext, UserContext,
 };
 
 // ============================================================================
@@ -128,6 +128,18 @@ mod shared {
         let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         let league = OwnedResource::from_json(&json::parse(league_json)?);
         Ok(can_edit_league(&actor, actor_uid, &league).to_json().dump())
+    }
+
+    pub fn can_link_tournament_to_league_json(
+        actor_json: &str,
+        actor_uid: &str,
+        league_json: &str,
+    ) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let league = OwnedResource::from_json(&json::parse(league_json)?);
+        Ok(can_link_tournament_to_league(&actor, actor_uid, &league)
+            .to_json()
+            .dump())
     }
 
     pub fn can_issue_sanction_json(
@@ -421,6 +433,20 @@ mod wasm {
             js_str(can_edit_league_json(actor_json, actor_uid, league_json))
         }
 
+        #[wasm_bindgen(js_name = canLinkTournamentToLeague)]
+        pub fn can_link_tournament_to_league(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            league_json: &str,
+        ) -> Result<String, String> {
+            js_str(can_link_tournament_to_league_json(
+                actor_json,
+                actor_uid,
+                league_json,
+            ))
+        }
+
         #[wasm_bindgen(js_name = canIssueSanction)]
         pub fn can_issue_sanction(
             &self,
@@ -672,6 +698,19 @@ mod python {
             league_json: &str,
         ) -> PyResult<String> {
             py_str(can_edit_league_json(actor_json, actor_uid, league_json))
+        }
+
+        fn can_link_tournament_to_league(
+            &self,
+            actor_json: &str,
+            actor_uid: &str,
+            league_json: &str,
+        ) -> PyResult<String> {
+            py_str(can_link_tournament_to_league_json(
+                actor_json,
+                actor_uid,
+                league_json,
+            ))
         }
 
         fn can_issue_sanction(

@@ -4,6 +4,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getAllLeagues } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import { canLinkTournamentToLeague } from "$lib/engine";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
   import { Info, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -66,13 +67,14 @@
     });
   });
 
-  // Leagues where the current user is an organizer (selectable)
+  // Leagues the user may attach tournaments to (selectable): league editors,
+  // or a same-country Prince when the league is open to them.
   const myLeagues = $derived(
-    allActiveLeagues.filter(l => l.organizers_uids?.includes(auth.user?.uid ?? ""))
+    allActiveLeagues.filter(l => canLinkTournamentToLeague(auth.user, l))
   );
-  // Leagues where the user is NOT an organizer (shown disabled with explanation)
+  // Leagues the user may NOT attach to (shown disabled with explanation)
   const otherLeagues = $derived(
-    allActiveLeagues.filter(l => !l.organizers_uids?.includes(auth.user?.uid ?? ""))
+    allActiveLeagues.filter(l => !canLinkTournamentToLeague(auth.user, l))
   );
 
   function id(name: string) {

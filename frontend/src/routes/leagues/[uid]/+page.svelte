@@ -10,14 +10,14 @@
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
-  import { canEditLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
+  import { canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
   import { tournamentAction } from "$lib/tournament-actions";
   import { translateTournamentState, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar } from "@lucide/svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar, Crown, Flag } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);
@@ -88,6 +88,10 @@
   let standingsError = $state(false);
 
   const isOrganizer = $derived(league ? canEditLeague(auth.user, league) : false);
+  // Attach tier: organizers, plus same-country Princes when the league is open to them.
+  const canAttach = $derived(league ? canLinkTournamentToLeague(auth.user, league) : false);
+  // Crowned on a finished league; ties share rank 1 (co-champions).
+  const champions = $derived(standings.filter(e => e.rank === 1));
 
   function standingsModeLabel(mode: LeagueStandingsMode): string {
     switch (mode) {
@@ -214,6 +218,7 @@
   let editFinish = $state("");
   let editDescription = $state("");
   let editStandingsMode = $state<LeagueStandingsMode>("RTP");
+  let editOpenPrinces = $state(false);
 
   function toDateInput(d: string | null): string {
     if (!d) return "";
@@ -229,6 +234,7 @@
     editFinish = toDateInput(league.finish);
     editDescription = league.description;
     editStandingsMode = league.standings_mode;
+    editOpenPrinces = league.open_to_country_princes ?? false;
     editing = true;
   }
 
@@ -252,8 +258,22 @@
         finish: editFinish || null,
         description: editDescription,
         standings_mode: editStandingsMode,
+        // Inert without a country — never persist it on a worldwide league.
+        open_to_country_princes: editCountry ? editOpenPrinces : false,
       }, { suppressErrorToast: true });
       editing = false;
+      await loadLeague();
+    } catch (e) {
+      error = toUserMessage(e, m.league_error_update());
+    }
+  }
+
+  // Sets finish = now; trivially reversible by editing the date, so no confirm.
+  async function finishLeague() {
+    if (!league) return;
+    error = null;
+    try {
+      await updateLeague(league.uid, { finish: new Date().toISOString() }, { suppressErrorToast: true });
       await loadLeague();
     } catch (e) {
       error = toUserMessage(e, m.league_error_update());
@@ -328,7 +348,7 @@
       </div>
     {:else}
       <!-- Header -->
-      <div class="flex items-start justify-between mb-6">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
         <div class="flex items-center gap-3">
           <a href="/leagues" class="text-ink-muted hover:text-ink-strong">
             <ArrowLeft class="w-5 h-5" />
@@ -359,7 +379,12 @@
           </div>
         </div>
         {#if isOrganizer}
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
+            {#if isActive()}
+              <Button variant="secondary" size="md" onclick={finishLeague}>
+                <Flag class="w-4 h-4 inline -mt-0.5" /> {m.league_finish_action()}
+              </Button>
+            {/if}
             <Button variant="secondary" size="md" onclick={startEdit}>
               <Pencil class="w-4 h-4 inline -mt-0.5" /> {m.common_edit()}
             </Button>
@@ -439,6 +464,19 @@
             </select>
           </div>
 
+          <!-- Country-princes attach tier (country leagues only) -->
+          {#if league.kind === "League" && editCountry}
+            <div>
+              <label class="flex items-start gap-2 text-sm text-ink-bright">
+                <input type="checkbox" bind:checked={editOpenPrinces}
+                  class="w-5 h-5 mt-0.5 shrink-0 rounded border-line-strong bg-surface-card text-accent focus:ring-accent" />
+                <span>
+                  {m.league_open_princes_label()}
+                  <span class="block text-xs text-ink-faint mt-0.5">{m.league_open_princes_hint()}</span>
+                </span>
+              </label>
+            </div>
+          {/if}
 
           <!-- Description -->
           <div>
@@ -543,7 +581,7 @@
             {m.league_tournaments_heading({ count: leagueTournaments.length })}
           </h2>
           <div class="flex items-center gap-2">
-            {#if isOrganizer && league.kind === "League"}
+            {#if canAttach && league.kind === "League"}
               <Button variant="secondary" size="sm" onclick={() => (addEventOpen ? (addEventOpen = false) : openAddEvent())}>
                 <Plus class="h-3 w-3" aria-hidden="true" />
                 {m.league_add_event()}
@@ -612,7 +650,7 @@
         {:else}
           <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
             <p class="text-ink-muted">{m.league_no_tournaments()}</p>
-            {#if isOrganizer && league.kind === "League"}
+            {#if canAttach && league.kind === "League"}
               <p class="mt-2 text-sm text-ink-faint">{m.league_no_tournaments_hint()}</p>
             {/if}
           </div>
@@ -633,13 +671,30 @@
           </p>
         {/if}
         {#if standings.length > 0}
+          <!-- Champion flourish: crowned once the league season is over -->
+          {#if !isActive() && champions.length > 0}
+            <div class="bg-surface-card rounded-lg shadow border border-line p-4 mb-3 flex items-center gap-3">
+              <Crown class="w-8 h-8 shrink-0 text-accent" aria-hidden="true" />
+              <div class="min-w-0">
+                <div class="text-xs uppercase tracking-wide text-ink-faint">{m.league_champion()}</div>
+                <!-- No truncate: co-champions (ties) must stay visible, wrap instead -->
+                <div class="text-lg font-semibold text-ink-strong">
+                  {#each champions as c, i (c.user_uid)}{#if i > 0} · {/if}<a href="/users/{c.user_uid}" class="hover:text-link">{c.name}</a>{/each}
+                </div>
+              </div>
+            </div>
+          {/if}
           <!-- Mobile card layout -->
           <div class="sm:hidden bg-surface-card rounded-lg shadow overflow-hidden border border-line divide-y divide-line">
             {#each standings as entry (entry.user_uid)}
-              <div class="flex items-center gap-3 px-4 py-3">
+              {@const isMe = entry.user_uid === auth.user?.uid}
+              <div class="flex items-center gap-3 px-4 py-3 {isMe ? 'ring-1 ring-inset ring-accent/40 bg-accent-soft/10' : ''}">
                 <span class="w-6 shrink-0 text-right text-sm font-medium text-ink-muted">{entry.rank}</span>
                 <div class="min-w-0 flex-1">
-                  <a href="/users/{entry.user_uid}" class="block truncate text-sm text-ink-strong hover:text-link">{entry.name}</a>
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <a href="/users/{entry.user_uid}" class="truncate text-sm text-ink-strong hover:text-link">{entry.name}</a>
+                    {#if isMe}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.league_standings_you()}</span>{/if}
+                  </div>
                   <div class="mt-0.5 flex items-center gap-3 text-xs text-ink-faint">
                     <span class="whitespace-nowrap">{formatScore(entry.gw, entry.vp, entry.tp)}</span>
                     <span class="inline-flex items-center gap-1"><Trophy class="w-3 h-3" />{entry.tournaments_count}</span>
@@ -672,10 +727,13 @@
                 </thead>
                 <tbody class="divide-y divide-line">
                   {#each standings as entry (entry.user_uid)}
-                    <tr class="hover:bg-surface-muted/50">
-                      <td class="px-4 py-2 text-ink-muted font-medium">{entry.rank}</td>
+                    {@const isMe = entry.user_uid === auth.user?.uid}
+                    <!-- Ring (box-shadow) is unreliable on <tr>: accent left border instead -->
+                    <tr class="hover:bg-surface-muted/50 {isMe ? 'bg-accent-soft/10' : ''}">
+                      <td class="px-4 py-2 text-ink-muted font-medium {isMe ? 'border-l-2 border-accent' : ''}">{entry.rank}</td>
                       <td class="px-4 py-2 text-ink-strong">
                         <a href="/users/{entry.user_uid}" class="hover:text-link">{entry.name}</a>
+                        {#if isMe}<span class="ml-1.5 px-1.5 py-0.5 rounded text-xs badge-slate">{m.league_standings_you()}</span>{/if}
                       </td>
                       {#if league?.standings_mode !== "Score"}
                         <td class="px-4 py-2 text-right text-ink-strong font-medium">{entry.points}</td>

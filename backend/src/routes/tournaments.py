@@ -410,15 +410,14 @@ def _build_actor_context(
 
 
 async def _get_user_organizable_league_uids(user, conn=None) -> list[str]:
-    """Get league UIDs the user can organize (own leagues + NC same-country)."""
+    """Get league UIDs the user can link tournaments to (feeds the engine's
+    UpdateConfig league gate): league editors, plus same-country Princes when
+    the league is open to them."""
     if Role.IC in user.roles:
         return []  # IC bypasses league check in engine
     leagues = await get_all_leagues(conn=conn)
     return [
-        lg.uid
-        for lg in leagues
-        if user.uid in lg.organizers_uids
-        or (Role.NC in user.roles and lg.country == user.country)
+        lg.uid for lg in leagues if permissions.can_link_tournament_to_league(user, lg)
     ]
 
 
@@ -862,21 +861,17 @@ async def create_tournament(
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid decklists_mode") from e
 
-    # Validate league_uid: only league organizers (or IC) can link
+    # Validate league_uid: league editors, or same-country Princes when the
+    # league is open to them (rule single-sourced in the engine).
     if request.league_uid:
         league = await get_league_by_uid(request.league_uid)
         if not league:
             raise HTTPException(status_code=400, detail="League not found")
-        if Role.IC not in current_user.roles:
-            is_nc_same_country = (
-                Role.NC in current_user.roles and league.country == current_user.country
+        if not permissions.can_link_tournament_to_league(current_user, league):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to attach tournaments to this league",
             )
-            is_organizer = current_user.uid in league.organizers_uids
-            if not (is_nc_same_country or is_organizer):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Only league organizers can link tournaments to this league",
-                )
 
     # VEKN legality (championships forbid proxies/multideck) — single-sourced
     # in the engine; this route builds the Tournament in Python rather than
@@ -2331,16 +2326,11 @@ async def _gate_offline_created_insert(
         league = await get_league_by_uid(league_uid)
         if not league:
             raise HTTPException(status_code=400, detail="League not found")
-        if Role.IC not in current_user.roles:
-            is_nc_same_country = (
-                Role.NC in current_user.roles and league.country == current_user.country
+        if not permissions.can_link_tournament_to_league(current_user, league):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to attach tournaments to this league",
             )
-            is_league_organizer = current_user.uid in league.organizers_uids
-            if not (is_nc_same_country or is_league_organizer):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Only league organizers can link tournaments to this league",
-                )
 
 
 @router.post("/{uid}/go-online")

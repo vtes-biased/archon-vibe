@@ -94,9 +94,10 @@ Role hierarchy: IC > NC > Prince (country-scoped) > Judge/Judgekin
 - `can_manage_tournaments(actor)` — can create/manage tournaments (= `is_official`)
 - `can_manage_leagues(actor)` — IC or NC
 
-**Resource predicates** (take `OwnedResource {country, organizers_uids}`):
+**Resource predicates** (take `OwnedResource {country, organizers_uids}`; league adds `open_to_country_princes`):
 - `is_organizer(actor, actor_uid, tournament)` — in organizers list, IC, or same-country NC
 - `can_edit_league(actor, actor_uid, league)` — IC, same-country NC, or a league organizer
+- `can_link_tournament_to_league(actor, actor_uid, league)` — `can_edit_league`, or a same-country Prince when the league's `open_to_country_princes` flag is set (attach-only — no other league rights)
 
 **Sanction predicates**:
 - `can_issue_sanction(actor, actor_uid, level, tournament)` — IC/Ethics, or a tournament organizer (caution/warning/SA/DQ); IC/Ethics only for suspension/probation

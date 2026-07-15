@@ -22,6 +22,7 @@
   let finishDate = $state("");
   let description = $state("");
   let parentUid = $state("");
+  let openToCountryPrinces = $state(false);
 
   let metaLeagues = $state<League[]>([]);
 
@@ -61,6 +62,8 @@
         finish: finishDate || null,
         description,
         parent_uid: parentUid || null,
+        // Inert without a country — never persist it on a worldwide league.
+        open_to_country_princes: country ? openToCountryPrinces : false,
       }, { suppressErrorToast: true });
       await saveLeague(league);
       goto(`/leagues/${league.uid}`);
@@ -172,6 +175,21 @@
               </select>
             </div>
           </div>
+
+          <!-- Country-princes attach tier (country leagues only) -->
+          {#if kind === "League" && country}
+            <div>
+              <label class="flex items-start gap-2 text-sm text-ink-bright">
+                <input type="checkbox" bind:checked={openToCountryPrinces}
+                  class="w-5 h-5 mt-0.5 shrink-0 rounded border-line-strong bg-surface-card text-accent focus:ring-accent" />
+                <span>
+                  {m.league_open_princes_label()}
+                  <span class="block text-xs text-ink-faint mt-0.5">{m.league_open_princes_hint()}</span>
+                </span>
+              </label>
+              <p class="text-xs text-ink-faint mt-2">{m.league_new_princes_hint()}</p>
+            </div>
+          {/if}
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Start date -->
