@@ -116,6 +116,9 @@ Tracking fields on User: `vekn_synced` (bool), `vekn_synced_at` (timestamp), `lo
   so a VEKN-side score correction — and legacy folded imports — self-heal
 - Seeds venue autocomplete data
 - Stamps `vekn_pushed_at=now` on finished imports so batch_push never re-uploads them
+- Rebuilds changed tournaments field-by-field from VEKN data, so local-only bookkeeping
+  (`checkin_code`, `twda_status`) is explicitly carried over from the existing row —
+  otherwise it would reset on every re-sync
 
 ### Error handling
 

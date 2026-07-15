@@ -230,14 +230,14 @@ projection columns (public/member/full); SSE reads the matching column. There is
 per-viewer field filtering at read time. Consequently the member projection of a
 tournament (`compute_tournament_member`) ships the **entire** tournament object — all
 rounds, finals, and per-player results — to **every** member, excluding only
-`checkin_code` and `vekn_pushed_at`. During an ongoing event, full structural data
-lands in every member's IndexedDB.
+`checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, and `twda_status`. During an
+ongoing event, full structural data lands in every member's IndexedDB.
 
 Two real server-side boundaries do exist within the member level:
 - **Decks** are a separate object type with their own per-deck member projection — a deck
   is shipped only when the engine sets its `public` flag (from `decklists_mode` +
   tournament state + winner/finalist status). This row *is* an access control.
-- **`checkin_code` / `vekn_pushed_at` / `vekn_results_stale`** are stripped from the member projection.
+- **`checkin_code` / `vekn_pushed_at` / `vekn_results_stale` / `twda_status`** are stripped from the member projection.
 
 Everything else below is a **frontend display default**, not an access boundary —
 `standings_mode` (Private/Cutoff/Top 10/Public), the "my tables" view, and the
@@ -253,7 +253,7 @@ already holds. They shape the UI; they do not gate what a member can read from I
 | Finals | No (shipped) | hidden until finished |
 | My tables | No (all tables shipped) | only the viewer's own tables shown |
 | Rounds | No (shipped) | hidden |
-| checkin_code / vekn_pushed_at / vekn_results_stale | **Yes** — stripped | — |
+| checkin_code / vekn_pushed_at / vekn_results_stale / twda_status | **Yes** — stripped | — |
 
 This is an accepted tradeoff: viewer-specific visibility ("my tables") cannot be expressed
 in pre-computed per-row columns, and frontend hiding suits the threat model (a local-event
@@ -297,7 +297,7 @@ A compact map of what exists; implementation detail lives in code and the docs i
 - **Call for judge** (online): ephemeral SSE alert to organizers + IC, stacking banners + chime, auto-dismiss 120s, validates seated/Playing/online.
 - **Raffle**: random draw from pools (AllPlayers/NonFinalists/GameWinners/NoGameWin/NoVictoryPoint), draw/undo/clear.
 - **Table rooms**: named rooms over table ranges, shown as labels in seating/print/player views.
-- **Decks**: card DB in IndexedDB; upload via paste (local, offline) / deckbuilder URL (VDB/VTESDecks/Amaranth, backend-proxied via krcg, online only) / QR (URL-scan shortcut, online only); Rust parse (Lackey/JOL/TWDA) + validate (counts, banned, group, V5, multideck) + enrich; attribution (self/named author/anonymous); decklist-required enforcement (override w/ warning); multideck per-round locking; post-tournament upload; visibility by decklists_mode (Winner/Finalists/All); TWDA auto-PR on finish.
+- **Decks**: card DB in IndexedDB; upload via paste (local, offline) / deckbuilder URL (VDB/VTESDecks/Amaranth, backend-proxied via krcg, online only) / QR (URL-scan shortcut, online only); Rust parse (Lackey/JOL/TWDA) + validate (counts, banned, group, V5, multideck) + enrich; attribution (self/named author/anonymous); decklist-required enforcement (override w/ warning); multideck per-round locking; post-tournament upload; visibility by decklists_mode (Winner/Finalists/All); TWDA auto-PR on finish, outcome (submitted/skipped/failed) shown to organizers.
 - **Result reporting**: player self-report VP during round; organizer override locks the table (comment required); oust-order validation; text/JSON report download (organizer).
 - **Sanctions**: event-level (Caution/Warning/SA/DQ) + VEKN-wide (Suspension/Probation/Ban, IC/Ethics); JG v2 categories + escalation hints; SA −1 VP; league-wide + suspension barring at check-in/finals; lift permissions per §3.8; daily cleanup of >18mo. (Rules: §3.8.)
 - **Leagues**: league + meta-league (NC/IC); standings modes RTP/Score/GP; tournament association (league editors, or same-country Princes when the league opts in — attach-only, no other league rights); auto-updating standings; finish-without-finals support; organizer Finish action (sets `finish=now`, reversible by editing the date) + rank-1 Champion crowning on finished leagues.

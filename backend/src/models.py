@@ -547,6 +547,22 @@ class RaffleDraw(msgspec.Struct, kw_only=True):
     winners: list[str] = msgspec.field(default_factory=list)
 
 
+class TwdaOutcome(StrEnum):
+    SUBMITTED = "submitted"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+class TwdaStatus(msgspec.Struct, kw_only=True):
+    """Last TWDA auto-submission outcome — organizer-facing transparency for
+    the otherwise fire-and-forget PR flow (routes/tournaments._maybe_submit_twda)."""
+
+    outcome: TwdaOutcome
+    reason: str = ""  # skip reason code, mapped to i18n frontend-side
+    pr_url: str = ""
+    at: datetime | None = None
+
+
 class Tournament(TournamentConfig, kw_only=True):
     # Hero / social-share image. Versioned URL (?v=<epoch-ms>) so a re-upload
     # produces a new URL — SSE carries it and every client refetches at once,
@@ -569,6 +585,8 @@ class Tournament(TournamentConfig, kw_only=True):
     # is write-once — corrections never reach vekn.net via API, so this is sticky;
     # only a manual admin fix (there and here) clears it.
     vekn_results_stale: bool = False
+    # Last TWDA auto-submission outcome (organizer projection only)
+    twda_status: TwdaStatus | None = None
     # Offline mode: device-level locking for offline tournament management
     offline_mode: bool = False
     offline_device_id: str = (

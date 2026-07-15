@@ -505,6 +505,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 # `tournament` carries a new default_factory random
                                 # value that would break an already-printed QR.
                                 checkin_code=existing.checkin_code,
+                                # Local-only bookkeeping: not derivable from VEKN
+                                twda_status=existing.twda_status,
                             )
                             bd = await save_tournament(tournament, conn=tx_conn)
                             stats["updated"] += 1

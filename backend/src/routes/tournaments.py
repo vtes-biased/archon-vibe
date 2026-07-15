@@ -64,6 +64,8 @@ from ..models import (
     TournamentFormat,
     TournamentRank,
     TournamentState,
+    TwdaOutcome,
+    TwdaStatus,
     User,
 )
 from .auth import send_invite_email
@@ -366,33 +368,75 @@ def _played_player_count(tournament: Tournament) -> int:
     return len(seated - proxies)
 
 
+async def _record_twda_status(
+    uid: str, outcome: TwdaOutcome, reason: str = "", pr_url: str = ""
+) -> None:
+    """Persist the last TWDA outcome onto the (already-committed) tournament.
+
+    Locked fetch-modify-save, same as vekn_push's bookkeeping write: only the
+    twda_status field lands on the CURRENT row so concurrent edits aren't
+    clobbered. Unchanged outcome → no write (no pointless SSE churn)."""
+    async with tournament_transaction(uid) as (fresh, tx_conn):
+        if not fresh:
+            return
+        prev = fresh.twda_status
+        if prev and (prev.outcome, prev.reason, prev.pr_url) == (
+            outcome,
+            reason,
+            pr_url,
+        ):
+            return
+        fresh.twda_status = TwdaStatus(
+            outcome=outcome, reason=reason, pr_url=pr_url, at=datetime.now(UTC)
+        )
+        fresh.modified = datetime.now(UTC)
+        bd = await save_tournament(fresh, conn=tx_conn)
+    broadcast_precomputed(bd)
+
+
 async def _maybe_submit_twda(tournament: Tournament) -> None:
-    """Submit winner's deck to TWDA if conditions are met.
+    """Submit winner's deck to TWDA if conditions are met, and record the
+    outcome — submitted (PR URL) / skipped (reason) / failed — on the
+    tournament for organizer transparency. Self-contains its errors.
 
     Conditions: finished, sanctioned (rank != Basic), >=10 players who actually
     played, a winner with a stored deck, and a VEKN event ID.
     """
+    from ..twda import is_configured, submit_twda_pr
+
     if tournament.state != TournamentState.FINISHED:
         return
     if not tournament.winner:
-        return
-    if tournament.rank == TournamentRank.BASIC:
-        return  # unsanctioned
-    if _played_player_count(tournament) < TWDA_MIN_PLAYERS:
-        return  # too few participants for TWDA eligibility
-    vekn_event_id = tournament.external_ids.get("vekn")
-    if not vekn_event_id:
-        return
+        outcome = (TwdaOutcome.SKIPPED, "no_winner", "")
+    elif tournament.rank == TournamentRank.BASIC:
+        outcome = (TwdaOutcome.SKIPPED, "unsanctioned", "")
+    elif _played_player_count(tournament) < TWDA_MIN_PLAYERS:
+        outcome = (TwdaOutcome.SKIPPED, "too_few_players", "")
+    elif not tournament.external_ids.get("vekn"):
+        outcome = (TwdaOutcome.SKIPPED, "no_vekn_event", "")
+    elif not is_configured():
+        outcome = (TwdaOutcome.SKIPPED, "not_configured", "")
+    else:
+        try:
+            deck_text = await _winner_deck_twda(tournament)
+            if not deck_text:
+                outcome = (TwdaOutcome.SKIPPED, "no_deck", "")
+            else:
+                pr_url = await submit_twda_pr(
+                    tournament.external_ids["vekn"], deck_text, tournament.name
+                )
+                if pr_url:
+                    outcome = (TwdaOutcome.SUBMITTED, "", pr_url)
+                else:
+                    outcome = (TwdaOutcome.FAILED, "", "")
+        except Exception:
+            logger.exception("Failed to submit TWDA PR")
+            outcome = (TwdaOutcome.FAILED, "", "")
 
     try:
-        from ..twda import submit_twda_pr
-
-        deck_text = await _winner_deck_twda(tournament)
-        if not deck_text:
-            return
-        await submit_twda_pr(vekn_event_id, deck_text, tournament.name)
+        await _record_twda_status(tournament.uid, *outcome)
     except Exception:
-        logger.exception("Failed to submit TWDA PR")
+        logger.exception("Failed to record TWDA status")
 
 
 def _build_actor_context(
@@ -2475,6 +2519,11 @@ async def go_online(
                 else None
             )
             request.tournament["vekn_results_stale"] = tournament.vekn_results_stale
+            request.tournament["twda_status"] = (
+                msgspec.to_builtins(tournament.twda_status)
+                if tournament.twda_status
+                else None
+            )
 
         # Remap temp UIDs → real user UIDs throughout tournament data
         tournament_data = request.tournament
@@ -2740,6 +2789,13 @@ async def sync_offline(
             tournament_data["offline_user_uid"] = tournament.offline_user_uid
             if tournament.offline_since:
                 tournament_data["offline_since"] = tournament.offline_since.isoformat()
+            # Server-only bookkeeping: keep the DB row authoritative during the
+            # offline window (the snapshot never carries a fresher value).
+            tournament_data["twda_status"] = (
+                msgspec.to_builtins(tournament.twda_status)
+                if tournament.twda_status
+                else None
+            )
         else:
             # Insert: no server-side lock fields to preserve — the snapshot stays
             # locked to the device that created it offline.

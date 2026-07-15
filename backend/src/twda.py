@@ -33,7 +33,7 @@ TWDA_TARGET_OWNER = TWDA_TARGET_REPO.split("/")[0]  # "GiottoVerducci"
 _GH_API_VERSION = github_app.GH_API_VERSION
 
 
-def _is_configured() -> bool:
+def is_configured() -> bool:
     return bool(
         TWDA_GITHUB_CLIENT_ID
         and TWDA_GITHUB_PRIVATE_KEY
@@ -53,7 +53,7 @@ async def submit_twda_pr(
 
     Returns the PR URL on success, None on failure.
     """
-    if not _is_configured():
+    if not is_configured():
         logger.info("TWDA GitHub App not configured, skipping PR submission")
         return None
 

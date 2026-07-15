@@ -2,7 +2,7 @@
   import type { TournamentEventType } from "$lib/engine";
   import type { Tournament } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { Download, Upload, TriangleAlert } from "@lucide/svelte";
+  import { Download, Upload, TriangleAlert, BookMarked, Info, ExternalLink } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import RankedBadge from "./RankedBadge.svelte";
@@ -51,6 +51,18 @@
   }
 
   let showReopenConfirm = $state(false);
+
+  function twdaSkipReason(code: string): string {
+    switch (code) {
+      case "no_winner": return m.twda_reason_no_winner();
+      case "unsanctioned": return m.twda_reason_unsanctioned();
+      case "too_few_players": return m.twda_reason_too_few_players();
+      case "no_vekn_event": return m.twda_reason_no_vekn_event();
+      case "not_configured": return m.twda_reason_not_configured();
+      case "no_deck": return m.twda_reason_no_deck();
+      default: return code;
+    }
+  }
 </script>
 
 <div class="space-y-3">
@@ -80,6 +92,33 @@
       <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
       <span>{m.vekn_out_of_sync_hint()}</span>
     </div>
+  {/if}
+
+  <!-- TWDA outcome: the auto-submission is otherwise invisible — tell the
+       organizer what happened to the winner's deck (and why, when skipped) -->
+  {#if tournament.twda_status}
+    {@const ts = tournament.twda_status}
+    {#if ts.outcome === "submitted"}
+      <div class="text-sm flex items-start gap-2 text-ink-muted">
+        <BookMarked class="w-4 h-4 mt-0.5 shrink-0 text-info" aria-hidden="true" />
+        <span>
+          {m.twda_status_submitted()}
+          {#if ts.pr_url}
+            <a href={ts.pr_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-link underline">{m.twda_status_view_submission()}<ExternalLink class="w-3 h-3" aria-hidden="true" /></a>
+          {/if}
+        </span>
+      </div>
+    {:else if ts.outcome === "failed"}
+      <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
+        <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{m.twda_status_failed()}</span>
+      </div>
+    {:else if ts.outcome === "skipped"}
+      <div class="text-sm flex items-start gap-2 text-ink-muted">
+        <Info class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{m.twda_status_skipped({ reason: twdaSkipReason(ts.reason) })}</span>
+      </div>
+    {/if}
   {/if}
 
   <!-- Results actions. With standings: share + copy + More (report download) on one

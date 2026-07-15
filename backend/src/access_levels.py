@@ -157,8 +157,13 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "banner_path",  # public hero / og:image — visible pre-login
 }
 
-# Member gets everything EXCEPT checkin_code and the VEKN push bookkeeping
-_TOURNAMENT_MEMBER_EXCLUDE = {"checkin_code", "vekn_pushed_at", "vekn_results_stale"}
+# Member gets everything EXCEPT checkin_code and the VEKN/TWDA push bookkeeping
+_TOURNAMENT_MEMBER_EXCLUDE = {
+    "checkin_code",
+    "vekn_pushed_at",
+    "vekn_results_stale",
+    "twda_status",
+}
 
 
 def compute_tournament_public(d: dict) -> dict:

@@ -23,6 +23,7 @@ from src.models import (
     TournamentFormat,
     TournamentRank,
     TournamentState,
+    TwdaOutcome,
     User,
 )
 from src.routes.tournaments import TWDA_MIN_PLAYERS, _maybe_submit_twda
@@ -104,7 +105,9 @@ async def _captured_credit(
         ),
         patch("src.routes.tournaments._load_cards_json", lambda: "{}"),
         patch("src.routes.tournaments._engine", engine),
+        patch("src.twda.is_configured", lambda: True),
         patch("src.twda.submit_twda_pr", AsyncMock(return_value="http://pr")),
+        patch("src.routes.tournaments._record_twda_status", AsyncMock()),
     ):
         await _maybe_submit_twda(tournament)
 
@@ -172,12 +175,17 @@ async def test_below_participation_floor_skips_twda():
     TWDA-worthy; guards against leaking a sub-floor deck to a third-party archive."""
     tournament = _tournament("w-001", seated=TWDA_MIN_PLAYERS - 1)
     submit = AsyncMock(return_value="http://pr")
+    record = AsyncMock()
     with (
         patch(
             "src.routes.tournaments._winner_deck_twda",
             AsyncMock(return_value="TWDA TEXT"),
         ),
+        patch("src.twda.is_configured", lambda: True),
         patch("src.twda.submit_twda_pr", submit),
+        patch("src.routes.tournaments._record_twda_status", record),
     ):
         await _maybe_submit_twda(tournament)
     submit.assert_not_called()
+    # The skip is not silent anymore: the reason lands on the tournament.
+    record.assert_called_once_with("t-001", TwdaOutcome.SKIPPED, "too_few_players", "")

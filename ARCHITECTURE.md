@@ -315,6 +315,8 @@ Avatar upload: client-side cropping (`AvatarCropper.svelte`), server-side compre
 
 On the transition into `Finished` (if the winner has a deck), `twda.py` opens or updates a GitHub PR against the [TWDA repo](https://github.com/GiottoVerducci/TWD) — idempotent (branch `archon/{vekn_event_id}` + file `decks/{id}.txt`, create-or-update). It re-fires when the winner's deck is upserted on an already-finished tournament (by an organizer, or by the winner adding their *first* deck — post-finish, players can add but not replace), so late uploads and post-event edits reach the archive. Files: `backend/src/twda.py`, `engine/src/deck.rs` (`export_twda`).
 
+Every attempt records its outcome on `Tournament.twda_status` — `submitted` (with PR URL), `skipped` (with a reason code: no winner, unsanctioned, <10 players played, no VEKN event id, GitHub App unconfigured, or winner has no deck), or `failed` — organizer/full projection only (`_TOURNAMENT_MEMBER_EXCLUDE` in `access_levels.py`), shown as a status line on the finished-tournament organizer view (`FinishedResults.svelte`). Replaces the prior silent fire-and-forget.
+
 Designer credit: the winner's name is always in the header; a separate optional `Created by: <name>` line is emitted only when the deck is attributed to someone else (or historical `twda` backfill) — omitted for self-designed or anonymous decks. Names only, never VEKN IDs. The winner's name appearing regardless of attribution is intentional: TWDA is the public win registry — you win, your name goes there.
 
 ### Inbound (Import)

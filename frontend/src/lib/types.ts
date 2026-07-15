@@ -307,6 +307,13 @@ export interface Tournament extends BaseObject {
   external_ids?: Record<string, string>;
   vekn_pushed_at?: string | null;
   vekn_results_stale?: boolean; // results diverged after the write-once VEKN push
+  // Last TWDA auto-submission outcome (organizer projection only)
+  twda_status?: {
+    outcome: "submitted" | "skipped" | "failed";
+    reason: string; // skip reason code → twda_reason_* i18n keys
+    pr_url: string;
+    at: string | null;
+  } | null;
   checkin_code?: string;
   players?: Player[];
   rounds?: Table[][];

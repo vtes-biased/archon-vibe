@@ -56,6 +56,7 @@
 - [Error localization across throw surfaces](error-localization-offline-path-trap.md) — engine-error localization covers HTTP + offline WASM + JS pre-checks (wired); preserve all three when changing error presentation.
 - [Resync branch zero-delay loop](sync-resync-branch-zero-delay-loop.md) — sync.ts resync onmessage branch reconnects with NO delay; cold-start trigger fixed, branch unguarded for any other persistent resync cause; route resync reconnects through backoff.
 - [go-online self-echo + 409 gap](go-online-self-echo-409-gap.md) — FIXED: broadcast_precomputed exclude_device_id self-excludes the initiating device + goingOnlineUids guard (HTTP response is sole authority in-flight) + 409→clearOfflineState. Residual: bounded in-flight reconciliation window.
+- [Offline re-pull of server-managed Tournament fields](offline-repull-server-managed-fields.md) — new backend-only Tournament field must be added to go_online's "server wins" re-pull block (alongside checkin_code/vekn_pushed_at/…), else offline round-trip silently reverts it; online /action is safe (engine json-rust preserves unknown keys). twda_status currently omitted.
 
 ## Web Push (#314)
 - [Web Push VAPID thread + claims traps](webpush-vapid-thread-and-claims.md) — `vapid_claims` dict IS mutated per-send (fresh dict required); `Vapid01` instance is NOT (safe to share across to_thread). Backwards from intuition.
