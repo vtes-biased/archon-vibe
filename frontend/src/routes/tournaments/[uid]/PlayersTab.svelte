@@ -949,16 +949,21 @@
                 </td>
               {/if}
               {#if isOrganizer}
-                <td class="py-1.5 text-right whitespace-nowrap">
-                  {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
-                    <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
-                  {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
-                    <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
-                  {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
-                    <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
-                  {/if}
-                  <!-- Rare/destructive tail (drop/remove · sanction · proxy) lives in "More". -->
-                  <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} aria-expanded={morePlayer === puid}><Ellipsis class="w-4 h-4" aria-hidden="true" />{m.players_more()}</Button>
+                <td class="py-1.5">
+                  <!-- Flex row: two adjacent inline-flex Buttons on a text line
+                       baseline-shift when one leads with an icon (More).
+                       nowrap: labels must not wrap under column squeeze. -->
+                  <div class="flex items-center justify-end gap-1 whitespace-nowrap">
+                    {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
+                      <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+                    {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
+                      <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
+                    {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
+                      <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
+                    {/if}
+                    <!-- Rare/destructive tail (drop/remove · sanction · proxy) lives in "More". -->
+                    <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} aria-expanded={morePlayer === puid}><Ellipsis class="w-4 h-4" aria-hidden="true" />{m.players_more()}</Button>
+                  </div>
                 </td>
               {/if}
             </tr>

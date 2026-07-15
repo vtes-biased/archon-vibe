@@ -377,98 +377,6 @@
   </div>
 {/if}
 
-<h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide border-t border-line pt-4">{m.tfield_section_rounds()}</h3>
-
-<!-- Rounds: open-rounds opt-in + round count / per-player cap (always shown) -->
-<fieldset class="border-0 p-0 m-0">
-  <legend class="sr-only">{m.tfield_round_settings()}</legend>
-  <label class="flex items-center gap-3 cursor-pointer">
-    <input
-      type="checkbox"
-      checked={values.open_rounds}
-      disabled={disabled || disabledFields.has("open_rounds")}
-      onchange={(e) => handleOpenRoundsToggle((e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-    />
-    <span class="text-sm text-ink-bright">{m.tfield_open_rounds()}</span>
-  </label>
-  {#if values.open_rounds}
-    <div class="banner-warn flex items-start gap-2 rounded-lg p-2 mt-1 ml-8 text-xs">
-      <Info class="w-4 h-4 shrink-0 mt-px" aria-hidden="true" />
-      <span>{m.tfield_open_rounds_warning()}</span>
-    </div>
-  {:else}
-    <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
-  {/if}
-
-  <!-- Round count (standard) / per-player cap (open rounds) — always visible and
-       aligned flush with the other fields; it no longer depends on open rounds. The
-       VEKN-push build constrains a standard tournament to 2–4 (the count it reports). -->
-  <div class="mt-3">
-    <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>
-      {values.open_rounds ? m.tfield_round_cap() : m.tfield_round_count()}
-    </label>
-    <select
-      id={id("max-rounds")}
-      value={String(values.max_rounds)}
-      disabled={disabled || disabledFields.has("max_rounds")}
-      onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      {#if !values.open_rounds && veknPush}
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-      {:else}
-        <option value="0">{m.tfield_max_rounds_no_limit()}</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-      {/if}
-    </select>
-    {#if disabledFields.has("max_rounds")}
-      <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_locked_hint()}</p>
-    {/if}
-  </div>
-
-  <!-- Soft registration cap: warn-only (venue seat limits are advisory) -->
-  <div class="mt-3">
-    <label class="block text-sm text-ink-muted mb-1" for={id("max-players")}>{m.tfield_max_players()}</label>
-    <input
-      id={id("max-players")}
-      type="number"
-      min="0"
-      value={values.max_players || ""}
-      {disabled}
-      placeholder={m.tfield_max_players_none()}
-      onchange={(e) => handleInput("max_players", parseInt((e.target as HTMLInputElement).value) || 0)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-    />
-    <p class="text-xs text-ink-faint mt-1">{m.tfield_max_players_desc()}</p>
-  </div>
-
-  <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite
-       (works offline and with or without a per-player cap) — lets present players
-       seat their own pod without an organizer. -->
-  {#if values.open_rounds}
-    <div class="mt-3">
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={values.self_organized_rounds}
-          {disabled}
-          onchange={(e) => handleInput("self_organized_rounds", (e.target as HTMLInputElement).checked)}
-          class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-        />
-        <span class="text-sm text-ink-bright">{m.tfield_self_organized_rounds()}</span>
-      </label>
-      <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_self_organized_rounds_desc()}</p>
-    </div>
-  {/if}
-</fieldset>
-
 <!-- Rare fields behind disclosures: the required path stays scannable -->
 <div class="bg-surface-muted/30 rounded-lg p-4">
   <button type="button" onclick={() => visibilityExpanded = !visibilityExpanded}
@@ -568,6 +476,98 @@
     />
     <span class="text-sm text-ink-bright">{m.tfield_decklist_required()}</span>
   </label>
+</div>
+
+<!-- Rounds: open-rounds opt-in + round count / per-player cap. Defaults (3
+     standard rounds, no cap) fit most events, so the block lives in Advanced. -->
+<div class="border-t border-line pt-4">
+<fieldset class="border-0 p-0 m-0">
+  <h3 class="text-sm font-medium text-ink-strong mb-3">{m.tfield_section_rounds()}</h3>
+  <label class="flex items-center gap-3 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={values.open_rounds}
+      disabled={disabled || disabledFields.has("open_rounds")}
+      onchange={(e) => handleOpenRoundsToggle((e.target as HTMLInputElement).checked)}
+      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+    />
+    <span class="text-sm text-ink-bright">{m.tfield_open_rounds()}</span>
+  </label>
+  {#if values.open_rounds}
+    <div class="banner-warn flex items-start gap-2 rounded-lg p-2 mt-1 ml-8 text-xs">
+      <Info class="w-4 h-4 shrink-0 mt-px" aria-hidden="true" />
+      <span>{m.tfield_open_rounds_warning()}</span>
+    </div>
+  {:else}
+    <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
+  {/if}
+
+  <!-- Round count (standard) / per-player cap (open rounds). The VEKN-push
+       build constrains a standard tournament to 2–4 (the count it reports). -->
+  <div class="mt-3">
+    <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>
+      {values.open_rounds ? m.tfield_round_cap() : m.tfield_round_count()}
+    </label>
+    <select
+      id={id("max-rounds")}
+      value={String(values.max_rounds)}
+      disabled={disabled || disabledFields.has("max_rounds")}
+      onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
+      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+    >
+      {#if !values.open_rounds && veknPush}
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+      {:else}
+        <option value="0">{m.tfield_max_rounds_no_limit()}</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      {/if}
+    </select>
+    {#if disabledFields.has("max_rounds")}
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_locked_hint()}</p>
+    {/if}
+  </div>
+
+  <!-- Soft registration cap: warn-only (venue seat limits are advisory) -->
+  <div class="mt-3">
+    <label class="block text-sm text-ink-muted mb-1" for={id("max-players")}>{m.tfield_max_players()}</label>
+    <input
+      id={id("max-players")}
+      type="number"
+      min="0"
+      value={values.max_players || ""}
+      {disabled}
+      placeholder={m.tfield_max_players_none()}
+      onchange={(e) => handleInput("max_players", parseInt((e.target as HTMLInputElement).value) || 0)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+    />
+    <p class="text-xs text-ink-faint mt-1">{m.tfield_max_players_desc()}</p>
+  </div>
+
+  <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite
+       (works offline and with or without a per-player cap) — lets present players
+       seat their own pod without an organizer. -->
+  {#if values.open_rounds}
+    <div class="mt-3">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={values.self_organized_rounds}
+          {disabled}
+          onchange={(e) => handleInput("self_organized_rounds", (e.target as HTMLInputElement).checked)}
+          class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+        />
+        <span class="text-sm text-ink-bright">{m.tfield_self_organized_rounds()}</span>
+      </label>
+      <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_self_organized_rounds_desc()}</p>
+    </div>
+  {/if}
+</fieldset>
 </div>
 
 <!-- Timer Configuration -->
