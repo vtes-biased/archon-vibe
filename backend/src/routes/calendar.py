@@ -223,6 +223,7 @@ async def tournament_calendar(
 
     # Query tournaments from DB. Finished events are excluded except for
     # personal feeds, which keep them within FINISHED_WINDOW_DAYS (keyed on
+    # finish, falling back to start — some imported Finished rows carry no
     # finish); _matches_agenda then restricts them to own events.
     async with get_connection() as conn:
         result = await conn.execute(
@@ -234,7 +235,7 @@ async def tournament_calendar(
                 ("full"->>'state' != 'Finished'
                   AND ("full"->>'start' IS NULL OR ("full"->>'start')::timestamp >= %s::timestamp))
                 OR (%s AND "full"->>'state' = 'Finished'
-                  AND ("full"->>'finish')::timestamp >= %s::timestamp)
+                  AND (COALESCE("full"->>'finish', "full"->>'start'))::timestamp >= %s::timestamp)
               )
             ORDER BY "full"->>'start' ASC
             """,
