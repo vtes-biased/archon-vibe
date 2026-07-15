@@ -565,6 +565,18 @@ export function computeRatingPoints(
 }
 
 /**
+ * Ranking-eligibility gate (VEKN rules 3.1/3.1.6), single-sourced in the engine
+ * alongside backend ratings.py's inclusion filter.
+ * Returns "eligible" | "open_rounds" | "few_players" | "no_final",
+ * or null while the engine isn't loaded yet.
+ */
+export function rankingEligibility(tournament: unknown): string | null {
+  const engine = getEngineReactive();
+  if (!engine) return null;
+  return engine.rankingEligibility(JSON.stringify(tournament));
+}
+
+/**
  * Compute league standings using the WASM engine.
  *
  * @param standingsMode "RTP" | "Score" | "GP"

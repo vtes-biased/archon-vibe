@@ -1,5 +1,5 @@
 import type { Tournament, TournamentState } from "./types";
-import { computeFinalStandings, computeRatingPoints } from "./engine";
+import { computeFinalStandings, computeRatingPoints, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
@@ -306,19 +306,20 @@ export type RankedStatus =
 
 /** Ranked/unranked eligibility (VEKN rules 3.1/3.1.6): international ranking
  *  needs ≥8 players AND a played final; open-rounds / self-organized events are
- *  the non-VEKN house format, never rated (mirrors their exclusion in backend
- *  ratings.py). Finished is definitive (players who played, finals-or-winner —
- *  the winner fallback covers VEKN imports that carry no finals object); live
- *  events derive optimistically from checked-in players, assuming a final will
- *  be played. null = indeterminate: registration still open, or the viewer's
- *  projection lacks the data (anonymous). */
+ *  the non-VEKN house format, never rated. Finished is definitive and comes
+ *  from the engine's ranking_eligibility — the same single-sourced predicate
+ *  backend ratings.py inclusion-filters on. Live events derive optimistically
+ *  from checked-in players, assuming a final will be played. null =
+ *  indeterminate: registration still open, the viewer's projection lacks the
+ *  data (anonymous), or the WASM engine isn't loaded yet. */
 export function rankedStatus(t: Tournament): RankedStatus {
   if (t.open_rounds || t.self_organized_rounds) return { ranked: false, reason: "open_rounds" };
   if (t.state === "Finished") {
     if (!t.rounds && !t.standings) return null;
-    if (seatedPlayerCount(t) < 8) return { ranked: false, reason: "few_players" };
-    if (!t.finals && !t.winner) return { ranked: false, reason: "no_final" };
-    return { ranked: true };
+    const verdict = rankingEligibility(t);
+    if (verdict === null) return null;
+    if (verdict === "eligible") return { ranked: true };
+    return { ranked: false, reason: verdict as "few_players" | "no_final" | "open_rounds" };
   }
   if (t.state === "Waiting" || t.state === "Playing") {
     if (!t.players) return null;
@@ -331,9 +332,12 @@ export function rankedStatus(t: Tournament): RankedStatus {
 /** Rating points a Finished tournament awards a standings entry — the single copy.
  *  DQ'd/proxy players earn none (not even the base); the winner gains the +1 GW and
  *  finalist position 1. `playedCount` is seatedPlayerCount(tournament) — the field
- *  size backend ratings.py uses — NOT standings.length (over-counts no-shows). */
+ *  size backend ratings.py uses — NOT standings.length (over-counts no-shows).
+ *  Ranking-ineligible events (< 8 players / no final / house format) award none:
+ *  the RtP column must agree with the pipeline's engine-gated inclusion filter. */
 export function getRatingPts(entry: StandingEntry, tournament: Tournament, playedCount: number): number {
   if (tournament.state !== "Finished" || entry.disqualified || entry.non_competing) return 0;
+  if (rankingEligibility(tournament) !== "eligible") return 0;
   const isWinner = entry.user_uid === tournament.winner;
   const finalistPos = isWinner ? 1
     : (tournament.finals?.seating.some((s) => s.player_uid === entry.user_uid) ? 2 : 0);

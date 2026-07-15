@@ -208,23 +208,26 @@ async def recompute_ratings_for_players(
         all_tournaments.extend(
             await get_finished_tournaments_for_category(fmt, online, cutoff_str)
         )
-    # Open-rounds / self-organized events are the non-VEKN house format — they never
-    # count toward ratings/RTP (mirrors their exclusion from VEKN push).
-    all_tournaments = [
-        t for t in all_tournaments if not (t.open_rounds or t.self_organized_rounds)
-    ]
 
     # Precompute per-tournament data once, not per (user, tournament): the played
     # set, encoded JSON, and player count are user-independent. Avoids re-scanning
     # rounds and re-encoding the full tournament O(players) times.
+    # The engine's ranking_eligibility gate (rules 3.1/3.1.6) drops open-rounds/
+    # self-organized house events AND events with < 8 players or no final — the
+    # same single-sourced predicate the frontend ranked/unranked badge displays.
     played_by_t: dict[str, set[str]] = {}
     json_by_t: dict[str, str] = {}
     count_by_t: dict[str, int] = {}
+    eligible: list[Tournament] = []
     for t in all_tournaments:
-        played = _players_with_rounds(t)
-        played_by_t[t.uid] = played
-        json_by_t[t.uid] = msgspec.json.encode(t).decode()
-        count_by_t[t.uid] = len(played)
+        t_json = msgspec.json.encode(t).decode()
+        if _engine.ranking_eligibility(t_json) != "eligible":
+            continue
+        eligible.append(t)
+        played_by_t[t.uid] = _players_with_rounds(t)
+        json_by_t[t.uid] = t_json
+        count_by_t[t.uid] = len(played_by_t[t.uid])
+    all_tournaments = eligible
 
     # Fetch wins + the player User objects in batch (one query each, not N).
     wins_map = await get_tournament_wins_for_users(player_uids)
@@ -305,8 +308,8 @@ async def recompute_all_ratings() -> list[tuple[User, BroadcastData]]:
             t = decode_json(json_str, Tournament)
             if t.state != "Finished" or t.deleted_at:
                 continue
-            if t.open_rounds or t.self_organized_rounds:
-                continue  # non-VEKN house format: excluded from ratings
+            if _engine.ranking_eligibility(json_str) != "eligible":
+                continue  # house format / < 8 players / no final: never rated
             category = rating_category_for_tournament(t)
             players = _players_with_rounds(t)
             players_by_category[category].update(players)

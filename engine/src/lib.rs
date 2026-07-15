@@ -502,6 +502,14 @@ mod wasm {
             super::ratings::rating_category(format, online).to_string()
         }
 
+        /// "eligible" or the blocking reason: "open_rounds" | "few_players" | "no_final".
+        #[wasm_bindgen(js_name = rankingEligibility)]
+        pub fn ranking_eligibility(&self, tournament_json: &str) -> Result<String, String> {
+            let t =
+                json::parse(tournament_json).map_err(|e| super::EngineError::from(e).to_json())?;
+            Ok(super::ratings::ranking_eligibility(&t).to_string())
+        }
+
         #[wasm_bindgen(js_name = parseDeck)]
         pub fn parse_deck(&self, text: &str, cards_json: &str) -> Result<String, String> {
             js_str(parse_deck_json(text, cards_json))
@@ -733,6 +741,14 @@ mod python {
 
         fn rating_category(&self, format: &str, online: bool) -> String {
             super::ratings::rating_category(format, online).to_string()
+        }
+
+        /// "eligible" or the blocking reason: "open_rounds" | "few_players" | "no_final".
+        fn ranking_eligibility(&self, tournament_json: &str) -> PyResult<String> {
+            use pyo3::exceptions::PyValueError;
+            let t = json::parse(tournament_json)
+                .map_err(|e| PyValueError::new_err(super::EngineError::from(e).to_json()))?;
+            Ok(super::ratings::ranking_eligibility(&t).to_string())
         }
 
         /// Compute a player's SA-adjusted (vp, gw) for rating/VEKN-push, so the

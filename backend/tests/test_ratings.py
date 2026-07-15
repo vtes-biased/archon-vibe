@@ -207,6 +207,81 @@ def _sanction(user_uid: str, **overrides) -> Sanction:
     return msgspec.convert(d, Sanction)
 
 
+def test_ranking_eligibility_gate():
+    """Rules 3.1/3.1.6: only >=8 players AND a played final counts toward the
+    international ranking; house formats never do. This PyO3 predicate is what
+    ratings.py inclusion-filters on (and the frontend badge displays) — a
+    regression here silently re-credits sub-threshold events."""
+
+    def verdict(t: Tournament) -> str:
+        return _engine.ranking_eligibility(msgspec.json.encode(t).decode())
+
+    finals = {
+        "seating": [
+            _seat("p0", 3.0, 1),
+            _seat("p1"),
+            _seat("p2"),
+            _seat("p3"),
+            _seat("p4"),
+        ],
+        "seed_order": ["p0", "p1", "p2", "p3", "p4"],
+    }
+    eligible = _make_tournament(
+        rounds=[
+            [
+                {"seating": [_seat(f"p{i}") for i in range(4)]},
+                {"seating": [_seat(f"p{i}") for i in range(4, 8)]},
+            ]
+        ],
+        finals=finals,
+        winner="p0",
+    )
+    assert verdict(eligible) == "eligible"
+
+    seven = _make_tournament(
+        rounds=[
+            [
+                {"seating": [_seat(f"p{i}") for i in range(4)]},
+                {"seating": [_seat(f"p{i}") for i in range(4, 7)]},
+            ]
+        ],
+        finals=finals,
+        winner="p0",
+    )
+    assert verdict(seven) == "few_players"
+
+    no_final = _make_tournament(
+        rounds=[
+            [
+                {"seating": [_seat(f"p{i}") for i in range(4)]},
+                {"seating": [_seat(f"p{i}") for i in range(4, 8)]},
+            ]
+        ],
+    )
+    assert verdict(no_final) == "no_final"
+
+    house = msgspec.structs.replace(eligible, open_rounds=True)
+    assert verdict(house) == "open_rounds"
+
+    # VEKN import: rounds-less, standings carry the field, winner but no finals
+    # object — stays eligible (the reconstructed-history convention).
+    imported = _make_tournament(
+        standings=[
+            {
+                "user_uid": f"p{i}",
+                "gw": 0,
+                "vp": 1.5,
+                "tp": 24,
+                "toss": 0,
+                "rank": i + 1,
+            }
+            for i in range(9)
+        ],
+        winner="p0",
+    )
+    assert verdict(imported) == "eligible"
+
+
 def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
     """A DQ'd player who played earns NO rating points — not even the 5-point
     participation base (spec #284). The engine zeroes their VP/GW to (0,0), so an
