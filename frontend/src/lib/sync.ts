@@ -474,7 +474,11 @@ class SyncManager {
     };
 
     this.eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
+      // EventSource fires onerror on every transient drop before auto-reconnecting;
+      // we run our own backoff in handleError(). Log at debug so an expected
+      // reconnect doesn't spam error-level noise — the terminal give-up (below)
+      // is the one that logs at error level.
+      console.debug('SSE connection error (will reconnect):', error);
       void this.handleError();
     };
   }
@@ -583,6 +587,9 @@ class SyncManager {
       );
       setTimeout(() => { void this.connect(); }, delay);
     } else {
+      // Terminal: reconnect budget exhausted. This is the genuine failure worth
+      // an error-level log (the per-drop onerror above stays at debug).
+      console.error(`SSE connection failed after ${this.reconnectAttempts} attempts`);
       this.emit({ type: 'error', error: 'Failed to connect after multiple attempts' });
     }
   }
