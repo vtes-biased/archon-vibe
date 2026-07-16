@@ -119,7 +119,7 @@ Aggregates tournaments into leagues with standings. Synced via SSE like tourname
 
 msgspec is used throughout for high-performance JSON: responses encode via `msgspec.json.Encoder`; Python models are `msgspec.Struct`, mirrored by TypeScript interfaces.
 
-The Rust core defines the canonical object schemas and business logic, compiled to a native library (PyO3) and to WebAssembly (wasm-bindgen) so logic is identical across client and server. Engine at `engine/src/`; build with `just build-engine` (see engine/README.md for bindings and entry-point signatures).
+The Rust core defines the canonical object schemas and business logic, compiled to a native library (PyO3) and to WebAssembly (wasm-bindgen) so logic is identical across client and server. Engine at `engine/src/`; `just dev` rebuilds both targets, or build directly with `wasm-pack` / `maturin develop` (see engine/README.md for the commands, bindings and entry-point signatures).
 
 **Key modules**:
 - `lib.rs` — entry point, WASM/PyO3 bindings.

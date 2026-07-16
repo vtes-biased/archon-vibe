@@ -386,4 +386,4 @@ Offline uses a device-lock model (no CRUD log / conflict resolution): the organi
 
 ## Building
 
-`just build-engine` (both targets), or `build-engine-wasm` / `build-engine-python` individually. See ARCHITECTURE.md / engine/README.md.
+`just dev` rebuilds both engine targets on start; to build one directly, use the `wasm-pack` (WASM) or `maturin develop` (PyO3) commands in engine/README.md.
