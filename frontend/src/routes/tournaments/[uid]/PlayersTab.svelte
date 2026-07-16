@@ -311,8 +311,12 @@
   let showCreateModal = $state(false);
 
   async function addPlayerByUser(user: User) {
-    if (!user.vekn_id) {
-      // No VEKN ID → must be sponsored first; the modal explains eligibility.
+    if (!user.vekn_id && "vekn_id" in user) {
+      // Empty at an access level that shows it → genuinely unsponsored; the
+      // modal explains eligibility. A missing KEY instead means the field is
+      // hidden from this viewer (public-level co-organizer): fall through —
+      // the server injects the authoritative vekn_id on AddPlayer, and
+      // sponsoring a member who already has one would 400.
       sponsorTarget = user;
       return;
     }
