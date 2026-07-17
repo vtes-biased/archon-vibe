@@ -147,6 +147,11 @@ def entitled_level(
         return "public"
     if Role.IC in viewer.roles:
         return "full"
+    # Promo inventory chain (IC→NC→organizer) is not country-scoped: NC sees the
+    # full projection (holdings) for every promo. Princes/organizers stay member;
+    # an organizer's own stock reaches them via their own User full projection.
+    if obj_type == ObjectType.PROMO and Role.NC in viewer.roles:
+        return "full"
     if (
         (Role.NC in viewer.roles or Role.PRINCE in viewer.roles)
         and viewer.country

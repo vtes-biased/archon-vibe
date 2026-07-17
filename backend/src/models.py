@@ -22,6 +22,7 @@ class ObjectType(StrEnum):
     TOURNAMENT = "tournament"
     DECK = "deck"
     LEAGUE = "league"
+    PROMO = "promo"
 
 
 class DataLevel(StrEnum):
@@ -601,6 +602,46 @@ class Tournament(TournamentConfig, kw_only=True):
     )  # table_idx → extra seconds
     # Live organizer announcements (online-only, member-projected, capped)
     announcements: list[Announcement] = msgspec.field(default_factory=list)
+
+
+# Promotional items (BCP promo cards/packs)
+
+
+class PromoKind(StrEnum):
+    CARD = "card"
+    PACK = "pack"
+    OTHER = "other"
+
+
+class PromoHolding(msgspec.Struct, kw_only=True):
+    """Server-computed inventory aggregate for one holder (promo ledger)."""
+
+    assigned: int = 0
+    remaining: int = 0
+
+
+class Promo(BaseObject, kw_only=True):
+    """Promotional item distributed at events (usually an alt-art card).
+
+    Catalog fields are IC-edited. `holdings` is server-written only — denormalized
+    from the promo ledger and tournament distribution reports, so every client
+    reads the same authoritative remaining counts (never derived client-side).
+    """
+
+    name: str
+    kind: PromoKind = PromoKind.CARD
+    description: str = ""
+    release_date: datetime | None = None
+    # Retirement flag. A referenced promo is never soft-deleted (historical
+    # distribution rows and raffle prizes must keep resolving); UI filters.
+    active: bool = True
+    # Distribution gating, UX-only (organizer picker filter, no access control):
+    # empty = unrestricted; when both are set a tournament must match both.
+    allowed_ranks: list[TournamentRank] = msgspec.field(default_factory=list)
+    league_uids: list[str] = msgspec.field(default_factory=list)
+    image_path: str | None = None  # Server-stored compressed image path (versioned)
+    # holder_uid → aggregate; full projection only (officials)
+    holdings: dict[str, PromoHolding] = msgspec.field(default_factory=dict)
 
 
 # OAuth 2.0 models

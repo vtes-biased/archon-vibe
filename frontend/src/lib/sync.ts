@@ -7,7 +7,7 @@
  * 3. On resync: re-fetch snapshot, reconnect SSE
  */
 
-import type { User, Sanction, Tournament, DeckObject, League } from '$lib/types';
+import type { User, Sanction, Tournament, DeckObject, League, Promo } from '$lib/types';
 import {
   saveUser,
   saveUsersBatch,
@@ -24,11 +24,15 @@ import {
   saveLeague,
   saveLeaguesBatch,
   deleteLeague,
+  savePromo,
+  savePromosBatch,
+  deletePromo,
   clearAllUsers,
   clearAllSanctions,
   clearAllTournaments,
   clearAllDecks,
   clearAllLeagues,
+  clearAllPromos,
   setLastSyncTimestamp,
   getLastSyncTimestamp,
   clearLastSyncTimestamp,
@@ -93,6 +97,7 @@ const SPECS: ObjectSpec<any>[] = [
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
   { batchType: 'decks', singleType: 'deck', save: saveDeck, saveBatch: saveDecksBatch, del: deleteDeck },
   { batchType: 'leagues', singleType: 'league', save: saveLeague, saveBatch: saveLeaguesBatch, del: deleteLeague },
+  { batchType: 'promos', singleType: 'promo', save: savePromo, saveBatch: savePromosBatch, del: deletePromo },
 ];
 
 class SyncManager {
@@ -556,6 +561,7 @@ class SyncManager {
     await clearAllTournaments();
     await clearAllDecks();
     await clearAllLeagues();
+    await clearAllPromos();
     await clearLastSyncTimestamp();
     await clearLastSyncGeneratedAt();
     await clearLastSyncAccessVersion();

@@ -221,6 +221,15 @@ def compute_deck_full(d: dict) -> dict:
     return dict(d)
 
 
+def compute_promo_public(d: dict) -> dict:
+    """Catalog only — the server-written inventory aggregates are officials-only.
+
+    Deliberately NOT gated on `active`: retired promos must keep resolving for
+    historical distribution rows and raffle prizes; the gallery UI filters.
+    """
+    return {k: v for k, v in d.items() if k != "holdings"}
+
+
 # ---------------------------------------------------------------------------
 # Shared passthrough (identity projection)
 # ---------------------------------------------------------------------------
@@ -245,6 +254,7 @@ _PUBLIC_DISPATCH = {
     ObjectType.SANCTION: compute_sanction_public,
     ObjectType.DECK: compute_deck_public,
     ObjectType.LEAGUE: _identity,
+    ObjectType.PROMO: compute_promo_public,
 }
 
 _MEMBER_DISPATCH = {
@@ -253,6 +263,7 @@ _MEMBER_DISPATCH = {
     ObjectType.SANCTION: _identity,
     ObjectType.DECK: compute_deck_member,
     ObjectType.LEAGUE: _identity,
+    ObjectType.PROMO: compute_promo_public,
 }
 
 _FULL_DISPATCH = {
@@ -261,6 +272,7 @@ _FULL_DISPATCH = {
     ObjectType.SANCTION: _identity,
     ObjectType.DECK: compute_deck_full,
     ObjectType.LEAGUE: _identity,
+    ObjectType.PROMO: _identity,
 }
 
 

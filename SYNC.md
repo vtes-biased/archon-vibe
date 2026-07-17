@@ -48,6 +48,7 @@ async def stream_objects_new(
 | sanction | `None` | full data | full data |
 | deck | `None` | full data if `public=true`, else `None` | full data |
 | league | full data | full data | full data |
+| promo | catalog only (no `holdings`) | catalog only, same as public | everything, incl. `holdings` |
 
 `None` means column is NULL in DB — object invisible at that level.
 
@@ -170,7 +171,7 @@ Every targeted frame carries the recomputed `access_version`. **Organizer add/re
 
 ### Access Entitlement
 
-`entitled_level(viewer, *, obj_type, uid, country, org_uids, obj_user_uid) → "public"|"member"|"full"` in `broadcast.py` is the **single source of truth** for per-object access. It is called by both the live broadcast (`broadcast_precomputed`) and the tournament-scoped catch-up (`_scoped_catchup_frames`). Logic: IC → full; NC/Prince same country → full; explicit organizer → full; member with own profile/deck → full; any member → member; otherwise public.
+`entitled_level(viewer, *, obj_type, uid, country, org_uids, obj_user_uid) → "public"|"member"|"full"` in `broadcast.py` is the **single source of truth** for per-object access. It is called by both the live broadcast (`broadcast_precomputed`) and the tournament-scoped catch-up (`_scoped_catchup_frames`). Logic: IC → full; NC/Prince same country → full; explicit organizer → full; member with own profile/deck → full; any member → member; otherwise public. Exception: NC gets full for promo objects regardless of country (the IC→NC→organizer inventory chain isn't country-scoped; Princes/organizers stay member).
 
 ### Generic Broadcast
 
@@ -205,6 +206,7 @@ Minimal indexes only:
 | tournaments | `by-state`, `by-start`, `by-country`, `by-format` |
 | decks | `by-tournament`, `by-user` |
 | leagues | `by-country`, `by-start` |
+| promos | none (small catalog) |
 
 ### Offline Mode
 
@@ -238,6 +240,7 @@ const SPECS = [
   { batchType: 'tournaments', singleType: 'tournament', save, saveBatch, del },
   { batchType: 'decks', singleType: 'deck', save, saveBatch, del },
   { batchType: 'leagues', singleType: 'league', save, saveBatch, del },
+  { batchType: 'promos', singleType: 'promo', save, saveBatch, del },
 ];
 ```
 
@@ -322,9 +325,7 @@ When adding new state: if it's display data keyed by uid that every authorized c
 2. **Projection functions** in `access_levels.py`: `compute_<type>_public/member/full()` + add to dispatch dicts
 3. **CRUD wrappers** in `db.py`: thin wrappers calling `save_object_from_model("<type>", obj)` and `get_object_full(uid, Type)`; populate `BroadcastData.tournament_uid` if the type belongs to a tournament (needed for tournament-scoped SSE connections)
 4. **Access entitlement** in `broadcast.entitled_level()`: add a branch if the type has non-standard visibility rules (own object, country-scoped, etc.)
-5. **Add to `_STREAM_TYPES`** in `main.py` (SSE catch-up loop)
-6. **Add to `OBJECT_TYPES`** in `snapshots.py`
-7. **Broadcast** via `broadcast_precomputed()` (from `broadcast.py`) after mutations
-8. **Frontend type** in `types.ts`
-9. **IndexedDB store** in `db.ts` (bump version → full clear)
-10. **Add to `SPECS`** in `sync.ts`
+5. **Broadcast** via `broadcast_precomputed()` (from `broadcast.py`) after mutations — no registration step needed: `_STREAM_TYPES` (`main.py`) and `OBJECT_TYPES` (`snapshots.py`) both derive from `list(ObjectType)` and pick up the new type automatically
+6. **Frontend type** in `types.ts`
+7. **IndexedDB store** in `db.ts` (bump version → full clear)
+8. **Add to `SPECS`** in `sync.ts`

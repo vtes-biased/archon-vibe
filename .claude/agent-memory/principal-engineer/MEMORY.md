@@ -104,6 +104,7 @@
 ## Authorization (cross-stack)
 - Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).
 - [Projection tier: column vs content split](projection-tier-column-vs-content-split.md) — new precomputed access column ONLY when projection CONTENT must vary by viewer at the same level (else collapse onto existing column + shrink lower one); base64 contact obfuscation is a harvester speed-bump, not access control.
+- [entitled_level vs overlay catch-up asymmetry](entitled-level-vs-overlay-catchup-asymmetry.md) — a new full-access branch in entitled_level only wires the LIVE path; non-country/non-own-object full grants must ALSO be added to _overlay_frames (main.py) or the resync re-delivers the lower projection (promo holdings for NC is the exemplar gap).
 
 ## Error handling (cross-stack)
 - [aiohttp timeout escapes ClientError](aiohttp-timeout-escapes-clienterror.md) — ClientTimeout breach raises asyncio.TimeoutError, NOT aiohttp.ClientError; `except aiohttp.ClientError` misses timeouts (→ 500 not 502) on every external-proxy route (feedback/twda/webpush).

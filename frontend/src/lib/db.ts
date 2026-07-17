@@ -4,7 +4,7 @@
  */
 
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
-import type { User, Role, Sanction, Tournament, DeckObject, League, VtesCard, OfflinePlayer } from '$lib/types';
+import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch } from './utils';
 
@@ -61,6 +61,10 @@ interface ArchonDB extends DBSchema {
       'by-start': string;
     };
   };
+  promos: {
+    key: string;  // uid
+    value: Promo;
+  };
   cards: {
     key: number; // card id
     value: VtesCard;
@@ -73,8 +77,8 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-// Version 15: new sync — replace ratings with decks store, remove changes store
-const DB_VERSION = 15;
+// Version 16: add promos store
+const DB_VERSION = 16;
 
 type UpgradeTx = IDBPTransaction<ArchonDB, ArrayLike<StoreNames<ArchonDB>>, 'versionchange'>;
 
@@ -241,6 +245,9 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       const leagueStore = db.createObjectStore('leagues', { keyPath: 'uid' });
       leagueStore.createIndex('by-country', 'country');
       leagueStore.createIndex('by-start', 'start');
+
+      // Promos store (small catalog — no indexes)
+      db.createObjectStore('promos', { keyPath: 'uid' });
 
       // Cards store (VTES card database, keyed by card ID)
       db.createObjectStore('cards', { keyPath: 'id' });
@@ -853,6 +860,40 @@ export async function deleteLeague(uid: string): Promise<void> {
 export async function clearAllLeagues(): Promise<void> {
   const db = await getDB();
   await db.clear('leagues');
+}
+
+// Promo operations
+export async function getPromo(uid: string): Promise<Promo | undefined> {
+  const db = await getDB();
+  return db.get('promos', uid);
+}
+
+export async function getAllPromos(): Promise<Promo[]> {
+  const db = await getDB();
+  return db.getAll('promos');
+}
+
+export async function savePromo(promo: Promo): Promise<void> {
+  const db = await getDB();
+  await db.put('promos', promo);
+}
+
+export async function savePromosBatch(promos: Promo[]): Promise<void> {
+  if (promos.length === 0) return;
+  const db = await getDB();
+  const tx = db.transaction('promos', 'readwrite');
+  for (const p of promos) tx.store.put(p);
+  await tx.done;
+}
+
+export async function deletePromo(uid: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('promos', uid);
+}
+
+export async function clearAllPromos(): Promise<void> {
+  const db = await getDB();
+  await db.clear('promos');
 }
 
 // Metadata helpers for offline tournament state

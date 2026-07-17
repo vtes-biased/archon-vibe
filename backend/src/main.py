@@ -53,6 +53,7 @@ from .routes import (
     feedback,
     leagues,
     oauth,
+    promos,
     push,
     sanctions,
     tournaments,
@@ -535,6 +536,7 @@ app.include_router(tournaments.router)
 app.include_router(oauth.router)
 app.include_router(cards.router)
 app.include_router(leagues.router)
+app.include_router(promos.router)
 app.include_router(calendar.router)
 app.include_router(push.router)
 app.include_router(feedback.router)
@@ -917,6 +919,21 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
             ).fetchall()
             if rows:
                 frames.extend(_sse_object_lines("tournaments", [r[0] for r in rows]))
+                count += len(rows)
+
+        # NC: full for all promos (inventory chain is not country-scoped) —
+        # mirrors the entitled_level promo branch; without this a resync would
+        # re-deliver member promos (holdings stripped) to NC officials.
+        if Role.NC in viewer.roles:
+            rows = await (
+                await db_conn.execute(
+                    'SELECT "full"::text FROM objects WHERE type = %s '
+                    "AND deleted_at IS NULL",
+                    (ObjectType.PROMO,),
+                )
+            ).fetchall()
+            if rows:
+                frames.extend(_sse_object_lines("promos", [r[0] for r in rows]))
                 count += len(rows)
 
         # Organizer: full for organized tournaments + their decks

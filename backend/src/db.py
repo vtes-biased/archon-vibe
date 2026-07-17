@@ -21,6 +21,7 @@ from .models import (
     DeckObject,
     League,
     ObjectType,
+    Promo,
     Role,
     Sanction,
     Tournament,
@@ -467,6 +468,7 @@ _OBJECT_TYPES: dict[type, ObjectType] = {
     Tournament: ObjectType.TOURNAMENT,
     League: ObjectType.LEAGUE,
     DeckObject: ObjectType.DECK,
+    Promo: ObjectType.PROMO,
 }
 
 
@@ -1127,6 +1129,48 @@ async def get_finished_tournaments_for_category(
 async def save_league(league: League) -> BroadcastData:
     """Upsert a league into the objects table."""
     return await save_object_from_model(ObjectType.LEAGUE, league)
+
+
+async def save_promo(promo: Promo) -> BroadcastData:
+    """Upsert a promo into the objects table."""
+    return await save_object_from_model(ObjectType.PROMO, promo)
+
+
+async def get_promo_by_uid(uid: str) -> Promo | None:
+    """Get a promo by UID."""
+    return await get_object_full(uid, Promo)
+
+
+async def get_all_promos(
+    conn: psycopg.AsyncConnection | None = None,
+) -> list[Promo]:
+    """Get all promos (retired included; UI filters on `active`)."""
+    async with _acquire(conn) as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'promo' AND deleted_at IS NULL""",
+        )
+        rows = await result.fetchall()
+        return [decode_json(row[0], Promo) for row in rows]
+
+
+async def count_promo_references(uid: str) -> int:
+    """Live tournament rows referencing a promo (distribution reports).
+
+    Guards hard-delete: a referenced promo must be retired (active=false), never
+    tombstoned — the universal soft-delete would evict it from clients and dangle
+    historical rows. Raffle-prize and ledger references extend this count when
+    those features land.
+    """
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT COUNT(*) FROM objects
+            WHERE type = 'tournament' AND deleted_at IS NULL
+              AND "full"->'promos_distributed' @> %s::jsonb""",
+            (msgspec.json.encode([{"promo_uid": uid}]).decode(),),
+        )
+        row = await result.fetchone()
+        return row[0] if row else 0
 
 
 async def get_all_leagues(

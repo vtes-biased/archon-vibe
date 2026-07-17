@@ -174,6 +174,31 @@ export interface League extends BaseObject {
   open_to_country_princes?: boolean;
 }
 
+// Promotional items (BCP promo cards/packs)
+
+export type PromoKind = "card" | "pack" | "other";
+
+/** Server-computed inventory aggregate for one holder (promo ledger). */
+export interface PromoHolding {
+  assigned: number;
+  remaining: number;
+}
+
+export interface Promo extends BaseObject {
+  name: string;
+  kind: PromoKind;
+  description: string;
+  release_date: string | null;
+  // Retirement flag — retired promos stay synced so historical rows resolve; UI filters.
+  active: boolean;
+  // Distribution gating (UX-only, organizer picker filter): empty = unrestricted.
+  allowed_ranks: TournamentRank[];
+  league_uids: string[];
+  image_path: string | null;
+  // holder_uid → aggregate; present only in the full projection (officials).
+  holdings?: Record<string, PromoHolding>;
+}
+
 // Tournament types
 
 export type TournamentState = "Planned" | "Registration" | "Waiting" | "Playing" | "Finished";

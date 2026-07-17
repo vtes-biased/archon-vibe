@@ -115,6 +115,12 @@ Seating is seeded and value-stable: `seating::seed_for_round(tournament_uid, rou
 
 Aggregates tournaments into leagues with standings. Synced via SSE like tournaments/users; stored in IndexedDB `leagues` (indexes `by-country`, `by-start`). Fields: `name`, `kind` (League/Meta-League), `standings_mode` (RTP/Score/GP), `format`, `country`, `start`/`finish`, `description`, `organizers_uids`, `parent_uid`, `open_to_country_princes` (country leagues only: same-country Princes may attach their own tournaments without becoming organizers — attach-only, gated by `can_link_tournament_to_league`; inert on a worldwide league). GP and RTP modes use `compute_final_standings` to derive final placement (winner=1, other finalists=2).
 
+## Promo Catalog
+
+IC-managed catalog of promotional items (BCP promo cards/packs, alt-art or unreleased — no krcg link) distributed at events. Synced via SSE; stored in IndexedDB `promos` (no indexes — small catalog). Fields: `name`, `kind` (card/pack/other), `description`, `release_date`, `active` (retirement flag: a promo referenced by a tournament report is refused hard-delete and retired instead — never soft-deleted, so historical references keep resolving; the gallery UI filters on it, the public projection does not), `allowed_ranks`/`league_uids` (distribution-picker gating, UX-only — no engine/access-control enforcement; empty = unrestricted, both set = AND), `image_path`, `holdings` (`holder_uid → {assigned, remaining}`, server-written aggregate, full projection only).
+
+Public/member projections strip `holdings` down to the catalog (`compute_promo_public`); full (officials) includes it. `entitled_level` gives NC full access to every promo regardless of country — the IC→NC→organizer inventory chain isn't country-scoped (Princes/organizers stay member). CRUD is plain REST, not the engine event pipeline: `POST/PUT/DELETE /api/promos` (IC-only; delete 409s while a tournament still references the uid).
+
 ## Serialization & Rust Integration
 
 msgspec is used throughout for high-performance JSON: responses encode via `msgspec.json.Encoder`; Python models are `msgspec.Struct`, mirrored by TypeScript interfaces.
