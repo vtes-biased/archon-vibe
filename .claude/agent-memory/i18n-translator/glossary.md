@@ -85,6 +85,15 @@ metadata:
 | crowned (verb, "crowned Champion") | couronné | coronado | coroado | incoronato |
 | promo (card) — not official rulebook terminology, coined; fem. noun all 4 locales, "le promo" invariable plural in it | promo (une promo / des promos) | promo (una promo / las promos) | promo (uma promo / as promos) | promo (una promo / le promo, invariable) |
 | stock (an organizer's personal promo-card inventory) | stock (loanword) | stock (loanword) | estoque (translated) | stock (loanword) |
+| promo kind: card / pack / other (catalog taxonomy, `promo_kind_*`) | Carte / Lot / Autre | Carta / Lote / Otro | Carta / Pacote / Outro | Carta / Pacchetto / Altro |
+| promo catalog "retire" (soft-deactivate, keep for historical reports) / "reactivate" | Retirer / Réactiver | Retirar / Reactivar | Retirar / Reativar | Ritira / Riattiva (tu-imperative) |
+| ledger (promo movement audit log, `promo_ledger_*`) | registre | registro | registro | registro |
+| movement (one ledger transaction, `promo_movement_*`) | mouvement | movimiento | movimentação (NOT "movimento" — that's the seating-move noun, different domain) | movimento |
+| assignment (ledger kind: stock handed to another official/holder) | Attribution | Asignación | Atribuição | Assegnazione |
+| distribution (ledger kind: copies handed to players directly) | Distribution | Distribución | Distribuição | Distribuzione |
+| holdings (a holder's per-promo remaining/assigned counts, `promo_holdings_*`/`promo_inventory_no_holdings`) — reuses "stock" rather than coining a separate word | stock | stock | estoque | stock |
+| member (generic app user in a picker/search context, `user_picker_*`) | membre | miembro | membro | membro |
+| National/Continental promo-rank badge (short form, `promo_rank_national`/`_continental` — drops "Championship", distinct from the full `tfield_rank` phrase above) | National / Continental | Nacional / Continental | National / Continental (kept English, matches pt's `tfield_ranked_no_proxies_hint` precedent of not translating this exact phrase) | Nazionale / Continentale |
 
 § it "register" for organizer-registers-someone-else keeps "iscrivere" even though it.json glosses self-registration and generic "registrato/a" (deceased/status) with "registrare" — don't conflate; the *action* of registering a player for a tournament is always iscrivere/inscrire/inscribir/inscrever, not registrare/registrarse family, across all four Romance locales.
 

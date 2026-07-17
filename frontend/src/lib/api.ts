@@ -2,7 +2,7 @@
  * API client for backend communication.
  */
 
-import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League } from '$lib/types';
+import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League, Promo, PromoKind, PromoLedgerEntry, PromoLedgerKind, TournamentRank } from '$lib/types';
 import { saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
 import { authorizedFetch, getAuthState } from '$lib/stores/auth.svelte';
@@ -733,4 +733,73 @@ export async function deleteTournamentBanner(
   );
   showToast({ type: 'success', message: m.tournament_banner_removed() });
   return result;
+}
+
+// ============================================================================
+// Promos (catalog IC-only; ledger self-sourced — see SYNC.md carve-out)
+// ============================================================================
+
+export interface PromoPayload {
+  name?: string;
+  kind?: PromoKind;
+  description?: string;
+  release_date?: string | null;
+  active?: boolean;
+  allowed_ranks?: TournamentRank[];
+  league_uids?: string[];
+}
+
+export async function createPromo(payload: PromoPayload): Promise<Promo> {
+  return apiRequest<Promo>('/api/promos/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updatePromo(uid: string, payload: PromoPayload): Promise<Promo> {
+  return apiRequest<Promo>(`/api/promos/${uid}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** 409 = referenced by reports/raffles/ledger — retire (active=false) instead. */
+export async function deletePromoCatalogEntry(uid: string): Promise<void> {
+  await apiRequest<void>(`/api/promos/${uid}`, { method: 'DELETE' }, { suppressErrorToast: true });
+}
+
+export async function uploadPromoImage(uid: string, file: File | Blob): Promise<{ success: boolean }> {
+  const formData = new FormData();
+  formData.append('file', file, 'promo.webp');
+  return apiRequest<{ success: boolean }>(`/api/promos/${uid}/image`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function deletePromoImage(uid: string): Promise<void> {
+  await apiRequest<void>(`/api/promos/${uid}/image`, { method: 'DELETE' });
+}
+
+export interface LedgerEntryPayload {
+  kind: PromoLedgerKind;
+  promo_uid: string;
+  qty: number; // negative = compensating correction
+  to_uid?: string; // assignments only
+  from_uid?: string; // IC only; defaults to the actor
+  note?: string;
+  happened_at?: string;
+}
+
+export async function createPromoLedgerEntry(payload: LedgerEntryPayload): Promise<PromoLedgerEntry> {
+  return apiRequest<PromoLedgerEntry>('/api/promos/ledger', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Whole role-scoped ledger (officials: all rows; others: involved rows).
+ * Online-only read — the sanctioned SYNC.md carve-out. */
+export async function getPromoLedger(): Promise<PromoLedgerEntry[]> {
+  return apiRequest<PromoLedgerEntry[]>('/api/promos/ledger', { method: 'GET' });
 }

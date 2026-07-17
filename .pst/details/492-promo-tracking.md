@@ -131,11 +131,17 @@ Owner-level discussion complete; engineering forks settled by PE review above.
 Remaining implementation minutiae: CSV columns; Community tab order/naming;
 finish-prompt UX; i18n.
 
-## Children (filed 2026-07-17, dependency order)
+## Children (filed 2026-07-17, dependency order — ALL LANDED 2026-07-17)
 
-1. #493 PromoItem object type (projections, IDB store, DB_VERSION bump, sync SPECS)
-2. #494 Promo image blob table + IC upload/delete + SW offline caching (depends #493)
-3. #495 Tournament distribution reporting via ReportPromos event + UI (depends #493)
-4. #496 Raffle prize link (depends #493, relates #494)
-5. #497 Inventory ledger + CSV + SYNC.md carve-out doc (depends #493, #495)
-6. #498 Community Promos tab (depends #493, #497, relates #494)
+1. #493 Promo object type — commit 1f5bff9
+2. #495 Tournament distribution reporting (ReportPromos + editor UI) — 62f83d3
+3. #494 Promo images + SW offline caching — 2008efd
+4. #496 Raffle prize link — 988eea0
+5. #497 Inventory ledger + server-computed stock + carve-out doc — 3f0f8eb
+6. #498 Community Promos tab — final commit of the epic
+
+Post-epic notes: ledger POST has a VEKN-membership floor; member-to-member
+assignments are allowed by design (indistinguishable from legitimate promo
+gifting; audited via created_by/from_uid, correctable via compensating rows).
+Recomputes are serialized behind a module lock; the daily pass remains the
+hard convergence backstop.

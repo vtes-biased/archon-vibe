@@ -31,7 +31,7 @@
 ### Recurring Patterns / Standards
 - All UI strings go through Paraglide (`m.key_name()`) — no hardcoded English. Translate raw enum states (tournament/player/table state) rather than rendering the enum value.
 - Mobile tables must reflow to a card layout (the player table is the canonical case) and signal horizontal-scroll affordance when they don't.
-- Every `<button>` needs `cursor: pointer` (it's not the default in this app's reset). Touch targets ≥44px — re-check small icon buttons (+/- steppers, unseat/sanction, VP selects).
+- Cursor affordance is handled globally now: `app.css` has `button, [role="button"], summary, select { cursor: pointer; }` (+ a `label:has(> input[checkbox/radio/file])` rule) — do NOT flag missing per-button `cursor-pointer`. Touch targets ≥44px is still the real recurring gap — re-check small icon buttons (+/- steppers, unseat/sanction, VP selects) and the Community tab-toggle buttons (`py-2` ≈ 36px).
 - Modals: `fixed inset-0 z-50` + backdrop-blur, `role="dialog"` + `aria-modal` + `aria-labelledby`, Escape handling, `focusOnMount` action, stopPropagation, captured state.
 - Shared utils live in `tournament-utils.ts` (e.g. `getStateBadgeClass`, score helpers) — don't re-duplicate `computeGwLocal`/`computeTpLocal`/`vpOptions` per file.
 - English copy must pluralize (`{count} round(s)`) — the flat-string i18n setup has no built-in plural rules, so handle count-dependent strings deliberately.
