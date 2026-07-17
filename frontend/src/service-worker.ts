@@ -32,6 +32,13 @@ sw.addEventListener('fetch', (event) => {
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
 
   if (url.origin === location.origin) {
+    // Promo images: unauthenticated by design, versioned/immutable URLs —
+    // cache-first so they display during offline tournaments (raffle winner,
+    // promo picker). Populated by the catalog-sync prefetch (sync.ts).
+    if (url.pathname.startsWith('/api/promos/') && url.pathname.endsWith('/image')) {
+      event.respondWith(cacheFirst(event.request));
+      return;
+    }
     // Same-origin allow-list: only precached assets (cache-first) and SPA
     // navigations (200.html fallback) are served from Cache Storage. Every
     // other same-origin GET — /api, /stream, /snapshot?token=JWT, /auth,
@@ -46,6 +53,17 @@ sw.addEventListener('fetch', (event) => {
   // Cross-origin (card images): network-first, cache fallback.
   event.respondWith(networkFirst(event.request));
 });
+
+// Versioned promo-image URLs are immutable content: a cache hit is always
+// correct, and a re-upload changes the URL (new ?v=) so staleness can't occur.
+async function cacheFirst(request: Request): Promise<Response> {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) cache.put(request, response.clone());
+  return response;
+}
 
 async function respondFromCache(request: Request, url: URL): Promise<Response> {
   const cache = await caches.open(CACHE);

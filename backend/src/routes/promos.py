@@ -5,15 +5,18 @@ from datetime import UTC, datetime
 from uuid import uuid7
 
 import msgspec
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from ..broadcast import broadcast_precomputed
 from ..db import (
     count_promo_references,
+    delete_promo_image,
     get_league_by_uid,
     get_promo_by_uid,
+    get_promo_image,
     save_promo,
+    upsert_promo_image,
 )
 from ..middleware.auth import OptionalUser
 from ..models import Promo, PromoKind, Role, TournamentRank
@@ -135,6 +138,87 @@ async def delete_promo(
         )
 
     promo.deleted_at = datetime.now(UTC)
+    promo.modified = datetime.now(UTC)
+    bd = await save_promo(promo)
+    broadcast_precomputed(bd)
+    return Response(status_code=204)
+
+
+# Promo image: blob in the promo_images side table; the Promo object only
+# carries a versioned image_path so a re-upload propagates via SSE while each
+# version stays long-cacheable. Served UNAUTHENTICATED by design — the service
+# worker deliberately never caches JWT-bearing responses, and these images must
+# be cacheable for offline display (raffle winner, picker).
+MAX_PROMO_IMAGE_SIZE = 1024 * 1024  # 1MB
+
+
+@router.post("/{uid}/image")
+async def upload_promo_image(
+    uid: str,
+    file: UploadFile,
+    user: OptionalUser = None,
+) -> Response:
+    """Upload or replace a promo image. IC only. Max 1MB webp/png/jpeg."""
+    _require_ic(user)
+    promo = await get_promo_by_uid(uid)
+    if not promo:
+        raise HTTPException(404, "Promo not found")
+
+    if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
+        raise HTTPException(400, "Image must be webp, png, or jpeg")
+
+    data = await file.read()
+    if len(data) > MAX_PROMO_IMAGE_SIZE:
+        raise HTTPException(
+            400, f"Image too large. Max size: {MAX_PROMO_IMAGE_SIZE // 1024}KB"
+        )
+
+    await upsert_promo_image(uid, data, file.content_type or "image/webp")
+
+    now = datetime.now(UTC)
+    version = int(now.timestamp() * 1000)  # cache-busting token baked into the URL
+    promo.image_path = f"/api/promos/{uid}/image?v={version}"
+    promo.modified = now
+    bd = await save_promo(promo)
+    broadcast_precomputed(bd)
+
+    return Response(content=b'{"success": true}', media_type="application/json")
+
+
+@router.get("/{uid}/image")
+async def get_promo_image_endpoint(uid: str, request: Request) -> Response:
+    """Serve a promo image. A versioned (?v=) URL is immutable, so it can be
+    cached aggressively; an unversioned request gets a short TTL."""
+    result = await get_promo_image(uid)
+    if not result:
+        raise HTTPException(404, "Promo image not found")
+
+    data, content_type = result
+    cache = (
+        "public, max-age=31536000, immutable"
+        if request.query_params.get("v")
+        else "public, max-age=3600"
+    )
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": cache, "Content-Length": str(len(data))},
+    )
+
+
+@router.delete("/{uid}/image")
+async def delete_promo_image_endpoint(
+    uid: str,
+    user: OptionalUser = None,
+) -> Response:
+    """Delete a promo image. IC only."""
+    _require_ic(user)
+    promo = await get_promo_by_uid(uid)
+    if not promo:
+        raise HTTPException(404, "Promo not found")
+
+    await delete_promo_image(uid)
+    promo.image_path = None
     promo.modified = datetime.now(UTC)
     bd = await save_promo(promo)
     broadcast_precomputed(bd)

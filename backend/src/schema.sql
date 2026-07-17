@@ -53,6 +53,17 @@ CREATE TABLE IF NOT EXISTS banners (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Promo images - binary storage for promo card art (IC-uploaded). Like
+-- avatars/banners: the blob stays out of the synced objects table (a versioned
+-- image_path string rides the Promo object). Served unauthenticated so the
+-- service worker can cache it for offline display (raffle winner, picker).
+CREATE TABLE IF NOT EXISTS promo_images (
+    promo_uid TEXT PRIMARY KEY,
+    data BYTEA NOT NULL,
+    content_type TEXT NOT NULL DEFAULT 'image/webp',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- OAuth clients
 CREATE TABLE IF NOT EXISTS oauth_clients (
     uid TEXT PRIMARY KEY,

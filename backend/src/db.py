@@ -1297,6 +1297,48 @@ async def delete_banner(tournament_uid: str) -> bool:
         return row is not None
 
 
+async def upsert_promo_image(
+    promo_uid: str, data: bytes, content_type: str = "image/webp"
+) -> None:
+    """Insert or update the image for a promo."""
+    async with get_connection() as conn:
+        await conn.execute(
+            """
+            INSERT INTO promo_images (promo_uid, data, content_type, updated_at)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (promo_uid) DO UPDATE SET
+                data = EXCLUDED.data,
+                content_type = EXCLUDED.content_type,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (promo_uid, data, content_type),
+        )
+
+
+async def get_promo_image(promo_uid: str) -> tuple[bytes, str] | None:
+    """Get promo image data and content type, or None."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT data, content_type FROM promo_images WHERE promo_uid = %s",
+            (promo_uid,),
+        )
+        row = await result.fetchone()
+        if row:
+            return (row[0], row[1])
+        return None
+
+
+async def delete_promo_image(promo_uid: str) -> bool:
+    """Delete the image for a promo. Returns True if deleted, else False."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "DELETE FROM promo_images WHERE promo_uid = %s RETURNING promo_uid",
+            (promo_uid,),
+        )
+        row = await result.fetchone()
+        return row is not None
+
+
 # ---------------------------------------------------------------------------
 # Transient Token CRUD (auth challenges, magic links, discord state, etc.)
 # ---------------------------------------------------------------------------

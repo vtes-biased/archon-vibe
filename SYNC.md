@@ -314,6 +314,7 @@ Not all persistent server state flows through the `objects` projection/SSE pipel
 | Side table | Rationale |
 |-----------|-----------|
 | `avatars`, `banners` | Binary blobs; served directly, path string on the object |
+| `promo_images` | Binary blob, same pattern, but served **unauthenticated** and cached cache-first by the service worker — offline raffle/picker display needs the bytes without a session (mechanics: ARCHITECTURE.md Binary Asset System) |
 | `push_subscriptions` | Send credentials (endpoints the backend delivers to, never display data). Routing them through the projection/SSE pipeline would broadcast per-device push endpoints to every client — wrong semantics and a privacy/security issue. Managed entirely in `push_service.py` + `routes/push.py`. |
 | `oauth_*` | OAuth state / token management |
 

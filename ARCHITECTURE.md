@@ -119,7 +119,7 @@ Aggregates tournaments into leagues with standings. Synced via SSE like tourname
 
 IC-managed catalog of promotional items (BCP promo cards/packs, alt-art or unreleased — no krcg link) distributed at events. Synced via SSE; stored in IndexedDB `promos` (no indexes — small catalog). Fields: `name`, `kind` (card/pack/other), `description`, `release_date`, `active` (retirement flag: a promo referenced by a tournament report is refused hard-delete and retired instead — never soft-deleted, so historical references keep resolving; the gallery UI filters on it, the public projection does not), `allowed_ranks`/`league_uids` (distribution-picker gating, UX-only — no engine/access-control enforcement; empty = unrestricted, both set = AND), `image_path`, `holdings` (`holder_uid → {assigned, remaining}`, server-written aggregate, full projection only).
 
-Public/member projections strip `holdings` down to the catalog (`compute_promo_public`); full (officials) includes it. `entitled_level` gives NC full access to every promo regardless of country — the IC→NC→organizer inventory chain isn't country-scoped (Princes/organizers stay member). CRUD is plain REST, not the engine event pipeline: `POST/PUT/DELETE /api/promos` (IC-only; delete 409s while a tournament still references the uid).
+Public/member projections strip `holdings` down to the catalog (`compute_promo_public`); full (officials) includes it. `entitled_level` gives NC full access to every promo regardless of country — the IC→NC→organizer inventory chain isn't country-scoped (Princes/organizers stay member). CRUD is plain REST, not the engine event pipeline: `POST/PUT/DELETE /api/promos` (IC-only; delete 409s while a tournament still references the uid). Image: `POST/GET/DELETE /api/promos/{uid}/image` (Binary Asset System) — the one **unauthenticated** blob endpoint, so the service worker can cache it cache-first for offline raffle-winner/picker display; the catalog sync prefetches every active promo's image on save (`prefetchPromoImages()` in `sync.ts`), since the SW cache only populates lazily on fetch and a device may go offline having never viewed the promo online.
 
 **Distribution reporting**: `Tournament.promos_distributed` (`{promo_uid, qty}[]`) + `promo_stock_source_uid` (multi-organizer stock attribution, defaults to the reporting organizer) are written by the `ReportPromos` engine event (organizer-gated, replace-the-whole-list, **no state gate** — post-finish corrections are first-class) — unlike the VEKN/TWDA push bookkeeping fields, both are member-visible (absent from `_TOURNAMENT_MEMBER_EXCLUDE`) and never touched server-side. `ReportPromos` is in `_RATING_IRRELEVANT_ACTIONS` (skips post-finish rating recompute). UI: `PromosDistributedEditor.svelte`, a foldable section in the organizer Config tab, with a `FinishedResults` CTA deep-linking into it right after finish.
 
@@ -302,7 +302,7 @@ No unauthenticated rotate endpoint (an endpoint-only rewrite would be a notifica
 
 ## Binary Asset System
 
-Binary image blobs are stored in dedicated side tables (`avatars`, `banners`) — **not** in the unified `objects` table. The `objects` table rows are projected into public/member/full JSONB and streamed via SSE to every client's IndexedDB; blobs must stay off that path. Each side table uses the owning object's uid as PK plus `data BYTEA` + `content_type`.
+Binary image blobs are stored in dedicated side tables (`avatars`, `banners`, `promo_images`) — **not** in the unified `objects` table. The `objects` table rows are projected into public/member/full JSONB and streamed via SSE to every client's IndexedDB; blobs must stay off that path. Each side table uses the owning object's uid as PK plus `data BYTEA` + `content_type`.
 
 A small **path string** on the synced object points to the served URL (`avatar_path` on User, `banner_path` on Tournament). When a new image is uploaded, a fresh versioned URL is written to the object and saved — the resulting SSE broadcast propagates the new URL to all clients. Each versioned URL is served `Cache-Control: public, max-age=31536000, immutable`; an unversioned request gets a short TTL. This removes any need for client-side cache-busting.
 
@@ -310,12 +310,15 @@ A small **path string** on the synced object points to the served URL (`avatar_p
 |-------|-----------|------------|--------------|-----------|
 | User avatar | `avatars` | `avatar_path` (member+) | member | `POST/GET/DELETE /api/users/{uid}/avatar` |
 | Tournament banner | `banners` | `banner_path` (public) | public | `POST/GET/DELETE /api/tournaments/{uid}/banner` |
+| Promo image | `promo_images` | `image_path` (public) | public, **unauthenticated** GET | `POST/GET/DELETE /api/promos/{uid}/image` |
 
-**URL shape**: `/api/{users\|tournaments}/{uid}/{avatar\|banner}?v=<epoch-ms>`. The `?v=` parameter is the version key — a re-upload yields a new epoch-ms, making the URL unique and thus immutable-cacheable.
+**URL shape**: `/api/{users\|tournaments\|promos}/{uid}/{avatar\|banner\|image}?v=<epoch-ms>`. The `?v=` parameter is the version key — a re-upload yields a new epoch-ms, making the URL unique and thus immutable-cacheable.
 
 `banner_path` is public so it serves as the `og:image` for social share links (see Social Sharing below).
 
-Avatar upload: client-side cropping (`AvatarCropper.svelte`), server-side compression. Banner upload: organizer-gated, 1 MB, webp/png/jpeg; blocked while offline (so `banner_path` can't diverge from the device snapshot and get overwritten on go-online).
+Avatar upload: client-side cropping (`AvatarCropper.svelte`), server-side compression. Banner upload: organizer-gated, 1 MB, webp/png/jpeg; blocked while offline (so `banner_path` can't diverge from the device snapshot and get overwritten on go-online). Promo image upload: IC-gated, 1 MB, webp/png/jpeg — catalog edits are online-only already (no engine path), so no offline-divergence guard is needed.
+
+**Promo images are the one asset served without auth**, and the one asset the service worker actively caches: `service-worker.ts` routes any same-origin `/api/promos/*/image` request to a dedicated cache-first handler, a deliberate exception to its default same-origin rule (every other same-origin GET — `/api`, `/stream`, `/snapshot?token=JWT`, etc. — passes through untouched so authenticated responses never land in Cache Storage). Since that cache only populates lazily on fetch, `sync.ts` prefetches every active, non-deleted promo's image into it on every catalog save/batch-save — so a device that never opened the picker or raffle screen still has the bytes cached before it goes offline.
 
 ## TWDA
 

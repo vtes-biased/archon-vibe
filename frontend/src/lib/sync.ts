@@ -97,8 +97,27 @@ const SPECS: ObjectSpec<any>[] = [
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
   { batchType: 'decks', singleType: 'deck', save: saveDeck, saveBatch: saveDecksBatch, del: deleteDeck },
   { batchType: 'leagues', singleType: 'league', save: saveLeague, saveBatch: saveLeaguesBatch, del: deleteLeague },
-  { batchType: 'promos', singleType: 'promo', save: savePromo, saveBatch: savePromosBatch, del: deletePromo },
+  {
+    batchType: 'promos',
+    singleType: 'promo',
+    save: async (p: Promo) => { await savePromo(p); prefetchPromoImages([p]); },
+    saveBatch: async (ps: Promo[]) => { await savePromosBatch(ps); prefetchPromoImages(ps); },
+    del: deletePromo,
+  },
 ];
+
+// Prefetch active promo images into the service-worker cache: the cache only
+// populates on fetch, and the offline raffle-winner display needs the bytes
+// present even if this device never viewed the promo online. Versioned URLs
+// are immutable, so a re-fetch of an already-cached version is served locally.
+function prefetchPromoImages(promos: Promo[]): void {
+  const apiBase = import.meta.env.VITE_API_URL ?? "";
+  for (const p of promos) {
+    if (p.active && p.image_path && !p.deleted_at) {
+      fetch(`${apiBase}${p.image_path}`).catch(() => {});
+    }
+  }
+}
 
 class SyncManager {
   private eventSource: EventSource | null = null;
