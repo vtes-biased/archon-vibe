@@ -49,8 +49,18 @@ dev-stop:
     docker compose stop db 2>/dev/null || true
     rm -f backend.log frontend.log
 
-# Update all dependencies to latest versions
+# Update the toolchains AND all dependencies to latest versions. Semver-major
+# dependency bumps stay manual by design (an unreviewed major can break the
+# build) — the closing deps-check report lists what remains.
 update:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Toolchains first: deps can only be as fresh as the tools resolving them.
+    rustup update
+    # uv: brew-managed here (`uv self update` refuses on brew installs); try
+    # brew first, fall back to the standalone self-updater.
+    brew upgrade uv 2>/dev/null || uv self update 2>/dev/null || true
+    npm install -g npm >/dev/null 2>&1 || echo "npm self-update failed (non-fatal)"
     cargo install wasm-pack
     uv lock --upgrade && uv sync
     (cd frontend && npm update)
@@ -58,7 +68,8 @@ update:
     # archon_engine (our PyO3 module) isn't a tracked dep, so `uv sync` above
     # prunes it — rebuild it into the venv so the env is complete after update.
     uv run maturin develop --manifest-path engine/Cargo.toml
-    @just hooks   # ensure the pre-commit hook is installed (idempotent symlink refresh)
+    just hooks   # ensure the pre-commit hook is installed (idempotent symlink refresh)
+    just -q deps-check || true   # report what stayed manual (semver-major bumps)
 
 # Exits non-zero if any ecosystem has updates available — used to gate `just release`.
 # Report whether `just update` would pull newer deps (read-only; no lockfile writes).
@@ -66,32 +77,35 @@ deps-check:
     #!/usr/bin/env bash
     set -uo pipefail   # not -e: run all three probes, then aggregate
     stale=0
-    echo "Dependency freshness (read-only):"
+    echo "Dependency freshness (read-only; per-ecosystem deps, not the tools themselves):"
     # Python/uv: `uv lock --upgrade --dry-run` reports what `just update` WOULD change
     # (within constraints) — unlike `uv tree --outdated`, which flags transitive deps
     # that are pinned by their parents and thus unreachable. Prints "No lockfile
     # changes detected" when nothing would move.
     if out=$(uv lock --upgrade --dry-run 2>&1); then
         if printf '%s\n' "$out" | grep -q 'No lockfile changes detected'; then
-            echo "  uv (python)    current"
+            echo "  python deps (uv)     current"
         else
-            stale=1; echo "  uv (python)    updates available:"
+            stale=1; echo "  python deps (uv)     updates available:"
             printf '%s\n' "$out" | grep -vE '^[[:space:]]*$|Resolved ' | sed 's/^/      /'
         fi
-    else echo "  uv (python)    (could not check)"; fi
+    else echo "  python deps (uv)     (could not check)"; fi
     # Frontend/npm: `npm outdated` exits non-zero when a package is upgradable.
     if (cd frontend && npm outdated) >/dev/null 2>&1; then
-        echo "  npm (frontend) current"
+        echo "  frontend deps (npm)  current"
     else
-        stale=1; echo "  npm (frontend) updates available (see 'cd frontend && npm outdated')"
+        stale=1
+        echo "  frontend deps (npm)  updates available ('cd frontend && npm outdated');"
+        echo "                       anything beyond the Wanted column is a semver-major"
+        echo "                       'just update' won't take — edit package.json manually"
     fi
     # Engine/cargo: `cargo update --dry-run` prints "name vX -> vY" without writing.
     if out=$(cd engine && cargo update --dry-run 2>&1); then
         if printf '%s\n' "$out" | grep -q ' -> '; then
-            stale=1; echo "  cargo (engine) updates available:"
+            stale=1; echo "  engine deps (cargo)  updates available:"
             printf '%s\n' "$out" | grep ' -> ' | sed 's/^/      /'
-        else echo "  cargo (engine) current"; fi
-    else echo "  cargo (engine) (could not check)"; fi
+        else echo "  engine deps (cargo)  current"; fi
+    else echo "  engine deps (cargo)  (could not check)"; fi
     exit "$stale"
 
 # Run all tests
