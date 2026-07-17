@@ -167,12 +167,17 @@
       </div>
 
       {#if kind === "assignment"}
+        <!-- The effective source can't be the recipient: a self-assignment nets
+             to zero in the recompute (intake covers self-crediting). -->
         <div>
           <span class="block text-sm text-ink-muted mb-1">{m.promo_movement_to_label()} *</span>
           {#if toUser}
             {@render userChip(toUser, () => (toUser = null))}
           {:else}
-            <UserPicker onselect={(u) => (toUser = u)} />
+            <UserPicker
+              onselect={(u) => (toUser = u)}
+              excludeUids={auth.user ? [fromUser?.uid ?? auth.user.uid] : []}
+            />
           {/if}
         </div>
       {/if}
@@ -191,7 +196,10 @@
                 ? m.promo_movement_received_by_self({ name: auth.user.name })
                 : m.promo_movement_from_self({ name: auth.user.name })}
             </p>
-            <UserPicker onselect={(u) => (fromUser = u)} excludeUids={[auth.user.uid]} />
+            <UserPicker
+              onselect={(u) => (fromUser = u)}
+              excludeUids={toUser ? [auth.user.uid, toUser.uid] : [auth.user.uid]}
+            />
           {/if}
         </div>
       {/if}

@@ -206,6 +206,11 @@ async def create_ledger_entry(
     if body.kind == PromoLedgerKind.ASSIGNMENT:
         if not body.to_uid:
             raise HTTPException(400, "Assignment requires to_uid")
+        # Credits and debits the same holder — nets to zero in the recompute.
+        if body.to_uid == from_uid:
+            raise HTTPException(
+                400, "Self-assignment is a no-op — record an intake instead"
+            )
         if not await get_user_by_uid(body.to_uid):
             raise HTTPException(400, "Assignee not found")
     elif body.to_uid:
