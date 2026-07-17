@@ -222,6 +222,13 @@ pub enum TournamentEvent {
     RaffleUndo,
     RaffleClear,
 
+    // Promo distribution report (replace-the-whole-list; no state gate —
+    // post-finish corrections are first-class)
+    ReportPromos {
+        promos: JsonValue,
+        stock_source_uid: Option<String>,
+    },
+
     // Config update (partial fields)
     UpdateConfig {
         config: JsonValue,

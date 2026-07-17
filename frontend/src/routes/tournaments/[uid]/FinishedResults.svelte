@@ -2,7 +2,7 @@
   import type { TournamentEventType } from "$lib/engine";
   import type { Tournament } from "$lib/types";
   import { seatDisplay as seatDisplayUtil, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { Download, Upload, TriangleAlert, BookMarked, Info, ExternalLink } from "@lucide/svelte";
+  import { Download, Gift, Upload, TriangleAlert, BookMarked, Info, ExternalLink } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import RankedBadge from "./RankedBadge.svelte";
@@ -20,6 +20,7 @@
     doAction,
     actionLoading = false,
     onImportArchon,
+    onRecordPromos,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
@@ -28,6 +29,7 @@
     doAction?: (action: TournamentEventType, body?: any) => Promise<string | null>;
     actionLoading?: boolean;
     onImportArchon?: () => void;
+    onRecordPromos?: () => void;
   } = $props();
 
   function seatDisplay(uid: string): string {
@@ -137,6 +139,18 @@
       </Button>
     {/if}
   </div>
+
+  <!-- Promo distribution nudge: the entry moment is right after finishing;
+       deep-links to the Config foldable (the editor's single home). -->
+  {#if onRecordPromos}
+    {@const promoRows = tournament.promos_distributed?.length ?? 0}
+    <div>
+      <Button variant="ghost" size="md" onclick={() => onRecordPromos?.()}>
+        <Gift class="w-4 h-4" aria-hidden="true" />
+        {promoRows > 0 ? m.promos_recorded_edit({ count: String(promoRows) }) : m.promos_record_cta()}
+      </Button>
+    </div>
+  {/if}
 
   <!-- Reopen: rare, semi-destructive rollback — set apart below the results -->
   <div class="pt-3 border-t border-line">

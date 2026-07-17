@@ -121,6 +121,8 @@ IC-managed catalog of promotional items (BCP promo cards/packs, alt-art or unrel
 
 Public/member projections strip `holdings` down to the catalog (`compute_promo_public`); full (officials) includes it. `entitled_level` gives NC full access to every promo regardless of country — the IC→NC→organizer inventory chain isn't country-scoped (Princes/organizers stay member). CRUD is plain REST, not the engine event pipeline: `POST/PUT/DELETE /api/promos` (IC-only; delete 409s while a tournament still references the uid).
 
+**Distribution reporting**: `Tournament.promos_distributed` (`{promo_uid, qty}[]`) + `promo_stock_source_uid` (multi-organizer stock attribution, defaults to the reporting organizer) are written by the `ReportPromos` engine event (organizer-gated, replace-the-whole-list, **no state gate** — post-finish corrections are first-class) — unlike the VEKN/TWDA push bookkeeping fields, both are member-visible (absent from `_TOURNAMENT_MEMBER_EXCLUDE`) and never touched server-side. `ReportPromos` is in `_RATING_IRRELEVANT_ACTIONS` (skips post-finish rating recompute). UI: `PromosDistributedEditor.svelte`, a foldable section in the organizer Config tab, with a `FinishedResults` CTA deep-linking into it right after finish.
+
 ## Serialization & Rust Integration
 
 msgspec is used throughout for high-performance JSON: responses encode via `msgspec.json.Encoder`; Python models are `msgspec.Struct`, mirrored by TypeScript interfaces.

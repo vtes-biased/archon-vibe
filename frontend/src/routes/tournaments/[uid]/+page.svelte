@@ -88,6 +88,7 @@ import TournamentModals from "./TournamentModals.svelte";
   let viewAsPlayer = $state(false);
   let showDeleteConfirm = $state(false);
   let configExpandOrganizers = $state(false);
+  let configExpandPromos = $state(false);
   // Offline mode state
   const tournamentIsOffline = $derived(isOffline(uid));
   const deviceId = getDeviceId();
@@ -906,6 +907,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {archonImportItem}
             {csvImportItem}
             onImportArchon={() => (showArchonImport = true)}
+            onRecordPromos={() => { configExpandPromos = true; activeTab = 'config'; }}
           />
 
           <!-- Tab content -->
@@ -956,6 +958,7 @@ import TournamentModals from "./TournamentModals.svelte";
                 bind:tournament={tournament}
                 isOrganizer={true}
                 expandOrganizers={configExpandOrganizers}
+                expandPromos={configExpandPromos}
               />
             {/if}
           </div>

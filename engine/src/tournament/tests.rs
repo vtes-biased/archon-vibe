@@ -3377,3 +3377,40 @@ fn test_raffle_pools_count_scores_from_round_in_progress() {
     assert_eq!(winners.len(), 7);
     assert!(!winners.contains(&"p1"));
 }
+
+#[test]
+fn test_report_promos_post_finish_replaces_whole_list() {
+    // ReportPromos is deliberately state-gate-free: the primary flow enters it from
+    // the Finished console (FinishedResults CTA), and re-submitting corrects an
+    // already-filed report by replacing the whole list — not merging. A future
+    // "fix" that adds a state gate or switches to append semantics would silently
+    // break both the corrections flow and the finish-flow CTA. This pins both, plus
+    // the submitter default for the stock source.
+    let mut tournament = make_tournament();
+    tournament["state"] = "Finished".into();
+    // An already-filed report the organizer is now correcting.
+    tournament["promos_distributed"] =
+        json::array![json::object! { promo_uid: "stale-promo", qty: 9 },];
+
+    let event = json::object! {
+        type: "ReportPromos",
+        promos: [
+            { promo_uid: "promo-a", qty: 3 },
+            { promo_uid: "promo-b", qty: 1 },
+        ],
+        // stock_source_uid omitted -> defaults to the acting organizer.
+    };
+    let updated = json::parse(&run_event(&tournament, &event, &make_organizer()).unwrap()).unwrap();
+
+    let rows = &updated["promos_distributed"];
+    assert_eq!(rows.len(), 2, "the stale row must be replaced, not merged");
+    assert_eq!(rows[0]["promo_uid"].as_str(), Some("promo-a"));
+    assert_eq!(rows[0]["qty"].as_usize(), Some(3));
+    assert_eq!(rows[1]["promo_uid"].as_str(), Some("promo-b"));
+    assert_eq!(rows[1]["qty"].as_usize(), Some(1));
+    assert_eq!(
+        updated["promo_stock_source_uid"].as_str(),
+        Some("organizer-1"),
+        "omitted stock source defaults to the submitting organizer"
+    );
+}

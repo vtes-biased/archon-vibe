@@ -2452,6 +2452,21 @@ fn apply_event(
             Ok(())
         }
 
+        TournamentEvent::ReportPromos {
+            promos,
+            stock_source_uid,
+        } => {
+            require_organizer(actor)?;
+            // No state gate: usually entered at/after finish, and corrections
+            // to an already-submitted report are first-class.
+            tournament["promos_distributed"] = promos.clone();
+            let source = stock_source_uid
+                .clone()
+                .unwrap_or_else(|| actor.uid.clone());
+            tournament["promo_stock_source_uid"] = source.into();
+            Ok(())
+        }
+
         TournamentEvent::UpdateConfig { config } => {
             require_organizer(actor)?;
 

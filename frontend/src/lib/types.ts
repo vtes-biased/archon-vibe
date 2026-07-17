@@ -259,6 +259,11 @@ export interface RaffleDraw {
   winners: string[];
 }
 
+export interface PromoDistribution {
+  promo_uid: string;
+  qty: number;
+}
+
 export interface Seat {
   player_uid: string;
   result: Score;
@@ -346,6 +351,9 @@ export interface Tournament extends BaseObject {
   winner?: string;
   standings?: Standing[];
   raffles?: RaffleDraw[];
+  // Promo distribution report (organizer-entered, replace-whole-list, member-visible)
+  promos_distributed?: PromoDistribution[];
+  promo_stock_source_uid?: string;
   // Offline mode
   offline_mode?: boolean;
   offline_device_id?: string;

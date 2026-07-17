@@ -269,6 +269,28 @@ impl TournamentEvent {
                     seed,
                 })
             }
+            "ReportPromos" => {
+                let rows = match &value["promos"] {
+                    JsonValue::Array(rows) => rows,
+                    _ => return Err("promos required".into()),
+                };
+                let mut promos = Vec::with_capacity(rows.len());
+                for row in rows {
+                    let promo_uid = row["promo_uid"].as_str().ok_or("promo_uid required")?;
+                    let qty = row["qty"].as_usize().ok_or("qty required")?;
+                    if promo_uid.is_empty() || qty == 0 {
+                        return Err("promo rows need a promo_uid and a positive qty".into());
+                    }
+                    promos.push(json::object! {
+                        "promo_uid" => promo_uid,
+                        "qty" => qty,
+                    });
+                }
+                Ok(Self::ReportPromos {
+                    promos: JsonValue::Array(promos),
+                    stock_source_uid: value["stock_source_uid"].as_str().map(String::from),
+                })
+            }
             "RaffleUndo" => Ok(Self::RaffleUndo),
             "RaffleClear" => Ok(Self::RaffleClear),
             "UpdateConfig" => {

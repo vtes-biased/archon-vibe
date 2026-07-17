@@ -23,7 +23,8 @@
 - VtesCard has **three name fields**, not one `name`: `printed_name` (bare, display), `unique_name` (minimal disambiguator, text export), `full_name` (always group/adv-suffixed), plus `name_variants` — all four are engine parser lookup keys (see [[card-data-pipeline]]).
 
 ## Which Docs Update Together
-- New object type → ARCHITECTURE.md (data model) + SYNC.md ("adding a new object type") + maybe CLAUDE.md summary.
+- New object type → ARCHITECTURE.md (data model) + SYNC.md ("adding a new object type") + PRODUCT.md §5 Feature Map bullet + maybe CLAUDE.md summary. **The PRODUCT.md Feature Map bullet is the one that gets skipped** — Promo catalog (#493) shipped with an ARCHITECTURE.md subsection but no §5 bullet; only added retroactively during the #495 distribution-reporting follow-up. Check §5 explicitly, don't assume a prior pass covered it.
+- New engine event with its own organizer-UI entry point (not folded into `UpdateConfig`) → TOURNAMENTS.md event-catalog table (new row, plus a state-gate callout in the States prose if it bypasses the normal gate) + ARCHITECTURE.md's subsystem paragraph for whatever data it writes (if one exists) + PRODUCT.md §5 Feature Map bullet. Added for `ReportPromos`, 2026-07-17.
 - Sync pattern change → SYNC.md (primary), ARCHITECTURE.md (only if fundamental).
 - Rust engine capability change → ARCHITECTURE.md (Rust Integration) + TOURNAMENTS.md (if tournament-related) + engine/README.md.
 - Architecture fact that affects mutations/reads → confirm CLAUDE.md's terse summary still matches (it intentionally stays high-level).

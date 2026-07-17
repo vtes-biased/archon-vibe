@@ -97,6 +97,7 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         "RaffleDraw",
         "RaffleUndo",
         "RaffleClear",
+        "ReportPromos",
         "CheckIn",
         "CheckOut",
         "CheckInAll",

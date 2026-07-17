@@ -176,6 +176,7 @@ export type TournamentEventType =
   | 'FinishFinals'
   | 'CancelFinals'
   | 'RaffleDraw'
+  | 'ReportPromos'
   | 'RaffleUndo'
   | 'RaffleClear'
   | 'UpdateConfig';

@@ -6,6 +6,7 @@
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
+  import PromosDistributedEditor from "./PromosDistributedEditor.svelte";
   import { RefreshCw, Check, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -16,11 +17,14 @@
     tournament = $bindable(),
     isOrganizer,
     expandOrganizers = false,
+    expandPromos = false,
   }: {
     tournament: Tournament;
     isOrganizer: boolean;
     /** Open the organizers section on mount (header add-co-organizer chip). */
     expandOrganizers?: boolean;
+    /** Open the promos section on mount (FinishedResults record-promos nudge). */
+    expandPromos?: boolean;
   } = $props();
 
   let saving = $state(false);
@@ -41,6 +45,8 @@
   // svelte-ignore state_referenced_locally
   let organizersExpanded = $state(expandOrganizers);
   let roomsExpanded = $state(false);
+  // svelte-ignore state_referenced_locally
+  let promosExpanded = $state(expandPromos);
 
   // Stash location fields when toggling online mode, so we can restore on toggle-back
   let stashedPhysical = $state<{ country: string; venue: string; venue_url: string; address: string; map_url: string } | null>(null);
@@ -276,6 +282,22 @@
             <TableRoomsEditor
               tournamentUid={tournament.uid}
               tableRooms={tournament.table_rooms ?? []}
+              onupdate={(t) => { tournament = t; }}
+            />
+          </div>
+        {/if}
+      </div>
+      <div class="bg-surface-muted/30 rounded-lg p-4">
+        <button onclick={() => promosExpanded = !promosExpanded}
+          aria-expanded={promosExpanded}
+          class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
+          {#if promosExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+          {m.promos_title()}
+        </button>
+        {#if promosExpanded}
+          <div class="mt-3">
+            <PromosDistributedEditor
+              {tournament}
               onupdate={(t) => { tournament = t; }}
             />
           </div>

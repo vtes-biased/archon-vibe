@@ -42,7 +42,7 @@ Online: Frontend → Backend (FastAPI) → Rust engine (PyO3) → updated state 
 | `Playing` | Round in progress | SetScore (players + organizers), Override, FinishRound, CancelRound, seating edits |
 | `Finished` | Tournament complete | ReopenTournament, SetScore/Override (organizers only), deck uploads, view results |
 
-Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig is available in **any** state (mid-event typo fixes matter), with targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds exist, and `rank`/`format`/`start` freeze once the event is published to VEKN (`external_ids.vekn` set — calendar create is write-once, so edits would silently diverge from vekn.net). Championships (National/Continental) reject `proxies`/`multideck` (engine-enforced at create and config-edit). SetScore/Override/Unoverride: players only during Playing; organizers may correct any round while Waiting, Playing, or Finished (i.e. whenever rounds exist) — standings recompute after each edit.
+Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig is available in **any** state (mid-event typo fixes matter), with targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds exist, and `rank`/`format`/`start` freeze once the event is published to VEKN (`external_ids.vekn` set — calendar create is write-once, so edits would silently diverge from vekn.net). Championships (National/Continental) reject `proxies`/`multideck` (engine-enforced at create and config-edit). SetScore/Override/Unoverride: players only during Playing; organizers may correct any round while Waiting, Playing, or Finished (i.e. whenever rounds exist) — standings recompute after each edit. `ReportPromos` is likewise available in **any** state, with no locks at all — promo counts are typically entered post-finish and re-entered on correction.
 
 ## Business Events
 
@@ -127,6 +127,12 @@ Events are processed by the Rust engine. Each event includes:
 | `RaffleDraw` | `pool` | Draw from pool: AllPlayers, NonFinalists, GameWinners, NoGameWin, NoVictoryPoint |
 | `RaffleUndo` | - | Undo last raffle draw |
 | `RaffleClear` | - | Clear all raffle results |
+
+#### Promos
+
+| Event | Required Fields | Description |
+|-------|-----------------|-------------|
+| `ReportPromos` | `promos[]` (`{promo_uid, qty}`), `stock_source_uid?` | Replace-the-whole-list promo distribution report; no state gate (post-finish corrections are first-class) |
 
 #### Configuration
 

@@ -83,6 +83,8 @@ metadata:
 | league champion (badge crowning the rank-1 standings player) | Champion | Campeón | Campeão | Campione |
 | season (a league's points/scoring period) | saison | temporada | temporada | stagione |
 | crowned (verb, "crowned Champion") | couronné | coronado | coroado | incoronato |
+| promo (card) — not official rulebook terminology, coined; fem. noun all 4 locales, "le promo" invariable plural in it | promo (une promo / des promos) | promo (una promo / las promos) | promo (uma promo / as promos) | promo (una promo / le promo, invariable) |
+| stock (an organizer's personal promo-card inventory) | stock (loanword) | stock (loanword) | estoque (translated) | stock (loanword) |
 
 § it "register" for organizer-registers-someone-else keeps "iscrivere" even though it.json glosses self-registration and generic "registrato/a" (deceased/status) with "registrare" — don't conflate; the *action* of registering a player for a tournament is always iscrivere/inscrire/inscribir/inscrever, not registrare/registrarse family, across all four Romance locales.
 

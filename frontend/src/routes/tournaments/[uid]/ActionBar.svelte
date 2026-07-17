@@ -24,6 +24,7 @@
     archonImportItem,
     csvImportItem,
     onImportArchon,
+    onRecordPromos,
   }: {
     tournament: Tournament;
     standings: StandingEntry[];
@@ -35,6 +36,7 @@
     archonImportItem: MenuItem;
     csvImportItem: MenuItem;
     onImportArchon: () => void;
+    onRecordPromos: () => void;
   } = $props();
 
   let showQrCode = $state(false);
@@ -234,6 +236,7 @@
       {doAction}
       {actionLoading}
       {onImportArchon}
+      {onRecordPromos}
     />
   {/if}
 

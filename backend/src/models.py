@@ -548,6 +548,11 @@ class RaffleDraw(msgspec.Struct, kw_only=True):
     winners: list[str] = msgspec.field(default_factory=list)
 
 
+class PromoDistribution(msgspec.Struct, kw_only=True):
+    promo_uid: str
+    qty: int
+
+
 class TwdaOutcome(StrEnum):
     SUBMITTED = "submitted"
     SKIPPED = "skipped"
@@ -580,6 +585,11 @@ class Tournament(TournamentConfig, kw_only=True):
     # or populated by VEKN sync. NOT cleared if rounds are empty.
     standings: list[Standing] = msgspec.field(default_factory=list)
     raffles: list[RaffleDraw] = msgspec.field(default_factory=list)
+    # Promo distribution report (organizer-entered via ReportPromos, replace-
+    # whole-list, member-visible). The server never writes these fields — the
+    # offline device is authoritative on go-online.
+    promos_distributed: list[PromoDistribution] = msgspec.field(default_factory=list)
+    promo_stock_source_uid: str = ""
     # VEKN push tracking
     vekn_pushed_at: datetime | None = None  # When results were pushed to vekn.net
     # Results diverged after the push (reopen or result-affecting edit). The push
