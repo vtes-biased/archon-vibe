@@ -546,6 +546,9 @@ class RaffleDraw(msgspec.Struct, kw_only=True):
     label: str
     pool: RafflePool
     winners: list[str] = msgspec.field(default_factory=list)
+    # Optional promo-catalog prize; display-only (never auto-counted in the
+    # distribution report)
+    prize_promo_uid: str | None = None
 
 
 class PromoDistribution(msgspec.Struct, kw_only=True):

@@ -218,6 +218,9 @@ pub enum TournamentEvent {
         exclude_drawn: bool,
         count: usize,
         seed: u64,
+        // Optional promo-catalog prize; display-only (never auto-writes the
+        // distribution report — no double count)
+        prize_promo_uid: Option<String>,
     },
     RaffleUndo,
     RaffleClear,

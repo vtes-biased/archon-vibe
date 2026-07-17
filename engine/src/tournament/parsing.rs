@@ -267,6 +267,7 @@ impl TournamentEvent {
                     exclude_drawn,
                     count,
                     seed,
+                    prize_promo_uid: value["prize_promo_uid"].as_str().map(String::from),
                 })
             }
             "ReportPromos" => {

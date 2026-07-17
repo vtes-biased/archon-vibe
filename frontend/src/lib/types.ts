@@ -257,6 +257,8 @@ export interface RaffleDraw {
   label: string;
   pool: RafflePool;
   winners: string[];
+  // Optional promo-catalog prize; display-only
+  prize_promo_uid?: string | null;
 }
 
 export interface PromoDistribution {

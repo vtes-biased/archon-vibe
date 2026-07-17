@@ -1,10 +1,13 @@
 <script lang="ts">
   import type { TournamentEventType } from "$lib/engine";
-  import type { Tournament, RafflePool } from "$lib/types";
+  import type { Tournament, RafflePool, Promo } from "$lib/types";
+  import { getAllPromos } from "$lib/db";
   import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
   import { Dices, Undo2, Trash2 } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
+
+  const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
   let {
     tournament,
@@ -24,6 +27,27 @@
   let pool = $state<RafflePool>("AllPlayers");
   let excludeDrawn = $state(true);
   let count = $state(1);
+  let prizePromoUid = $state("");
+
+  // Promo catalog: the organizer picks a prize from it, and both views resolve
+  // a draw's prize_promo_uid to a name + image.
+  let promoCatalog = $state<Promo[]>([]);
+  $effect(() => {
+    getAllPromos().then(promos => { promoCatalog = promos; });
+  });
+
+  // Same hard filter as the distribution report picker: active promos whose
+  // gating matches this tournament (empty gating = unrestricted).
+  const eligiblePromos = $derived(promoCatalog.filter(p =>
+    p.active
+    && (p.allowed_ranks.length === 0 || p.allowed_ranks.includes(tournament.rank))
+    && (p.league_uids.length === 0
+      || (!!tournament.league_uid && p.league_uids.includes(tournament.league_uid)))
+  ));
+
+  function promoByUid(uid: string | null | undefined): Promo | undefined {
+    return uid ? promoCatalog.find(p => p.uid === uid) : undefined;
+  }
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo, tournament.online);
@@ -128,8 +152,10 @@
       exclude_drawn: excludeDrawn,
       count: Math.min(count, currentEligible),
       seed,
+      prize_promo_uid: prizePromoUid || undefined,
     });
     label = "";
+    prizePromoUid = "";
   }
 
   const raffles = $derived(tournament.raffles ?? []);
@@ -160,6 +186,18 @@
           <input type="checkbox" bind:checked={excludeDrawn} class="rounded border-line-strong" />
           {m.raffle_exclude_drawn()}
         </label>
+        {#if eligiblePromos.length > 0}
+          <select
+            bind:value={prizePromoUid}
+            aria-label={m.raffle_prize_select()}
+            class="px-2 py-1.5 text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong"
+          >
+            <option value="">{m.raffle_prize_none()}</option>
+            {#each eligiblePromos as promo (promo.uid)}
+              <option value={promo.uid}>{promo.name}</option>
+            {/each}
+          </select>
+        {/if}
       </div>
       <div class="flex items-center gap-2">
         <label class="text-sm text-ink-muted">
@@ -210,6 +248,22 @@
       {#each [...raffles].reverse() as draw}
         <div class="bg-surface-muted/50 rounded-lg p-3">
           <div class="text-sm font-medium text-ink-strong mb-1">{draw.label}</div>
+          {#if draw.prize_promo_uid}
+            {@const prize = promoByUid(draw.prize_promo_uid)}
+            {#if prize}
+              <div class="flex items-center gap-2 mb-2">
+                {#if prize.image_path}
+                  <img
+                    src="{API_BASE}{prize.image_path}"
+                    alt={prize.name}
+                    loading="lazy"
+                    class="w-12 rounded shadow"
+                  />
+                {/if}
+                <span class="text-xs text-ink-muted">{m.raffle_prize_won({ name: prize.name })}</span>
+              </div>
+            {/if}
+          {/if}
           <div class="flex flex-wrap gap-1.5">
             {#each draw.winners as winner}
               <span class="px-2 py-0.5 text-xs badge-highlight rounded">{seatDisplay(winner)}</span>

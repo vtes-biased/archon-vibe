@@ -124,7 +124,7 @@ Events are processed by the Rust engine. Each event includes:
 
 | Event | Required Fields | Description |
 |-------|-----------------|-------------|
-| `RaffleDraw` | `pool` | Draw from pool: AllPlayers, NonFinalists, GameWinners, NoGameWin, NoVictoryPoint |
+| `RaffleDraw` | `pool`, `prize_promo_uid?` | Draw from pool: AllPlayers, NonFinalists, GameWinners, NoGameWin, NoVictoryPoint; optional promo-catalog prize, display-only (never written to `promos_distributed`) |
 | `RaffleUndo` | - | Undo last raffle draw |
 | `RaffleClear` | - | Clear all raffle results |
 

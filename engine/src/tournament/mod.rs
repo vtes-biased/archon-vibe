@@ -2395,6 +2395,7 @@ fn apply_event(
             exclude_drawn,
             count,
             seed,
+            prize_promo_uid,
         } => {
             require_organizer(actor)?;
             if state != TournamentState::Waiting
@@ -2424,11 +2425,14 @@ fn apply_event(
                 .take(*count)
                 .map(|uid| uid.into())
                 .collect();
-            let draw = json::object! {
+            let mut draw = json::object! {
                 "label" => label.as_str(),
                 "pool" => pool.as_str(),
                 "winners" => JsonValue::Array(winners),
             };
+            if let Some(promo_uid) = prize_promo_uid {
+                draw["prize_promo_uid"] = promo_uid.as_str().into();
+            }
             if tournament["raffles"].is_null() {
                 tournament["raffles"] = JsonValue::new_array();
             }

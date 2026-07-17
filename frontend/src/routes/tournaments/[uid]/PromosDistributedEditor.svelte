@@ -68,6 +68,26 @@
   // suspended while any row is invalid — say so instead of silently no-oping.
   const hasInvalidRow = $derived(rows.some(r => !r.promo_uid || !(r.qty >= 1)));
 
+  // Raffle pre-fill hint: promos raffled at this event (one copy per winner)
+  // but absent from the report. Suggestion only — raffles never auto-count.
+  let dismissedHints = $state<Set<string>>(new Set());
+  const raffleHints = $derived.by(() => {
+    const totals = new Map<string, number>();
+    for (const d of tournament.raffles ?? []) {
+      if (d.prize_promo_uid) {
+        totals.set(d.prize_promo_uid, (totals.get(d.prize_promo_uid) ?? 0) + d.winners.length);
+      }
+    }
+    return [...totals]
+      .filter(([uid]) => !rows.some(r => r.promo_uid === uid) && !dismissedHints.has(uid))
+      .map(([uid, qty]) => ({ uid, qty, name: catalog.find(p => p.uid === uid)?.name ?? uid }));
+  });
+
+  function applyHint(hint: { uid: string; qty: number }) {
+    rows = [...rows, { promo_uid: hint.uid, qty: hint.qty }];
+    save();
+  }
+
   let saving = $state(false);
 
   async function save() {
@@ -113,6 +133,18 @@
       <p class="text-xs text-ink-faint mt-1">{m.promos_stock_source_hint()}</p>
     </div>
   {/if}
+
+  {#each raffleHints as hint (hint.uid)}
+    <div class="flex items-center gap-2 mb-2 text-xs text-ink-muted">
+      <span>{m.promos_raffled_hint({ count: String(hint.qty), name: hint.name })}</span>
+      <button onclick={() => applyHint(hint)} disabled={saving}
+        class="text-link hover:underline min-h-[28px]">{m.promos_raffled_add()}</button>
+      <button onclick={() => { dismissedHints = new Set([...dismissedHints, hint.uid]); }}
+        class="min-w-[28px] min-h-[28px] flex items-center justify-center text-ink-faint hover:text-ink-strong transition-colors"
+        aria-label={m.promos_raffled_dismiss()}
+      ><X class="w-3 h-3" /></button>
+    </div>
+  {/each}
 
   {#if rows.length > 0}
     <div class="space-y-2 mb-3">

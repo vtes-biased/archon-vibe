@@ -1155,19 +1155,22 @@ async def get_all_promos(
 
 
 async def count_promo_references(uid: str) -> int:
-    """Live tournament rows referencing a promo (distribution reports).
+    """Live tournament rows referencing a promo (reports or raffle prizes).
 
     Guards hard-delete: a referenced promo must be retired (active=false), never
     tombstoned — the universal soft-delete would evict it from clients and dangle
-    historical rows. Raffle-prize and ledger references extend this count when
-    those features land.
+    historical rows. Ledger references extend this count when that feature lands.
     """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT COUNT(*) FROM objects
             WHERE type = 'tournament' AND deleted_at IS NULL
-              AND "full"->'promos_distributed' @> %s::jsonb""",
-            (msgspec.json.encode([{"promo_uid": uid}]).decode(),),
+              AND ("full"->'promos_distributed' @> %s::jsonb
+                   OR "full"->'raffles' @> %s::jsonb)""",
+            (
+                msgspec.json.encode([{"promo_uid": uid}]).decode(),
+                msgspec.json.encode([{"prize_promo_uid": uid}]).decode(),
+            ),
         )
         row = await result.fetchone()
         return row[0] if row else 0

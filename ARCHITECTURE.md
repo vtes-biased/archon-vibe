@@ -123,6 +123,8 @@ Public/member projections strip `holdings` down to the catalog (`compute_promo_p
 
 **Distribution reporting**: `Tournament.promos_distributed` (`{promo_uid, qty}[]`) + `promo_stock_source_uid` (multi-organizer stock attribution, defaults to the reporting organizer) are written by the `ReportPromos` engine event (organizer-gated, replace-the-whole-list, **no state gate** — post-finish corrections are first-class) — unlike the VEKN/TWDA push bookkeeping fields, both are member-visible (absent from `_TOURNAMENT_MEMBER_EXCLUDE`) and never touched server-side. `ReportPromos` is in `_RATING_IRRELEVANT_ACTIONS` (skips post-finish rating recompute). UI: `PromosDistributedEditor.svelte`, a foldable section in the organizer Config tab, with a `FinishedResults` CTA deep-linking into it right after finish.
 
+**Raffle prize link**: `RaffleDraw`'s optional `prize_promo_uid` (organizer-picked from the same gated catalog, serde-only field on the draw's `json::object` literal) is display-only — never written to `promos_distributed`, so a raffled promo doesn't double-count. Both organizer and player raffle views resolve it to name + cached image; `PromosDistributedEditor.svelte` surfaces unreported raffled promos only as a dismissible pre-fill hint (`count_promo_references` also counts `raffles` prize references for the hard-delete guard).
+
 ## Serialization & Rust Integration
 
 msgspec is used throughout for high-performance JSON: responses encode via `msgspec.json.Encoder`; Python models are `msgspec.Struct`, mirrored by TypeScript interfaces.
