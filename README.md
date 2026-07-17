@@ -1,5 +1,11 @@
 # Archon
 
+[![CI](https://github.com/vtes-biased/archon-vibe/actions/workflows/ci.yml/badge.svg)](https://github.com/vtes-biased/archon-vibe/actions/workflows/ci.yml)
+![Rust](https://img.shields.io/badge/Rust-2021-CE412B?logo=rust&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14+-3776AB?logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)
+
 Web application for managing the VEKN community and tournaments.
 
 ## About
