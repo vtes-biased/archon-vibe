@@ -53,6 +53,24 @@ CREATE TABLE IF NOT EXISTS banners (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Promo ledger - inventory movements for promotional material. Source of truth
+-- for the server-computed stock aggregates (Promo.holdings / User.promo_stock);
+-- deliberately NOT a synced object type: officials-only, online-only back-office
+-- read via REST (see the SYNC.md offline-first carve-out). Rows are
+-- append-mostly; corrections are compensating rows (negative qty), never edits.
+CREATE TABLE IF NOT EXISTS promo_ledger (
+    uid TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,       -- 'assignment' (from -> to) | 'distribution' (from -> out)
+    promo_uid TEXT NOT NULL,
+    qty INTEGER NOT NULL,     -- negative = compensating correction
+    from_uid TEXT NOT NULL,   -- holder the stock moves from
+    to_uid TEXT,              -- assignment target; NULL for distributions
+    note TEXT NOT NULL DEFAULT '',
+    happened_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by TEXT NOT NULL, -- actor who entered the row
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Promo images - binary storage for promo card art (IC-uploaded). Like
 -- avatars/banners: the blob stays out of the synced objects table (a versioned
 -- image_path string rides the Promo object). Served unauthenticated so the

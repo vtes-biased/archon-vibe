@@ -68,6 +68,7 @@ from ..models import (
     TwdaStatus,
     User,
 )
+from ..promo_stock import schedule_recompute
 from .auth import send_invite_email
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
@@ -106,6 +107,16 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
 )
 
 _engine = PyEngine()
+
+
+def _promo_recompute_diff(old: Tournament | None, new: Tournament | None) -> None:
+    """Re-derive promo stock aggregates for promos whose distribution rows may
+    have changed — union of both sides, so removed rows recompute too. Fires on
+    every path that can alter promos_distributed: the ReportPromos action, the
+    offline snapshot/go-online pushes, and tournament soft-delete."""
+    affected = {r.promo_uid for t in (old, new) if t for r in t.promos_distributed}
+    if affected:
+        schedule_recompute(list(affected))
 
 
 async def _build_decks_json(tournament_uid: str, conn=None) -> str:
@@ -1054,6 +1065,8 @@ async def delete_tournament_endpoint(
 
     if result:
         broadcast_precomputed(result[1])
+    # No state gate on ReportPromos, so even a Planned event may carry rows.
+    _promo_recompute_diff(tournament, None)
 
     return Response(
         content=encoder.encode({"message": "Tournament deleted"}),
@@ -1625,6 +1638,9 @@ async def tournament_action(
         broadcast_precomputed(bd)
 
     broadcast_precomputed(tournament_bd)
+
+    if request.type == "ReportPromos":
+        _promo_recompute_diff(tournament, updated)
 
     # Web Push seating notification (#314): on a just-started round/finals, push each
     # seated player their table+seat. Fire-and-forget, post-commit (a DB-touching task
@@ -2641,6 +2657,8 @@ async def go_online(
     # ratings broadcasts above intentionally reach the device (it lacks them).
     broadcast_precomputed(tournament_bd, exclude_device_id=request.device_id)
 
+    _promo_recompute_diff(tournament, updated)
+
     # An event run+finished offline would otherwise get its rating points only on
     # the next daily recompute (~24h late). Mirror the action route and recompute
     # immediately on go-online so players' ratings reflect the result right away.
@@ -2820,6 +2838,8 @@ async def sync_offline(
 
     now = datetime.now(UTC)
     logger.info(f"Tournament {uid} offline sync from device {request.device_id}")
+
+    _promo_recompute_diff(tournament, updated)
 
     return Response(
         content=encoder.encode({"synced_at": now.isoformat()}),

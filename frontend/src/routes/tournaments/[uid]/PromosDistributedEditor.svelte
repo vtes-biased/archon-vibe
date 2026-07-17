@@ -68,6 +68,23 @@
   // suspended while any row is invalid — say so instead of silently no-oping.
   const hasInvalidRow = $derived(rows.some(r => !r.promo_uid || !(r.qty >= 1)));
 
+  // Own computed stock (server-written, streamed to own profile): warn — never
+  // block — when a reported promo's remaining has gone negative. Re-read on
+  // tournament change so the post-save recompute is picked up.
+  let ownStock = $state<Record<string, number>>({});
+  $effect(() => {
+    void tournament.modified;
+    const uid = getAuthState().user?.uid;
+    if (uid) getUser(uid).then(u => { ownStock = u?.promo_stock ?? {}; });
+  });
+  const negativeStockNames = $derived(
+    stockSource === getAuthState().user?.uid
+      ? rows
+          .filter(r => r.promo_uid && (ownStock[r.promo_uid] ?? 0) < 0)
+          .map(r => catalog.find(p => p.uid === r.promo_uid)?.name ?? r.promo_uid)
+      : []
+  );
+
   // Raffle pre-fill hint: promos raffled at this event (one copy per winner)
   // but absent from the report. Suggestion only — raffles never auto-count.
   let dismissedHints = $state<Set<string>>(new Set());
@@ -181,6 +198,9 @@
     </div>
     {#if hasInvalidRow}
       <p class="text-xs text-warn mb-2">{m.promos_validation_hint()}</p>
+    {/if}
+    {#if negativeStockNames.length > 0}
+      <p class="text-xs text-warn mb-2">{m.promos_negative_stock({ names: negativeStockNames.join(", ") })}</p>
     {/if}
     <p class="text-xs text-ink-faint mb-2">{m.promos_hint()}</p>
   {:else}

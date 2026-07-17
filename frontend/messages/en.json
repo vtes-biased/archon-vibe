@@ -1045,6 +1045,7 @@
   "promos_stock_source_hint": "Whose stock these promos came from.",
   "promos_record_cta": "Record promo cards distributed",
   "promos_recorded_edit": "{count} promo(s) recorded · Edit",
+  "promos_negative_stock": "Reported copies exceed your recorded stock for: {names} — saved anyway, check your inventory records.",
   "promos_raffled_hint": "{count}× {name} raffled at this event",
   "promos_raffled_add": "Add to report",
   "promos_raffled_dismiss": "Dismiss",

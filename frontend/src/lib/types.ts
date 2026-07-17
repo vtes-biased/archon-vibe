@@ -95,6 +95,9 @@ export interface User extends BaseObject {
 
   // Profile
   avatar_path?: string | null; // Server-stored compressed image path
+  // promo_uid → computed remaining copies. Server-written (promo recompute);
+  // full projection only — reaches the holder (own profile) and officials.
+  promo_stock?: Record<string, number>;
 
   // Contact info (visible based on role-based access rules)
   contact_email?: string | null;
@@ -197,6 +200,23 @@ export interface Promo extends BaseObject {
   image_path: string | null;
   // holder_uid → aggregate; present only in the full projection (officials).
   holdings?: Record<string, PromoHolding>;
+}
+
+export type PromoLedgerKind = "assignment" | "distribution";
+
+/** One promo inventory movement. REST-read (not synced): officials see all
+ * rows, everyone else only rows they are party to. */
+export interface PromoLedgerEntry {
+  uid: string;
+  kind: PromoLedgerKind;
+  promo_uid: string;
+  qty: number; // negative = compensating correction
+  from_uid: string;
+  to_uid: string | null;
+  note: string;
+  happened_at: string;
+  created_by: string;
+  created_at: string;
 }
 
 // Tournament types

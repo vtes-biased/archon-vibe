@@ -1045,6 +1045,7 @@
   "promos_stock_source_hint": "O estoque do organizador de onde vêm essas promos.",
   "promos_record_cta": "Registrar as cartas promo distribuídas",
   "promos_recorded_edit": "{count} promo(s) registrada(s) · Editar",
+  "promos_negative_stock": "As cópias declaradas excedem seu estoque registrado para: {names} — salvo mesmo assim, verifique seu estoque.",
   "promos_raffled_hint": "{count}× {name} sorteada(s) neste evento",
   "promos_raffled_add": "Adicionar ao relatório",
   "promos_raffled_dismiss": "Fechar",

@@ -317,8 +317,20 @@ Not all persistent server state flows through the `objects` projection/SSE pipel
 | `promo_images` | Binary blob, same pattern, but served **unauthenticated** and cached cache-first by the service worker — offline raffle/picker display needs the bytes without a session (mechanics: ARCHITECTURE.md Binary Asset System) |
 | `push_subscriptions` | Send credentials (endpoints the backend delivers to, never display data). Routing them through the projection/SSE pipeline would broadcast per-device push endpoints to every client — wrong semantics and a privacy/security issue. Managed entirely in `push_service.py` + `routes/push.py`. |
 | `oauth_*` | OAuth state / token management |
+| `promo_ledger` | Append-mostly inventory audit trail (officials-only, online-only back-office); source of truth for the server-computed `Promo.holdings`/`User.promo_stock` aggregates. REST-readable — see the carve-out below |
 
 When adding new state: if it's display data keyed by uid that every authorized client needs, use the `objects` path. If it's server-side-only credentials or blobs, use a side table.
+
+## Online-Only REST Reads (the offline-first carve-out)
+
+"All UI reads come from IndexedDB" has exactly one sanctioned exception: the promo ledger audit view reads `GET /api/promos/ledger` directly. A surface qualifies ONLY when **all four** hold:
+
+1. **Online-only** — never needed at a venue or during an offline tournament.
+2. **Officials-only** — not player- or tournament-facing display.
+3. **Back-office** — administrative bookkeeping, not gameplay or event flow.
+4. **Small role-scoped dataset shipped whole** — one response, no server-side pagination (CLAUDE.md convention); filtering/aggregation happen client-side.
+
+A tournament- or player-facing view meets none of these — do not cite this carve-out to bypass offline-first for display data. Authoritative aggregates derived from carve-out data are themselves NOT part of the carve-out: remaining promo stock is server-computed (`promo_stock.py`) and streamed through the normal objects pipeline (`Promo.holdings`, `User.promo_stock`), because totals derived client-side diverge with local sync state.
 
 ## Adding a New Object Type
 

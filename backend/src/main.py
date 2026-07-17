@@ -236,6 +236,17 @@ async def run_sanction_cleanup() -> None:
         logger.error(f"Error during sanction cleanup: {e}", exc_info=True)
 
 
+async def run_promo_stock_recompute() -> None:
+    """Daily full promo stock recompute (self-healing consistency pass)."""
+    try:
+        from .promo_stock import recompute_promo_stock
+
+        await recompute_promo_stock()
+        logger.info("Promo stock recompute complete")
+    except Exception as e:
+        logger.error(f"Error during promo stock recompute: {e}", exc_info=True)
+
+
 async def run_rating_recompute() -> None:
     """Full recomputation of all ratings and wins (scheduled daily).
 
@@ -402,6 +413,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         replace_existing=True,
     )
     logger.info("Rating recompute scheduled daily (initial run after VEKN sync)")
+
+    # Schedule daily promo stock recompute (self-healing consistency pass)
+    _scheduler.add_job(
+        run_promo_stock_recompute,
+        trigger=IntervalTrigger(hours=24),
+        id="promo_stock_recompute",
+        name="Promo Stock Recompute",
+        replace_existing=True,
+    )
+    logger.info("Promo stock recompute scheduled daily")
 
     # Schedule VEKN push batch (runs hourly if VEKN_PUSH enabled)
     if os.getenv("VEKN_PUSH", "").lower() == "true":

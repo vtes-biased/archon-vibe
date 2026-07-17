@@ -252,6 +252,11 @@ class User(BaseObject, kw_only=True):
     # Profile
     avatar_path: str | None = None  # Server-stored compressed image path
 
+    # Promo stock: promo_uid -> computed remaining copies. Server-written only
+    # (promo_stock.recompute) — full projection, so it reaches the holder
+    # (own profile) and officials, never member/public.
+    promo_stock: dict[str, int] = msgspec.field(default_factory=dict)
+
     # Contact info (visible based on role-based access rules)
     contact_email: str | None = None
     contact_discord: str | None = None  # Discord handle
@@ -631,6 +636,30 @@ class PromoHolding(msgspec.Struct, kw_only=True):
 
     assigned: int = 0
     remaining: int = 0
+
+
+class PromoLedgerKind(StrEnum):
+    ASSIGNMENT = "assignment"  # stock moves from one holder to another
+    DISTRIBUTION = "distribution"  # stock exits (non-tournament channel)
+
+
+class PromoLedgerEntry(msgspec.Struct, kw_only=True):
+    """One promo inventory movement (promo_ledger side table, not synced).
+
+    Append-mostly: corrections are compensating rows (negative qty), never
+    edits — the ledger is the auditable source of truth for computed stock.
+    """
+
+    uid: str
+    kind: PromoLedgerKind
+    promo_uid: str
+    qty: int  # negative = compensating correction
+    from_uid: str
+    to_uid: str | None = None  # assignment target; None for distributions
+    note: str = ""
+    happened_at: datetime
+    created_by: str
+    created_at: datetime
 
 
 class Promo(BaseObject, kw_only=True):

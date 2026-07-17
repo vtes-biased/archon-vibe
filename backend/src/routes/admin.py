@@ -12,9 +12,10 @@ from pydantic import BaseModel
 from .. import permissions
 from ..accounts import merge_users
 from ..broadcast import broadcast_precomputed
-from ..db import get_user_by_uid
+from ..db import get_user_by_uid, remap_promo_ledger_user
 from ..middleware.auth import CurrentUser
 from ..models import Role
+from ..promo_stock import schedule_recompute
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +201,12 @@ async def merge_user_accounts(
     # Propagate the merge to other clients' caches live.
     for bd in merge_bds:
         broadcast_precomputed(bd)
+
+    # Promo ledger rows point at the survivor; the full recompute then rebuilds
+    # the survivor's stock aggregates (the absorbed account's tombstone keeps
+    # its stale keys, moot — tombstones are client-evicted).
+    await remap_promo_ledger_user(request.delete_uid, request.keep_uid)
+    schedule_recompute()
 
     logger.info(
         f"Merged users {request.delete_uid} into {request.keep_uid} by {manager.uid}"

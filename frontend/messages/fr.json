@@ -1045,6 +1045,7 @@
   "promos_stock_source_hint": "Le stock de l'organisateur dont proviennent ces promos.",
   "promos_record_cta": "Enregistrer les cartes promo distribuées",
   "promos_recorded_edit": "{count} promo(s) enregistrée(s) · Modifier",
+  "promos_negative_stock": "Les copies déclarées dépassent votre stock enregistré pour : {names} — enregistré quand même, vérifiez votre stock.",
   "promos_raffled_hint": "{count}× {name} tirée(s) au sort lors de cet événement",
   "promos_raffled_add": "Ajouter au rapport",
   "promos_raffled_dismiss": "Fermer",

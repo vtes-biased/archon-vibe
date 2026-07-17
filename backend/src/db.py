@@ -22,6 +22,8 @@ from .models import (
     League,
     ObjectType,
     Promo,
+    PromoLedgerEntry,
+    PromoLedgerKind,
     Role,
     Sanction,
     Tournament,
@@ -1155,21 +1157,24 @@ async def get_all_promos(
 
 
 async def count_promo_references(uid: str) -> int:
-    """Live tournament rows referencing a promo (reports or raffle prizes).
+    """Rows referencing a promo: tournament reports, raffle prizes, ledger.
 
     Guards hard-delete: a referenced promo must be retired (active=false), never
     tombstoned — the universal soft-delete would evict it from clients and dangle
-    historical rows. Ledger references extend this count when that feature lands.
+    historical rows.
     """
     async with get_connection() as conn:
         result = await conn.execute(
-            """SELECT COUNT(*) FROM objects
-            WHERE type = 'tournament' AND deleted_at IS NULL
-              AND ("full"->'promos_distributed' @> %s::jsonb
-                   OR "full"->'raffles' @> %s::jsonb)""",
+            """SELECT
+                (SELECT COUNT(*) FROM objects
+                 WHERE type = 'tournament' AND deleted_at IS NULL
+                   AND ("full"->'promos_distributed' @> %s::jsonb
+                        OR "full"->'raffles' @> %s::jsonb))
+                + (SELECT COUNT(*) FROM promo_ledger WHERE promo_uid = %s)""",
             (
                 msgspec.json.encode([{"promo_uid": uid}]).decode(),
                 msgspec.json.encode([{"prize_promo_uid": uid}]).decode(),
+                uid,
             ),
         )
         row = await result.fetchone()
@@ -1340,6 +1345,141 @@ async def delete_promo_image(promo_uid: str) -> bool:
         )
         row = await result.fetchone()
         return row is not None
+
+
+# ---------------------------------------------------------------------------
+# Promo ledger (side table, not synced — see the SYNC.md carve-out)
+# ---------------------------------------------------------------------------
+
+_LEDGER_COLS = (
+    "uid, kind, promo_uid, qty, from_uid, to_uid, note, happened_at, "
+    "created_by, created_at"
+)
+
+
+def _ledger_row_to_entry(row: tuple) -> PromoLedgerEntry:
+    return PromoLedgerEntry(
+        uid=row[0],
+        kind=PromoLedgerKind(row[1]),
+        promo_uid=row[2],
+        qty=row[3],
+        from_uid=row[4],
+        to_uid=row[5],
+        note=row[6],
+        happened_at=row[7],
+        created_by=row[8],
+        created_at=row[9],
+    )
+
+
+async def insert_promo_ledger_entry(entry: PromoLedgerEntry) -> None:
+    """Append one ledger row (corrections are new compensating rows)."""
+    async with get_connection() as conn:
+        await conn.execute(
+            f"""INSERT INTO promo_ledger ({_LEDGER_COLS})
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (
+                entry.uid,
+                entry.kind,
+                entry.promo_uid,
+                entry.qty,
+                entry.from_uid,
+                entry.to_uid,
+                entry.note,
+                entry.happened_at,
+                entry.created_by,
+                entry.created_at,
+            ),
+        )
+
+
+async def get_promo_ledger_entries(
+    involved_uid: str | None = None,
+) -> list[PromoLedgerEntry]:
+    """Whole role-scoped ledger, oldest first. No pagination by design
+    (CLAUDE.md convention): officials read everything (involved_uid=None),
+    everyone else only rows they are party to."""
+    async with get_connection() as conn:
+        if involved_uid is None:
+            result = await conn.execute(
+                f"SELECT {_LEDGER_COLS} FROM promo_ledger ORDER BY happened_at, uid"
+            )
+        else:
+            result = await conn.execute(
+                f"""SELECT {_LEDGER_COLS} FROM promo_ledger
+                WHERE from_uid = %s OR to_uid = %s OR created_by = %s
+                ORDER BY happened_at, uid""",
+                (involved_uid, involved_uid, involved_uid),
+            )
+        rows = await result.fetchall()
+        return [_ledger_row_to_entry(r) for r in rows]
+
+
+async def get_promo_ledger_for_promos(
+    promo_uids: list[str],
+) -> list[PromoLedgerEntry]:
+    """All ledger rows for the given promos (recompute input)."""
+    if not promo_uids:
+        return []
+    async with get_connection() as conn:
+        result = await conn.execute(
+            f"SELECT {_LEDGER_COLS} FROM promo_ledger WHERE promo_uid = ANY(%s)",
+            (promo_uids,),
+        )
+        rows = await result.fetchall()
+        return [_ledger_row_to_entry(r) for r in rows]
+
+
+async def remap_promo_ledger_user(old_uid: str, new_uid: str) -> None:
+    """Point ledger rows at a merged user (users/merge)."""
+    async with get_connection() as conn:
+        await conn.execute(
+            """UPDATE promo_ledger SET
+                from_uid = CASE WHEN from_uid = %(old)s THEN %(new)s ELSE from_uid END,
+                to_uid = CASE WHEN to_uid = %(old)s THEN %(new)s ELSE to_uid END,
+                created_by = CASE WHEN created_by = %(old)s THEN %(new)s ELSE created_by END
+            WHERE from_uid = %(old)s OR to_uid = %(old)s OR created_by = %(old)s""",
+            {"old": old_uid, "new": new_uid},
+        )
+
+
+async def get_tournament_promo_attributions(
+    promo_uids: set[str],
+) -> list[tuple[str, str, int]]:
+    """(promo_uid, holder_uid, qty) from live tournaments' distribution
+    reports, attributed to each report's stock source. Recompute input."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full"->'promos_distributed', "full"->>'promo_stock_source_uid'
+            FROM objects WHERE type = 'tournament' AND deleted_at IS NULL
+              AND jsonb_array_length(coalesce("full"->'promos_distributed', '[]'::jsonb)) > 0"""
+        )
+        rows = await result.fetchall()
+    out: list[tuple[str, str, int]] = []
+    for dist_rows, source_uid in rows:
+        if not source_uid:
+            continue
+        for r in dist_rows or []:
+            promo_uid = r.get("promo_uid")
+            if promo_uid in promo_uids:
+                out.append((promo_uid, source_uid, int(r.get("qty", 0))))
+    return out
+
+
+async def get_users_with_promo_stock_keys(promo_uids: list[str]) -> list[str]:
+    """Users whose stored promo_stock mentions any of the given promos —
+    ensures stale keys get cleaned even when the holder no longer appears in
+    the recomputed aggregates (e.g. a report's stock source was changed)."""
+    if not promo_uids:
+        return []
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT uid FROM objects WHERE type = 'user' AND deleted_at IS NULL
+              AND coalesce("full"->'promo_stock', '{}'::jsonb) ?| %s::text[]""",
+            (promo_uids,),
+        )
+        rows = await result.fetchall()
+        return [r[0] for r in rows]
 
 
 # ---------------------------------------------------------------------------

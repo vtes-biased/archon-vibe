@@ -15,11 +15,22 @@ from ..db import (
     get_league_by_uid,
     get_promo_by_uid,
     get_promo_image,
+    get_promo_ledger_entries,
+    get_user_by_uid,
+    insert_promo_ledger_entry,
     save_promo,
     upsert_promo_image,
 )
 from ..middleware.auth import OptionalUser
-from ..models import Promo, PromoKind, Role, TournamentRank
+from ..models import (
+    Promo,
+    PromoKind,
+    PromoLedgerEntry,
+    PromoLedgerKind,
+    Role,
+    TournamentRank,
+)
+from ..promo_stock import schedule_recompute
 
 router = APIRouter(prefix="/api/promos", tags=["promos"])
 logger = logging.getLogger(__name__)
@@ -111,6 +122,9 @@ async def update_promo(
     promo.modified = datetime.now(UTC)
     bd = await save_promo(promo)
     broadcast_precomputed(bd)
+    # Self-heal: this read-modify-write may overlap a concurrent holdings
+    # recompute; re-deriving from source data always converges.
+    schedule_recompute([uid])
     return Response(
         content=encoder.encode(msgspec.to_builtins(promo)),
         media_type="application/json",
@@ -142,6 +156,87 @@ async def delete_promo(
     bd = await save_promo(promo)
     broadcast_precomputed(bd)
     return Response(status_code=204)
+
+
+# Promo ledger: append-mostly inventory movements (promo_ledger side table,
+# not synced — officials-only online-only back-office, the SYNC.md carve-out).
+# Remaining stock is recomputed server-side after every write and streamed via
+# the Promo/User objects, never derived client-side.
+
+
+class LedgerEntryCreate(BaseModel):
+    kind: PromoLedgerKind
+    promo_uid: str
+    qty: int  # negative = compensating correction
+    to_uid: str | None = None
+    from_uid: str | None = None  # IC only; defaults to the actor
+    note: str = ""
+    happened_at: datetime | None = None
+
+
+@router.post("/ledger")
+async def create_ledger_entry(
+    body: LedgerEntryCreate,
+    user: OptionalUser = None,
+) -> Response:
+    """Record an inventory movement. Self-sourced (own stock) for anyone;
+    IC may record for another holder (BCP supply needs no prior stock)."""
+    if not user:
+        raise HTTPException(401, "Authentication required")
+    # Membership floor: every real holder (official/organizer) has a VEKN ID —
+    # keeps drive-by accounts from writing rows. Movements stay auditable
+    # (created_by/from_uid) and correctable via compensating rows.
+    if not user.vekn_id:
+        raise HTTPException(403, "VEKN membership required")
+    from_uid = body.from_uid or user.uid
+    if from_uid != user.uid and Role.IC not in user.roles:
+        raise HTTPException(403, "Only IC can record movements for another holder")
+    if body.qty == 0:
+        raise HTTPException(400, "qty must be non-zero")
+    if not await get_promo_by_uid(body.promo_uid):
+        raise HTTPException(404, "Promo not found")
+    if body.kind == PromoLedgerKind.ASSIGNMENT:
+        if not body.to_uid:
+            raise HTTPException(400, "Assignment requires to_uid")
+        if not await get_user_by_uid(body.to_uid):
+            raise HTTPException(400, "Assignee not found")
+    elif body.to_uid:
+        raise HTTPException(400, "Distribution cannot have to_uid")
+
+    now = datetime.now(UTC)
+    entry = PromoLedgerEntry(
+        uid=str(uuid7()),
+        kind=body.kind,
+        promo_uid=body.promo_uid,
+        qty=body.qty,
+        from_uid=from_uid,
+        to_uid=body.to_uid,
+        note=body.note,
+        happened_at=body.happened_at or now,
+        created_by=user.uid,
+        created_at=now,
+    )
+    await insert_promo_ledger_entry(entry)
+    schedule_recompute([body.promo_uid])
+    return Response(
+        content=encoder.encode(msgspec.to_builtins(entry)),
+        media_type="application/json",
+        status_code=201,
+    )
+
+
+@router.get("/ledger")
+async def list_ledger_entries(user: OptionalUser = None) -> Response:
+    """The whole role-scoped ledger, oldest first — no pagination by design
+    (small dataset; filtering/aggregation happen client-side)."""
+    if not user:
+        raise HTTPException(401, "Authentication required")
+    is_official = Role.IC in user.roles or Role.NC in user.roles
+    entries = await get_promo_ledger_entries(None if is_official else user.uid)
+    return Response(
+        content=encoder.encode(msgspec.to_builtins(entries)),
+        media_type="application/json",
+    )
 
 
 # Promo image: blob in the promo_images side table; the Promo object only
