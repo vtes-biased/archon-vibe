@@ -1,10 +1,8 @@
 <script lang="ts">
   import type { User } from "$lib/types";
   import { getFilteredUsers, getUser } from "$lib/db";
-  import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import { showToast } from "$lib/stores/toast.svelte";
-  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
   import { X } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -83,22 +81,16 @@
     }
   }
 
-  const auth = $derived(getAuthState());
-  let pendingRemove = $state<string | null>(null);
-
-  function handleRemove(uid: string) {
+  async function handleRemove(uid: string) {
     if (organizerUids.length <= 1) {
       showToast({ type: "error", message: m.organizers_last_warning() });
       return;
     }
-    pendingRemove = uid;
-  }
-
-  async function confirmRemove(uid: string) {
     loading = true;
     try {
       await onremove(uid);
-      showToast({ type: "success", message: m.organizers_removed() });
+    } catch {
+      // Error already shown by apiRequest
     } finally {
       loading = false;
     }
@@ -170,15 +162,3 @@
     {/if}
   </div>
 </div>
-
-{#if pendingRemove}
-  {@const uid = pendingRemove}
-  {@const name = organizers[uid]?.name || uid.slice(0, 8)}
-  <ConfirmActionModal
-    title={m.organizers_remove_title()}
-    body={uid === auth.user?.uid ? m.organizers_remove_self_warning() : m.organizers_remove_confirm({ name })}
-    confirmLabel={m.organizers_remove_btn()}
-    action={() => confirmRemove(uid)}
-    onClose={() => (pendingRemove = null)}
-  />
-{/if}
