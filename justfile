@@ -91,14 +91,24 @@ deps-check:
         fi
     else echo "  python deps (uv)     (could not check)"; fi
     # Frontend/npm: `npm outdated` exits non-zero when a package is upgradable.
-    if (cd frontend && npm outdated) >/dev/null 2>&1; then
-        echo "  frontend deps (npm)  current"
+    # Frontend/npm: stale only when `npm update` would move something (current
+    # != wanted) — this gate's stated intent. Beyond-Wanted semver-majors are
+    # manual-or-blocked-upstream (e.g. typescript 7 vs the SvelteKit peer cap):
+    # reported informationally, never gating.
+    npmrep=$(cd frontend && npm outdated --json 2>/dev/null | node -e '
+        let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+          const o=s.trim()?JSON.parse(s):{};
+          for(const [k,v] of Object.entries(o)){
+            if(v.current!==v.wanted)console.log(`TAKE ${k} ${v.current} -> ${v.wanted}`);
+            else if(v.wanted!==v.latest)console.log(`INFO ${k} ${v.current} (latest ${v.latest}: semver-major, manual bump)`);
+          }});') || true
+    if printf '%s\n' "$npmrep" | grep -q '^TAKE '; then
+        stale=1; echo "  frontend deps (npm)  updates available:"
+        printf '%s\n' "$npmrep" | grep '^TAKE ' | sed 's/^TAKE /      /'
     else
-        stale=1
-        echo "  frontend deps (npm)  updates available ('cd frontend && npm outdated');"
-        echo "                       anything beyond the Wanted column is a semver-major"
-        echo "                       'just update' won't take — edit package.json manually"
+        echo "  frontend deps (npm)  current (within ranges)"
     fi
+    printf '%s\n' "$npmrep" | grep '^INFO ' | sed 's/^INFO /      /' || true
     # Engine/cargo: `cargo update --dry-run` prints "name vX -> vY" without writing.
     if out=$(cd engine && cargo update --dry-run 2>&1); then
         if printf '%s\n' "$out" | grep -q ' -> '; then
