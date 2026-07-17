@@ -1,7 +1,8 @@
 <script lang="ts">
-  // Record a promo inventory movement (officials). Assignment = stock handed to
-  // a member; distribution = copies handed out to players outside a tournament
-  // report. Negative qty records a compensating correction.
+  // Record a promo inventory movement (officials). Intake = print batch
+  // received from BCP (NC for themselves, IC for anyone); assignment = stock
+  // handed to a member; distribution = copies handed out to players outside a
+  // tournament report. Negative qty records a compensating correction.
   import type { Promo, PromoLedgerKind, User } from "$lib/types";
   import { createPromoLedgerEntry } from "$lib/api";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -47,9 +48,22 @@
       Number.isInteger(qty) &&
       qty !== 0 &&
       !!happenedAt &&
-      (kind === "distribution" || !!toUser) &&
+      (kind !== "assignment" || !!toUser) &&
       !saving
   );
+
+  // Stock lifecycle order: in, move, out.
+  const kinds: PromoLedgerKind[] = ["intake", "assignment", "distribution"];
+  const kindLabels: Record<PromoLedgerKind, () => string> = {
+    intake: m.promo_ledger_kind_intake,
+    assignment: m.promo_ledger_kind_assignment,
+    distribution: m.promo_ledger_kind_distribution,
+  };
+  const submitLabels: Record<PromoLedgerKind, () => string> = {
+    intake: m.promo_movement_submit_intake,
+    assignment: m.promo_movement_submit_assignment,
+    distribution: m.promo_movement_submit_distribution,
+  };
 
   async function submit() {
     if (!canSubmit) return;
@@ -130,21 +144,16 @@
 
     <form onsubmit={(e) => { e.preventDefault(); submit(); }} class="p-6 space-y-4">
       <!-- Kind segmented toggle -->
-      <div class="grid grid-cols-2 bg-surface-muted rounded-lg border border-line p-1">
-        <button
-          type="button"
-          onclick={() => (kind = "assignment")}
-          class="px-3 py-2 min-h-[44px] text-sm font-medium rounded-md transition-colors {kind === 'assignment' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
-        >
-          {m.promo_ledger_kind_assignment()}
-        </button>
-        <button
-          type="button"
-          onclick={() => (kind = "distribution")}
-          class="px-3 py-2 min-h-[44px] text-sm font-medium rounded-md transition-colors {kind === 'distribution' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
-        >
-          {m.promo_ledger_kind_distribution()}
-        </button>
+      <div class="grid grid-cols-3 bg-surface-muted rounded-lg border border-line p-1">
+        {#each kinds as k (k)}
+          <button
+            type="button"
+            onclick={() => (kind = k)}
+            class="px-3 py-2 min-h-[44px] text-sm font-medium rounded-md transition-colors {kind === k ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
+          >
+            {kindLabels[k]()}
+          </button>
+        {/each}
       </div>
 
       <div>
@@ -169,12 +178,19 @@
       {/if}
 
       {#if isIC}
+        <!-- from_uid doubles as the receiving holder for intakes -->
         <div>
-          <span class="block text-sm text-ink-muted mb-1">{m.promo_movement_from_label()}</span>
+          <span class="block text-sm text-ink-muted mb-1">
+            {kind === "intake" ? m.promo_movement_received_by_label() : m.promo_movement_from_label()}
+          </span>
           {#if fromUser}
             {@render userChip(fromUser, () => (fromUser = null))}
           {:else if auth.user}
-            <p class="text-sm text-ink mb-2">{m.promo_movement_from_self({ name: auth.user.name })}</p>
+            <p class="text-sm text-ink mb-2">
+              {kind === "intake"
+                ? m.promo_movement_received_by_self({ name: auth.user.name })
+                : m.promo_movement_from_self({ name: auth.user.name })}
+            </p>
             <UserPicker onselect={(u) => (fromUser = u)} excludeUids={[auth.user.uid]} />
           {/if}
         </div>
@@ -198,7 +214,7 @@
 
       <div class="flex gap-2 pt-2">
         <Button type="submit" variant="primary" size="lg" class="flex-1" loading={saving} disabled={!canSubmit}>
-          {kind === "assignment" ? m.promo_movement_submit_assignment() : m.promo_movement_submit_distribution()}
+          {submitLabels[kind]()}
         </Button>
         <Button variant="secondary" size="lg" disabled={saving} onclick={requestClose}>
           {m.common_cancel()}

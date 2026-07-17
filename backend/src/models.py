@@ -634,11 +634,12 @@ class PromoKind(StrEnum):
 class PromoHolding(msgspec.Struct, kw_only=True):
     """Server-computed inventory aggregate for one holder (promo ledger)."""
 
-    assigned: int = 0
+    assigned: int = 0  # stock credited in (assignments + intakes)
     remaining: int = 0
 
 
 class PromoLedgerKind(StrEnum):
+    INTAKE = "intake"  # stock enters from the printer (BCP), credited to a holder
     ASSIGNMENT = "assignment"  # stock moves from one holder to another
     DISTRIBUTION = "distribution"  # stock exits (non-tournament channel)
 
@@ -654,8 +655,8 @@ class PromoLedgerEntry(msgspec.Struct, kw_only=True):
     kind: PromoLedgerKind
     promo_uid: str
     qty: int  # negative = compensating correction
-    from_uid: str
-    to_uid: str | None = None  # assignment target; None for distributions
+    from_uid: str  # source holder; for intake, the receiving holder
+    to_uid: str | None = None  # assignment target; None for intake/distribution
     note: str = ""
     happened_at: datetime
     created_by: str

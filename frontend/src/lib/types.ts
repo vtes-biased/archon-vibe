@@ -202,7 +202,7 @@ export interface Promo extends BaseObject {
   holdings?: Record<string, PromoHolding>;
 }
 
-export type PromoLedgerKind = "assignment" | "distribution";
+export type PromoLedgerKind = "intake" | "assignment" | "distribution";
 
 /** One promo inventory movement. REST-read (not synced): officials see all
  * rows, everyone else only rows they are party to. */

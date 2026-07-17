@@ -41,7 +41,14 @@ inventory — the feature's whole point. Mutation-verified against two mutations
   safe in tests.
 
 The route guards (`POST /api/promos/ledger`: qty≠0, assignment-needs-to_uid,
-distribution-forbids-to_uid, self-sourced-unless-IC) are thin one-line checks —
-deliberately NOT tested (would re-assert the implementation). See
+distribution-forbids-to_uid, self-sourced-unless-IC, **intake-is-IC-or-NC**) are
+thin one-line checks — deliberately NOT tested (would re-assert the
+implementation line-for-line; no route-level ledger test infra exists and one
+authz pin would leave the sibling self-sourced/NC-own-pool guard — pre-existing,
+out of scope — untested anyway). The **recompute** intake branch (credit
+from_uid, debit nobody, `continue`-skips the outflow) IS pinned by the one test
+via emergent arithmetic (intake 4 + assign 10 out → assigned==4, remaining==−6):
+removing the `continue` yields −10 and fails. That's why the recompute term
+clears the bar and the route gate doesn't. See
 [[project_report_promos_no_state_gate]] for the engine-side ReportPromos event
 (different surface — that's the offline-authoritative field the ledger only reads).

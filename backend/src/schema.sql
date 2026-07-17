@@ -60,11 +60,11 @@ CREATE TABLE IF NOT EXISTS banners (
 -- append-mostly; corrections are compensating rows (negative qty), never edits.
 CREATE TABLE IF NOT EXISTS promo_ledger (
     uid TEXT PRIMARY KEY,
-    kind TEXT NOT NULL,       -- 'assignment' (from -> to) | 'distribution' (from -> out)
+    kind TEXT NOT NULL,       -- 'intake' (BCP -> from) | 'assignment' (from -> to) | 'distribution' (from -> out)
     promo_uid TEXT NOT NULL,
     qty INTEGER NOT NULL,     -- negative = compensating correction
-    from_uid TEXT NOT NULL,   -- holder the stock moves from
-    to_uid TEXT,              -- assignment target; NULL for distributions
+    from_uid TEXT NOT NULL,   -- holder the stock moves from (for intake: the receiving holder)
+    to_uid TEXT,              -- assignment target; NULL for intake/distribution
     note TEXT NOT NULL DEFAULT '',
     happened_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by TEXT NOT NULL, -- actor who entered the row

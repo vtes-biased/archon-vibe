@@ -3,17 +3,18 @@
 `recompute_promo_stock` is the sole writer of `Promo.holdings` and
 `User.promo_stock` — the authoritative "remaining" counts every client reads via
 SSE (never derived client-side). The invariant it must hold: for each holder,
-remaining = assignments in − outflow out (both ledger kinds) − tournament
-attributions, and a holder that drops out of the recomputed set has its stale
-denormalized key cleaned. A sign flip, a dropped term, or a missed cleanup would
-show officials/organizers phantom or wrong physical-inventory counts — the whole
-point of the feature.
+remaining = credited in (assignments + intakes) − outflow out (assignments,
+distributions) − tournament attributions, and a holder that drops out of the
+recomputed set has its stale denormalized key cleaned. A sign flip, a dropped
+term, or a missed cleanup would show officials/organizers phantom or wrong
+physical-inventory counts — the whole point of the feature.
 
 One scenario drives every term through the shipped function against the real
-`test_db` Postgres: an assignment in, a generic distribution out, a compensating
-negative correction, a BCP/IC source going legitimately negative, a tournament
-attribution to a stock source, and — after re-pointing that stock source — the
-stale-key cleanup for the holder that no longer appears.
+`test_db` Postgres: an intake crediting a holder with nobody debited, an
+assignment in, a generic distribution out, a compensating negative correction, a
+source with more assigned out than intaken going legitimately negative, a
+tournament attribution to a stock source, and — after re-pointing that stock
+source — the stale-key cleanup for the holder that no longer appears.
 """
 
 from datetime import UTC, datetime
@@ -66,8 +67,11 @@ async def test_recompute_nets_ledger_and_attributions_and_cleans_stale_holders(t
         for u in (ic, org_b, org_c):
             await db.save_user(u)
 
-        # 10 assigned IC -> B; B gives away 3, then a -1 compensating correction.
+        # IC intakes 4 from BCP, assigns 10 to B (net −6: partial intake keeps
+        # the unbounded-source path exercised); B gives away 3, then a -1
+        # compensating correction.
         for e in (
+            _entry(PromoLedgerKind.INTAKE, p, 4, ic.uid, None),
             _entry(PromoLedgerKind.ASSIGNMENT, p, 10, ic.uid, org_b.uid),
             _entry(PromoLedgerKind.DISTRIBUTION, p, 3, org_b.uid, None),
             _entry(PromoLedgerKind.DISTRIBUTION, p, -1, org_b.uid, None),
@@ -87,13 +91,15 @@ async def test_recompute_nets_ledger_and_attributions_and_cleans_stale_holders(t
         await recompute_promo_stock([p])
 
         promo_after = await db.get_promo_by_uid(p)
-        # B: 10 in − (3 − 1) out = 8. IC source: 0 − 10 = −10. C: 0 − 2 attributed.
+        # B: 10 in − (3 − 1) out = 8. IC: 4 intaken − 10 out = −6 (intake debits
+        # nobody). C: 0 − 2 attributed.
         assert promo_after.holdings[org_b.uid].assigned == 10
         assert promo_after.holdings[org_b.uid].remaining == 8
-        assert promo_after.holdings[ic.uid].remaining == -10
+        assert promo_after.holdings[ic.uid].assigned == 4
+        assert promo_after.holdings[ic.uid].remaining == -6
         assert promo_after.holdings[org_c.uid].remaining == -2
         assert (await db.get_user_by_uid(org_b.uid)).promo_stock[p] == 8
-        assert (await db.get_user_by_uid(ic.uid)).promo_stock[p] == -10
+        assert (await db.get_user_by_uid(ic.uid)).promo_stock[p] == -6
         assert (await db.get_user_by_uid(org_c.uid)).promo_stock[p] == -2
 
         # Re-point the report's stock source B<-C: the attribution moves to B and

@@ -180,7 +180,9 @@ async def create_ledger_entry(
     user: OptionalUser = None,
 ) -> Response:
     """Record an inventory movement. Self-sourced (own stock) for anyone;
-    IC may record for another holder (BCP supply needs no prior stock)."""
+    IC may record for another holder (unrecorded supply needs no prior stock).
+    Intake (batch received from BCP, from_uid = the receiving holder) is
+    officials-only: NC for their own pool, IC for anyone."""
     if not user:
         raise HTTPException(401, "Authentication required")
     # Membership floor: every real holder (official/organizer) has a VEKN ID —
@@ -191,6 +193,12 @@ async def create_ledger_entry(
     from_uid = body.from_uid or user.uid
     if from_uid != user.uid and Role.IC not in user.roles:
         raise HTTPException(403, "Only IC can record movements for another holder")
+    # Intake creates stock from nothing: officials only (self check above
+    # already restricts NC to their own pool).
+    if body.kind == PromoLedgerKind.INTAKE and not (
+        Role.IC in user.roles or Role.NC in user.roles
+    ):
+        raise HTTPException(403, "Only IC or NC can record an intake")
     if body.qty == 0:
         raise HTTPException(400, "qty must be non-zero")
     if not await get_promo_by_uid(body.promo_uid):
@@ -201,7 +209,7 @@ async def create_ledger_entry(
         if not await get_user_by_uid(body.to_uid):
             raise HTTPException(400, "Assignee not found")
     elif body.to_uid:
-        raise HTTPException(400, "Distribution cannot have to_uid")
+        raise HTTPException(400, "Only assignments have to_uid")
 
     now = datetime.now(UTC)
     entry = PromoLedgerEntry(

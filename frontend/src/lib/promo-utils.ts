@@ -34,7 +34,7 @@ export interface HoldingRow {
 }
 
 /** One display row per holder. Pure supply sources (negative remaining with
- * nothing assigned to them — IC/BCP roots) are supply bookkeeping, not holders. */
+ * nothing credited in — IC/BCP roots) are supply bookkeeping, not holders. */
 export function holdingRows(promo: Promo): HoldingRow[] {
   return Object.entries(promo.holdings ?? {})
     .filter(([, h]) => !(h.remaining < 0 && h.assigned === 0))

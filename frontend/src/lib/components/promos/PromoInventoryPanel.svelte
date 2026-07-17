@@ -76,8 +76,13 @@
           e.kind,
           promoNames.get(e.promo_uid) ?? e.promo_uid,
           String(e.qty),
-          resolved[e.from_uid] ?? e.from_uid,
-          e.to_uid ? (resolved[e.to_uid] ?? e.to_uid) : "",
+          // Intake flows into from_uid — keep the name columns directional.
+          e.kind === "intake" ? "BCP" : (resolved[e.from_uid] ?? e.from_uid),
+          e.kind === "intake"
+            ? (resolved[e.from_uid] ?? e.from_uid)
+            : e.to_uid
+              ? (resolved[e.to_uid] ?? e.to_uid)
+              : "",
           e.note ?? "",
           resolved[e.created_by] ?? e.created_by,
           e.created_at,
@@ -135,7 +140,7 @@
                   {:else}
                     <span class="text-ink-muted">{m.promo_holdings_remaining({ count: String(row.remaining) })}</span>
                   {/if}
-                  <span class="text-ink-faint"> · {m.promo_holdings_assigned({ count: String(row.assigned) })}</span>
+                  <span class="text-ink-faint"> · {m.promo_holdings_received({ count: String(row.assigned) })}</span>
                 </span>
               </div>
             {/each}

@@ -70,7 +70,7 @@ async def _recompute(promo_uids: list[str] | None) -> None:
     entries = await get_promo_ledger_for_promos(list(target_uids))
     attributions = await get_tournament_promo_attributions(target_uids)
 
-    # promo_uid -> holder_uid -> aggregate. Remaining = assignments in
+    # promo_uid -> holder_uid -> aggregate. Remaining = assignments + intakes in
     # - assignments out - generic distributions - tournament attributions.
     holdings: dict[str, dict[str, PromoHolding]] = {u: {} for u in target_uids}
 
@@ -78,12 +78,20 @@ async def _recompute(promo_uids: list[str] | None) -> None:
         return holdings[promo_uid].setdefault(holder_uid, PromoHolding())
 
     for e in entries:
+        if e.kind == PromoLedgerKind.INTAKE:
+            # Print batch received from BCP: credits the holder (from_uid),
+            # debits nobody — the external origin is outside the ledger.
+            h = hold(e.promo_uid, e.from_uid)
+            h.assigned += e.qty
+            h.remaining += e.qty
+            continue
         if e.kind == PromoLedgerKind.ASSIGNMENT and e.to_uid:
             h = hold(e.promo_uid, e.to_uid)
             h.assigned += e.qty
             h.remaining += e.qty
-        # Outflow from the source holder, both kinds. IC sources go negative —
-        # BCP supply is unbounded from the app's perspective; UI hides it.
+        # Outflow from the source holder (assignment + distribution). Sources
+        # with no recorded intake go negative — unbounded fallback; UI hides
+        # pure supply sources.
         h = hold(e.promo_uid, e.from_uid)
         h.remaining -= e.qty
 

@@ -91,7 +91,10 @@ metadata:
 | movement (one ledger transaction, `promo_movement_*`) | mouvement | movimiento | movimentação (NOT "movimento" — that's the seating-move noun, different domain) | movimento |
 | assignment (ledger kind: stock handed to another official/holder) | Attribution | Asignación | Atribuição | Assegnazione |
 | distribution (ledger kind: copies handed to players directly) | Distribution | Distribución | Distribuição | Distribuzione |
-| holdings (a holder's per-promo remaining/assigned counts, `promo_holdings_*`/`promo_inventory_no_holdings`) — reuses "stock" rather than coining a separate word | stock | stock | estoque | stock |
+| intake (ledger kind: print batch received from BCP into a holder's stock, `promo_ledger_kind_intake`/`promo_movement_submit_intake`) — same root as "received" below, not the assignment/distribution roots | Réception | Recepción | Recebimento | Ricezione |
+| printer (BCP, the VEKN's card printer/manufacturer, `promo_ledger_source_bcp`="BCP (printer)") — coined, no prior precedent; BCP itself stays untranslated (proper noun) | imprimeur | imprenta | gráfica | tipografia |
+| received (a holder's total intake-or-assignment credit, `promo_holdings_received` — renamed 2026-07-17 from `promo_holdings_assigned`; also `promo_movement_received_by_label`="Received by") — same root as "intake" above | reçue(s) / Reçu par | recibida(s) / Recibido por | recebida(s) / Recebido por | ricevuta/e / Ricevuto da |
+| holdings (a holder's per-promo remaining/received counts, `promo_holdings_*`/`promo_inventory_no_holdings`) — reuses "stock" rather than coining a separate word | stock | stock | estoque | stock |
 | member (generic app user in a picker/search context, `user_picker_*`) | membre | miembro | membro | membro |
 | National/Continental promo-rank badge (short form, `promo_rank_national`/`_continental` — drops "Championship", distinct from the full `tfield_rank` phrase above) | National / Continental | Nacional / Continental | National / Continental (kept English, matches pt's `tfield_ranked_no_proxies_hint` precedent of not translating this exact phrase) | Nazionale / Continentale |
 

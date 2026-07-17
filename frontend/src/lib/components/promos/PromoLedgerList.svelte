@@ -1,7 +1,7 @@
 <script lang="ts">
   // Online-only ledger read (the sanctioned SYNC.md carve-out) with simple
   // client-side filters. Rendered inside the inventory panel.
-  import type { Promo, PromoLedgerEntry } from "$lib/types";
+  import type { Promo, PromoLedgerEntry, PromoLedgerKind } from "$lib/types";
   import { getPromoLedger } from "$lib/api";
   import { getUser } from "$lib/db";
   import * as m from '$lib/paraglide/messages.js';
@@ -71,6 +71,17 @@
     return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   }
 
+  const kindLabels: Record<PromoLedgerKind, () => string> = {
+    intake: m.promo_ledger_kind_intake,
+    assignment: m.promo_ledger_kind_assignment,
+    distribution: m.promo_ledger_kind_distribution,
+  };
+  const kindBadges: Record<PromoLedgerKind, string> = {
+    intake: "badge-amethyst",
+    assignment: "badge-blue",
+    distribution: "badge-fuchsia",
+  };
+
   const selectClass =
     'px-2 py-1 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent';
 </script>
@@ -86,6 +97,7 @@
     </select>
     <select bind:value={filterKind} aria-label={m.promo_ledger_filter_kind()} class={selectClass}>
       <option value="">{m.promo_ledger_all_kinds()}</option>
+      <option value="intake">{m.promo_ledger_kind_intake()}</option>
       <option value="assignment">{m.promo_ledger_kind_assignment()}</option>
       <option value="distribution">{m.promo_ledger_kind_distribution()}</option>
     </select>
@@ -105,16 +117,23 @@
         <div class="py-2 text-sm">
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span class="text-xs text-ink-muted">{fmtDate(entry.happened_at)}</span>
-            <span class="px-1.5 py-0.5 text-xs rounded {entry.kind === 'assignment' ? 'badge-blue' : 'badge-fuchsia'}">
-              {entry.kind === 'assignment' ? m.promo_ledger_kind_assignment() : m.promo_ledger_kind_distribution()}
+            <span class="px-1.5 py-0.5 text-xs rounded {kindBadges[entry.kind]}">
+              {kindLabels[entry.kind]()}
             </span>
             <span class="font-medium text-ink-strong">{promoNames.get(entry.promo_uid) ?? entry.promo_uid}</span>
             <span class={entry.qty < 0 ? 'text-warn' : 'text-ink'}>×{entry.qty}</span>
           </div>
           <div class="text-xs text-ink-muted mt-0.5">
-            {names[entry.from_uid] ?? entry.from_uid}
-            →
-            {entry.to_uid ? (names[entry.to_uid] ?? entry.to_uid) : m.promo_ledger_to_players()}
+            <!-- Intake flows into from_uid (the receiving holder), out otherwise -->
+            {#if entry.kind === "intake"}
+              {m.promo_ledger_source_bcp()}
+              →
+              {names[entry.from_uid] ?? entry.from_uid}
+            {:else}
+              {names[entry.from_uid] ?? entry.from_uid}
+              →
+              {entry.to_uid ? (names[entry.to_uid] ?? entry.to_uid) : m.promo_ledger_to_players()}
+            {/if}
           </div>
           {#if entry.note}
             <div class="text-xs text-ink-faint mt-0.5">{entry.note}</div>
