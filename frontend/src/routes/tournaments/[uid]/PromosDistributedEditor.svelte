@@ -49,6 +49,10 @@
     && (p.league_uids.length === 0
       || (!!tournament.league_uid && p.league_uids.includes(tournament.league_uid)))
   ));
+  // Never filter silently: say how many active promos the gating hides.
+  const hiddenByGating = $derived(
+    catalog.filter(p => p.active).length - eligible.length
+  );
 
   // One row per promo: a row's options exclude promos chosen in other rows but
   // always include its own current pick (even retired or re-gated) so an
@@ -205,6 +209,9 @@
     <p class="text-xs text-ink-faint mb-2">{m.promos_hint()}</p>
   {:else}
     <p class="text-xs text-ink-faint mb-2">{m.promos_empty_state()}</p>
+  {/if}
+  {#if hiddenByGating > 0}
+    <p class="text-xs text-ink-faint mb-2">{m.promos_hidden_by_gating({ count: String(hiddenByGating) })}</p>
   {/if}
 
   <button

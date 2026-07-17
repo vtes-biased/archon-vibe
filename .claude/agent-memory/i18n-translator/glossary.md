@@ -22,7 +22,7 @@ metadata:
 | row / gap (finals seating ritual) | rangée / espace | fila / hueco | fileira / espaço | fila / spazio |
 | lowest qualifier (finals seating start order) | tête de série la plus basse | cabeza de serie más baja | cabeça de chave mais baixa | testa di serie più bassa |
 | toss | — | sorteo | sorteio | sorteggio |
-| raffle | — | sorteo | sorteio | estrazione |
+| raffle | Tirage au sort (full) / tirage (short form used in compact labels & badges, e.g. `raffle_name_default`, `raffle_results_header`) | sorteo | sorteio | estrazione |
 | check-in | Enregistrement / Pointer | registro (de asistencia) / registrarse | check-in | check-in |
 | player | — | jugador | jogador | giocatore |
 | organizer | — | organizador | organizador | organizzatore |
