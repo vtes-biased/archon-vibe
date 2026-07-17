@@ -1178,7 +1178,6 @@
   "raffle_winners": "Ganadores",
   "raffle_prize_optional": "Premio (opcional)",
   "raffle_prize_empty": "No hay promos configuradas",
-  "raffle_more_options": "Más opciones",
   "raffle_draw_one": "Sortear {count} ganador",
   "raffle_draw_many": "Sortear {count} ganadores",
   "raffle_no_eligible": "No hay jugadores elegibles en este pool",

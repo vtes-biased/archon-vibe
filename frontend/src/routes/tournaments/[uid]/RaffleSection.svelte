@@ -3,7 +3,7 @@
   import type { Tournament, RafflePool, Promo } from "$lib/types";
   import { getAllPromos } from "$lib/db";
   import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { ChevronDown, ChevronRight, Dices, Gift, Undo2, Trash2 } from "@lucide/svelte";
+  import { Dices, Gift, Undo2, Trash2 } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -30,7 +30,6 @@
   let excludeDrawn = $state(true);
   let count = $state(1);
   let prizePromoUid = $state("");
-  let moreOpen = $state(false);
 
   const raffles = $derived(tournament.raffles ?? []);
   const hasRaffles = $derived(raffles.length > 0);
@@ -257,25 +256,10 @@
         {/if}
       </div>
 
-      <button
-        type="button"
-        onclick={() => (moreOpen = !moreOpen)}
-        aria-expanded={moreOpen}
-        class="flex items-center gap-1.5 min-h-[44px] text-sm font-medium text-ink-muted hover:text-ink-strong transition-colors"
-      >
-        {#if moreOpen}
-          <ChevronDown class="w-4 h-4" aria-hidden="true" />
-        {:else}
-          <ChevronRight class="w-4 h-4" aria-hidden="true" />
-        {/if}
-        {m.raffle_more_options()}
-      </button>
-      {#if moreOpen}
-        <label class="flex items-center gap-1.5 py-2 min-h-[44px] text-sm text-ink">
-          <input type="checkbox" bind:checked={excludeDrawn} class="rounded border-line-strong" />
-          {m.raffle_exclude_drawn()}
-        </label>
-      {/if}
+      <label class="flex items-center gap-1.5 py-2 min-h-[44px] text-sm text-ink">
+        <input type="checkbox" bind:checked={excludeDrawn} class="rounded border-line-strong" />
+        {m.raffle_exclude_drawn()}
+      </label>
 
       <Button
         variant="primary"
