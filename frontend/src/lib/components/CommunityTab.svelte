@@ -9,6 +9,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
+  import CommunityModerationActions from "./CommunityModerationActions.svelte";
   import CommunitySocialSection from "./CommunitySocialSection.svelte";
   import CommunityContentSection from "./CommunityContentSection.svelte";
   import DiscordContact from "./DiscordContact.svelte";
@@ -43,12 +44,13 @@
   const pinScope = (l: CommunityLink) =>
     l.moderation?.status === "promoted" ? l.moderation.scope : null;
 
-  // Global resources: links a moderator (IC) has pinned globally, from any owner.
+  // Global resources: links a moderator (IC) has pinned globally, from any
+  // owner. Owner rides along — the moderation API is addressed by owner uid.
   const globalLinks = $derived.by(() => {
-    const links: CommunityLink[] = [];
+    const links: { user: User; link: CommunityLink }[] = [];
     for (const u of allUsersWithLinks) {
       for (const l of u.community_links || []) {
-        if (pinScope(l) === "global") links.push(l);
+        if (pinScope(l) === "global") links.push({ user: u, link: l });
       }
     }
     return links;
@@ -262,7 +264,18 @@
         <Globe class="w-5 h-5 text-accent" />
         <h2 class="text-lg font-medium text-ink-strong">{m.community_global_resources()}</h2>
       </div>
-      <CommunityLinkPills links={globalLinks} />
+      {#if isIC}
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {#each globalLinks as { user, link } (user.uid + link.url)}
+            <div class="flex items-center gap-1">
+              <CommunityLinkPills links={[link]} />
+              <CommunityModerationActions userUid={user.uid} {link} onModerate={handleModerate} canPromoteGlobal={true} />
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <CommunityLinkPills links={globalLinks.map(g => g.link)} />
+      {/if}
     </div>
   {/if}
 
