@@ -539,7 +539,7 @@
   "tfield_rank": "Rank",
   "tfield_rank_basic": "Basic",
   "tfield_open_rounds": "Open Rounds",
-  "tfield_open_rounds_desc": "Casual house format for multi-week or drop-in play: each player plays up to a set number of rounds, without everyone playing the same rounds together. Results are never sent to VEKN and don't count toward rankings.",
+  "tfield_open_rounds_desc": "Casual house format where each player plays up to a set number of rounds; no rankings are awarded.",
   "tfield_rounds_locked_hint": "Round count can't change after the tournament has started or been registered with VEKN.",
   "tfield_open_rounds_warning": "Open-rounds events are not reported to VEKN and don't count toward player rankings.",
   "tfield_section_basics": "Basics",

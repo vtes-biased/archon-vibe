@@ -539,7 +539,7 @@
   "tfield_rank": "Classificação",
   "tfield_rank_basic": "Básico",
   "tfield_open_rounds": "Rodadas Abertas",
-  "tfield_open_rounds_desc": "Formato caseiro e casual para eventos de várias semanas ou de participação pontual: cada jogador joga até um número determinado de rodadas, sem que todos joguem as mesmas rodadas juntos. Os resultados nunca são enviados à VEKN e não contam para o ranking.",
+  "tfield_open_rounds_desc": "Formato caseiro e casual em que cada jogador joga até um número determinado de rodadas; não é atribuída nenhuma classificação.",
   "tfield_rounds_locked_hint": "O número de rodadas não pode ser alterado após o torneio ter sido iniciado ou registrado na VEKN.",
   "tfield_open_rounds_warning": "Eventos de rodadas abertas não são informados à VEKN e não contam para o ranking dos jogadores.",
   "tfield_section_basics": "Geral",

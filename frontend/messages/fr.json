@@ -539,7 +539,7 @@
   "tfield_rank": "Rang",
   "tfield_rank_basic": "Basique",
   "tfield_open_rounds": "Rondes ouvertes",
-  "tfield_open_rounds_desc": "Format maison décontracté pour des événements multi-semaines ou à participation ponctuelle : chaque joueur joue jusqu'à un nombre défini de rondes, sans que tout le monde joue les mêmes rondes ensemble. Les résultats ne sont jamais envoyés à la VEKN et ne comptent pas pour le classement.",
+  "tfield_open_rounds_desc": "Format maison décontracté où chaque joueur joue jusqu'à un nombre défini de rondes ; aucun classement n'est attribué.",
   "tfield_rounds_locked_hint": "Le nombre de rondes ne peut plus être modifié une fois le tournoi commencé ou enregistré auprès de la VEKN.",
   "tfield_open_rounds_warning": "Les événements à rondes ouvertes ne sont pas signalés à la VEKN et ne comptent pas dans le classement des joueurs.",
   "tfield_section_basics": "Général",

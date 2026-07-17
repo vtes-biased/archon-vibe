@@ -539,7 +539,7 @@
   "tfield_rank": "Rank",
   "tfield_rank_basic": "Base",
   "tfield_open_rounds": "Round Aperti",
-  "tfield_open_rounds_desc": "Formato casalingo e casual per eventi multi-settimana o a partecipazione occasionale: ogni giocatore gioca fino a un numero prestabilito di round, senza che tutti giochino gli stessi round insieme. I risultati non vengono mai inviati alla VEKN e non contano per il ranking.",
+  "tfield_open_rounds_desc": "Formato casalingo e casual in cui ogni giocatore gioca fino a un numero prestabilito di round; non viene assegnata alcuna classifica.",
   "tfield_rounds_locked_hint": "Il numero di round non può essere modificato dopo che il torneo è stato avviato o registrato presso la VEKN.",
   "tfield_open_rounds_warning": "Gli eventi con round aperti non vengono segnalati alla VEKN e non contano per il ranking dei giocatori.",
   "tfield_section_basics": "Generale",
