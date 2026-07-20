@@ -368,37 +368,32 @@
     <!-- Calendar Subscribe — hidden offline: token generation is an API call
          and webcal makes the OS calendar fetch the feed immediately -->
     {#if auth.isAuthenticated && isBrowserOnline()}
-      <div class="flex items-center gap-2 flex-wrap mb-6 px-1">
-        <Calendar class="h-4 w-4 text-ink-faint shrink-0" />
-        <span class="text-xs text-ink-faint">{m.tournaments_calendar_subscribe()}:</span>
+      <div class="mb-6 px-1">
         {#if viewMode === "agenda" && !auth.user?.calendar_token}
           <Button variant="primary" size="sm" loading={calendarLoading} onclick={handleGenerateCalendarToken}>
             {m.tournaments_calendar_generate()}
           </Button>
         {:else}
-          <input
-            type="text"
-            readonly
-            value={calendarUrl}
-            title={calendarScope}
-            class="flex-1 min-w-0 px-2 py-1.5 text-xs border border-line-strong rounded bg-surface-card text-ink-muted select-all"
-          />
-          <Button variant="secondary" size="sm" class="shrink-0" onclick={() => copyToClipboard(calendarUrl)}>
-            {#if copied}
-              <Check class="h-3 w-3" />
-              {m.tournaments_calendar_copied()}
-            {:else}
-              <Copy class="h-3 w-3" />
-              {m.tournaments_calendar_copy()}
-            {/if}
-          </Button>
-          <a href={webcalUrl}
-             class="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
-            <Calendar class="h-3 w-3" aria-hidden="true" />
-            {m.tournaments_calendar_webcal()}
-          </a>
-          <p class="w-full text-xs text-ink-faint">
-            {m.tournaments_calendar_scope_label({ scope: calendarScope })} — {m.tournaments_calendar_howto()}
+          <!-- The feed URL is never shown: the two actions cover both subscribe
+               paths, so the raw .ics link is only a copy target. -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <a href={webcalUrl}
+               class="inline-flex items-center justify-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+              <Calendar class="h-3 w-3" aria-hidden="true" />
+              {m.tournaments_calendar_webcal()}
+            </a>
+            <Button variant="ghost" size="sm" onclick={() => copyToClipboard(calendarUrl)}>
+              {#if copied}
+                <Check class="h-3 w-3" aria-hidden="true" />
+                {m.tournaments_calendar_copied()}
+              {:else}
+                <Copy class="h-3 w-3" aria-hidden="true" />
+                {m.tournaments_calendar_copy()}
+              {/if}
+            </Button>
+          </div>
+          <p class="mt-1.5 text-xs text-ink-faint">
+            {m.tournaments_calendar_scope_label({ scope: calendarScope })}
           </p>
         {/if}
       </div>
