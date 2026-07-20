@@ -94,16 +94,30 @@
 {#if !loaded}
   <div class="text-center py-8 text-ink-muted">{m.common_loading()}</div>
 {:else}
-  {#if isIC && promos.some((p) => p.active)}
-    <!-- With no active promos displayed, the create CTA lives in the gallery
-         empty state instead (one primary per surface). -->
-    <div class="flex justify-end mb-4">
+  <!-- Actionable stock first: the gallery is reference material and can be long. -->
+  {#if auth.isAuthenticated && Object.keys(ownStock).length > 0}
+    <div class="mb-8">
+      <OwnStockCard stock={ownStock} {promos} />
+    </div>
+  {/if}
+
+  {#if isOfficial}
+    <div class="mb-8">
+      <PromoInventoryPanel {promos} {isIC} />
+    </div>
+  {/if}
+
+  <div class="flex items-center justify-between gap-3 mb-4">
+    <h2 class="text-lg font-medium text-ink-strong">{m.promo_catalog_title()}</h2>
+    {#if isIC && promos.some((p) => p.active)}
+      <!-- With no active promos displayed, the create CTA lives in the gallery
+           empty state instead (one primary per surface). -->
       <Button variant="primary" onclick={openCreate}>
         <Plus class="w-4 h-4" aria-hidden="true" />
         {m.promo_new()}
       </Button>
-    </div>
-  {/if}
+    {/if}
+  </div>
 
   <PromoGallery
     {promos}
@@ -114,18 +128,6 @@
     ondelete={handleDelete}
     oncreate={openCreate}
   />
-
-  {#if auth.isAuthenticated && Object.keys(ownStock).length > 0}
-    <div class="mt-8">
-      <OwnStockCard stock={ownStock} {promos} />
-    </div>
-  {/if}
-
-  {#if isOfficial}
-    <div class="mt-8">
-      <PromoInventoryPanel {promos} {isIC} />
-    </div>
-  {/if}
 {/if}
 
 {#if showEdit}

@@ -97,6 +97,7 @@ metadata:
 | holdings (a holder's per-promo remaining/received counts, `promo_holdings_*`/`promo_inventory_no_holdings`) — reuses "stock" rather than coining a separate word | stock | stock | estoque | stock |
 | member (generic app user in a picker/search context, `user_picker_*`) | membre | miembro | membro | membro |
 | National/Continental promo-rank badge (short form, `promo_rank_national`/`_continental` — drops "Championship", distinct from the full `tfield_rank` phrase above) | National / Continental | Nacional / Continental | National / Continental (kept English, matches pt's `tfield_ranked_no_proxies_hint` precedent of not translating this exact phrase) | Nazionale / Continentale |
+| catalog (the promo card gallery's own section heading, `promo_catalog_title`, distinct from "gallery" which stays untranslated as a component/key name only — no UI string uses "gallery" itself) | Catalogue | Catálogo | Catálogo | Catalogo |
 
 § it "register" for organizer-registers-someone-else keeps "iscrivere" even though it.json glosses self-registration and generic "registrato/a" (deceased/status) with "registrare" — don't conflate; the *action* of registering a player for a tournament is always iscrivere/inscrire/inscribir/inscrever, not registrare/registrarse family, across all four Romance locales.
 
