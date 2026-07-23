@@ -371,7 +371,10 @@ async def push_member_background(user: User) -> None:
 
 
 # batch_push step 2 selection: tournaments needing a vekn.net calendar event.
-# The vekn_pushed_at guard keeps imported history out — ETL-migrated finished
+# Planned drafts are included on purpose: create() pushes on creation regardless
+# of state (tournaments.py), and this batch retries any push that failed then, so
+# the calendar entry lands as soon as VEKN accepts it — not only once registration
+# opens. The vekn_pushed_at guard keeps imported history out — ETL-migrated finished
 # tournaments without a vekn id are stamped at import (no push owed) and must
 # not get calendar events created for them years after the fact.
 # Guard covered by test_vekn_push_batch.py.
@@ -381,7 +384,6 @@ async def push_member_background(user: User) -> None:
 UNCREATED_EVENTS_QUERY = """
     SELECT "full" FROM objects
     WHERE type = %s
-      AND "full"->>'state' != 'Planned'
       AND deleted_at IS NULL
       AND ("full"->'external_ids'->>'vekn') IS NULL
       AND "full"->>'vekn_pushed_at' IS NULL
