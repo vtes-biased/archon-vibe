@@ -1041,7 +1041,7 @@ async def delete_tournament_endpoint(
     uid: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Delete a tournament (organizers only, PLANNED state only)."""
+    """Delete a tournament (organizers only, before it has reached VEKN)."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1054,19 +1054,51 @@ async def delete_tournament_endpoint(
             status_code=403, detail="Only organizers can delete this tournament"
         )
 
-    if tournament.state != TournamentState.PLANNED:
+    # An offline-locked device holds authoritative state and would resurrect the
+    # tournament (deleted_at=null) on go-online — force-unlock it before deleting.
+    if tournament.offline_mode:
         raise HTTPException(
             status_code=400,
-            detail="Can only delete tournaments in Planned state",
+            detail="Cannot delete a tournament locked for offline use; unlock it first",
         )
 
+    # Deletable at any state until it has a VEKN footprint: once a calendar event
+    # exists (external_ids.vekn) or results were pushed (vekn_pushed_at), deleting
+    # here would orphan the vekn.net record — that's the system of record, so block it.
+    if tournament.external_ids.get("vekn") or tournament.vekn_pushed_at is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete a tournament that has been pushed to VEKN",
+        )
+
+    was_finished = tournament.state == TournamentState.FINISHED
     result = await soft_delete_tournament(uid)
     logger.info(f"Tournament {uid} soft-deleted by {current_user.uid}")
 
     if result:
-        broadcast_precomputed(result[1])
+        # Tombstone the tournament plus its cascaded decks/sanctions.
+        for bd in result[1]:
+            broadcast_precomputed(bd)
     # No state gate on ReportPromos, so even a Planned event may carry rows.
     _promo_recompute_diff(tournament, None)
+
+    # A finished event fed player ratings; recompute now that it's soft-deleted
+    # (recompute reads only live finished tournaments, so the deleted one drops out).
+    if was_finished:
+        try:
+            from ..ratings import (
+                rating_category_for_tournament,
+                recompute_ratings_for_players,
+            )
+
+            player_uids = {p.user_uid for p in tournament.players if p.user_uid}
+            category = rating_category_for_tournament(tournament)
+            for _user, bd in await recompute_ratings_for_players(player_uids, category):
+                broadcast_precomputed(bd)
+        except Exception as e:
+            logger.error(
+                f"Error recomputing ratings after deleting {uid}: {e}", exc_info=True
+            )
 
     return Response(
         content=encoder.encode({"message": "Tournament deleted"}),

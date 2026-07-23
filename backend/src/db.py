@@ -1036,16 +1036,38 @@ async def get_league_public_projection(uid: str) -> tuple[dict, int] | None:
         return pub, count
 
 
-async def soft_delete_tournament(uid: str) -> tuple[Tournament, BroadcastData] | None:
-    """Soft-delete a tournament under a row lock. Returns (tournament, BroadcastData)."""
+async def soft_delete_tournament(
+    uid: str,
+) -> tuple[Tournament, list[BroadcastData]] | None:
+    """Soft-delete a tournament and cascade to its decks and sanctions.
+
+    Returns (tournament, [tournament_bd, *deck_bds, *sanction_bds]) so the caller
+    broadcasts a tombstone for the tournament AND each dependent object — otherwise
+    they linger, live and orphaned (a deck pointing at a gone event, a DQ/SA still
+    on the player's record), in every client's IndexedDB. All writes share the
+    tournament's row-lock transaction, so the cascade is atomic.
+    """
     async with tournament_transaction(uid) as (tournament, tx_conn):
         if not tournament:
             return None
         now = datetime.now(UTC)
         tournament.deleted_at = now
         tournament.modified = now
-        bd = await save_tournament(tournament, conn=tx_conn)
-    return tournament, bd
+        bds = [await save_tournament(tournament, conn=tx_conn)]
+        decks = await get_decks_for_tournament(uid, conn=tx_conn)
+        sanctions = await get_sanctions_for_tournament(uid, conn=tx_conn)
+        for obj_type, objs in (
+            (ObjectType.DECK, decks),
+            (ObjectType.SANCTION, sanctions),
+        ):
+            for obj in objs:
+                if obj.deleted_at is not None:
+                    continue  # get_decks_for_tournament doesn't filter tombstones
+                tombstoned = msgspec.structs.replace(obj, deleted_at=now, modified=now)
+                bds.append(
+                    await save_object_from_model(obj_type, tombstoned, conn=tx_conn)
+                )
+    return tournament, bds
 
 
 async def get_tournament_by_external_id(
@@ -1104,14 +1126,17 @@ async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[s
 async def get_finished_tournaments_for_category(
     format_value: str, online: bool, since_date: str
 ) -> list[Tournament]:
-    """Get all FINISHED tournaments matching format/online within date window."""
+    """Get all live FINISHED tournaments matching format/online within date window."""
     async with get_connection() as conn:
         # finish is optional (the engine never stamps it on FinishTournament /
         # FinishFinals) — fall back to start then modified, mirroring the date
         # used for the rating entry itself (ratings.py).
+        # deleted_at IS NULL: a soft-deleted tournament keeps state='Finished', so
+        # without this it would still feed ratings (and never drop out on delete).
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'tournament'
+              AND deleted_at IS NULL
               AND "full"->>'state' = 'Finished'
               AND "full"->>'format' = %s
               AND ("full"->>'online')::boolean = %s

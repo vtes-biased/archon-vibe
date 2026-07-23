@@ -664,6 +664,7 @@
   "tournament_col_deck": "Deck",
   "tournament_delete_title": "Delete Tournament?",
   "tournament_delete_msg": "This will permanently delete this tournament. This action cannot be undone.",
+  "tournament_delete_msg_results": "This event has recorded rounds and results. Deleting it permanently removes all of them. This action cannot be undone.",
   "tournament_error_save_scores": "Failed to save scores",
   "tournament_error_save_finals": "Failed to save finals scores",
   "tournament_error_not_synced": "Tournament not yet synced. Waiting for data...",

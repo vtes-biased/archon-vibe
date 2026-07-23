@@ -664,6 +664,7 @@
   "tournament_col_deck": "Deck",
   "tournament_delete_title": "Excluir Torneio?",
   "tournament_delete_msg": "Isso excluirá permanentemente este torneio. Esta ação não pode ser desfeita.",
+  "tournament_delete_msg_results": "Este evento tem rodadas e resultados registrados. Excluí-lo removerá todos eles permanentemente. Esta ação não pode ser desfeita.",
   "tournament_error_save_scores": "Falha ao salvar pontuações",
   "tournament_error_save_finals": "Falha ao salvar pontuações das finais",
   "tournament_error_not_synced": "Torneio ainda não sincronizado. Aguardando dados...",

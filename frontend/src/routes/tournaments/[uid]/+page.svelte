@@ -67,6 +67,14 @@ import TournamentModals from "./TournamentModals.svelte";
     veknPush && tournament?.state === "Finished" && tournament?.vekn_pushed_at === null
       && (tournament?.rounds?.length ?? 0) > 0
   );
+  // Deletable at any state until it reaches VEKN: once a calendar event
+  // (external_ids.vekn) or pushed results (vekn_pushed_at) exist, deleting here
+  // would orphan the vekn.net record — mirrors the server gate in tournaments.py.
+  const canDelete = $derived(
+    !tournament?.external_ids?.vekn && !tournament?.vekn_pushed_at
+  );
+  // Strengthen the delete confirmation once real play data exists.
+  const deleteHasResults = $derived((tournament?.rounds?.length ?? 0) > 0);
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
   );
@@ -752,7 +760,7 @@ import TournamentModals from "./TournamentModals.svelte";
               {m.offline_go_offline()}
             </Button>
           {/if}
-          {#if showOrganizerView && tournament.state === "Planned"}
+          {#if showOrganizerView && canDelete}
             <Button variant="danger" size="md" onclick={() => (showDeleteConfirm = true)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.common_delete()}</Button>
           {/if}
         </div>
@@ -1000,6 +1008,7 @@ import TournamentModals from "./TournamentModals.svelte";
   bind:showForceTakeoverConfirm
   bind:showForceUnlockConfirm
   {offlineActionLoading}
+  {deleteHasResults}
   onDelete={handleDelete}
   onGoOffline={handleGoOffline}
   onGoOnline={handleGoOnline}

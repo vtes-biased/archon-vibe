@@ -664,6 +664,7 @@
   "tournament_col_deck": "Deck",
   "tournament_delete_title": "Eliminare Torneo?",
   "tournament_delete_msg": "Questo eliminerà permanentemente questo torneo. Questa azione non può essere annullata.",
+  "tournament_delete_msg_results": "Questo evento ha round e risultati registrati. Eliminarlo li rimuoverà tutti permanentemente. Questa azione non può essere annullata.",
   "tournament_error_save_scores": "Salvataggio punteggi fallito",
   "tournament_error_save_finals": "Salvataggio punteggi finali fallito",
   "tournament_error_not_synced": "Torneo non ancora sincronizzato. In attesa dei dati...",

@@ -36,13 +36,13 @@ Online: Frontend → Backend (FastAPI) → Rust engine (PyO3) → updated state 
 
 | State | Description | Key Actions |
 |-------|-------------|-------------|
-| `Planned` | Initial state | OpenRegistration, UpdateConfig (available in any state), Delete |
+| `Planned` | Initial state | OpenRegistration, UpdateConfig (available in any state), Delete (available in any state) |
 | `Registration` | Players can register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
 | `Waiting` | Between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
 | `Playing` | Round in progress | SetScore (players + organizers), Override, FinishRound, CancelRound, seating edits |
 | `Finished` | Tournament complete | ReopenTournament, SetScore/Override (organizers only), deck uploads, view results |
 
-Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig is available in **any** state (mid-event typo fixes matter), with targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds exist, and `rank`/`format`/`start` freeze once the event is published to VEKN (`external_ids.vekn` set — calendar create is write-once, so edits would silently diverge from vekn.net). Championships (National/Continental) reject `proxies`/`multideck` (engine-enforced at create and config-edit). SetScore/Override/Unoverride: players only during Playing; organizers may correct any round while Waiting, Playing, or Finished (i.e. whenever rounds exist) — standings recompute after each edit. `ReportPromos` is likewise available in **any** state, with no locks at all — promo counts are typically entered post-finish and re-entered on correction.
+Seating edits (SwapSeats, AlterSeating, SeatPlayer, UnseatPlayer, AddTable, RemoveTable) are available in Playing state. Payment and raffle actions available in Registration/Waiting/Playing. UpdateConfig is available in **any** state (mid-event typo fixes matter), with targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds exist, and `rank`/`format`/`start` freeze once the event is published to VEKN (`external_ids.vekn` set — calendar create is write-once, so edits would silently diverge from vekn.net). Championships (National/Continental) reject `proxies`/`multideck` (engine-enforced at create and config-edit). SetScore/Override/Unoverride: players only during Playing; organizers may correct any round while Waiting, Playing, or Finished (i.e. whenever rounds exist) — standings recompute after each edit. `ReportPromos` is likewise available in **any** state, with no locks at all — promo counts are typically entered post-finish and re-entered on correction. Delete (plain REST, not an engine event) is available in **any** state too, gated only on VEKN footprint — blocked once `external_ids.vekn` or `vekn_pushed_at` is set, since that would orphan the vekn.net record; deleting a `Finished` tournament triggers a ratings recompute for its players.
 
 ## Business Events
 
@@ -296,7 +296,7 @@ Canonical shapes live in `frontend/src/lib/types.ts` (`Tournament`, `Player`, `T
 | `POST` | `/api/tournaments/` | Create tournament |
 | `GET` | `/api/tournaments/{uid}` | Get tournament |
 | `PUT` | `/api/tournaments/{uid}` | Update config |
-| `DELETE` | `/api/tournaments/{uid}` | Delete (Planned only) |
+| `DELETE` | `/api/tournaments/{uid}` | Soft-delete (any state, until pushed to VEKN) |
 
 ### Action Endpoint (Rust Engine)
 
@@ -342,7 +342,7 @@ Actions are validated by the Rust engine:
 |--------|-----------------|
 | Create Tournament | IC, NC, Prince |
 | Update Config | Organizers (Planned/Registration; timer/display settings in later states) |
-| Delete | Organizers (Planned only) |
+| Delete | Organizers (any state, until pushed to VEKN) |
 | Open/Close/Cancel/Reopen Registration | Organizers |
 | Register/Unregister | Any authenticated member (Registration state) |
 | Add/Remove/Drop Player | Organizers |

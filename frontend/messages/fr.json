@@ -664,6 +664,7 @@
   "tournament_col_deck": "Deck",
   "tournament_delete_title": "Supprimer le tournoi ?",
   "tournament_delete_msg": "Cela supprimera définitivement ce tournoi. Cette action ne peut pas être annulée.",
+  "tournament_delete_msg_results": "Cet événement a des rondes et des résultats enregistrés. Le supprimer les effacera tous définitivement. Cette action ne peut pas être annulée.",
   "tournament_error_save_scores": "Échec de l'enregistrement des scores",
   "tournament_error_save_finals": "Échec de l'enregistrement des scores de finale",
   "tournament_error_not_synced": "Tournoi pas encore synchronisé. En attente des données...",

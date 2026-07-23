@@ -10,6 +10,7 @@
     showForceTakeoverConfirm = $bindable(false),
     showForceUnlockConfirm = $bindable(false),
     offlineActionLoading,
+    deleteHasResults = false,
     onDelete,
     onGoOffline,
     onGoOnline,
@@ -22,6 +23,7 @@
     showForceTakeoverConfirm: boolean;
     showForceUnlockConfirm: boolean;
     offlineActionLoading: boolean;
+    deleteHasResults?: boolean;
     onDelete: () => void;
     onGoOffline: () => void;
     onGoOnline: () => void;
@@ -59,7 +61,11 @@
         <h2 class="text-xl font-medium text-link">{m.tournament_delete_title()}</h2>
       </div>
       <div class="p-6">
-        <p class="text-ink mb-6">{m.tournament_delete_msg()}</p>
+        {#if deleteHasResults}
+          <p class="text-ink mb-6 flex items-start gap-2"><TriangleAlert class="w-5 h-5 shrink-0 text-accent" aria-hidden="true" />{m.tournament_delete_msg_results()}</p>
+        {:else}
+          <p class="text-ink mb-6">{m.tournament_delete_msg()}</p>
+        {/if}
         <div class="flex gap-2">
           <Button variant="danger" size="lg" class="flex-1" onclick={onDelete}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.common_delete()}</Button>
           <Button variant="secondary" size="lg" onclick={() => (showDeleteConfirm = false)}>{m.common_cancel()}</Button>
