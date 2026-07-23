@@ -189,6 +189,8 @@ async def push_tournament_event(
         return None
     if not end_date:
         end_date = start_date  # Same day
+    if not end_time:
+        end_time = start_time  # VEKN requires a non-empty endtime
 
     # Base on an actual finals (max_rounds is a per-player cap now, not a finals signal).
     has_finals = 1 if tournament.finals else 0
@@ -197,8 +199,12 @@ async def push_tournament_event(
         event_id = await client.create_event(
             name=tournament.name[:120],
             event_type=event_type,
-            startdate=f"{start_date} {start_time}" if start_time else start_date,
-            enddate=f"{end_date} {end_time}" if end_time else end_date,
+            # VEKN wants date and time as separate fields (event.php requires all
+            # four; a combined "date time" reads as an empty starttime/endtime → 400).
+            startdate=start_date,
+            starttime=start_time,
+            enddate=end_date,
+            endtime=end_time,
             rounds=rounds,
             final=has_finals,
             organizer_vekn_id=organizer.vekn_id,

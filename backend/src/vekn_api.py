@@ -231,7 +231,9 @@ class VEKNAPIClient:
         name: str,
         event_type: int,
         startdate: str,
+        starttime: str,
         enddate: str,
+        endtime: str,
         rounds: int,
         final: int,
         organizer_vekn_id: str,
@@ -243,7 +245,12 @@ class VEKNAPIClient:
         website: str = "",
         description: str = "",
     ) -> str:
-        """Create a VEKN calendar event. Returns the event ID."""
+        """Create a VEKN calendar event. Returns the event ID.
+
+        date/time are four separate fields: startdate/enddate are "Y-m-d",
+        starttime/endtime are "H:i". VEKN's event.php requires all four non-empty
+        (a combined "date time" leaves starttime/endtime empty → 400 "empty").
+        """
         await self._ensure_authenticated()
         session = self._get_session()
 
@@ -251,7 +258,9 @@ class VEKNAPIClient:
             "name": name,
             "type": event_type,
             "startdate": startdate,
+            "starttime": starttime,
             "enddate": enddate,
+            "endtime": endtime,
             "rounds": rounds,
             "final": final,
             "online": 1 if online else 0,
