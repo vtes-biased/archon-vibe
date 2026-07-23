@@ -11,7 +11,7 @@ metadata:
 | tournament | — | torneo | torneio | torneo |
 | round | Ronde | ronda | rodada | round* |
 | standings | Classement | clasificación | classificação | classifica |
-| standings adjustment | — | ajuste de clasificación | ajuste de classificação | aggiustamento di classifica |
+| standings adjustment | ajustement de classement | ajuste de clasificación | ajuste de classificação | aggiustamento di classifica |
 | finals | Finale | final | final | finale† |
 | seating | Placement | asientos | assentos | disposizione / seduta (finals-specific)** |
 | seat (position) | Siège (unit) / Placement (concept) | asiento | assento | posto |

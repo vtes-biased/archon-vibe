@@ -143,7 +143,7 @@
     const labels: Record<SanctionLevel, () => string> = {
       caution: () => m.sanction_level_caution(),
       warning: () => m.sanction_level_warning(),
-      standings_adjustment: () => m.sanction_level_sa(),
+      standings_adjustment: () => m.sanction_level_standings_adjustment(),
       disqualification: () => m.sanction_level_dq(),
       suspension: () => m.sanction_level_suspension(),
       probation: () => m.sanction_level_probation(),
@@ -284,7 +284,7 @@
         >
           <option value="caution">{m.sanction_level_caution()}</option>
           <option value="warning">{m.sanction_level_warning()}</option>
-          <option value="standings_adjustment">{m.sanction_level_sa()}</option>
+          <option value="standings_adjustment">{m.sanction_level_standings_adjustment()}</option>
           <option value="disqualification">{m.sanction_level_dq()}</option>
         </select>
       </div>

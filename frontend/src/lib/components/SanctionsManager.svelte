@@ -435,7 +435,7 @@
           >
             <option value="caution">{m.sanction_level_caution()}</option>
             <option value="warning">{m.sanction_level_warning()}</option>
-            <option value="standings_adjustment">{m.sanction_level_sa()}</option>
+            <option value="standings_adjustment">{m.sanction_level_standings_adjustment()}</option>
             <option value="disqualification">{m.sanction_level_disqualification()}</option>
             <option value="probation">{m.sanction_level_probation()}</option>
             <option value="suspension">{m.sanction_level_suspension()}</option>
