@@ -73,11 +73,11 @@ Why not the alternatives we walked through:
 - **Watchdog**: each tick compare `Δwall` (Date.now) vs `Δmono` (performance.now); if they diverge
   past a threshold, a sleep or a wall-clock step happened → force an offset re-sync before trusting
   the display. One check covers both.
-- **Advisory**: when the raw system clock is off by **>5s**, show a non-blocking notice ("device
+- **Advisory**: when the raw system clock is off by **>15s**, show a non-blocking notice ("device
   clock ~X off — enable automatic date & time"). Surfaces the real fault (it also breaks the user's
-  auth-token timing, calendar, etc.) without hiding the (now-corrected) timer. 5s chosen because the
+  auth-token timing, calendar, etc.) without hiding the (now-corrected) timer. 15s chosen because the
   offset distribution is bimodal (synced ±1s vs wrong-by-minutes) — almost nothing lives in the
-  5s–60s band, so the exact cutoff is not sensitive; 5s is well above measurement noise given the
+  15s–60s band, so the exact cutoff is not sensitive; 15s is well above measurement noise given the
   precise `server_time` source.
 
 ### Edge cases

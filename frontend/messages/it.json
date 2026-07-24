@@ -1165,6 +1165,7 @@
   "timer_finals_time": "Tempo della finale",
   "timer_no_timer": "Nessun timer",
   "timer_same_as_round": "Uguale al round",
+  "timer_clock_skew_advisory": "Il tuo orologio è sfasato di circa {amount}.",
   "raffle_title": "Estrazione",
   "raffle_help": "Estrae vincitori a caso da un gruppo di giocatori.",
   "raffle_name_label": "Nome dell'estrazione",

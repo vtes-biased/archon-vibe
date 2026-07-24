@@ -1165,6 +1165,7 @@
   "timer_finals_time": "Finals time",
   "timer_no_timer": "No timer",
   "timer_same_as_round": "Same as round",
+  "timer_clock_skew_advisory": "Your clock is about {amount} off.",
   "raffle_title": "Raffle",
   "raffle_help": "Randomly draw winners from a pool of players.",
   "raffle_name_label": "Draw name",

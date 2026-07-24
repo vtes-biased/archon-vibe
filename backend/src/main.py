@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import signal
+import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -567,6 +568,25 @@ app.include_router(feedback.router)
 async def root() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "version": __version__}
+
+
+@app.get("/api/time")
+async def server_time() -> Response:
+    """Microsecond server clock for the frontend's mini-NTP offset sync.
+
+    The round timer subtracts a server-stamped started_at from a client Date.now(),
+    so a mis-set device clock shows phantom elapsed time. The client probes this a
+    few times, keeps the min-RTT sample, and corrects Date.now()'s offset against
+    our clock (the one that stamps started_at) — see the frontend clock store /
+    .pst/details/512-timer-clock-skew.md. No auth, no DB: just the wall clock.
+    Must not be cached — a stale timestamp defeats the sync.
+    """
+    body = msgspec.json.encode({"server_time": time.time_ns() // 1000})
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/tournaments/{uid}")

@@ -1165,6 +1165,7 @@
   "timer_finals_time": "Tempo de final",
   "timer_no_timer": "Sem temporizador",
   "timer_same_as_round": "Igual à rodada",
+  "timer_clock_skew_advisory": "Seu relógio está com um desvio de cerca de {amount}.",
   "raffle_title": "Sorteio",
   "raffle_help": "Sorteia vencedores aleatoriamente entre um grupo de jogadores.",
   "raffle_name_label": "Nome do sorteio",

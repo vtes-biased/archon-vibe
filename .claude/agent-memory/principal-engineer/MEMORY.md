@@ -106,6 +106,9 @@
 - [Projection tier: column vs content split](projection-tier-column-vs-content-split.md) — new precomputed access column ONLY when projection CONTENT must vary by viewer at the same level (else collapse onto existing column + shrink lower one); base64 contact obfuscation is a harvester speed-bump, not access control.
 - [entitled_level vs overlay catch-up asymmetry](entitled-level-vs-overlay-catchup-asymmetry.md) — a new full-access branch in entitled_level only wires the LIVE path; non-country/non-own-object full grants must ALSO be added to _overlay_frames (main.py) or the resync re-delivers the lower projection (promo holdings for NC is the exemplar gap).
 
+## Deploy / infra (cross-stack)
+- [nginx _backend_paths allowlist](nginx-backend-paths-allowlist.md) — prod nginx proxies ONLY the prefix allowlist (/api,/auth,/oauth,/vekn,/sanctions,/admin,/snapshot,+/stream) to FastAPI; a new route under an existing prefix is fine, a new TOP-LEVEL segment 404s in prod but passes dev CORS/tests.
+
 ## Error handling (cross-stack)
 - [aiohttp timeout escapes ClientError](aiohttp-timeout-escapes-clienterror.md) — ClientTimeout breach raises asyncio.TimeoutError, NOT aiohttp.ClientError; `except aiohttp.ClientError` misses timeouts (→ 500 not 502) on every external-proxy route (feedback/twda/webpush).
 - [Error-codes contract](error-codes-contract.md) — `EngineError` enum = single error taxonomy; `{code,params,message}` wire JSON across WASM/PyO3/HTTP; domain rejection MUST be an explicit variant (From-impls silently demote to internal); EngineRejection-in-transaction is sound FastAPI.

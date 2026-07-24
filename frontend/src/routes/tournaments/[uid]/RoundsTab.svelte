@@ -756,7 +756,7 @@
                 <!-- Per-table timer + extension controls (unfold-only: the unfold is this table's org-action surface; the folded list stays compact, and the global round timer above keeps time visible at all times) -->
                 {#if isScoring && !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
                   <div class="mb-2">
-                    <TimerDisplay {tournament} {isOrganizer} tableIndex={i} />
+                    <TimerDisplay {tournament} {isOrganizer} tableIndex={i} showAdvisory={false} />
                   </div>
                 {/if}
                 <div class="divide-y divide-line">

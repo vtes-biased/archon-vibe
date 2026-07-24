@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
   import { timerStart, timerPause, timerReset, timerAddTime } from "$lib/api";
-  import { Play, Pause, RotateCcw, Clock } from "@lucide/svelte";
+  import { activateClock, getClockOffset, getClockSkewAdvisory } from "$lib/stores/clock.svelte";
+  import { Play, Pause, RotateCcw, Clock, TriangleAlert } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import ConfirmActionModal from '$lib/components/ConfirmActionModal.svelte';
   import * as m from '$lib/paraglide/messages.js';
@@ -15,12 +16,21 @@
     isOrganizer = false,
     tableIndex,
     finals = false,
+    showAdvisory = true,
   }: {
     tournament: Tournament;
     isOrganizer?: boolean;
     tableIndex?: number;
     finals?: boolean;
+    // Suppress the device-clock advisory on secondary per-table timers so it
+    // renders once per view, not once per table (RoundsTab's per-table copies).
+    showAdvisory?: boolean;
   } = $props();
+
+  // Keep the server-clock offset synced while any timer is on screen (see the
+  // clock store / .pst/details/512): corrects Date.now()'s skew so a mis-set
+  // device clock doesn't show phantom elapsed time.
+  $effect(() => activateClock());
 
   // The final is a single table (index 0): its widget needs BOTH the global
   // start/pause/reset controls and per-table time extensions, so it counts down
@@ -50,7 +60,9 @@
     if (!t) return 0;
     let elapsed = t.elapsed_before_pause;
     if (!t.paused && t.started_at) {
-      elapsed += (now - new Date(t.started_at).getTime()) / 1000;
+      // (now + offset) aligns the client wall clock with the server clock that
+      // stamped started_at, so a skewed device clock cancels out.
+      elapsed += (now + getClockOffset() - new Date(t.started_at).getTime()) / 1000;
     }
     return Math.max(0, elapsed);
   });
@@ -79,6 +91,16 @@
   const tableKey = $derived(effTableIndex != null ? String(effTableIndex) : "");
   const tableExtraTime = $derived(tableKey ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0);
   const isPaused = $derived(tournament.timer?.paused ?? true);
+
+  // Non-blocking notice when THIS device's clock is far enough off that the user
+  // should fix it (it also breaks their auth-token timing/calendar). The timer
+  // itself is already corrected via the offset — this just surfaces the fault.
+  const clockSkewMs = $derived(showAdvisory ? getClockSkewAdvisory() : null);
+  const clockSkewLabel = $derived.by(() => {
+    if (clockSkewMs == null) return "";
+    const s = Math.round(Math.abs(clockSkewMs) / 1000);
+    return s >= 60 ? `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}` : `${s}s`;
+  });
 
   async function doStart() {
     loading = true;
@@ -151,6 +173,16 @@
             +{secs / 60}min
           </Button>
         {/each}
+      </div>
+    {/if}
+
+    <!-- Device-clock advisory (the timer stays corrected; this nudges a fix).
+         role=status: it appears async after the first sync resolves, so a live
+         region is what announces it to screen readers. -->
+    {#if clockSkewMs != null}
+      <div role="status" class="text-xs text-warn flex items-center gap-1.5 text-center max-w-xs">
+        <TriangleAlert class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+        <span>{m.timer_clock_skew_advisory({ amount: clockSkewLabel })}</span>
       </div>
     {/if}
   </div>

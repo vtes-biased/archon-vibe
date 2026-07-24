@@ -1165,6 +1165,7 @@
   "timer_finals_time": "Durée de finale",
   "timer_no_timer": "Pas de chronomètre",
   "timer_same_as_round": "Identique à la ronde",
+  "timer_clock_skew_advisory": "Votre horloge est décalée d'environ {amount}.",
   "raffle_title": "Tirage au sort",
   "raffle_help": "Tire au sort des gagnants au hasard dans un groupe de joueurs.",
   "raffle_name_label": "Nom du tirage",
