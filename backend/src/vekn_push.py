@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from .broadcast import broadcast_precomputed
 from .db import (
-    get_connection,
+    batch_read_connection,
     get_sanctions_for_tournament,
     get_tournament_by_uid,
     get_user_by_uid,
@@ -435,7 +435,7 @@ async def batch_push(client: VEKNAPIClient) -> dict:
 
     try:
         # 1. Push unsynced members (must come before results so VEKN knows the IDs)
-        async with get_connection() as conn:
+        async with batch_read_connection() as conn:
             result = await conn.execute(
                 """
                 SELECT "full" FROM objects
@@ -459,7 +459,7 @@ async def batch_push(client: VEKNAPIClient) -> dict:
                 stats["errors"] += 1
 
         # 2. Push calendar events for tournaments without external_ids.vekn
-        async with get_connection() as conn:
+        async with batch_read_connection() as conn:
             result = await conn.execute(
                 UNCREATED_EVENTS_QUERY,
                 (ObjectType.TOURNAMENT,),
@@ -479,7 +479,7 @@ async def batch_push(client: VEKNAPIClient) -> dict:
                 stats["errors"] += 1
 
         # 3. Push results for finished tournaments without vekn_pushed_at.
-        async with get_connection() as conn:
+        async with batch_read_connection() as conn:
             result = await conn.execute(
                 UNPUSHED_RESULTS_QUERY,
                 (ObjectType.TOURNAMENT,),

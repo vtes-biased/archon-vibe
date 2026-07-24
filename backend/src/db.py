@@ -142,6 +142,30 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
 
 
 @asynccontextmanager
+async def batch_read_connection(
+    statement_timeout_ms: int = 120_000,
+) -> AsyncIterator[psycopg.AsyncConnection]:
+    """Pooled connection with a relaxed statement_timeout for internal batch jobs
+    (snapshot gen, VEKN push) whose full-corpus reads outlast the 30s user-request
+    guard when this shared VPS's disk is latency-bound.
+
+    Autocommit pool has no reset hook, so RESET on release stops the relaxed
+    timeout leaking to the next borrower. int() interpolation: SET can't bind-param.
+    """
+    async with get_connection() as conn:
+        await conn.execute(f"SET statement_timeout = {int(statement_timeout_ms)}")
+        try:
+            yield conn
+        finally:
+            # Swallow reset failure on an already-broken conn (pool recycles it) so
+            # the original error is never masked.
+            try:
+                await conn.execute("RESET statement_timeout")
+            except Exception:
+                pass
+
+
+@asynccontextmanager
 async def _acquire(
     conn: psycopg.AsyncConnection | None = None,
 ) -> AsyncIterator[psycopg.AsyncConnection]:
@@ -496,18 +520,23 @@ async def stream_objects_new(
     since: str | None = None,
     batch_size: int = 1000,
     exclude_deleted: bool = False,
+    conn: psycopg.AsyncConnection | None = None,
 ) -> AsyncIterator[tuple[list[str], str]]:
     """Stream pre-serialized JSON in keyset-paginated batches.
 
-    Each batch acquires a pooled connection, fetches up to `batch_size` rows
-    ordered by (modified_at, uid), then RELEASES the connection BEFORE yielding —
-    so a slow SSE client never pins a pool slot across its catch-up, and app heap
-    holds at most one batch (not the whole resultset). This bounds the full-corpus
-    reads a single fetchall would otherwise materialize per connection: a no-`since`
-    rating recompute, or a large catch-up delta. Keyset continuation on
-    (modified_at, uid) is tie-safe across batch boundaries (a same-timestamp run
-    split by the LIMIT is neither skipped nor duplicated) and rides the
-    idx_objects_type_modified (type, modified_at, uid) index.
+    With `conn` None each batch acquires a pooled connection, fetches up to
+    `batch_size` rows ordered by (modified_at, uid), then RELEASES the connection
+    BEFORE yielding — so a slow SSE client never pins a pool slot across its
+    catch-up, and app heap holds at most one batch (not the whole resultset). This
+    bounds the full-corpus reads a single fetchall would otherwise materialize per
+    connection: a no-`since` rating recompute, or a large catch-up delta. Keyset
+    continuation on (modified_at, uid) is tie-safe across batch boundaries (a
+    same-timestamp run split by the LIMIT is neither skipped nor duplicated) and
+    rides the idx_objects_type_modified (type, modified_at, uid) index.
+
+    Pass `conn` to pin every batch to one caller-held connection (the snapshot
+    generator's relaxed-timeout session); the per-batch release only matters for
+    slow SSE clients, not a bg task.
 
     `exclude_deleted` filters soft-deleted rows (the snapshot path — a fresh client
     needs no tombstones); the SSE catch-up leaves it False so deletions propagate.
@@ -536,15 +565,17 @@ async def stream_objects_new(
             conditions.append("modified_at > %s::timestamp")
             params.append(since)
         where = " AND ".join(conditions)
+        sql = (
+            f"SELECT {col}::text, modified_at, uid FROM objects "  # ty: ignore[invalid-argument-type]
+            f"WHERE {where} ORDER BY modified_at ASC, uid ASC LIMIT %s"
+        )
+        batch_params = (*params, batch_size)
 
-        async with _pool.connection() as conn:
-            rows = await (
-                await conn.execute(
-                    f"SELECT {col}::text, modified_at, uid FROM objects "  # ty: ignore[invalid-argument-type]
-                    f"WHERE {where} ORDER BY modified_at ASC, uid ASC LIMIT %s",
-                    (*params, batch_size),
-                )
-            ).fetchall()
+        if conn is not None:
+            rows = await (await conn.execute(sql, batch_params)).fetchall()
+        else:
+            async with _pool.connection() as c:
+                rows = await (await c.execute(sql, batch_params)).fetchall()
 
         if not rows:
             break

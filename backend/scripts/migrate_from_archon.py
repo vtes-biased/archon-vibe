@@ -1488,7 +1488,11 @@ def backup_new_db(dsn: str, backup_dir: Path) -> Path:
     backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     path = backup_dir / f"archon_vibe_premerge_{stamp}.dump"
-    subprocess.run(["pg_dump", "-Fc", "-f", str(path), dsn], check=True)
+    # nice/ionice: yield CPU/I/O to the live stacks on the shared VPS.
+    subprocess.run(
+        ["nice", "-n10", "ionice", "-c3", "pg_dump", "-Fc", "-f", str(path), dsn],
+        check=True,
+    )
     for stale in sorted(backup_dir.glob("archon_vibe_premerge_*.dump"))[:-7]:
         stale.unlink()
     return path

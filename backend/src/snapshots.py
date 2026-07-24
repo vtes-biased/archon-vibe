@@ -33,7 +33,7 @@ async def generate_snapshots() -> dict[str, int]:
     Returns dict of {level: object_count}.
     Reads {level}::text column directly — no Python deserialization.
     """
-    from .db import _pool, stream_objects_new
+    from .db import _pool, batch_read_connection, stream_objects_new
 
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -41,78 +41,83 @@ async def generate_snapshots() -> dict[str, int]:
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
     stats: dict[str, int] = {}
 
-    # DB-clock instant this batch was generated. The client echoes it on /stream as a
-    # freshness signal so the staleness guard measures real client-away time, not the
-    # data's last-modified time (`timestamp` below), which is stale on a quiet system.
-    # `::timestamp` keeps it naive, in the same clock/format as the modified_at column
-    # (and the client's `since`), so the server compares them without tz-format skew.
-    async with _pool.connection() as conn:
+    # Relaxed-timeout session for the whole generation (see batch_read_connection),
+    # with every batch pinned to this one connection.
+    async with batch_read_connection() as conn:
+        # DB-clock instant this batch was generated. The client echoes it on /stream as
+        # a freshness signal so the staleness guard measures real client-away time, not
+        # the data's last-modified time (`timestamp` below), which is stale on a quiet
+        # system. `::timestamp` keeps it naive, in the same clock/format as modified_at
+        # (and the client's `since`), so the server compares without tz-format skew.
         gen_row = await (await conn.execute("SELECT now()::timestamp")).fetchone()
-    generated_at = gen_row[0].isoformat()
+        generated_at = gen_row[0].isoformat()
 
-    for level in ("public", "member", "full"):
-        start = time.time()
-        count = 0
-        timestamp: str | None = None
+        for level in ("public", "member", "full"):
+            start = time.time()
+            count = 0
+            timestamp: str | None = None
 
-        # Write to temp file then atomic rename
-        fd, tmp_path = tempfile.mkstemp(dir=SNAPSHOT_DIR, suffix=".tmp")
-        os.close(fd)
-        try:
-            with gzip.open(tmp_path, "wt", encoding="utf-8", compresslevel=6) as gz:
-                gz.write("[")
-                first_type = True
-
-                for obj_type in OBJECT_TYPES:
-                    if not first_type:
-                        gz.write(",")
-                    first_type = False
-
-                    gz.write(f'{{"type":"{obj_type}","data":[')
-
-                    # Stream the pre-computed column in keyset batches (bounded heap),
-                    # excluding soft-deleted rows — a fresh client needs no tombstones.
-                    first_obj = True
-                    async for json_strings, batch_max in stream_objects_new(
-                        obj_type=obj_type, level=level, exclude_deleted=True
-                    ):
-                        for json_str in json_strings:
-                            if not first_obj:
-                                gz.write(",")
-                            first_obj = False
-                            gz.write(json_str)
-                            count += 1
-                        if timestamp is None or batch_max > timestamp:
-                            timestamp = batch_max
-
-                    gz.write("]}")
-
-                # Meta section: `timestamp` (max modified_at) seeds the client's `since`
-                # cursor; `generated_at` is the freshness signal (see above).
-                if timestamp is None:
-                    timestamp = datetime.now(UTC).isoformat()
-                gz.write(
-                    f',{{"type":"meta","timestamp":"{timestamp}",'
-                    f'"generated_at":"{generated_at}"}}'
-                )
-                gz.write("]")
-
-            # Atomic rename
-            dest = _snapshot_path(level)
-            os.rename(tmp_path, dest)
-            elapsed = time.time() - start
-            stats[level] = count
-            logger.info(
-                f"Snapshot {level}: {count} objects, "
-                f"{dest.stat().st_size / 1024:.1f} KB, {elapsed:.2f}s"
-            )
-        except Exception:
-            # Clean up temp file on error
+            # Write to temp file then atomic rename
+            fd, tmp_path = tempfile.mkstemp(dir=SNAPSHOT_DIR, suffix=".tmp")
+            os.close(fd)
             try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise
+                with gzip.open(tmp_path, "wt", encoding="utf-8", compresslevel=6) as gz:
+                    gz.write("[")
+                    first_type = True
+
+                    for obj_type in OBJECT_TYPES:
+                        if not first_type:
+                            gz.write(",")
+                        first_type = False
+
+                        gz.write(f'{{"type":"{obj_type}","data":[')
+
+                        # Keyset batches (bounded heap); exclude soft-deleted rows —
+                        # fresh clients need no tombstones.
+                        first_obj = True
+                        async for json_strings, batch_max in stream_objects_new(
+                            obj_type=obj_type,
+                            level=level,
+                            exclude_deleted=True,
+                            conn=conn,
+                        ):
+                            for json_str in json_strings:
+                                if not first_obj:
+                                    gz.write(",")
+                                first_obj = False
+                                gz.write(json_str)
+                                count += 1
+                            if timestamp is None or batch_max > timestamp:
+                                timestamp = batch_max
+
+                        gz.write("]}")
+
+                    # Meta section: `timestamp` (max modified_at) seeds the client's
+                    # `since` cursor; `generated_at` is the freshness signal (above).
+                    if timestamp is None:
+                        timestamp = datetime.now(UTC).isoformat()
+                    gz.write(
+                        f',{{"type":"meta","timestamp":"{timestamp}",'
+                        f'"generated_at":"{generated_at}"}}'
+                    )
+                    gz.write("]")
+
+                # Atomic rename
+                dest = _snapshot_path(level)
+                os.rename(tmp_path, dest)
+                elapsed = time.time() - start
+                stats[level] = count
+                logger.info(
+                    f"Snapshot {level}: {count} objects, "
+                    f"{dest.stat().st_size / 1024:.1f} KB, {elapsed:.2f}s"
+                )
+            except Exception:
+                # Clean up temp file on error
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
 
     return stats
 
