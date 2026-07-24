@@ -519,28 +519,23 @@ async def stream_objects_new(
     level: str = "full",
     since: str | None = None,
     batch_size: int = 1000,
-    exclude_deleted: bool = False,
-    conn: psycopg.AsyncConnection | None = None,
 ) -> AsyncIterator[tuple[list[str], str]]:
-    """Stream pre-serialized JSON in keyset-paginated batches.
+    """Stream pre-serialized JSON in keyset-paginated batches — the monotonic,
+    `since`-ordered path for SSE catch-up and the full-corpus rating recompute.
 
-    With `conn` None each batch acquires a pooled connection, fetches up to
-    `batch_size` rows ordered by (modified_at, uid), then RELEASES the connection
-    BEFORE yielding — so a slow SSE client never pins a pool slot across its
-    catch-up, and app heap holds at most one batch (not the whole resultset). This
-    bounds the full-corpus reads a single fetchall would otherwise materialize per
-    connection: a no-`since` rating recompute, or a large catch-up delta. Keyset
-    continuation on (modified_at, uid) is tie-safe across batch boundaries (a
-    same-timestamp run split by the LIMIT is neither skipped nor duplicated) and
-    rides the idx_objects_type_modified (type, modified_at, uid) index.
+    Each batch acquires a pooled connection, fetches up to `batch_size` rows ordered
+    by (modified_at, uid), then RELEASES the connection BEFORE yielding — so a slow
+    SSE client never pins a pool slot across its catch-up, and app heap holds at most
+    one batch (not the whole resultset). This bounds the full-corpus reads a single
+    fetchall would otherwise materialize per connection: a no-`since` rating recompute,
+    or a large catch-up delta. Keyset continuation on (modified_at, uid) is tie-safe
+    across batch boundaries (a same-timestamp run split by the LIMIT is neither skipped
+    nor duplicated) and rides the idx_objects_type_modified (type, modified_at, uid) index.
 
-    Pass `conn` to pin every batch to one caller-held connection (the snapshot
-    generator's relaxed-timeout session); the per-batch release only matters for
-    slow SSE clients, not a bg task.
-
-    `exclude_deleted` filters soft-deleted rows (the snapshot path — a fresh client
-    needs no tombstones); the SSE catch-up leaves it False so deletions propagate.
-    Yields (batch_of_raw_json_strings, max_modified_at_in_batch) per non-empty batch.
+    The ORDER BY is load-bearing here (the `since` high-water mark must advance
+    monotonically); a full snapshot needs no order and takes the cheaper unordered
+    sequential scan instead — see stream_objects_snapshot. Yields
+    (batch_of_raw_json_strings, max_modified_at_in_batch) per non-empty batch.
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -555,8 +550,6 @@ async def stream_objects_new(
         if obj_type:
             conditions.append("type = %s")
             params.append(obj_type)
-        if exclude_deleted:
-            conditions.append("deleted_at IS NULL")
         if last_modified is not None:
             # Keyset continuation: tie-safe past the previous batch's last row.
             conditions.append("(modified_at, uid) > (%s::timestamp, %s)")
@@ -569,13 +562,8 @@ async def stream_objects_new(
             f"SELECT {col}::text, modified_at, uid FROM objects "  # ty: ignore[invalid-argument-type]
             f"WHERE {where} ORDER BY modified_at ASC, uid ASC LIMIT %s"
         )
-        batch_params = (*params, batch_size)
-
-        if conn is not None:
-            rows = await (await conn.execute(sql, batch_params)).fetchall()
-        else:
-            async with _pool.connection() as c:
-                rows = await (await c.execute(sql, batch_params)).fetchall()
+        async with _pool.connection() as c:
+            rows = await (await c.execute(sql, (*params, batch_size))).fetchall()
 
         if not rows:
             break
@@ -584,6 +572,50 @@ async def stream_objects_new(
             break
         last_modified = rows[-1][1].isoformat()
         last_uid = rows[-1][2]
+
+
+async def stream_objects_snapshot(
+    obj_type: str,
+    level: str,
+    conn: psycopg.AsyncConnection,
+    batch_size: int = 1000,
+) -> AsyncIterator[tuple[list[str], str]]:
+    """Stream a FULL snapshot of one type/level via an UNORDERED sequential scan.
+
+    A full snapshot captures every non-deleted row plus the max modified_at — it
+    needs no row order. Dropping the ORDER BY (modified_at, uid) that stream_objects_new
+    forces frees the planner to choose a seq/bitmap heap scan (physical page order =
+    sequential I/O) over the index scan it was pinned to (index-order heap access =
+    random I/O), dramatically cheaper on the latency-bound prod disk (~20-55ms/IO) —
+    the whole point of this path. The actual plan is stats-dependent (confirm with
+    EXPLAIN on prod); the partial idx_objects_type (type WHERE deleted_at IS NULL)
+    keeps small/selective types cheap without reintroducing modified_at ordering.
+
+    A server-side cursor bounds the app heap to one `batch_size` fetch without keyset
+    pagination; it is DECLAREd inside an explicit transaction (autocommit forbids a
+    bare DECLARE CURSOR) that spans the whole iteration — the idle gaps between FETCHes
+    are just gzip writes (ms), far under the idle-in-transaction timeout. max(modified_at)
+    is tracked per batch for the caller's meta cursor.
+
+    The transaction/cursor live inside this generator but the `conn` is caller-owned, so
+    the caller MUST drive it under contextlib.aclosing (or fully drain it) — an early
+    break/exception then unwinds the cursor+ROLLBACK deterministically before the conn
+    is released, instead of at GC on a connection the pool may have already re-lent.
+    Yields (batch_of_raw_json_strings, max_modified_at_in_batch) per non-empty batch.
+    """
+    col = _level_col(level)
+    sql = (
+        f"SELECT {col}::text, modified_at FROM objects "  # ty: ignore[invalid-argument-type]
+        f"WHERE {col} IS NOT NULL AND type = %s AND deleted_at IS NULL"
+    )
+    async with conn.transaction():
+        async with conn.cursor(name=f"snap_{obj_type}_{level}") as cur:
+            await cur.execute(sql, (obj_type,))
+            while True:
+                rows = await cur.fetchmany(batch_size)
+                if not rows:
+                    break
+                yield [r[0] for r in rows], max(r[1] for r in rows).isoformat()
 
 
 async def purge_deleted_objects(days: int = 30) -> int:

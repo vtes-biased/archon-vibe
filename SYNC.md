@@ -19,23 +19,24 @@ past events) — but the `public` projection on the wire is unchanged. See PRODU
 
 ## Backend Streaming
 
-### Unified `stream_objects_new()`
+### Two object streamers: `stream_objects_new()` (ordered) + `stream_objects_snapshot()` (unordered)
 
-Single generic function reading pre-computed access-level columns:
+Both read the pre-computed access-level columns and yield raw JSONB text strings (no Python deserialization); they differ only in ordering, which is dictated by their consumer:
 
 ```python
 # backend/src/db.py
-async def stream_objects_new(
+async def stream_objects_new(         # SSE catch-up + rating recompute
     obj_type: str | None = None,
     level: str = "full",          # "public" | "member" | "full"
     since: str | None = None,
     batch_size: int = 1000,
-    exclude_deleted: bool = False, # snapshot path drops tombstones; SSE keeps them
 ) -> AsyncIterator[tuple[list[str], str]]:
     # Yields (batch_of_raw_json_strings, max_modified_at)
 ```
 
-**Keyset pagination**: Uses `WHERE (modified_at, uid) > (%s, %s)` (tie-safe across batch seams), `ORDER BY modified_at, uid LIMIT batch_size`. A pooled connection is acquired then **released before each yield**, so a slow SSE client never pins a pool slot across its catch-up and app heap holds at most one batch — not the whole resultset. Yields raw JSONB text strings — no Python deserialization. Snapshot generation reuses it with `exclude_deleted=True`.
+**Keyset pagination** (`stream_objects_new`): Uses `WHERE (modified_at, uid) > (%s, %s)` (tie-safe across batch seams), `ORDER BY modified_at, uid LIMIT batch_size`. A pooled connection is acquired then **released before each yield**, so a slow SSE client never pins a pool slot across its catch-up and app heap holds at most one batch — not the whole resultset. The ORDER BY is load-bearing: the client's `since` high-water mark must advance monotonically.
+
+**Unordered sequential scan** (`stream_objects_snapshot(obj_type, level, conn)`): the snapshot path. A **full** snapshot captures every non-deleted row + the max `modified_at`, so it needs **no row order** — dropping the ORDER BY lets Postgres pick a bitmap/seq heap scan (physical-page order = sequential I/O) over the index-order random I/O that was punishing on the latency-bound prod disk. It filters `deleted_at IS NULL` (fresh clients need no tombstones) and streams via a server-side cursor (DECLAREd in an explicit transaction — autocommit forbids a bare one) to keep app heap bounded without keyset pagination; max(`modified_at`) is tracked in Python for `meta.timestamp`.
 
 ### Access-Level Projections (computed at write time)
 
@@ -181,7 +182,7 @@ Each connection has a bounded `CoalescingQueue` (maxsize 30). The queue keeps on
 
 ### Snapshot-Based Initial Sync
 
-On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects. The same `_resolve_viewer()` credential logic applies (see **Credential Transport** above). `/snapshot` streams the gzip from disk in chunks, holding one fd open per response (so the 15-min atomic-rename regen stays consistent mid-stream) — the full file is never read into app heap, so hundreds of concurrent door-open reconnects don't spike memory. Snapshot generation (`snapshots.py`) reuses `stream_objects_new(exclude_deleted=True)` — same keyset-paginated, pool-releasing path as SSE catch-up.
+On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects. The same `_resolve_viewer()` credential logic applies (see **Credential Transport** above). `/snapshot` streams the gzip from disk in chunks, holding one fd open per response (so the 15-min atomic-rename regen stays consistent mid-stream) — the full file is never read into app heap, so hundreds of concurrent door-open reconnects don't spike memory. Snapshot generation (`snapshots.py`) uses `stream_objects_snapshot` — an unordered server-side-cursor sequential scan (no ORDER BY), pinned to one relaxed-`statement_timeout` session (`batch_read_connection`); see the streamer contrast above.
 
 After the snapshot loads, the SSE stream picks up from the snapshot's `timestamp` (`?since=`) plus its `generated_at` (`?generated_at=`), delivering any changes that occurred since generation.
 

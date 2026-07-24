@@ -10,6 +10,7 @@ import logging
 import os
 import tempfile
 import time
+from contextlib import aclosing
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -33,7 +34,7 @@ async def generate_snapshots() -> dict[str, int]:
     Returns dict of {level: object_count}.
     Reads {level}::text column directly — no Python deserialization.
     """
-    from .db import _pool, batch_read_connection, stream_objects_new
+    from .db import _pool, batch_read_connection, stream_objects_snapshot
 
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -72,23 +73,28 @@ async def generate_snapshots() -> dict[str, int]:
 
                         gz.write(f'{{"type":"{obj_type}","data":[')
 
-                        # Keyset batches (bounded heap); exclude soft-deleted rows —
-                        # fresh clients need no tombstones.
+                        # Unordered sequential scan (bounded heap via server-side
+                        # cursor); soft-deleted rows excluded — fresh clients need no
+                        # tombstones. No ORDER BY: a full snapshot needs no row order,
+                        # and dropping it turns random index-order I/O into sequential.
+                        # aclosing: a gz.write failure mid-iteration must unwind the
+                        # streamer's cursor+transaction NOW (before batch_read_connection
+                        # releases the conn), not at GC on an already-reborrowed conn.
                         first_obj = True
-                        async for json_strings, batch_max in stream_objects_new(
-                            obj_type=obj_type,
-                            level=level,
-                            exclude_deleted=True,
-                            conn=conn,
-                        ):
-                            for json_str in json_strings:
-                                if not first_obj:
-                                    gz.write(",")
-                                first_obj = False
-                                gz.write(json_str)
-                                count += 1
-                            if timestamp is None or batch_max > timestamp:
-                                timestamp = batch_max
+                        async with aclosing(
+                            stream_objects_snapshot(
+                                obj_type=obj_type, level=level, conn=conn
+                            )
+                        ) as batches:
+                            async for json_strings, batch_max in batches:
+                                for json_str in json_strings:
+                                    if not first_obj:
+                                        gz.write(",")
+                                    first_obj = False
+                                    gz.write(json_str)
+                                    count += 1
+                                if timestamp is None or batch_max > timestamp:
+                                    timestamp = batch_max
 
                         gz.write("]}")
 
