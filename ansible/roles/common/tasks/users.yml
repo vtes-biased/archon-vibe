@@ -1,4 +1,16 @@
 ---
+# Pre-create each become_user's ~/.ansible/tmp so Ansible finds it instead of
+# creating it at 0700 on first use and warning about the unprivileged-user temp
+# handoff (the postgresql role pre-creates its own). Root's must precede the
+# common role's first root-context copy/get_url (unattended_upgrades, python).
+- name: Ensure ansible tmp dir exists under root home
+  ansible.builtin.file:
+    path: /root/.ansible/tmp
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
 - name: Ensure archon group exists
   ansible.builtin.group:
     name: "{{ archon_group }}"
@@ -22,6 +34,14 @@
     owner: "{{ archon_user }}"
     group: "{{ archon_group }}"
     mode: "0755"
+
+- name: Ensure ansible tmp dir exists under archon home
+  ansible.builtin.file:
+    path: "{{ opt_root }}/.ansible/tmp"
+    state: directory
+    owner: "{{ archon_user }}"
+    group: "{{ archon_group }}"
+    mode: "0700"
 
 - name: Ensure /etc/archon exists (env files)
   ansible.builtin.file:
