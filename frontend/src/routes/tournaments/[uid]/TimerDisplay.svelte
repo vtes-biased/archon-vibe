@@ -14,11 +14,18 @@
     tournament,
     isOrganizer = false,
     tableIndex,
+    finals = false,
   }: {
     tournament: Tournament;
     isOrganizer?: boolean;
     tableIndex?: number;
+    finals?: boolean;
   } = $props();
+
+  // The final is a single table (index 0): its widget needs BOTH the global
+  // start/pause/reset controls and per-table time extensions, so it counts down
+  // finals_time (via roundTime below) with the finals-table extension applied.
+  const effTableIndex = $derived(finals ? 0 : tableIndex);
 
   let now = $state(Date.now());
   let loading = $state(false);
@@ -52,13 +59,13 @@
 
   // Per-table remaining (includes extensions)
   const tableRemaining = $derived.by(() => {
-    if (tableIndex == null) return baseRemaining;
-    const key = String(tableIndex);
+    if (effTableIndex == null) return baseRemaining;
+    const key = String(effTableIndex);
     const extra = tournament.table_extra_time?.[key] ?? 0;
     return Math.max(0, roundTime - baseElapsed + extra);
   });
 
-  const displaySeconds = $derived(tableIndex != null ? tableRemaining : baseRemaining);
+  const displaySeconds = $derived(effTableIndex != null ? tableRemaining : baseRemaining);
   const expired = $derived(displaySeconds <= 0 && baseElapsed > 0);
   const warning = $derived(displaySeconds > 0 && displaySeconds <= 300); // <5 min
 
@@ -69,7 +76,7 @@
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  const tableKey = $derived(tableIndex != null ? String(tableIndex) : "");
+  const tableKey = $derived(effTableIndex != null ? String(effTableIndex) : "");
   const tableExtraTime = $derived(tableKey ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0);
   const isPaused = $derived(tournament.timer?.paused ?? true);
 
@@ -101,7 +108,7 @@
       <Clock class="w-4 h-4 {expired ? 'text-link' : warning ? 'text-warn' : 'text-info'}" />
       <span class="font-mono text-2xl font-bold tabular-nums {expired ? 'text-link animate-pulse' : warning ? 'text-warn' : 'text-info'}">
         {#if expired}
-          -{formatTime(baseElapsed - roundTime - (tableIndex != null ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0))}
+          -{formatTime(baseElapsed - roundTime - (effTableIndex != null ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0))}
         {:else}
           {formatTime(displaySeconds)}
         {/if}
@@ -112,14 +119,14 @@
     </div>
 
     <!-- Table extensions info -->
-    {#if tableIndex != null && tableExtraTime > 0}
+    {#if effTableIndex != null && tableExtraTime > 0}
       <div class="text-xs text-ink-muted flex items-center gap-2">
         <span>+{Math.floor(tableExtraTime / 60)}:{(tableExtraTime % 60).toString().padStart(2, '0')} {m.timer_extra_time()}</span>
       </div>
     {/if}
 
-    <!-- Organizer global controls -->
-    {#if isOrganizer && tableIndex == null}
+    <!-- Organizer global controls (also for the single-table final) -->
+    {#if isOrganizer && (tableIndex == null || finals)}
       <div class="flex items-center gap-2">
         {#if isPaused}
           <Button variant="primary" size="sm" onclick={doStart} disabled={loading} title={m.timer_start()}>
@@ -136,8 +143,8 @@
       </div>
     {/if}
 
-    <!-- Organizer per-table controls -->
-    {#if isOrganizer && tableIndex != null}
+    <!-- Organizer per-table controls (time extensions) -->
+    {#if isOrganizer && effTableIndex != null}
       <div class="flex items-center gap-1 flex-wrap">
         {#each [60, 120, 300, 600] as secs}
           <Button variant="ghost" size="sm" onclick={() => doAddTime(secs)} disabled={loading || tableExtraTime + secs > MAX_EXTRA_TIME}>

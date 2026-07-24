@@ -420,6 +420,12 @@
             {translateTableState(tournament.finals.state)}
           </span>
         </div>
+        <!-- Finals timer (read-only; hidden in offline tournaments) -->
+        {#if !tournament.offline_mode && (tournament.finals_time || tournament.round_time || 0) > 0}
+          <div class="mb-2">
+            <TimerDisplay {tournament} finals />
+          </div>
+        {/if}
         <div class="space-y-1.5">
           {#each tournament.finals.seating as seat, j}
             {@const tVps = tournament.finals.seating.map(s => s.result.vp)}

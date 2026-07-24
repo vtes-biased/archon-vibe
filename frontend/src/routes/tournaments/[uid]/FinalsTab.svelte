@@ -7,6 +7,7 @@
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import VpInput from "./VpInput.svelte";
+  import TimerDisplay from "./TimerDisplay.svelte";
   import Button from '$lib/components/Button.svelte';
   import { ArrowRightLeft, ShieldCheck, Lock, TriangleAlert } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
@@ -90,6 +91,13 @@
     <p class="text-ink-muted">{m.finals_not_started()}</p>
   {:else}
     <h3 class="text-lg font-medium text-ink-strong">{m.finals_title()}</h3>
+
+    <!-- Finals timer (counts down finals_time; organizer gets start/pause/reset + extensions) -->
+    {#if (tournament.finals_time || tournament.round_time || 0) > 0 && tournament.state === "Playing"}
+      <div class="bg-surface-muted/50 rounded-lg p-4 flex justify-center">
+        <TimerDisplay {tournament} {isOrganizer} finals />
+      </div>
+    {/if}
 
     <!-- Finals table -->
     <div class="bg-surface-muted/50 rounded-lg p-4">
