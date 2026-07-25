@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Single-select member typeahead (extracted from OrganizerManager's search):
-  // IndexedDB search, min 2 chars, keyboard nav, flag + #vekn_id rows.
+  // Single-select member typeahead: IndexedDB search, min 2 chars, keyboard
+  // nav, flag + #vekn_id rows. The one search box — organizers, promos, …
   import type { User } from "$lib/types";
   import { getFilteredUsers } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";

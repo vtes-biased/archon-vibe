@@ -935,7 +935,6 @@
   "organizers_search_placeholder": "Search users to add...",
   "organizers_add_chip": "Add co-organizer",
   "organizers_last_warning": "Cannot remove the last organizer",
-  "organizers_no_results": "No matching users found",
   "organizers_added": "Organizer added",
   "tournament_share": "Share",
   "tournament_share_copied": "Event link copied to clipboard",
