@@ -17,6 +17,12 @@ copies that already exist.
     … dedup_tournaments.py --emit-decisions /tmp/dedup.tsv
     … dedup_tournaments.py --apply /tmp/dedup.tsv
 
+Reported groups are live copies of one event where SOME BUT NOT ALL copies hold a
+vekn id. Copies that all hold (different) vekn ids are distinct events, not
+duplicates — legacy placeholder names like "Imported VTES Event" cover hundreds of
+separate 2005 events, dozens per day — and copies that all lack one were never
+linked to anything.
+
 Resolution is per group and NOT mechanical: the vekn-less copy is often the
 richer one (it ran in the app; the vekn-linked copy can hold zero players). The
 proposal ranks by play data, never by which copy holds the vekn id.

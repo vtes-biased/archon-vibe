@@ -133,20 +133,32 @@ paths derive the instant differently — the sync applies a guessed venue timezo
 vekn id on it rather than creating a second row. The legacy merge
 (`migrate_from_archon.py`) applies the same fallback as its last key.
 
-Adoption refuses every ambiguous case and logs instead: several candidates, a
-candidate already holding a vekn id, or a candidate holding registered players
-but no rounds (the round-less update path treats vekn.net as authoritative for
-players, so adopting would wipe a live registration list). Duplicates that
-already exist are therefore reported, not repaired: each sync run ends with one
-grouped query (`db.find_duplicate_tournament_groups`) that logs every live
-same-name/same-day group. Resolve them with
-`backend/scripts/dedup_tournaments.py` — it reports the play-data metrics the
-choice hangs on (the vekn-linked copy is often the *poorer* one), then
-soft-deletes the losers and **transplants the vekn id onto the survivor**.
-Without that transplant the next sync finds no live holder of the event id and
-re-creates the copy just deleted. Ratings aggregate whatever is live, so a group
-with more than one rating-eligible copy was double-counted: recompute after
-applying.
+**Name + day is not an identity key.** Legacy imports share placeholder names —
+`Imported VTES Event` covers hundreds of distinct 2005 events, dozens on a single
+Saturday — and one convention runs several same-named events in a day. It is
+evidence of identity only where it is *unique in the corpus*, so both callers
+abandon the match when it isn't: the sync refuses if any other same-name/same-day
+copy already holds a vekn id (proof the key doesn't discriminate there), the
+merge refuses on more than one candidate, and a declared `country` that differs
+drops a candidate outright. The sync additionally refuses a candidate holding
+registered players but no rounds — the round-less update path treats vekn.net as
+authoritative for players, so adopting would wipe a live registration list.
+
+Duplicates that already exist are reported, not repaired: each sync run ends with
+one grouped query (`db.find_duplicate_tournament_groups`) logging live copies of
+one event where **some but not all** copies hold a vekn id. That mixed-vekn
+condition is what makes the report mean anything — without it every same-name/
+same-day cluster matches and the output is mostly distinct events. Copies that
+*all* hold (different) vekn ids are a separate class: one event entered twice on
+vekn.net, which is VEKN's record to reconcile, not ours.
+
+Resolve a reported group with `backend/scripts/dedup_tournaments.py` — it reports
+the play-data metrics the choice hangs on (the vekn-linked copy is often the
+*poorer* one), then soft-deletes the losers and **transplants the vekn id onto
+the survivor**. Without that transplant the next sync finds no live holder of the
+event id and re-creates the copy just deleted. Ratings aggregate whatever is
+live, so a group with more than one rating-eligible copy was double-counted:
+recompute after applying.
 
 ### Error handling
 

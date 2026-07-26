@@ -355,31 +355,35 @@ async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament
     class, and (because the orphaned copy keeps retrying an event-create that
     vekn.net rejects as already existing) the standing hourly push error.
 
-    Refuses to guess: adopts only when exactly one live candidate matches and it
-    holds no vekn id of its own.
+    Refuses to guess. Name+start-day is only evidence of identity where it is
+    UNIQUE in the corpus, so any other same-name/same-day copy already carrying a
+    vekn id proves the key doesn't discriminate here (legacy placeholder names
+    like "Imported VTES Event" cover dozens of distinct events per day) and the
+    match is abandoned. What remains must be a single vekn-less candidate.
     """
     if tournament.start is None:
         return None
-    candidates = await find_same_event_tournaments(tournament.name, tournament.start)
-    free = [c for c in candidates if not c.external_ids.get("vekn")]
-    if not free:
-        if candidates:
-            # Every candidate is spoken for: our copy of this event is a duplicate
-            # of another one we already track. Judgement call to resolve (which copy
-            # is richer), so stay loud rather than pick — scripts/dedup_tournaments.py.
-            logger.warning(
-                f"VEKN event {event_id} '{tournament.name}': duplicate local copies "
-                f"{[c.uid for c in candidates]} — resolve manually"
-            )
-        return None
-    if len(free) > 1:
+    candidates = await find_same_event_tournaments(
+        tournament.name, tournament.start, country=tournament.country
+    )
+    taken = [c for c in candidates if c.external_ids.get("vekn")]
+    if taken:
         logger.warning(
-            f"VEKN event {event_id} '{tournament.name}': {len(free)} vekn-less "
-            f"same-day copies {[c.uid for c in free]} — ambiguous, not adopting"
+            f"VEKN event {event_id} '{tournament.name}': same-day copies "
+            f"{[c.uid for c in taken]} already hold vekn ids — name+day is not "
+            f"unique here, not adopting"
         )
         return None
+    if len(candidates) != 1:
+        if candidates:
+            logger.warning(
+                f"VEKN event {event_id} '{tournament.name}': {len(candidates)} "
+                f"vekn-less same-day copies {[c.uid for c in candidates]} — "
+                f"ambiguous, not adopting"
+            )
+        return None
 
-    adopted = free[0]
+    adopted = candidates[0]
     # Adopting hands the row to the caller's existing-row paths, and the round-less
     # one treats vekn.net as authoritative for players/standings. Safe when the copy
     # has rounds (rich-guard → metadata only) or no players (nothing to lose); a

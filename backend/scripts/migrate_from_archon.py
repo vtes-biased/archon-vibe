@@ -372,24 +372,30 @@ async def live_tournament_by_vekn(ext_id: str) -> Tournament | None:
 async def live_same_event_tournament(d: dict, old_uid: str) -> Tournament | None:
     """The live copy of this vekn-id-less legacy event, matched on name + start day.
 
-    Only fires as the last key (see process_tournament_row). Declines anything
-    ambiguous: several candidates, or a candidate already claimed by a DIFFERENT
-    old-archon row — two same-named events on one day must stay two events.
+    Only fires as the last key (see process_tournament_row). Name+day identifies an
+    event only where it is UNIQUE — old archon is full of placeholder names shared
+    by dozens of distinct same-day events — so more than one candidate means the
+    key doesn't discriminate and we insert a separate copy rather than guess. A
+    candidate claimed by a DIFFERENT old-archon row is likewise not ours.
     """
     start = parse_dt(d.get("start"))
     name = d.get("name") or ""
     if start is None or not name:
         return None
-    candidates = await db.find_same_event_tournaments(name, start, exclude_uid=old_uid)
-    free = [c for c in candidates if c.external_ids.get("archon", old_uid) == old_uid]
-    if len(free) != 1:
-        if free:
+    candidates = await db.find_same_event_tournaments(
+        name, start, exclude_uid=old_uid, country=nz(d.get("country"))
+    )
+    if len(candidates) != 1:
+        if candidates:
             loud(
                 f"ambiguous name match for old archon {old_uid} '{name}' {start}: "
-                f"{[c.uid for c in free]} — inserting a separate copy"
+                f"{[c.uid for c in candidates]} — inserting a separate copy"
             )
         return None
-    return free[0]
+    match = candidates[0]
+    if match.external_ids.get("archon", old_uid) != old_uid:
+        return None
+    return match
 
 
 async def archon_uid_index() -> dict[str, str]:

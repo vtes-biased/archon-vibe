@@ -1169,6 +1169,12 @@ async def get_tournament_by_external_id(
 # than on the calendar date because the two paths derive the instant differently
 # (the sync applies a guessed venue timezone, the ETL takes old archon's stored
 # value) — the observed skew reaches 9h and can straddle midnight UTC.
+#
+# Name+day is NOT an identity key on its own: legacy imports share placeholder
+# names ("Imported VTES Event" covers hundreds of distinct 2005 events, dozens on
+# one Saturday), and one convention runs several same-named events in a day. It is
+# only evidence of identity when unambiguous — callers must apply the guards in
+# their own docstrings, never merge on a bare hit.
 SAME_EVENT_QUERY = """
     SELECT "full" FROM objects
     WHERE type = 'tournament'
@@ -1181,12 +1187,14 @@ SAME_EVENT_QUERY = """
 
 
 async def find_same_event_tournaments(
-    name: str, start: datetime, exclude_uid: str = ""
+    name: str, start: datetime, exclude_uid: str = "", country: str | None = None
 ) -> list[Tournament]:
-    """Live tournaments that look like the same real event as (name, start).
+    """Live tournaments that MIGHT be the same real event as (name, start).
 
-    Deliberately NOT used to auto-merge: callers require a single unambiguous
-    candidate and apply their own richness/ownership guards before adopting one.
+    A hit is a candidate, not a match — see SAME_EVENT_QUERY. `country` drops
+    candidates that declare a different one (a same-named event elsewhere on the
+    same day is a different event); candidates or callers without a country
+    declared stay in, since most legacy imports have none.
     """
     if not name or start is None:
         return []
@@ -1194,12 +1202,22 @@ async def find_same_event_tournaments(
         result = await conn.execute(
             SAME_EVENT_QUERY, (exclude_uid, name, start.isoformat())
         )
-        return [decode_json(row[0], Tournament) for row in await result.fetchall()]
+        found = [decode_json(row[0], Tournament) for row in await result.fetchall()]
+    if country:
+        found = [t for t in found if not t.country or t.country == country]
+    return found
 
 
-# The #520 class: N live copies of one event, at most N-1 of them holding a vekn
-# id. Grouping by external_ids.vekn (the one-live-per-vekn-id invariant check)
-# cannot see it — the extra copies have no vekn id at all.
+# The #520 class: several live copies of ONE event where at least one copy holds a
+# vekn id and at least one holds none. Grouping by external_ids.vekn (the
+# one-live-per-vekn-id invariant check) cannot see it — the extra copies have no
+# vekn id at all.
+#
+# The mixed-vekn clause is load-bearing, not a refinement: without it this reports
+# every same-name/same-day cluster, and legacy placeholder names make that
+# hundreds of DISTINCT events (each with its own vekn id) rather than duplicates.
+# Copies that ALL hold vekn ids are a different class — one event entered twice on
+# vekn.net — which is VEKN's record to reconcile, not ours.
 DUPLICATE_GROUPS_QUERY = """
     WITH t AS (
         SELECT uid,
@@ -1217,11 +1235,12 @@ DUPLICATE_GROUPS_QUERY = """
     FROM t
     GROUP BY 1, 2
     HAVING count(*) > 1
+       AND count(vekn) BETWEEN 1 AND count(*) - 1
 """
 
 
 async def find_duplicate_tournament_groups() -> list[dict]:
-    """Live tournaments sharing a name and a UTC start day. One row per group."""
+    """Live copies of one event where only some copies hold a vekn id."""
     async with get_connection() as conn:
         result = await conn.execute(DUPLICATE_GROUPS_QUERY)
         return [

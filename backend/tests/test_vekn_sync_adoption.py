@@ -50,3 +50,25 @@ async def test_vekn_event_adopts_veknless_copy_instead_of_duplicating(test_db):
     # Already linked to another event id: the local copies are a duplicate pair
     # only an operator can resolve, so refuse rather than steal the id.
     assert await _adopt_same_event(_tournament(name, start), "99999") is None
+
+
+@pytest.mark.asyncio
+async def test_no_adoption_when_name_and_day_are_not_unique(test_db):
+    """Placeholder names cover many distinct events per day — never merge on one.
+
+    Legacy imports share names like "Imported VTES Event" across hundreds of
+    separate 2005 events, dozens falling on one Saturday. A vekn-less copy sitting
+    among same-day copies that already hold their own vekn ids must NOT be adopted:
+    the key doesn't identify anything there.
+    """
+    name = f"Imported VTES Event {uuid4()}"
+    day = datetime(2005, 5, 14, 8, 0, tzinfo=UTC)
+    distinct = _tournament(name, day, external_ids={"vekn": "630"})
+    veknless = _tournament(name, day + timedelta(hours=3))
+    async with db.get_connection() as conn:
+        await db.save_tournament(distinct, conn=conn)
+        await db.save_tournament(veknless, conn=conn)
+
+    assert await _adopt_same_event(_tournament(name, day), "1461") is None
+    stored = await db.get_tournament_by_uid(veknless.uid)
+    assert "vekn" not in stored.external_ids
