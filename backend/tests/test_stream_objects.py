@@ -31,37 +31,31 @@ async def test_stream_objects_keyset_covers_all_rows_across_batches(populated_db
 
 
 @pytest.mark.asyncio
-async def test_stream_objects_snapshot_covers_live_rows_and_max(populated_db):
+async def test_stream_objects_snapshot_covers_live_rows(populated_db):
     """The unordered server-side-cursor snapshot path must return every non-deleted
-    row exactly once across fetchmany batches, exclude soft-deleted rows, and report
-    the max modified_at over the LIVE set (not the whole table)."""
-    # Soft-delete two users; their tombstones get a NEWER modified_at, so a snapshot
-    # that leaked them (or their timestamp) would be caught by both assertions below.
+    row exactly once across fetchmany batches, and exclude soft-deleted rows."""
+    # Soft-delete two users; a snapshot that leaked them fails the first assertion.
     for user in populated_db[:2]:
         await db.soft_delete_user(user.uid)
 
     async with db.get_connection() as conn:
         ground = await (
             await conn.execute(
-                "SELECT uid, modified_at FROM objects "
+                "SELECT uid FROM objects "
                 "WHERE type = 'user' AND deleted_at IS NULL AND \"full\" IS NOT NULL"
             )
         ).fetchall()
     expected_uids = {r[0] for r in ground}
-    expected_max = max(r[1] for r in ground).isoformat()
 
     seen: list[str] = []
-    overall_max = ""
     async with db.get_connection() as conn:  # server-side cursor needs a held conn
-        async for json_strings, batch_max in stream_objects_snapshot(
+        async for json_strings in stream_objects_snapshot(
             "user",
             "full",
             conn=conn,
             batch_size=50,  # 398 live rows → ≥8 batches
         ):
             seen.extend(msgspec.json.decode(js.encode())["uid"] for js in json_strings)
-            overall_max = max(overall_max, batch_max)
 
     assert set(seen) == expected_uids  # every live row, deleted excluded
     assert len(seen) == len(set(seen))  # exactly once (no fetchmany-seam dup)
-    assert overall_max == expected_max

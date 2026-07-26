@@ -579,11 +579,12 @@ async def stream_objects_snapshot(
     level: str,
     conn: psycopg.AsyncConnection,
     batch_size: int = 1000,
-) -> AsyncIterator[tuple[list[str], str]]:
+) -> AsyncIterator[list[str]]:
     """Stream a FULL snapshot of one type/level via an UNORDERED sequential scan.
 
-    A full snapshot captures every non-deleted row plus the max modified_at — it
-    needs no row order. Dropping the ORDER BY (modified_at, uid) that stream_objects_new
+    A full snapshot captures every non-deleted row and nothing else — no row order,
+    and no modified_at: the meta cursor is the generation instant, not a data max
+    (see snapshots.py). Dropping the ORDER BY (modified_at, uid) that stream_objects_new
     forces frees the planner to choose a seq/bitmap heap scan (physical page order =
     sequential I/O) over the index scan it was pinned to (index-order heap access =
     random I/O), dramatically cheaper on the latency-bound prod disk (~20-55ms/IO) —
@@ -594,18 +595,17 @@ async def stream_objects_snapshot(
     A server-side cursor bounds the app heap to one `batch_size` fetch without keyset
     pagination; it is DECLAREd inside an explicit transaction (autocommit forbids a
     bare DECLARE CURSOR) that spans the whole iteration — the idle gaps between FETCHes
-    are just gzip writes (ms), far under the idle-in-transaction timeout. max(modified_at)
-    is tracked per batch for the caller's meta cursor.
+    are just gzip writes (ms), far under the idle-in-transaction timeout.
 
     The transaction/cursor live inside this generator but the `conn` is caller-owned, so
     the caller MUST drive it under contextlib.aclosing (or fully drain it) — an early
     break/exception then unwinds the cursor+ROLLBACK deterministically before the conn
     is released, instead of at GC on a connection the pool may have already re-lent.
-    Yields (batch_of_raw_json_strings, max_modified_at_in_batch) per non-empty batch.
+    Yields a batch of raw JSON strings per non-empty fetch.
     """
     col = _level_col(level)
     sql = (
-        f"SELECT {col}::text, modified_at FROM objects "  # ty: ignore[invalid-argument-type]
+        f"SELECT {col}::text FROM objects "  # ty: ignore[invalid-argument-type]
         f"WHERE {col} IS NOT NULL AND type = %s AND deleted_at IS NULL"
     )
     async with conn.transaction():
@@ -615,7 +615,7 @@ async def stream_objects_snapshot(
                 rows = await cur.fetchmany(batch_size)
                 if not rows:
                     break
-                yield [r[0] for r in rows], max(r[1] for r in rows).isoformat()
+                yield [r[0] for r in rows]
 
 
 async def purge_deleted_objects(days: int = 30) -> int:
