@@ -118,7 +118,7 @@
 - [No-change guard bounded by denormalized inputs](ratings-nochange-guard-denormalized-inputs.md) — the skip-if-unchanged guard only converges if the entry's embedded tournament_name + date(finish/start/modified fallback) are stable; meta flip-flop + both-null date are the two daily re-save vectors.
 
 ## Migration / legacy-archon merge (residual hazards)
-- [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; tournament meta + officials' contact_email oscillate daily unless single-writer enforced (member side is, tournament side isn't).
+- [Archon-merge cross-sync flip-flop](archon-merge-cross-sync-flipflop.md) — daily `--merge` shares fields with both VEKN syncs; both known vectors (tournament meta, officials' contact_email) are FIXED and guarded — check the guards, don't re-report them as live.
 - [Vekn-less drop is NOT ref-free (measured)](migration-veknless-orphan-measured.md) — dropping the 142 vekn-less members orphans 9 refs (4 players + 5 seats) in 3 Finished tournaments; old archon never enforced vekn at registration. Reusable probe recipe in file.
 - [vekn_id unique index spans tombstones](vekn-unique-index-spans-tombstones.md) — index has no deleted_at exclusion; soft-deleted user reserves its vekn_id; deleted_at-filtered lookups disagree → seed-insert can crash on a reserved number. UNFIXED, reachable on steady-state nightly merges (admin user-delete keeps vekn_id).
 - The vekn-id-matching redesign (member matching, no tombstone, vekn-less shells, `member_uid_map` remap of all member-uid refs) shipped; full impl + ref surface in `.pst/details/169-vekn-id-matching-merge.md`.
