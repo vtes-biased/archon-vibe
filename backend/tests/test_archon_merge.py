@@ -35,6 +35,7 @@ from scripts.migrate_from_archon import (
     KNOWN_REMAP,
     Stats,
     allocate_veknless_participant,
+    archon_uid_index,
     build_user,
     deck_uid,
     merge_member,
@@ -143,7 +144,7 @@ async def test_rich_merge_into_vekn_copy_then_idempotent(test_db):
         row = _old_tournament_row("o-1", vekn_id="555", with_deck=True)
 
         uid_map: dict[str, str] = {}
-        await process_tournament_row(row, {}, Stats(), True, uid_map)
+        await process_tournament_row(row, {}, Stats(), True, uid_map, archon_ix={})
 
         merged = await db.get_tournament_by_uid("x-1")
         assert merged is not None and merged.deleted_at is None
@@ -157,7 +158,9 @@ async def test_rich_merge_into_vekn_copy_then_idempotent(test_db):
 
         # Second run: matched back via the archon marker, nothing rewritten.
         stats2 = Stats()
-        await process_tournament_row(row, {}, stats2, True, {})
+        await process_tournament_row(
+            row, {}, stats2, True, {}, archon_ix=await archon_uid_index()
+        )
         assert stats2["tournaments.unchanged"] == 1
         assert stats2["tournaments.updated"] == 0
         assert stats2["decks.upserted"] == 0
@@ -168,14 +171,16 @@ async def test_rich_merge_into_vekn_copy_then_idempotent(test_db):
 async def test_archon_first_interleave_tombstones_roundless_copy(test_db):
     async with _cleanup():
         # Run N inserted the rich tournament before old archon pushed to vekn…
-        await process_tournament_row(_old_tournament_row("o-2"), {}, Stats(), True, {})
+        await process_tournament_row(
+            _old_tournament_row("o-2"), {}, Stats(), True, {}, archon_ix={}
+        )
         # …then the VEKN sync created a round-less copy under a fresh uid…
         await seed_tournament(_vekn_created("c-2", "777"))
 
         # …and run N+1 sees the old tournament with its vekn id.
         stats = Stats()
         await process_tournament_row(
-            _old_tournament_row("o-2", vekn_id="777"), {}, stats, True, {}
+            _old_tournament_row("o-2", vekn_id="777"), {}, stats, True, {}, archon_ix={}
         )
 
         survivor = await db.get_tournament_by_uid("o-2")
@@ -199,6 +204,7 @@ async def test_echo_guard_roundless_never_overwrites_rich(test_db):
             stats,
             True,
             uid_map,
+            archon_ix={},
         )
 
         assert stats["tournaments.echo_skipped"] == 1
@@ -216,7 +222,7 @@ async def test_both_rich_conflict_is_skipped(test_db):
 
         stats = Stats()
         await process_tournament_row(
-            _old_tournament_row("o-4", vekn_id="999"), {}, stats, True, {}
+            _old_tournament_row("o-4", vekn_id="999"), {}, stats, True, {}, archon_ix={}
         )
 
         assert stats["tournaments.both_rich_conflict"] == 1
@@ -335,7 +341,9 @@ async def test_member_refs_remapped_and_vekn_less_seeded(test_db):
 
         row = _old_tournament_row("o-r", with_deck=True)
         row["data"]["winner"] = "p1"
-        await process_tournament_row(row, {}, Stats(), True, {}, member_uid_map)
+        await process_tournament_row(
+            row, {}, Stats(), True, {}, member_uid_map, archon_ix={}
+        )
 
         t = await db.get_tournament_by_uid("o-r")
         seat_uids = {s.player_uid for tbl in t.rounds[0] for s in tbl.seating}
@@ -391,7 +399,9 @@ async def test_veknless_played_throwaway_collapses_onto_real_noshow(
         }
 
         stats = Stats()
-        await process_tournament_row(row, {}, stats, True, {}, member_uid_map)
+        await process_tournament_row(
+            row, {}, stats, True, {}, member_uid_map, archon_ix={}
+        )
 
         t = await db.get_tournament_by_uid(tuid)
         puids = [p.user_uid for p in t.players]

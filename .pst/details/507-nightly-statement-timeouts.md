@@ -56,17 +56,23 @@ inheriting the 30 s *user-request* guard.
   `nice -n10 ionice -c3` to yield to the live stacks (the box's `mq-deadline`
   ignores the ioclass — correct + future-proof, harmless).
 
+The merge script itself was the gap this pass missed: it runs out-of-process, so
+neither `batch_read_connection` nor anything else here reached its own two
+connections and it kept inheriting the 30 s guard — it then died nightly on the
+#216 participant pre-pass. Closed separately (#516) by putting
+`options=-c statement_timeout=…` on both its DSNs. Any FUTURE out-of-process
+batch job needs the same treatment; in-process ones get it from
+`batch_read_connection`.
+
 The snapshot was already fail-safe (temp file + atomic rename → a slow-but-
 completing gen serves the last good file meanwhile); 120 s just lets it finish.
 
 ## Residual / deploy notes (not code)
 
-- **Config drift:** prod inventory already has `effective_cache_size: 384MB` and
-  `shared_buffers: 96MB`, but the running cluster shows PG stock 4GB / 128MB —
-  the PG memory tuning was never applied. A postgresql-role redeploy applies 384MB
-  (reload) — corrects the planner's 4× cache overestimate that biases it toward
-  random index-order heap access. `shared_buffers` stays small BY DESIGN (rely on
-  OS page cache on the tiny box); do NOT grow it.
+- **PG memory tuning:** applied — prod now runs `effective_cache_size = 384MB` /
+  `shared_buffers = 96MB`, matching inventory (verified on the box 2026-07-26 by
+  the #515 audit). `shared_buffers` stays small BY DESIGN (rely on OS page cache
+  on the tiny box); do NOT grow it.
 - **Durable cure:** Phase-4 legacy decommission frees the whole box + cache for
   the new stack — removes the cross-DB eviction entirely.
 - **#514** — switch the full-snapshot read to a sequential heap scan (drop the

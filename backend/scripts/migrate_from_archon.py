@@ -93,6 +93,7 @@ from uuid import uuid7
 
 import msgspec
 import psycopg
+from psycopg.conninfo import make_conninfo
 from psycopg.rows import dict_row
 
 from backend.src import db
@@ -124,6 +125,12 @@ from backend.src.models import (
     TournamentState,
 )
 from backend.src.vekn_sync import OFFICIALS_EMAILS
+
+# Applied to both DSNs in run(). Deliberately wider than db.batch_read_connection's
+# 120s: that guards single pooled reads inside a live server, this is a whole daily
+# job with a 24h window. Still capped, not disabled — a runaway read here would hold
+# the source transaction open and overlap the next timer firing.
+BATCH_STATEMENT_TIMEOUT_MS = 600_000
 
 # --------------------------------------------------------------------------- #
 # Mapping tables                                                               #
@@ -345,16 +352,38 @@ async def live_user_by_vekn_id(vekn_id: str) -> db.User | None:
     return db.decode_json(row[0], db.User) if row else None
 
 
-async def live_tournament_by_ext(platform: str, ext_id: str) -> Tournament | None:
+async def live_tournament_by_vekn(ext_id: str) -> Tournament | None:
+    # 'vekn' stays a literal: it is the only external_ids key schema.sql indexes,
+    # and the planner only matches idx_objects_tournament_vekn against that exact
+    # expression. Passing the key as a parameter still folds to a constant and
+    # still uses the index — but a DIFFERENT key silently seq-scans + detoasts
+    # every tournament row, which is what the archon-marker lookup used to do.
     async with db.get_connection() as conn:
         res = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'tournament' AND "full"->'external_ids'->>%s = %s
+            WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' = %s
               AND deleted_at IS NULL LIMIT 1""",
-            (platform, ext_id),
+            (ext_id,),
         )
         row = await res.fetchone()
     return db.decode_json(row[0], Tournament) if row else None
+
+
+async def archon_uid_index() -> dict[str, str]:
+    """`external_ids['archon']` → live uid, in ONE scan (merge mode).
+
+    Marks events a previous run merged INTO a vekn-created copy, so the old uid
+    no longer finds them. Only 'vekn' is indexed, so looking this up per row cost
+    a full seq scan + detoast of every tournament each time. Strings only —
+    decoding the rows here would be ~70 MB; hits re-fetch by uid and are rare.
+    """
+    async with db.get_connection() as conn:
+        res = await conn.execute(
+            """SELECT "full"->'external_ids'->>'archon', uid FROM objects
+            WHERE type = 'tournament' AND deleted_at IS NULL
+              AND "full"->'external_ids'->>'archon' IS NOT NULL"""
+        )
+        return {row[0]: row[1] for row in await res.fetchall()}
 
 
 async def other_live_vekn_holders(ext_id: str, but_uid: str) -> list[Tournament]:
@@ -1242,6 +1271,8 @@ async def process_tournament_row(
     merge: bool,
     uid_map: dict[str, str],
     member_uid_map: dict[str, str] | None = None,
+    *,
+    archon_ix: dict[str, str],
 ) -> None:
     """Migrate/merge one old tournament row. Records old_uid → surviving uid in
     `uid_map` (used to remap sanction tournament refs); remaps every member-uid
@@ -1279,12 +1310,15 @@ async def process_tournament_row(
             return
         if existing is None:
             # A previous run merged this event's rich payload into a
-            # vekn-created copy: find it again by the marker.
-            existing = await live_tournament_by_ext("archon", old_uid)
+            # vekn-created copy: find it again by the marker. The index is built
+            # once per run (see archon_uid_index) — each old_uid is processed at
+            # most once, so a pre-loop snapshot can't go stale under us.
+            live_uid = archon_ix.get(old_uid)
+            existing = await db.get_tournament_by_uid(live_uid) if live_uid else None
             if existing is not None:
                 target_uid = existing.uid
         if existing is None and vekn_eid:
-            x = await live_tournament_by_ext("vekn", vekn_eid)
+            x = await live_tournament_by_vekn(vekn_eid)
             if x is not None:
                 incoming_rich = bool(d.get("rounds"))
                 if not incoming_rich:
@@ -1415,12 +1449,19 @@ async def migrate_tournaments(
     q = "SELECT uid, data FROM tournaments"
     if limit:
         q += f" LIMIT {limit}"
+    archon_ix = await archon_uid_index() if merge else {}
     async with old.cursor(name="tournaments_cur", row_factory=dict_row) as cur:
         cur.itersize = 200
         await cur.execute(q)
         async for row in cur:
             await process_tournament_row(
-                row, sanctions, stats, merge, uid_map, member_uid_map
+                row,
+                sanctions,
+                stats,
+                merge,
+                uid_map,
+                member_uid_map,
+                archon_ix=archon_ix,
             )
             if stats["tournaments"] % 1000 == 0:
                 print(f"  …{stats['tournaments']} tournaments")
@@ -1499,8 +1540,16 @@ def backup_new_db(dsn: str, backup_dir: Path) -> Path:
 
 
 async def run(args: argparse.Namespace) -> None:
-    db.DB_URL = args.new_dsn
-    os.environ["DATABASE_URL"] = args.new_dsn
+    # Both DSNs get the relaxed guard: this is an off-request, fail-safe batch job
+    # (it pg_dumps the new DB first), so it must not inherit the cluster's 30s
+    # USER-REQUEST statement_timeout — same escape hatch as db.batch_read_connection,
+    # just wider, since a daily job has a 24h window. Without it the #216 participant
+    # pre-pass (one full-corpus JSONB expansion over legacy tournaments) blew the 30s
+    # guard nightly on the latency-bound prod disk and the merge never ran.
+    # make_conninfo, not string concat: --old-dsn/--new-dsn take URI *or* keyword form.
+    relaxed = {"options": f"-c statement_timeout={BATCH_STATEMENT_TIMEOUT_MS}"}
+    db.DB_URL = make_conninfo(args.new_dsn, **relaxed)
+    os.environ["DATABASE_URL"] = db.DB_URL
     if args.merge and not args.skip_backup:
         path = backup_new_db(args.new_dsn, Path(args.backup_dir))
         print(f"Pre-merge backup: {path}")
@@ -1511,7 +1560,9 @@ async def run(args: argparse.Namespace) -> None:
 
     # read-only source; autocommit=False keeps a transaction open so server-side
     # (named) cursors can DECLARE — we only read, never commit.
-    old = await psycopg.AsyncConnection.connect(args.old_dsn, autocommit=False)
+    old = await psycopg.AsyncConnection.connect(
+        make_conninfo(args.old_dsn, **relaxed), autocommit=False
+    )
     stats = Stats()
     sanctions: dict[str, Sanction] = {}
     uid_map: dict[str, str] = {}
