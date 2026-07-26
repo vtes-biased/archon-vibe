@@ -57,7 +57,7 @@ result = engine.process_event(event_json, objects_json)
 updated_tournament = engine.process_tournament_event(
     tournament_json,
     '{"type": "StartRound"}',
-    '{"uid": "...", "roles": ["Prince"], "is_organizer": true}'
+    '{"uid": "...", "roles": ["Prince"], "is_organizer": true}',
 )
 ```
 

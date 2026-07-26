@@ -79,7 +79,7 @@ from backend.src.geonames import (
     load_cities,
     get_country,
     get_city_by_id,
-    search_cities
+    search_cities,
 )
 
 # Get all countries

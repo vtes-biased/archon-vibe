@@ -67,8 +67,8 @@ async def stream_objects_new(         # SSE catch-up + rating recompute
 ### SSE Endpoint
 
 ```python
-_STREAM_TYPES = list(ObjectType)      # catch-up object order
-_SSE_LINE_BUDGET = 200_000            # bytes per `data:` line
+_STREAM_TYPES = list(ObjectType)  # catch-up object order
+_SSE_LINE_BUDGET = 200_000  # bytes per `data:` line
 ```
 
 Catch-up emits batch frames via `_sse_object_lines()`, which chunks each object-type batch so no single `data:` line exceeds `_SSE_LINE_BUDGET` (200 KB). Reason: the browser EventSource has no per-line cap, but the Discord bot's aiohttp StreamReader rejects lines over 512 KB. A single object larger than the budget is emitted alone (never split across lines).
