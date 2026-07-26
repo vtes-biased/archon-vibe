@@ -467,9 +467,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("Purge of deleted objects scheduled daily")
 
-    # Generate initial snapshot (if VEKN sync disabled; otherwise run_vekn_sync handles it)
-    if not sync_enabled:
-        asyncio.create_task(run_snapshot_generation())
+    # Always generate at startup, even when run_vekn_sync will regenerate at the end of
+    # its chain: until a file exists /snapshot 503s and no client can bootstrap, and on
+    # a deploy that changes the snapshot filename there is no previous file to serve.
+    # Waiting for members→tournaments→TWDA→ratings would leave that window open for
+    # minutes. A redundant pass is one corpus scan; a bootstrap outage is worse.
+    asyncio.create_task(run_snapshot_generation())
 
     _scheduler.start()
 

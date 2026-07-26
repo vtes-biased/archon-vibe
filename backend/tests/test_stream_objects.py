@@ -37,7 +37,9 @@ async def test_stream_objects_keyset_covers_all_rows_across_batches(populated_db
 
 
 @pytest.mark.asyncio
-async def test_snapshot_files_are_complete_wellformed_jsonl(populated_db, tmp_path):
+async def test_snapshot_files_are_complete_wellformed_jsonl(
+    populated_db, tmp_path, monkeypatch
+):
     """The generated snapshot must be readable exactly the way the client reads it:
     a header line, one tagged object per line, an eof trailer whose count matches
     the object lines actually present, soft-deleted rows excluded, and each level
@@ -46,7 +48,7 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(populated_db, tmp_pa
     for user in populated_db[:2]:
         await db.soft_delete_user(user.uid)
 
-    snapshots.SNAPSHOT_DIR = tmp_path
+    monkeypatch.setattr(snapshots, "SNAPSHOT_DIR", tmp_path)
     counts = await snapshots.generate_snapshots()
 
     # Ground truth per level: every live row whose projection for that level exists.

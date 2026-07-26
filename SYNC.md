@@ -360,7 +360,9 @@ A tournament- or player-facing view meets none of these — do not cite this car
 2. **Projection functions** in `access_levels.py`: `compute_<type>_public/member/full()` + add to dispatch dicts
 3. **CRUD wrappers** in `db.py`: thin wrappers calling `save_object_from_model("<type>", obj)` and `get_object_full(uid, Type)`; populate `BroadcastData.tournament_uid` if the type belongs to a tournament (needed for tournament-scoped SSE connections)
 4. **Access entitlement** in `broadcast.entitled_level()`: add a branch if the type has non-standard visibility rules (own object, country-scoped, etc.)
-5. **Broadcast** via `broadcast_precomputed()` (from `broadcast.py`) after mutations — no registration step needed: `_STREAM_TYPES` (`main.py`) and `OBJECT_TYPES` (`snapshots.py`) both derive from `list(ObjectType)` and pick up the new type automatically
+5. **Broadcast** via `broadcast_precomputed()` (from `broadcast.py`) after mutations — no registration step needed: `_STREAM_TYPES` (`main.py`) derives from `list(ObjectType)`, and snapshot generation reads whatever rows the single corpus scan returns, so both pick up the new type automatically
 6. **Frontend type** in `types.ts`
 7. **IndexedDB store** in `db.ts` (bump version → full clear)
 8. **Add to `SPECS`** in `sync.ts`
+
+A backend-first deploy is safe: a snapshot line whose type isn't in `SPECS` yet is counted toward the `eof` total and then ignored, so an older bundle still bootstraps. Do **not** "fix" that by counting only recognised types — that turns every unknown type into a phantom truncation and bricks the bootstrap for every client that hasn't updated.

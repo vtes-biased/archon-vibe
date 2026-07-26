@@ -279,7 +279,7 @@ class SyncManager {
       let sawEof = false;
       let objectLines = 0;
 
-      const handleLine = async (line: string): Promise<boolean> => {
+      const handleLine = async (line: string): Promise<void> => {
         const entry = JSON.parse(line) as {
           type: string;
           data?: any;
@@ -294,18 +294,24 @@ class SyncManager {
           }
           timestamp = entry.timestamp || null;
           generatedAt = entry.generated_at || null;
-          return true;
+          return;
         }
         if (entry.type === 'eof') {
           if (entry.count !== objectLines) {
             throw new Error(`snapshot truncated: ${objectLines}/${entry.count} objects`);
           }
           sawEof = true;
-          return true;
+          return;
         }
-        const spec = SPECS.find(s => s.singleType === entry.type);
-        if (!spec || !entry.data) return true;
+        // Counted BEFORE the spec lookup: this is a did-the-whole-file-arrive check,
+        // not a did-we-understand-it check. Counting only known types would make a
+        // backend that adds an object type before clients ship support for it look
+        // like a truncated file to every one of them — i.e. nobody can bootstrap.
+        // An unknown type is simply ignored; a genuinely breaking change bumps
+        // SNAPSHOT_FORMAT_VERSION instead.
         objectLines++;
+        const spec = SPECS.find(s => s.singleType === entry.type);
+        if (!spec || !entry.data) return;
         // Skip tournaments this device holds offline — UNLESS the server shows
         // we've lost the lock (force-unlock / takeover), in which case reconcile
         // and apply the authoritative copy so the device "gets the memo".
@@ -313,14 +319,13 @@ class SyncManager {
           if (lostOfflineLock(entry.data)) {
             await handleOfflineLockLost(entry.data.uid);
           } else if (isOffline(entry.data.uid)) {
-            return true;
+            return;
           }
         }
         const buf = buffers.get(spec.batchType) ?? [];
         buf.push(entry.data);
         buffers.set(spec.batchType, buf);
         if (buf.length >= SyncManager.SNAPSHOT_BATCH) await flush(spec);
-        return true;
       };
 
       const lines = textStream.getReader();
@@ -347,6 +352,11 @@ class SyncManager {
       // trusting a corpus that is silently missing rows.
       if (!sawEof) throw new Error('snapshot ended without eof');
 
+      // Cleared before the supersede check: eof landed and every batch is flushed, so
+      // the stores are whole even if a newer connect() is about to discard this cycle.
+      // Leaving it set would make the next boot re-download a file we already have.
+      await clearSnapshotIngesting();
+
       if (this.superseded(epoch)) return null;
       if (timestamp) {
         await setLastSyncTimestamp(timestamp);
@@ -357,7 +367,6 @@ class SyncManager {
       if (accessVersion) {
         await setLastSyncAccessVersion(accessVersion);
       }
-      await clearSnapshotIngesting();
 
       this.snapshotFailStreak = 0;
       return timestamp;
