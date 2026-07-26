@@ -14,6 +14,8 @@ from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
 from .db import (
     decode_json,
+    find_duplicate_tournament_groups,
+    find_same_event_tournaments,
     get_connection,
     get_tournament_by_external_id,
     save_tournament,
@@ -345,14 +347,71 @@ async def _build_users_by_vekn_id() -> dict[str, User]:
     return result_map
 
 
+async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament | None:
+    """Link a vekn-less local copy of this event to `event_id`, or return None.
+
+    Without this, an event whose only local copy came in through the legacy-archon
+    merge without a vekn id gets a SECOND copy created here — the #520 duplicate
+    class, and (because the orphaned copy keeps retrying an event-create that
+    vekn.net rejects as already existing) the standing hourly push error.
+
+    Refuses to guess: adopts only when exactly one live candidate matches and it
+    holds no vekn id of its own.
+    """
+    if tournament.start is None:
+        return None
+    candidates = await find_same_event_tournaments(tournament.name, tournament.start)
+    free = [c for c in candidates if not c.external_ids.get("vekn")]
+    if not free:
+        if candidates:
+            # Every candidate is spoken for: our copy of this event is a duplicate
+            # of another one we already track. Judgement call to resolve (which copy
+            # is richer), so stay loud rather than pick — scripts/dedup_tournaments.py.
+            logger.warning(
+                f"VEKN event {event_id} '{tournament.name}': duplicate local copies "
+                f"{[c.uid for c in candidates]} — resolve manually"
+            )
+        return None
+    if len(free) > 1:
+        logger.warning(
+            f"VEKN event {event_id} '{tournament.name}': {len(free)} vekn-less "
+            f"same-day copies {[c.uid for c in free]} — ambiguous, not adopting"
+        )
+        return None
+
+    adopted = free[0]
+    # Adopting hands the row to the caller's existing-row paths, and the round-less
+    # one treats vekn.net as authoritative for players/standings. Safe when the copy
+    # has rounds (rich-guard → metadata only) or no players (nothing to lose); a
+    # registration list with no rounds yet would be overwritten, so leave it alone.
+    if adopted.players and not adopted.rounds:
+        logger.warning(
+            f"VEKN event {event_id} '{tournament.name}': same-day copy {adopted.uid} "
+            f"holds {len(adopted.players)} registered players but no rounds — not "
+            f"adopting (would overwrite the registration list); resolve manually"
+        )
+        return None
+    adopted.external_ids["vekn"] = str(event_id)
+    adopted.modified = datetime.now(UTC)
+    async with get_connection() as conn:
+        bd = await save_tournament(adopted, conn=conn)
+    broadcast_precomputed(bd)
+    logger.info(
+        f"VEKN event {event_id} adopted by existing tournament {adopted.uid} "
+        f"'{adopted.name}' (was vekn-less) instead of creating a duplicate"
+    )
+    return adopted
+
+
 async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
     """Sync all VEKN tournaments.
 
-    Returns stats: {created, updated, unchanged, errors, skipped, total}.
+    Returns stats: {created, adopted, updated, unchanged, errors, skipped, total}.
     """
     logger.info("Starting VEKN tournament sync")
     stats = {
         "created": 0,
+        "adopted": 0,
         "updated": 0,
         "unchanged": 0,
         "errors": 0,
@@ -386,6 +445,10 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
 
             # Check if already exists (unlocked lookup by external id → uid)
             existing_ref = await get_tournament_by_external_id("vekn", str(event_id))
+            if existing_ref is None:
+                existing_ref = await _adopt_same_event(tournament, event_id)
+                if existing_ref is not None:
+                    stats["adopted"] += 1
             if existing_ref:
                 bd = None
                 # Re-read the row under a FOR UPDATE lock so this wholesale overwrite
@@ -542,7 +605,17 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
 
     logger.info(
         f"VEKN tournament sync completed: {stats['created']} created, "
-        f"{stats['updated']} updated, {stats['unchanged']} unchanged, "
-        f"{stats['skipped']} skipped, {stats['errors']} errors, {stats['total']} total"
+        f"{stats['adopted']} adopted, {stats['updated']} updated, "
+        f"{stats['unchanged']} unchanged, {stats['skipped']} skipped, "
+        f"{stats['errors']} errors, {stats['total']} total"
     )
+
+    # One grouped query, after the fact: the adoption guards above decline every
+    # ambiguous case, so duplicates still accumulate silently otherwise. Stays loud
+    # until an operator resolves them (scripts/dedup_tournaments.py).
+    for group in await find_duplicate_tournament_groups():
+        logger.warning(
+            f"Duplicate live tournaments: '{group['name']}' on {group['day']} — "
+            f"{group['uids']} ({group['with_vekn']} with a vekn id)"
+        )
     return stats

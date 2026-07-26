@@ -369,6 +369,29 @@ async def live_tournament_by_vekn(ext_id: str) -> Tournament | None:
     return db.decode_json(row[0], Tournament) if row else None
 
 
+async def live_same_event_tournament(d: dict, old_uid: str) -> Tournament | None:
+    """The live copy of this vekn-id-less legacy event, matched on name + start day.
+
+    Only fires as the last key (see process_tournament_row). Declines anything
+    ambiguous: several candidates, or a candidate already claimed by a DIFFERENT
+    old-archon row — two same-named events on one day must stay two events.
+    """
+    start = parse_dt(d.get("start"))
+    name = d.get("name") or ""
+    if start is None or not name:
+        return None
+    candidates = await db.find_same_event_tournaments(name, start, exclude_uid=old_uid)
+    free = [c for c in candidates if c.external_ids.get("archon", old_uid) == old_uid]
+    if len(free) != 1:
+        if free:
+            loud(
+                f"ambiguous name match for old archon {old_uid} '{name}' {start}: "
+                f"{[c.uid for c in free]} — inserting a separate copy"
+            )
+        return None
+    return free[0]
+
+
 async def archon_uid_index() -> dict[str, str]:
     """`external_ids['archon']` → live uid, in ONE scan (merge mode).
 
@@ -1342,6 +1365,29 @@ async def process_tournament_row(
                 # next VEKN sync run hits the rich-guard and refreshes metadata
                 # only.
                 target_uid, existing = x.uid, x
+        if existing is None and not vekn_eid:
+            # Old archon never recorded a vekn id for this event, so neither key
+            # above can see the copy the VEKN sync already created from vekn.net —
+            # this is where the #520 duplicate pairs came from. Fall back to
+            # name + start-day and reuse the same rich/echo arbitration.
+            x = await live_same_event_tournament(d, old_uid)
+            if x is not None:
+                incoming_rich = bool(d.get("rounds"))
+                if not incoming_rich:
+                    uid_map[old_uid] = x.uid
+                    stats.bump("tournaments.echo_skipped_by_name")
+                    return
+                if x.rounds:
+                    loud(
+                        f"BOTH-RICH conflict on '{d.get('name')}' {d.get('start')}: "
+                        f"ours {x.uid} and old archon {old_uid} both have rounds — "
+                        f"one-app-per-event violation, skipped; resolve manually"
+                    )
+                    uid_map[old_uid] = x.uid
+                    stats.bump("tournaments.both_rich_conflict")
+                    return
+                target_uid, existing = x.uid, x
+                stats.bump("tournaments.matched_by_name")
 
     t, decks = build_tournament(d, target_uid, existing, sanctions, stats)
     # Remap member refs to live uids BEFORE the merge-into-vekn-copy below, so the

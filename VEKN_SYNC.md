@@ -122,6 +122,32 @@ Tracking fields on User: `vekn_synced` (bool), `vekn_synced_at` (timestamp), `lo
   (`checkin_code`, `twda_status`) is explicitly carried over from the existing row —
   otherwise it would reset on every re-sync
 
+### Matching an incoming event to a local tournament
+
+Primary key is `external_ids.vekn`. The legacy-archon merge imports old events
+that never carried a vekn id, though, and those are invisible to that key — each
+path used to insert its own copy of one real event. So on a miss, the sync falls
+back to **name + start within 24 h** (`db.find_same_event_tournaments`; the two
+paths derive the instant differently — the sync applies a guessed venue timezone
+— and the observed skew reaches 9 h) and *adopts* the local copy, stamping the
+vekn id on it rather than creating a second row. The legacy merge
+(`migrate_from_archon.py`) applies the same fallback as its last key.
+
+Adoption refuses every ambiguous case and logs instead: several candidates, a
+candidate already holding a vekn id, or a candidate holding registered players
+but no rounds (the round-less update path treats vekn.net as authoritative for
+players, so adopting would wipe a live registration list). Duplicates that
+already exist are therefore reported, not repaired: each sync run ends with one
+grouped query (`db.find_duplicate_tournament_groups`) that logs every live
+same-name/same-day group. Resolve them with
+`backend/scripts/dedup_tournaments.py` — it reports the play-data metrics the
+choice hangs on (the vekn-linked copy is often the *poorer* one), then
+soft-deletes the losers and **transplants the vekn id onto the survivor**.
+Without that transplant the next sync finds no live holder of the event id and
+re-creates the copy just deleted. Ratings aggregate whatever is live, so a group
+with more than one rating-eligible copy was double-counted: recompute after
+applying.
+
 ### Error handling
 
 Each sync phase (member, tournament, TWDA) is wrapped independently. An exception or timeout logs an error and skips that phase for the current cycle without aborting the others.
@@ -137,3 +163,4 @@ Each sync phase (member, tournament, TWDA) is wrapped independently. An exceptio
 - `backend/src/vekn_api.py` — VEKN API client (auth, HTTP)
 - `backend/src/vekn_sync.py` — inbound member sync service
 - `backend/src/vekn_tournament_sync.py` — inbound tournament import
+- `backend/scripts/dedup_tournaments.py` — audit/resolve duplicate live tournaments

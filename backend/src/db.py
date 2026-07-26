@@ -1159,6 +1159,77 @@ async def get_tournament_by_external_id(
         return None
 
 
+# Same-event matcher for the two import paths that create tournaments without a
+# shared key: the VEKN tournament sync (keyed on external_ids.vekn) and the
+# legacy-archon merge (keyed on the old uid / external_ids.archon / the old
+# extra.vekn_id). A legacy event that never carried a vekn id is invisible to both
+# keys, so each path used to insert its own copy of the one real event.
+#
+# Name is compared case- and whitespace-insensitively; start within 24h rather
+# than on the calendar date because the two paths derive the instant differently
+# (the sync applies a guessed venue timezone, the ETL takes old archon's stored
+# value) — the observed skew reaches 9h and can straddle midnight UTC.
+SAME_EVENT_QUERY = """
+    SELECT "full" FROM objects
+    WHERE type = 'tournament'
+      AND deleted_at IS NULL
+      AND uid <> %s
+      AND lower(btrim("full"->>'name')) = lower(btrim(%s))
+      AND "full"->>'start' IS NOT NULL
+      AND abs(extract(epoch FROM (("full"->>'start')::timestamptz - %s::timestamptz))) < 86400
+"""
+
+
+async def find_same_event_tournaments(
+    name: str, start: datetime, exclude_uid: str = ""
+) -> list[Tournament]:
+    """Live tournaments that look like the same real event as (name, start).
+
+    Deliberately NOT used to auto-merge: callers require a single unambiguous
+    candidate and apply their own richness/ownership guards before adopting one.
+    """
+    if not name or start is None:
+        return []
+    async with get_connection() as conn:
+        result = await conn.execute(
+            SAME_EVENT_QUERY, (exclude_uid, name, start.isoformat())
+        )
+        return [decode_json(row[0], Tournament) for row in await result.fetchall()]
+
+
+# The #520 class: N live copies of one event, at most N-1 of them holding a vekn
+# id. Grouping by external_ids.vekn (the one-live-per-vekn-id invariant check)
+# cannot see it — the extra copies have no vekn id at all.
+DUPLICATE_GROUPS_QUERY = """
+    WITH t AS (
+        SELECT uid,
+               btrim("full"->>'name') AS name,
+               ("full"->>'start')::timestamptz AS start,
+               "full"->'external_ids'->>'vekn' AS vekn
+        FROM objects
+        WHERE type = 'tournament'
+          AND deleted_at IS NULL
+          AND "full"->>'start' IS NOT NULL
+    )
+    SELECT lower(name) AS key, (start AT TIME ZONE 'UTC')::date AS day,
+           min(name) AS name, array_agg(uid ORDER BY uid) AS uids,
+           count(vekn) AS with_vekn
+    FROM t
+    GROUP BY 1, 2
+    HAVING count(*) > 1
+"""
+
+
+async def find_duplicate_tournament_groups() -> list[dict]:
+    """Live tournaments sharing a name and a UTC start day. One row per group."""
+    async with get_connection() as conn:
+        result = await conn.execute(DUPLICATE_GROUPS_QUERY)
+        return [
+            {"name": row[2], "day": row[1], "uids": row[3], "with_vekn": row[4]}
+            for row in await result.fetchall()
+        ]
+
+
 async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[str]]:
     """Get all-time IRL tournament win UIDs for multiple users at once.
 
