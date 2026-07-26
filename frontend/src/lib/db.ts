@@ -430,6 +430,27 @@ export async function clearLastSyncAccessVersion(): Promise<void> {
   await db.delete('metadata', 'last_sync_access_version');
 }
 
+// Set while a snapshot is being streamed into the stores, cleared only when the file's
+// eof line lands. The snapshot used to be parsed whole before anything was written, so a
+// truncated file left IndexedDB untouched; streaming ingest writes as it reads and gives
+// that up. A marker surviving into the next boot therefore means "these stores are a
+// partial snapshot" — indistinguishable from a good load without it, since the rows that
+// DID arrive look perfectly valid. connect() treats it as no snapshot and refetches.
+export async function getSnapshotIngesting(): Promise<boolean> {
+  const db = await getDB();
+  return (await db.get('metadata', 'snapshot_ingest_in_progress')) === '1';
+}
+
+export async function setSnapshotIngesting(): Promise<void> {
+  const db = await getDB();
+  await db.put('metadata', '1', 'snapshot_ingest_in_progress');
+}
+
+export async function clearSnapshotIngesting(): Promise<void> {
+  const db = await getDB();
+  await db.delete('metadata', 'snapshot_ingest_in_progress');
+}
+
 // Sanction operations
 export async function getSanction(uid: string): Promise<Sanction | undefined> {
   const db = await getDB();

@@ -42,6 +42,9 @@ import {
   setLastSyncAccessVersion,
   getLastSyncAccessVersion,
   clearLastSyncAccessVersion,
+  getSnapshotIngesting,
+  setSnapshotIngesting,
+  clearSnapshotIngesting,
   getTournament,
   getUser,
   getSanction,
@@ -55,6 +58,11 @@ import { getAccessToken, ensureSyncToken, refreshTokens } from '$lib/stores/auth
 import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLockLost } from '$lib/stores/offline.svelte';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+
+// Must match backend snapshots.SNAPSHOT_FORMAT_VERSION. The header line is checked
+// against it so a format the client can't read is refused outright rather than
+// half-ingested into the stores.
+const SNAPSHOT_FORMAT_VERSION = 2;
 
 type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'deck' | 'league' | 'judge_call' | 'sync_complete' | 'syncing' | 'resync' | 'error' | 'disconnected';
 
@@ -142,6 +150,9 @@ class SyncManager {
   private snapshotFailStreak = 0;
   private static readonly SNAPSHOT_FAIL_WARN = 5;
   private static readonly RESYNC_BACKOFF_AFTER = 1;
+  // Rows buffered per type before a saveBatch during snapshot ingest. Bounds peak
+  // heap to one batch; the file itself is streamed, never materialised.
+  private static readonly SNAPSHOT_BATCH = 500;
 
   // Monotonic connect generation. Bumped at the top of every connect(); a
   // cycle whose epoch is stale aborts at its next await instead of mutating
@@ -207,69 +218,134 @@ class SyncManager {
       // per-user (not in the shared snapshot body); the client only stores + echoes it.
       const accessVersion = response.headers.get('X-Access-Version');
 
-      // Browser may auto-decompress gzip via Content-Encoding header.
-      // If not, detect gzip magic bytes and decompress manually.
-      const arrayBuffer = await response.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let text: string;
-
-      if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
-        // Still gzipped — decompress with DecompressionStream
-        const ds = new DecompressionStream('gzip');
-        const decompressedStream = new Blob([arrayBuffer]).stream().pipeThrough(ds);
-        text = await new Response(decompressedStream).text();
-      } else {
-        text = new TextDecoder().decode(bytes);
+      if (!response.body) {
+        this.noteSnapshotFailure('no response body');
+        return null;
       }
 
-      const sections = JSON.parse(text) as {
-        type: string;
-        data?: any[];
-        timestamp?: string;
-        generated_at?: string;
-      }[];
+      // Stream the file: gunzip → decode → split lines → parse one → save → drop.
+      // The whole point of the JSONL format is that no step ever holds the corpus;
+      // the previous shape kept the compressed bytes, the decompressed text and the
+      // parsed object graph alive at once, which OOM-killed tabs on mid-range phones.
+      // Content-Encoding: gzip means fetch usually gunzips for us — but not through
+      // every proxy, so sniff the magic bytes off the first chunk and pipe through
+      // DecompressionStream only when the bytes really are still gzip.
+      const reader = response.body.getReader();
+      const first = await reader.read();
+      const head = first.value;
+      const stillGzipped = !!head && head[0] === 0x1f && head[1] === 0x8b;
+      const source = new ReadableStream<BufferSource>({
+        start(controller) {
+          if (head) controller.enqueue(head);
+          if (first.done) controller.close();
+        },
+        async pull(controller) {
+          const { value, done } = await reader.read();
+          if (done) controller.close();
+          else controller.enqueue(value);
+        },
+        cancel(reason) {
+          void reader.cancel(reason);
+        },
+      });
+      let byteStream: ReadableStream<BufferSource> = source;
+      if (stillGzipped) byteStream = source.pipeThrough(new DecompressionStream('gzip'));
+      const textStream = byteStream.pipeThrough(new TextDecoderStream());
 
       // A newer connect() may have superseded us while the snapshot was in
       // flight; bail before touching IndexedDB so we don't clear/clobber the
       // data the newer cycle is loading.
       if (this.superseded(epoch)) return null;
 
-      // Clear stores before loading (preserve offline tournaments)
+      // Mark BEFORE the clear: everything from here to the eof line leaves the
+      // stores in a partial state that looks valid, so a crash/close/truncation
+      // anywhere in between must be detectable on the next boot.
+      await setSnapshotIngesting();
       await this.clearAllStores();
       if (this.superseded(epoch)) return null;
 
-      // Load each section into IDB
+      // Per-type buffers flushed through the existing saveBatch, so a single
+      // unordered pass of interleaved types still writes in batches.
+      const buffers = new Map<string, any[]>();
+      const flush = async (spec: ObjectSpec<any>) => {
+        const items = buffers.get(spec.batchType);
+        if (!items?.length) return;
+        buffers.set(spec.batchType, []);
+        await spec.saveBatch(items);
+      };
+
       let timestamp: string | null = null;
       let generatedAt: string | null = null;
-      for (const section of sections) {
-        if (this.superseded(epoch)) return null;
-        if (section.type === 'meta') {
-          timestamp = section.timestamp || null;
-          generatedAt = section.generated_at || null;
-          continue;
-        }
-        // Find matching spec by singleType (snapshot uses singular: "user", "tournament", etc.)
-        const spec = SPECS.find(s => s.singleType === section.type);
-        if (spec && section.data && section.data.length > 0) {
-          let items = section.data;
-          // Skip tournaments this device holds offline — UNLESS the server shows
-          // we've lost the lock (force-unlock / takeover), in which case reconcile
-          // and apply the authoritative copy so the device "gets the memo".
-          if (spec.batchType === 'tournaments') {
-            const kept: any[] = [];
-            for (const t of items) {
-              if (lostOfflineLock(t)) {
-                await handleOfflineLockLost(t.uid);
-                kept.push(t);
-              } else if (!isOffline(t.uid)) {
-                kept.push(t);
-              }
-            }
-            items = kept;
+      let sawEof = false;
+      let objectLines = 0;
+
+      const handleLine = async (line: string): Promise<boolean> => {
+        const entry = JSON.parse(line) as {
+          type: string;
+          data?: any;
+          version?: number;
+          timestamp?: string;
+          generated_at?: string;
+          count?: number;
+        };
+        if (entry.type === 'header') {
+          if (entry.version !== SNAPSHOT_FORMAT_VERSION) {
+            throw new Error(`unsupported snapshot version ${entry.version}`);
           }
-          if (items.length > 0) await spec.saveBatch(items);
+          timestamp = entry.timestamp || null;
+          generatedAt = entry.generated_at || null;
+          return true;
+        }
+        if (entry.type === 'eof') {
+          if (entry.count !== objectLines) {
+            throw new Error(`snapshot truncated: ${objectLines}/${entry.count} objects`);
+          }
+          sawEof = true;
+          return true;
+        }
+        const spec = SPECS.find(s => s.singleType === entry.type);
+        if (!spec || !entry.data) return true;
+        objectLines++;
+        // Skip tournaments this device holds offline — UNLESS the server shows
+        // we've lost the lock (force-unlock / takeover), in which case reconcile
+        // and apply the authoritative copy so the device "gets the memo".
+        if (spec.batchType === 'tournaments') {
+          if (lostOfflineLock(entry.data)) {
+            await handleOfflineLockLost(entry.data.uid);
+          } else if (isOffline(entry.data.uid)) {
+            return true;
+          }
+        }
+        const buf = buffers.get(spec.batchType) ?? [];
+        buf.push(entry.data);
+        buffers.set(spec.batchType, buf);
+        if (buf.length >= SyncManager.SNAPSHOT_BATCH) await flush(spec);
+        return true;
+      };
+
+      const lines = textStream.getReader();
+      let pending = '';
+      for (;;) {
+        const { value, done } = await lines.read();
+        if (done) break;
+        if (this.superseded(epoch)) {
+          void lines.cancel();
+          return null;
+        }
+        const parts = (pending + value).split('\n');
+        pending = parts.pop() ?? '';
+        for (const line of parts) {
+          if (line) await handleLine(line);
         }
       }
+      if (pending.trim()) await handleLine(pending);
+
+      for (const spec of SPECS) await flush(spec);
+
+      // No eof line = the file ended early (dropped connection, partial write).
+      // Leave the ingest marker set so the next boot refetches instead of
+      // trusting a corpus that is silently missing rows.
+      if (!sawEof) throw new Error('snapshot ended without eof');
 
       if (this.superseded(epoch)) return null;
       if (timestamp) {
@@ -281,11 +357,13 @@ class SyncManager {
       if (accessVersion) {
         await setLastSyncAccessVersion(accessVersion);
       }
+      await clearSnapshotIngesting();
 
       this.snapshotFailStreak = 0;
       return timestamp;
     } catch (e) {
-      // Corrupt gzip / JSON parse / network throw: broken, not warm-up.
+      // Corrupt gzip / JSON parse / truncation / network throw: broken, not warm-up.
+      // The ingest marker is deliberately NOT cleared — see setSnapshotIngesting.
       this.noteSnapshotFailure(String(e));
       return null;
     }
@@ -339,6 +417,16 @@ class SyncManager {
       return;
     }
     const token = auth.kind === 'token' ? auth.token : null;
+
+    // A marker surviving from a previous session means the stores hold a partial
+    // snapshot (see setSnapshotIngesting). The rows present look valid, so nothing
+    // downstream could notice — clear and refetch before reading the cursor.
+    if (await getSnapshotIngesting()) {
+      console.warn('Snapshot ingest was interrupted; discarding partial data');
+      await this.clearAllStores();
+      await clearSnapshotIngesting();
+    }
+    if (this.superseded(epoch)) return;
 
     let lastSync: string | null = await getLastSyncTimestamp();
     if (this.superseded(epoch)) return;

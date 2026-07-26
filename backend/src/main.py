@@ -726,7 +726,7 @@ async def get_snapshot(
     # gzip slice can't be inflated).
     return StreamingResponse(
         _iter_file_chunks(snapshot_path),
-        media_type="application/json",
+        media_type="application/x-ndjson",
         headers={
             "Content-Encoding": "gzip",
             "Cache-Control": "no-cache",

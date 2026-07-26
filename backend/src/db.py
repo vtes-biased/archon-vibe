@@ -575,47 +575,51 @@ async def stream_objects_new(
 
 
 async def stream_objects_snapshot(
-    obj_type: str,
-    level: str,
     conn: psycopg.AsyncConnection,
-    batch_size: int = 1000,
-) -> AsyncIterator[list[str]]:
-    """Stream a FULL snapshot of one type/level via an UNORDERED sequential scan.
+    batch_size: int = 150,
+) -> AsyncIterator[list[tuple[str, str | None, str | None, str | None]]]:
+    """Stream the WHOLE live corpus once — every type, all three levels per row.
 
-    A full snapshot captures every non-deleted row and nothing else — no row order,
-    and no modified_at: the meta cursor is the generation instant, not a data max
-    (see snapshots.py). Dropping the ORDER BY (modified_at, uid) that stream_objects_new
-    forces frees the planner to choose a seq/bitmap heap scan (physical page order =
-    sequential I/O) over the index scan it was pinned to (index-order heap access =
-    random I/O), dramatically cheaper on the latency-bound prod disk (~20-55ms/IO) —
-    the whole point of this path. The actual plan is stats-dependent (confirm with
-    EXPLAIN on prod); the partial idx_objects_type (type WHERE deleted_at IS NULL)
-    keeps small/selective types cheap without reintroducing modified_at ordering.
+    ONE unordered sequential scan feeds all three snapshot files. The previous shape
+    (one query per type per level) issued len(ObjectType) x 3 = 18 queries, each of
+    which the planner answers with a full heap scan for the big types: ~477MB of heap
+    reads per cycle to emit ~20MB of gzip, every 15 minutes, on a latency-bound disk.
+    Selecting the three level columns of the same row together drops that to 1x heap +
+    1x toast for the same detoast volume.
 
-    A server-side cursor bounds the app heap to one `batch_size` fetch without keyset
-    pagination; it is DECLAREd inside an explicit transaction (autocommit forbids a
-    bare DECLARE CURSOR) that spans the whole iteration — the idle gaps between FETCHes
-    are just gzip writes (ms), far under the idle-in-transaction timeout.
+    No ORDER BY: a full snapshot needs no row order, and dropping it frees the planner
+    to choose a seq/bitmap heap scan (physical page order = sequential I/O) over an
+    index scan (index-order heap access = random I/O). Note the plan is costed with
+    cursor_tuple_fraction (a named cursor is a DECLARE), so verify with EXPLAIN of the
+    DECLARE, not of the bare SELECT.
+
+    Consistency comes free: a DECLAREd cursor holds ONE MVCC snapshot for its whole
+    lifetime even under READ COMMITTED, so all three files describe the same instant
+    without needing REPEATABLE READ. The cursor bounds app heap to one fetch; it is
+    DECLAREd inside an explicit transaction (autocommit forbids a bare DECLARE CURSOR)
+    spanning the iteration — the gaps between FETCHes are just gzip writes (ms).
+    `batch_size` is deliberately far below the ordered streamer's 1000: rows now carry
+    three projections of the same object, and a tournament averages ~8KB per level.
 
     The transaction/cursor live inside this generator but the `conn` is caller-owned, so
     the caller MUST drive it under contextlib.aclosing (or fully drain it) — an early
     break/exception then unwinds the cursor+ROLLBACK deterministically before the conn
     is released, instead of at GC on a connection the pool may have already re-lent.
-    Yields a batch of raw JSON strings per non-empty fetch.
+    Yields batches of (type, public, member, full); a level is None where that
+    projection doesn't exist for the row, and the caller omits it from that file.
     """
-    col = _level_col(level)
     sql = (
-        f"SELECT {col}::text FROM objects "  # ty: ignore[invalid-argument-type]
-        f"WHERE {col} IS NOT NULL AND type = %s AND deleted_at IS NULL"
+        'SELECT type, "public"::text, "member"::text, "full"::text '
+        "FROM objects WHERE deleted_at IS NULL"
     )
     async with conn.transaction():
-        async with conn.cursor(name=f"snap_{obj_type}_{level}") as cur:
-            await cur.execute(sql, (obj_type,))
+        async with conn.cursor(name="snap_all") as cur:
+            await cur.execute(sql)
             while True:
                 rows = await cur.fetchmany(batch_size)
                 if not rows:
                     break
-                yield [r[0] for r in rows]
+                yield rows
 
 
 async def purge_deleted_objects(days: int = 30) -> int:

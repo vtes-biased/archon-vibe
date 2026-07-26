@@ -36,7 +36,9 @@ async def stream_objects_new(         # SSE catch-up + rating recompute
 
 **Keyset pagination** (`stream_objects_new`): Uses `WHERE (modified_at, uid) > (%s, %s)` (tie-safe across batch seams), `ORDER BY modified_at, uid LIMIT batch_size`. A pooled connection is acquired then **released before each yield**, so a slow SSE client never pins a pool slot across its catch-up and app heap holds at most one batch — not the whole resultset. The ORDER BY is load-bearing: the client's `since` high-water mark must advance monotonically.
 
-**Unordered sequential scan** (`stream_objects_snapshot(obj_type, level, conn)`): the snapshot path. A **full** snapshot captures every non-deleted row and needs **no row order** — dropping the ORDER BY lets Postgres pick a bitmap/seq heap scan (physical-page order = sequential I/O) over the index-order random I/O that was punishing on the latency-bound prod disk. It filters `deleted_at IS NULL` (fresh clients need no tombstones) and streams via a server-side cursor (DECLAREd in an explicit transaction — autocommit forbids a bare one) to keep app heap bounded without keyset pagination. It yields rows only: the meta cursor is the **generation instant**, not a data max (next section).
+**Unordered whole-corpus scan** (`stream_objects_snapshot(conn)`): the snapshot path — one scan for *all* types and *all three* levels, yielding `(type, public, member, full)`. A full snapshot captures every non-deleted row and needs **no row order**, so dropping the ORDER BY lets Postgres pick a bitmap/seq heap scan (physical-page order = sequential I/O) over the index-order random I/O that was punishing on the latency-bound prod disk. It filters `deleted_at IS NULL` (fresh clients need no tombstones) and streams via a server-side cursor (DECLAREd in an explicit transaction — autocommit forbids a bare one) to keep app heap bounded without keyset pagination; `batch_size` is far below the ordered streamer's because each row now carries three projections. It yields no timestamp: the meta cursor is the **generation instant**, not a data max (see below).
+
+> Plan checks must `EXPLAIN` the `DECLARE … CURSOR FOR`, not the bare `SELECT` — a named cursor is costed with `cursor_tuple_fraction` (default 0.1), which biases toward low-startup plans and can report a different scan than the one that runs.
 
 ### Access-Level Projections (computed at write time)
 
@@ -182,11 +184,28 @@ Each connection has a bounded `CoalescingQueue` (maxsize 30). The queue keeps on
 
 ### Snapshot-Based Initial Sync
 
-On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects. The same `_resolve_viewer()` credential logic applies (see **Credential Transport** above). `/snapshot` streams the gzip from disk in chunks, holding one fd open per response (so the 15-min atomic-rename regen stays consistent mid-stream) — the full file is never read into app heap, so hundreds of concurrent door-open reconnects don't spike memory. Snapshot generation (`snapshots.py`) uses `stream_objects_snapshot` — an unordered server-side-cursor sequential scan (no ORDER BY), pinned to one relaxed-`statement_timeout` session (`batch_read_connection`); see the streamer contrast above.
+On first connect (no `since` timestamp), the frontend fetches a pre-computed gzip snapshot (`GET /snapshot`) instead of streaming from scratch. Snapshots are regenerated every 15 minutes by a background task (`snapshots.py`), one file per access level (public/member/full). This avoids holding a DB connection open for the full initial stream of potentially thousands of objects. The same `_resolve_viewer()` credential logic applies (see **Credential Transport** above). `/snapshot` streams the gzip from disk in chunks, holding one fd open per response (so the 15-min atomic-rename regen stays consistent mid-stream) — the full file is never read into app heap, so hundreds of concurrent door-open reconnects don't spike memory.
+
+**All three files come from ONE pass** over `objects` (`stream_objects_snapshot`), selecting the three projection columns of each row together and writing three gzip streams as it goes, pinned to one relaxed-`statement_timeout` session (`batch_read_connection`). The previous per-`(type, level)` shape issued `len(ObjectType) × 3` queries whose big-type plans each scanned the whole heap. Mutual consistency of the three files is free: a `DECLARE`d cursor holds one MVCC snapshot for its whole lifetime even under READ COMMITTED, so REPEATABLE READ isn't needed. A row is simply omitted from a file whose projection column is NULL.
+
+### Snapshot file format (`version: 2`)
+
+Gzip **JSONL** — one JSON object per line, no enclosing array and no grouping by type:
+
+```
+{"type":"header","version":2,"timestamp":"…","generated_at":"…"}
+{"type":"user","data":{…}}
+{"type":"tournament","data":{…}}
+{"type":"eof","count":30216}
+```
+
+Line-delimited so the client can ingest it as a stream (`response.body` → `DecompressionStream` → `TextDecoderStream` → split → parse one line → buffer → `saveBatch` → drop), holding one batch instead of the compressed bytes *plus* the decompressed text *plus* the parsed object graph. Type grouping is what a one-pass unordered read gives up, so each line self-describes; object lines are built by string concat around the raw `{level}::text` column, so no row is deserialized server-side.
+
+`version` is checked against the client's `SNAPSHOT_FORMAT_VERSION` and a mismatch refuses the file outright. The **`eof` trailer is load-bearing**: ingest writes rows as it reads, so a truncated file can no longer be detected by "did the parse succeed". The client sets a `snapshot_ingest_in_progress` marker in `metadata` *before* clearing the stores and removes it only when `eof` lands with a matching count; a marker surviving into the next boot means the stores hold a partial snapshot (which otherwise looks perfectly valid) and `connect()` clears and refetches.
 
 After the snapshot loads, the SSE stream picks up from the snapshot's `timestamp` (`?since=`) plus its `generated_at` (`?generated_at=`), delivering any changes that occurred since generation.
 
-**Both meta fields carry the same value: the DB-clock instant generation started**, read before any row. This is a correctness requirement, not a simplification. Each `(type, level)` cursor takes its own MVCC snapshot at some instant *after* that one, so a max over the rows actually read is a max over **different instants** — a row modified between two per-type scans can fall below it and never be delivered by the since-delta, and the client has no way to notice. Anchoring the cursor before every read makes any such row either present in the file or strictly after the cursor. Cost: the first catch-up re-delivers rows modified during generation, which is exactly what catch-up is for. (Residual, inherent to a timestamp cursor: `modified_at` is transaction-*start* time, so a write straddling the anchor can commit after it with an earlier stamp. Window is one short write transaction.)
+**Both meta fields carry the same value: the DB-clock instant generation started**, read before any row. This is a correctness requirement, not a simplification. The cursor takes its MVCC snapshot at some instant *after* that one, so a max over the rows actually read can exceed the `modified_at` of a row the file missed — that row then falls below the client's `since` and is never delivered, and the client has no way to notice (for a tombstone, the 30-day purge eventually makes the ghost unrepairable). Anchoring the cursor before the read makes any such row either present in the file or strictly after the cursor. Cost: the first catch-up re-delivers rows modified during generation, which is exactly what catch-up is for. (Residual, inherent to a timestamp cursor: `modified_at` is transaction-*start* time, so a write straddling the anchor can commit after it with an earlier stamp. Window is one short write transaction.)
 
 ## Frontend: IndexedDB
 
