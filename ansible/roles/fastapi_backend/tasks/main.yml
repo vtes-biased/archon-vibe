@@ -39,6 +39,18 @@
     group: "{{ r.group }}"
     mode: "0755"
 
+# Operator tooling run by hand against the live DB with the deployed venv (ETL
+# merge, dedup, validation). Not imported by the service — shipping it here just
+# means an on-call run needs no checkout on the box.
+- name: Ship backend ops scripts
+  ansible.builtin.copy:
+    src: "{{ r.ops_scripts_src }}"
+    dest: "{{ r.site_root }}/scripts/"
+    owner: "{{ r.user }}"
+    group: "{{ r.group }}"
+    mode: "0755"
+  when: r.ops_scripts_src is defined
+
 - name: Upload backend wheel
   ansible.builtin.copy:
     src: "{{ r.backend_wheel_src }}"

@@ -43,6 +43,7 @@
         requirements_src: "{{ backend_requirements }}"
         env: "{{ backend_env }}"
         env_dir: "{{ env_dir }}"
+        ops_scripts_src: "{{ playbook_dir }}/../../backend/scripts/"
         officials_contacts_vault: officials_contacts.json.prod.vault
         twda_key_vault: twda_github_app.pem.prod.vault
         feedback_key_vault: feedback_github_app.pem.prod.vault
