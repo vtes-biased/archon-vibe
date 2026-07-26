@@ -64,14 +64,27 @@ async function globalSetup() {
 
   // 5. Warm up Vite dev server — visit the app so Vite pre-compiles all
   //    JS bundles before parallel test workers hit it simultaneously.
+  //    Retry rather than settle for one attempt: nothing upstream waits for Vite
+  //    (in Docker BASE_URL is set, which disables Playwright's own webServer
+  //    readiness check), so a single early attempt can land before the server
+  //    serves anything and leave the first tests racing dep optimization — they
+  //    assert on a bare page.goto with no wait helper and fail on a cold start.
   const { chromium } = await import('@playwright/test');
   const browser = await chromium.launch();
   const page = await browser.newPage();
-  try {
-    await page.goto(BASE_URL, { timeout: 30_000 });
-    await page.waitForSelector('[data-sync-state="synced"], [data-sync-state="syncing"]', { timeout: 15_000 });
-  } catch {
-    // Non-fatal: tests may still pass with slightly slower first load
+  const deadline = Date.now() + 120_000;
+  let warm = false;
+  while (!warm && Date.now() < deadline) {
+    try {
+      await page.goto(BASE_URL, { timeout: 30_000 });
+      await page.waitForSelector('[data-sync-state="synced"], [data-sync-state="syncing"]', { timeout: 15_000 });
+      warm = true;
+    } catch {
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  if (!warm) {
+    console.warn(`Vite warm-up never completed at ${BASE_URL}; first tests may be slow`);
   }
   await browser.close();
 }
