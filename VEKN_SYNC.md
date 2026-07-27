@@ -116,6 +116,12 @@ Tracking fields on User: `vekn_synced` (bool), `vekn_synced_at` (timestamp), `lo
   tournament-win GW from the engine rating rule instead (no finals object)
 - Re-sync compares the authoritative play data (`standings`/`finals`/`winner`/…)
   so a VEKN-side score correction — and legacy folded imports — self-heal
+- **Authority follows content.** VEKN is authoritative for a matched event only
+  where it has something to say: a local row with `rounds`, *or* an incoming event
+  with no players, gets a metadata-only refresh. Rebuilding a round-less row from
+  an empty calendar entry used to reset an in-app event still taking registrations
+  to `Planned` and discard everyone registered, on every sync until its first
+  round started
 - Seeds venue autocomplete data
 - Stamps `vekn_pushed_at=now` on finished imports so batch_push never re-uploads them
 - Rebuilds changed tournaments field-by-field from VEKN data, so local-only bookkeeping

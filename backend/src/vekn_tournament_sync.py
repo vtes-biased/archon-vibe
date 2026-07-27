@@ -469,7 +469,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             existing.organizers_uids + tournament.organizers_uids
                         )
                     )
-                    if existing.rounds:
+                    if existing.rounds or not tournament.players:
                         # Tournament was run in-app (it has per-round play data). VEKN.net
                         # is NOT authoritative for its rounds/finals/standings/players/
                         # winner/state — only for descriptive event metadata. Refresh
@@ -478,6 +478,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         # `rounds` only: a re-imported VEKN event now carries a
                         # reconstructed finals object, but VEKN stays authoritative for
                         # it (a final implies prelim rounds, so this never misses in-app).
+                        #
+                        # Round-less events take this path too when VEKN reports NO
+                        # players: authority follows content, and an empty calendar entry
+                        # has nothing to be authoritative about. Without this, the branch
+                        # below rebuilt the row from that empty entry — resetting an
+                        # in-app event still taking registrations to Planned and
+                        # discarding everyone registered so far, every sync, until its
+                        # first round started.
                         meta_changed = (
                             existing.name != tournament.name
                             or existing.format != tournament.format
