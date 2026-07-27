@@ -2,8 +2,10 @@
   import type { User } from "$lib/types";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert } from "@lucide/svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
+  import UserPicker from '$lib/components/UserPicker.svelte';
+  import { getCountryFlag } from "$lib/geonames";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -38,8 +40,16 @@
   let showMergeModal = $state(false);
   let showDeleteConfirm = $state(false);
   let linkVeknIdInput = $state("");
-  let mergeTargetUid = $state("");
+  let mergeTarget = $state<User | null>(null);
   let processingAction = $state(false);
+
+  // A uid carrying a VEKN ID is immovable — the backend refuses to soft-delete
+  // one, so the survivor must be whichever side holds it. When only the picked
+  // account does, the merge still works, just the other way round.
+  const mergeSwap = $derived(!!mergeTarget?.vekn_id && !user.vekn_id);
+  const mergeBlocked = $derived(!!mergeTarget?.vekn_id && !!user.vekn_id);
+  const mergeKeep = $derived(mergeSwap ? mergeTarget : user);
+  const mergeDrop = $derived(mergeSwap ? user : mergeTarget);
 
   function focusOnMount(node: HTMLElement) {
     const input = node.querySelector<HTMLElement>("input:not(.hidden):not([type=hidden]), textarea, select");
@@ -121,14 +131,18 @@
   }
 
   async function handleMerge() {
-    if (!mergeTargetUid.trim()) return;
+    if (!mergeKeep || !mergeDrop || mergeBlocked) return;
+    // Read before the reset below clears what these derive from.
+    const swapped = mergeSwap;
     processingAction = true;
     try {
-      const result = await mergeUsers(user.uid, mergeTargetUid.trim());
+      const result = await mergeUsers(mergeKeep.uid, mergeDrop.uid);
       showToast({ type: "success", message: result.message });
       showMergeModal = false;
-      mergeTargetUid = "";
-      onaction(result.user);
+      mergeTarget = null;
+      // A swapped merge soft-deletes the profile we are standing on.
+      if (swapped) ondelete?.();
+      else onaction(result.user);
     } catch {
       // Error toast shown by apiRequest
     } finally {
@@ -182,7 +196,7 @@
         </Button>
       {/if}
       {#if !sponsorOnly}
-        <Button variant="secondary" size="md" onclick={() => showMergeModal = true} title={m.vekn_merge_modal_title()}>
+        <Button variant="secondary" size="md" onclick={() => { mergeTarget = null; showMergeModal = true; }} title={m.vekn_merge_modal_title()}>
           <GitMerge class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_merge()}
         </Button>
@@ -379,29 +393,66 @@
         }}
         class="p-6 space-y-4"
       >
-        <div>
-          <label for="merge-target-uid" class="block text-sm font-medium text-ink-muted mb-1">
-            {m.vekn_merge_uid_label()}
-          </label>
-          <input
-            id="merge-target-uid"
-            type="text"
-            bind:value={mergeTargetUid}
-            placeholder={m.vekn_merge_uid_placeholder()}
-            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent font-mono text-sm"
-          />
-        </div>
+        {#if !mergeTarget}
+          <div>
+            <label for="merge-target-search" class="block text-sm font-medium text-ink-muted mb-1">
+              {m.vekn_merge_search_label()}
+            </label>
+            <UserPicker
+              inputId="merge-target-search"
+              excludeUids={[user.uid]}
+              placeholder={m.vekn_merge_search_placeholder()}
+              onselect={(u) => (mergeTarget = u)}
+            />
+          </div>
+        {:else}
+          <div class="flex items-center gap-2 px-3 py-2 rounded border border-line-strong bg-surface-muted">
+            <span class="flex-1 text-sm text-ink-bright">
+              {#if mergeTarget.country}
+                <span class="mr-1">{getCountryFlag(mergeTarget.country)}</span>
+              {/if}
+              {mergeTarget.name}
+              {#if mergeTarget.vekn_id}
+                <span class="text-ink-faint ml-2">#{mergeTarget.vekn_id}</span>
+              {/if}
+            </span>
+            <Button variant="secondary" size="sm" disabled={processingAction} onclick={() => (mergeTarget = null)}>
+              {m.vekn_merge_change_target()}
+            </Button>
+          </div>
+
+          {#if mergeBlocked}
+            <p class="banner-error border rounded-lg p-3 text-sm flex items-start gap-2">
+              <TriangleAlert class="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{m.vekn_merge_blocked_notice()}</span>
+            </p>
+          {:else}
+            {#if mergeSwap}
+              <p class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
+                <ArrowLeftRight class="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                <span>{m.vekn_merge_swap_notice({ name: mergeTarget.name })}</span>
+              </p>
+            {/if}
+            <p class="text-sm text-ink-muted">
+              {m.vekn_merge_summary({ drop: mergeDrop?.name ?? "", keep: mergeKeep?.name ?? "" })}
+            </p>
+          {/if}
+        {/if}
+
         <div class="flex gap-2">
-          <Button type="submit" variant="primary" size="lg" class="flex-1" loading={processingAction} disabled={!mergeTargetUid.trim()}>
-            {processingAction ? m.vekn_merging() : m.vekn_merge()}
-          </Button>
+          {#if mergeTarget && !mergeBlocked}
+            <Button type="submit" variant="primary" size="lg" class="flex-1" loading={processingAction}>
+              {processingAction ? m.vekn_merging() : m.vekn_merge()}
+            </Button>
+          {/if}
           <Button
             variant="secondary"
             size="lg"
+            class={mergeTarget && !mergeBlocked ? "" : "flex-1"}
             disabled={processingAction}
             onclick={() => {
               showMergeModal = false;
-              mergeTargetUid = "";
+              mergeTarget = null;
             }}
           >
             {m.common_cancel()}
