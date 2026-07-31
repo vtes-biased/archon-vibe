@@ -408,9 +408,11 @@ class VEKNAPIClient:
 
         Returns the event dict, or None when the API confirms no event (404,
         empty body, code != 200, empty events list). Raises VEKNAPIConnectionError
-        on a transient failure (network / 5xx / unparseable) so fetch_all_events
-        can tell 'no event' from 'could not read' and not end its scan on an outage.
+        on a transient failure (network / 5xx / unparseable / auth rejection) so
+        fetch_all_events can tell 'no event' from 'could not read' and not end its
+        scan on an outage.
         """
+        await self._ensure_authenticated()
         try:
             params = {
                 "app": "vekn",
@@ -438,6 +440,16 @@ class VEKNAPIClient:
                     raise VEKNAPIConnectionError(
                         f"Unparseable event response for id {event_id}"
                     ) from e
+                # Auth rejections come as a TOP-LEVEL err envelope with an empty
+                # data field — parsed naively they read as 'no events', turning
+                # e.g. an expired token into confirmed no-events (and a full scan
+                # into a silent early stop).
+                err = data.get("err_code")
+                if err not in (None, 0, "0", ""):
+                    raise VEKNAPIConnectionError(
+                        f"VEKN API error for event {event_id}: "
+                        f"{data.get('err_msg')} (err_code: {err})"
+                    )
                 inner = data.get("data", {})
                 if "code" in inner:
                     code = inner.get("code", 200)

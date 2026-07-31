@@ -1217,7 +1217,8 @@ async def find_same_event_tournaments(
 # every same-name/same-day cluster, and legacy placeholder names make that
 # hundreds of DISTINCT events (each with its own vekn id) rather than duplicates.
 # Copies that ALL hold vekn ids are a different class — one event entered twice on
-# vekn.net — which is VEKN's record to reconcile, not ours.
+# vekn.net — resolvable locally only once one of the ids is deleted there (see
+# BOTH_VEKN_GROUPS_QUERY below).
 DUPLICATE_GROUPS_QUERY = """
     WITH t AS (
         SELECT uid,
@@ -1245,6 +1246,41 @@ async def find_duplicate_tournament_groups() -> list[dict]:
         result = await conn.execute(DUPLICATE_GROUPS_QUERY)
         return [
             {"name": row[2], "day": row[1], "uids": row[3], "with_vekn": row[4]}
+            for row in await result.fetchall()
+        ]
+
+
+# Same-name/same-day groups where EVERY copy holds a (different) vekn id. Most are
+# DISTINCT events sharing a legacy placeholder name, not duplicates — only a VEKN
+# API probe can tell (one id confirmed deleted marks a resolvable double-entry), so
+# this feeds the operator dedup script only, never the sync's end-of-run logging.
+BOTH_VEKN_GROUPS_QUERY = """
+    WITH t AS (
+        SELECT uid,
+               btrim("full"->>'name') AS name,
+               ("full"->>'start')::timestamptz AS start,
+               "full"->'external_ids'->>'vekn' AS vekn
+        FROM objects
+        WHERE type = 'tournament'
+          AND deleted_at IS NULL
+          AND "full"->>'start' IS NOT NULL
+    )
+    SELECT lower(name) AS key, (start AT TIME ZONE 'UTC')::date AS day,
+           min(name) AS name, array_agg(uid ORDER BY uid) AS uids
+    FROM t
+    GROUP BY 1, 2
+    HAVING count(*) > 1
+       AND count(vekn) = count(*)
+       AND count(DISTINCT vekn) > 1
+"""
+
+
+async def find_both_vekn_tournament_groups() -> list[dict]:
+    """Live same-event copies that all hold different vekn ids (see query comment)."""
+    async with get_connection() as conn:
+        result = await conn.execute(BOTH_VEKN_GROUPS_QUERY)
+        return [
+            {"name": row[2], "day": row[1], "uids": row[3]}
             for row in await result.fetchall()
         ]
 
