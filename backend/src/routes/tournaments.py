@@ -7,6 +7,7 @@ import os
 from datetime import UTC, datetime
 from importlib.resources import files
 from uuid import uuid7
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import msgspec
 from archon_engine import PyEngine
@@ -868,6 +869,16 @@ def _parse_datetime(s: str | None) -> datetime | None:
     return datetime.fromisoformat(s)
 
 
+def _wall_clock_now(tz_name: str) -> datetime:
+    """Now as NAIVE wall clock in `tz_name` — the storage shape of start/finish
+    (paired with Tournament.timezone, never tz-aware)."""
+    try:
+        tz = ZoneInfo(tz_name or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = UTC
+    return datetime.now(tz).replace(tzinfo=None)
+
+
 @router.post("/", status_code=201)
 async def create_tournament(
     request: CreateTournamentRequest,
@@ -1608,7 +1619,7 @@ async def tournament_action(
             and tournament.state != TournamentState.FINISHED
             and updated.finish is None
         ):
-            updated.finish = datetime.now(UTC)
+            updated.finish = _wall_clock_now(updated.timezone)
         deck_ops = result.get("deck_ops", [])
 
         # Timer lifecycle hooks (online-only, not handled by Rust engine).
@@ -2605,7 +2616,7 @@ async def go_online(
         # A tournament finished offline arrives without a finish date (the
         # engine never stamps it) — use the sync time as the actual end time
         if updated.state == TournamentState.FINISHED and updated.finish is None:
-            updated.finish = datetime.now(UTC)
+            updated.finish = _wall_clock_now(updated.timezone)
         # Offline edits to already-pushed results diverge from vekn.net just
         # like online ones — same compare as the /action endpoint, against the
         # locked server pre-image (the restore above only carries the flag over;

@@ -160,6 +160,7 @@ Frontend fallback order (`toUserMessage` in `errors.ts`; the same mapping locali
 - **Request bodies**: Pydantic `BaseModel` (FastAPI parses automatically) — not `msgspec.Struct` over raw `bytes` (an unbound `body: bytes` won't read the request body).
 - **Responses**: msgspec (`msgspec.json.Encoder`) — faster than Pydantic.
 - **Date-only fields** (expiry/event dates): accept `YYYY-MM-DD`, store as UTC midnight; reserve full tz-aware datetimes for precise timestamps (`issued_at`, `modified`).
+- **Scheduled times** (`Tournament.start`/`finish`): stored **naive**, paired with the separate `Tournament.timezone` — never tz-aware. Readers anchor the wall clock in that zone (`routes/calendar._as_utc`, frontend `utils.zonedDate`), so a stored instant gets shifted by the venue's offset a second time. Every writer must follow it: the create/config routes, the VEKN import, the legacy merge, and the server-side `finish` stamp on Finished.
 - **Soft delete**: set `deleted_at = now()`; SSE broadcasts the deleted object so clients (including those offline during the delete) remove it from IndexedDB on reconnect; a daily job hard-deletes after 30 days.
 
 ## Shared Timer

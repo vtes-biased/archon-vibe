@@ -153,7 +153,9 @@
     if (started || pushedToVekn) { s.add("open_rounds"); s.add("max_rounds"); }
     // VEKN identity freeze: calendar create is write-once — post-push edits
     // to these silently diverge from vekn.net (engine rejects them too).
-    if (pushedToVekn) { s.add("rank"); s.add("format"); s.add("start"); }
+    // `proxies` joins them because the sync reads it back from vekn.net, so a
+    // local change would revert on the next cycle rather than just diverge.
+    if (pushedToVekn) { s.add("rank"); s.add("format"); s.add("start"); s.add("proxies"); }
     return s;
   });
 

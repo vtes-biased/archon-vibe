@@ -439,11 +439,11 @@
   <!-- Championships forbid proxies/multideck (VEKN rules, engine-enforced):
        explained-disable when a rank is selected. -->
   {#if !values.online}
-    <label class="flex items-center gap-3 {disabled || values.rank ? '' : 'cursor-pointer'}">
+    <label class="flex items-center gap-3 {disabled || values.rank || disabledFields.has('proxies') ? '' : 'cursor-pointer'}">
       <input
         type="checkbox"
         checked={values.proxies}
-        disabled={disabled || !!values.rank}
+        disabled={disabled || !!values.rank || disabledFields.has("proxies")}
         onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
         class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
       />
@@ -451,6 +451,8 @@
     </label>
     {#if values.rank}
       <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
+    {:else if disabledFields.has("proxies")}
+      <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_vekn_locked_hint()}</p>
     {/if}
   {/if}
   <label class="flex items-center gap-3 {disabled || values.rank ? '' : 'cursor-pointer'}">

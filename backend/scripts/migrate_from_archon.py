@@ -78,6 +78,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Make `backend.src` importable from a source checkout (local `uv run`). On the
 # deployed box it's already installed in the venv, so skip the insert there —
@@ -271,17 +272,41 @@ def deck_uid(tuid: str, puid: str, round_idx: int | None) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def parse_dt(v) -> datetime | None:
-    """Parse old timestamps (ISO strings from JSONB, or psycopg datetimes)."""
+def _raw_dt(v) -> datetime | None:
+    """Parse an old timestamp (ISO string from JSONB, or psycopg datetime),
+    preserving whether it carried an offset."""
     if not v:
         return None
     if isinstance(v, datetime):
-        return v if v.tzinfo else v.replace(tzinfo=UTC)
+        return v
     try:
-        d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
-        return d if d.tzinfo else d.replace(tzinfo=UTC)
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return None
+
+
+def parse_dt(v) -> datetime | None:
+    """Parse an instant (modified, deleted_at, …) — a naive value reads as UTC."""
+    d = _raw_dt(v)
+    return None if d is None else (d if d.tzinfo else d.replace(tzinfo=UTC))
+
+
+def parse_wall_dt(v, tz_name: str | None) -> datetime | None:
+    """Parse a tournament start/finish: NAIVE wall clock paired with `timezone`.
+
+    Both stacks store them that way — old archon indexes on
+    `(start || ' ' || timezone)::timestamptz`, so its stored values carry no
+    offset. Reading them as instants stamped UTC onto that wall clock, and every
+    reader that anchors the naive value in the tournament timezone then shifted
+    it by the venue's offset.
+    """
+    d = _raw_dt(v)
+    if d is None or d.tzinfo is None:
+        return d
+    try:
+        return d.astimezone(ZoneInfo(tz_name or "UTC")).replace(tzinfo=None)
+    except (ZoneInfoNotFoundError, ValueError):
+        return d.astimezone(UTC).replace(tzinfo=None)
 
 
 def nz(s) -> str | None:
@@ -378,7 +403,7 @@ async def live_same_event_tournament(d: dict, old_uid: str) -> Tournament | None
     key doesn't discriminate and we insert a separate copy rather than guess. A
     candidate claimed by a DIFFERENT old-archon row is likewise not ours.
     """
-    start = parse_dt(d.get("start"))
+    start = parse_wall_dt(d.get("start"), d.get("timezone"))
     name = d.get("name") or ""
     if start is None or not name:
         return None
@@ -1177,8 +1202,8 @@ def build_tournament(
         format=FORMAT_MAP.get(d.get("format"), TournamentFormat.Standard),
         rank=RANK_MAP.get(d.get("rank"), TournamentRank.BASIC),
         online=bool(d.get("online")),
-        start=parse_dt(d.get("start")),
-        finish=parse_dt(d.get("finish")),
+        start=parse_wall_dt(d.get("start"), d.get("timezone")),
+        finish=parse_wall_dt(d.get("finish"), d.get("timezone")),
         timezone=d.get("timezone") or "UTC",
         country=nz(d.get("country")),
         league_uid=nz(league_ref.get("uid")),
@@ -1403,8 +1428,8 @@ async def process_tournament_row(
 
     # vekn-linked events: the VEKN tournament sync owns descriptive metadata —
     # its rich-guard path refreshes name/format/rank/online/dates/timezone/
-    # country/venue fields from vekn.net and unions organizers. Writing old
-    # archon's values for those would flip-flop daily with that refresh. Keep
+    # country/venue/proxies fields from vekn.net and unions organizers. Writing
+    # old archon's values for those would flip-flop daily with that refresh. Keep
     # the existing metadata, write play data + archon-only config, and union
     # organizers the same way the VEKN sync does.
     if merge and existing is not None and "vekn" in t.external_ids:
@@ -1412,7 +1437,6 @@ async def process_tournament_row(
             existing,
             state=t.state,
             league_uid=t.league_uid,
-            proxies=t.proxies,
             multideck=t.multideck,
             decklist_required=t.decklist_required,
             description=t.description,

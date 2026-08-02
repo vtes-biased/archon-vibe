@@ -122,15 +122,18 @@ Tracking fields on User: `vekn_synced` (bool), `vekn_synced_at` (timestamp), `lo
   an empty calendar entry used to reset an in-app event still taking registrations
   to `Planned` and discard everyone registered, on every sync until its first
   round started
-- **Event times are local, not UTC.** `event_starttime`/`event_endtime` are wall
-  time at the venue, so the sync converts them through a timezone guessed from the
-  venue country/city (`data/timezones.py`) and stores that zone on the tournament;
-  online events (no venue) are the only ones read as UTC
+- **Event times are wall clock at the venue**, which is how `start`/`finish` are
+  stored: naive, paired with `timezone` — the sync writes VEKN's time verbatim and
+  fills `timezone` from a guess off the venue country/city (`data/timezones.py`);
+  online events (no venue) keep the `UTC` default. Converting to UTC here made
+  every reader that anchors the naive value (`calendar._as_utc`, frontend
+  `utils.zonedDate`) shift it twice
 - Carries `proxies_allowed` onto `proxies`, except under a championship rank, which
   forbids proxies by rule — a few vekn.net championships do set the flag, and
   importing that combo would block every later config edit on engine legality.
-  Tournaments run in-app keep their own `proxies`: the app pushes it at event
-  creation and never updates it there, so re-reading it would revert local changes
+  The calendar entry is write-once (create only, no update endpoint), so the flag
+  is owned by vekn.net: the sync refreshes it like the other descriptive metadata
+  and the app's config field is frozen once a tournament holds a vekn id
 - Seeds venue autocomplete data
 - Stamps `vekn_pushed_at=now` on finished imports so batch_push never re-uploads them
 - Rebuilds changed tournaments field-by-field from VEKN data, so local-only bookkeeping
@@ -143,8 +146,9 @@ Primary key is `external_ids.vekn`. The legacy-archon merge imports old events
 that never carried a vekn id, though, and those are invisible to that key — each
 path used to insert its own copy of one real event. So on a miss, the sync falls
 back to **name + start within 24 h** (`db.find_same_event_tournaments`; the two
-paths derive the instant differently — the sync applies a guessed venue timezone
-— and the observed skew reaches 9 h) and *adopts* the local copy, stamping the
+paths get their times from different humans, and the observed skew reaches 9 h —
+it used to include the offset the sync added by storing UTC, which it no longer
+does) and *adopts* the local copy, stamping the
 vekn id on it rather than creating a second row. The legacy merge
 (`migrate_from_archon.py`) applies the same fallback as its last key.
 

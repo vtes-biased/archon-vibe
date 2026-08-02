@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 from uuid import uuid7
-from zoneinfo import ZoneInfo
 
 import msgspec
 
@@ -90,13 +89,16 @@ def _parse_rounds(raw: Any) -> int:
     return int(m.group(1)) if m else 0
 
 
-def _parse_date(
-    date_str: str | None, time_str: str | None = None, tz_name: str = "UTC"
-) -> datetime | None:
-    """Parse date and optional time strings from VEKN API as local time, convert to UTC.
+def _parse_date(date_str: str | None, time_str: str | None = None) -> datetime | None:
+    """Parse VEKN date/time strings into a NAIVE wall-clock datetime.
 
     date_str: "YYYY-MM-DD", time_str: "HH:MM:SS" or "HH:MM"
-    tz_name: IANA timezone name (times are interpreted as local to this zone)
+
+    VEKN event times are wall clock at the venue, which is exactly how
+    Tournament.start/finish are stored: naive, paired with Tournament.timezone
+    (see calendar._as_utc, frontend utils.zonedDate). Converting to UTC here
+    stored the instant twice over — readers that anchor the naive value in the
+    tournament timezone then shifted it by the venue's offset.
     """
     if not date_str:
         return None
@@ -106,9 +108,8 @@ def _parse_date(
             fmt = "%H:%M:%S" if len(time_str) > 5 else "%H:%M"
             t = datetime.strptime(time_str, fmt)
             dt = dt.replace(hour=t.hour, minute=t.minute, second=t.second)
-        tz = ZoneInfo(tz_name)
-        return dt.replace(tzinfo=tz).astimezone(UTC)
-    except (ValueError, TypeError, KeyError):
+        return dt
+    except (ValueError, TypeError):
         return None
 
 
@@ -157,13 +158,12 @@ def _map_vekn_to_tournament(
     venue = data.get("venue_name") or ""
     address = venue_data.get("address") or ""
 
-    # Guess timezone from venue location (VEKN times are local)
+    # Guess the venue timezone the wall-clock times belong to (online events have
+    # no venue — their times ride the UTC default).
     venue_city = venue_data.get("city") or data.get("venue_city") or ""
     tz_name = "UTC" if online else _guess_timezone(country, venue_city, address)
-    start = _parse_date(
-        data.get("event_startdate"), data.get("event_starttime"), tz_name
-    )
-    finish = _parse_date(data.get("event_enddate"), data.get("event_endtime"), tz_name)
+    start = _parse_date(data.get("event_startdate"), data.get("event_starttime"))
+    finish = _parse_date(data.get("event_enddate"), data.get("event_endtime"))
     if address and venue_data.get("city"):
         address += f", {venue_data['city']}"
     elif not address:
@@ -496,10 +496,10 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         # in-app event still taking registrations to Planned and
                         # discarding everyone registered so far, every sync, until its
                         # first round started.
-                        # `proxies` is deliberately absent here: it is play-affecting
-                        # config the app owns, pushed to VEKN at event creation and
-                        # never updated there — reading it back would revert an
-                        # organizer's later in-app change on every sync.
+                        # `proxies` refreshes here like the rest of the descriptive
+                        # metadata: the calendar entry is write-once (no update
+                        # endpoint), so vekn.net is where the flag is changed and the
+                        # app config field is frozen once an event has a vekn id.
                         meta_changed = (
                             existing.name != tournament.name
                             or existing.format != tournament.format
@@ -513,6 +513,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             or existing.address != tournament.address
                             or existing.venue_url != tournament.venue_url
                             or existing.map_url != tournament.map_url
+                            or existing.proxies != tournament.proxies
                             or merged_organizers != existing.organizers_uids
                         )
                         if meta_changed:
@@ -531,6 +532,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 venue_url=tournament.venue_url,
                                 address=tournament.address,
                                 map_url=tournament.map_url,
+                                proxies=tournament.proxies,
                                 organizers_uids=merged_organizers,
                             )
                             bd = await save_tournament(updated, conn=tx_conn)

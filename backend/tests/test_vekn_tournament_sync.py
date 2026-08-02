@@ -71,6 +71,19 @@ def test_import_populates_round_count():
     assert t is not None and t.max_rounds == 3
 
 
+def test_import_stores_naive_wall_clock_paired_with_timezone():
+    # start/finish are stored NAIVE, paired with `timezone` — readers anchor them
+    # in that zone (calendar._as_utc, frontend utils.zonedDate). Converting VEKN's
+    # venue wall clock to UTC here made those readers shift it a second time, so a
+    # 09:00 Madrid event read back as 07:00.
+    event = _planned_event() | {"venue_country": "ES", "event_starttime": "09:00:00"}
+    t = _map_vekn_to_tournament(event, {})
+    assert t is not None
+    assert t.timezone == "Europe/Madrid"
+    assert t.start == datetime(2099, 3, 1, 9, 0)
+    assert t.start.tzinfo is None
+
+
 def test_import_carries_proxies_allowed_unless_rank_forbids_it():
     # VEKN's 'proxies_allowed' flag drives deck legality in the UI — dropping it
     # showed every import as "proxies not allowed" (over half of vekn.net events
