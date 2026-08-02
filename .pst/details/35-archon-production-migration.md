@@ -154,12 +154,27 @@ owner decision; sync logs must be loud on conflicts.)
 
 Announce → freeze old archon (stop `archon_web` + nginx maintenance page; that
 also stops its in-app sync/push) → insurance `pg_dump` of `archondb` → final
-#115 run + checks + ratings recompute → **nginx vhost swap** (both stacks share
+#115 run + checks → **wall-clock normalization** (below) → ratings recompute →
+**nginx vhost swap** (both stacks share
 the IP, so this is NOT a DNS cutover): redeploy new stack with
 `domain_main=archon.vekn.net`; re-host legacy read-only at `old.archon.vekn.net`
 (domain is a var in `archon/ansible/archon.yml`; Discord login breaks there —
 acceptable for a 30-day safety net). The `archon.vekn.net` cert already exists
 on the box; watch the two certbot renewal setups until #42 consolidates them.
+
+**Wall-clock normalization** (`backend/scripts/normalize_wall_clock.py`, #527):
+`start`/`finish` are naive wall clock paired with `timezone`, and three writers
+used to store tz-aware instants instead — readers anchor them a second time, so
+the venue's offset shows up as a wrong time. The fix lets the VEKN sync and the
+#115 merge heal what they own; a `finish` stamped by the app on a tournament run
+*here* is owned by no sync and never gets rewritten, hence the one-off. Report by
+default, `--apply` to write, idempotent (only touches values still carrying an
+offset). Order matters: after the final merge/sync so the self-healing writers
+have gone first, before the ratings recompute because a rating's date comes from
+`finish or start` and a shifted instant lands on the wrong day at the edges. It
+rewrites `modified`, so touched tournaments re-download on each client's next
+reconnect — free inside a window that already redeploys. Dev-DB run: 8187 rows in
+24 s, second run reports 0.
 
 **Rollback:** vhost flip back (instant; old data untouched — the sync only reads
 it). After the flip, writes land on the new stack; rolling back later loses
