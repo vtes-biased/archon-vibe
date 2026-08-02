@@ -122,6 +122,15 @@ Tracking fields on User: `vekn_synced` (bool), `vekn_synced_at` (timestamp), `lo
   an empty calendar entry used to reset an in-app event still taking registrations
   to `Planned` and discard everyone registered, on every sync until its first
   round started
+- **Event times are local, not UTC.** `event_starttime`/`event_endtime` are wall
+  time at the venue, so the sync converts them through a timezone guessed from the
+  venue country/city (`data/timezones.py`) and stores that zone on the tournament;
+  online events (no venue) are the only ones read as UTC
+- Carries `proxies_allowed` onto `proxies`, except under a championship rank, which
+  forbids proxies by rule — a few vekn.net championships do set the flag, and
+  importing that combo would block every later config edit on engine legality.
+  Tournaments run in-app keep their own `proxies`: the app pushes it at event
+  creation and never updates it there, so re-reading it would revert local changes
 - Seeds venue autocomplete data
 - Stamps `vekn_pushed_at=now` on finished imports so batch_push never re-uploads them
 - Rebuilds changed tournaments field-by-field from VEKN data, so local-only bookkeeping

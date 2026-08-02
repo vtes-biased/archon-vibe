@@ -145,6 +145,14 @@ def _map_vekn_to_tournament(
     # Online detection
     online = str(data.get("event_isonline", "0")) == "1"
 
+    # VEKN 'proxies_allowed' is "0"/"1". Championship ranks forbid proxies by rule
+    # (engine validate_rank_legality), so rank wins over a mis-set calendar flag —
+    # a few NC events on vekn.net do carry proxies_allowed=1, and importing that
+    # combo would leave the tournament unable to save any config edit.
+    proxies = (
+        str(data.get("proxies_allowed", "0")) == "1" and rank == TournamentRank.BASIC
+    )
+
     # Venue info: name from event, address/website from venue details
     venue = data.get("venue_name") or ""
     address = venue_data.get("address") or ""
@@ -294,6 +302,7 @@ def _map_vekn_to_tournament(
             venue_url=venue_url,
             address=address,
             map_url=map_url,
+            proxies=proxies,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
             max_rounds=max_rounds,
@@ -324,6 +333,7 @@ def _map_vekn_to_tournament(
             venue_url=venue_url,
             address=address,
             map_url=map_url,
+            proxies=proxies,
             external_ids={"vekn": str(event_id)},
             organizers_uids=organizers_uids,
             max_rounds=max_rounds,
@@ -486,6 +496,10 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         # in-app event still taking registrations to Planned and
                         # discarding everyone registered so far, every sync, until its
                         # first round started.
+                        # `proxies` is deliberately absent here: it is play-affecting
+                        # config the app owns, pushed to VEKN at event creation and
+                        # never updated there — reading it back would revert an
+                        # organizer's later in-app change on every sync.
                         meta_changed = (
                             existing.name != tournament.name
                             or existing.format != tournament.format
@@ -541,6 +555,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             or existing.address != tournament.address
                             or existing.venue_url != tournament.venue_url
                             or existing.map_url != tournament.map_url
+                            or existing.proxies != tournament.proxies
                             or len(existing.players) != len(tournament.players)
                             # Compare the authoritative play data so a VEKN-side score
                             # correction is picked up — and so legacy folded imports (old
@@ -568,6 +583,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 venue_url=tournament.venue_url,
                                 address=tournament.address,
                                 map_url=tournament.map_url,
+                                proxies=tournament.proxies,
                                 external_ids=tournament.external_ids,
                                 organizers_uids=merged_organizers,
                                 max_rounds=tournament.max_rounds,

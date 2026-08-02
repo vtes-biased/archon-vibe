@@ -71,6 +71,19 @@ def test_import_populates_round_count():
     assert t is not None and t.max_rounds == 3
 
 
+def test_import_carries_proxies_allowed_unless_rank_forbids_it():
+    # VEKN's 'proxies_allowed' flag drives deck legality in the UI — dropping it
+    # showed every import as "proxies not allowed" (over half of vekn.net events
+    # allow them). Championship ranks forbid proxies (engine legality), and a few
+    # vekn.net championships do carry the flag set: rank wins there, otherwise the
+    # imported row can't pass validate_rank_legality on any later config edit.
+    event = _planned_event() | {"proxies_allowed": "1"}
+    assert _map_vekn_to_tournament(event, {}).proxies is True
+
+    nc = event | {"eventtype_id": "8"}  # National Championship
+    assert _map_vekn_to_tournament(nc, {}).proxies is False
+
+
 def test_planned_import_leaves_vekn_pushed_at_null():
     # Blanket-stamping would be harmful the other way: a planned import later
     # run in-app would keep the stamp and never get its real results pushed.
