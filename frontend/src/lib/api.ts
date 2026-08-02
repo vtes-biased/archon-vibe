@@ -5,7 +5,7 @@
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League, Promo, PromoKind, PromoLedgerEntry, PromoLedgerKind, TournamentRank } from '$lib/types';
 import { saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
-import { authorizedFetch, getAuthState } from '$lib/stores/auth.svelte';
+import { authorizedFetch, ensureSyncToken, getAuthState } from '$lib/stores/auth.svelte';
 import { errorCodeToMessage } from './error-codes';
 import * as m from './paraglide/messages.js';
 
@@ -372,6 +372,26 @@ export interface VeknStatusResponse {
  */
 export async function getVeknStatus(): Promise<VeknStatusResponse> {
   return apiRequest<VeknStatusResponse>('/admin/vekn-status', { method: 'GET' }, { suppressErrorToast: true });
+}
+
+/**
+ * Data export: download the sync snapshot for the caller's access level as a
+ * gzip JSONL attachment. A browser download can't carry an Authorization header,
+ * so the token rides the query string — same as the SSE/snapshot fetch.
+ */
+export async function downloadDataExport(): Promise<void> {
+  // Offline the navigation would land on the browser's error page, replacing the SPA.
+  if (!isOnline()) {
+    showToast({ type: 'error', message: m.error_action_requires_online() });
+    return;
+  }
+  const t = await ensureSyncToken();
+  if (t.kind !== 'token') {
+    showToast({ type: 'error', message: m.auth_error_session_expired() });
+    return;
+  }
+  // Content-Disposition makes this a download, not a navigation — the SPA stays put.
+  window.location.href = `${API_URL}/snapshot?download=1&token=${encodeURIComponent(t.token)}`;
 }
 
 // Sanctions API

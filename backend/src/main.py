@@ -692,6 +692,7 @@ def _iter_file_chunks(path, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
 async def get_snapshot(
     request: Request,
     token: str | None = None,
+    download: bool = False,
     authorization: Annotated[str | None, Header()] = None,
 ) -> Response:
     """Serve pre-computed gzip snapshot for the viewer's access level.
@@ -706,6 +707,9 @@ async def get_snapshot(
     fresh file — no truncation, no spurious reconnect. A further prod win would be
     nginx X-Accel-Redirect (zero app IO), but that needs an `internal` location and
     a snapshot dir nginx can read — out of scope here.
+
+    `download=1` is the data-export mode (admin affordance / curl recipe): the same
+    file, handed over as an opaque .gz attachment instead of a transfer-encoded body.
     """
     from .snapshots import get_snapshot_path
 
@@ -727,15 +731,26 @@ async def get_snapshot(
     # echoes a matching `av` and doesn't resync. Chunked (no Content-Length) so a
     # mid-stream regen can't size-mismatch, and ranges aren't offered (a partial
     # gzip slice can't be inflated).
+    headers = {
+        "Cache-Control": "no-cache",
+        "Accept-Ranges": "none",
+        "X-Access-Version": await compute_access_version(viewer),
+    }
+    if download:
+        # No Content-Encoding: the export is the .gz ITSELF, so the browser writes
+        # the compressed bytes to disk instead of transparently inflating them.
+        # Dated from the file's mtime — the regen that produced it, not "now".
+        stamp = time.strftime("%Y-%m-%d", time.localtime(snapshot_path.stat().st_mtime))
+        headers["Content-Disposition"] = (
+            f'attachment; filename="archon-export-{level.value}-{stamp}.jsonl.gz"'
+        )
+    else:
+        headers["Content-Encoding"] = "gzip"
+
     return StreamingResponse(
         _iter_file_chunks(snapshot_path),
-        media_type="application/x-ndjson",
-        headers={
-            "Content-Encoding": "gzip",
-            "Cache-Control": "no-cache",
-            "Accept-Ranges": "none",
-            "X-Access-Version": await compute_access_version(viewer),
-        },
+        media_type="application/gzip" if download else "application/x-ndjson",
+        headers=headers,
     )
 
 
