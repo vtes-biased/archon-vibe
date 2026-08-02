@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, Download, RefreshCw } from '@lucide/svelte';
+  import { ChevronDown, Download, RefreshCw, TriangleAlert } from '@lucide/svelte';
   import * as m from '$lib/paraglide/messages.js';
   import {
     syncVeknMembers,
@@ -91,6 +91,7 @@
   ];
 
   let activeOp = $state<Op | null>(null);
+  let confirmExport = $state(false);
 </script>
 
 <div class="p-6 border-t border-line">
@@ -167,15 +168,21 @@
         </div>
       {/each}
 
-      <div class="bg-surface-muted rounded-lg border border-line-strong p-4 flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <h4 class="text-ink-strong font-medium text-sm">{m.admin_export_label()}</h4>
-          <p class="text-ink-faint text-xs mt-0.5">{m.admin_export_desc()}</p>
+      <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h4 class="text-ink-strong font-medium text-sm">{m.admin_export_label()}</h4>
+            <p class="text-ink-faint text-xs mt-0.5">{m.admin_export_desc()}</p>
+          </div>
+          <Button variant="primary" size="lg" class="shrink-0" onclick={() => (confirmExport = true)}>
+            <Download class="w-3.5 h-3.5" />
+            {m.admin_export_button()}
+          </Button>
         </div>
-        <Button variant="primary" size="lg" class="shrink-0" onclick={downloadDataExport}>
-          <Download class="w-3.5 h-3.5" />
-          {m.admin_export_button()}
-        </Button>
+        <p class="banner-warn border rounded-lg p-2 mt-3 text-xs flex items-start gap-2">
+          <TriangleAlert class="w-3.5 h-3.5 shrink-0 mt-px" />
+          {m.admin_export_pii_warning()}
+        </p>
       </div>
     </div>
   {/if}
@@ -191,5 +198,15 @@
       activeOp = null;
       loadStatus();
     }}
+  />
+{/if}
+
+{#if confirmExport}
+  <ConfirmActionModal
+    title={m.admin_export_label()}
+    body={m.admin_export_confirm()}
+    confirmLabel={m.admin_export_button()}
+    action={downloadDataExport}
+    onClose={() => (confirmExport = false)}
   />
 {/if}

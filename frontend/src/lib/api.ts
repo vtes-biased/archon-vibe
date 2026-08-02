@@ -376,20 +376,16 @@ export async function getVeknStatus(): Promise<VeknStatusResponse> {
 
 /**
  * Data export: download the sync snapshot for the caller's access level as a
- * gzip JSONL attachment. A browser download can't carry an Authorization header,
- * so the token rides the query string — same as the SSE/snapshot fetch.
+ * zip-wrapped JSONL attachment. A browser download can't carry an Authorization
+ * header, so the token rides the query string — same as the SSE/snapshot fetch.
  */
 export async function downloadDataExport(): Promise<void> {
+  // Thrown, not toasted: the caller is the confirm modal, which renders the
+  // failure in place (with a retry) instead of dismissing itself over a toast.
   // Offline the navigation would land on the browser's error page, replacing the SPA.
-  if (!isOnline()) {
-    showToast({ type: 'error', message: m.error_action_requires_online() });
-    return;
-  }
+  if (!isOnline()) throw new Error(m.error_action_requires_online());
   const t = await ensureSyncToken();
-  if (t.kind !== 'token') {
-    showToast({ type: 'error', message: m.auth_error_session_expired() });
-    return;
-  }
+  if (t.kind !== 'token') throw new Error(m.auth_error_session_expired());
   // Content-Disposition makes this a download, not a navigation — the SPA stays put.
   window.location.href = `${API_URL}/snapshot?download=1&token=${encodeURIComponent(t.token)}`;
 }

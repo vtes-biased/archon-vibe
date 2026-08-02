@@ -1,10 +1,12 @@
 """FastAPI application entry point."""
 
 import asyncio
+import gzip
 import logging
 import os
 import signal
 import time
+import zipfile
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -688,6 +690,71 @@ def _iter_file_chunks(path, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
             yield chunk
 
 
+class _ZipSink:
+    """Write-only, non-seekable sink zipfile can stream an archive into.
+
+    zipfile falls back to per-entry data descriptors when its output can `tell()`
+    but not `seek()` — which is what makes a streamed archive possible at all.
+    `pos` must keep counting past a drain: it is the entry header offset zipfile
+    records in the central directory.
+    """
+
+    def __init__(self) -> None:
+        self._buf = bytearray()
+        self.pos = 0
+
+    def write(self, data: bytes) -> int:
+        self._buf += data
+        self.pos += len(data)
+        return len(data)
+
+    def tell(self) -> int:
+        return self.pos
+
+    def flush(self) -> None:
+        pass
+
+    @property
+    def pending(self) -> int:
+        return len(self._buf)
+
+    def take(self) -> bytes:
+        chunk = bytes(self._buf)
+        del self._buf[:]
+        return chunk
+
+
+def _iter_snapshot_zip(
+    path, name: str, mtime: float, chunk_size: int = 64 * 1024
+) -> Iterator[bytes]:
+    """Yield a single-entry .zip holding the snapshot's JSONL, streamed.
+
+    The stored snapshot is a .gz, which Windows can't open without a third-party
+    tool, so the export is re-enveloped: inflate and re-deflate through zipfile.
+    That costs one compression round per download — fine for a manual admin action,
+    and the zero-CPU alternative (transmuxing the gzip deflate stream straight into
+    a zip entry) buys it with hand-packed headers. Heap stays bounded either way:
+    the sink is drained every chunk_size bytes.
+    """
+    info = zipfile.ZipInfo(name, time.localtime(mtime)[:6])
+    info.compress_type = zipfile.ZIP_DEFLATED
+    # ZipInfo defaults external_attr to 0, which on the Unix create_system means
+    # mode 0000 — some extractors honour that and unpack an unreadable file.
+    info.external_attr = 0o644 << 16
+    sink = _ZipSink()
+    with (
+        zipfile.ZipFile(sink, "w") as archive,
+        gzip.open(path, "rb") as source,
+        archive.open(info, "w") as entry,
+    ):
+        while chunk := source.read(chunk_size):
+            entry.write(chunk)
+            if sink.pending >= chunk_size:
+                yield sink.take()
+    # Exiting the block wrote the data descriptor and the central directory.
+    yield sink.take()
+
+
 @app.get("/snapshot")
 async def get_snapshot(
     request: Request,
@@ -709,7 +776,7 @@ async def get_snapshot(
     a snapshot dir nginx can read — out of scope here.
 
     `download=1` is the data-export mode (admin affordance / curl recipe): the same
-    file, handed over as an opaque .gz attachment instead of a transfer-encoded body.
+    content, re-enveloped as a .zip attachment instead of a transfer-encoded body.
     """
     from .snapshots import get_snapshot_path
 
@@ -737,19 +804,24 @@ async def get_snapshot(
         "X-Access-Version": await compute_access_version(viewer),
     }
     if download:
-        # No Content-Encoding: the export is the .gz ITSELF, so the browser writes
-        # the compressed bytes to disk instead of transparently inflating them.
-        # Dated from the file's mtime — the regen that produced it, not "now".
-        stamp = time.strftime("%Y-%m-%d", time.localtime(snapshot_path.stat().st_mtime))
-        headers["Content-Disposition"] = (
-            f'attachment; filename="archon-export-{level.value}-{stamp}.jsonl.gz"'
+        # Dated from the file's mtime — the regen that produced it, not "now". No
+        # Content-Encoding: the .zip is the payload, not a transfer envelope, so
+        # the browser writes its bytes to disk instead of inflating them.
+        mtime = snapshot_path.stat().st_mtime
+        stem = f"archon-export-{level.value}-" + time.strftime(
+            "%Y-%m-%d", time.localtime(mtime)
         )
-    else:
-        headers["Content-Encoding"] = "gzip"
+        headers["Content-Disposition"] = f'attachment; filename="{stem}.zip"'
+        return StreamingResponse(
+            _iter_snapshot_zip(snapshot_path, f"{stem}.jsonl", mtime),
+            media_type="application/zip",
+            headers=headers,
+        )
 
+    headers["Content-Encoding"] = "gzip"
     return StreamingResponse(
         _iter_file_chunks(snapshot_path),
-        media_type="application/gzip" if download else "application/x-ndjson",
+        media_type="application/x-ndjson",
         headers=headers,
     )
 
