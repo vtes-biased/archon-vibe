@@ -83,7 +83,18 @@ async function globalSetup() {
       await new Promise(r => setTimeout(r, 2000));
     }
   }
-  if (!warm) {
+  //    Per route, not just '/': a dep first discovered on another route re-runs the
+  //    optimizer and force-reloads every open page, blanking mid-assertion workers.
+  if (warm) {
+    for (const route of ['/users', '/login', '/leagues', '/rankings', '/profile']) {
+      try {
+        await page.goto(`${BASE_URL}${route}`, { timeout: 30_000 });
+        await page.waitForSelector('[data-sync-state]', { timeout: 15_000 });
+      } catch {
+        console.warn(`Vite warm-up for ${route} did not complete; first tests may be slow`);
+      }
+    }
+  } else {
     console.warn(`Vite warm-up never completed at ${BASE_URL}; first tests may be slow`);
   }
   await browser.close();

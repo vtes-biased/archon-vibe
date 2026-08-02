@@ -104,6 +104,7 @@ services:
     environment:
       VITE_API_URL: http://backend-test:8000
       E2E_SEED_FILE: /shared/e2e-seed.json
+      CI: ${CI:-}   # playwright.config.ts branches on it (workers, retries, forbidOnly)
     depends_on:
       populate-db:
         condition: service_completed_successfully
