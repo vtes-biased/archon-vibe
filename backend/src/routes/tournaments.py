@@ -869,14 +869,38 @@ def _parse_datetime(s: str | None) -> datetime | None:
     return datetime.fromisoformat(s)
 
 
+def _zone(tz_name: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(tz_name or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        return ZoneInfo("UTC")
+
+
 def _wall_clock_now(tz_name: str) -> datetime:
     """Now as NAIVE wall clock in `tz_name` — the storage shape of start/finish
     (paired with Tournament.timezone, never tz-aware)."""
-    try:
-        tz = ZoneInfo(tz_name or "UTC")
-    except (ZoneInfoNotFoundError, ValueError):
-        tz = UTC
-    return datetime.now(tz).replace(tzinfo=None)
+    return datetime.now(_zone(tz_name)).replace(tzinfo=None)
+
+
+def _wall_clock(dt: datetime | None, tz_name: str) -> datetime | None:
+    """Coerce a client-supplied start/finish to the stored shape: naive wall clock
+    in `tz_name`. An offset is CONVERTED, not truncated — truncating would move the
+    event by the difference between the sender's zone and the venue's."""
+    if dt is None or dt.tzinfo is None:
+        return dt
+    return dt.astimezone(_zone(tz_name)).replace(tzinfo=None)
+
+
+def _normalize_wall_clock(t: Tournament) -> None:
+    """Apply `_wall_clock` to a tournament decoded from a client payload.
+
+    Nothing the frontend sends carries an offset today — the config form posts the
+    naive text of a `datetime-local` input — but these payloads are whole objects
+    off the wire, and one tz-aware value would read back shifted by the venue's
+    offset everywhere (see ARCHITECTURE.md, "API & Data Conventions").
+    """
+    t.start = _wall_clock(t.start, t.timezone)
+    t.finish = _wall_clock(t.finish, t.timezone)
 
 
 @router.post("/", status_code=201)
@@ -955,8 +979,8 @@ async def create_tournament(
         format=fmt,
         rank=rank,
         online=request.online,
-        start=_parse_datetime(request.start),
-        finish=_parse_datetime(request.finish),
+        start=_wall_clock(_parse_datetime(request.start), request.timezone),
+        finish=_wall_clock(_parse_datetime(request.finish), request.timezone),
         timezone=request.timezone,
         country=request.country,
         venue=request.venue,
@@ -1611,6 +1635,7 @@ async def tournament_action(
         # CPU on a 400-player object during a large scoring burst.
         updated = msgspec.convert(t_data, Tournament)
         updated.modified = datetime.now(UTC)
+        _normalize_wall_clock(updated)
         # Stamp the actual end time when entering Finished without an explicit
         # finish date — the engine never sets finish, and ratings/VEKN push
         # rely on it (server-side hook, same as modified and the timer below)
@@ -2599,6 +2624,7 @@ async def go_online(
         # Save tournament within the locked transaction (upsert handles insert)
         updated = msgspec.convert(tournament_data, Tournament)
         updated.modified = datetime.now(UTC)
+        _normalize_wall_clock(updated)
         # Offline-issued DQs: assert the player state server-side too. The
         # offline client mirrors the flip, but state gates check-in/StartFinals
         # — belt and braces before the authoritative save.
@@ -2872,6 +2898,7 @@ async def sync_offline(
 
         updated = msgspec.convert(tournament_data, Tournament)
         updated.modified = datetime.now(UTC)
+        _normalize_wall_clock(updated)
         await save_object(
             ObjectType.TOURNAMENT,
             updated.uid,
