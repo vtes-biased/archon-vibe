@@ -14,7 +14,6 @@ from ..accounts import merge_users
 from ..broadcast import broadcast_precomputed
 from ..db import get_user_by_uid, remap_promo_ledger_user
 from ..middleware.auth import CurrentUser
-from ..models import Role
 from ..promo_stock import schedule_recompute
 
 logger = logging.getLogger(__name__)
@@ -73,7 +72,7 @@ async def trigger_vekn_sync(
     Returns immediately ({"status": "started"} or "already_running"); the
     outcome lands in /admin/vekn-status under member_sync.
     """
-    if Role.IC not in manager.roles:
+    if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
     runner = _runners.get("member_sync")
@@ -95,7 +94,7 @@ async def trigger_vekn_tournament_sync(
     Returns immediately; the outcome lands in /admin/vekn-status under
     tournament_sync.
     """
-    if Role.IC not in manager.roles:
+    if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
     runner = _runners.get("tournament_sync")
@@ -117,7 +116,7 @@ async def vekn_status(
     Lets admins spot a days-long vekn.net outage without grepping logs. State is
     in-process (resets on restart); keys: member_sync, tournament_sync, batch_push.
     """
-    if Role.IC not in manager.roles:
+    if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can view VEKN status")
 
     from ..vekn_status import get_status
@@ -146,7 +145,7 @@ async def trigger_twda_deck_import(
     Returns immediately; the outcome is logged (TWDA has no vekn-status panel
     entry).
     """
-    if Role.IC not in manager.roles:
+    if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
     logger.info("Manual TWDA deck import dispatched via admin endpoint")

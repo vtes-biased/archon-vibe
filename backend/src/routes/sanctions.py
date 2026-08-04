@@ -26,7 +26,6 @@ from ..middleware.auth import OptionalUser
 from ..models import (
     SUBCATEGORIES_BY_CATEGORY,
     PlayerState,
-    Role,
     Sanction,
     SanctionCategory,
     SanctionLevel,
@@ -465,7 +464,7 @@ async def update_sanction_endpoint(
         ]
     )
     if has_modify_fields:
-        if Role.IC not in current_user.roles and Role.ETHICS not in current_user.roles:
+        if not permissions.can_modify_sanction(current_user):
             raise HTTPException(
                 status_code=403, detail="Only IC or Ethics can modify sanctions"
             )

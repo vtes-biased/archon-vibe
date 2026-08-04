@@ -8,6 +8,7 @@ import msgspec
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 
+from .. import permissions
 from ..broadcast import broadcast_precomputed
 from ..db import (
     count_promo_references,
@@ -27,7 +28,6 @@ from ..models import (
     PromoKind,
     PromoLedgerEntry,
     PromoLedgerKind,
-    Role,
     TournamentRank,
 )
 from ..promo_stock import schedule_recompute
@@ -62,7 +62,7 @@ class PromoUpdate(BaseModel):
 def _require_ic(user: OptionalUser) -> None:
     if not user:
         raise HTTPException(401, "Authentication required")
-    if Role.IC not in user.roles:
+    if not permissions.can_manage_promos(user):
         raise HTTPException(403, "Only IC can manage promos")
 
 
@@ -191,12 +191,12 @@ async def create_ledger_entry(
     if not user.vekn_id:
         raise HTTPException(403, "VEKN membership required")
     from_uid = body.from_uid or user.uid
-    if from_uid != user.uid and Role.IC not in user.roles:
+    if from_uid != user.uid and not permissions.can_manage_promos(user):
         raise HTTPException(403, "Only IC can record movements for another holder")
     # Intake creates stock from nothing: officials only (self check above
     # already restricts NC to their own pool).
-    if body.kind == PromoLedgerKind.INTAKE and not (
-        Role.IC in user.roles or Role.NC in user.roles
+    if body.kind == PromoLedgerKind.INTAKE and not permissions.can_record_promo_intake(
+        user
     ):
         raise HTTPException(403, "Only IC or NC can record an intake")
     if body.qty == 0:
@@ -244,8 +244,8 @@ async def list_ledger_entries(user: OptionalUser = None) -> Response:
     (small dataset; filtering/aggregation happen client-side)."""
     if not user:
         raise HTTPException(401, "Authentication required")
-    is_official = Role.IC in user.roles or Role.NC in user.roles
-    entries = await get_promo_ledger_entries(None if is_official else user.uid)
+    whole_ledger = permissions.can_view_full_promo_ledger(user)
+    entries = await get_promo_ledger_entries(None if whole_ledger else user.uid)
     return Response(
         content=encoder.encode(msgspec.to_builtins(entries)),
         media_type="application/json",

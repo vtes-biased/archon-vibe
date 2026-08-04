@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+from .. import permissions
 from ..db_oauth import (
     delete_oauth_consent,
     get_oauth_client_by_client_id,
@@ -32,20 +33,32 @@ from ..db_oauth import (
     update_oauth_token,
     upsert_oauth_consent,
 )
-from ..middleware.auth import JWT_ALGORITHM, JWT_SECRET, CurrentUser, require_role
+from ..middleware.auth import (
+    JWT_ALGORITHM,
+    JWT_SECRET,
+    CurrentUser,
+    require_permission,
+)
 from ..models import (
     OAuthAuthorizationCode,
     OAuthClient,
     OAuthConsent,
     OAuthScope,
     OAuthToken,
-    Role,
     User,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
+
+# Client management is IC or DEV — one gate, four routes.
+RequireOauthAdmin = Depends(
+    require_permission(
+        permissions.can_manage_oauth_clients,
+        "Only IC or DEV can manage OAuth clients",
+    )
+)
 
 ph = PasswordHasher()
 
@@ -577,7 +590,7 @@ class RegisterClientRequest(BaseModel):
 @router.post("/clients")
 async def register_client(
     body: RegisterClientRequest,
-    user: User = Depends(require_role(Role.DEV)),
+    user: User = RequireOauthAdmin,
 ):
     """Register a new OAuth client. Returns client_secret once."""
     name = body.name.strip()
@@ -625,7 +638,7 @@ async def register_client(
 
 
 @router.get("/clients")
-async def list_clients(user: User = Depends(require_role(Role.DEV))):
+async def list_clients(user: User = RequireOauthAdmin):
     """List own OAuth clients."""
     clients = await get_oauth_clients_by_owner(user.uid)
     return [
@@ -645,7 +658,7 @@ async def list_clients(user: User = Depends(require_role(Role.DEV))):
 @router.post("/clients/{client_id}/regenerate-secret")
 async def regenerate_secret(
     client_id: str,
-    user: User = Depends(require_role(Role.DEV)),
+    user: User = RequireOauthAdmin,
 ):
     """Regenerate client secret. Old secret is invalidated."""
     client = await get_oauth_client_by_client_id(client_id)
@@ -677,7 +690,7 @@ async def regenerate_secret(
 @router.delete("/clients/{client_id}")
 async def deactivate_client(
     client_id: str,
-    user: User = Depends(require_role(Role.DEV)),
+    user: User = RequireOauthAdmin,
 ):
     """Deactivate an OAuth client."""
     client = await get_oauth_client_by_client_id(client_id)

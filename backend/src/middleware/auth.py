@@ -1,5 +1,6 @@
 """Authentication middleware and dependencies."""
 
+from collections.abc import Callable
 from typing import Annotated
 
 import jwt
@@ -8,7 +9,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from ..db import get_user_by_uid
 from ..db_oauth import get_oauth_token_by_jti
 from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
-from ..models import Role, User
+from ..models import User
 
 
 async def get_current_user(
@@ -123,37 +124,24 @@ async def get_optional_user(
         return None
 
 
-def require_role(*required_roles: Role):
-    """FastAPI dependency factory to require specific roles.
+def require_permission(check: Callable[[User], bool], detail: str):
+    """FastAPI dependency factory gating a whole route on one capability.
 
     Usage:
-        @router.post("/admin-only")
-        async def admin_route(user: User = Depends(require_role(Role.IC))):
-            return {"admin": user.name}
+        RequireOauthAdmin = Depends(
+            require_permission(permissions.can_manage_oauth_clients, "...")
+        )
 
-        @router.post("/nc-or-prince")
-        async def nc_route(user: User = Depends(require_role(Role.NC, Role.Prince))):
-            return {"coordinator": user.name}
+    Only for capabilities that need nothing but the actor. Anything scoped to a
+    target or a resource is checked inside the handler, where those are in hand.
     """
 
-    async def check_role(user: User = Depends(get_current_user)) -> User:
-        user_roles = set(user.roles)
-        required_set = set(required_roles)
-
-        # IC (Inner Circle) has access to everything
-        if Role.IC in user_roles:
-            return user
-
-        # Check if user has at least one of the required roles
-        if not user_roles.intersection(required_set):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Requires one of: {[r.value for r in required_roles]}",
-            )
-
+    async def gate(user: User = Depends(get_current_user)) -> User:
+        if not check(user):
+            raise HTTPException(status_code=403, detail=detail)
         return user
 
-    return check_role
+    return gate
 
 
 # Convenient typed dependencies

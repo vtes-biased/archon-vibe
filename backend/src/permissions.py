@@ -268,3 +268,8 @@ def can_view_full_promo_ledger(user: User) -> bool:
 def can_manage_oauth_clients(user: User) -> bool:
     """Register and revoke OAuth clients."""
     return _check("manage_oauth_clients", user)
+
+
+def can_run_admin_sync(user: User) -> bool:
+    """Trigger and inspect the VEKN/TWDA sync jobs."""
+    return _check("run_admin_sync", user)

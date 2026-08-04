@@ -470,8 +470,10 @@ async def _get_user_organizable_league_uids(user, conn=None) -> list[str]:
     """Get league UIDs the user can link tournaments to (feeds the engine's
     UpdateConfig league gate): league editors, plus same-country Princes when
     the league is open to them."""
+    # Not a gate — it mirrors the engine's own contract: an empty list means
+    # "unrestricted", which is what IC already is, so skip the full scan.
     if Role.IC in user.roles:
-        return []  # IC bypasses league check in engine
+        return []
     leagues = await get_all_leagues(conn=conn)
     return [
         lg.uid for lg in leagues if permissions.can_link_tournament_to_league(user, lg)
@@ -2302,8 +2304,8 @@ async def go_offline(
             )
 
         # Offline implies member-creation power (name-only players get real VEKN
-        # IDs at go-online), so it is officials-only like online member creation.
-        if not permissions.can_create_tournament(current_user):
+        # IDs at go-online), so it takes the same authority as creating one online.
+        if not permissions.can_create_member(current_user):
             raise HTTPException(
                 status_code=403,
                 detail="Only officials (IC, NC, Prince) can take a tournament offline",
@@ -2788,9 +2790,9 @@ async def force_takeover(
                 status_code=403, detail="Only organizers can force-takeover"
             )
 
-        # Same officials-only gate as go_offline: the taken-over lock carries
-        # the same member-creation power.
-        if not permissions.can_create_tournament(current_user):
+        # Same gate as go_offline: the taken-over lock carries the same
+        # member-creation power.
+        if not permissions.can_create_member(current_user):
             raise HTTPException(
                 status_code=403,
                 detail="Only officials (IC, NC, Prince) can force-takeover",
@@ -2936,7 +2938,7 @@ async def force_unlock(
             status_code=403, detail="OAuth tokens cannot force-unlock tournaments"
         )
 
-    if Role.IC not in current_user.roles:
+    if not permissions.can_force_unlock_tournament(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC can force-unlock tournaments"
         )

@@ -218,6 +218,7 @@ pub enum Capability {
     RecordPromoIntake,
     ViewFullPromoLedger,
     ManageOauthClients,
+    RunAdminSync,
 }
 
 impl Capability {
@@ -547,6 +548,17 @@ pub const CAPABILITIES: &[Rule] = &[
         self_service: false,
         organizer: false,
         deny: "Only IC or DEV can manage OAuth clients",
+        deny_scope: None,
+    },
+    // Trigger and inspect the VEKN/TWDA sync jobs.
+    Rule {
+        capability: Capability::RunAdminSync,
+        name: "run_admin_sync",
+        global: &[IC],
+        same_country: &[],
+        self_service: false,
+        organizer: false,
+        deny: "Only IC can trigger a sync",
         deny_scope: None,
     },
 ];
@@ -1522,6 +1534,7 @@ mod tests {
             (Capability::RecordPromoIntake, vec![IC, NC]),
             (Capability::ViewFullPromoLedger, vec![IC, NC]),
             (Capability::ManageOauthClients, vec![IC, DEV]),
+            (Capability::RunAdminSync, vec![IC]),
             (Capability::MergeAccounts, vec![IC]),
             (Capability::ModifySanction, vec![IC, Ethics]),
         ];
