@@ -14,6 +14,7 @@
   import type { User as UserType, Role } from "$lib/types";
   import Button from '$lib/components/Button.svelte';
   import { RefreshCw, Users } from "@lucide/svelte";
+  import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import * as m from '$lib/paraglide/messages.js';
 
   let filteredUsers = $state<UserType[]>([]);
@@ -32,12 +33,31 @@
   // Create user form
   let showCreateForm = $state(false);
 
-  // Pagination and filtering
-  let currentPage = $state(1);
+  const availableRoles: Role[] = [
+    "IC",
+    "NC",
+    "Prince",
+    "Ethics",
+    "PTC",
+    "PT",
+    "Judge",
+    "DEV",
+  ];
+
+  // Pagination and filtering. The public filters live in the query string (see
+  // $lib/url-filters) so leaving for a member page and coming back restores the
+  // list; the officials-only triage toggles below stay local — restoring one for
+  // a viewer who cannot see its control would filter the list unaccountably.
+  const urlParams = currentParams();
+  let currentPage = $state(readPageParam() + 1);
   let pageSize = 250;
-  let selectedCountry = $state<string>("all");
-  let selectedRoles = $state<Role[]>([]);
-  let searchQuery = $state("");
+  let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
+  let selectedRoles = $state<Role[]>(
+    (urlParams.get("roles")?.split(",").filter(r => availableRoles.includes(r as Role)) ?? []) as Role[],
+  );
+  let searchQuery = $state(urlParams.get("q") ?? "");
+  // Mirrored to the URL only once the search debounce fires, not per keystroke.
+  let debouncedSearch = $state(urlParams.get("q") ?? "");
   let filterHasPastSanctions = $state(false);
   let filterCurrentlySanctioned = $state(false);
   // Official-only sponsor-management filters (coopted_by / vekn_id). 'mine' and
@@ -56,16 +76,24 @@
 
   const countries = getCountries();
   const sortedCountries = getSortedCountries();
-  const availableRoles: Role[] = [
-    "IC",
-    "NC",
-    "Prince",
-    "Ethics",
-    "PTC",
-    "PT",
-    "Judge",
-    "DEV",
-  ];
+
+  // A page restored from the URL can point past the end — clamp once loaded, or
+  // the list renders empty with no controls to get back.
+  $effect(() => {
+    if (!hasLoadedOnce) return;
+    const last = Math.max(1, totalPages);
+    if (currentPage > last) untrack(() => { currentPage = last; });
+  });
+
+  // Mirror the public filters + page into the address bar.
+  $effect(() => {
+    syncQueryParams({
+      q: debouncedSearch.trim() || null,
+      country: selectedCountry === "all" ? null : selectedCountry,
+      roles: selectedRoles.length ? selectedRoles.join(",") : null,
+      page: pageParam(currentPage - 1),
+    });
+  });
 
   // Paginate users (filtering happens in IndexedDB query)
   let paginatedUsers = $derived.by(() => {
@@ -263,6 +291,7 @@
   function handleSearchInput() {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
+      debouncedSearch = searchQuery;
       currentPage = 1;
       updateDisplayContext();
       loadUsers();

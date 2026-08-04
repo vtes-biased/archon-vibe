@@ -10,6 +10,7 @@
   import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
+  import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import { Loader2, Trophy, Calendar, Copy, Check } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
@@ -40,40 +41,46 @@
   });
   let error = $state<string | null>(null);
 
+  // Filters and page live in the query string (see $lib/url-filters): coming
+  // back from a tournament remounts this component, so anything held only in
+  // local state is lost.
+  const urlParams = currentParams();
+
   // View mode
   const auth = $derived(getAuthState());
   const canUseAgenda = $derived(auth.isAuthenticated && auth.user?.vekn_id && auth.user?.country);
-  let viewMode = $state<"agenda" | "all">("all");
+  const urlView = urlParams.get("view");
+  let viewMode = $state<"agenda" | "all">(urlView === "agenda" || urlView === "all" ? urlView : "all");
 
-  // Set initial view mode based on auth
+  // Default to the agenda once auth resolves — unless the URL already chose.
   $effect(() => {
-    if (canUseAgenda) {
+    if (canUseAgenda && !urlView) {
       untrack(() => { viewMode = "agenda"; });
     }
   });
 
   // Filters
-  let searchQuery = $state("");
+  let searchQuery = $state(urlParams.get("q") ?? "");
   // Debounced mirror of searchQuery: the search path scans the whole tournaments
   // table per query, so don't re-query on every keystroke (country/format filters
   // use narrower indexes and stay immediate).
-  let debouncedSearch = $state("");
+  let debouncedSearch = $state(urlParams.get("q") ?? "");
   $effect(() => {
     const q = searchQuery;
     const timer = setTimeout(() => { debouncedSearch = q; }, 250);
     return () => clearTimeout(timer);
   });
-  let ongoing = $state(false);
-  let selectedCountry = $state<string>("all");
-  let selectedFormat = $state<string>("all");
-  let includeOnline = $state(true);
+  let ongoing = $state(urlParams.get("ongoing") === "true");
+  let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
+  let selectedFormat = $state<string>(urlParams.get("format") ?? "all");
+  let includeOnline = $state(urlParams.get("online") !== "false");
 
   // Calendar
   let calendarLoading = $state(false);
   let copied = $state(false);
 
   // Pagination
-  let page = $state(0);
+  let page = $state(readPageParam());
   const PAGE_SIZE = 50;
 
   const countries = getCountries();
@@ -174,15 +181,43 @@
     untrack(() => loadTournaments());
   });
 
-  // Reset page when filters change
+  const filterKey = $derived(
+    [debouncedSearch, ongoing, selectedCountry, selectedFormat, includeOnline, viewMode].join("|"),
+  );
+
+  // Reset page when filters change. Comparing against the last key rather than
+  // resetting on every run keeps the mount pass from discarding a page number
+  // restored from the URL.
+  let lastFilterKey = untrack(() => filterKey);
   $effect(() => {
-    const _s = debouncedSearch;
-    const _o = ongoing;
-    const _c = selectedCountry;
-    const _f = selectedFormat;
-    const _io = includeOnline;
-    const _vm = viewMode;
-    untrack(() => { page = 0; });
+    const key = filterKey;
+    untrack(() => {
+      if (key === lastFilterKey) return;
+      lastFilterKey = key;
+      page = 0;
+    });
+  });
+
+  // A page restored from the URL can point past the end (fewer matches than when
+  // the link was made). The list renders empty there, pagination controls and all,
+  // so there would be no way back except editing the address bar.
+  $effect(() => {
+    if (!loaded) return;
+    const last = Math.max(0, totalPages - 1);
+    if (page > last) untrack(() => { page = last; });
+  });
+
+  // Mirror filters + page into the address bar so Back restores this view.
+  $effect(() => {
+    syncQueryParams({
+      q: debouncedSearch,
+      ongoing: ongoing ? "true" : null,
+      country: selectedCountry === "all" ? null : selectedCountry,
+      format: selectedFormat === "all" ? null : selectedFormat,
+      online: includeOnline ? null : "false",
+      view: canUseAgenda ? viewMode : null,
+      page: pageParam(page),
+    });
   });
 
   // SSE sync listener

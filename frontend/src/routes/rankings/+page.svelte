@@ -5,9 +5,9 @@
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import type { User, RatingCategory } from "$lib/types";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
-  import { goto, replaceState } from "$app/navigation";
-  import { page as pageStore } from "$app/stores";
-  import { get } from "svelte/store";
+  import { goto } from "$app/navigation";
+  import { untrack } from "svelte";
+  import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import * as m from '$lib/paraglide/messages.js';
 
   type Tab = RatingCategory | "halloffame";
@@ -19,11 +19,12 @@
   let isSyncing = $state(!syncManager.isSynced);
 
   // Filters. Tab is deep-linkable (?tab=halloffame — the guide and the profile
-  // HoF chip land there); switching keeps the URL in sync via replaceState.
-  const urlTab = get(pageStore).url.searchParams.get("tab") as Tab | null;
+  // HoF chip land there); country and page ride along so Back restores the view.
+  const urlParams = currentParams();
+  const urlTab = urlParams.get("tab") as Tab | null;
   let activeTab = $state<Tab>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : "constructed_offline");
-  let selectedCountry = $state<string>("all");
-  let page = $state(0);
+  let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
+  let page = $state(readPageParam());
 
   const isHof = $derived(activeTab === "halloffame");
   const pageSize = $derived(isHof ? 100 : 50);
@@ -76,11 +77,34 @@
     suspendedUids = suspended;
   }
 
-  // Reset page on tab/filter change
+  // Reset page on tab/filter change — but not on the mount pass, which would
+  // discard a page number restored from the URL.
+  const filterKey = $derived(`${activeTab}|${selectedCountry}`);
+  let lastFilterKey = untrack(() => filterKey);
   $effect(() => {
-    activeTab;
-    selectedCountry;
-    page = 0;
+    const key = filterKey;
+    untrack(() => {
+      if (key === lastFilterKey) return;
+      lastFilterKey = key;
+      page = 0;
+    });
+  });
+
+  // A page restored from the URL can point past the end — clamp once the data
+  // is in, or the list renders empty with no controls to get back.
+  $effect(() => {
+    if (!users.length) return;
+    const last = Math.max(0, totalPages - 1);
+    if (page > last) untrack(() => { page = last; });
+  });
+
+  // Mirror filters + page into the address bar so Back restores this view.
+  $effect(() => {
+    syncQueryParams({
+      tab: activeTab === "constructed_offline" ? null : activeTab,
+      country: selectedCountry === "all" ? null : selectedCountry,
+      page: pageParam(page),
+    });
   });
 
   $effect(() => {
@@ -110,7 +134,7 @@
     <div class="flex flex-wrap gap-y-1 mb-6 bg-surface-card rounded-lg border border-line p-1 w-fit max-w-full">
       {#each tabs as tab}
         <button
-          onclick={() => { activeTab = tab.value; replaceState(`/rankings?tab=${tab.value}`, {}); }}
+          onclick={() => { activeTab = tab.value; }}
           class="px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors {activeTab === tab.value ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
         >
           {tab.labelFn()}
