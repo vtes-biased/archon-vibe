@@ -215,6 +215,28 @@ async def test_echo_guard_roundless_never_overwrites_rich(test_db):
 
 
 @pytest.mark.asyncio
+async def test_echo_guard_on_uid_match_roundless_never_overwrites_rich(test_db):
+    """Legacy-born event later run live in the new app: same uid on both sides,
+    legacy's copy stuck round-less at Registration. The uid-match path must
+    echo-skip it, not revert the rich row (the 'Open de Coya 2026' wipe)."""
+    async with _cleanup():
+        await seed_tournament(_vekn_created("o-5", "444", rich=True))
+
+        stats = Stats()
+        uid_map: dict[str, str] = {}
+        row = _old_tournament_row("o-5", vekn_id="444", rich=False)
+        row["data"]["state"] = "Registration"
+        await process_tournament_row(row, {}, stats, True, uid_map, archon_ix={})
+
+        assert stats["tournaments.echo_skipped_by_uid"] == 1
+        assert stats["tournaments.updated"] == 0
+        original = await db.get_tournament_by_uid("o-5")
+        assert original.rounds, "rich original untouched"
+        assert original.state == TournamentState.FINISHED
+        assert uid_map["o-5"] == "o-5"
+
+
+@pytest.mark.asyncio
 async def test_both_rich_conflict_is_skipped(test_db):
     async with _cleanup():
         await seed_tournament(_vekn_created("x-4", "999", rich=True))

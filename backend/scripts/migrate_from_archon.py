@@ -50,7 +50,10 @@ id): match by uid, else by `external_ids.archon` (set when a previous run
 merged the rich payload into a vekn-created copy), else by `external_ids.vekn`
 — rich data merges INTO the vekn-created copy (its uid survives, deep links
 stay valid); a round-less incoming copy never overwrites a rich original (echo
-guard); both rich is a one-app-per-event violation: logged loudly, skipped.
+guard, on every match path — uid and marker included, where legacy's copy of an
+event run live in the new app stays round-less forever); on the vekn/name paths
+both rich is a one-app-per-event violation: logged loudly, skipped (on the
+uid/marker paths both rich is a legacy-run event mid-merge — legacy wins).
 
 Dry-run against the sandbox (from the repo root):
     OLD_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_old \\
@@ -1371,6 +1374,21 @@ async def process_tournament_row(
             existing = await db.get_tournament_by_uid(live_uid) if live_uid else None
             if existing is not None:
                 target_uid = existing.uid
+        if (
+            existing is not None
+            and not d.get("rounds")
+            and (existing.rounds or existing.finals)
+        ):
+            # Echo guard, uid/marker edition: a legacy-born event later run live
+            # in the new app (the supported cutover flow) leaves legacy's copy
+            # round-less at Registration forever — without this, every nightly
+            # merge reverts the rich row's play data + state to that stale copy
+            # (wiped 'Open de Coya 2026', vekn 13412, on 2026-08-03). Both-rich
+            # stays an overwrite here: a legacy-run event is rich on both sides
+            # after its first merge, and legacy owns it until finished there.
+            uid_map[old_uid] = target_uid
+            stats.bump("tournaments.echo_skipped_by_uid")
+            return
         if existing is None and vekn_eid:
             x = await live_tournament_by_vekn(vekn_eid)
             if x is not None:
