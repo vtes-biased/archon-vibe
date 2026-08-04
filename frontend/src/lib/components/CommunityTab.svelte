@@ -7,6 +7,7 @@
   import { deobfuscateContact } from "$lib/contact";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
+  import { canModerateLink, canPromoteLinkNational, canPromoteLinkGlobal } from "$lib/engine";
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunityModerationActions from "./CommunityModerationActions.svelte";
@@ -34,12 +35,12 @@
   let searchQuery = $state("");
   let selectedLanguage = $state("");
 
-  const isOfficial = $derived(
-    auth.user?.roles?.some((r: string) => r === "IC" || r === "NC" || r === "Prince") ?? false
-  );
-  const isModerator = $derived(isOfficial);
-  const isIC = $derived(auth.user?.roles?.includes("IC") ?? false);
-  const isNC = $derived(auth.user?.roles?.includes("NC") ?? false);
+  // Moderation is scoped to the link's owner, so these stay per-target: an NC
+  // moderates their own country, IC anywhere. Reading engineReady() keeps the
+  // deriveds that call them recomputing once WASM lands.
+  const canModerate = (target: User) => canModerateLink(auth.user, target).allowed;
+  const canPromoteNational = (target: User) => canPromoteLinkNational(auth.user, target).allowed;
+  const canPromoteGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
 
   const pinScope = (l: CommunityLink) =>
     l.moderation?.status === "promoted" ? l.moderation.scope : null;
@@ -63,7 +64,7 @@
       const country = u.country || "??";
       const socialLinks = (u.community_links || []).filter(l =>
         SOCIAL_TYPES.has(l.type) && pinScope(l) !== "global" &&
-        (l.moderation?.status !== "hidden" || isModerator)
+        (l.moderation?.status !== "hidden" || canModerate(u))
       );
       if (socialLinks.length === 0) continue;
       if (!grouped.has(country)) grouped.set(country, []);
@@ -105,7 +106,7 @@
       for (const l of u.community_links || []) {
         if (!CONTENT_TYPES.has(l.type)) continue;
         if (pinScope(l) === "global") continue; // shown once in Global Resources
-        if (l.moderation?.status === "hidden" && !isModerator) continue;
+        if (l.moderation?.status === "hidden" && !canModerate(u)) continue;
         if (selectedLanguage && l.languages?.length && !l.languages.includes(selectedLanguage)) continue;
         items.push({ user: u, link: l });
       }
@@ -264,7 +265,7 @@
         <Globe class="w-5 h-5 text-accent" />
         <h2 class="text-lg font-medium text-ink-strong">{m.community_global_resources()}</h2>
       </div>
-      {#if isIC}
+      {#if canPromoteGlobal}
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
           {#each globalLinks as { user, link } (user.uid + link.url)}
             <div class="flex items-center gap-1">
@@ -326,9 +327,9 @@
         groups={socialGroups}
         {expandedCountries}
         userCountry={auth.user?.country ?? null}
-        {isModerator}
-        {isIC}
-        {isNC}
+        {canModerate}
+        {canPromoteNational}
+        {canPromoteGlobal}
         onToggleCountry={toggleCountry}
         onModerate={handleModerate}
       />
@@ -347,10 +348,9 @@
         items={contentItems}
         languages={contentLanguages}
         {selectedLanguage}
-        {isModerator}
-        {isIC}
-        {isNC}
-        viewerCountry={auth.user?.country ?? null}
+        {canModerate}
+        {canPromoteNational}
+        {canPromoteGlobal}
         onSelectLanguage={(lang) => { selectedLanguage = lang; }}
         onModerate={handleModerate}
       />

@@ -393,13 +393,14 @@ pub const CAPABILITIES: &[Rule] = &[
         deny_scope: None,
     },
     // ---- Community links --------------------------------------------------
-    // Self-service: officials pin and clear their own links.
+    // Officials pin and clear their own links through the same grant — an NC is
+    // trivially in their own country — so no self-service row is needed.
     Rule {
         capability: Capability::ModerateLink,
         name: "moderate_link",
         global: &[IC],
-        same_country: &[NC, Prince],
-        self_service: true,
+        same_country: &[NC],
+        self_service: false,
         organizer: false,
         deny: "You don't have permission to moderate this member's links",
         deny_scope: Some("You can only moderate links for members in your country"),
@@ -1342,12 +1343,18 @@ mod tests {
     fn test_link_moderation_scopes() {
         assert!(over_country(
             Capability::ModerateLink,
-            &ctx(vec![Prince], Some("FR")),
+            &ctx(vec![NC], Some("FR")),
             Some("FR")
         ));
         assert!(!over_country(
             Capability::ModerateLink,
-            &ctx(vec![Prince], Some("US")),
+            &ctx(vec![NC], Some("US")),
+            Some("FR")
+        ));
+        // Princes do not moderate links at all.
+        assert!(!over_country(
+            Capability::ModerateLink,
+            &ctx(vec![Prince], Some("FR")),
             Some("FR")
         ));
         // Promotion narrows as it widens in reach: national is NC, global is IC.
@@ -1370,13 +1377,20 @@ mod tests {
 
     #[test]
     fn test_officials_moderate_their_own_links() {
-        let prince = ctx(vec![Prince], Some("FR"));
-        assert!(allows(
-            Capability::ModerateLink,
-            &Request::new(&prince, "me")
-                .target_uid("me")
-                .target_country(Some("US"))
-        ));
+        // Officials pin their own links through the ordinary grant, not a
+        // self-service exemption — so an unprivileged member gets no such reach.
+        let nc = ctx(vec![NC], Some("FR"));
+        let member = ctx(vec![], Some("FR"));
+        let own = |actor| {
+            allows(
+                Capability::ModerateLink,
+                &Request::new(actor, "me")
+                    .target_uid("me")
+                    .target_country(Some("FR")),
+            )
+        };
+        assert!(own(&nc));
+        assert!(!own(&member));
     }
 
     // ---- Sanctions --------------------------------------------------------

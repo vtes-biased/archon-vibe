@@ -44,12 +44,12 @@ MATRIX = [
     # --- non-official is locked out of every action ---
     ([], "hide", "FR", 403),
     ([Role.JUDGE], "hide", "FR", 403),
-    # --- hide/clear: IC anywhere, NC/Prince same-country only ---
+    # --- hide/clear: IC anywhere, NC same-country only; never a Prince ---
     ([Role.IC], "hide", "FR", 200),
     ([Role.IC], "hide", "US", 200),
     ([Role.NC], "hide", "FR", 200),
     ([Role.NC], "hide", "US", 403),
-    ([Role.PRINCE], "clear", "FR", 200),
+    ([Role.PRINCE], "clear", "FR", 403),
     ([Role.PRINCE], "clear", "US", 403),
     # --- promote_national: IC anywhere, NC same-country; NOT Prince ---
     ([Role.IC], "promote_national", "US", 200),

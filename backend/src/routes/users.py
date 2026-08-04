@@ -469,30 +469,20 @@ async def moderate_community_link(
 ) -> Response:
     """Moderate a community link on a target user.
 
-    Hide/clear: IC anywhere, NC/Prince in the same country as the target.
-    promote_national: IC anywhere, NC in the same country (not Prince —
-    "top level for country" is the NC's call).
+    Hide/clear: IC anywhere, NC in the same country as the target.
+    promote_national: same, but never delegated further down.
     promote_global: IC only.
     Self-moderation is allowed: officials pin their own links this way.
     """
-    is_ic = Role.IC in current_user.roles
-    is_nc = Role.NC in current_user.roles
-    is_prince = Role.PRINCE in current_user.roles
-    if not (is_ic or is_nc or is_prince):
-        raise HTTPException(
-            status_code=403, detail="Only IC/NC/Prince can moderate links"
-        )
-
     # Get target user
     target = await get_user_by_uid(user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    same_country = current_user.country == target.country
     mod: LinkModeration | None
     match request.action:
         case "hide" | "clear":
-            if not is_ic and not same_country:
+            if not permissions.can_moderate_link(current_user, target):
                 raise HTTPException(
                     status_code=403,
                     detail="Can only moderate links in your country",
@@ -505,7 +495,7 @@ async def moderate_community_link(
                 else None
             )
         case "promote_national":
-            if not (is_ic or (is_nc and same_country)):
+            if not permissions.can_promote_link_national(current_user, target):
                 raise HTTPException(
                     status_code=403,
                     detail="Only IC, or the country's NC, can promote nationally",
@@ -517,7 +507,7 @@ async def moderate_community_link(
                 scope="national",
             )
         case "promote_global":
-            if not is_ic:
+            if not permissions.can_promote_link_global(current_user):
                 raise HTTPException(
                     status_code=403, detail="Only IC can promote globally"
                 )

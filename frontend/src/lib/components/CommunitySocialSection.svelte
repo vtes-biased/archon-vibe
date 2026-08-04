@@ -17,13 +17,13 @@
     groups: CountryGroup[];
     expandedCountries: Set<string>;
     userCountry: string | null;
-    isModerator: boolean;
-    isIC: boolean;
-    isNC: boolean;
+    canModerate: (user: User) => boolean;
+    canPromoteNational: (user: User) => boolean;
+    canPromoteGlobal: boolean;
     onToggleCountry: (code: string) => void;
     onModerate: (userUid: string, url: string, action: string) => void;
   }
-  let { groups, expandedCountries, userCountry, isModerator, isIC, isNC, onToggleCountry, onModerate }: Props = $props();
+  let { groups, expandedCountries, userCountry, canModerate, canPromoteNational, canPromoteGlobal, onToggleCountry, onModerate }: Props = $props();
 </script>
 
 {#if groups.length > 0}
@@ -66,7 +66,7 @@
                     {/if}
                   </div>
                 {/if}
-                {#if isModerator}
+                {#if canModerate(user)}
                   <div class="flex flex-wrap gap-3">
                     {#each links as link}
                       <div class="flex flex-col items-center gap-1">
@@ -75,8 +75,8 @@
                           userUid={user.uid}
                           {link}
                           {onModerate}
-                          canPromoteNational={isIC || (isNC && userCountry === user.country)}
-                          canPromoteGlobal={isIC}
+                          canPromoteNational={canPromoteNational(user)}
+                          {canPromoteGlobal}
                         />
                       </div>
                     {/each}

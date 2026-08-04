@@ -17,14 +17,13 @@
     items: ContentItem[];
     languages: string[];
     selectedLanguage: string;
-    isModerator: boolean;
-    isIC: boolean;
-    isNC: boolean;
-    viewerCountry: string | null;
+    canModerate: (user: User) => boolean;
+    canPromoteNational: (user: User) => boolean;
+    canPromoteGlobal: boolean;
     onSelectLanguage: (lang: string) => void;
     onModerate: (userUid: string, url: string, action: string) => void;
   }
-  let { items, languages, selectedLanguage, isModerator, isIC, isNC, viewerCountry, onSelectLanguage, onModerate }: Props = $props();
+  let { items, languages, selectedLanguage, canModerate, canPromoteNational, canPromoteGlobal, onSelectLanguage, onModerate }: Props = $props();
 
   const scope = (link: CommunityLink) =>
     link.moderation?.status === "promoted" ? link.moderation.scope : null;
@@ -77,13 +76,13 @@
             {/if}
           </div>
         </div>
-        {#if isModerator}
+        {#if canModerate(user)}
           <CommunityModerationActions
             userUid={user.uid}
             {link}
             {onModerate}
-            canPromoteNational={isIC || (isNC && viewerCountry === user.country)}
-            canPromoteGlobal={isIC}
+            canPromoteNational={canPromoteNational(user)}
+            {canPromoteGlobal}
           />
         {/if}
       </div>
