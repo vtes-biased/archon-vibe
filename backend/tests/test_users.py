@@ -234,6 +234,44 @@ async def test_update_user_requires_edit_authority(test_db, test_client: AsyncCl
 
 
 @pytest.mark.asyncio
+async def test_role_only_edit_without_profile_authority(
+    test_db, test_client: AsyncClient
+):
+    """A Rulemonger appoints Judges anywhere without holding profile authority.
+
+    Profile fields and roles are two independent gates over one endpoint: the
+    baseline can_edit_user check used to run first, so the appointment matrix's
+    grants to a bare Rulemonger/PTC were unreachable unless they also held
+    IC/NC. A roles-only request now passes; a profile field still does not.
+    """
+    actor = await _mk_user("FR", [Role.RULEMONGER], vekn="2000001")
+    target = await _mk_user("US", [], vekn="2000002")
+
+    resp = await test_client.put(
+        f"/api/users/{target.uid}",
+        json={"roles": [Role.JUDGE.value]},
+        headers=make_auth_header(actor.uid),
+    )
+    assert resp.status_code == 200
+    assert (await db.get_user_by_uid(target.uid)).roles == [Role.JUDGE]
+
+    # ...but the same actor may not ride a profile edit in alongside it.
+    resp = await test_client.put(
+        f"/api/users/{target.uid}",
+        json={"roles": [Role.JUDGE.value], "name": "Hijacked"},
+        headers=make_auth_header(actor.uid),
+    )
+    assert resp.status_code == 403
+    # ...nor appoint a role outside their own matrix row.
+    resp = await test_client.put(
+        f"/api/users/{target.uid}",
+        json={"roles": [Role.PRINCE.value]},
+        headers=make_auth_header(actor.uid),
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_country_change_authority_for_officials(
     test_db, test_client: AsyncClient
 ):

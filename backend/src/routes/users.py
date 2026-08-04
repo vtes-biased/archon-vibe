@@ -188,8 +188,17 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Baseline edit authority: self, IC (anyone), or NC/Prince same-country.
-    if not permissions.can_edit_user(current_user, user):
+    # Two independent gates over one endpoint: profile fields take edit
+    # authority, roles take the appointment matrix. A Rulemonger or PTC holds
+    # the second without the first, so a roles-only request must not be turned
+    # away here — but any profile field they send still is.
+    edits_profile = any(
+        field is not None
+        for field in (name, country, city, city_geoname_id, state, nickname)
+    )
+    if not permissions.can_edit_user(current_user, user) and (
+        edits_profile or roles is None
+    ):
         raise HTTPException(
             status_code=403, detail="You don't have permission to edit this user"
         )
