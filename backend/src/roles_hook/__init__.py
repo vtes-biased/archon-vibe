@@ -25,7 +25,7 @@ METADATA = [
     {
         "key": "judge",
         "name": "Judge Level",
-        "description": "VEKN judge certification (1: Judgekin, 2: Judge, 3: Rulemonger)",
+        "description": "VEKN judge certification (1: Sheriff, 2: Judge, 3: Rulemonger)",
         "type": 2,
     },
     {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getCountryFlag } from "$lib/geonames";
-  import { getRoleClasses } from "$lib/roles";
+  import { getRoleClasses, getRoleLabel } from "$lib/roles";
   import { LANGUAGE_NAMES } from "$lib/data/languages";
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
@@ -69,7 +69,7 @@
               <span>{getCountryFlag(user.country)}</span>
             {/if}
             {#each user.roles.filter(r => r === "NC" || r === "Prince" || r === "IC") as role}
-              <span class="px-1.5 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{role}</span>
+              <span class="px-1.5 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{getRoleLabel(role)}</span>
             {/each}
             {#if (link.languages?.length ?? 0) > 1}
               <span class="text-ink-faint tracking-wide">{link.languages!.map(c => c.toUpperCase()).join(" · ")}</span>

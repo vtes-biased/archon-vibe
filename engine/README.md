@@ -83,7 +83,7 @@ const updatedTournament = engine.processTournamentEvent(
 
 **Single source of truth for all authorization predicates** — consumed by backend (PyO3) and frontend (WASM). See `.pst/details/72-authz-rust-single-source.md` for the design rationale.
 
-Role hierarchy: IC > NC > Prince (country-scoped) > Judge/Judgekin
+Role hierarchy: IC > NC > Prince (country-scoped) > Judge/Judgekin (displayed as Sheriff)
 
 **User predicates** (take `UserContext {roles, country, vekn_id}`):
 - `can_change_role(actor, target, role)` — can actor grant/revoke a role

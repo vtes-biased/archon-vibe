@@ -6,7 +6,7 @@
   import DeceasedIcon from "./DeceasedIcon.svelte";
   import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { getRoleClasses } from "$lib/roles";
+  import { getRoleClasses, getRoleLabel } from "$lib/roles";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { isOfficial as engineIsOfficial } from "$lib/engine";
@@ -425,7 +425,7 @@
                     ? getRoleClasses(role)
                     : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
                 >
-                  {role}
+                  {getRoleLabel(role)}
                 </button>
               {/each}
             </div>
@@ -577,7 +577,7 @@
                             role,
                           )}"
                         >
-                          {role}
+                          {getRoleLabel(role)}
                         </span>
                       {/each}
                     </div>
@@ -613,7 +613,7 @@
                               role,
                             )}"
                           >
-                            {role}
+                            {getRoleLabel(role)}
                           </span>
                         {/each}
                       </div>

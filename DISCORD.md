@@ -22,7 +22,7 @@ Three `INTEGER_GREATER_THAN_OR_EQUAL` fields — `roles_hook/__init__.py` `METAD
 | Key | Shown in Discord as | Values |
 |-----|---------------------|--------|
 | `organization` | VEKN Role | 1 Member · 2 Prince · 3 NC · 4 IC |
-| `judge` | Judge Level | 1 Judgekin · 2 Judge · 3 Rulemonger |
+| `judge` | Judge Level | 1 Sheriff · 2 Judge · 3 Rulemonger |
 | `playtest` | Playtest Role | 1 Playtester · 2 Playtest Coordinator |
 
 `build_metadata()` takes the **max** matching level per axis, and falls back to

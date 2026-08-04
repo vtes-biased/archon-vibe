@@ -24,7 +24,7 @@ The VEKN has set up different roles in the organization to support players aroun
 - **NC** National Coordinators support organized play at national level, and appoint Princes.
 - **Prince** Princes support VTES in their locality. They organize regular gaming sessions at a store or public location, demos, and tournaments.
 - **Rulemonger** Rulemongers maintain cards rulings and advise the Inner Circle on rules changes and Judges designation
-- **Judge** / **Judgekin** Judges and judgekins answer players questions about the rules, and arbitrate issues during organized events.
+- **Judge** / **Sheriff** Judges and sheriffs answer players questions about the rules, and arbitrate issues during organized events.
 - **PTC** Playtest Coordinators advise the Inner Circle on playtest procedures, and Playtesters appointments.
 - **Playtester** Playtesters advise the Inner Circle on new cards design by testing candidate cards in actual play, under NDA.
 - **Ethics** Members of the Ethics Committe are responsible for upholding VEKN's Code of Ethics.

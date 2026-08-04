@@ -1,4 +1,5 @@
 import type { Role } from '$lib/types';
+import * as m from '$lib/paraglide/messages.js';
 
 // Gothic-inspired muted role colors - see DESIGN.md
 // Uses semantic badge-* classes from app.css for light/dark mode support
@@ -18,6 +19,18 @@ const ROLE_CLASSES: Record<Role, string> = {
 
 export function getRoleClasses(role: Role): string {
   return ROLE_CLASSES[role];
+}
+
+// Roles render as their stored value except where the two diverge. The stored
+// value "Judgekin" is DISPLAYED AS "Sheriff": renaming the value would mean a
+// data migration during a live parallel run, for a badge.
+const ROLE_LABELS: Partial<Record<Role, () => string>> = {
+  Judgekin: m.role_judgekin,
+};
+
+/** The user-facing name of a role — never the raw value. */
+export function getRoleLabel(role: Role): string {
+  return ROLE_LABELS[role]?.() ?? role;
 }
 
 /**
