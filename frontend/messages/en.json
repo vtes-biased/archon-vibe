@@ -503,6 +503,7 @@
   "tournaments_view_all": "All Tournaments",
   "tournaments_ongoing": "Ongoing",
   "tournaments_all_states": "All",
+  "tournaments_state_upcoming": "Upcoming",
   "tournaments_include_online": "Include online",
   "tournaments_col_name": "Name",
   "tournaments_col_date": "Date",

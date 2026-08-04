@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getLeague } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getLeague, type TournamentStateFilter } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
   import { getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
@@ -70,7 +70,11 @@
     const timer = setTimeout(() => { debouncedSearch = q; }, 250);
     return () => clearTimeout(timer);
   });
-  let ongoing = $state(urlParams.get("ongoing") === "true");
+  const STATE_FILTERS: TournamentStateFilter[] = ["all", "upcoming", "ongoing", "finished"];
+  const urlState = urlParams.get("state");
+  let selectedState = $state<TournamentStateFilter>(
+    STATE_FILTERS.includes(urlState as TournamentStateFilter) ? (urlState as TournamentStateFilter) : "all",
+  );
   let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
   let selectedFormat = $state<string>(urlParams.get("format") ?? "all");
   let includeOnline = $state(urlParams.get("online") !== "false");
@@ -86,6 +90,14 @@
   const countries = getCountries();
   const sortedCountries = getSortedCountries();
   const formats: TournamentFormat[] = ["Standard", "V5", "Limited"];
+  // Finished is authenticated-only: logged-out viewers are restricted to
+  // current + upcoming (excludePast below), so it would always come up empty.
+  const stateOptions = $derived<{ value: TournamentStateFilter; label: string }[]>([
+    { value: "all", label: m.tournaments_all_states() },
+    { value: "upcoming", label: m.tournaments_state_upcoming() },
+    { value: "ongoing", label: m.tournaments_ongoing() },
+    ...(auth.isAuthenticated ? [{ value: "finished" as const, label: m.state_finished() }] : []),
+  ]);
 
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
   const canCreate = $derived(canCreateTournament(auth.user).allowed);
@@ -120,7 +132,7 @@
           user.uid,
           user.country!,
           continentCountries,
-          { ongoing, includeOnline, format: selectedFormat, search: debouncedSearch },
+          { state: selectedState, includeOnline, format: selectedFormat, search: debouncedSearch },
           page,
           PAGE_SIZE,
         );
@@ -130,7 +142,7 @@
       } else {
         const result = await getFilteredTournaments(
           {
-            ongoing,
+            state: selectedState,
             includeOnline,
             country: selectedCountry,
             format: selectedFormat,
@@ -171,7 +183,7 @@
   // Re-query when filters or page change
   $effect(() => {
     const _s = debouncedSearch;
-    const _o = ongoing;
+    const _o = selectedState;
     const _c = selectedCountry;
     const _f = selectedFormat;
     const _io = includeOnline;
@@ -182,7 +194,7 @@
   });
 
   const filterKey = $derived(
-    [debouncedSearch, ongoing, selectedCountry, selectedFormat, includeOnline, viewMode].join("|"),
+    [debouncedSearch, selectedState, selectedCountry, selectedFormat, includeOnline, viewMode].join("|"),
   );
 
   // Reset page when filters change. Comparing against the last key rather than
@@ -211,7 +223,7 @@
   $effect(() => {
     syncQueryParams({
       q: debouncedSearch,
-      ongoing: ongoing ? "true" : null,
+      state: selectedState === "all" ? null : selectedState,
       country: selectedCountry === "all" ? null : selectedCountry,
       format: selectedFormat === "all" ? null : selectedFormat,
       online: includeOnline ? null : "false",
@@ -378,15 +390,18 @@
           </div>
         {/if}
 
-        <!-- Ongoing toggle -->
-        <div class="flex items-center gap-3 pb-1">
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" bind:checked={ongoing} class="sr-only peer" />
-            <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
-              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={ongoing}></div>
-            </div>
-            <span class="text-sm text-ink">{m.tournaments_ongoing()}</span>
-          </label>
+        <!-- State -->
+        <div class="min-w-[130px]">
+          <label for="state-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_col_state()}</label>
+          <select
+            id="state-filter"
+            bind:value={selectedState}
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+          >
+            {#each stateOptions as option}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
         </div>
 
         <!-- Include online -->
@@ -570,7 +585,7 @@
         </div>
         <h3 class="text-lg font-medium text-ink-strong mb-2">{m.tournaments_no_results()}</h3>
         <p class="text-ink-muted">
-          {#if searchQuery.trim() || selectedCountry !== "all" || selectedFormat !== "all"}
+          {#if searchQuery.trim() || selectedCountry !== "all" || selectedFormat !== "all" || selectedState !== "all"}
             {m.tournaments_adjust_filters()}
           {:else if viewMode === "agenda"}
             {m.tournaments_agenda_empty()}

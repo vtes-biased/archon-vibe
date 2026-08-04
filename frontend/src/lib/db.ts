@@ -645,30 +645,62 @@ export interface FilteredTournamentsResult {
 
 const ONGOING_STATES: Set<string> = new Set(['Registration', 'Waiting', 'Playing']);
 
+/** Which slice of the calendar a list shows. */
+export type TournamentStateFilter = 'all' | 'upcoming' | 'ongoing' | 'finished';
+
+/** Naive local wall-clock "today", same format as Tournament.start. */
+function todayCutoff(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00`;
+}
+
+const tournamentDate = (t: Tournament) => t.start || t.modified;
+
+/**
+ * "Upcoming" = not Finished and dated today or later — plus actually-running
+ * events (Playing/Waiting) from an earlier date, which belong with the live ones.
+ */
+function isUpcoming(t: Tournament, cutoff: string): boolean {
+  return (
+    t.state !== 'Finished' &&
+    (tournamentDate(t) >= cutoff || t.state === 'Playing' || t.state === 'Waiting')
+  );
+}
+
+/** Shared by both list queries so the filter and the divider agree on "upcoming". */
+function matchesState(t: Tournament, state: TournamentStateFilter, cutoff: string): boolean {
+  switch (state) {
+    case 'upcoming':
+      return isUpcoming(t, cutoff);
+    case 'ongoing':
+      return ONGOING_STATES.has(t.state);
+    case 'finished':
+      return t.state === 'Finished';
+    default:
+      return true;
+  }
+}
+
 /**
  * Sort in place: upcoming/current events ascending (soonest first), then past
  * events descending (most recent first). Returns the upcoming cluster size so
- * callers can render an Upcoming/Past divider. "Upcoming" = not Finished and
- * dated today or later — plus actually-running events (Playing/Waiting) from an
- * earlier date, which belong above the divider while live.
+ * callers can render an Upcoming/Past divider. Filtering to Finished therefore
+ * needs no separate sort flip: with no upcoming events left, the whole list is
+ * the past cluster, most recent first.
  */
 export function sortUpcomingFirst(items: Tournament[]): number {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  // Naive local wall-clock cutoff, same format as Tournament.start.
-  const cutoff = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00`;
-  const date = (t: Tournament) => t.start || t.modified;
-  const isUpcoming = (t: Tournament) =>
-    t.state !== 'Finished' &&
-    (date(t) >= cutoff || t.state === 'Playing' || t.state === 'Waiting');
+  const cutoff = todayCutoff();
+  const date = tournamentDate;
+  const isUpcomingHere = (t: Tournament) => isUpcoming(t, cutoff);
   let upcomingCount = 0;
   items.sort((a, b) => {
-    const ua = isUpcoming(a);
-    if (ua !== isUpcoming(b)) return ua ? -1 : 1;
+    const ua = isUpcomingHere(a);
+    if (ua !== isUpcomingHere(b)) return ua ? -1 : 1;
     return ua ? date(a).localeCompare(date(b)) : date(b).localeCompare(date(a));
   });
   for (const t of items) {
-    if (!isUpcoming(t)) break;
+    if (!isUpcomingHere(t)) break;
     upcomingCount++;
   }
   return upcomingCount;
@@ -676,7 +708,7 @@ export function sortUpcomingFirst(items: Tournament[]): number {
 
 export async function getFilteredTournaments(
   filters: {
-    ongoing?: boolean;
+    state?: TournamentStateFilter;
     includeOnline?: boolean;
     country?: string;
     format?: string;
@@ -699,8 +731,9 @@ export async function getFilteredTournaments(
   }
 
   // Apply filters in JS
-  if (filters.ongoing) {
-    items = items.filter(t => ONGOING_STATES.has(t.state));
+  if (filters.state && filters.state !== 'all') {
+    const cutoff = todayCutoff();
+    items = items.filter(t => matchesState(t, filters.state!, cutoff));
   }
   // Logged-out viewers see current + upcoming only (no finished/past events).
   if (filters.excludePast) {
@@ -740,7 +773,7 @@ export async function getAgendaTournaments(
   userUid: string,
   userCountry: string,
   continentCountries: string[],
-  filters: { ongoing?: boolean; includeOnline?: boolean; format?: string; search?: string },
+  filters: { state?: TournamentStateFilter; includeOnline?: boolean; format?: string; search?: string },
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
@@ -767,8 +800,9 @@ export async function getAgendaTournaments(
   });
 
   // Apply additional filters
-  if (filters.ongoing) {
-    items = items.filter(t => ONGOING_STATES.has(t.state));
+  if (filters.state && filters.state !== 'all') {
+    const cutoff = todayCutoff();
+    items = items.filter(t => matchesState(t, filters.state!, cutoff));
   }
   if (filters.format && filters.format !== 'all') {
     items = items.filter(t => t.format === filters.format);
