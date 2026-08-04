@@ -4,9 +4,10 @@
   import { onMount } from "svelte";
   import {
     getAuthState, getAccessToken, logout,
-    initAuth, storeTokensFromCallback, hasAnyRole,
+    initAuth, storeTokensFromCallback,
     requestMagicLink,
   } from "$lib/stores/auth.svelte";
+  import { canManageOauthClients, canRunAdminSync } from "$lib/engine";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
   import { syncManager } from "$lib/sync";
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
@@ -29,8 +30,8 @@
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
   const auth = $derived(getAuthState());
-  const isDev = $derived(hasAnyRole('DEV', 'IC'));
-  const isIC = $derived(hasAnyRole('IC'));
+  const isDev = $derived(canManageOauthClients(auth.user).allowed);
+  const canAdminister = $derived(canRunAdminSync(auth.user).allowed);
 
   let discordMessage = $state("");
   let discordError = $state("");
@@ -284,7 +285,7 @@
         {#if isDev}
           <DeveloperSection />
         {/if}
-        {#if isIC}
+        {#if canAdminister}
           <AdminSection />
         {/if}
         <DataSection onResync={handleResync} onLogout={handleLogout} />

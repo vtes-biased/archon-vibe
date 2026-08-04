@@ -15,12 +15,12 @@
 
   let {
     promos,
-    isIC = false,
+    canManagePromo = false,
     onclose,
     onrecorded,
   }: {
     promos: Promo[]; // active promos
-    isIC?: boolean;
+    canManagePromo?: boolean;
     onclose: () => void;
     onrecorded: () => void;
   } = $props();
@@ -74,7 +74,7 @@
         promo_uid: promoUid,
         qty: qty!,
         to_uid: kind === "assignment" ? toUser!.uid : undefined,
-        from_uid: isIC && fromUser ? fromUser.uid : undefined,
+        from_uid: canManagePromo && fromUser ? fromUser.uid : undefined,
         note: note.trim() || undefined,
         // Local noon → stable calendar date in every timezone.
         happened_at: new Date(`${happenedAt}T12:00:00`).toISOString(),
@@ -182,7 +182,7 @@
         </div>
       {/if}
 
-      {#if isIC}
+      {#if canManagePromo}
         <!-- from_uid doubles as the receiving holder for intakes -->
         <div>
           <span class="block text-sm text-ink-muted mb-1">

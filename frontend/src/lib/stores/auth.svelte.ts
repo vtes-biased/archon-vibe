@@ -562,23 +562,6 @@ export function getAuthState(): AuthState {
 }
 
 /**
- * Check if the current user has a specific role.
- */
-export function hasRole(role: string): boolean {
-  return authState.user?.roles.includes(role as User["roles"][number]) ?? false;
-}
-
-/**
- * Check if the current user has any of the specified roles.
- */
-export function hasAnyRole(...roles: string[]): boolean {
-  if (!authState.user) return false;
-  return roles.some((role) =>
-    authState.user!.roles.includes(role as User["roles"][number])
-  );
-}
-
-/**
  * Request a magic link email for signup or password reset.
  * @param email User's email address
  * @param purpose "signup" for new accounts, "reset" for password reset

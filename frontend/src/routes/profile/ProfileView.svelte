@@ -6,6 +6,7 @@
   import Button from "$lib/components/Button.svelte";
   import { updateProfile } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
+  import { canChangeCountry, isOfficial as engineIsOfficial } from "$lib/engine";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
   import type { CommunityLinkType } from "$lib/types";
@@ -29,16 +30,13 @@
   const sortedCountries = Object.values(countries).sort((a, b) => a.name.localeCompare(b.name));
   let copied = $state(false);
 
-  const isOfficial = $derived(
-    user?.roles?.some((r: string) => r === "IC" || r === "NC" || r === "Prince") ?? false
-  );
+  // Identity, not authority: it only decides which contact-visibility note to show.
+  const isOfficial = $derived(engineIsOfficial(user ?? null));
 
-  // NC/Prince may not change their own country (the backend returns 403): changing it
-  // would move the scope their FULL projection is computed for. IC is unrestricted.
-  const isCountryLocked = $derived(
-    !user?.roles?.includes("IC") &&
-      (user?.roles?.some((r: string) => r === "NC" || r === "Prince") ?? false)
-  );
+  // An official may not move their own country — it would move the scope their
+  // FULL projection is computed for, so it takes the authority that could change
+  // their highest role, which self-service never has.
+  const isCountryLocked = $derived(!!user && !canChangeCountry(user, user).allowed);
 
   // svelte-ignore state_referenced_locally
   const initial = { ...user };

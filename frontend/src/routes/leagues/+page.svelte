@@ -3,7 +3,8 @@
   import { getAllLeagues } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { hasAnyRole, getAuthState } from "$lib/stores/auth.svelte";
+  import { getAuthState } from "$lib/stores/auth.svelte";
+  import { canManageLeagues } from "$lib/engine";
   import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
   import { Loader2, BarChart3 } from "@lucide/svelte";
@@ -20,8 +21,8 @@
   let showPast = $state(false);
 
   const countries = getCountries();
-  const canCreate = $derived(hasAnyRole("IC", "NC"));
   const auth = $derived(getAuthState());
+  const canCreate = $derived(canManageLeagues(auth.user).allowed);
   // Logged-out viewers never see past leagues; the toggle is hidden for them, so a
   // stale showPast=true (toggled on before logout) must not leak through filter or copy.
   const effectiveShowPast = $derived(showPast && auth.isAuthenticated);

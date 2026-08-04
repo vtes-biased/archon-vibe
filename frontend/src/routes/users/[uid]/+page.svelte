@@ -4,7 +4,7 @@
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorVekn, canMergeAccounts } from "$lib/engine";
+  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorVekn, canMergeAccounts, canIssueRestrictedSanction } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
@@ -99,7 +99,9 @@
   const canIssueSanctions = $derived.by(() => {
     if (!auth.user || !user || !isOnline) return false;
     if (auth.user.uid === user.uid) return false;
-    return auth.user.roles.includes("IC") || auth.user.roles.includes("Ethics");
+    // Member-level sanctions only — an organizer's tournament-level powers are
+    // gated at the tournament, where the engine can see the event.
+    return canIssueRestrictedSanction(auth.user).allowed;
   });
 
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;

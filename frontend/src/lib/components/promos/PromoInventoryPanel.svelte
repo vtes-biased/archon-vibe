@@ -15,10 +15,10 @@
 
   let {
     promos,
-    isIC = false,
+    canManagePromo = false,
   }: {
     promos: Promo[];
-    isIC?: boolean;
+    canManagePromo?: boolean;
   } = $props();
 
   const online = $derived(isBrowserOnline());
@@ -174,7 +174,7 @@
 {#if showMovement}
   <RecordMovementModal
     promos={activePromos}
-    {isIC}
+    {canManagePromo}
     onclose={() => (showMovement = false)}
     onrecorded={() => (ledgerRefreshKey += 1)}
   />

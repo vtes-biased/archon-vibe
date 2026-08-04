@@ -16,11 +16,13 @@
   import OwnStockCard from "./OwnStockCard.svelte";
   import { Plus } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { canManagePromos, canViewFullPromoLedger } from "$lib/engine";
 
   const auth = $derived(getAuthState());
-  const isIC = $derived(auth.user?.roles?.includes("IC") ?? false);
-  const isNC = $derived(auth.user?.roles?.includes("NC") ?? false);
-  const isOfficial = $derived(isIC || isNC);
+  const canManagePromo = $derived(canManagePromos(auth.user).allowed);
+  // NC records intakes and sees the whole ledger, in any country — the promo
+  // inventory chain (IC -> NC -> organizer) is not country-scoped.
+  const canViewLedger = $derived(canViewFullPromoLedger(auth.user).allowed);
 
   let promos = $state<Promo[]>([]);
   let ownStock = $state<Record<string, number>>({});
@@ -101,15 +103,15 @@
     </div>
   {/if}
 
-  {#if isOfficial}
+  {#if canViewLedger}
     <div class="mb-8">
-      <PromoInventoryPanel {promos} {isIC} />
+      <PromoInventoryPanel {promos} {canManagePromo} />
     </div>
   {/if}
 
   <div class="flex items-center justify-between gap-3 mb-4">
     <h2 class="text-lg font-medium text-ink-strong">{m.promo_catalog_title()}</h2>
-    {#if isIC && promos.some((p) => p.active)}
+    {#if canManagePromo && promos.some((p) => p.active)}
       <!-- With no active promos displayed, the create CTA lives in the gallery
            empty state instead (one primary per surface). -->
       <Button variant="primary" onclick={openCreate}>
@@ -121,8 +123,8 @@
 
   <PromoGallery
     {promos}
-    {isIC}
-    {isOfficial}
+    {canManagePromo}
+    {canViewLedger}
     onedit={openEdit}
     ontoggleactive={toggleActive}
     ondelete={handleDelete}

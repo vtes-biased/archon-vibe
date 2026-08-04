@@ -4,7 +4,8 @@
   import { getFilteredTournaments, getAgendaTournaments, getLeague } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
-  import { hasAnyRole, getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
+  import { getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
+  import { canCreateTournament } from "$lib/engine";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import type { Tournament, TournamentFormat } from "$lib/types";
   import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
@@ -79,7 +80,7 @@
   const formats: TournamentFormat[] = ["Standard", "V5", "Limited"];
 
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
-  const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
+  const canCreate = $derived(canCreateTournament(auth.user).allowed);
 
   // League names for display, plus parent meta-league (keyed by league_uid)
   let leagueNames = $state<Record<string, string>>({});

@@ -7,7 +7,7 @@
   import { TriangleAlert, Flower2, Ban } from "@lucide/svelte";
   import { sponsorVeknMember, createUser, isOnline, ApiError } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import type { TournamentEventType } from "$lib/engine";
+  import { canSponsorVekn, type TournamentEventType } from "$lib/engine";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -33,11 +33,8 @@
 
   // Sponsor modal state
   let sponsorLoading = $state(false);
-  // Sponsor eligibility mirrors backend /vekn/sponsor: any official (IC/NC/
-  // Prince), any country — a visiting official can sponsor newcomers abroad.
-  const sponsorEligible = $derived(
-    (["IC", "NC", "Prince"] as const).some(r => auth.user?.roles.includes(r))
-  );
+  // Deliberately cross-country: a visiting official can sponsor newcomers abroad.
+  const sponsorEligible = $derived(canSponsorVekn(auth.user).allowed);
 
   // Create-and-register modal state
   let createName = $state('');

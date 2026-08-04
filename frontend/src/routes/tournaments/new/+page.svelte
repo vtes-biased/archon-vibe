@@ -4,12 +4,14 @@
   import { createTournament, createTournamentOffline, isOnline } from "$lib/api";
   import { saveTournament } from "$lib/db";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
-  import { hasAnyRole } from "$lib/stores/auth.svelte";
+  import { getAuthState } from "$lib/stores/auth.svelte";
+  import { canCreateTournament } from "$lib/engine";
   import Button from '$lib/components/Button.svelte';
   import { ArrowLeft, WifiOff } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  const canCreate = $derived(hasAnyRole("IC", "NC", "Prince"));
+  const auth = $derived(getAuthState());
+  const canCreate = $derived(canCreateTournament(auth.user).allowed);
 
   const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
 

@@ -548,6 +548,31 @@ export function canManageLeagues(actor: UserContext | null): PermissionResult {
   return checkPermission('manage_leagues', actor);
 }
 
+/** Break an offline device lock. */
+export function canForceUnlockTournament(actor: UserContext | null): PermissionResult {
+  return checkPermission('force_unlock_tournament', actor);
+}
+
+/** Create, edit and allocate promos. */
+export function canManagePromos(actor: UserContext | null): PermissionResult {
+  return checkPermission('manage_promos', actor);
+}
+
+/** See the whole promo ledger rather than one's own entries. */
+export function canViewFullPromoLedger(actor: UserContext | null): PermissionResult {
+  return checkPermission('view_full_promo_ledger', actor);
+}
+
+/** Register and revoke OAuth clients. */
+export function canManageOauthClients(actor: UserContext | null): PermissionResult {
+  return checkPermission('manage_oauth_clients', actor);
+}
+
+/** Trigger and inspect the VEKN/TWDA sync jobs. */
+export function canRunAdminSync(actor: UserContext | null): PermissionResult {
+  return checkPermission('run_admin_sync', actor);
+}
+
 /** Issue an organizer-level sanction at a tournament. */
 export function canIssueTournamentSanction(
   actor: UserContext | null,

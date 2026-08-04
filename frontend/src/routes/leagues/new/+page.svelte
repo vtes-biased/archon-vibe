@@ -3,14 +3,16 @@
   import { goto } from "$app/navigation";
   import { createLeague } from "$lib/api";
   import { saveLeague, getAllLeagues } from "$lib/db";
-  import { hasAnyRole } from "$lib/stores/auth.svelte";
+  import { getAuthState } from "$lib/stores/auth.svelte";
+  import { canManageLeagues } from "$lib/engine";
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import type { League, LeagueKind, LeagueStandingsMode } from "$lib/types";
   import Button from '$lib/components/Button.svelte';
   import { ArrowLeft } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  const canCreate = $derived(hasAnyRole("IC", "NC"));
+  const auth = $derived(getAuthState());
+  const canCreate = $derived(canManageLeagues(auth.user).allowed);
   const countries = getCountries();
 
   let name = $state("");

@@ -7,16 +7,16 @@
 
   let {
     promos,
-    isIC = false,
-    isOfficial = false,
+    canManagePromo = false,
+    canViewLedger = false,
     onedit,
     ontoggleactive,
     ondelete,
     oncreate,
   }: {
     promos: Promo[];
-    isIC?: boolean;
-    isOfficial?: boolean;
+    canManagePromo?: boolean;
+    canViewLedger?: boolean;
     onedit?: (promo: Promo) => void;
     ontoggleactive?: (promo: Promo) => void;
     ondelete?: (promo: Promo) => void;
@@ -28,7 +28,7 @@
   const displayed = $derived(showRetired ? promos : promos.filter((p) => p.active));
 </script>
 
-{#if isOfficial && retiredCount > 0}
+{#if canViewLedger && retiredCount > 0}
   <label class="flex items-center gap-2 mb-3 min-h-[44px] w-fit cursor-pointer">
     <input
       type="checkbox"
@@ -42,7 +42,7 @@
 {#if displayed.length > 0}
   <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
     {#each displayed as promo (promo.uid)}
-      <PromoCard {promo} {isIC} {onedit} {ontoggleactive} {ondelete} />
+      <PromoCard {promo} {canManagePromo} {onedit} {ontoggleactive} {ondelete} />
     {/each}
   </div>
 {:else}
@@ -50,7 +50,7 @@
     <Gift class="mx-auto h-12 w-12 text-ink-faint mb-4" aria-hidden="true" />
     <h3 class="text-lg font-medium text-ink-strong mb-2">{m.promo_gallery_empty()}</h3>
     <p class="text-ink-muted text-sm">{m.promo_gallery_empty_hint()}</p>
-    {#if isIC}
+    {#if canManagePromo}
       <div class="mt-4">
         <Button variant="primary" onclick={() => oncreate?.()}>
           <Plus class="w-4 h-4" aria-hidden="true" />

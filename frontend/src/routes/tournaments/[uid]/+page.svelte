@@ -5,7 +5,8 @@
   import { deleteTournamentApi, syncTournamentVekn, qrCheckin } from "$lib/api";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { getAuthState, hasAnyRole } from "$lib/stores/auth.svelte";
+  import { getAuthState } from "$lib/stores/auth.svelte";
+  import { canCreateMember, canForceUnlockTournament } from "$lib/engine";
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
@@ -121,10 +122,10 @@ import TournamentModals from "./TournamentModals.svelte";
   let showGoOnlineConfirm = $state(false);
   let showForceTakeoverConfirm = $state(false);
   let showForceUnlockConfirm = $state(false);
-  const isIC = $derived(hasAnyRole('IC'));
-  // Offline lock implies member-creation power at go-online — officials only
-  // (mirrors the backend gate on go-offline/force-takeover).
-  const isOfficial = $derived(hasAnyRole('IC', 'NC', 'Prince'));
+  const canForceUnlock = $derived(canForceUnlockTournament(auth.user).allowed);
+  // Offline lock implies member-creation power at go-online, so it takes the
+  // same authority as creating one online (mirrors go-offline/force-takeover).
+  const canGoOffline = $derived(canCreateMember(auth.user).allowed);
   let offlineActionLoading = $state(false);
   const lastSync = $derived(getLastSyncTime(uid));
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
@@ -674,12 +675,12 @@ import TournamentModals from "./TournamentModals.svelte";
               <span class="text-ink text-sm">{m.offline_locked_banner()}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              {#if isOrganizer && isOfficial}
+              {#if isOrganizer && canGoOffline}
                 <Button variant="ghost" size="md" disabled={offlineActionLoading} onclick={() => showForceTakeoverConfirm = true}>
                   {m.offline_force_takeover()}
                 </Button>
               {/if}
-              {#if isIC}
+              {#if canForceUnlock}
                 <Button variant="danger" size="md" disabled={offlineActionLoading} onclick={() => showForceUnlockConfirm = true}>
                   <TriangleAlert class="w-4 h-4" aria-hidden="true" />
                   {m.offline_force_unlock()}
@@ -754,7 +755,7 @@ import TournamentModals from "./TournamentModals.svelte";
             <Share2 class="w-4 h-4" aria-hidden="true" />
             {m.tournament_share()}
           </Button>
-          {#if showOrganizerView && !tournament.offline_mode && isOfficial}
+          {#if showOrganizerView && !tournament.offline_mode && canGoOffline}
             <Button variant="ghost" size="md" onclick={() => showGoOfflineConfirm = true}>
               <WifiOff class="w-4 h-4" />
               {m.offline_go_offline()}

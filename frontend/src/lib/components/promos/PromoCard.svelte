@@ -7,13 +7,13 @@
 
   let {
     promo,
-    isIC = false,
+    canManagePromo = false,
     onedit,
     ontoggleactive,
     ondelete,
   }: {
     promo: Promo;
-    isIC?: boolean;
+    canManagePromo?: boolean;
     onedit?: (promo: Promo) => void;
     ontoggleactive?: (promo: Promo) => void;
     ondelete?: (promo: Promo) => void;
@@ -59,7 +59,7 @@
     {#if !promo.active}
       <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 text-xs rounded badge-slate">{m.promo_retired()}</span>
     {/if}
-    {#if isIC}
+    {#if canManagePromo}
       <div class="absolute top-1 right-1">
         <ActionMenu
           label={m.common_more()}

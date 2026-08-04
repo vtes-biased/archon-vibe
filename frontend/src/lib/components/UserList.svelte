@@ -8,7 +8,8 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses } from "$lib/roles";
   import { syncManager } from "$lib/sync";
-  import { hasAnyRole, getAuthState } from "$lib/stores/auth.svelte";
+  import { getAuthState } from "$lib/stores/auth.svelte";
+  import { isOfficial as engineIsOfficial } from "$lib/engine";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
   import Button from '$lib/components/Button.svelte';
@@ -50,7 +51,8 @@
 
   // Officials receive members' contact info (full projection), so only they can
   // search by email/Discord — advertise it in the placeholder for them alone.
-  const isOfficial = hasAnyRole("IC", "NC", "Prince");
+  // Identity, not authority: the search itself is filtered by what synced.
+  const isOfficial = $derived(engineIsOfficial(getAuthState().user));
 
   const countries = getCountries();
   const availableRoles: Role[] = [
