@@ -164,12 +164,6 @@ async def merge_user_accounts(
     Transfers auth methods, sanctions from delete_uid to keep_uid.
     """
 
-    # Check manager has appropriate role
-    if not permissions.is_official(manager):
-        raise HTTPException(
-            status_code=403, detail="Only IC, NC, or Prince can merge users"
-        )
-
     # Get both users
     keep_user = await get_user_by_uid(request.keep_uid)
     delete_user = await get_user_by_uid(request.delete_uid)
@@ -179,12 +173,12 @@ async def merge_user_accounts(
     if not delete_user:
         raise HTTPException(status_code=404, detail="Delete user not found")
 
-    # Check manager can manage both users' countries
-    if not permissions.can_manage_country(manager, keep_user.country):
+    # Both sides of the merge, so a country-scoped official cannot reach across.
+    if not permissions.can_merge_accounts(manager, keep_user):
         raise HTTPException(
             status_code=403, detail="Cannot manage keep user from other country"
         )
-    if not permissions.can_manage_country(manager, delete_user.country):
+    if not permissions.can_merge_accounts(manager, delete_user):
         raise HTTPException(
             status_code=403, detail="Cannot manage delete user from other country"
         )

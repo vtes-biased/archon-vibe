@@ -44,7 +44,7 @@
   const canEdit = $derived.by(() => {
     if (!auth.user || !user || !engineReady()) return false;
     try {
-      return canEditUser(auth.user, auth.user.uid, user.uid, user).allowed;
+      return canEditUser(auth.user, user).allowed;
     } catch {
       return false;
     }

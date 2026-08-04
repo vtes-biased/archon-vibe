@@ -912,7 +912,7 @@ async def create_tournament(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    if not permissions.is_official(current_user):
+    if not permissions.can_create_tournament(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can create tournaments"
         )
@@ -2303,7 +2303,7 @@ async def go_offline(
 
         # Offline implies member-creation power (name-only players get real VEKN
         # IDs at go-online), so it is officials-only like online member creation.
-        if not permissions.is_official(current_user):
+        if not permissions.can_create_tournament(current_user):
             raise HTTPException(
                 status_code=403,
                 detail="Only officials (IC, NC, Prince) can take a tournament offline",
@@ -2440,7 +2440,7 @@ async def _gate_offline_created_insert(
     sync_offline; whichever inserts first is the creation, and the other then
     takes its existing-row path.
     """
-    if not permissions.is_official(current_user):
+    if not permissions.can_create_tournament(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can create tournaments"
         )
@@ -2790,7 +2790,7 @@ async def force_takeover(
 
         # Same officials-only gate as go_offline: the taken-over lock carries
         # the same member-creation power.
-        if not permissions.is_official(current_user):
+        if not permissions.can_create_tournament(current_user):
             raise HTTPException(
                 status_code=403,
                 detail="Only officials (IC, NC, Prince) can force-takeover",

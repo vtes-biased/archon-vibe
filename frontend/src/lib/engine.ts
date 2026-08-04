@@ -386,12 +386,51 @@ export function getSanctionReference(): SanctionReference | null {
 }
 
 // Type for user context in permission checks
-type UserContext = { uid: string; roles: string[]; country?: string | null; vekn_id?: string | null };
+type UserContext = { uid: string; roles?: string[] | null; country?: string | null; vekn_id?: string | null };
+type Resource = { country?: string | null; organizers_uids?: string[] };
 
 /**
- * Check if actor can change a role on target user (sync version).
- * Returns {allowed: false, reason: null} if engine not initialized.
+ * Ask the engine whether `actor` holds `capability` in this context.
+ *
+ * The single authorization entry point: every gate below is one call of this,
+ * naming a capability from the engine's table (engine/src/permissions.rs).
+ * Fill only what the capability reads — an absent field matches no grant.
+ *
+ * Fail-closed: denies with a null reason until the WASM engine is loaded, so a
+ * cold page never shows a control the backend would refuse. Callers rendering a
+ * deny reason should treat null as "not yet known".
  */
+function checkPermission(
+  capability: string,
+  actor: UserContext | null,
+  context: { target?: UserContext; targetCountry?: string | null; resource?: Resource } = {}
+): PermissionResult {
+  if (!actor) return { allowed: false, reason: null };
+  const engine = getEngineReactive();
+  if (!engine) return { allowed: false, reason: null };
+
+  const { target, resource } = context;
+  const request: Record<string, unknown> = {
+    actor: { roles: actor.roles ?? [], country: actor.country ?? null, vekn_id: actor.vekn_id ?? null },
+    actor_uid: actor.uid,
+    target_uid: target?.uid ?? null,
+    target_country: target ? target.country ?? null : context.targetCountry ?? null,
+  };
+  if (resource) {
+    request.resource = {
+      country: resource.country ?? null,
+      organizers_uids: resource.organizers_uids ?? [],
+    };
+    // For a resource-scoped capability, "same country" means the resource's
+    // — an NC is an implicit organizer of their country's tournaments.
+    if (!target && context.targetCountry === undefined) {
+      request.target_country = resource.country ?? null;
+    }
+  }
+  return JSON.parse(callEngine(() => engine.checkPermission(capability, JSON.stringify(request))));
+}
+
+/** Grant or revoke one role — see the engine's appointment matrix. */
 export function canChangeRole(
   actor: UserContext,
   target: UserContext,
@@ -400,14 +439,9 @@ export function canChangeRole(
   const engine = getEngineReactive();
   if (!engine) return { allowed: false, reason: null };
 
-  const actorJson = JSON.stringify({
-    uid: actor.uid,
-    roles: actor.roles,
-    country: actor.country,
-  });
+  const actorJson = JSON.stringify({ roles: actor.roles ?? [], country: actor.country });
   const targetJson = JSON.stringify({
-    uid: target.uid,
-    roles: target.roles,
+    roles: target.roles ?? [],
     country: target.country,
     vekn_id: target.vekn_id ?? null,
   });
@@ -417,136 +451,122 @@ export function canChangeRole(
 }
 
 /**
- * Check if actor can manage VEKN IDs for target user (sync version).
- * Returns {allowed: false, reason: null} if engine not initialized.
+ * Move a member between countries. For an official target this takes the
+ * authority that could change their highest official role.
  */
-export function canManageVekn(
-  actor: UserContext,
-  target: UserContext
-): PermissionResult {
+export function canChangeCountry(actor: UserContext, target: UserContext): PermissionResult {
   const engine = getEngineReactive();
   if (!engine) return { allowed: false, reason: null };
 
-  const actorJson = JSON.stringify({
-    uid: actor.uid,
-    roles: actor.roles,
-    country: actor.country,
-  });
+  const actorJson = JSON.stringify({ roles: actor.roles ?? [], country: actor.country });
   const targetJson = JSON.stringify({
-    uid: target.uid,
-    roles: target.roles,
+    roles: target.roles ?? [],
     country: target.country,
+    vekn_id: target.vekn_id ?? null,
   });
 
-  const resultJson = callEngine(() => engine.canManageVekn(actorJson, targetJson));
+  const resultJson = callEngine(() => engine.canChangeCountry(actorJson, targetJson));
   return JSON.parse(resultJson);
 }
 
-/**
- * Check if actor can mark/clear a member's deceased status (sync version).
- * IC anywhere, NC in the target's country (Prince excluded).
- * Returns {allowed: false, reason: null} if engine not initialized.
- */
+/** Create a member record. */
+export function canCreateMember(actor: UserContext | null): PermissionResult {
+  return checkPermission('create_member', actor);
+}
+
+/** Edit a user's profile fields. */
+export function canEditUser(actor: UserContext | null, target: UserContext): PermissionResult {
+  return checkPermission('edit_member_profile', actor, { target });
+}
+
+/** Link or force-abandon a target's VEKN ID. */
+export function canManageVekn(actor: UserContext | null, target: UserContext): PermissionResult {
+  return checkPermission('manage_vekn', actor, { target });
+}
+
+/** Sponsor a new VEKN ID — deliberately cross-country. */
+export function canSponsorVekn(actor: UserContext | null): PermissionResult {
+  return checkPermission('sponsor_vekn', actor);
+}
+
+/** Merge one account into another. */
+export function canMergeAccounts(actor: UserContext | null, target: UserContext): PermissionResult {
+  return checkPermission('merge_accounts', actor, { target });
+}
+
+/** Set or clear a member's deceased status. */
 export function canMarkDeceased(
-  actor: UserContext,
+  actor: UserContext | null,
   targetCountry: string | null
 ): PermissionResult {
-  const engine = getEngineReactive();
-  if (!engine) return { allowed: false, reason: null };
-
-  const actorJson = JSON.stringify({
-    uid: actor.uid,
-    roles: actor.roles,
-    country: actor.country,
-  });
-
-  const resultJson = callEngine(() => engine.canMarkDeceased(actorJson, targetCountry ?? ""));
-  return JSON.parse(resultJson);
+  return checkPermission('mark_deceased', actor, { targetCountry });
 }
 
-/**
- * Check if actor can soft-delete a member (sync version). IC only.
- * The target-must-be-VEKN-less rule is enforced by the caller/route.
- * Returns {allowed: false, reason: null} if engine not initialized.
- */
-export function canDeleteMember(actor: UserContext): PermissionResult {
-  const engine = getEngineReactive();
-  if (!engine) return { allowed: false, reason: null };
-
-  const actorJson = JSON.stringify({
-    uid: actor.uid,
-    roles: actor.roles,
-    country: actor.country,
-  });
-
-  const resultJson = callEngine(() => engine.canDeleteMember(actorJson));
-  return JSON.parse(resultJson);
+/** Soft-delete a member. The target-must-be-VEKN-less rule is enforced by the route. */
+export function canDeleteMember(actor: UserContext | null): PermissionResult {
+  return checkPermission('delete_member', actor);
 }
 
-/**
- * Check if actor can edit target user's profile (sync version).
- * Returns {allowed: false, reason: null} if engine not initialized.
- */
-export function canEditUser(
-  actor: UserContext,
-  actorUid: string,
-  targetUid: string,
+/** Hide or clear a member's community link (self-moderation included). */
+export function canModerateLink(actor: UserContext | null, target: UserContext): PermissionResult {
+  return checkPermission('moderate_link', actor, { target });
+}
+
+/** Promote a link to the national listing. */
+export function canPromoteLinkNational(
+  actor: UserContext | null,
   target: UserContext
 ): PermissionResult {
-  const engine = getEngineReactive();
-  if (!engine) return { allowed: false, reason: null };
+  return checkPermission('promote_link_national', actor, { target });
+}
 
-  const actorJson = JSON.stringify({
-    uid: actor.uid,
-    roles: actor.roles,
-    country: actor.country,
-  });
-  const targetJson = JSON.stringify({
-    uid: target.uid,
-    roles: target.roles,
-    country: target.country,
-  });
+/** Promote a link to the global listing. */
+export function canPromoteLinkGlobal(actor: UserContext | null): PermissionResult {
+  return checkPermission('promote_link_global', actor);
+}
 
-  const resultJson = callEngine(() => engine.canEditUser(actorJson, actorUid, targetUid, targetJson));
-  return JSON.parse(resultJson);
+/** Create a tournament. */
+export function canCreateTournament(actor: UserContext | null): PermissionResult {
+  return checkPermission('create_tournament', actor);
+}
+
+/** Create and delete leagues. */
+export function canManageLeagues(actor: UserContext | null): PermissionResult {
+  return checkPermission('manage_leagues', actor);
+}
+
+/** Issue an organizer-level sanction at a tournament. */
+export function canIssueTournamentSanction(
+  actor: UserContext | null,
+  tournament: Resource
+): PermissionResult {
+  return checkPermission('issue_tournament_sanction', actor, { resource: tournament });
+}
+
+/** Issue a suspension or probation. */
+export function canIssueRestrictedSanction(actor: UserContext | null): PermissionResult {
+  return checkPermission('issue_restricted_sanction', actor);
 }
 
 /**
- * Check if a user is an organizer of a tournament (sync).
+ * Run a tournament: an explicit organizer, or implicitly IC/NC.
  * Fail-closed (false) until the WASM engine is loaded — never default-allow.
  */
 export function isOrganizer(
-  user: { uid: string; roles?: string[]; country?: string | null } | null,
-  tournament: { country?: string | null; organizers_uids?: string[] }
+  user: UserContext | null,
+  tournament: Resource
 ): boolean {
-  if (!user) return false;
-  const engine = getEngineReactive();
-  if (!engine) return false;
-  const actorJson = JSON.stringify({ uid: user.uid, roles: user.roles ?? [], country: user.country });
-  const tournamentJson = JSON.stringify({
-    country: tournament.country ?? null,
-    organizers_uids: tournament.organizers_uids ?? [],
-  });
-  return JSON.parse(callEngine(() => engine.isOrganizer(actorJson, user.uid, tournamentJson))).allowed;
+  return checkPermission('organize_tournament', user, { resource: tournament }).allowed;
 }
 
 /**
- * Check if a user can edit/organize a league (sync).
- * Fail-closed (false) until the WASM engine is loaded.
+ * Edit a league. Fail-closed (false) until the WASM engine is loaded.
  */
 export function canEditLeague(
-  user: { uid: string; roles?: string[]; country?: string | null } | null,
-  league: { country?: string | null; organizers_uids?: string[] }
+  user: UserContext | null,
+  league: Resource
 ): boolean {
-  if (!user) return false;
-  const engine = getEngineReactive();
-  if (!engine) return false;
-  const actorJson = JSON.stringify({ uid: user.uid, roles: user.roles ?? [], country: user.country });
-  const leagueJson = JSON.stringify({
-    country: league.country ?? null,
-    organizers_uids: league.organizers_uids ?? [],
-  });
-  return JSON.parse(callEngine(() => engine.canEditLeague(actorJson, user.uid, leagueJson))).allowed;
+  return checkPermission('edit_league', user, { resource: league }).allowed;
 }
 
 /**

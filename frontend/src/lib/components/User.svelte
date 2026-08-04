@@ -7,7 +7,7 @@
   import { getRoleClasses } from "$lib/roles";
   import { deobfuscateContact } from "$lib/contact";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canChangeRole as engineCanChangeRole, canEditUser } from "$lib/engine";
+  import { canChangeRole as engineCanChangeRole } from "$lib/engine";
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";

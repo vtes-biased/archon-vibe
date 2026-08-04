@@ -35,10 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 def _require_manager_for_user(manager: User, target: User) -> None:
-    """Raise 403 if manager cannot manage target user."""
-    if not permissions.can_manage_country(manager, target.country):
+    """Raise 403 if manager cannot manage target's VEKN ID."""
+    if not permissions.can_manage_vekn(manager, target):
         raise HTTPException(
-            status_code=403, detail="Cannot manage users from other countries"
+            status_code=403,
+            detail="You don't have permission to manage this user's VEKN ID",
         )
 
 
@@ -203,7 +204,7 @@ async def sponsor_new_member(
     """
 
     # Check manager has appropriate role
-    if not permissions.is_official(manager):
+    if not permissions.can_sponsor_vekn(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can sponsor new members"
         )
@@ -271,12 +272,6 @@ async def link_vekn_to_user(
     If claimed by another user, displaces them first (strips their account).
     Requires IC, or NC/Prince for same country (both users must be same country).
     """
-
-    # Check manager has appropriate role
-    if not permissions.is_official(manager):
-        raise HTTPException(
-            status_code=403, detail="Only IC, NC, or Prince can link VEKN IDs"
-        )
 
     # Get target user
     target = await get_user_by_uid(request.user_uid)
@@ -362,12 +357,6 @@ async def force_abandon_vekn_id(
     Requires IC, or NC/Prince for same country.
     Same effect as user abandoning themselves.
     """
-
-    # Check manager has appropriate role
-    if not permissions.is_official(manager):
-        raise HTTPException(
-            status_code=403, detail="Only IC, NC, or Prince can force-abandon VEKN IDs"
-        )
 
     # Get target user
     target = await get_user_by_uid(request.user_uid)

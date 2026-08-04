@@ -15,10 +15,9 @@ pub use error::EngineError;
 
 // Re-export permissions module items
 pub use permissions::{
-    can_change_role, can_delete_member, can_delete_sanction, can_edit_league, can_edit_user,
-    can_issue_sanction, can_lift_sanction, can_link_tournament_to_league, can_manage_country,
-    can_manage_leagues, can_manage_tournaments, can_manage_vekn, can_mark_deceased, is_organizer,
-    OwnedResource, PermissionResult, Role, SanctionContext, UserContext,
+    can_change_country, can_change_role, can_delete_sanction, can_edit_league, can_issue_sanction,
+    can_lift_sanction, can_link_tournament_to_league, check, is_official, is_organizer, Capability,
+    OwnedResource, PermissionResult, Request, Role, SanctionContext, UserContext,
 };
 
 // ============================================================================
@@ -42,92 +41,45 @@ mod shared {
         Ok(can_change_role(&actor, &target, role).to_json().dump())
     }
 
-    pub fn can_manage_vekn_json(
+    /// Evaluate one capability from the engine's permission table.
+    ///
+    /// The single authorization entry point for both bindings. Request shape:
+    /// `{actor: {roles, country, vekn_id}, actor_uid, target_uid?,
+    /// target_country?, resource?: {country, organizers_uids}}` — supply only
+    /// the fields the capability's rule reads. Capability names are the `name`
+    /// column of `permissions::CAPABILITIES`.
+    pub fn check_permission_json(
+        capability: &str,
+        request_json: &str,
+    ) -> Result<String, EngineError> {
+        let capability = Capability::from_str(capability)
+            .ok_or_else(|| EngineError::internal(format!("Unknown capability: {}", capability)))?;
+        let value = json::parse(request_json)?;
+        let actor = UserContext::from_json(&value["actor"])?;
+        let resource = value["resource"]
+            .is_object()
+            .then(|| OwnedResource::from_json(&value["resource"]));
+        let mut request = Request::new(&actor, value["actor_uid"].as_str().unwrap_or(""));
+        request.target_uid = value["target_uid"].as_str();
+        request.target_country = value["target_country"].as_str();
+        request.resource = resource.as_ref();
+        Ok(check(capability, &request).to_json().dump())
+    }
+
+    /// Identity, not authority — see `permissions::is_official`.
+    pub fn is_official_json(actor_json: &str) -> Result<bool, EngineError> {
+        Ok(is_official(&UserContext::from_json(&json::parse(
+            actor_json,
+        )?)?))
+    }
+
+    pub fn can_change_country_json(
         actor_json: &str,
         target_json: &str,
     ) -> Result<String, EngineError> {
         let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         let target = UserContext::from_json(&json::parse(target_json)?)?;
-        Ok(can_manage_vekn(&actor, &target).to_json().dump())
-    }
-
-    pub fn can_edit_user_json(
-        actor_json: &str,
-        actor_uid: &str,
-        target_uid: &str,
-        target_json: &str,
-    ) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        let target = UserContext::from_json(&json::parse(target_json)?)?;
-        Ok(can_edit_user(&actor, actor_uid, target_uid, &target)
-            .to_json()
-            .dump())
-    }
-
-    pub fn can_manage_country_json(
-        actor_json: &str,
-        target_country: &str,
-    ) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        let country = if target_country.is_empty() {
-            None
-        } else {
-            Some(target_country)
-        };
-        Ok(can_manage_country(&actor, country).to_json().dump())
-    }
-
-    pub fn can_mark_deceased_json(
-        actor_json: &str,
-        target_country: &str,
-    ) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        let country = if target_country.is_empty() {
-            None
-        } else {
-            Some(target_country)
-        };
-        Ok(can_mark_deceased(&actor, country).to_json().dump())
-    }
-
-    pub fn can_manage_tournaments_json(actor_json: &str) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        Ok(can_manage_tournaments(&actor).to_json().dump())
-    }
-
-    pub fn can_delete_member_json(actor_json: &str) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        Ok(can_delete_member(&actor).to_json().dump())
-    }
-
-    pub fn can_manage_leagues_json(actor_json: &str) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        Ok(can_manage_leagues(&actor).to_json().dump())
-    }
-
-    pub fn is_organizer_json(
-        actor_json: &str,
-        actor_uid: &str,
-        tournament_json: &str,
-    ) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        let tournament = OwnedResource::from_json(&json::parse(tournament_json)?);
-        let result = if is_organizer(&actor, actor_uid, &tournament) {
-            PermissionResult::allow()
-        } else {
-            PermissionResult::deny("You are not an organizer of this tournament")
-        };
-        Ok(result.to_json().dump())
-    }
-
-    pub fn can_edit_league_json(
-        actor_json: &str,
-        actor_uid: &str,
-        league_json: &str,
-    ) -> Result<String, EngineError> {
-        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
-        let league = OwnedResource::from_json(&json::parse(league_json)?);
-        Ok(can_edit_league(&actor, actor_uid, &league).to_json().dump())
+        Ok(can_change_country(&actor, &target).to_json().dump())
     }
 
     pub fn can_link_tournament_to_league_json(
@@ -355,82 +307,22 @@ mod wasm {
             js_str(can_change_role_json(actor_json, target_json, role))
         }
 
-        #[wasm_bindgen(js_name = canManageVekn)]
-        pub fn can_manage_vekn(
+        #[wasm_bindgen(js_name = checkPermission)]
+        pub fn check_permission(
+            &self,
+            capability: &str,
+            request_json: &str,
+        ) -> Result<String, String> {
+            js_str(check_permission_json(capability, request_json))
+        }
+
+        #[wasm_bindgen(js_name = canChangeCountry)]
+        pub fn can_change_country(
             &self,
             actor_json: &str,
             target_json: &str,
         ) -> Result<String, String> {
-            js_str(can_manage_vekn_json(actor_json, target_json))
-        }
-
-        #[wasm_bindgen(js_name = canEditUser)]
-        pub fn can_edit_user(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            target_uid: &str,
-            target_json: &str,
-        ) -> Result<String, String> {
-            js_str(can_edit_user_json(
-                actor_json,
-                actor_uid,
-                target_uid,
-                target_json,
-            ))
-        }
-
-        #[wasm_bindgen(js_name = canManageCountry)]
-        pub fn can_manage_country(
-            &self,
-            actor_json: &str,
-            target_country: &str,
-        ) -> Result<String, String> {
-            js_str(can_manage_country_json(actor_json, target_country))
-        }
-
-        #[wasm_bindgen(js_name = canMarkDeceased)]
-        pub fn can_mark_deceased(
-            &self,
-            actor_json: &str,
-            target_country: &str,
-        ) -> Result<String, String> {
-            js_str(can_mark_deceased_json(actor_json, target_country))
-        }
-
-        #[wasm_bindgen(js_name = canManageTournaments)]
-        pub fn can_manage_tournaments(&self, actor_json: &str) -> Result<String, String> {
-            js_str(can_manage_tournaments_json(actor_json))
-        }
-
-        #[wasm_bindgen(js_name = canDeleteMember)]
-        pub fn can_delete_member(&self, actor_json: &str) -> Result<String, String> {
-            js_str(can_delete_member_json(actor_json))
-        }
-
-        #[wasm_bindgen(js_name = canManageLeagues)]
-        pub fn can_manage_leagues(&self, actor_json: &str) -> Result<String, String> {
-            js_str(can_manage_leagues_json(actor_json))
-        }
-
-        #[wasm_bindgen(js_name = isOrganizer)]
-        pub fn is_organizer(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            tournament_json: &str,
-        ) -> Result<String, String> {
-            js_str(is_organizer_json(actor_json, actor_uid, tournament_json))
-        }
-
-        #[wasm_bindgen(js_name = canEditLeague)]
-        pub fn can_edit_league(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            league_json: &str,
-        ) -> Result<String, String> {
-            js_str(can_edit_league_json(actor_json, actor_uid, league_json))
+            js_str(can_change_country_json(actor_json, target_json))
         }
 
         #[wasm_bindgen(js_name = canLinkTournamentToLeague)]
@@ -631,8 +523,17 @@ mod python {
             py_str(can_change_role_json(actor_json, target_json, role))
         }
 
-        fn can_manage_vekn(&self, actor_json: &str, target_json: &str) -> PyResult<String> {
-            py_str(can_manage_vekn_json(actor_json, target_json))
+        fn check_permission(&self, capability: &str, request_json: &str) -> PyResult<String> {
+            py_str(check_permission_json(capability, request_json))
+        }
+
+        fn can_change_country(&self, actor_json: &str, target_json: &str) -> PyResult<String> {
+            py_str(can_change_country_json(actor_json, target_json))
+        }
+
+        fn is_official(&self, actor_json: &str) -> PyResult<bool> {
+            is_official_json(actor_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
         }
 
         /// VEKN legality gate for the online create route, which builds the
@@ -645,59 +546,6 @@ mod python {
         ) -> PyResult<()> {
             crate::tournament::validate_rank_legality(rank, proxies, multideck)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
-        }
-
-        fn can_edit_user(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            target_uid: &str,
-            target_json: &str,
-        ) -> PyResult<String> {
-            py_str(can_edit_user_json(
-                actor_json,
-                actor_uid,
-                target_uid,
-                target_json,
-            ))
-        }
-
-        fn can_manage_country(&self, actor_json: &str, target_country: &str) -> PyResult<String> {
-            py_str(can_manage_country_json(actor_json, target_country))
-        }
-
-        fn can_mark_deceased(&self, actor_json: &str, target_country: &str) -> PyResult<String> {
-            py_str(can_mark_deceased_json(actor_json, target_country))
-        }
-
-        fn can_manage_tournaments(&self, actor_json: &str) -> PyResult<String> {
-            py_str(can_manage_tournaments_json(actor_json))
-        }
-
-        fn can_delete_member(&self, actor_json: &str) -> PyResult<String> {
-            py_str(can_delete_member_json(actor_json))
-        }
-
-        fn can_manage_leagues(&self, actor_json: &str) -> PyResult<String> {
-            py_str(can_manage_leagues_json(actor_json))
-        }
-
-        fn is_organizer(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            tournament_json: &str,
-        ) -> PyResult<String> {
-            py_str(is_organizer_json(actor_json, actor_uid, tournament_json))
-        }
-
-        fn can_edit_league(
-            &self,
-            actor_json: &str,
-            actor_uid: &str,
-            league_json: &str,
-        ) -> PyResult<String> {
-            py_str(can_edit_league_json(actor_json, actor_uid, league_json))
         }
 
         fn can_link_tournament_to_league(
