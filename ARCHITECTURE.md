@@ -218,7 +218,7 @@ Full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access. Endpo
 
 Standalone process (`bot/`) managing online VTES tournaments inside Discord servers — a pure OAuth client to the backend (no DB access, no business logic); all mutations go through `POST /{uid}/action` using `user:impersonate` tokens on behalf of real users. Single process only (module-level state in `sse_listener.py`). **Pre-production — not live and not yet tested**, but in scope for prod prep.
 
-**Commands**: `/setup <url>` (probes the tournament's scoped SSE stream before creating anything — a bad/inaccessible uid or a `Finished` tournament creates nothing; on success names the category from the real tournament name and creates announcement/lobby/judges channels — NC/Prince/IC only), `/teardown`, `/announce`, `/sync` (reconcile voice channels — repair tool), `/register`, `/checkin`, `/report <vp>` (→ `SetScore`), `/judge` (→ `judge_call`), `/sanction` (multi-step).
+**Commands**: `/setup <url>` (probes the tournament's scoped SSE stream before creating anything — a bad/inaccessible uid or a `Finished` tournament creates nothing; on success names the category from the real tournament name and creates announcement/lobby/judges channels — gated on the `create_tournament` capability reported by `/oauth/userinfo`), `/teardown`, `/announce`, `/sync` (reconcile voice channels — repair tool), `/register`, `/checkin`, `/report <vp>` (→ `SetScore`), `/judge` (→ `judge_call`), `/sanction` (multi-step).
 
 **Modules**: `token_store.py` (SQLite: `tokens`, `guild_tournaments` (+ `scheduled_event_id`), `pending_oauth` 15-min TTL); `archon_api.py` (REST client using stored OAuth tokens); `sse_listener.py` (per-(guild, tournament) SSE subscription driving channel/announcement/scheduled-event updates); `channel_manager.py` (voice channels with per-player CONNECT+SPEAK perms); `scheduled_events.py` (Guild Scheduled Event lifecycle); `oauth_callback.py` (local PKCE redirect server); `commands/{setup,player,judge}.py`.
 
@@ -235,7 +235,7 @@ Standalone process (`bot/`) managing online VTES tournaments inside Discord serv
 
 **OAuth flow**: `/setup` initiates PKCE → user authorizes `user:impersonate` → redirect to the local callback server → token stored in SQLite for all API calls and SSE subscriptions. Refresh clears the stored pair only on 400/401 (invalid grant); 5xx/network/timeout are treated as transient and feed the SSE listener's reconnect backoff instead, so a backend blip can't kill a valid token. A successful `/register` OAuth callback respawns any dead SSE listeners for that organizer's guild links — self-service recovery once a token has genuinely died.
 
-**Misc**: Register / AddPlayer / CheckIn accept an optional `display_name` (Discord nickname) stored on `Player`, shown in `playerInfo`/`seatDisplay`. `/auth?login_hint=discord` auto-redirects bot-generated links to Discord OAuth. Only NC/Prince/IC can `/setup`; the bot never holds privileged backend credentials. Key directory: `bot/src/`.
+**Misc**: Register / AddPlayer / CheckIn accept an optional `display_name` (Discord nickname) stored on `Player`, shown in `playerInfo`/`seatDisplay`. `/auth?login_hint=discord` auto-redirects bot-generated links to Discord OAuth. The bot carries no role matrix of its own: `/oauth/userinfo` reports the capabilities the holder has, and `/sanction` simply surfaces the API's refusal. It never holds privileged backend credentials. Key directory: `bot/src/`.
 
 ## Community Links
 

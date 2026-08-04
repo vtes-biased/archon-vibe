@@ -6,15 +6,12 @@ import hikari
 import lightbulb
 import miru
 
-from .. import config
 from ..archon_api import ArchonAPI
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
 from ._common import fetch_userinfo
 
 logger = logging.getLogger(__name__)
-
-ORGANIZER_ROLES = config.SANCTION_ROLES
 
 # Judges-Guide tables (categories/subcategories with labels, levels, baselines)
 # come from the backend's public /sanctions/reference endpoint — owned by the

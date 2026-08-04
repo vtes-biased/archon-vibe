@@ -16,8 +16,9 @@ pub use error::EngineError;
 // Re-export permissions module items
 pub use permissions::{
     can_change_country, can_change_role, can_delete_sanction, can_edit_league, can_issue_sanction,
-    can_lift_sanction, can_link_tournament_to_league, check, is_official, is_organizer, Capability,
-    OwnedResource, PermissionResult, Request, Role, SanctionContext, UserContext,
+    can_lift_sanction, can_link_tournament_to_league, check, is_official, is_organizer,
+    unconditional_capabilities, Capability, OwnedResource, PermissionResult, Request, Role,
+    SanctionContext, UserContext,
 };
 
 // ============================================================================
@@ -64,6 +65,16 @@ mod shared {
         request.target_country = value["target_country"].as_str();
         request.resource = resource.as_ref();
         Ok(check(capability, &request).to_json().dump())
+    }
+
+    /// JSON array of the capabilities the actor holds unconditionally.
+    pub fn unconditional_capabilities_json(actor_json: &str) -> Result<String, EngineError> {
+        let actor = UserContext::from_json(&json::parse(actor_json)?)?;
+        let names: Vec<JsonValue> = unconditional_capabilities(&actor)
+            .into_iter()
+            .map(JsonValue::from)
+            .collect();
+        Ok(JsonValue::Array(names).dump())
     }
 
     /// Identity, not authority — see `permissions::is_official`.
@@ -534,6 +545,10 @@ mod python {
 
         fn can_change_country(&self, actor_json: &str, target_json: &str) -> PyResult<String> {
             py_str(can_change_country_json(actor_json, target_json))
+        }
+
+        fn unconditional_capabilities(&self, actor_json: &str) -> PyResult<String> {
+            py_str(unconditional_capabilities_json(actor_json))
         }
 
         fn is_official(&self, actor_json: &str) -> PyResult<bool> {

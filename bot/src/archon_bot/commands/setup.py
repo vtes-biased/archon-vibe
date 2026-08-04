@@ -25,7 +25,13 @@ from ._common import fetch_userinfo
 
 logger = logging.getLogger(__name__)
 
-ORGANIZER_ROLES = config.SETUP_ROLES
+
+def _may_set_up(info_data: dict) -> bool:
+    """Whether the backend says this user may set a tournament up.
+
+    Absent capabilities (an older backend) means no — the API is authoritative
+    and would refuse anyway; better a missing button than a broken one."""
+    return config.SETUP_CAPABILITY in info_data.get("capabilities", [])
 
 
 def extract_tournament_uid(url: str) -> str | None:
@@ -92,10 +98,9 @@ class SetupCommand(
         if info is None:
             return
 
-        roles = set(info.data.get("roles", []))
-        if not roles & ORGANIZER_ROLES:
+        if not _may_set_up(info.data):
             await ctx.respond(
-                "Only NC, Prince, or IC members can set up tournament channels.",
+                "Only officials who can create tournaments may set up their channels.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
@@ -232,12 +237,11 @@ class TeardownCommand(
         is_archon_organizer = False
         info = await api.get_userinfo(discord_id)
         if info.ok:
-            roles = set(info.data.get("roles", []))
-            is_archon_organizer = bool(roles & ORGANIZER_ROLES)
+            is_archon_organizer = _may_set_up(info.data)
 
         if link["organizer_discord_id"] != discord_id and not is_archon_organizer:
             await ctx.respond(
-                "You don't have permission to teardown. Only the setup organizer or NC/Prince/IC can do this.",
+                "You don't have permission to teardown. Only the setup organizer, or an official who can create tournaments, can do this.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
@@ -332,9 +336,9 @@ class AnnounceCommand(
         is_organizer = link["organizer_discord_id"] == discord_id
         if not is_organizer:
             info = await api.get_userinfo(discord_id)
-            if not info.ok or not set(info.data.get("roles", [])) & ORGANIZER_ROLES:
+            if not info.ok or not _may_set_up(info.data):
                 await ctx.respond(
-                    "Only the setup organizer or NC/Prince/IC can post announcements.",
+                    "Only the setup organizer, or an official who can create tournaments, can post announcements.",
                     flags=hikari.MessageFlag.EPHEMERAL,
                 )
                 return
@@ -384,9 +388,9 @@ class SyncCommand(
         is_organizer = link["organizer_discord_id"] == discord_id
         if not is_organizer:
             info = await api.get_userinfo(discord_id)
-            if not info.ok or not set(info.data.get("roles", [])) & ORGANIZER_ROLES:
+            if not info.ok or not _may_set_up(info.data):
                 await ctx.respond(
-                    "Only the setup organizer or NC/Prince/IC can sync channels.",
+                    "Only the setup organizer, or an official who can create tournaments, can sync channels.",
                     flags=hikari.MessageFlag.EPHEMERAL,
                 )
                 return

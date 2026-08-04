@@ -273,3 +273,15 @@ def can_manage_oauth_clients(user: User) -> bool:
 def can_run_admin_sync(user: User) -> bool:
     """Trigger and inspect the VEKN/TWDA sync jobs."""
     return _check("run_admin_sync", user)
+
+
+def unconditional_capabilities(user: User) -> list[str]:
+    """Capability names the user holds anywhere, over anyone.
+
+    For remote clients (the Discord bot) that need to know what to offer without
+    carrying their own copy of the matrix. Country- and resource-scoped grants
+    are absent by construction — they have no answer without a target.
+    """
+    return json.loads(
+        _engine.unconditional_capabilities(json.dumps(user_to_context(user)))
+    )

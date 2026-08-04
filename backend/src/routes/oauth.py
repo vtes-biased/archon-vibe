@@ -525,6 +525,8 @@ async def userinfo(user: CurrentUser, request: Request):
         "sub": user.uid,
         "roles": [r.value for r in user.roles],
         "vekn_id": user.vekn_id,
+        # What the holder may do, so a client need not match role strings.
+        "capabilities": permissions.unconditional_capabilities(user),
     }
 
 

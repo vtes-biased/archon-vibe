@@ -23,8 +23,8 @@ CALLBACK_PORT = int(os.environ.get("CALLBACK_PORT", "9000"))
 # SQLite token store path
 TOKEN_DB_PATH = os.environ.get("TOKEN_DB_PATH", "bot_tokens.db")
 
-# Role sets for permission checks
-# Setup/teardown/announce — tournament management
-SETUP_ROLES = {"IC", "NC", "Prince"}
-# Sanctions — includes Ethics committee
-SANCTION_ROLES = {"IC", "NC", "Prince", "Ethics"}
+# The capability /setup, /teardown and /announce require. The bot does not know
+# who holds it — /oauth/userinfo answers that, so the role matrix lives only in
+# the engine. Sanctions carry no local check at all: /sanction posts to the API
+# and surfaces its refusal.
+SETUP_CAPABILITY = "create_tournament"

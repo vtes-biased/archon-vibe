@@ -713,6 +713,20 @@ pub fn allows(capability: Capability, req: &Request) -> bool {
     check(capability, req).allowed
 }
 
+/// Every capability the actor holds unconditionally — anywhere, over anyone.
+///
+/// What a remote client (the Discord bot) needs to decide what to offer without
+/// carrying its own copy of the matrix. Country- and resource-scoped grants are
+/// deliberately absent: they have no answer without a target, so a client that
+/// wants one must ask for that specific case.
+pub fn unconditional_capabilities(actor: &UserContext) -> Vec<&'static str> {
+    CAPABILITIES
+        .iter()
+        .filter(|rule| actor.has_any(rule.global))
+        .map(|rule| rule.name)
+        .collect()
+}
+
 // ============================================================================
 // Resolvers — rules with a precondition the table cannot express
 // ============================================================================
