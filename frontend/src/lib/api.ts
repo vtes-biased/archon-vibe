@@ -321,7 +321,7 @@ export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageR
 }
 
 /**
- * Merge two user accounts (for NC/Prince/IC).
+ * Merge two user accounts (IC only — the merge unions both accounts' roles).
  */
 export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<{ user: User; message: string }> {
   return apiRequest<{ user: User; message: string }>('/admin/users/merge', {

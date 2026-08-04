@@ -394,7 +394,7 @@ Search engines (Googlebot, Bingbot) are deliberately excluded from the UA list �
 
 ### Merge / Detach
 
-- **Merge** (`POST /admin/users/merge`; IC/NC/Prince, same-country): the VEKN-bearing uid is always the survivor (`keep_uid`). Migrates auth methods, sanctions, decks, and `coopted_by` from the dying uid, then soft-deletes it; consolidates ratings, wins, roles, and `local_modifications` (union). `accounts.merge_users()`. Separately, the route remaps `promo_ledger` holder references onto the survivor and triggers a full promo stock recompute (Promo Catalog).
+- **Merge** (`POST /admin/users/merge`; IC only — the merge unions both accounts' roles without consulting the appointment matrix): the VEKN-bearing uid is always the survivor (`keep_uid`). Migrates auth methods, sanctions, decks, and `coopted_by` from the dying uid, then soft-deletes it; consolidates ratings, wins, roles, and `local_modifications` (union). `accounts.merge_users()`. Separately, the route remaps `promo_ledger` holder references onto the survivor and triggers a full promo stock recompute (Promo Catalog).
 - **Detach** (`detach_user_from_vekn`): splits one account in two — the VEKN record keeps its uid and all keyed data; a fresh uid walks away with auth methods + personal/contact PII only. Callers: **self-abandon** (`POST /vekn/me/abandon`, blocked while an active suspension or probation is held — the sanction stays with the VEKN record; admin force-abandon is exempt) and **admin displace** (inside `POST /vekn/link`, frees a VEKN ID before re-linking it; the new owner is then merged into the freed record).
 
 ## Scheduled Background Tasks

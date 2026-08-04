@@ -14,7 +14,8 @@
     ondelete,
     canMarkDeceased = false,
     canDelete = false,
-    // Cross-country official: sponsoring is allowed anywhere, but link/merge/
+    canMerge = false,
+    // Cross-country official: sponsoring is allowed anywhere, but link/
     // delete/abandon stay country-scoped — render only the Sponsor action.
     sponsorOnly = false,
   }: {
@@ -23,6 +24,7 @@
     ondelete?: () => void;
     canMarkDeceased?: boolean;
     canDelete?: boolean;
+    canMerge?: boolean;
     sponsorOnly?: boolean;
   } = $props();
 
@@ -195,7 +197,7 @@
           {m.vekn_force_abandon()}
         </Button>
       {/if}
-      {#if !sponsorOnly}
+      {#if canMerge}
         <Button variant="secondary" size="md" onclick={() => { mergeTarget = null; showMergeModal = true; }} title={m.vekn_merge_modal_title()}>
           <GitMerge class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_merge()}

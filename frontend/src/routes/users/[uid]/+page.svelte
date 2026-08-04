@@ -4,7 +4,7 @@
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorVekn } from "$lib/engine";
+  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorVekn, canMergeAccounts } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
@@ -79,6 +79,13 @@
     } catch {
       return false;
     }
+  });
+
+  // Merging unions both accounts' roles, so it is IC-only — a narrower gate
+  // than the rest of VeknManagement.
+  const canMerge = $derived.by(() => {
+    if (!auth.user || !user || !isOnline || !engineReady()) return false;
+    return canMergeAccounts(auth.user).allowed;
   });
 
   // Cross-country officials can sponsor (mint a VEKN ID) but not otherwise
@@ -197,7 +204,7 @@
 
     {#if canManage || sponsorOnly}
       <div class="mt-6">
-        <VeknManagement {user} {sponsorOnly} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
+        <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
       </div>
     {/if}
 

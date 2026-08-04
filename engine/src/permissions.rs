@@ -328,15 +328,17 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "Only IC, NC, or Prince can sponsor VEKN IDs",
         deny_scope: None,
     },
+    // IC-only: the merge unions both accounts' roles, so anyone who could merge
+    // could land a role by absorbing a shell that carries it.
     Rule {
         capability: Capability::MergeAccounts,
         name: "merge_accounts",
         global: &[IC],
-        same_country: &[NC, Prince],
+        same_country: &[],
         self_service: false,
         organizer: false,
-        deny: "You don't have permission to merge these accounts",
-        deny_scope: Some("You can only merge accounts in your own country"),
+        deny: "Only IC can merge accounts",
+        deny_scope: None,
     },
     // ---- Tournaments & leagues -------------------------------------------
     Rule {
@@ -1083,7 +1085,11 @@ mod tests {
         assert!(over_country(cap, &ctx(vec![IC], Some("US")), Some("FR")));
         assert!(over_country(cap, &ctx(vec![NC], Some("FR")), Some("FR")));
         assert!(!over_country(cap, &ctx(vec![NC], Some("FR")), Some("US")));
-        assert!(!over_country(cap, &ctx(vec![Prince], Some("FR")), Some("FR")));
+        assert!(!over_country(
+            cap,
+            &ctx(vec![Prince], Some("FR")),
+            Some("FR")
+        ));
         assert!(!over_country(cap, &ctx(vec![], Some("FR")), Some("FR")));
     }
 

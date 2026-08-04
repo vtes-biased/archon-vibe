@@ -160,9 +160,13 @@ async def merge_user_accounts(
 ) -> Response:
     """Merge two user accounts.
 
-    Requires IC, or NC/Prince for same country (both users must be same country).
-    Transfers auth methods, sanctions from delete_uid to keep_uid.
+    IC only: the merge unions both accounts' roles without consulting the
+    appointment matrix. Transfers auth methods, sanctions from delete_uid to
+    keep_uid.
     """
+
+    if not permissions.can_merge_accounts(manager):
+        raise HTTPException(status_code=403, detail="Only IC can merge users")
 
     # Get both users
     keep_user = await get_user_by_uid(request.keep_uid)
@@ -172,16 +176,6 @@ async def merge_user_accounts(
         raise HTTPException(status_code=404, detail="Keep user not found")
     if not delete_user:
         raise HTTPException(status_code=404, detail="Delete user not found")
-
-    # Both sides of the merge, so a country-scoped official cannot reach across.
-    if not permissions.can_merge_accounts(manager, keep_user):
-        raise HTTPException(
-            status_code=403, detail="Cannot manage keep user from other country"
-        )
-    if not permissions.can_merge_accounts(manager, delete_user):
-        raise HTTPException(
-            status_code=403, detail="Cannot manage delete user from other country"
-        )
 
     # Perform merge. merge_users refuses to absorb a VEKN-bearing account
     # (invariant); surface that as a 400 rather than a generic 500.

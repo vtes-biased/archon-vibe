@@ -104,9 +104,9 @@ def can_sponsor_vekn(user: User) -> bool:
     return _check("sponsor_vekn", user)
 
 
-def can_merge_accounts(actor: User, target: User) -> bool:
+def can_merge_accounts(actor: User) -> bool:
     """Merge one account into another."""
-    return _check("merge_accounts", actor, target=target)
+    return _check("merge_accounts", actor)
 
 
 def can_mark_deceased(actor: User, target_country: str | None) -> bool:

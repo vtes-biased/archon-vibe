@@ -490,8 +490,8 @@ export function canSponsorVekn(actor: UserContext | null): PermissionResult {
 }
 
 /** Merge one account into another. */
-export function canMergeAccounts(actor: UserContext | null, target: UserContext): PermissionResult {
-  return checkPermission('merge_accounts', actor, { target });
+export function canMergeAccounts(actor: UserContext | null): PermissionResult {
+  return checkPermission('merge_accounts', actor);
 }
 
 /** Set or clear a member's deceased status. */
