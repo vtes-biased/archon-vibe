@@ -69,7 +69,7 @@ Action → backend Rust engine → PostgreSQL → CRUD event → SSE broadcast �
 
 Primary-device ownership — no CRUD log or conflict resolution needed:
 
-1. An official organizer (IC/NC/Prince) takes the tournament offline (`go-offline`) → locked to their device. Officials-only because offline play can create new members at go-online. A tournament can also be *created* while offline (same form, detect-and-adapt): the WASM engine creates it born device-locked; the server first learns of it at go-online (insert path).
+1. An organizer who can create members takes the tournament offline (`go-offline`) → locked to their device: offline play mints real members at go-online, so it takes `create_member` on top of `organize_tournament`. A tournament can also be *created* while offline (same form, detect-and-adapt): the WASM engine creates it born device-locked; the server first learns of it at go-online (insert path).
 2. Other devices see an "offline" message — no mutations.
 3. The WASM Rust engine processes business events locally → writes IndexedDB directly.
 4. Offline-created players get temp UIDs (remapped to real UIDs on sync).
@@ -83,9 +83,9 @@ go-online resolves/creates offline players (`save_user` / `allocate_next_vekn_id
 ### Ownership & Transfer
 
 - **Primary device** is authoritative — the server accepts its full state on go-online.
-- **Force-takeover**: another official organizer can claim the lock (warned about losing the primary's unsaved data).
+- **Force-takeover**: another organizer who can create members can claim the lock (warned about losing the primary's unsaved data).
 - **Opportunistic sync**: the primary can background-sync without unlocking (`sync-offline`).
-- **IC force-unlock**: emergency unlock without syncing offline data (first-party IC sessions only — OAuth tokens rejected).
+- **Force-unlock**: emergency unlock without syncing offline data (`force_unlock_tournament`; first-party sessions only — OAuth tokens rejected).
 - **Lock-loss reconciliation**: when a force-unlock or takeover reaches the previously isolated device via SSE/snapshot, it clears local offline state and warns the user their unsynced changes are discarded. `go-online` returns 410 (no longer offline) or 409 (another device took over) so a stale snapshot can't clobber authoritative state, and the server self-excludes the initiating device from its own go-online broadcast so a normal online transition doesn't self-trip that warning. (Full mechanics: SYNC.md.)
 
 ## Mutation Pipeline
@@ -192,6 +192,47 @@ Player-initiated, online-only: `POST /{uid}/call-judge` `{table}` — the caller
 
 Bidirectional integration with vekn.net, gated by feature flags (`VEKN_PUSH` backend, `VITE_VEKN_PUSH` frontend). Outbound push creates a VEKN calendar entry on tournament create and uploads archondata on finish, plus member sync; inbound pull imports members and historical tournaments. All push is fire-and-forget with an hourly batch retry; imported/merged tournaments are stamped `vekn_pushed_at` so results are never re-uploaded (re-pushing the source of record is pointless, and round-less imports fail the `rounds` push guard anyway). Full mechanics — flags, archondata format, push constraints, outage resilience, member/tournament/error handling: **VEKN_SYNC.md**. Key files: `vekn_push.py`, `vekn_api.py`, `vekn_sync.py`, `vekn_tournament_sync.py`.
 
+## Authorization
+
+Every authorization rule lives once, as data, in `engine/src/permissions.rs`:
+`CAPABILITIES` (what each authority takes) and `ROLE_APPOINTMENTS` (who may
+grant each role). A matrix change edits a row there and nowhere else — the
+backend (`permissions.py`), the frontend (`lib/engine.ts`) and the Discord bot
+are callers, and no role literal outside the engine may decide access.
+
+Scope: **global** = anywhere; **own country** = the actor's `country` equals the
+target's (or the resource's), and the actor must have one; **organizer** = the
+actor is listed on the tournament/league. IC holds every capability globally
+and is omitted from the rows below.
+
+| Capability | Who, besides IC |
+|---|---|
+| `create_member`, `sponsor_vekn`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
+| `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
+| `merge_accounts`, `delete_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global` | nobody |
+| `moderate_link`, `promote_link_national` | NC — own country |
+| `organize_tournament` | NC — own country; explicit organizer |
+| `manage_leagues` | NC — global |
+| `edit_league` | NC — own country; league organizer |
+| `issue_restricted_sanction`, `lift_restricted_sanction`, `modify_sanction`, `delete_any_sanction` | Ethics — global |
+| `issue_tournament_sanction` | Ethics — global; tournament organizer |
+| `lift_tournament_sanction` | Rulemonger — global; NC — the tournament's country |
+| `lift_league_disqualification` | league organizer |
+| `delete_organizer_sanction` | tournament organizer, while the tournament is unfinished |
+| `record_promo_intake`, `view_full_promo_ledger` | NC — global (the inventory chain is not country-scoped) |
+| `manage_oauth_clients` | DEV — global |
+
+Appointments: NC grants **Prince** in their own country; PTC grants **PT**;
+Rulemonger grants **Judge** and **Judgekin**; everything else is IC's. A target
+must hold a `vekn_id` to hold any role.
+
+Rules carrying a precondition the table cannot express keep a resolver beside
+it: sanction level, tournament state, a target's own roles
+(`can_change_country`), and the `open_to_country_princes` league flag.
+
+Not covered here: **access levels**, which compute *visibility* from the same
+roles — a separate axis, see SYNC.md.
+
 ## Authentication
 
 Multiple methods, all issuing JWT access/refresh token pairs.
@@ -243,7 +284,7 @@ Member-contributed links to external community resources, with moderator oversig
 
 - **CommunityLink**: `type` (Discord/Telegram/WhatsApp/Forum/Facebook/Website/Twitch/YouTube/Reddit/Instagram/Blog/Other), `url`, `label`, `languages` (ISO 639-1, cap 5; empty = shows under every filter), `moderation` (`LinkModeration`: `status` hidden|promoted, `by`, `at`, `scope` global(IC)|national(NC)). The backend validates only the two-letter shape; the curated UI list is `frontend/src/lib/data/languages.ts`.
 - **Add**: any user with `vekn_id`; limit 5 (10 for IC/NC/Prince). On update, existing moderation is re-applied by URL match.
-- **Moderation** (`PATCH /api/users/{uid}/community-link-moderation` `{url, action}`): IC may hide/clear/promote_national/promote_global anywhere; NC hide/clear/promote_national in their own country. Princes do not moderate. Officials pin their own links through the same country-scoped grant, not a self-service exemption.
+- **Moderation** (`PATCH /api/users/{uid}/community-link-moderation` `{url, action}`): actions map to the `moderate_link` / `promote_link_national` / `promote_link_global` capabilities (see Authorization). Officials pin their own links through the same country-scoped grant, not a self-service exemption.
 - **Projection**: public — NC/Prince and IC included (IC without contact), others hidden; member — NC/Prince/IC and any user with non-empty links; full — always. (`compute_user_public` / `compute_user_member`.)
 - **Frontend** (`CommunityTab.svelte`): Global Resources (scope=global pins), Communities (social links grouped by country, pins first), Content (language filter defaulting to All, sorted global pin → national pin → promoted → officials → rest), Officials Directory (NC/Prince/IC contacts). `CommunityModerationActions.svelte` provides inline moderator controls.
 
@@ -384,7 +425,7 @@ Search engines (Googlebot, Bingbot) are deliberately excluded from the UA list �
 
 ### Deceased Members
 
-`User.deceased_at` (in-memoriam flag + date) and `deceased_by_uid` (audit, full-only). This is **not** a soft-delete — tournament history, ratings, and rankings are preserved and the record stays active. Set/cleared (reversible) via `PATCH /api/users/{uid}/deceased`. Permission: IC (any country) or NC (same country only); Prince excluded; **requires `vekn_id`**. Engine `can_mark_deceased` / WASM `canMarkDeceased`. Never pushed to VEKN; `deceased_at` tracked in `local_modifications` to block VEKN-sync overwrite. Access: `deceased_at` member+, `deceased_by_uid` full-only.
+`User.deceased_at` (in-memoriam flag + date) and `deceased_by_uid` (audit, full-only). This is **not** a soft-delete — tournament history, ratings, and rankings are preserved and the record stays active. Set/cleared (reversible) via `PATCH /api/users/{uid}/deceased`. Permission: `mark_deceased` (see Authorization); **requires `vekn_id`**. Never pushed to VEKN; `deceased_at` tracked in `local_modifications` to block VEKN-sync overwrite. Access: `deceased_at` member+, `deceased_by_uid` full-only.
 
 ### Delete Member
 
@@ -394,7 +435,7 @@ Search engines (Googlebot, Bingbot) are deliberately excluded from the UA list �
 
 ### Merge / Detach
 
-- **Merge** (`POST /admin/users/merge`; IC only — the merge unions both accounts' roles without consulting the appointment matrix): the VEKN-bearing uid is always the survivor (`keep_uid`). Migrates auth methods, sanctions, decks, and `coopted_by` from the dying uid, then soft-deletes it; consolidates ratings, wins, roles, and `local_modifications` (union). `accounts.merge_users()`. Separately, the route remaps `promo_ledger` holder references onto the survivor and triggers a full promo stock recompute (Promo Catalog).
+- **Merge** (`POST /admin/users/merge`; `merge_accounts`, IC only — the merge unions both accounts' roles without consulting the appointment matrix): the VEKN-bearing uid is always the survivor (`keep_uid`). Migrates auth methods, sanctions, decks, and `coopted_by` from the dying uid, then soft-deletes it; consolidates ratings, wins, roles, and `local_modifications` (union). `accounts.merge_users()`. Separately, the route remaps `promo_ledger` holder references onto the survivor and triggers a full promo stock recompute (Promo Catalog).
 - **Detach** (`detach_user_from_vekn`): splits one account in two — the VEKN record keeps its uid and all keyed data; a fresh uid walks away with auth methods + personal/contact PII only. Callers: **self-abandon** (`POST /vekn/me/abandon`, blocked while an active suspension or probation is held — the sanction stays with the VEKN record; admin force-abandon is exempt) and **admin displace** (inside `POST /vekn/link`, frees a VEKN ID before re-linking it; the new owner is then merged into the freed record).
 
 ## Scheduled Background Tasks

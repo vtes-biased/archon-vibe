@@ -81,29 +81,39 @@ const updatedTournament = engine.processTournamentEvent(
 
 ### Permissions (`src/permissions.rs`)
 
-**Single source of truth for all authorization predicates** — consumed by backend (PyO3) and frontend (WASM). See `.pst/details/72-authz-rust-single-source.md` for the design rationale.
+**Single source of truth for every authorization rule** — consumed by backend
+(PyO3), frontend (WASM) and, through `/oauth/userinfo`, the Discord bot. See
+`.pst/details/72-authz-rust-single-source.md` for the design rationale and
+`.pst/details/538-permission-model-realignment.md` for the capability rewrite.
 
-Role hierarchy: IC > NC > Prince (country-scoped) > Judge/Judgekin (displayed as Sheriff)
+The rules are **data**, not functions:
 
-**User predicates** (take `UserContext {roles, country, vekn_id}`):
-- `can_change_role(actor, target, role)` — can actor grant/revoke a role
-- `can_manage_vekn(actor, target)` — can actor manage target's VEKN ID
-- `can_edit_user(actor, target)` — can actor edit target's profile
-- `is_official(actor)` — IC, NC, or Prince
-- `can_manage_country(actor, target_country)` — IC (any), or NC/Prince of that country
-- `can_manage_tournaments(actor)` — can create/manage tournaments (= `is_official`)
-- `can_manage_leagues(actor)` — IC or NC
+- `CAPABILITIES` — one row per distinct authority: the roles that hold it
+  globally, the roles that hold it over their own country, whether it is
+  self-service, whether an organizer of the resource qualifies, and the
+  user-facing denial. Deny by default.
+- `ROLE_APPOINTMENTS` — one row per role: who may grant or revoke it.
 
-**Resource predicates** (take `OwnedResource {country, organizers_uids}`; league adds `open_to_country_princes`):
-- `is_organizer(actor, actor_uid, tournament)` — in organizers list, IC, or same-country NC
-- `can_edit_league(actor, actor_uid, league)` — IC, same-country NC, or a league organizer
-- `can_link_tournament_to_league(actor, actor_uid, league)` — `can_edit_league`, or a same-country Prince when the league's `open_to_country_princes` flag is set (attach-only — no other league rights)
+A matrix change edits a row. The published matrix lives in ARCHITECTURE.md
+(Authorization); this file describes the mechanism.
 
-**Sanction predicates**:
-- `can_issue_sanction(actor, actor_uid, level, tournament)` — IC/Ethics, or a tournament organizer (caution/warning/SA/DQ); IC/Ethics only for suspension/probation
-- `can_lift_sanction(actor, actor_uid, ctx)` — takes a `SanctionContext` (level + tournament/league fields)
+**Evaluating** — `check(capability, &Request)` is the single decision point.
+`Request` carries the actor plus only what the row reads (`target_uid`,
+`target_country`, `resource`); an absent field matches no grant. Both bindings
+expose it as one entry point, `check_permission(capability, request_json)`.
 
-All exposed via both PyO3 and WASM bindings in `lib.rs`.
+**Resolvers** — the few rules with a precondition the table cannot express keep
+a thin function over `check`: `can_change_role` (the appointment matrix plus the
+target's `vekn_id`), `can_change_country` (the authority over the target's
+highest official role), `can_issue_sanction` / `can_lift_sanction` /
+`can_delete_sanction` (level and tournament state select the capability),
+`can_link_tournament_to_league` (the `open_to_country_princes` flag), and
+`is_organizer` / `can_edit_league` (named wrappers over one capability each).
+
+**Not authority** — `is_official(actor)` answers whether someone holds the
+official badge, for badges and quotas only; `unconditional_capabilities(actor)`
+lists what an actor holds anywhere, for remote clients that must decide what to
+offer without carrying their own copy of the matrix.
 
 ### Sanctions Reference (`src/sanctions.rs`)
 
