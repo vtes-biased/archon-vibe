@@ -85,6 +85,26 @@
     if (currentPage > last) untrack(() => { currentPage = last; });
   });
 
+  const hasFilters = $derived(
+    !!searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0
+      || filterHasPastSanctions || filterCurrentlySanctioned || sponsorFilter !== "all" || filterNoVekn,
+  );
+
+  // One way out of a filtered-empty list, including one the nav menu restored.
+  function clearFilters() {
+    searchQuery = "";
+    debouncedSearch = "";
+    selectedCountry = "all";
+    selectedRoles = [];
+    filterHasPastSanctions = false;
+    filterCurrentlySanctioned = false;
+    sponsorFilter = "all";
+    filterNoVekn = false;
+    currentPage = 1;
+    updateDisplayContext();
+    loadUsers();
+  }
+
   // Mirror the public filters + page into the address bar.
   $effect(() => {
     syncQueryParams({
@@ -707,12 +727,17 @@
           </div>
           <h3 class="text-lg font-medium text-ink-strong mb-2">{m.user_list_no_users()}</h3>
           <p class="text-ink-muted">
-            {#if searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0 || filterHasPastSanctions || filterCurrentlySanctioned || sponsorFilter !== "all" || filterNoVekn}
+            {#if hasFilters}
               {m.user_list_adjust_filters()}
             {:else}
               {m.user_list_no_users_yet()}
             {/if}
           </p>
+          {#if hasFilters}
+            <Button variant="secondary" size="md" class="mt-4" onclick={clearFilters}>
+              {m.filters_clear()}
+            </Button>
+          {/if}
         {/if}
       </div>
     {/if}

@@ -1,6 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/stores';
+  // A plain click on a nav item reopens that list where the viewer left it.
+  import { openLastView } from '$lib/last-view';
   import { syncManager } from '$lib/sync';
   import { initAuth } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine';
@@ -205,6 +207,7 @@
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
           href={item.href}
+          onclick={(e) => openLastView(e, item.href)}
           aria-label={item.labelFn()}
           aria-current={active ? 'page' : undefined}
           title={item.labelFn()}
@@ -219,7 +222,7 @@
   <!-- Side navigation (desktop) -->
   <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-20 bg-surface-card border-r border-line flex-col items-center py-4 z-40">
     <!-- Logo -->
-    <a href="/tournaments" class="mb-6 text-link hover:text-link-soft" title={m.nav_home()}>
+    <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="mb-6 text-link hover:text-link-soft" title={m.nav_home()}>
       <img src="/favicon.svg" alt="Archon" class="w-16 h-16" />
     </a>
 
@@ -228,6 +231,7 @@
         {@const active = isActive(item.href, $page.url.pathname)}
         <a
           href={item.href}
+          onclick={(e) => openLastView(e, item.href)}
           class="flex flex-col items-center py-3 px-2 rounded-lg transition-colors {active ? 'bg-accent-soft/50 text-link' : 'text-ink-muted hover:text-ink-bright hover:bg-surface-hover/50'}"
           title={item.labelFn()}
         >

@@ -174,6 +174,16 @@ Show country flag emoji with country name. Use `getCountryFlag(isoCode)` from `l
 - No "Cancel" affordance on auto-save forms — changes persist as they're made, so the exit action is Close/Done, and a pending debounce is **flushed** on close (never dropped)
 - Exception: genuinely irreversible or externally-visible actions gate behind an explicit confirm step; for everything else prefer clean reversibility over confirmation (no confirmation bloat)
 
+## List View State
+
+Filters belong to the list, not to the component instance. Three layers, in order:
+
+- **URL query string** (`$lib/url-filters`) — canonical. Every filter and the page number are mirrored there with `replaceState`, so Back restores the exact view and a filtered list is shareable. Read `window.location`, never the `page` store (shallow routing leaves the store behind).
+- **Nav-menu memory** (`$lib/last-view`) — a bare link back into a list resolves, on click, to the view it was left in. sessionStorage, 30-minute inactivity window, so a new tab or a stale one starts clean. The page number and the free-text query are deliberately dropped: a position and an intent, not a view preference.
+- **localStorage** — only for true display preferences that should outlive the tab (the tournaments agenda/all toggle, the theme).
+
+Because a restored filter can hide data, every list's empty state must distinguish "nothing matches these filters" from "nothing here yet" and offer a one-click **Clear filters**.
+
 ## Mobile First
 
 Design for touch devices first, then enhance for desktop.

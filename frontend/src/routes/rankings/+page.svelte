@@ -3,6 +3,7 @@
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
+  import Button from "$lib/components/Button.svelte";
   import type { User, RatingCategory } from "$lib/types";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import { goto } from "$app/navigation";
@@ -167,7 +168,18 @@
         <span class="ml-2">{isHof ? m.hof_loading() : m.rankings_loading()}</span>
       </div>
     {:else if filtered.length === 0}
-      <div class="text-center text-ink-faint py-8">{isHof ? m.hof_no_results() : m.rankings_no_results()}</div>
+      <div class="text-center text-ink-faint py-8">
+        {isHof ? m.hof_no_results() : m.rankings_no_results()}
+        <!-- The country filter can come back with the view the nav menu restored,
+             so an empty table needs a visible way out of it. -->
+        {#if selectedCountry !== "all"}
+          <div>
+            <Button variant="secondary" size="md" class="mt-4" onclick={() => selectedCountry = "all"}>
+              {m.filters_clear()}
+            </Button>
+          </div>
+        {/if}
+      </div>
     {:else}
       <div class="overflow-x-auto">
         <table class="w-full text-sm">

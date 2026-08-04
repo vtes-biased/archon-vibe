@@ -517,6 +517,7 @@
   "tournaments_loading_from_storage": "Loading tournaments from local storage.",
   "tournaments_no_results": "No tournaments found",
   "tournaments_adjust_filters": "Try adjusting your filters.",
+  "filters_clear": "Clear filters",
   "tournaments_none_yet": "No tournaments have been created yet.",
   "tournaments_agenda_empty": "Your agenda is empty — events you play in, organize, or that happen near you show up here. Browse all events to find something to play, or subscribe to the calendar feed.",
   "tournaments_agenda_show_all": "Show all events",

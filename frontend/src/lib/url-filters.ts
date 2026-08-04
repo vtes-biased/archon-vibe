@@ -14,6 +14,7 @@
  */
 
 import { replaceState } from '$app/navigation';
+import { rememberView } from '$lib/last-view';
 
 /** Query params of the URL actually in the address bar. */
 export function currentParams(): URLSearchParams {
@@ -24,6 +25,9 @@ export function currentParams(): URLSearchParams {
  * Mirror the given params into the current URL. A null or empty value drops its
  * param, keeping default views on a clean URL. The write is history-neutral:
  * Back must leave the list, not step through every filter change.
+ *
+ * Also feeds the nav menu's short-lived memory ($lib/last-view) — before the
+ * no-op check, so a view arrived at through a shared link is remembered too.
  */
 export function syncQueryParams(params: Record<string, string | null>): void {
     const current = new URL(window.location.href);
@@ -32,6 +36,7 @@ export function syncQueryParams(params: Record<string, string | null>): void {
         if (value === null || value === '') next.searchParams.delete(key);
         else next.searchParams.set(key, value);
     }
+    rememberView(next.pathname, next.search);
     if (next.search === current.search) return;
     replaceState(next.pathname + next.search + next.hash, {});
 }

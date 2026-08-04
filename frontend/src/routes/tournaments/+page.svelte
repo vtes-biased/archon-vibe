@@ -46,17 +46,29 @@
   // local state is lost.
   const urlParams = currentParams();
 
-  // View mode
+  // View mode. Agenda-vs-all is a display preference, not a filter: it outlives
+  // the tab like the theme does (localStorage), while the filters below only get
+  // the short-lived nav-menu memory in $lib/last-view.
+  const VIEW_PREF_KEY = "archon:tournaments-view";
   const auth = $derived(getAuthState());
   const canUseAgenda = $derived(auth.isAuthenticated && auth.user?.vekn_id && auth.user?.country);
   const urlView = urlParams.get("view");
-  let viewMode = $state<"agenda" | "all">(urlView === "agenda" || urlView === "all" ? urlView : "all");
+  const storedView = localStorage.getItem(VIEW_PREF_KEY);
+  const initialView = [urlView, storedView].find(v => v === "agenda" || v === "all");
+  let viewMode = $state<"agenda" | "all">((initialView as "agenda" | "all") ?? "all");
 
-  // Default to the agenda once auth resolves — unless the URL already chose.
+  // Default to the agenda once auth resolves — unless the URL or a remembered
+  // preference already chose.
   $effect(() => {
-    if (canUseAgenda && !urlView) {
+    if (canUseAgenda && !initialView) {
       untrack(() => { viewMode = "agenda"; });
     }
+  });
+
+  // Only remember the choice once the agenda is actually reachable: before auth
+  // resolves every viewer reads as "all", which would overwrite a stored agenda.
+  $effect(() => {
+    if (canUseAgenda) localStorage.setItem(VIEW_PREF_KEY, viewMode);
   });
 
   // Filters
@@ -196,6 +208,21 @@
   const filterKey = $derived(
     [debouncedSearch, selectedState, selectedCountry, selectedFormat, includeOnline, viewMode].join("|"),
   );
+
+  // includeOnline counts: it hides data like any other filter, so an empty list
+  // under it must read as filtered, not as "no tournaments yet".
+  const hasFilters = $derived(
+    !!searchQuery.trim() || selectedState !== "all" || selectedCountry !== "all"
+      || selectedFormat !== "all" || !includeOnline,
+  );
+
+  function clearFilters() {
+    searchQuery = "";
+    selectedState = "all";
+    selectedCountry = "all";
+    selectedFormat = "all";
+    includeOnline = true;
+  }
 
   // Reset page when filters change. Comparing against the last key rather than
   // resetting on every run keeps the mount pass from discarding a page number
@@ -585,7 +612,7 @@
         </div>
         <h3 class="text-lg font-medium text-ink-strong mb-2">{m.tournaments_no_results()}</h3>
         <p class="text-ink-muted">
-          {#if searchQuery.trim() || selectedCountry !== "all" || selectedFormat !== "all" || selectedState !== "all"}
+          {#if hasFilters}
             {m.tournaments_adjust_filters()}
           {:else if viewMode === "agenda"}
             {m.tournaments_agenda_empty()}
@@ -593,6 +620,14 @@
             {m.tournaments_none_yet()}
           {/if}
         </p>
+        <!-- A view restored by the nav menu can come up empty on filters the
+             viewer did not just set, so the way out is one click, not a hunt
+             through the controls. -->
+        {#if hasFilters}
+          <Button variant="secondary" size="md" class="mt-4" onclick={clearFilters}>
+            {m.filters_clear()}
+          </Button>
+        {/if}
         {#if viewMode === "agenda" && !searchQuery.trim() && selectedFormat === "all"}
           <Button variant="secondary" size="md" class="mt-4" onclick={() => viewMode = "all"}>
             {m.tournaments_agenda_show_all()}

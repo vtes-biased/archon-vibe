@@ -16,6 +16,8 @@
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
+  // The back link returns to the list the way it was left, like the nav menu.
+  import { openLastView } from "$lib/last-view";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, UserPlus, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2, CalendarPlus } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
@@ -615,7 +617,7 @@ import TournamentModals from "./TournamentModals.svelte";
 <div class="p-4 sm:p-8">
   <div class="max-w-4xl mx-auto">
     <!-- Back link -->
-    <a href="/tournaments" class="inline-flex items-center gap-2 text-ink-muted hover:text-ink-bright mb-4">
+    <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="inline-flex items-center gap-2 text-ink-muted hover:text-ink-bright mb-4">
       <ArrowLeft class="w-4 h-4" />
       {m.nav_tournaments()}
     </a>

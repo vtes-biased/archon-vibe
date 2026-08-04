@@ -517,6 +517,7 @@
   "tournaments_loading_from_storage": "Chargement des tournois depuis le stockage local.",
   "tournaments_no_results": "Aucun tournoi trouvé",
   "tournaments_adjust_filters": "Essayez d'ajuster vos filtres.",
+  "filters_clear": "Réinitialiser les filtres",
   "tournaments_none_yet": "Aucun tournoi n'a encore été créé.",
   "tournaments_agenda_empty": "Votre agenda est vide — les événements auxquels vous participez, que vous organisez, ou qui se déroulent près de vous apparaissent ici. Parcourez tous les événements pour trouver quelque chose à jouer, ou abonnez-vous au flux du calendrier.",
   "tournaments_agenda_show_all": "Afficher tous les événements",

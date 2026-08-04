@@ -10,6 +10,7 @@ import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
 import type { User } from "$lib/types";
 import { syncManager } from "$lib/sync";
+import { forgetViews } from "$lib/last-view";
 
 const ACCESS_TOKEN_KEY = "archon_access_token";
 const REFRESH_TOKEN_KEY = "archon_refresh_token";
@@ -496,6 +497,9 @@ export async function login(email: string, password: string): Promise<boolean> {
  */
 export async function logout(): Promise<void> {
   clearTokens();
+  // Remembered list views can hold filters an anonymous viewer has no control
+  // for (state=finished is authenticated-only), so they would filter unaccountably.
+  forgetViews();
   await syncManager.reset();
   setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
 }
