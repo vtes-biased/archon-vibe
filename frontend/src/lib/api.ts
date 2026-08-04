@@ -311,7 +311,7 @@ export async function linkVeknId(vekn_id: string, user_uid: string): Promise<Vek
 }
 
 /**
- * Force-abandon a user's VEKN ID (for NC/Prince/IC).
+ * Force-abandon a user's VEKN ID (gated by the `manage_vekn` capability).
  */
 export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageResponse> {
   return apiRequest<VeknMessageResponse>('/vekn/force-abandon', {

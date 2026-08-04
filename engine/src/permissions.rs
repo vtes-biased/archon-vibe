@@ -281,7 +281,7 @@ pub const CAPABILITIES: &[Rule] = &[
         capability: Capability::EditMemberProfile,
         name: "edit_member_profile",
         global: &[IC],
-        same_country: &[NC, Prince],
+        same_country: &[NC],
         self_service: true,
         organizer: false,
         deny: "You don't have permission to edit this user",
@@ -311,10 +311,10 @@ pub const CAPABILITIES: &[Rule] = &[
         capability: Capability::ManageVekn,
         name: "manage_vekn",
         global: &[IC],
-        same_country: &[NC, Prince],
+        same_country: &[NC],
         self_service: false,
         organizer: false,
-        deny: "Only IC, NC, or Prince can manage VEKN IDs",
+        deny: "Only IC, or the member's national coordinator, can manage VEKN IDs",
         deny_scope: Some("You can only manage VEKN IDs for users in your country"),
     },
     // Deliberately cross-country: any official may sponsor a VEKN ID anywhere.
@@ -1063,14 +1063,11 @@ mod tests {
         let cap = Capability::EditMemberProfile;
         assert!(over_country(cap, &ctx(vec![IC], Some("US")), Some("FR")));
         assert!(over_country(cap, &ctx(vec![NC], Some("FR")), Some("FR")));
-        assert!(over_country(
-            cap,
-            &ctx(vec![Prince], Some("FR")),
-            Some("FR")
-        ));
+        assert!(!over_country(cap, &ctx(vec![NC], Some("US")), Some("FR")));
+        // A Prince holds no member-data authority, not even at home.
         assert!(!over_country(
             cap,
-            &ctx(vec![Prince], Some("US")),
+            &ctx(vec![Prince], Some("FR")),
             Some("FR")
         ));
         assert!(!over_country(
@@ -1086,6 +1083,7 @@ mod tests {
         assert!(over_country(cap, &ctx(vec![IC], Some("US")), Some("FR")));
         assert!(over_country(cap, &ctx(vec![NC], Some("FR")), Some("FR")));
         assert!(!over_country(cap, &ctx(vec![NC], Some("FR")), Some("US")));
+        assert!(!over_country(cap, &ctx(vec![Prince], Some("FR")), Some("FR")));
         assert!(!over_country(cap, &ctx(vec![], Some("FR")), Some("FR")));
     }
 
