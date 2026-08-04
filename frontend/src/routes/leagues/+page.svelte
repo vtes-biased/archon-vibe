@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import { getAllLeagues } from "$lib/db";
   import { syncManager } from "$lib/sync";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canManageLeagues } from "$lib/engine";
   import { normalizeSearch } from "$lib/utils";
@@ -21,6 +21,7 @@
   let showPast = $state(false);
 
   const countries = getCountries();
+  const sortedCountries = getSortedCountries();
   const auth = $derived(getAuthState());
   const canCreate = $derived(canManageLeagues(auth.user).allowed);
   // Logged-out viewers never see past leagues; the toggle is hidden for them, so a
@@ -158,8 +159,8 @@
             class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
           >
             <option value="all">{m.league_all_countries()}</option>
-            {#each Object.entries(countries) as [code, country]}
-              <option value={code}>{country.name} {getCountryFlag(code)}</option>
+            {#each sortedCountries as country}
+              <option value={country.iso_code}>{country.name} {getCountryFlag(country.iso_code)}</option>
             {/each}
           </select>
         </div>

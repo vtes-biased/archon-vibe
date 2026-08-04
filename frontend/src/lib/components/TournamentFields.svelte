@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "$lib/types";
   import type { VenueInfo } from "$lib/db";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getAllLeagues } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canLinkTournamentToLeague } from "$lib/engine";
@@ -53,7 +53,7 @@
     idPrefix?: string;
   } = $props();
 
-  const countries = getCountries();
+  const countries = getSortedCountries();
   const timezones = Intl.supportedValuesOf("timeZone");
   const auth = $derived(getAuthState());
   const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
@@ -312,8 +312,8 @@
       class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright {values.country ? 'border-line-strong' : 'border-accent-strong/50'}"
     >
       <option value="">{m.tfield_select_country()}</option>
-      {#each Object.entries(countries) as [code, c]}
-        <option value={code}>{c.name} {getCountryFlag(code)}</option>
+      {#each countries as c}
+        <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
       {/each}
     </select>
   </div>

@@ -5,7 +5,7 @@
   import { saveLeague, getAllLeagues } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canManageLeagues } from "$lib/engine";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import type { League, LeagueKind, LeagueStandingsMode } from "$lib/types";
   import Button from '$lib/components/Button.svelte';
   import { ArrowLeft } from "@lucide/svelte";
@@ -13,7 +13,7 @@
 
   const auth = $derived(getAuthState());
   const canCreate = $derived(canManageLeagues(auth.user).allowed);
-  const countries = getCountries();
+  const countries = getSortedCountries();
 
   let name = $state("");
   let kind = $state<LeagueKind>("League");
@@ -171,8 +171,8 @@
               <select id="country" bind:value={country}
                 class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
                 <option value="">{m.league_worldwide()}</option>
-                {#each Object.entries(countries) as [code, c]}
-                  <option value={code}>{c.name} {getCountryFlag(code)}</option>
+                {#each countries as c}
+                  <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
                 {/each}
               </select>
             </div>

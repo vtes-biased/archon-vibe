@@ -5,7 +5,7 @@
   import { getLeague, getAllTournaments, getAllLeagues, sortUpcomingFirst } from "$lib/db";
   import { updateLeague, deleteLeagueApi, addLeagueOrganizer, removeLeagueOrganizer } from "$lib/api";
   import { syncManager } from "$lib/sync";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { getUser } from "$lib/db";
@@ -28,6 +28,7 @@
     return `${base}/api/calendar/tournaments.ics?league=${uid}`;
   });
   const countries = getCountries();
+  const sortedCountries = getSortedCountries();
   const auth = $derived(getAuthState());
 
   let league = $state<League | null>(null);
@@ -458,8 +459,8 @@
             <select id="edit-country" bind:value={editCountry}
               class="w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright">
               <option value="">{m.league_worldwide()}</option>
-              {#each Object.entries(countries) as [code, c]}
-                <option value={code}>{c.name} {getCountryFlag(code)}</option>
+              {#each sortedCountries as c}
+                <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
               {/each}
             </select>
           </div>

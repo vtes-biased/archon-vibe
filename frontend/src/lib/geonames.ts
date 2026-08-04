@@ -24,6 +24,18 @@ export function getCountries(): Record<string, Country> {
 }
 
 /**
+ * Get all countries sorted by display name — the order every dropdown wants
+ * (the raw record is keyed by ISO code, which sorts by native name, not label).
+ */
+let sortedCountriesCache: Country[] | null = null;
+export function getSortedCountries(): Country[] {
+    sortedCountriesCache ??= Object.values(getCountries()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+    );
+    return sortedCountriesCache;
+}
+
+/**
  * Get a specific country by ISO code.
  */
 export function getCountry(isoCode: string): Country | undefined {

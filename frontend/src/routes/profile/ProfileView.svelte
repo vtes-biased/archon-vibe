@@ -1,6 +1,6 @@
 <script lang="ts">
   import { User, Camera, Unlink, Share2, Check, Plus, Trash2, CloudOff, X } from "@lucide/svelte";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
   import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
   import Button from "$lib/components/Button.svelte";
@@ -27,8 +27,7 @@
     veknPush && !!user.vekn_id && user.vekn_synced === false
   );
 
-  const countries = getCountries();
-  const sortedCountries = Object.values(countries).sort((a, b) => a.name.localeCompare(b.name));
+  const sortedCountries = getSortedCountries();
   let copied = $state(false);
 
   // Identity, not authority: it only decides which contact-visibility note to show.

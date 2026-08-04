@@ -5,7 +5,7 @@
   import User from "./User.svelte";
   import DeceasedIcon from "./DeceasedIcon.svelte";
   import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned } from "$lib/db";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses, getRoleLabel } from "$lib/roles";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -55,6 +55,7 @@
   const isOfficial = $derived(engineIsOfficial(getAuthState().user));
 
   const countries = getCountries();
+  const sortedCountries = getSortedCountries();
   const availableRoles: Role[] = [
     "IC",
     "NC",
@@ -403,9 +404,9 @@
                 class="w-full pl-3 pr-9 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
               >
                 <option value="all">{m.user_list_all_countries()}</option>
-                {#each Object.entries(countries) as [code, country]}
-                  <option value={code}
-                    >{country.name} {getCountryFlag(code)}</option
+                {#each sortedCountries as country}
+                  <option value={country.iso_code}
+                    >{country.name} {getCountryFlag(country.iso_code)}</option
                   >
                 {/each}
               </select>

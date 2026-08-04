@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getAllUsers, getSuspendedUserUids } from "$lib/db";
   import { syncManager } from "$lib/sync";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import type { User, RatingCategory } from "$lib/types";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
@@ -37,11 +37,7 @@
   ];
 
   const countries = getCountries();
-  const countryList = $derived(
-    Object.entries(countries)
-      .map(([code, c]) => ({ code, name: c.name }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  );
+  const countryList = getSortedCountries();
 
   let filtered = $derived.by(() => {
     if (isHof) {
@@ -135,7 +131,7 @@
       >
         <option value="all">{m.rankings_all_countries()}</option>
         {#each countryList as c}
-          <option value={c.code}>{c.name} {getCountryFlag(c.code)}</option>
+          <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
         {/each}
       </select>
     </div>

@@ -3,7 +3,7 @@
   import { toUserMessage } from '$lib/errors';
   import type { User, Role } from "$lib/types";
   import { createUser, updateUser, uploadAvatar } from "$lib/api";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
+  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleClasses, getRoleLabel } from "$lib/roles";
   import { deobfuscateContact } from "$lib/contact";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -220,11 +220,8 @@
     editCountry = user?.country || "";
   }
 
-  // Load countries for select box
   const countries = getCountries();
-  const sortedCountries = Object.values(countries).sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  const sortedCountries = getSortedCountries();
 
   const availableRoles: Role[] = [
     "IC",

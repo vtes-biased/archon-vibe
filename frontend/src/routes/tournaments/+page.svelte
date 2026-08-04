@@ -3,7 +3,7 @@
   import { untrack } from "svelte";
   import { getFilteredTournaments, getAgendaTournaments, getLeague } from "$lib/db";
   import { syncManager } from "$lib/sync";
-  import { getCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
+  import { getCountries, getSortedCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
   import { getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
   import { canCreateTournament } from "$lib/engine";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
@@ -77,6 +77,7 @@
   const PAGE_SIZE = 50;
 
   const countries = getCountries();
+  const sortedCountries = getSortedCountries();
   const formats: TournamentFormat[] = ["Standard", "V5", "Limited"];
 
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
@@ -335,8 +336,8 @@
               class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
             >
               <option value="all">{m.tournaments_all_countries()}</option>
-              {#each Object.entries(countries) as [code, country]}
-                <option value={code}>{country.name} {getCountryFlag(code)}</option>
+              {#each sortedCountries as country}
+                <option value={country.iso_code}>{country.name} {getCountryFlag(country.iso_code)}</option>
               {/each}
             </select>
           </div>
