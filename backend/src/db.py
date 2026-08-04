@@ -253,7 +253,7 @@ DATA_SCHEMA_VERSION = 1
 
 # Roles that branch in base_data_level / entitled_level / access_levels — the only
 # roles whose presence changes a viewer's entitlement (so only these enter the fp).
-_OVERLAY_ROLES = (Role.IC, Role.NC, Role.PRINCE)
+_OVERLAY_ROLES = (Role.IC, Role.NC)
 
 
 def base_data_level(viewer: User | None) -> str:
@@ -292,7 +292,7 @@ async def compute_access_version(viewer: User | None) -> str:
 
     Hashes everything that changes WHICH objects (or which projection of them) a
     viewer is entitled to: the wire-shape version, base level, overlay-granting
-    roles, the country that scopes an NC/Prince overlay, and the tournaments they
+    roles, the country that scopes an NC's overlay, and the tournaments they
     organize. A mismatch at connect ⇒ the cached corpus predates an entitlement
     change a since-delta can't repair ⇒ resync. Backend-only + opaque: the client
     stores + echoes it, never parses it, so the inputs stay server-evolvable.
@@ -301,7 +301,7 @@ async def compute_access_version(viewer: User | None) -> str:
     roles = sorted(r.value for r in _OVERLAY_ROLES if viewer and r in viewer.roles)
     # country enters the fp ONLY for officials — it scopes their same-country overlay.
     # Must stay in lockstep with entitled_level's same-country branch (broadcast.py).
-    official = bool(viewer and (Role.NC in viewer.roles or Role.PRINCE in viewer.roles))
+    official = bool(viewer and Role.NC in viewer.roles)
     country = viewer.country if official else None
     # The org-set only changes a MEMBER's entitlement (IC already sees full
     # everywhere; public/anon have no overlay) — so only members pay the query.

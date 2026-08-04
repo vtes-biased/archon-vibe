@@ -30,7 +30,7 @@ class DataLevel(StrEnum):
 
     PUBLIC = "public"  # Unauthenticated or non-member
     MEMBER = "member"  # Has vekn_id
-    FULL = "full"  # IC, NC/Prince (same country), organizer
+    FULL = "full"  # IC, NC (same country), organizer
 
 
 class Role(StrEnum):

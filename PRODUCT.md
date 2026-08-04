@@ -36,7 +36,7 @@ Archon is an **offline-first Progressive Web App** for managing VTES (Vampire: T
 
 **CRITICAL: ICs (admins) always have full access to everything and all permissions, everywhere in the app.** When any access rule mentions Princes or NCs, ICs implicitly have the same or greater access.
 
-**Needs**: sponsor new VEKN members; manage Prince/NC appointments; view all tournaments/results in jurisdiction; access player contact info (NC/Prince: same country; IC: all); view + manage sanctions.
+**Needs**: sponsor new VEKN members; manage Prince/NC appointments; view all tournaments/results in jurisdiction; access player contact info (NC: same country; IC: all); view + manage sanctions.
 
 **Implicit organizer access**: NC (and IC) implicitly act as organizers on tournaments in their country; a Prince does **not** — it's a city-level role without that oversight. Judge-call broadcasts reach the explicit tournament organizers only (not IC/NC), since they're the ones physically present.
 
@@ -221,7 +221,7 @@ Three data levels control what each connected client sees:
 |-------|-----|------|
 | Public | Unauthenticated / no VEKN ID | Prince/NC list (with contact), minimal tournament info |
 | Member | Has VEKN ID | All users (no contact info), sanctions, tournaments with standings/own tables/filtered decks |
-| Full | IC (always, everywhere), NC/Prince (same country), organizer | Everything: all rounds, finals, check-in codes, contact info |
+| Full | IC (always, everywhere), NC (same country), organizer | Everything: all rounds, finals, check-in codes, contact info |
 
 ### Tournament Field Visibility (Member Level)
 

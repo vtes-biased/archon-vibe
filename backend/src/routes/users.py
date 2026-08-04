@@ -305,21 +305,21 @@ async def update_user(
     # Save to database
     bd = await db_save_user(user)
 
-    # Resync when the user's access-affecting entitlement changes: the overlay
-    # roles they hold (NC/Prince/IC), or — for an NC/Prince — their country,
-    # which scopes their FULL-level overlay (IC sees full everywhere, so an IC
-    # country change is overlay-neutral). _viewer_level and the access_levels
-    # projections branch solely on these; other roles (PT/Judge/...) change no
-    # projection, so resyncing on them just empties caches for ~10s for nothing.
-    # Offline clients self-heal via the access-version fingerprint at connect;
-    # this is the online nudge.
+    # Resync when the user's VIEWER entitlement changes: the overlay roles they
+    # hold (NC/IC), or — for an NC — their country, which scopes their FULL-level
+    # overlay (IC sees full everywhere, so an IC country change is
+    # overlay-neutral). Must stay in lockstep with db._OVERLAY_ROLES and
+    # broadcast.entitled_level. Other roles change no projection they can see, so
+    # resyncing on them just empties caches for ~10s for nothing — a Prince's own
+    # projection does change (they enter the public officials directory), but
+    # that reaches every viewer through broadcast_precomputed below, not through
+    # their own resync. Offline clients self-heal via the access-version
+    # fingerprint at connect; this is the online nudge.
     new_roles = set(user.roles)
-    access_roles = {Role.NC, Role.PRINCE, Role.IC}
+    access_roles = {Role.NC, Role.IC}
     roles_access_changed = (old_roles & access_roles) != (new_roles & access_roles)
     country_overlay_changed = (
-        country is not None
-        and country != old_country
-        and bool(old_roles & {Role.NC, Role.PRINCE})
+        country is not None and country != old_country and Role.NC in old_roles
     )
     if roles_access_changed or country_overlay_changed:
         await broadcast_resync(user.uid)

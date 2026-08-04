@@ -139,7 +139,7 @@ def entitled_level(
     Single source of truth for SSE access, shared by the live broadcast and the
     tournament-scoped catch-up (main.stream_updates). Returns "public",
     "member", or "full"; the caller maps that to its precomputed message or DB
-    column. IC sees full; NC/Prince see full in their own country; explicit
+    column. IC sees full; an NC sees full in their own country; explicit
     organizers see full for their tournaments; members see member (plus full for
     their own profile/decks); everyone else sees public.
     """
@@ -153,7 +153,7 @@ def entitled_level(
     if obj_type == ObjectType.PROMO and Role.NC in viewer.roles:
         return "full"
     if (
-        (Role.NC in viewer.roles or Role.PRINCE in viewer.roles)
+        Role.NC in viewer.roles
         and viewer.country
         and country
         and viewer.country == country

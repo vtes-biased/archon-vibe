@@ -134,13 +134,16 @@ async def test_update_user_tracks_nickname_local_modification(
 async def test_role_change_resyncs_only_for_access_roles(
     test_client: AsyncClient, populated_db
 ):
-    """Only NC/Prince/IC role changes nudge a resync; other roles must not.
+    """Only NC/IC role changes nudge a resync; other roles must not.
 
     Resync clears every client's IndexedDB and forces a snapshot re-fetch (~10s
-    blank community page). Only NC/Prince/IC change what a user can see or is seen
-    as, so only those warrant it. The online nudge is broadcast_resync (asserted
-    here via the user's SSE connection); the offline path is the access-version fp
-    (test_access_version: a non-overlay role like PT doesn't move it).
+    blank community page), so it is reserved for a change to what the user can
+    SEE — the overlay roles. Prince sits on the other side of that line: gaining
+    it changes the user's own projection (they enter the public officials
+    directory), but that reaches other viewers as an ordinary object update, and
+    it grants the Prince no wider view of their own. The online nudge is
+    broadcast_resync (asserted here via the user's SSE connection); the offline
+    path is the access-version fp (test_access_version).
     """
     import json
 
@@ -170,26 +173,29 @@ async def test_role_change_resyncs_only_for_access_roles(
         return types
 
     try:
-        # Non-access role change (add PT) must NOT emit a resync.
-        resp = await test_client.put(
-            f"/api/users/{target.uid}",
-            json={"roles": [*(r.value for r in target.roles), Role.PT.value]},
-            headers=headers,
-        )
-        assert resp.status_code == 200
-        after = await db.get_user_by_uid(target.uid)
-        assert Role.PT in after.roles
-        assert "resync" not in drained_types()
+        # Neither a plain badge (PT) nor a Prince widens what the user sees.
+        for role in (Role.PT, Role.PRINCE):
+            current = await db.get_user_by_uid(target.uid)
+            resp = await test_client.put(
+                f"/api/users/{target.uid}",
+                json={"roles": [*(r.value for r in current.roles), role.value]},
+                headers=headers,
+            )
+            assert resp.status_code == 200
+            after = await db.get_user_by_uid(target.uid)
+            assert role in after.roles
+            assert "resync" not in drained_types(), f"{role.value} forced a resync"
 
-        # Access role change (add Prince) MUST emit a resync.
+        # An overlay role (NC) MUST emit a resync — it grants the same-country
+        # FULL projection.
         resp = await test_client.put(
             f"/api/users/{target.uid}",
-            json={"roles": [*(r.value for r in after.roles), Role.PRINCE.value]},
+            json={"roles": [*(r.value for r in after.roles), Role.NC.value]},
             headers=headers,
         )
         assert resp.status_code == 200
         after = await db.get_user_by_uid(target.uid)
-        assert Role.PRINCE in after.roles
+        assert Role.NC in after.roles
         assert "resync" in drained_types()
     finally:
         _sse_connections.clear()

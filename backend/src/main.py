@@ -988,7 +988,7 @@ async def _scoped_catchup_frames(
 
 async def _overlay_frames(viewer) -> tuple[list[str], int]:
     """Personal-overlay frames for a member connection: own profile/decks at full
-    level, plus NC/Prince same-country and organizer full data.
+    level, plus NC same-country and organizer full data.
 
     Buffers every frame while holding ONE pooled connection, then returns them so
     the caller can release the connection BEFORE draining to the client. Yielding
@@ -1028,8 +1028,8 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
             frames.extend(_sse_object_lines("decks", [r[0] for r in rows]))
             count += len(rows)
 
-        # NC/Prince: full for same-country users + tournaments
-        if viewer.country and (Role.NC in viewer.roles or Role.PRINCE in viewer.roles):
+        # NC: full for same-country users + tournaments
+        if viewer.country and Role.NC in viewer.roles:
             rows = await (
                 await db_conn.execute(
                     'SELECT "full"::text FROM objects WHERE type = %s '
@@ -1114,7 +1114,7 @@ async def stream_updates(
 
     Reads pre-computed access level columns — no per-item filtering.
     Personal overlay sends full-level data for own objects and
-    role-based full access (NC/Prince same country, organizer).
+    role-based full access (NC same country, organizer).
 
     `tournament=<uid>` opens a tournament-scoped stream (the Discord bot): the
     catch-up carries only that tournament + its sanctions, and live events are

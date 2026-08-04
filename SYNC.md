@@ -10,7 +10,7 @@ Three access levels determine what data each SSE viewer receives:
 |-------|--------|-------------|
 | `public` | No token or no vekn_id | Only Prince/NC users (with contact info, base64-obfuscated), minimal tournaments, no sanctions |
 | `member` | Has vekn_id | All users (no contact info), all sanctions, tournaments with standings/filtered decks |
-| `full` | IC, NC/Prince (same country), organizer | Everything including rounds, finals, checkin_code |
+| `full` | IC, NC (same country), organizer | Everything including rounds, finals, checkin_code |
 
 Note: a second, frontend-only display gate (`getAuthState().isAuthenticated`) further
 reduces what not-logged-in visitors *see* in the UI (officials directory, members list,
@@ -75,7 +75,7 @@ _SSE_LINE_BUDGET = 200_000  # bytes per `data:` line
 
 Catch-up emits batch frames via `_sse_object_lines()`, which chunks each object-type batch so no single `data:` line exceeds `_SSE_LINE_BUDGET` (200 KB). Reason: the browser EventSource has no per-line cap, but the Discord bot's aiohttp StreamReader rejects lines over 512 KB. A single object larger than the budget is emitted alone (never split across lines).
 
-No per-viewer filtering at read time — projections are pre-computed. After the catch-up phase, a **personal overlay** sends `full`-level data for the viewer's own objects and role-based full-access objects (NC/Prince same country, organizers).
+No per-viewer filtering at read time — projections are pre-computed. After the catch-up phase, a **personal overlay** sends `full`-level data for the viewer's own objects and role-based full-access objects (NC same country, organizers).
 
 **Tournament-scoped stream** — `/stream?tournament=<uid>` opens a scoped connection (used by the Discord bot). The catch-up delivers only that tournament, its sanctions, and its **participant identities** (`_scoped_catchup_frames`); the live phase filters to that tournament's object, its sanctions, and its judge calls via `SSEConnection.tournament_uid` + `_scope_matches`. Access rules are unchanged — `entitled_level()` (see below) applies per object, just restricted to one tournament's scope. The bot opens one scoped stream per watched tournament instead of streaming the whole corpus.
 
@@ -132,8 +132,8 @@ The connect handshake asks the precise question — *"is the client based on the
 ```
 fp = hash( DATA_SCHEMA_VERSION,                  # global wire-shape lever (replaces MINIMUM_SYNC_EPOCH)
            base_level,                           # base_data_level: full | member | public
-           sorted({IC,NC,PRINCE} ∩ roles),       # overlay-granting roles only
-           country if (NC or Prince) else None,  # scopes the official overlay
+           sorted({IC,NC} ∩ roles),              # overlay-granting roles only
+           country if NC else None,              # scopes the NC overlay
            sorted(organizer_tournament_uids) )   # member-only; from the GIN-indexed org query
 ```
 
@@ -169,12 +169,12 @@ Every targeted frame carries the recomputed `access_version`. **Organizer add/re
 **Triggers** (fingerprint at connect / live nudge while connected):
 - VEKN operations: `/claim`, `/sponsor`, `/link`, `/force-abandon`, `/abandon` (vekn_id gained/lost → base level changes).
 - Organizer add/remove on a tournament → **targeted push** while online (no resync); fingerprint org-set term while offline.
-- User update: an **access-affecting** role (`NC`/`Prince`/`IC` — the closed set `base_data_level`/`access_levels.py` branch on) gained/lost, or vekn_id changed. A non-access role (PT/Judge/…) changes no projection, so it does **not** move the fingerprint.
+- User update: an **overlay-granting** role (`NC`/`IC` — the closed set `base_data_level` and `entitled_level` branch on) gained/lost, or vekn_id changed. Any other role change (Prince, PT, Judge, …) moves no projection *the viewer can see*, so it does **not** move the fingerprint — a Prince's own projection does change, but that reaches other viewers as an ordinary object update.
 - Wire-shape change: bump `DATA_SCHEMA_VERSION` in `db.py`.
 
 ### Access Entitlement
 
-`entitled_level(viewer, *, obj_type, uid, country, org_uids, obj_user_uid) → "public"|"member"|"full"` in `broadcast.py` is the **single source of truth** for per-object access. It is called by both the live broadcast (`broadcast_precomputed`) and the tournament-scoped catch-up (`_scoped_catchup_frames`). Logic: IC → full; NC/Prince same country → full; explicit organizer → full; member with own profile/deck → full; any member → member; otherwise public. Exception: NC gets full for promo objects regardless of country (the IC→NC→organizer inventory chain isn't country-scoped; Princes/organizers stay member).
+`entitled_level(viewer, *, obj_type, uid, country, org_uids, obj_user_uid) → "public"|"member"|"full"` in `broadcast.py` is the **single source of truth** for per-object access. It is called by both the live broadcast (`broadcast_precomputed`) and the tournament-scoped catch-up (`_scoped_catchup_frames`). Logic: IC → full; NC same country → full; explicit organizer → full; member with own profile/deck → full; any member → member; otherwise public. Exception: NC gets full for promo objects regardless of country (the IC→NC→organizer inventory chain isn't country-scoped; Princes/organizers stay member).
 
 ### Generic Broadcast
 

@@ -40,16 +40,24 @@ async def test_av_is_deterministic_and_level_sensitive(test_db):
 
 @pytest.mark.asyncio
 async def test_av_ignores_nonoverlay_roles(test_db):
-    """A non-overlay role (Judge/PT/…) doesn't branch in access projection, so adding it
-    must NOT change the fp — else every such grant would force a needless resync."""
+    """A non-overlay role doesn't branch in access projection, so adding it must
+    NOT change the fp — else every such grant would force a needless resync.
+
+    Prince is one of them: it grants member-data authority nowhere and no
+    same-country FULL overlay, so a Prince is entitled to exactly what a plain
+    member is."""
     plain = await compute_access_version(_member())
     judge = await compute_access_version(_member(roles=[Role.JUDGE, Role.PT]))
+    prince = await compute_access_version(
+        _member(roles=[Role.PRINCE], country="France")
+    )
     assert plain == judge
+    assert plain == prince
 
 
 @pytest.mark.asyncio
 async def test_av_country_counts_only_for_officials(test_db):
-    """Country scopes the NC/Prince overlay, so it enters the fp ONLY for officials —
+    """Country scopes the NC overlay, so it enters the fp ONLY for an NC —
     a plain member's country edit is cosmetic and must not resync."""
     assert await compute_access_version(
         _member(country="France")
