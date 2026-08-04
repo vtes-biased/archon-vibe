@@ -155,6 +155,12 @@ lint-check:
     uv run ruff check .
     uv run ruff format --check .
     (cd engine && cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings)
+    just permission-drift
+
+# Fail when a role literal is used for gating outside the engine's capability
+# table — the drift this repo's permission model keeps re-growing without it.
+permission-drift:
+    uv run python3 scripts/check_permission_drift.py
 
 # Lint and auto-fix all code
 lint:
