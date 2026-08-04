@@ -316,6 +316,11 @@ mod wasm {
             js_str(check_permission_json(capability, request_json))
         }
 
+        #[wasm_bindgen(js_name = isOfficial)]
+        pub fn is_official(&self, actor_json: &str) -> Result<bool, String> {
+            is_official_json(actor_json).map_err(|e| e.to_json())
+        }
+
         #[wasm_bindgen(js_name = canChangeCountry)]
         pub fn can_change_country(
             &self,

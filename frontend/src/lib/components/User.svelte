@@ -7,7 +7,7 @@
   import { getRoleClasses } from "$lib/roles";
   import { deobfuscateContact } from "$lib/contact";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canChangeRole as engineCanChangeRole } from "$lib/engine";
+  import { canChangeRole as engineCanChangeRole, canChangeCountry, isOfficial } from "$lib/engine";
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
@@ -180,11 +180,14 @@
   }
 
   // Changing an official's country changes the data-access scope their FULL
-  // projection is computed for, so it needs explicit confirmation (and the
-  // backend gates it with the same authority required to change their role).
-  const isTargetOfficial = $derived(
-    user?.roles?.some((r) => r === "IC" || r === "NC" || r === "Prince") ?? false,
-  );
+  // projection is computed for, so it needs explicit confirmation — and the
+  // backend takes the authority that could change their highest role. Ask the
+  // engine for that instead of letting the select 403 after an optimistic save.
+  const isTargetOfficial = $derived(isOfficial(user ?? null));
+  const countryChange = $derived.by(() => {
+    if (mode === "create" || !auth.user || !user) return { allowed: true, reason: null };
+    return canChangeCountry(auth.user, user);
+  });
   let showCountryConfirm = $state(false);
 
   // Called when the country select changes. Returns true if the change is being
@@ -402,8 +405,10 @@
           id="edit-country"
           bind:value={editCountry}
           required
+          disabled={!countryChange.allowed}
+          title={countryChange.reason ?? undefined}
           onchange={handleCountryChange}
-          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
+          class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent {countryChange.allowed ? '' : 'opacity-50 cursor-not-allowed'}"
         >
           <option value="">{m.user_country_placeholder()}</option>
           {#each sortedCountries as country}

@@ -469,6 +469,19 @@ export function canChangeCountry(actor: UserContext, target: UserContext): Permi
   return JSON.parse(resultJson);
 }
 
+/**
+ * Whether a member holds the official badge (IC/NC/Prince).
+ *
+ * Identity, not authority — badges, quotas and warnings only. Never gate on it:
+ * ask for the capability the control actually needs.
+ */
+export function isOfficial(user: UserContext | null): boolean {
+  if (!user) return false;
+  const engine = getEngineReactive();
+  if (!engine) return false;
+  return callEngine(() => engine.isOfficial(JSON.stringify({ roles: user.roles ?? [] })));
+}
+
 /** Create a member record. */
 export function canCreateMember(actor: UserContext | null): PermissionResult {
   return checkPermission('create_member', actor);
