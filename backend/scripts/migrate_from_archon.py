@@ -809,9 +809,18 @@ async def remap_coopted_by(
     This is the SOLE writer of coopted_by in this sync: it writes the remapped
     value directly and idempotently, so daily re-runs are a no-op (writing the
     un-remapped old uid in the merge loop instead would flip-flop against this).
-    A local edit wins; the ETL identity map writes the unchanged uid (no-op)."""
+    A local edit wins; the ETL identity map writes the unchanged uid (no-op).
+
+    A sponsor that does NOT resolve through the map is never written: legacy's
+    sponsor refs can dangle even within its own members table and rotate to a
+    fresh uid nightly — chasing them rewrote ~10k users (and their SSE
+    re-download) every night, with dangling values that also blocked the VEKN
+    sync's coopted_by inference from ever filling the field properly."""
     for live_uid, old_sponsor in coopted_pending:
-        desired = member_uid_map.get(old_sponsor, old_sponsor)
+        desired = member_uid_map.get(old_sponsor)
+        if desired is None:
+            stats.bump("members.coopted_sponsor_unresolved")
+            continue
         u = await db.get_user_by_uid(live_uid)
         if u is None or u.deleted_at or "coopted_by" in u.local_modifications:
             continue

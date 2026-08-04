@@ -40,6 +40,7 @@ from scripts.migrate_from_archon import (
     deck_uid,
     merge_member,
     process_tournament_row,
+    remap_coopted_by,
     resolve_known_remaps,
 )
 from src import db
@@ -250,6 +251,37 @@ async def test_both_rich_conflict_is_skipped(test_db):
         assert stats["tournaments.both_rich_conflict"] == 1
         assert await db.get_tournament_by_uid("o-4") is None
         assert await db.get_tournament_by_uid("x-4") == before
+
+
+@pytest.mark.asyncio
+async def test_coopted_remap_never_writes_unresolvable_sponsor(test_db):
+    """Legacy sponsor refs dangle and rotate to fresh uids nightly; an
+    unresolvable sponsor must never reach coopted_by (it rewrote ~10k users
+    per night and blocked the VEKN sync's inference)."""
+    await db.save_user(
+        User(
+            uid="u-c1",
+            modified=datetime(2025, 6, 1, tzinfo=UTC),
+            name="Member",
+            vekn_id="1000002",
+            coopted_by="sponsor-live",
+        )
+    )
+
+    stats = Stats()
+    await remap_coopted_by([("u-c1", "rotating-garbage-uid")], {}, stats)
+    after = await db.get_user_by_uid("u-c1")
+    assert after.coopted_by == "sponsor-live", "unresolvable sponsor not written"
+    assert stats["members.coopted_sponsor_unresolved"] == 1
+    assert stats["members.coopted_remapped"] == 0
+
+    # A resolvable sponsor still remaps normally (idempotently).
+    await remap_coopted_by(
+        [("u-c1", "old-sponsor")], {"old-sponsor": "sponsor-live-2"}, stats
+    )
+    after = await db.get_user_by_uid("u-c1")
+    assert after.coopted_by == "sponsor-live-2"
+    assert stats["members.coopted_remapped"] == 1
 
 
 @pytest.mark.asyncio
