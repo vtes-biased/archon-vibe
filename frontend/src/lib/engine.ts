@@ -548,6 +548,27 @@ export function canManageLeagues(actor: UserContext | null): PermissionResult {
   return checkPermission('manage_leagues', actor);
 }
 
+/**
+ * Take a tournament offline, or force-take its lock: run the event AND hold the
+ * member-creation power the lock carries. Fail-closed until WASM is loaded.
+ */
+export function canTakeTournamentOffline(
+  user: UserContext | null,
+  tournament: Resource
+): boolean {
+  if (!user) return false;
+  const engine = getEngineReactive();
+  if (!engine) return false;
+  const actorJson = JSON.stringify({ roles: user.roles ?? [], country: user.country ?? null });
+  const tournamentJson = JSON.stringify({
+    country: tournament.country ?? null,
+    organizers_uids: tournament.organizers_uids ?? [],
+  });
+  return JSON.parse(
+    callEngine(() => engine.canTakeTournamentOffline(actorJson, user.uid, tournamentJson))
+  ).allowed;
+}
+
 /** Break an offline device lock. */
 export function canForceUnlockTournament(actor: UserContext | null): PermissionResult {
   return checkPermission('force_unlock_tournament', actor);

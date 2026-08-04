@@ -2298,17 +2298,12 @@ async def go_offline(
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        if not permissions.is_organizer(current_user, tournament):
-            raise HTTPException(
-                status_code=403, detail="Only organizers can take a tournament offline"
-            )
-
-        # Offline implies member-creation power (name-only players get real VEKN
-        # IDs at go-online), so it takes the same authority as creating one online.
-        if not permissions.can_create_member(current_user):
+        # Organizer AND member-creation power: offline play mints real members
+        # at go-online, so the lock carries more than running the event.
+        if not permissions.can_take_tournament_offline(current_user, tournament):
             raise HTTPException(
                 status_code=403,
-                detail="Only officials (IC, NC, Prince) can take a tournament offline",
+                detail="You don't have permission to take this tournament offline",
             )
 
         if tournament.offline_mode:
@@ -2785,17 +2780,12 @@ async def force_takeover(
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        if not permissions.is_organizer(current_user, tournament):
-            raise HTTPException(
-                status_code=403, detail="Only organizers can force-takeover"
-            )
-
         # Same gate as go_offline: the taken-over lock carries the same
         # member-creation power.
-        if not permissions.can_create_member(current_user):
+        if not permissions.can_take_tournament_offline(current_user, tournament):
             raise HTTPException(
                 status_code=403,
-                detail="Only officials (IC, NC, Prince) can force-takeover",
+                detail="You don't have permission to force-takeover this tournament",
             )
 
         if not tournament.offline_mode:

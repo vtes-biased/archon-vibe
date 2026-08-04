@@ -807,6 +807,29 @@ pub fn is_organizer(actor: &UserContext, actor_uid: &str, tournament: &OwnedReso
     )
 }
 
+/// Check if actor can take a tournament offline, or force-take its lock.
+///
+/// A conjunction, which the table cannot express: running the event AND the
+/// member-creation power the lock carries — offline play mints real members at
+/// go-online. A Prince is never an implicit organizer, so they hold this only
+/// on a tournament they are actually named on.
+pub fn can_take_tournament_offline(
+    actor: &UserContext,
+    actor_uid: &str,
+    tournament: &OwnedResource,
+) -> PermissionResult {
+    let organizes = check(
+        Capability::OrganizeTournament,
+        &Request::new(actor, actor_uid)
+            .target_country(tournament.country.as_deref())
+            .resource(tournament),
+    );
+    if !organizes.allowed {
+        return organizes;
+    }
+    check(Capability::CreateMember, &Request::new(actor, actor_uid))
+}
+
 /// Check if actor can edit a league: IC, NC (same country), or a league organizer.
 pub fn can_edit_league(
     actor: &UserContext,
@@ -1280,6 +1303,29 @@ mod tests {
             "nobody",
             &tournament
         ));
+    }
+
+    #[test]
+    fn test_can_take_tournament_offline() {
+        let tournament = OwnedResource {
+            country: Some("FR".to_string()),
+            organizers_uids: vec!["prince-1".to_string(), "player-1".to_string()],
+            ..Default::default()
+        };
+        let offline = |roles, country, uid: &str| {
+            can_take_tournament_offline(&ctx(roles, country), uid, &tournament).allowed
+        };
+        // Both halves: implicit organizers who can also create members.
+        assert!(offline(vec![IC], Some("US"), "x"));
+        assert!(offline(vec![NC], Some("FR"), "x"));
+        // A Prince holds create_member but is never an implicit organizer, so
+        // only on a tournament they are actually named on.
+        assert!(offline(vec![Prince], Some("FR"), "prince-1"));
+        assert!(!offline(vec![Prince], Some("FR"), "x"));
+        // An explicit organizer who cannot create members fails the other half.
+        assert!(!offline(vec![], Some("FR"), "player-1"));
+        // An NC of another country is neither.
+        assert!(!offline(vec![NC], Some("US"), "x"));
     }
 
     #[test]

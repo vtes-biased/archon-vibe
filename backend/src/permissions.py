@@ -50,6 +50,11 @@ def _check(
     return json.loads(result)["allowed"]
 
 
+def _resource(obj: Tournament | League) -> str:
+    """Flat ownership descriptor for the resolvers that take one directly."""
+    return json.dumps({"country": obj.country, "organizers_uids": obj.organizers_uids})
+
+
 def is_official(user: User) -> bool:
     """Holds the official badge (IC/NC/Prince).
 
@@ -152,6 +157,15 @@ def can_create_tournament(user: User) -> bool:
 def is_organizer(user: User, tournament: Tournament) -> bool:
     """Run a tournament: an explicit organizer, or implicitly IC/NC."""
     return _check("organize_tournament", user, resource=tournament)
+
+
+def can_take_tournament_offline(user: User, tournament: Tournament) -> bool:
+    """Take a tournament offline, or force-take its lock: run the event AND hold
+    the member-creation power the lock carries."""
+    result = _engine.can_take_tournament_offline(
+        json.dumps(user_to_context(user)), user.uid, _resource(tournament)
+    )
+    return json.loads(result)["allowed"]
 
 
 def can_force_unlock_tournament(user: User) -> bool:
