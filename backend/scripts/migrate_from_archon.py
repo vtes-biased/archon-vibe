@@ -1330,6 +1330,26 @@ def _remap_member_refs(
     return t, decks
 
 
+async def carry_league_onto_echo(existing: Tournament, d: dict, stats: Stats) -> None:
+    """League membership is archon-only knowledge — the VEKN sync can't set it
+    (and its rebuild used to clear it) — so an echo-skip must still carry the
+    legacy league ref onto the surviving copy, or a legacy league event whose
+    results arrived via vekn.net stays league-less forever. Leagues keep their
+    uids across the merge, so the ref maps 1:1. Idempotent: writes only when
+    the ref resolves to a live league and differs from what's stored."""
+    league_uid = nz((d.get("league") or {}).get("uid"))
+    if not league_uid or existing.league_uid == league_uid:
+        return
+    league = await db.get_league_by_uid(league_uid)
+    if league is None or league.deleted_at:
+        return
+    existing.league_uid = league_uid
+    existing.modified = datetime.now(UTC)
+    async with db.get_connection() as conn:
+        await db.save_tournament(existing, conn=conn)
+    stats.bump("tournaments.league_carried_on_echo")
+
+
 async def process_tournament_row(
     row: dict,
     sanctions: dict[str, Sanction],
@@ -1397,6 +1417,7 @@ async def process_tournament_row(
             # after its first merge, and legacy owns it until finished there.
             uid_map[old_uid] = target_uid
             stats.bump("tournaments.echo_skipped_by_uid")
+            await carry_league_onto_echo(existing, d, stats)
             return
         if existing is None and vekn_eid:
             x = await live_tournament_by_vekn(vekn_eid)
@@ -1408,6 +1429,7 @@ async def process_tournament_row(
                     # Never import the pale copy over the original.
                     uid_map[old_uid] = x.uid
                     stats.bump("tournaments.echo_skipped")
+                    await carry_league_onto_echo(x, d, stats)
                     return
                 if x.rounds:
                     loud(
@@ -1434,6 +1456,7 @@ async def process_tournament_row(
                 if not incoming_rich:
                     uid_map[old_uid] = x.uid
                     stats.bump("tournaments.echo_skipped_by_name")
+                    await carry_league_onto_echo(x, d, stats)
                     return
                 if x.rounds:
                     loud(

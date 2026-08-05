@@ -66,7 +66,7 @@ async def _cleanup():
     finally:
         async with db.get_connection() as conn:
             await conn.execute(
-                "DELETE FROM objects WHERE type IN ('tournament', 'deck')"
+                "DELETE FROM objects WHERE type IN ('tournament', 'deck', 'league')"
             )
 
 
@@ -235,6 +235,36 @@ async def test_echo_guard_on_uid_match_roundless_never_overwrites_rich(test_db):
         assert original.rounds, "rich original untouched"
         assert original.state == TournamentState.FINISHED
         assert uid_map["o-5"] == "o-5"
+
+
+@pytest.mark.asyncio
+async def test_echo_skip_still_carries_league_membership(test_db):
+    """League membership is archon-only knowledge: an echo-skipped legacy copy
+    must still stamp its league ref onto the surviving row (the VEKN sync can't,
+    and its rebuild used to clear it), idempotently."""
+    from src.models import League
+
+    async with _cleanup():
+        await db.save_league(
+            League(uid="lg-e1", modified=datetime(2025, 5, 1, tzinfo=UTC), name="L")
+        )
+        await seed_tournament(_vekn_created("x-6", "666", rich=True))
+
+        row = _old_tournament_row("o-6", vekn_id="666", rich=False)
+        row["data"]["league"] = {"uid": "lg-e1"}
+        stats = Stats()
+        await process_tournament_row(row, {}, stats, True, {}, archon_ix={})
+
+        assert stats["tournaments.echo_skipped"] == 1
+        after = await db.get_tournament_by_uid("x-6")
+        assert after.league_uid == "lg-e1", "league carried through the echo skip"
+        assert after.rounds, "play data still untouched"
+        assert stats["tournaments.league_carried_on_echo"] == 1
+
+        # Second run: league already set — no rewrite, no churn.
+        stats2 = Stats()
+        await process_tournament_row(row, {}, stats2, True, {}, archon_ix={})
+        assert stats2["tournaments.league_carried_on_echo"] == 0
 
 
 @pytest.mark.asyncio

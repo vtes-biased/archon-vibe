@@ -600,6 +600,10 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 checkin_code=existing.checkin_code,
                                 # Local-only bookkeeping: not derivable from VEKN
                                 twda_status=existing.twda_status,
+                                # League membership is archon-only knowledge —
+                                # dropping it here nulled the league link on
+                                # every rebuild of a round-less event.
+                                league_uid=existing.league_uid,
                             )
                             bd = await save_tournament(tournament, conn=tx_conn)
                             stats["updated"] += 1
