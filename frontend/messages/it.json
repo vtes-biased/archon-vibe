@@ -327,6 +327,7 @@
   "twda_status_skipped": "Mazzo del vincitore non inviato al TWDA: {reason}.",
   "twda_status_failed": "Invio al TWDA fallito — il mazzo del vincitore non ha raggiunto l'archivio. Salvare di nuovo il mazzo del vincitore, o inviare di nuovo al VEKN, reinvia il mazzo al TWDA.",
   "twda_reason_no_winner": "nessun vincitore registrato",
+  "twda_reason_limited": "i mazzi Limited (draft/sealed) non vengono archiviati",
   "twda_reason_unranked": "gli eventi non classificati non vengono archiviati",
   "twda_reason_too_few_players": "meno di 10 giocatori hanno giocato",
   "twda_reason_no_vekn_event": "questo torneo non ha ID evento VEKN",

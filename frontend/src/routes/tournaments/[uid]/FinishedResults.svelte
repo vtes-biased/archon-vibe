@@ -57,6 +57,7 @@
   function twdaSkipReason(code: string): string {
     switch (code) {
       case "no_winner": return m.twda_reason_no_winner();
+      case "limited": return m.twda_reason_limited();
       case "unranked":
       case "unsanctioned": // legacy stored reason from the pre-fix rank gate
         return m.twda_reason_unranked();

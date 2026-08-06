@@ -327,6 +327,7 @@
   "twda_status_skipped": "Deck do vencedor não enviado para o TWDA: {reason}.",
   "twda_status_failed": "Envio para o TWDA falhou — o deck do vencedor não chegou ao arquivo. Salvar o deck do vencedor novamente, ou enviar novamente para a VEKN, reenvia o deck para o TWDA.",
   "twda_reason_no_winner": "nenhum vencedor registrado",
+  "twda_reason_limited": "decks Limited (draft/sealed) não são arquivados",
   "twda_reason_unranked": "eventos não classificados não são arquivados",
   "twda_reason_too_few_players": "menos de 10 jogadores jogaram",
   "twda_reason_no_vekn_event": "este torneio não tem ID de evento VEKN",

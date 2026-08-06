@@ -412,10 +412,10 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
     outcome — submitted (PR URL) / skipped (reason) / failed — on the
     tournament for organizer transparency. Self-contains its errors.
 
-    Conditions: finished, >=10 players who actually played, ranking-eligible
-    (the engine predicate behind the ranked badge — NOT rank, which is the
-    Basic/NC/CC championship axis), a winner with a stored deck, and a VEKN
-    event ID.
+    Conditions: finished, constructed (not Limited), >=10 players who actually
+    played, ranking-eligible (the engine predicate behind the ranked badge —
+    NOT rank, which is the Basic/NC/CC championship axis), a winner with a
+    stored deck, and a VEKN event ID.
     """
     from ..twda import is_configured, submit_twda_pr
 
@@ -423,6 +423,10 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
         return
     if not tournament.winner:
         outcome = (TwdaOutcome.SKIPPED, "no_winner", "")
+    elif tournament.format == TournamentFormat.Limited:
+        # Limited events are rated (own category) but draft/sealed decks
+        # don't belong in a constructed-deck archive.
+        outcome = (TwdaOutcome.SKIPPED, "limited", "")
     elif _played_player_count(tournament) < TWDA_MIN_PLAYERS:
         outcome = (TwdaOutcome.SKIPPED, "too_few_players", "")
     elif (
