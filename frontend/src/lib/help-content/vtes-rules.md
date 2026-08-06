@@ -294,7 +294,7 @@ In many cases, a minion card will have a Discipline symbol, a clan symbol and/or
 The general types of minion cards are as follows.
 It is possible for a minion card to be of multiple types.
 
-**Action cards:** A ready unlocked (see [Important Terms of the Game](#important-terms-of-the-game)) minion can play an action card to perform an action other than the default actions.
+**Action cards:** A ready unlocked (see [Important Terms in the Game](#important-terms-in-the-game)) minion can play an action card to perform an action other than the default actions.
 Only one action card can be played for the action.
 Action cards cannot be used to modify other actions.
 

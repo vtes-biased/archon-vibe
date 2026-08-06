@@ -166,6 +166,10 @@ export function renderDocument(src: string): string {
       }
       const calloutId = slugify(title);
       idSet.add(calloutId);
+      // The subtitle was folded into the callout title, so its own slug now
+      // matches no element — but that is the name cross-references use
+      // ("(see Sequencing)"), so keep it reachable.
+      if (subMatch) aliasMap.set(slugify(subMatch[1]!.trim()), calloutId);
       return `<div class="callout" id="${calloutId}"><div class="callout-title">${title} <a href="#${calloutId}" class="anchor-link" aria-label="Link to this section">#</a></div>${body}</div>\n`;
     }
     return `<blockquote>${html}</blockquote>\n`;
