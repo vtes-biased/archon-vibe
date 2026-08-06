@@ -327,7 +327,7 @@
   "twda_status_skipped": "Winner's deck not sent to the TWDA: {reason}.",
   "twda_status_failed": "TWDA submission failed — the winner's deck did not reach the archive. Saving the winner's deck again, or publishing to VEKN again, retries.",
   "twda_reason_no_winner": "no winner recorded",
-  "twda_reason_unsanctioned": "unsanctioned events are not archived",
+  "twda_reason_unranked": "unranked events are not archived",
   "twda_reason_too_few_players": "fewer than 10 players played",
   "twda_reason_no_vekn_event": "the event has no VEKN event ID",
   "twda_reason_not_configured": "TWDA submission is not configured on this server",

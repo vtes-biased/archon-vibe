@@ -59,7 +59,9 @@ def _tournament(winner_uid: str, *, seated: int = TWDA_MIN_PLAYERS) -> Tournamen
         modified=datetime(2025, 6, 1, tzinfo=UTC),
         name="Test Tournament",
         format=TournamentFormat.Standard,
-        rank=TournamentRank.NC,  # sanctioned
+        # BASIC on purpose: rank (Basic/NC/CC championship axis) must not gate
+        # TWDA — the old rank!=BASIC check skipped every ordinary tournament.
+        rank=TournamentRank.BASIC,
         state=TournamentState.FINISHED,
         start=datetime(2025, 6, 1, tzinfo=UTC),
         external_ids={"vekn": "12345"},
@@ -89,6 +91,7 @@ async def _captured_credit(
     tournament = _tournament(winner.uid)
     engine = MagicMock()
     engine.export_twda.return_value = "TWDA TEXT"
+    engine.ranking_eligibility.return_value = "eligible"
 
     with (
         patch(
