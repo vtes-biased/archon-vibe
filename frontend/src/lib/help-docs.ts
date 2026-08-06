@@ -1,11 +1,24 @@
 import { renderDocument } from "$lib/markdown";
 import * as m from "$lib/paraglide/messages.js";
+import { getLocale } from "$lib/paraglide/runtime.js";
 
 // Import markdown files as raw strings (bundled into JS, works offline)
 import vtesRulesRaw from "$lib/help-content/vtes-rules.md?raw";
 import tournamentRulesRaw from "$lib/help-content/tournament-rules.md?raw";
 import judgesGuideRaw from "$lib/help-content/judges-guide.md?raw";
+import judgesGuideEsRaw from "$lib/help-content/judges-guide.es.md?raw";
 import codeOfEthicsRaw from "$lib/help-content/code-of-ethics.md?raw";
+
+// Translated reference docs, by slug then locale. A static import (not a dynamic
+// one) on purpose: the service worker precaches every built chunk at install, so
+// splitting these out would still download them — it would only add machinery.
+const translations: Record<string, Record<string, string>> = {
+  "judges-guide": { es: judgesGuideEsRaw },
+};
+
+function localized(slug: string, fallback: string): string {
+  return translations[slug]?.[getLocale()] ?? fallback;
+}
 
 export interface TocEntry {
   id: string;
@@ -44,10 +57,11 @@ export function extractToc(html: string, maxDepth: number): TocEntry[] {
 // Lazy-render cache
 const renderCache = new Map<string, string>();
 function getRendered(slug: string, raw: string): string {
-  if (!renderCache.has(slug)) {
-    renderCache.set(slug, renderDocument(raw));
+  const key = `${slug}:${getLocale()}`;
+  if (!renderCache.has(key)) {
+    renderCache.set(key, renderDocument(raw));
   }
-  return renderCache.get(slug)!;
+  return renderCache.get(key)!;
 }
 
 export const helpDocs: Record<string, HelpDoc> = {
@@ -72,7 +86,7 @@ export const helpDocs: Record<string, HelpDoc> = {
     description: "Tournament conduct and infraction guide for judges.",
     icon: "scale",
     tocDepth: 3,
-    raw: judgesGuideRaw,
+    get raw() { return localized("judges-guide", judgesGuideRaw); },
     get content() { return getRendered("judges-guide", this.raw); },
   },
   "code-of-ethics": {

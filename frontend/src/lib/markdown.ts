@@ -84,25 +84,30 @@ function preprocessDocument(src: string): string {
     const bMatch = line.match(/^\*\*([^*]+)\*\*\s*$/);
     if (bMatch) { indexTitle(bMatch[1]!); }
   }
-  // Replace (see Title) and (see Title, p. N) with linked versions
+  // Replace (see Title) and (see Title, p. N) with linked versions.
+  // "véase" is the Spanish docs' equivalent, and both languages prefix the title
+  // with a section word ("see section 1.4.2", "véase el apartado 1.2.4.") that
+  // has to come off before the lookup but stay in the visible link text.
   cleaned = cleaned.replace(
-    /\(see ([^)[\]]+?)(?:,\s*p\.\s*\d+)?\)/g,
-    (_full, ref: string) => {
+    /\((see|véase) ((?:(?:el|la)\s+)?(?:section|secci[óo]n|apartado)\s+)?([^)[\]]+?)(?:,\s*p\.\s*\d+)?\)/gi,
+    (_full, verb: string, prefix: string | undefined, ref: string) => {
+      const lead = `${verb} ${prefix ?? ""}`;
       // ref may be a comma-separated list: "Game Setup, Drawing cards and Influence Phase"
       // Try the full ref first, then individual parts
-      const refLower = ref.trim().toLowerCase();
+      const text = ref.trim();
+      const refLower = text.replace(/\*\*/g, "").toLowerCase();
       const slug = headingIndex.get(refLower);
       if (slug) {
-        return `(see [${ref.trim()}](#${slug}))`;
+        return `(${lead}[${text}](#${slug}))`;
       }
       // Try splitting on comma and linking each part
-      const parts = ref.split(",").map(p => p.trim());
+      const parts = text.split(",").map(p => p.trim());
       if (parts.length > 1) {
         const linked = parts.map(part => {
-          const partSlug = headingIndex.get(part.toLowerCase());
+          const partSlug = headingIndex.get(part.replace(/\*\*/g, "").toLowerCase());
           return partSlug ? `[${part}](#${partSlug})` : part;
         });
-        return `(see ${linked.join(", ")})`;
+        return `(${lead}${linked.join(", ")})`;
       }
       return _full; // no match, leave as-is
     }
