@@ -28,7 +28,7 @@ vault_pass_prod := justfile_directory() / ".prod.vault_pass"
 # Phase-2 flip to revert to archon.vekn.net + push on. The file lives OUTSIDE
 # inventories/prod/ on purpose — a vars file inside the `-i` dir gets mis-parsed
 # as an inventory source. See ../.pst/details/39-phase1-parallel-run.md
-phase1_override := "-e @inventories/prod-phase1-override.yml"
+phase1_override := ""
 
 default:
     @just --list

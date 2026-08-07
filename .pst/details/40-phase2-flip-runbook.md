@@ -2,6 +2,9 @@
 
 Green light 2026-08-06, flip announced for **2026-08-07** (comms: `40-flip-comm.md`).
 
+**Executed 2026-08-07** — beta first, then prod. Corrections found while running it
+are folded in below. Post-flip follow-ups (#41, #521, #346, #42) are unchanged.
+
 **Owner decision, deviates from #40/#42 as filed:** legacy archon is *shut down*,
 not re-hosted read-only at `old.archon.vekn.net`. No `old.` DNS record, no `old.`
 vhost. The safety net is the pre-flip `pg_dump` + `archondb` left intact on the box
@@ -25,7 +28,7 @@ and starts serving archon-vibe beta. **Do beta first — it rehearses both traps
 
 2. **Certbot renewal webroot mismatch on both boxes.** The `archon.vekn.net` /
    `archon.krcg.org` certs were issued by the *legacy* tooling with
-   `--webroot-path /usr/share/nginx/html` — **both** boxes, verified on beta
+   `--webroot-path /usr/share/nginx/html` — **both** boxes, verified on each
    2026-08-07 (the earlier `-w /var/www/certbot` guess for beta was wrong; that
    path isn't in play). Only the legacy-issued cert is affected: `bot.` and `new.`
    were issued by `nginx_tls` and already renew from `/var/www/acme`. After the flip the
@@ -51,8 +54,13 @@ the paths `nginx_tls` (`{{ r.server_name }}.http.conf`) and `static_site`
 (`.https.conf`) write once `domain_main` flips. So the deploy would overwrite them
 in place, and if either is a symlink into `sites-available` the write lands
 somewhere unintended. Move the legacy confs aside *before* deploying rather than
-letting the template land on them. Check the prod filenames in the box-state step
-instead of trusting `archon_web.*`.
+letting the template land on them.
+
+**Prod does not have this problem** (box state, 2026-08-07): legacy there really is
+`archon_web.{http,https}.conf`, regular files, no symlinks, and `sites-available`
+holds only `default`. The deploy writes the *new* filenames
+`archon.vekn.net.{http,https}.conf`, so step 6 below is a plain removal of the
+legacy vhost, not a collision.
 
 ---
 
@@ -92,11 +100,17 @@ instead of trusting `archon_web.*`.
 4. **Disable the merge, permanently:** `sudo systemctl disable --now archon-legacy-sync.timer`
    (trap 1). Also set `legacy_sync_enabled: false` in `inventories/prod/group_vars/all/vars.yml`
    so a later deploy doesn't re-render it.
-5. **Wall-clock normalization** (#527) — report, then apply:
+5. **Wall-clock normalization** (#527) — report, then apply. The script needs a
+   DSN (`--dsn` or `DATABASE_URL`); the docstring's bare `python …` invocation
+   supplies neither and exits on `--dsn or DATABASE_URL is required`. Borrow the
+   backend's own `EnvironmentFile` so nothing parses the password by hand and it
+   never lands in `ps`:
    ```
-   sudo -u archon /opt/archon/backend/.venv/bin/python \
-     /opt/archon/backend/scripts/normalize_wall_clock.py          # report
-   … normalize_wall_clock.py --apply
+   sudo systemd-run --uid=archon --pipe --wait \
+     -p EnvironmentFile=/etc/archon/archon-backend.env \
+     /opt/archon/backend/.venv/bin/python \
+     /opt/archon/backend/scripts/normalize_wall_clock.py           # report
+   … same, with --apply appended
    ```
    Must run after the final merge/sync and before the ratings recompute.
 6. **Drop the legacy vhosts:**

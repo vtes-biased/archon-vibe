@@ -76,7 +76,7 @@ postgresql_effective_cache_size: 384MB
 # Reads legacy `archondb` (role `archon`) over the socket via peer auth (the unit
 # runs as OS user `archon`) and merges rich data into the vekn-seeded copies. No
 # legacy password needed; the new-db write uses the archonvibe scram cred.
-legacy_sync_enabled: true
+legacy_sync_enabled: false
 legacy_db_user: archon
 legacy_db_name: archondb
 merge_backup_dir: /var/lib/archon/merge-backups
