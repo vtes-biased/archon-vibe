@@ -28,6 +28,12 @@
     <meta name="twitter:image" content="/icon-512.png" />
     <title>Archon</title>
     <script>
+      // Legacy archon's cached 308 / -> /index.html strands returning users on a
+      // routeless path. replaceState, not a redirect: / would re-hit the 308 and loop.
+      if (location.pathname === '/index.html')
+        history.replaceState(null, '', '/' + location.search + location.hash);
+    </script>
+    <script>
       // Anti-FOUC: apply theme class and meta theme-color before first paint
       (function() {
         var t = localStorage.getItem('theme');
