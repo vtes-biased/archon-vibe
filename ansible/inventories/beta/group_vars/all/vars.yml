@@ -7,14 +7,14 @@
 # --- identity -------------------------------------------------------------
 # Beta runs alongside the legacy `archon` on the server-setup frankfurt host, so
 # everything is namespaced `new_archon` to avoid collisions (user, paths, db,
-# services, domain). service_name flows to the shared nginx_site role.
+# services). service_name flows to the shared nginx_site role.
 service_name: new_archon         # shared identifier (nginx_site tag, db name)
 archon_user: new_archon          # unprivileged runtime user (== db role for PG peer auth)
 archon_group: new_archon
 contact_email: "lionel.panhaleux@gmail.com"
 
 # --- domains --------------------------------------------------------------
-domain_main: new.archon.krcg.org
+domain_main: archon.krcg.org
 domain_bot: bot.archon.krcg.org
 site_url_base: "https://{{ domain_main }}"
 

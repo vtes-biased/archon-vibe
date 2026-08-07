@@ -25,8 +25,10 @@ and starts serving archon-vibe beta. **Do beta first — it rehearses both traps
 
 2. **Certbot renewal webroot mismatch on both boxes.** The `archon.vekn.net` /
    `archon.krcg.org` certs were issued by the *legacy* tooling with
-   `--webroot-path /usr/share/nginx/html` (prod, `archon/ansible/roles/register-tls`)
-   and `-w /var/www/certbot` (beta, server-setup `nginx_site`). After the flip the
+   `--webroot-path /usr/share/nginx/html` — **both** boxes, verified on beta
+   2026-08-07 (the earlier `-w /var/www/certbot` guess for beta was wrong; that
+   path isn't in play). Only the legacy-issued cert is affected: `bot.` and `new.`
+   were issued by `nginx_tls` and already renew from `/var/www/acme`. After the flip the
    `:80` vhost is archon-vibe's `nginx_tls/templates/http.conf.j2`, which serves
    `/.well-known/acme-challenge/` from **`/var/www/acme`** and 301s everything else.
    `certbot renew` then fails ~60 days later, silently. Fix the renewal conf (or
@@ -39,11 +41,18 @@ and starts serving archon-vibe beta. **Do beta first — it rehearses both traps
    redirect URI is additive and harmless while Phase 1 still runs — do it the day
    before. Same for the beta app on `archon.krcg.org`.
 
-Non-traps, verified: legacy has **no service worker** and sets **no HSTS**, so no
-stale-client residue on the old origin. Legacy vhost filenames (`archon_web.*`,
-`archon_beta.conf`) never collide with archon-vibe's (`<domain>.{http,https}.conf`);
-duplicate `server_name` is an nginx *warning* and `.` sorts before `_`, so the new
-vhost would win the glob anyway — don't rely on it, remove the legacy confs.
+Non-trap, verified: legacy has **no service worker** and sets **no HSTS**, so no
+stale-client residue on the old origin.
+
+**Correction (2026-08-07, beta box):** the filenames *do* collide on frankfurt.
+Legacy beta there is the unit `archon.krcg.org.service` (not `archon_beta`) and its
+vhosts are `/etc/nginx/sites-enabled/archon.krcg.org.{http,https}.conf` — exactly
+the paths `nginx_tls` (`{{ r.server_name }}.http.conf`) and `static_site`
+(`.https.conf`) write once `domain_main` flips. So the deploy would overwrite them
+in place, and if either is a symlink into `sites-available` the write lands
+somewhere unintended. Move the legacy confs aside *before* deploying rather than
+letting the template land on them. Check the prod filenames in the box-state step
+instead of trusting `archon_web.*`.
 
 ---
 
@@ -128,14 +137,16 @@ Writes made in the new app during the window stay in the new DB.
 
 1. `ansible/inventories/beta/group_vars/all/vars.yml`: `domain_main: archon.krcg.org`
    (`domain_bot` unchanged). `site_url_base` / `WEBAUTHN_RP_ID` / redirect URIs derive.
-2. Stop legacy beta: `sudo systemctl disable --now archon_beta`, remove
-   `/etc/nginx/sites-{enabled,available}/archon_beta.conf`, `nginx -t && reload`.
-   Ports don't clash (legacy 8007, archon-vibe beta 8008) — this is about the vhost.
-   Legacy beta's `archondb` stays on the box.
+2. Stop legacy beta: `sudo systemctl disable --now archon.krcg.org.service`, then
+   `sudo mv /etc/nginx/sites-enabled/archon.krcg.org.{http,https}.conf /root/` and
+   `sudo nginx -t && sudo systemctl reload nginx`. Ports don't clash (legacy 8007,
+   archon-vibe beta 8008) — this is about the vhost, and about not templating over
+   legacy's files (see the correction above). Legacy beta's `archondb` stays.
 3. `cd ansible && RELEASE_TAG=v0.4.15 just deploy-beta` (full, not `QUICK=1`).
-4. Cert renewal fix, beta flavour: `/etc/letsencrypt/renewal/archon.krcg.org.conf`
-   webroot `/var/www/certbot` → `/var/www/acme` (or pass `r.acme_webroot:
-   /var/www/certbot` to `nginx_tls`/`static_site`), then `certbot renew --dry-run`.
+4. Cert renewal fix: in `/etc/letsencrypt/renewal/archon.krcg.org.conf` replace
+   `/usr/share/nginx/html` → `/var/www/acme` (both `webroot_path` and the
+   `[[webroot_map]]` entry — a single `sed s#…#…#g` on that literal path does it),
+   then `certbot renew --dry-run --cert-name archon.krcg.org`.
 5. Smoke as above. `new.archon.krcg.org` keeps working — leave it.
 
 ## After the flip
