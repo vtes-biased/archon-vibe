@@ -1532,6 +1532,7 @@
   "err_tournament_raffle_none_played": "Ningún jugador disponible para el sorteo aún",
   "err_tournament_raffle_wrong_state": "El sorteo requiere un torneo en estado En espera, En juego o Finalizado",
   "err_tournament_name_required": "El nombre del torneo no puede estar vacío",
+  "err_tournament_finish_before_start": "La hora de finalización no puede ser anterior a la hora de inicio",
   "err_tournament_max_rounds_below_completed": "max_rounds ({max}) no puede ser inferior a las rondas completadas ({completed})",
   "tfield_ranked_no_proxies_hint": "No permitido en el Campeonato Nacional o Continental.",
   "tfield_vekn_locked_hint": "Bloqueado — este evento ya está publicado en el calendario VEKN.",

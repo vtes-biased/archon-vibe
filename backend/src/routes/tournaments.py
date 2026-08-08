@@ -979,6 +979,7 @@ async def create_tournament(
     # through engine create_tournament, so call the gate explicitly.
     try:
         _engine.validate_rank_legality(rank, request.proxies, request.multideck)
+        _engine.validate_finish_after_start(request.start or "", request.finish or "")
     except ValueError as e:
         raise EngineRejection.from_engine(e) from e
 

@@ -1532,6 +1532,7 @@
   "err_tournament_raffle_none_played": "Nessun giocatore disponibile per l'estrazione ancora",
   "err_tournament_raffle_wrong_state": "L'estrazione richiede il torneo in stato In Attesa, In gioco o Terminato",
   "err_tournament_name_required": "Il nome del torneo non può essere vuoto",
+  "err_tournament_finish_before_start": "L'orario di fine non può precedere l'orario di inizio",
   "err_tournament_max_rounds_below_completed": "max_rounds ({max}) non può essere inferiore ai round completati ({completed})",
   "tfield_ranked_no_proxies_hint": "Non consentito nel Campionato Nazionale o Continentale.",
   "tfield_vekn_locked_hint": "Bloccato — questo evento è già pubblicato nel calendario VEKN.",

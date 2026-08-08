@@ -128,6 +128,25 @@ pub(crate) fn validate_rank_legality(
     Ok(())
 }
 
+/// Reject a finish that precedes its start. Both are naive wall-clock times in
+/// the tournament's single `timezone`, so comparing their shared fixed-width
+/// `YYYY-MM-DDTHH:MM` prefix orders them — the config form posts minute
+/// precision while the store keeps seconds, and a plain string compare would
+/// read `…T10:00` as earlier than `…T10:00:00`. Equal times stay legal:
+/// zero-length events are common in imported data.
+pub(crate) fn validate_finish_after_start(start: &str, finish: &str) -> Result<(), EngineError> {
+    if start.is_empty() || finish.is_empty() {
+        return Ok(());
+    }
+    fn minute(s: &str) -> &str {
+        s.get(..16).unwrap_or(s)
+    }
+    if minute(finish) < minute(start) {
+        return Err(EngineError::FinishBeforeStart);
+    }
+    Ok(())
+}
+
 /// Create a new tournament from config and actor context.
 /// Returns the tournament JSON string.
 pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, EngineError> {
@@ -143,6 +162,10 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         config["rank"].as_str().unwrap_or(""),
         config["proxies"].as_bool().unwrap_or(false),
         config["multideck"].as_bool().unwrap_or(false),
+    )?;
+    validate_finish_after_start(
+        config["start"].as_str().unwrap_or(""),
+        config["finish"].as_str().unwrap_or(""),
     )?;
 
     // Name is required for creation
@@ -2521,6 +2544,23 @@ fn apply_event(
                     merged_bool("proxies"),
                     merged_bool("multideck"),
                 )?;
+            }
+
+            // Date ordering on the merged view: a partial update can carry
+            // `finish` while `start` still lives on the stored tournament, so a
+            // config-only check would see half the pair. Gated on the edit
+            // touching one of the two, like the rank-legality check above, so a
+            // legacy inverted row doesn't block unrelated venue/description edits.
+            if config.has_key("start") || config.has_key("finish") {
+                let merged_date = |field: &str| -> String {
+                    let src = if config.has_key(field) {
+                        &config[field]
+                    } else {
+                        &tournament[field]
+                    };
+                    src.as_str().unwrap_or("").to_string()
+                };
+                validate_finish_after_start(&merged_date("start"), &merged_date("finish"))?;
             }
 
             if let Some(mr) = config["max_rounds"].as_usize() {

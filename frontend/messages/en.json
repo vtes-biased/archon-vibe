@@ -1532,6 +1532,7 @@
   "err_tournament_raffle_none_played": "No players available to raffle yet",
   "err_tournament_raffle_wrong_state": "Raffle requires tournament in Waiting, Playing, or Finished state",
   "err_tournament_name_required": "Tournament name cannot be empty",
+  "err_tournament_finish_before_start": "Finish time cannot be earlier than start time",
   "err_tournament_max_rounds_below_completed": "max_rounds ({max}) cannot be less than completed rounds ({completed})",
   "tfield_ranked_no_proxies_hint": "Not allowed in National or Continental championships.",
   "tfield_vekn_locked_hint": "Locked — this event is already published on the VEKN calendar.",

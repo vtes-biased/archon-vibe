@@ -254,6 +254,7 @@
       id={id("finish")}
       type="datetime-local"
       value={values.finish}
+      min={values.start || undefined}
       {disabled}
       onchange={(e) => handleInput("finish", (e.target as HTMLInputElement).value)}
       class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"

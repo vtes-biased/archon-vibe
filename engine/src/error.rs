@@ -94,6 +94,7 @@ pub enum EngineError {
     RaffleNonePlayed,
     RaffleWrongState,
     NameRequired,
+    FinishBeforeStart,
     MaxRoundsBelowCompleted { max: usize, completed: usize },
     RankForbidsProxies,
     RankForbidsMultideck,
@@ -192,6 +193,7 @@ impl EngineError {
             RaffleNonePlayed => "tournament.raffle_none_played",
             RaffleWrongState => "tournament.raffle_wrong_state",
             NameRequired => "tournament.name_required",
+            FinishBeforeStart => "tournament.finish_before_start",
             MaxRoundsBelowCompleted { .. } => "tournament.max_rounds_below_completed",
             RankForbidsProxies => "tournament.rank_forbids_proxies",
             RankForbidsMultideck => "tournament.rank_forbids_multideck",
@@ -362,6 +364,7 @@ impl fmt::Display for EngineError {
                 "Raffle requires tournament in Waiting, Playing, or Finished state"
             ),
             NameRequired => write!(f, "Tournament name cannot be empty"),
+            FinishBeforeStart => write!(f, "Finish time cannot be earlier than start time"),
             MaxRoundsBelowCompleted { max, completed } => write!(
                 f,
                 "max_rounds ({}) cannot be less than completed rounds ({})",

@@ -114,6 +114,7 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.raffle_none_played': () => m.err_tournament_raffle_none_played(),
   'tournament.raffle_wrong_state': () => m.err_tournament_raffle_wrong_state(),
   'tournament.name_required': () => m.err_tournament_name_required(),
+  'tournament.finish_before_start': () => m.err_tournament_finish_before_start(),
   'tournament.max_rounds_below_completed': (p) => m.err_tournament_max_rounds_below_completed({ max: p.max ?? '', completed: p.completed ?? '' }),
   'tournament.rank_forbids_proxies': () => m.err_tournament_rank_forbids_proxies(),
   'tournament.rank_forbids_multideck': () => m.err_tournament_rank_forbids_multideck(),

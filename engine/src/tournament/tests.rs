@@ -2555,6 +2555,24 @@ fn test_update_config_rank_forbids_proxies() {
 }
 
 #[test]
+fn test_update_config_finish_before_start() {
+    // A finish-only patch must be ordered against the STORED start, and the two
+    // sides carry different precisions (form posts minutes, store keeps seconds)
+    // — so equal wall-clock times stay legal and only a real inversion fails.
+    let mut tournament = make_tournament();
+    tournament["start"] = "2026-06-01T10:00:00".into();
+    let actor = make_organizer();
+    let patch = |finish: &str| {
+        json::object! { type: "UpdateConfig", config: { finish: finish } }
+    };
+
+    let err = run_event(&tournament, &patch("2026-06-01T09:00"), &actor).unwrap_err();
+    assert_eq!(err.code(), "tournament.finish_before_start");
+    assert!(run_event(&tournament, &patch("2026-06-01T10:00"), &actor).is_ok());
+    assert!(run_event(&tournament, &patch("2026-06-01T18:00"), &actor).is_ok());
+}
+
+#[test]
 fn test_update_config_vekn_frozen_identity() {
     // After VEKN publication rank/format/start are frozen; same-value writes
     // and non-identity fields stay editable.
