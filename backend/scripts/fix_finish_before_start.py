@@ -1,14 +1,20 @@
 """Repair tournaments whose `finish` lands before their `start`.
 
-Upstream data, not ours: `vekn_tournament_sync._map_vekn_to_tournament` builds
-`finish` from VEKN's own `event_enddate` + `event_endtime`, and the legacy merge
-carries `archondb`'s stored value. A VEKN row with `enddate == startdate` and an
-after-midnight `endtime` imports faithfully — an evening event that ran past
-midnight keeps the start's date, so `finish` reads earlier than `start`.
+Two populations, and only one is repairable (prod, 2026-08-08: 423 inverted).
 
-Only that case is repaired, and only when rolling `finish` forward one day yields
-a plausible duration. Anything else is reported as UNRESOLVED and left alone: a
-finish that is merely *wrong* is a guess we have no basis to make.
+The majority — 247 rows, `finish` at exactly midnight — is ours: `_parse_date`
+applies a time only when `event_endtime` is truthy, so a VEKN event carrying an
+`event_enddate` but no end time lands on midnight of that date. With
+`enddate == startdate` that is midnight of the *start* date, before any start
+time. Nothing ran past midnight; we invented an end time from a missing one.
+Those are left alone here (fixing the importer is the real answer) because
+rolling them forward would fabricate a duration for each.
+
+The rest is genuine: an evening event whose end time rolled past midnight while
+the date stayed on the start day. Those are repaired, and only when rolling
+`finish` forward one day yields a plausible duration. Everything else is
+reported UNRESOLVED with its reason: a finish that is merely *wrong* is a guess
+we have no basis to make.
 
     # report (safe, read-only)
     sudo systemd-run --uid=archon --pipe --wait \\
@@ -30,7 +36,7 @@ import asyncio
 import importlib.util
 import os
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
 try:
@@ -59,14 +65,24 @@ INVERTED_QUERY = """
 MAX_PLAUSIBLE = timedelta(hours=18)
 
 
-def roll_forward(t: Tournament) -> datetime | None:
-    """`finish` a day later, when that is the reading the data supports."""
+def roll_forward(t: Tournament) -> tuple[datetime | None, str]:
+    """`finish` a day later, when that is the reading the data supports.
+
+    Returns (new_finish, reason-it-was-refused).
+    """
     if t.start is None or t.finish is None or t.finish >= t.start:
-        return None
+        return None, "not inverted"
     if t.finish.date() != t.start.date():
-        return None  # already spans days — the inversion is not a midnight roll
+        return None, "spans days — not a midnight roll"
+    # vekn_tournament_sync._parse_date leaves midnight when event_endtime is
+    # empty, so an exact-midnight finish means "no end time recorded" far more
+    # often than "ended at midnight". Rolling it invents a duration.
+    if t.finish.time() == time(0, 0, 0):
+        return None, "midnight — no end time recorded upstream"
     rolled = t.finish + timedelta(days=1)
-    return rolled if timedelta(0) < rolled - t.start <= MAX_PLAUSIBLE else None
+    if rolled - t.start > MAX_PLAUSIBLE:
+        return None, f"rolled duration {rolled - t.start} implausible"
+    return rolled, ""
 
 
 async def run(args: argparse.Namespace) -> int:
@@ -82,12 +98,12 @@ async def run(args: argparse.Namespace) -> int:
 
         repaired, unresolved = 0, 0
         for t in found:
-            rolled = roll_forward(t)
+            rolled, why = roll_forward(t)
             print(f"  {t.uid}  {t.name[:40]:<40} tz={t.timezone}")
             print(f"    start  {t.start}")
             if rolled is None:
                 unresolved += 1
-                print(f"    finish {t.finish}   UNRESOLVED — left alone")
+                print(f"    finish {t.finish}   UNRESOLVED — {why}")
                 continue
             repaired += 1
             print(f"    finish {t.finish} → {rolled}  ({rolled - t.start} long)")
