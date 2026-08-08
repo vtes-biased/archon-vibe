@@ -164,6 +164,14 @@ def _map_vekn_to_tournament(
     tz_name = "UTC" if online else _guess_timezone(country, venue_city, address)
     start = _parse_date(data.get("event_startdate"), data.get("event_starttime"))
     finish = _parse_date(data.get("event_enddate"), data.get("event_endtime"))
+    # VEKN writes event_endtime "00:00:00" for an unset end time, and a handful of
+    # events are simply inverted upstream (11025: 10:00 -> 08:30 same day). Either
+    # way a finish before its start is not a finish — keep it unknown instead of
+    # importing a negative duration. Events that genuinely ran past midnight carry
+    # the next day in event_enddate (11096: 13th 22:00 -> 14th 06:00), so they
+    # never reach this and need no date arithmetic from us.
+    if finish and start and finish < start:
+        finish = None
     if address and venue_data.get("city"):
         address += f", {venue_data['city']}"
     elif not address:
