@@ -4,12 +4,14 @@
 
 import type { VtesCard } from '$lib/types';
 import { getDB } from './db';
-import { normalizeSearch } from './utils';
+import { normalizeSearch, searchTokens, matchesAllTerms } from './utils';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /** In-memory card map: id → card */
 let cardsMap: Map<number, VtesCard> | null = null;
+/** Word-prefix token cache, keyed by card id — see searchCards. */
+let cardTokens: Map<number, string[]> | null = null;
 /** ETag for cache validation */
 let currentEtag: string | null = null;
 
@@ -24,6 +26,7 @@ export async function getCards(): Promise<Map<number, VtesCard>> {
   const stored = await db.getAll('cards');
   if (stored.length > 0) {
     cardsMap = new Map(stored.map(c => [c.id, c]));
+    cardTokens = null;
     // Trigger background refresh
     refreshCardsFromAPI().catch(() => {});
     return cardsMap;
@@ -73,6 +76,7 @@ async function refreshCardsFromAPI(): Promise<void> {
 
     // Update in-memory map
     cardsMap = new Map(cards.map(c => [c.id, c]));
+    cardTokens = null;
 
     // Persist to IndexedDB
     const db = await getDB();
@@ -87,35 +91,46 @@ async function refreshCardsFromAPI(): Promise<void> {
   }
 }
 
+function tokensFor(card: VtesCard): string[] {
+  return [
+    ...searchTokens(card.printed_name),
+    ...searchTokens(card.unique_name),
+    // The engine's parser keys: aliases and ordinals.
+    ...card.name_variants.flatMap(searchTokens),
+  ];
+}
+
 /**
  * Simple card search by name (for the card search component).
  * Returns up to `limit` matches.
+ *
+ * Word-prefix on every term, the same rule the member search uses. This was a
+ * plain substring match, which made short queries mostly noise — "an" returned
+ * 856 cards of which 728 matched only mid-word (Abandoning the Flesh, Agate
+ * Talisman) and buried the ones actually named "An…". Multi-word queries still
+ * work because each term is matched independently: "govern the unaligned"
+ * matches all three.
  */
 export async function searchCards(query: string, limit = 20): Promise<VtesCard[]> {
   if (!query || query.length < 2) return [];
   const cards = await getCards();
-  const norm = normalizeSearch(query);
-  const results: VtesCard[] = [];
+  const terms = searchTokens(query);
+  const lead = terms[0];
+  if (!lead) return [];
+  if (!cardTokens) cardTokens = new Map([...cards].map(([id, c]) => [id, tokensFor(c)]));
 
-  // Collect every match first — matching the engine's parser keys (printed/unique
-  // names + variants: aliases, ordinals) — then sort and cap, so a prefix hit is
-  // never dropped by an incidental substring match ordered ahead of it.
+  const results: VtesCard[] = [];
   for (const card of cards.values()) {
-    if (
-      normalizeSearch(card.printed_name).includes(norm) ||
-      normalizeSearch(card.unique_name).includes(norm) ||
-      card.name_variants.some((v) => normalizeSearch(v).includes(norm))
-    ) {
-      results.push(card);
-    }
+    const tokens = cardTokens.get(card.id) ?? tokensFor(card);
+    if (matchesAllTerms(tokens, terms)) results.push(card);
   }
 
-  // Sort: exact prefix matches first, then by name
-  results.sort((a, b) => {
-    const aStarts = normalizeSearch(a.unique_name).startsWith(norm) ? 0 : 1;
-    const bStarts = normalizeSearch(b.unique_name).startsWith(norm) ? 0 : 1;
-    return aStarts - bStarts || a.unique_name.localeCompare(b.unique_name);
-  });
-
-  return results.slice(0, limit);
+  // Cards whose name opens with the query rank above ones merely containing a
+  // matching word. Keyed up front: normalizing inside the comparator would redo
+  // the work O(n log n) times.
+  return results
+    .map((c) => ({ c, lead: normalizeSearch(c.unique_name).startsWith(lead) ? 0 : 1 }))
+    .sort((a, b) => a.lead - b.lead || a.c.unique_name.localeCompare(b.c.unique_name))
+    .slice(0, limit)
+    .map((r) => r.c);
 }

@@ -5,6 +5,24 @@ export function normalizeSearch(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
+/**
+ * Split a string into normalized search tokens on any run of non-alphanumerics.
+ *
+ * Applied to BOTH the indexed field and the typed query, so every search in the
+ * app is word-prefix: "vin" finds Vincent, "inc" finds nobody. Splitting on
+ * punctuation is what keeps that true for addresses and handles \u2014 matching
+ * "vincent.ripoll@example.org" as one substring would quietly re-admit mid-name
+ * hits, since emails embed names.
+ */
+export function searchTokens(s: string): string[] {
+  return normalizeSearch(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/** Every query term must word-prefix one of `tokens`. Empty terms match all. */
+export function matchesAllTerms(tokens: string[], terms: string[]): boolean {
+  return terms.every((term) => tokens.some((tok) => tok.startsWith(term)));
+}
+
 export function formatScore(gw: number, vp: number, tp: number): string {
   const s = gw > 0 ? `${gw}GW${vp}` : `${vp}VP`;
   return `${s} ${tp}TP`;

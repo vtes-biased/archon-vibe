@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type { User } from "$lib/types";
-  import { getFilteredUsers } from "$lib/db";
+  import { getFilteredUsers, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -24,15 +25,21 @@
   let total = $state(0);
   let selectedIndex = $state(-1);
   const SEARCH_LIMIT = 10;
+  // See UserPicker: guards against an earlier, slower query landing last.
+  let searchSeq = 0;
+
+  onMount(() => { warmUserIndex(); });
 
   async function searchUsers() {
     selectedIndex = -1;
+    const seq = ++searchSeq;
     if (search.trim().length < 2) {
       results = [];
       total = 0;
       return;
     }
     const r = await getFilteredUsers(undefined, undefined, search.trim());
+    if (seq !== searchSeq) return;
     total = r.length;
     results = r.slice(0, SEARCH_LIMIT);
   }

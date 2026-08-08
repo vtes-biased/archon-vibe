@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type { User, Tournament } from "$lib/types";
-  import { getFilteredUsers, isUserCurrentlySanctioned } from "$lib/db";
+  import { getFilteredUsers, getRegistrationBarredUids, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import { Ban, TriangleAlert, Flower2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -23,9 +24,15 @@
   let pendingDeceased = $state<User | null>(null);
   const SEARCH_LIMIT = 10;
   const dropdownOpen = $derived(searchResults.length > 0 || playerSearch.trim().length >= 2);
+  // See UserPicker: the index build makes early keystrokes slower than later ones,
+  // so results can arrive out of order without a sequence guard.
+  let searchSeq = 0;
+
+  onMount(() => { warmUserIndex(); });
 
   async function searchPlayers() {
     selectedIndex = -1;
+    const seq = ++searchSeq;
     if (playerSearch.trim().length < 2) {
       searchResults = [];
       searchTotal = 0;
@@ -33,16 +40,16 @@
       return;
     }
     const results = await getFilteredUsers(undefined, undefined, playerSearch.trim());
+    if (seq !== searchSeq) return;
     const registeredUids = new Set(tournament?.players?.map(p => p.user_uid) ?? []);
     const filtered = results.filter(u => !registeredUids.has(u.uid));
+    // One scan for the whole page of results, rather than a lookup per row on
+    // the path to first paint.
+    const barred = await getRegistrationBarredUids();
+    if (seq !== searchSeq) return;
     searchTotal = filtered.length;
     searchResults = filtered.slice(0, SEARCH_LIMIT);
-    // Check suspension status for displayed results
-    const suspended = new Set<string>();
-    await Promise.all(searchResults.map(async (u) => {
-      if (await isUserCurrentlySanctioned(u.uid)) suspended.add(u.uid);
-    }));
-    suspendedUids = suspended;
+    suspendedUids = barred;
   }
 
   function handleSearchKeydown(e: KeyboardEvent) {

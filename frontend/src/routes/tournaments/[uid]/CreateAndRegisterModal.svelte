@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Tournament, User } from "$lib/types";
-  import { getFilteredUsers, getUser, isUserCurrentlySanctioned } from "$lib/db";
+  import { getFilteredUsers, getUser, getRegistrationBarredUids } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import Button from "$lib/components/Button.svelte";
@@ -138,11 +138,7 @@
         const matches = byName.filter(u => !registered.has(u.uid)).slice(0, 8);
         if (matches.length > 0) {
           createCandidates = matches;
-          const susp = new Set<string>();
-          await Promise.all(matches.map(async (u) => {
-            if (await isUserCurrentlySanctioned(u.uid)) susp.add(u.uid);
-          }));
-          candidateSuspended = susp;
+          candidateSuspended = await getRegistrationBarredUids();
           return;
         }
       }

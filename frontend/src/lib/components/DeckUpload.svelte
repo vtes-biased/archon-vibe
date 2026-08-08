@@ -2,7 +2,7 @@
   import { toUserMessage } from '$lib/errors';
   import { onDestroy } from 'svelte';
   import type { User } from '$lib/types';
-  import { getFilteredUsers, getTournament } from '$lib/db';
+  import { getFilteredUsers, getTournament, warmUserIndex } from '$lib/db';
   import { getCountryFlag } from '$lib/geonames';
   import { validateDeck, type ValidationError } from '$lib/engine';
   import { CircleX, TriangleAlert } from '@lucide/svelte';
@@ -64,15 +64,20 @@
     if (!online && mode !== 'text') mode = 'text';
   });
 
-  // Attribution autocomplete
+  // Attribution autocomplete. attrSearchSeq guards against an earlier, slower
+  // query landing last — see UserPicker.
+  let attrSearchSeq = 0;
+
   async function searchAttribution() {
     attrSelectedIndex = -1;
+    const seq = ++attrSearchSeq;
     if (attributionSearch.trim().length < 2) {
       attrResults = [];
       attrTotal = 0;
       return;
     }
     const results = await getFilteredUsers(undefined, undefined, attributionSearch.trim());
+    if (seq !== attrSearchSeq) return;
     attrTotal = results.length;
     attrResults = results.slice(0, ATTR_SEARCH_LIMIT);
   }
@@ -326,6 +331,7 @@
         <input
           type="text"
           bind:value={attributionSearch}
+          onfocus={() => warmUserIndex()}
           oninput={() => { attributionVekn = attributionSearch; attributionName = ''; searchAttribution(); }}
           onkeydown={handleAttrKeydown}
           placeholder={m.deck_upload_attr_other_placeholder()}

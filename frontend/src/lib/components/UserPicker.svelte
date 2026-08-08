@@ -1,8 +1,9 @@
 <script lang="ts">
   // Single-select member typeahead: IndexedDB search, min 2 chars, keyboard
   // nav, flag + #vekn_id rows. The one search box — organizers, promos, …
+  import { onMount } from "svelte";
   import type { User } from "$lib/types";
-  import { getFilteredUsers } from "$lib/db";
+  import { getFilteredUsers, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -23,15 +24,23 @@
   let searchTotal = $state(0);
   let selectedIndex = $state(-1);
   const SEARCH_LIMIT = 8;
+  // Keystrokes race: the first one pays for building the member index while
+  // later ones resolve straight from it, so without this the earliest (broadest)
+  // query can land last and overwrite the results for what was actually typed.
+  let searchSeq = 0;
+
+  onMount(() => { warmUserIndex(); });
 
   async function doSearch() {
     selectedIndex = -1;
+    const seq = ++searchSeq;
     if (search.trim().length < 2) {
       searchResults = [];
       searchTotal = 0;
       return;
     }
     const results = await getFilteredUsers(undefined, undefined, search.trim());
+    if (seq !== searchSeq) return;
     const excluded = new Set(excludeUids);
     const filtered = results.filter((u) => !excluded.has(u.uid));
     searchTotal = filtered.length;

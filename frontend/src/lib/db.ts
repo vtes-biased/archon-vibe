@@ -6,7 +6,7 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
 import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
-import { normalizeSearch } from './utils';
+import { normalizeSearch, searchTokens } from './utils';
 
 // Device ID: persistent random UUID identifying this browser/device
 export function getDeviceId(): string {
@@ -291,6 +291,7 @@ export async function hasAnyUsers(): Promise<boolean> {
 export async function saveUser(user: User): Promise<void> {
   const db = await getDB();
   await db.put('users', user);
+  patchUserIndex(user);
 }
 
 export async function saveUsersBatch(users: User[]): Promise<void> {
@@ -299,38 +300,121 @@ export async function saveUsersBatch(users: User[]): Promise<void> {
   const tx = db.transaction('users', 'readwrite');
   for (const user of users) tx.store.put(user);
   await tx.done;
+  for (const user of users) patchUserIndex(user);
 }
 
 export async function deleteUser(uid: string): Promise<void> {
   const db = await getDB();
   await db.delete('users', uid);
+  dropFromUserIndex(uid);
 }
 
 /**
- * Check if a user matches a search query.
- * Supports multiple search terms: "vin rip" matches "Vincent Ripoll".
- * Each term must match a name/nickname word prefix, the VEKN/Discord ID prefix,
- * or appear anywhere in the email / Discord handle. Contact fields are only
- * present for an official's entitled members (full projection — see backend
- * access_levels.py), so email/Discord search is implicitly scoped to those.
+ * In-memory member search index.
+ *
+ * The member typeahead runs per keystroke over the whole ~10k-member corpus, and
+ * a `getAll` of the users store cannot sit on that path: User rows embed four
+ * CategoryRating objects each carrying a full per-tournament history, so the
+ * corpus is tens of MB and materializing it costs ~100ms before IDB's own
+ * deserialization overhead — hence the >300ms completions organizers reported.
+ * So it is read once and patched on write, the same trick cards.ts uses. Tokens
+ * are precomputed for the same reason: NFD-normalizing every row per keystroke
+ * is the next cost down.
+ *
+ * All user writes funnel through saveUser/saveUsersBatch/deleteUser/clearAllUsers
+ * above, so keeping those four in step keeps the index authoritative.
  */
-function matchesNameSearch(user: User, search: string): boolean {
-  const nameWords = normalizeSearch(user.name).split(/\s+/);
-  const nickWords = user.nickname ? normalizeSearch(user.nickname).split(/\s+/) : [];
-  const email = user.contact_email ? normalizeSearch(user.contact_email) : "";
-  const discord = user.contact_discord ? normalizeSearch(user.contact_discord) : "";
-  const searchTerms = search.split(/\s+/).filter(t => t.length > 0);
-
-  return searchTerms.every(term =>
-    nameWords.some(word => word.startsWith(term)) ||
-    nickWords.some(word => word.startsWith(term)) ||
-    (user.vekn_id != null && user.vekn_id.startsWith(term)) ||
-    (user.discord_id != null && user.discord_id.startsWith(term)) ||
-    email.includes(term) ||
-    discord.includes(term)
-  );
+interface UserIndexEntry {
+  user: User;
+  /** Word-prefix haystack: name, nickname, email and Discord handle tokens. */
+  tokens: string[];
+  /** Normalized full name — ranking key, precomputed to stay out of sort comparators. */
+  nameNorm: string;
+  /** Matched as whole-value prefixes, never tokenized: they are opaque ids. */
+  vekn: string;
+  discordId: string;
 }
 
+let userIndexPromise: Promise<Map<string, UserIndexEntry>> | null = null;
+
+function buildEntry(user: User): UserIndexEntry {
+  return {
+    user,
+    // Contact fields exist only in the full projection (an official's entitled
+    // members — see backend access_levels.py), so email/Discord search is
+    // implicitly scoped to those.
+    tokens: [
+      ...searchTokens(user.name),
+      ...(user.nickname ? searchTokens(user.nickname) : []),
+      ...(user.contact_email ? searchTokens(user.contact_email) : []),
+      ...(user.contact_discord ? searchTokens(user.contact_discord) : []),
+    ],
+    nameNorm: normalizeSearch(user.name),
+    vekn: user.vekn_id ?? '',
+    discordId: user.discord_id ?? '',
+  };
+}
+
+async function getUserIndex(): Promise<Map<string, UserIndexEntry>> {
+  if (!userIndexPromise) {
+    userIndexPromise = (async () => {
+      const db = await getDB();
+      const all = await db.getAll('users');
+      return new Map(all.map(u => [u.uid, buildEntry(u)]));
+    })();
+  }
+  return userIndexPromise;
+}
+
+/**
+ * Build the index ahead of the first keystroke — components about to show a
+ * member search box call this on mount, so the one-off read isn't billed to the
+ * user's first character.
+ */
+export async function warmUserIndex(): Promise<void> {
+  await getUserIndex();
+}
+
+// Writes chain onto the build promise rather than a materialized map, so a write
+// landing mid-build still applies. The IDB write has already committed by the
+// time these run, so re-indexing the newer value is always correct.
+function patchUserIndex(user: User): void {
+  if (userIndexPromise) void userIndexPromise.then(idx => idx.set(user.uid, buildEntry(user)));
+}
+
+function dropFromUserIndex(uid: string): void {
+  if (userIndexPromise) void userIndexPromise.then(idx => idx.delete(uid));
+}
+
+/**
+ * Rank name-leading matches above incidental word hits, then alphabetically.
+ * Callers truncate to the top 8/10, so without this a surname query would order
+ * by *first* name and which few you saw would be arbitrary.
+ */
+function sortSearchResults(entries: UserIndexEntry[], terms: string[]): User[] {
+  const lead = terms[0];
+  if (lead) {
+    // Rank key read off the entry, never recomputed per comparison — normalizing
+    // inside a comparator redoes the work O(n log n) times.
+    entries.sort((a, b) =>
+      (a.nameNorm.startsWith(lead) ? 0 : 1) - (b.nameNorm.startsWith(lead) ? 0 : 1) ||
+      a.user.name.localeCompare(b.user.name));
+  } else {
+    entries.sort((a, b) => a.user.name.localeCompare(b.user.name));
+  }
+  return entries.map(e => e.user);
+}
+
+/**
+ * Filter members by country, roles and/or a search query.
+ *
+ * Search is uniformly word-prefix: every typed term must open a name, nickname,
+ * email or Discord-handle token, or prefix the VEKN/Discord id. All terms have to
+ * hit, so "vin rip" finds Vincent Ripoll. Mid-word matches are deliberately
+ * excluded — they read as a bug, and matching an address as one substring used to
+ * re-admit them through the back door, since emails embed names ("inc" hitting
+ * vincent.ripoll@…, and only ever for officials, who alone see contact fields).
+ */
 export async function getFilteredUsers(
   country?: string,
   roles?: Role[],
@@ -339,39 +423,32 @@ export async function getFilteredUsers(
   // Convert Svelte proxy to plain array and expand roles (e.g., Judge includes Judgekin)
   const plainRoles = roles && roles.length > 0 ? [...roles] : undefined;
   const expandedRoles = plainRoles ? expandRolesForFilter(plainRoles) : undefined;
-  const searchLower = nameSearch?.trim() ? normalizeSearch(nameSearch.trim()) : undefined;
-  const db = await getDB();
+  const terms = nameSearch?.trim() ? searchTokens(nameSearch) : [];
+  const index = await getUserIndex();
 
-  // Helper to apply name search filter
-  const applyNameFilter = (users: User[]): User[] => {
-    if (!searchLower) return users;
-    return users.filter(u => matchesNameSearch(u, searchLower));
-  };
-
-  // Helper to apply roles filter
-  const applyRolesFilter = (users: User[]): User[] => {
-    if (!expandedRoles || expandedRoles.length === 0) return users;
-    return users.filter(u => u.roles && expandedRoles.some(role => u.roles!.includes(role)));
-  };
-
-  // Soft-deleted users (e.g. merge_users dups) never appear in listings.
-  const notDeleted = (users: User[]): User[] => users.filter(u => !u.deleted_at);
-
-  // Case 1: No country filter - get all sorted by name, then filter in JS
-  if (!country) {
-    const allUsers = await db.getAllFromIndex('users', 'by-name');
-    return applyNameFilter(applyRolesFilter(notDeleted(allUsers)));
+  const matched: UserIndexEntry[] = [];
+  for (const entry of index.values()) {
+    const u = entry.user;
+    // Tombstones now hard-delete the row (sync.ts); this is defensive, hiding any
+    // pre-change soft-deleted row a client still holds until its next full resync.
+    if (u.deleted_at) continue;
+    if (country && u.country !== country) continue;
+    if (expandedRoles && expandedRoles.length > 0 &&
+        !(u.roles && expandedRoles.some(role => u.roles!.includes(role)))) continue;
+    if (terms.length > 0 &&
+        !terms.every(term =>
+          entry.tokens.some(tok => tok.startsWith(term)) ||
+          entry.vekn.startsWith(term) ||
+          entry.discordId.startsWith(term))) continue;
+    matched.push(entry);
   }
-
-  // Case 2: Country filter - use compound index, then filter in JS
-  const range = IDBKeyRange.bound([country, ''], [country, '\uffff']);
-  const usersInCountry = await db.getAllFromIndex('users', 'by-country-name', range);
-  return applyNameFilter(applyRolesFilter(notDeleted(usersInCountry)));
+  return sortSearchResults(matched, terms);
 }
 
 export async function clearAllUsers(): Promise<void> {
   const db = await getDB();
   await db.clear('users');
+  userIndexPromise = null;
 }
 
 // Metadata operations
@@ -549,25 +626,49 @@ export async function getActiveSanctionsForUser(userUid: string): Promise<Sancti
 }
 
 /**
+ * Does this one sanction currently bar its holder? Shared by the single-user and
+ * bulk checks below so the two can never drift — note it is NOT the same rule as
+ * getSuspendedUserUids, which is suspension-only for the rankings board.
+ */
+function barsRegistration(s: Sanction, now: Date, cutoff: Date): boolean {
+  if (s.deleted_at) return false;
+  if (s.level !== 'suspension' && s.level !== 'probation') return false;
+  if (s.lifted_at) return false;
+  // A suspension with no expiry is permanent, so it outlives the 18-month window.
+  const isPermanentBan = s.level === 'suspension' && !s.expires_at;
+  if (!isPermanentBan && new Date(s.issued_at) < cutoff) return false;
+  if (s.expires_at && new Date(s.expires_at) < now) return false;
+  return true;
+}
+
+function sanctionWindow(): { now: Date; cutoff: Date } {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 18);
+  return { now: new Date(), cutoff };
+}
+
+/**
  * Check if user currently has an active ban/suspension/probation.
  * Returns true if there's an active sanction that hasn't been lifted and hasn't expired.
  */
 export async function isUserCurrentlySanctioned(userUid: string): Promise<boolean> {
-  const sanctions = await getActiveSanctionsForUser(userUid);
-  const now = new Date();
+  const sanctions = await getSanctionsForUser(userUid);
+  const { now, cutoff } = sanctionWindow();
+  return sanctions.some(s => barsRegistration(s, now, cutoff));
+}
 
-  return sanctions.some(s => {
-    // Only count suspension and probation as "currently sanctioned"
-    if (s.level !== 'suspension' && s.level !== 'probation') return false;
-
-    // Skip if lifted
-    if (s.lifted_at) return false;
-
-    // Check if expired
-    if (s.expires_at && new Date(s.expires_at) < now) return false;
-
-    return true;
-  });
+/**
+ * UIDs currently barred from registering, in one pass over the sanctions store.
+ * The member pickers need this for a whole page of results at once; asking
+ * per-row cost one IDB transaction each, on the path to first paint.
+ */
+export async function getRegistrationBarredUids(): Promise<Set<string>> {
+  const db = await getDB();
+  const all = await db.getAll('sanctions');
+  const { now, cutoff } = sanctionWindow();
+  const barred = new Set<string>();
+  for (const s of all) if (barsRegistration(s, now, cutoff)) barred.add(s.user_uid);
+  return barred;
 }
 
 /**
