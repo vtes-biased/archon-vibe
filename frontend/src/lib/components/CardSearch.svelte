@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import type { VtesCard } from "$lib/types";
-  import { searchCards } from "$lib/cards";
+  import { searchCards, getCards } from "$lib/cards";
   import CardName from "$lib/components/CardName.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -14,16 +14,21 @@
   let query = $state('');
   let results = $state<VtesCard[]>([]);
   let selectedIndex = $state(-1);
-  let debounceTimer: ReturnType<typeof setTimeout>;
+  // Searching is sub-millisecond against the token cache, so there is nothing
+  // left to debounce — a 200ms timer here was pure added latency. It was also
+  // doubling as the race guard (each keystroke cleared the pending one), hence
+  // the explicit sequence guard now: the first query builds the card cache and
+  // can otherwise resolve after the later ones it should have preceded.
+  let searchSeq = 0;
 
-  onDestroy(() => clearTimeout(debounceTimer));
+  onMount(() => { getCards(); });
 
-  function onInput() {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(async () => {
-      selectedIndex = -1;
-      results = await searchCards(query, 15);
-    }, 200);
+  async function onInput() {
+    selectedIndex = -1;
+    const seq = ++searchSeq;
+    const found = await searchCards(query, 15);
+    if (seq !== searchSeq) return;
+    results = found;
   }
 
   function handleKeydown(e: KeyboardEvent) {
