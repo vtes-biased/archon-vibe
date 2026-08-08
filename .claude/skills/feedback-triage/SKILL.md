@@ -155,34 +155,45 @@ the exact missing detail plus an invitation to file again. Don't leave it open.
   Close the GitHub issue when the fix **deploys** — the pst ticket closes on
   commit (CLAUDE.md), the public issue closes when the reporter can see it work.
 
-## Reply style
+## Reply style — short, first person, human
 
-English always, whatever the reporter's locale. 2–6 sentences.
+**One or two sentences. Really.** The owner writes these as himself, not as a
+project. Match that voice:
 
-Thank them → name what you actually checked → give the verdict plainly → say what
-happens next. Decline in product terms, never codebase terms. Never promise a
-date. Don't add @-mentions: the body already mentions the reporter, and a comment
-notifies them.
+- **First person "I"** — "I'll add it", "I still have the old database". Not "we
+  will investigate", not "the team".
+- **Open with thanks, not agreement.** "Thanks", "Thanks for the feedback", "Nice
+  catch", "Thanks for catching that". Never open with **"You're right"** — it
+  reads as AI boilerplate, and it makes the reply about the verdict instead of
+  about the person who bothered to write in.
+- **Casual and plain.** No throat-clearing ("Thanks for taking the time to file
+  this"), no corporate prose, no restating their report back at them.
+- Say **what's happening and how**. That's the whole job. Skip the reasoning
+  chain, the file names, the architecture.
+- Decline in product terms, never codebase terms.
+- English always, whatever the reporter's locale.
+- Never promise a date. Never a pst number. No @-mentions — the body already
+  mentions them and a comment notifies them.
+
+The instinct to be thorough is wrong here. Long replies read as defensive; a
+short one reads as someone who knows their own codebase.
 
 **Accepted:**
-> Thanks for the report — confirmed. Past-tournament entries currently show the
-> event but not your finishing position, which is exactly the number you'd want
-> there. It's on the list to fix; I'll close this issue once it's live.
+> Nice catch — the finishing position isn't shown anywhere in your rating
+> history. I'll add it, rank plus the size of the field, same as on a tournament page.
+
+**Accepted, our fault:**
+> Thanks for catching that — the migration dropped judge ranks for members already
+> in the new system. I still have the old database, so I'll restore them.
 
 **Already possible:**
-> Thanks — this one is already supported: a judge can override any table's VP
-> total from the results screen, which covers Lifeboon and every other rule that
-> breaks the usual VP arithmetic. It clearly wasn't findable under time pressure
-> though, so I'm looking at making that control more obvious.
+> That's already in there — a judge can override any table's VP total from the
+> results screen. Clearly too well hidden though, I'll make it more obvious.
 
 **Needs info** (closed, not parked):
-> Thanks for flagging this. I couldn't reproduce it from the description — to
-> chase it down I'd need the tournament name and roughly when it happened, plus
-> what you saw on screen at that moment. Closing this one for now; please send it
-> again with those details and I'll pick it straight up.
+> I can't reproduce this — which tournament was it, and what did you see on
+> screen? Closing for now, send me that and I'll pick it straight up.
 
 **Won't do:**
-> Thanks for taking the time. I'm going to pass on this one: it would only apply
-> to a rare table configuration, and supporting it would make the scoring screen
-> meaningfully harder to use for every event. Closing — but do keep the feedback
-> coming.
+> I'm going to pass on this one — it'd only help a rare setup and would make the
+> scoring screen worse for every event. Thanks though, keep them coming.
