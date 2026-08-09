@@ -3,7 +3,8 @@
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
   import { timerAddTime } from "$lib/api";
-  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, type TournamentEventType } from "$lib/engine";
+  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, type TournamentEventType } from "$lib/engine";
+  import { vpIssueText } from "$lib/vpIssue";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
@@ -824,40 +825,65 @@
                     </div>
                   {/each}
                 </div>
-                <!-- Override trigger (unfolded-only: you reach for it from inside the scoring view, once the VPs won't validate) -->
-                {#if isScoring && isOrganizer && (table.state === 'Invalid' || table.state === 'In Progress')}
-                  {#if overrideTable_ === i}
-                    <div class="mt-2 pt-2 border-t border-line">
-                      <p class="text-xs text-ink-faint mb-1.5">{m.override_usage_hint()}</p>
-                      <label class="text-xs text-ink-muted block mb-1">{m.override_judge_comment()}
-                        <textarea
-                          bind:value={overrideComment}
-                          class="w-full bg-surface-hover text-ink-strong text-xs rounded px-2 py-1 border border-line-strong resize-none"
-                          rows="2"
-                          placeholder={m.override_placeholder()}
-                        ></textarea>
-                      </label>
-                      <div class="flex gap-2 mt-1 justify-end">
-                        <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ink-muted hover:text-ink-bright">{m.common_cancel()}</button>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          loading={overrideSaving}
-                          disabled={overrideSaving || !overrideComment.trim()}
-                          onclick={() => submitOverride(r, i)}
-                        >{overrideSaving ? m.common_saving() : m.override_save()}</Button>
+                <!-- Why the table won't close, then the way past it. Without the
+                     reason an impossible table and a half-typed one look identical:
+                     no error, just a round that never finishes. -->
+                {#if isScoring && (table.state === 'Invalid' || table.state === 'In Progress')}
+                  {@const vpIssue = checkTableVpsSync(table.seating.map(s => s.result.vp))}
+                  {@const blocked = !!vpIssue && vpIssue.code !== 'incomplete'}
+                  {#if blocked}
+                    <div class="mt-2 banner-warn border rounded-lg p-3">
+                      <p class="text-xs flex items-start gap-1.5">
+                        <TriangleAlert class="w-4 h-4 shrink-0" />
+                        <span>{vpIssueText(vpIssue!, table.seating.length)}</span>
+                      </p>
+                      {#if isOrganizer && overrideTable_ !== i}
+                        <p class="text-xs mt-1.5">{m.vp_blocked_override_hint()}</p>
+                      {/if}
+                    </div>
+                  {/if}
+                  {#if isOrganizer}
+                    {#if overrideTable_ === i}
+                      <div class="mt-2 pt-2 border-t border-line">
+                        <p class="text-xs text-ink-faint mb-1.5">{m.override_usage_hint()}</p>
+                        <label class="text-xs text-ink-muted block mb-1">{m.override_judge_comment()}
+                          <textarea
+                            bind:value={overrideComment}
+                            class="w-full bg-surface-hover text-ink-strong text-xs rounded px-2 py-1 border border-line-strong resize-none"
+                            rows="2"
+                            placeholder={m.override_placeholder()}
+                          ></textarea>
+                        </label>
+                        <div class="flex gap-2 mt-1 justify-end">
+                          <button onclick={() => { overrideTable_ = null; overrideComment = ""; }} class="px-2 py-1 text-xs text-ink-muted hover:text-ink-bright">{m.common_cancel()}</button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            loading={overrideSaving}
+                            disabled={overrideSaving || !overrideComment.trim()}
+                            onclick={() => submitOverride(r, i)}
+                          >{overrideSaving ? m.common_saving() : m.override_save()}</Button>
+                        </div>
                       </div>
-                    </div>
-                  {:else}
-                    <div class="mt-2 flex justify-end">
-                      <button
-                        onclick={() => { overrideTable_ = i; overrideComment = ""; }}
-                        class="px-2 py-1 text-xs text-warn hover:opacity-80 transition-opacity"
-                        title={m.override_title()}
-                      >
-                        <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
-                      </button>
-                    </div>
+                    {:else if blocked}
+                      <!-- Primary: the numbers are impossible and only a judge can move
+                           this table on, so the way out stops being a ghost button. -->
+                      <div class="mt-2">
+                        <Button variant="primary" size="lg" block class="min-h-[44px]" onclick={() => { overrideTable_ = i; overrideComment = ""; }}>
+                          <ShieldCheck class="w-4 h-4" />{m.vp_blocked_override_btn()}
+                        </Button>
+                      </div>
+                    {:else}
+                      <div class="mt-2 flex justify-end">
+                        <button
+                          onclick={() => { overrideTable_ = i; overrideComment = ""; }}
+                          class="px-2 py-1 text-xs text-warn hover:opacity-80 transition-opacity"
+                          title={m.override_title()}
+                        >
+                          <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
+                        </button>
+                      </div>
+                    {/if}
                   {/if}
                 {/if}
                 {#if isOrganizer && table.override}

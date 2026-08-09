@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { previewScoresSync, type TournamentEventType } from "$lib/engine";
+  import { previewScoresSync, checkTableVpsSync, type TournamentEventType } from "$lib/engine";
+  import { vpIssueText } from "$lib/vpIssue";
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Sanction } from "$lib/types";
   import { formatScore } from "$lib/utils";
@@ -185,8 +186,22 @@
       </div>
       {/if}
 
-      <!-- Override controls -->
-      {#if isOrganizer && (tournament.finals.state === 'Invalid' || tournament.finals.state === 'In Progress')}
+      <!-- Override controls, preceded by why the table is stuck (same reasoning as RoundsTab) -->
+      {#if tournament.finals.state === 'Invalid' || tournament.finals.state === 'In Progress'}
+        {@const vpIssue = checkTableVpsSync(tournament.finals.seating.map(s => s.result.vp))}
+        {@const blocked = !!vpIssue && vpIssue.code !== 'incomplete'}
+        {#if blocked}
+          <div class="mt-2 banner-warn border rounded-lg p-3">
+            <p class="text-xs flex items-start gap-1.5">
+              <TriangleAlert class="w-4 h-4 shrink-0" />
+              <span>{vpIssueText(vpIssue!, tournament.finals.seating.length)}</span>
+            </p>
+            {#if isOrganizer && overrideTable_ !== -1}
+              <p class="text-xs mt-1.5">{m.vp_blocked_override_hint()}</p>
+            {/if}
+          </div>
+        {/if}
+        {#if isOrganizer}
         {#if overrideTable_ === -1}
           <div class="mt-2 pt-2 border-t border-line">
             <label class="text-xs text-ink-muted block mb-1">{m.override_judge_comment()}
@@ -217,6 +232,12 @@
               >{overrideSaving ? m.common_saving() : m.override_save()}</Button>
             </div>
           </div>
+        {:else if blocked}
+          <div class="mt-2">
+            <Button variant="primary" size="lg" block class="min-h-[44px]" onclick={() => { overrideTable_ = -1; overrideComment = ""; }}>
+              <ShieldCheck class="w-4 h-4" />{m.vp_blocked_override_btn()}
+            </Button>
+          </div>
         {:else}
           <div class="mt-2 flex justify-end">
             <button
@@ -226,6 +247,7 @@
               <ShieldCheck class="w-3.5 h-3.5 inline mr-1" />{m.override_btn()}
             </button>
           </div>
+        {/if}
         {/if}
       {/if}
       {#if sanctionTarget && isOrganizer}

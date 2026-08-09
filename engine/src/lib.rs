@@ -276,6 +276,22 @@ mod shared {
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
+    /// Validate a table's VPs in seating order. Returns `null` when the table
+    /// is scorable, else `{ code, seats }` so the UI can say *why* a table
+    /// will not close instead of leaving it silently unfinished.
+    /// Input: `{ "vps": [1.5, 0, 0.5, 0.5, 0.5] }`.
+    pub fn check_table_vps_json(config_json: &str) -> Result<String, EngineError> {
+        let config = json::parse(config_json)?;
+        let vps: Vec<f64> = config["vps"]
+            .members()
+            .map(|v| v.as_f64().unwrap_or(0.0))
+            .collect();
+        Ok(match super::tournament::check_table_vps(&vps) {
+            Some(e) => e.to_json().dump(),
+            None => "null".to_string(),
+        })
+    }
+
     pub fn compute_player_issues_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
@@ -520,6 +536,11 @@ mod wasm {
         #[wasm_bindgen(js_name = computeFinalStandings)]
         pub fn compute_final_standings(&self, config_json: &str) -> Result<String, String> {
             js_str(compute_final_standings_json(config_json))
+        }
+
+        #[wasm_bindgen(js_name = checkTableVps)]
+        pub fn check_table_vps(&self, config_json: &str) -> Result<String, String> {
+            js_str(check_table_vps_json(config_json))
         }
 
         #[wasm_bindgen(js_name = computePlayerIssues)]

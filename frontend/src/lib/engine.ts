@@ -135,6 +135,33 @@ export function previewScoresSync(
   return result;
 }
 
+/** Why a table's VPs won't validate. `seats` are 0-based seating indices. */
+export type VpIssue = {
+  code:
+    | 'invalid_table_size'
+    | 'incomplete'
+    | 'excessive_total'
+    | 'redirected_vp'
+    | 'impossible_oust_order'
+    | 'missing_half_vp';
+  seats: number[];
+};
+
+/**
+ * Explain why a table won't close, using the same check that decides its state
+ * server-side. Returns null when the VPs are scorable (or the engine isn't up —
+ * callers then say nothing rather than guessing).
+ */
+export function checkTableVpsSync(vps: number[]): VpIssue | null {
+  const engine = getEngineReactive();
+  if (!engine) return null;
+  try {
+    return JSON.parse(callEngine(() => engine.checkTableVps(JSON.stringify({ vps }))));
+  } catch {
+    return null;
+  }
+}
+
 export type TournamentEventType =
   | 'OpenRegistration'
   | 'CloseRegistration'

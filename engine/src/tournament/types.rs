@@ -248,10 +248,33 @@ pub struct SeatScore {
 #[derive(Debug, Clone, PartialEq)]
 pub enum VpError {
     InvalidTableSize,
-    InsufficientTotal,
+    /// Below the lowest total any complete table can reach — seats are still
+    /// being entered. Not an error the user should be shown.
+    IncompleteTotal,
     ExcessiveTotal,
+    /// Every seat is scored and the total is one a real table can reach, but a
+    /// VP sits with a Methuselah who did not make the oust. Only a judge can
+    /// close this table.
+    RedirectedVp,
     MissingVp(usize),          // seat index (0-based)
     MissingHalfVp(Vec<usize>), // seat indices
+}
+
+impl VpError {
+    /// Stable code plus the seats at fault, for the UI to explain why a table
+    /// will not close. The `Debug` form stays log text; this is what callers
+    /// branch on.
+    pub fn to_json(&self) -> JsonValue {
+        let (code, seats): (&str, Vec<usize>) = match self {
+            VpError::InvalidTableSize => ("invalid_table_size", vec![]),
+            VpError::IncompleteTotal => ("incomplete", vec![]),
+            VpError::ExcessiveTotal => ("excessive_total", vec![]),
+            VpError::RedirectedVp => ("redirected_vp", vec![]),
+            VpError::MissingVp(i) => ("impossible_oust_order", vec![*i]),
+            VpError::MissingHalfVp(idx) => ("missing_half_vp", idx.clone()),
+        };
+        json::object! { code: code, seats: seats }
+    }
 }
 
 #[derive(Debug, Clone)]

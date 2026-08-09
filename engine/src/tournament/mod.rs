@@ -20,10 +20,7 @@ mod types;
 // Re-export items used by lib.rs
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
 pub use standings::{compute_final_standings, compute_rating_vp_gw};
-pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState};
-
-// Used within the module
-use types::VpError;
+pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState, VpError};
 
 // Import everything needed for apply_event from submodules
 use crate::error::EngineError;
@@ -1315,7 +1312,7 @@ fn apply_event(
                             .map(|j| r[i]["seating"][j]["result"]["vp"].as_f64().unwrap_or(0.0))
                             .collect();
                         match check_table_vps(&vps) {
-                            Some(VpError::InsufficientTotal) => "In Progress",
+                            Some(VpError::IncompleteTotal) => "In Progress",
                             Some(_) => "Invalid",
                             None => "Finished",
                         }
@@ -1911,8 +1908,14 @@ fn apply_event(
             if t["override"].is_null() {
                 let vp_err = check_table_vps(&vps);
                 match vp_err {
-                    Some(VpError::InsufficientTotal) => {
+                    Some(VpError::IncompleteTotal) => {
                         t["state"] = "In Progress".into();
+                    }
+                    Some(VpError::RedirectedVp) => {
+                        // These numbers used to read as a half-filled table and
+                        // were accepted, so keep accepting them — but say what
+                        // they are, since only a judge can close this table.
+                        t["state"] = "Invalid".into();
                     }
                     Some(_) => {
                         // Invalid oust order or other error
@@ -1998,7 +2001,7 @@ fn apply_event(
                 .collect();
             let vp_err = check_table_vps(&vps);
             match vp_err {
-                Some(VpError::InsufficientTotal) => {
+                Some(VpError::IncompleteTotal) => {
                     t["state"] = "In Progress".into();
                 }
                 Some(_) => {

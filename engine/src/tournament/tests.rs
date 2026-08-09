@@ -3464,3 +3464,35 @@ fn test_report_promos_post_finish_replaces_whole_list() {
         "omitted stock source defaults to the submitting organizer"
     );
 }
+
+/// A table where a card moved a VP (Life Boon merges two half-VPs into one
+/// integer) is complete, not half-entered — it used to read as "In Progress"
+/// and a round would simply never finish, which is how a sanctioned event ended
+/// up with a corrected score. It must say so instead. Validity itself is
+/// untouched: nothing here may make a new table Finished.
+#[test]
+fn redirected_vp_reads_as_blocked_not_unfinished() {
+    let plain = [1.5, 0.0, 0.5, 0.5, 0.5];
+    let boon = [2.0, 0.0, 0.5, 0.5, 0.0];
+    assert_eq!(
+        plain.iter().sum::<f64>(),
+        boon.iter().sum::<f64>(),
+        "moving a VP must not move the total"
+    );
+    assert_eq!(check_table_vps(&plain), None);
+    assert_eq!(check_table_vps(&boon), Some(VpError::RedirectedVp));
+
+    // Nothing entered, or barely: still just unfinished.
+    assert_eq!(check_table_vps(&[0.0; 5]), Some(VpError::IncompleteTotal));
+    assert_eq!(
+        check_table_vps(&[1.0, 0.0, 0.0, 0.0, 0.0]),
+        Some(VpError::IncompleteTotal)
+    );
+
+    assert_eq!(check_table_vps(&[5.0, 0.0, 0.0, 0.0, 0.0]), None, "sweep");
+    assert_eq!(check_table_vps(&[0.5; 4]), None, "timeout, nobody ousted");
+    assert_eq!(
+        check_table_vps(&[3.0, 0.0, 2.5, 0.0, 0.0]),
+        Some(VpError::ExcessiveTotal)
+    );
+}

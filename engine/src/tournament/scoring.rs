@@ -10,13 +10,35 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
     if !(4..=5).contains(&n) {
         return Some(VpError::InvalidTableSize);
     }
-    // Check total: ceil each VP, sum must equal table size
-    let total: i64 = vps.iter().map(|&v| v.ceil() as i64).sum();
-    if total < n as i64 {
-        return Some(VpError::InsufficientTotal);
-    }
-    if total > n as i64 {
+    // Seats accounted for: scoring each seat as ousts made plus half a VP for
+    // surviving makes this sum exactly the table size. The oust-order pass
+    // below leans on that and mis-reads a table with seats missing, so it stays
+    // the gate on validity.
+    let accounted: i64 = vps.iter().map(|&v| v.ceil() as i64).sum();
+    if accounted > n as i64 {
         return Some(VpError::ExcessiveTotal);
+    }
+    if accounted < n as i64 {
+        // Short of a full account — but of what? A complete table's raw total is
+        // always a half-step in [T/2, T]: each oust awards 1, each survivor 0.5,
+        // a sweep the extra game win. Landing there means the numbers are all in
+        // and one of them was redirected (Life Boon merges two halves into a
+        // single integer, costing exactly one unit above), which the oust order
+        // cannot represent — a judge call. Anywhere else the seats simply aren't
+        // filled in yet. Same VPs, opposite meanings: one needs a ruling, the
+        // other needs the rest of the scores.
+        let size = n as f64;
+        let total: f64 = vps.iter().sum();
+        let halves = total * 2.0;
+        let complete = total >= size / 2.0
+            && total <= size
+            && (halves - halves.round()).abs() < 1e-9
+            && accounted == n as i64 - 1;
+        return Some(if complete {
+            VpError::RedirectedVp
+        } else {
+            VpError::IncompleteTotal
+        });
     }
     // Oust-order simulation: work with (original_index, accounted_vp) pairs
     let mut seats: Vec<(usize, f64)> = vps.iter().enumerate().map(|(i, &v)| (i, v)).collect();
