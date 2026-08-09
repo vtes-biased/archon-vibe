@@ -93,7 +93,16 @@ def _final_positions(t: Tournament) -> dict[str, int]:
         {"standings": t.standings, "winner": t.winner}
     ).decode()
     ranked = msgspec.json.decode(_engine.compute_final_standings(config))
-    return {s["user_uid"]: s["rank"] for s in ranked}
+    # Drop the DQ'd/proxy tail the engine appends with ranks past the whole field.
+    # Callers skip those players anyway, but off a *different* signal (player state /
+    # active sanction, vs the stored standings flags read here) — so a stale
+    # standings flag would otherwise surface a rank past every real competitor.
+    # Absent from the map means position 0, i.e. no placement rendered.
+    return {
+        s["user_uid"]: s["rank"]
+        for s in ranked
+        if not s.get("disqualified") and not s.get("non_competing")
+    }
 
 
 def _is_disqualified(t: Tournament, sanctions: list | None, user_uid: str) -> bool:
@@ -312,13 +321,21 @@ async def recompute_ratings_for_players(
     return updated_users
 
 
-async def recompute_all_ratings() -> list[tuple[User, BroadcastData]]:
+async def recompute_all_ratings() -> int:
     """Full recomputation of all ratings and wins. Called daily for consistency.
 
     Lightweight first pass collects player UIDs per category (streaming tournaments).
     Then reuses recompute_ratings_for_players() per category.
-    Returns (User, BroadcastData) tuples.
+
+    Broadcasts each category's deltas as they are produced and returns only the
+    updated-user count: holding every (User, BroadcastData) until the end would peak
+    at three encoded JSON projections per rated user. The no-change guard keeps that
+    list tiny on an ordinary night, but any run that moves a field for the whole
+    corpus (a new entry field, a scoring change) would spike it on a box whose PG
+    pool is already sized down for memory.
     """
+    from .broadcast import broadcast_precomputed
+
     # Pass 1: stream tournaments to collect player sets per category
     players_by_category: dict[RatingCategory, set[str]] = {
         cat: set() for cat in RatingCategory
@@ -336,12 +353,13 @@ async def recompute_all_ratings() -> list[tuple[User, BroadcastData]]:
             players_by_category[category].update(players)
 
     # Pass 2: recompute per category using the normal code path
-    all_updated: list[tuple[User, BroadcastData]] = []
+    updated = 0
     for category, player_uids in players_by_category.items():
         if not player_uids:
             continue
-        results = await recompute_ratings_for_players(player_uids, category)
-        all_updated.extend(results)
+        for _user, bd in await recompute_ratings_for_players(player_uids, category):
+            broadcast_precomputed(bd)
+            updated += 1
 
-    logger.info(f"Full rating recompute: {len(all_updated)} users updated")
-    return all_updated
+    logger.info(f"Full rating recompute: {updated} users updated")
+    return updated

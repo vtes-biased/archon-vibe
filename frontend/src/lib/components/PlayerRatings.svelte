@@ -104,15 +104,11 @@
                         {/if}
                       </a>
                       {#if place > 0}
-                        <span
-                          class="text-xs ml-1 whitespace-nowrap"
-                          title={m.user_detail_placement({ rank: place, total: entry.player_count })}
-                        >
-                          <RankCell rank={place} finalist={entry.finalist_position > 0} hash />
-                          <span class="text-ink-faint">/ {entry.player_count}</span>
+                        <span class="text-xs text-ink-muted font-medium ml-1">·
+                          <RankCell rank={place} finalist={entry.finalist_position > 0} hash total={entry.player_count} />
                         </span>
                       {/if}
-                      <span class="text-xs text-ink-faint ml-1">{entry.date}</span>
+                      <span class="text-xs text-ink-faint ml-1">· {entry.date}</span>
                       <span class="text-xs text-ink-faint ml-1">· {m.user_detail_expires({ date: expiryMonth(entry.date) })}</span>
                     </td>
                     <td class="py-1 pl-3 text-right">{entry.vp}</td>

@@ -425,7 +425,7 @@ export interface TournamentRatingEntry {
   gw: number;
   finalist_position: number; // 0=none, 1=winner, 2=runner-up
   points: number;
-  position: number; // final placement; 0 = not computed (pre-backfill rows)
+  position?: number; // final placement; absent on rows written before the backfill
 }
 
 export interface CategoryRating {

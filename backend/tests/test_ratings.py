@@ -11,6 +11,7 @@ from src.models import (
 )
 from src.ratings import (
     _compute_entry_sync,
+    _final_positions,
     _finalist_position,
     _is_disqualified,
     _player_count,
@@ -326,6 +327,34 @@ def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
 
     # Head-count stays inclusive of DQ'd players (finalist-coefficient base).
     assert _player_count(t) == 3
+
+
+def test_final_positions_excludes_dq_and_proxy_rows():
+    """DQ'd/proxy players must be absent from the placement map.
+
+    The engine appends them after the whole field with ranks past every real
+    competitor. Callers skip them off a different signal (player state / active
+    sanction) than the stored standings flags read here, so a flag that outlived its
+    sanction would otherwise show a rating row placed behind the entire field.
+    Absent -> position 0 -> no placement rendered.
+    """
+    t = _make_tournament(
+        winner="w",
+        standings=[
+            {"user_uid": "w", "gw": 1.0, "vp": 5.0, "tp": 60, "finalist": True},
+            {"user_uid": "f", "gw": 0.0, "vp": 3.0, "tp": 50, "finalist": True},
+            {"user_uid": "p", "gw": 0.0, "vp": 2.0, "tp": 40},
+            {"user_uid": "dq", "gw": 0.0, "vp": 0.0, "tp": 0, "disqualified": True},
+            {
+                "user_uid": "proxy",
+                "gw": 0.0,
+                "vp": 1.0,
+                "tp": 10,
+                "non_competing": True,
+            },
+        ],
+    )
+    assert _final_positions(t) == {"w": 1, "f": 2, "p": 3}
 
 
 # ---------------------------------------------------------------------------

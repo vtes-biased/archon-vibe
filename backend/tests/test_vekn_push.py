@@ -64,14 +64,16 @@ def _make_tournament(
     )
 
 
-# Stub out _compute_entry_sync since it requires the Rust engine.
+# Stub out the rating-point computation (_compute_entry).
 # We only care about the archondata *format*, not the rating computation.
 class FakeEntry:
     def __init__(self, points: int = 42):
         self.points = points
 
 
-def _fake_compute(tournament, user_uid, sanctions=None):
+def _fake_compute(
+    tournament, t_json, sanctions_json, user_uid, player_count, positions
+):
     return FakeEntry(points=10)
 
 
@@ -117,7 +119,7 @@ def test_vekn_type_unmappable_is_none():
 # ---------------------------------------------------------------------------
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_basic_format(mock_compute):
     """Verify the basic archondata format: nrounds¤rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§"""
     users = {
@@ -180,7 +182,7 @@ def test_archondata_basic_format(mock_compute):
     assert parts[22] == ""  # trailing empty after last player
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_nrounds_includes_finals(mock_compute):
     """nrounds should count finals as an extra round."""
     users = {"u1": _user("u1", "Alice Smith", "1000001")}
@@ -201,7 +203,7 @@ def test_archondata_nrounds_includes_finals(mock_compute):
     assert result.startswith("3¤")
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_winner_prelim_gw_only(mock_compute):
     """Archondata GW should be prelim-only (standings don't include finals GW)."""
     users = {
@@ -252,7 +254,7 @@ def test_archondata_winner_prelim_gw_only(mock_compute):
     assert parts[11 + 7] == "1.5"  # finals VP
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_non_winner_gw_not_subtracted(mock_compute):
     """Non-winner finalists should NOT have GW subtracted even with finals."""
     users = {
@@ -288,7 +290,7 @@ def test_archondata_non_winner_gw_not_subtracted(mock_compute):
     assert parts[11 + 5] == "2"  # Bob's GW stays 2 (not subtracted)
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_skips_missing_users(mock_compute):
     """Players not found in users_by_uid should be silently skipped."""
     users = {
@@ -308,7 +310,7 @@ def test_archondata_skips_missing_users(mock_compute):
     assert "u2" not in result
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_skips_non_competing(mock_compute):
     """A proxy (non_competing) is a non-competing official stood in — never pushed to
     VEKN as a competitor, even though their seat scored real (non-zeroed) VPs."""
@@ -335,7 +337,7 @@ def test_archondata_skips_non_competing(mock_compute):
     assert "1000002" not in result  # proxy excluded from the system of record
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_single_name_user(mock_compute):
     """User with a single-word name should have empty last name."""
     users = {"u1": _user("u1", "Madonna", "1000001")}
@@ -349,7 +351,7 @@ def test_archondata_single_name_user(mock_compute):
     assert parts[2] == ""  # last (empty)
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_no_finals_vpf_zero(mock_compute):
     """Without finals, all players should have vpf=0.0."""
     users = {"u1": _user("u1", "Alice Smith", "1000001")}
@@ -362,7 +364,7 @@ def test_archondata_no_finals_vpf_zero(mock_compute):
     assert parts[7] == "0.0"  # vpf
 
 
-@patch("src.vekn_push._compute_entry_sync", side_effect=_fake_compute)
+@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_empty_standings(mock_compute):
     """Empty standings should produce just the nrounds prefix."""
     t = _make_tournament(rounds=[[Table(seating=[], state=TableState.FINISHED)]])

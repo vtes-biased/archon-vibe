@@ -6,6 +6,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
+import msgspec
+
 from .broadcast import broadcast_precomputed
 from .db import (
     batch_read_connection,
@@ -24,7 +26,7 @@ from .models import (
     TournamentState,
     User,
 )
-from .ratings import _compute_entry_sync
+from .ratings import _compute_entry, _final_positions, _player_count
 from .vekn_api import VEKNAPIClient, VEKNAPIConnectionError, VEKNAPIError
 
 logger = logging.getLogger(__name__)
@@ -89,6 +91,14 @@ def generate_archondata(
     # Sanctions feed the rating-point (rtp) calculation so the SA penalty is
     # reflected in the pushed rating; the {vp} field below reads standing.vp,
     # which the engine already SA-adjusts.
+    # Hoisted out of the loop: all four are user-independent, and encoding the whole
+    # tournament once per player is O(players) full-tournament encodes on events that
+    # can run to hundreds of seats.
+    t_json = msgspec.json.encode(tournament).decode()
+    sanctions_json = msgspec.json.encode(sanctions or []).decode()
+    player_count = _player_count(tournament)
+    positions = _final_positions(tournament)
+
     parts: list[str] = []
     # Guard: iterate standings (seating-derived), not tournament.players, so a
     # registered no-show stays out and our pushed RTP field size matches vekn's.
@@ -115,7 +125,14 @@ def generate_archondata(
         vpf = finals_vp.get(standing.user_uid, 0.0)
 
         # Rating points
-        entry = _compute_entry_sync(tournament, standing.user_uid, sanctions)
+        entry = _compute_entry(
+            tournament,
+            t_json,
+            sanctions_json,
+            standing.user_uid,
+            player_count,
+            positions,
+        )
         rtp = entry.points
 
         parts.append(

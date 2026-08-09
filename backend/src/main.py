@@ -259,10 +259,8 @@ async def run_rating_recompute() -> None:
         from .ratings import recompute_all_ratings
 
         logger.info("Starting daily rating recompute")
-        results = await recompute_all_ratings()
-        for _user, bd in results:
-            broadcast_precomputed(bd)
-        logger.info(f"Daily rating recompute complete: {len(results)} users updated")
+        updated = await recompute_all_ratings()
+        logger.info(f"Daily rating recompute complete: {updated} users updated")
     except Exception as e:
         logger.error(f"Error during rating recompute: {e}", exc_info=True)
 
