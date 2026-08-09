@@ -81,6 +81,21 @@ def _player_count(t: Tournament) -> int:
     return len(_players_with_rounds(t))
 
 
+def _final_positions(t: Tournament) -> dict[str, int]:
+    """{user_uid: final placement} for one finished tournament.
+
+    Placement comes from the engine's shared rule (winner 1, other finalists tied
+    for 2, non-finalists ranked from finalist_count+1) so the displayed position
+    matches the tournament page exactly. Computed once per tournament by the
+    caller, never per (user, tournament) — the map is user-independent.
+    """
+    config = msgspec.json.encode(
+        {"standings": t.standings, "winner": t.winner}
+    ).decode()
+    ranked = msgspec.json.decode(_engine.compute_final_standings(config))
+    return {s["user_uid"]: s["rank"] for s in ranked}
+
+
 def _is_disqualified(t: Tournament, sanctions: list | None, user_uid: str) -> bool:
     """A DQ'd player earns no rating from this tournament — not even the
     participation base. Mirrors the engine's dual signal (player state set by the
@@ -128,6 +143,7 @@ def _compute_entry(
     sanctions_json: str,
     user_uid: str,
     player_count: int,
+    positions: dict[str, int],
 ) -> TournamentRatingEntry:
     """Core entry computation from pre-encoded JSON + precomputed player count.
 
@@ -151,6 +167,7 @@ def _compute_entry(
         gw=gw,
         finalist_position=fp,
         points=points,
+        position=positions.get(user_uid, 0),
     )
 
 
@@ -167,6 +184,7 @@ def _compute_entry_sync(
         msgspec.json.encode(sanctions or []).decode(),
         user_uid,
         _player_count(t),
+        _final_positions(t),
     )
 
 
@@ -218,6 +236,7 @@ async def recompute_ratings_for_players(
     played_by_t: dict[str, set[str]] = {}
     json_by_t: dict[str, str] = {}
     count_by_t: dict[str, int] = {}
+    positions_by_t: dict[str, dict[str, int]] = {}
     eligible: list[Tournament] = []
     for t in all_tournaments:
         t_json = msgspec.json.encode(t).decode()
@@ -227,6 +246,7 @@ async def recompute_ratings_for_players(
         played_by_t[t.uid] = _players_with_rounds(t)
         json_by_t[t.uid] = t_json
         count_by_t[t.uid] = len(played_by_t[t.uid])
+        positions_by_t[t.uid] = _final_positions(t)
     all_tournaments = eligible
 
     # Fetch wins + the player User objects in batch (one query each, not N).
@@ -261,6 +281,7 @@ async def recompute_ratings_for_players(
                     sanctions_json_cache[t.uid],
                     user_uid,
                     count_by_t[t.uid],
+                    positions_by_t[t.uid],
                 )
             )
 

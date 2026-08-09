@@ -900,6 +900,7 @@
   "user_detail_col_gw": "GW",
   "user_detail_col_pts": "RtP",
   "user_detail_expires": "hasta {date}",
+  "user_detail_placement": "Clasificación: {rank} de {total} jugadores",
   "user_detail_no_rating": "No hay datos de calificación disponibles.",
   "payment_column": "Pago",
   "payment_pending": "Pendiente",

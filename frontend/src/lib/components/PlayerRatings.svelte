@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
-  import { ChevronDown, Crown, Medal } from "@lucide/svelte";
+  import { ChevronDown } from "@lucide/svelte";
+  import RankCell from "$lib/components/RankCell.svelte";
   import { getLocale } from '$lib/paraglide/runtime.js';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -88,6 +89,11 @@
               <tbody>
                 {#each sorted as entry}
                   {@const isTop8 = topUids.has(entry.tournament_uid)}
+                  <!-- Rows written before `position` existed fall back to
+                       finalist_position, which IS the placement for a winner (1) or
+                       finalist (2); non-finalists stay bare until the nightly
+                       recompute backfills them. -->
+                  {@const place = entry.position || entry.finalist_position}
                   <tr class="{isTop8 ? 'text-ink-bright' : 'text-ink-faint'}">
                     <td class="py-1">
                       <a href="/tournaments/{entry.tournament_uid}" class="hover:text-link">
@@ -97,13 +103,17 @@
                           {entry.tournament_name}
                         {/if}
                       </a>
+                      {#if place > 0}
+                        <span
+                          class="text-xs ml-1 whitespace-nowrap"
+                          title={m.user_detail_placement({ rank: place, total: entry.player_count })}
+                        >
+                          <RankCell rank={place} finalist={entry.finalist_position > 0} hash />
+                          <span class="text-ink-faint">/ {entry.player_count}</span>
+                        </span>
+                      {/if}
                       <span class="text-xs text-ink-faint ml-1">{entry.date}</span>
                       <span class="text-xs text-ink-faint ml-1">· {m.user_detail_expires({ date: expiryMonth(entry.date) })}</span>
-                      {#if entry.finalist_position === 1}
-                        <Crown class="w-3 h-3 inline text-highlight ml-1" />
-                      {:else if entry.finalist_position === 2}
-                        <Medal class="w-3 h-3 inline text-ink-muted ml-1" />
-                      {/if}
                     </td>
                     <td class="py-1 pl-3 text-right">{entry.vp}</td>
                     <td class="py-1 pl-3 text-right">{entry.gw}</td>

@@ -204,6 +204,10 @@ class TournamentRatingEntry(msgspec.Struct, kw_only=True, frozen=True):
     gw: int
     finalist_position: int  # 0=none, 1=winner, 2=runner-up
     points: int  # computed rating points
+    # Final placement (VEKN 3.7.5 band: winner 1, other finalists tied 2, then
+    # non-finalists). 0 = not yet computed — rows written before the field existed,
+    # until the ratings backfill runs.
+    position: int = 0
 
 
 class CategoryRating(msgspec.Struct, kw_only=True):
