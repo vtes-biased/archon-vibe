@@ -54,8 +54,10 @@ EVENT_TYPE_MAP: dict[int, tuple[TournamentFormat, TournamentRank]] = {
     10: (TournamentFormat.Limited, TournamentRank.BASIC),  # Launch Event
     11: (TournamentFormat.Limited, TournamentRank.BASIC),  # BYOS
     12: (TournamentFormat.Limited, TournamentRank.BASIC),  # Unsanctioned
-    13: (TournamentFormat.Limited, TournamentRank.BASIC),  # Limited NC
-    14: (TournamentFormat.Limited, TournamentRank.BASIC),  # Limited CC
+    # vekn.net gives these the championship coefficient — dropping the rank here
+    # under-rates every finalist.
+    13: (TournamentFormat.Limited, TournamentRank.NC),  # Limited NC
+    14: (TournamentFormat.Limited, TournamentRank.CC),  # Limited CC
     15: (TournamentFormat.Standard, TournamentRank.BASIC),  # Grand Prix
     16: (TournamentFormat.V5, TournamentRank.BASIC),  # V5 Constructed
 }

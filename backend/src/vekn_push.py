@@ -54,13 +54,19 @@ FORMAT_RANK_TO_VEKN_TYPE: dict[tuple[TournamentFormat, TournamentRank], int] = {
     (TournamentFormat.Standard, TournamentRank.NC): 8,  # National Championship
     (TournamentFormat.Standard, TournamentRank.CC): 6,  # Continental Championship
     (TournamentFormat.Limited, TournamentRank.BASIC): 3,  # Limited
+    (TournamentFormat.Limited, TournamentRank.NC): 13,  # Limited NC
+    (TournamentFormat.Limited, TournamentRank.CC): 14,  # Limited CC
     (TournamentFormat.V5, TournamentRank.BASIC): 16,  # V5 Constructed
 }
 
 
-def tournament_to_vekn_type(fmt: TournamentFormat, rank: TournamentRank) -> int:
-    """Map tournament format+rank to VEKN event type ID."""
-    return FORMAT_RANK_TO_VEKN_TYPE.get((fmt, rank), 2)  # default: Standard Constructed
+def tournament_to_vekn_type(fmt: TournamentFormat, rank: TournamentRank) -> int | None:
+    """Map tournament format+rank to VEKN event type ID, None when unmappable.
+
+    No silent fallback: vekn.net rates off its own event type, so filing a
+    championship as Standard Constructed costs every finalist their rank bonus.
+    """
+    return FORMAT_RANK_TO_VEKN_TYPE.get((fmt, rank))
 
 
 def generate_archondata(
@@ -156,6 +162,12 @@ async def push_tournament_event(
 
     # Map to VEKN event type
     event_type = tournament_to_vekn_type(tournament.format, tournament.rank)
+    if event_type is None:
+        logger.warning(
+            f"Tournament {tournament.uid}: no VEKN event type for "
+            f"{tournament.format.value}/{tournament.rank.value}"
+        )
+        return None
 
     # Determine rounds. Open rounds: max_rounds is a per-player cap, so the event can run
     # more (or fewer) total rounds than it — report the actual rounds run, falling back to

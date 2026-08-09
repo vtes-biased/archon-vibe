@@ -106,18 +106,24 @@ fn resolve_live_round(rounds: &JsonValue, round: Option<usize>) -> Result<usize,
 }
 
 /// VEKN legality: ranked events (National/Continental championships) forbid
-/// proxies and multideck. Callers pass the MERGED view (config over current
-/// tournament) so setting either side of an illegal combo is rejected —
-/// create/config-edit/offline all share this gate. pub(crate): the PyO3
-/// binding exposes it for the online create route, which builds the
-/// Tournament in Python without running engine create_tournament.
+/// proxies and multideck, and only Standard/Limited can be ranked at all —
+/// vekn.net has no V5 championship event type, so one could never be reported.
+/// Callers pass the MERGED view (config over current tournament) so setting
+/// either side of an illegal combo is rejected — create/config-edit/offline all
+/// share this gate. pub(crate): the PyO3 binding exposes it for the online
+/// create route, which builds the Tournament in Python without running engine
+/// create_tournament.
 pub(crate) fn validate_rank_legality(
+    format: &str,
     rank: &str,
     proxies: bool,
     multideck: bool,
 ) -> Result<(), EngineError> {
     if rank.is_empty() {
         return Ok(());
+    }
+    if !matches!(format, "Standard" | "Limited") {
+        return Err(EngineError::FormatForbidsRank);
     }
     if proxies {
         return Err(EngineError::RankForbidsProxies);
@@ -159,6 +165,7 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
 
     validate_config_fields(&config)?;
     validate_rank_legality(
+        config["format"].as_str().unwrap_or(""),
         config["rank"].as_str().unwrap_or(""),
         config["proxies"].as_bool().unwrap_or(false),
         config["multideck"].as_bool().unwrap_or(false),
@@ -2519,12 +2526,16 @@ fn apply_event(
                 }
             }
 
-            // VEKN legality on the merged view: either side of the illegal
-            // combo (rank vs proxies/multideck) may be the incoming edit.
-            // Only when the edit touches one of the three keys — an already-
+            // VEKN legality on the merged view: any side of the illegal combo
+            // (rank vs format/proxies/multideck) may be the incoming edit.
+            // Only when the edit touches one of the four keys — an already-
             // illegal stored combo (legacy import) must not block unrelated
             // edits like venue/description.
-            if config.has_key("rank") || config.has_key("proxies") || config.has_key("multideck") {
+            if config.has_key("rank")
+                || config.has_key("format")
+                || config.has_key("proxies")
+                || config.has_key("multideck")
+            {
                 let merged_str = |field: &str| -> String {
                     if config.has_key(field) {
                         config[field].as_str().unwrap_or("").to_string()
@@ -2540,6 +2551,7 @@ fn apply_event(
                     }
                 };
                 validate_rank_legality(
+                    &merged_str("format"),
                     &merged_str("rank"),
                     merged_bool("proxies"),
                     merged_bool("multideck"),

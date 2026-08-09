@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "archon_engine"
-version = "0.2.0"   # keep in sync with engine/Cargo.toml; bumped by hand on engine changes
+version = "0.2.1"   # keep in sync with engine/Cargo.toml; bumped by hand on engine changes
 requires-python = ">=3.11"
 
 [tool.maturin]

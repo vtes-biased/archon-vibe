@@ -98,6 +98,7 @@ pub enum EngineError {
     MaxRoundsBelowCompleted { max: usize, completed: usize },
     RankForbidsProxies,
     RankForbidsMultideck,
+    FormatForbidsRank,
     VeknFrozenField { field: String },
     DeckNoCards,
     SeatingMinPlayers,
@@ -197,6 +198,7 @@ impl EngineError {
             MaxRoundsBelowCompleted { .. } => "tournament.max_rounds_below_completed",
             RankForbidsProxies => "tournament.rank_forbids_proxies",
             RankForbidsMultideck => "tournament.rank_forbids_multideck",
+            FormatForbidsRank => "tournament.format_forbids_rank",
             VeknFrozenField { .. } => "tournament.vekn_frozen_field",
             DeckNoCards => "deck.no_cards",
             SeatingMinPlayers => "seating.min_players",
@@ -377,6 +379,12 @@ impl fmt::Display for EngineError {
             RankForbidsMultideck => write!(
                 f,
                 "Multideck is not allowed in National or Continental championships"
+            ),
+            FormatForbidsRank => write!(
+                f,
+                "Only Standard and Limited events can be National or Continental \
+                 championships: vekn.net has no V5 championship event type, so the \
+                 results could never be reported"
             ),
             VeknFrozenField { field } => write!(
                 f,

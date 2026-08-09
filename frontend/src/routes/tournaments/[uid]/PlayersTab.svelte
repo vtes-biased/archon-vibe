@@ -15,7 +15,8 @@
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import { validateDeck, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, seatedPlayerCount, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -373,7 +374,10 @@
   // Proxy is settled once the event is decided — mirror the engine guard.
   const canSetProxy = $derived(!tournament.finals && tournament.state !== "Finished");
 
-  const seatedCount = $derived(seatedPlayerCount(tournament));
+  const ratingCtx = $derived(ratingContext(tournament, tournamentSanctions));
+  // Anonymous viewers hold no sanctions: the SA-adjusted figure isn't computable
+  // for them, so drop the column rather than show a possibly-wrong number.
+  const showRating = $derived(isFinished && getAuthState().isAuthenticated);
 
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const hasFinals = $derived(standings.some(e => e.finals));
@@ -764,7 +768,10 @@
             <div class="mt-1 flex items-center gap-3 text-xs text-ink-muted">
               <span>{formatScore(entry.gw, entry.vp, entry.tp)}</span>
               {#if hasFinals && entry.finals}<span>{entry.finals}</span>{/if}
-              {#if isFinished && playerSort === 'standings'}<span class="text-ink-faint">{getRatingPts(entry, tournament, seatedCount)} RP</span>{/if}
+              {#if showRating && playerSort === 'standings'}
+                {@const pts = getRatingPts(entry, tournament, ratingCtx)}
+                {#if pts !== null}<span class="text-ink-faint">{pts} RP</span>{/if}
+              {/if}
               {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
                 {#if editingToss && isOrganizer}
                   <span class="text-ink-faint">{m.tournament_toss_label()}</span>
@@ -839,7 +846,7 @@
               {#if hasFinals}
                 <th class="text-right py-1.5 px-2">{m.tournament_col_finals()}</th>
               {/if}
-              {#if isFinished && playerSort === 'standings'}
+              {#if showRating && playerSort === 'standings'}
                 <th class="text-right py-1.5 px-2">{m.tournament_col_rating()}</th>
               {/if}
             {/if}
@@ -889,8 +896,9 @@
                 {#if hasFinals}
                   <td class="text-right py-1.5 px-2">{entry?.finals ?? ""}</td>
                 {/if}
-                {#if isFinished && playerSort === 'standings'}
-                  <td class="text-right py-1.5 px-2 text-ink-muted">{entry ? getRatingPts(entry, tournament, seatedCount) : "—"}</td>
+                {#if showRating && playerSort === 'standings'}
+                  {@const pts = entry ? getRatingPts(entry, tournament, ratingCtx) : null}
+                  <td class="text-right py-1.5 px-2 text-ink-muted">{pts ?? "—"}</td>
                 {/if}
               {/if}
               {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}

@@ -236,6 +236,26 @@ function openModal(item: Item) {
 
 This prevents SSE sync updates from changing the modal's data mid-edit.
 
+## Never Render a Figure We Can't Compute Correctly
+
+Authoritative numbers (ratings/RtP, totals, standings) must be **blank rather than approximate**.
+If the client lacks an input the server-side computation uses — the viewer can't see sanctions,
+the row isn't in scope, the engine binding isn't available — render nothing (or an em dash) and,
+where it aids comprehension, say why. Never fall back to a hand-rolled formula over whatever
+fields happen to be on hand: a plausible wrong number is worse than an absent one, because
+nobody can tell it is wrong.
+
+Two rules follow:
+
+- **Compute through the engine, never beside it.** A displayed figure the backend also computes
+  must call the same Rust binding with the same inputs. Re-deriving it in TypeScript from
+  standings rows produces a number that silently disagrees with the profile/API.
+- **Match the backend's inclusion filter, not just its formula.** If the server creates no
+  rating entry for a row (didn't play, DQ'd, non-competing), the column shows nothing for that
+  row — not the participation base it would have earned had it played.
+
+See PRODUCT.md §8 for why chasing vekn.net's stored value is the wrong correction.
+
 ## Context-Specific Options
 
 Scope form options by context. Example: sanctions from user list only allow PROBATION/SUSPENSION (global sanctions), while tournament view will allow all types (CAUTION, WARNING, DQ, etc.).

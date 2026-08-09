@@ -2555,6 +2555,38 @@ fn test_update_config_rank_forbids_proxies() {
 }
 
 #[test]
+fn test_update_config_v5_forbids_championship_rank() {
+    // No V5 championship type on vekn.net — reject from either side of the merged
+    // view; Limited championships stay legal.
+    let actor = make_organizer();
+    let ranked = |cfg: json::JsonValue| json::object! { type: "UpdateConfig", config: cfg };
+
+    let mut v5 = make_tournament();
+    v5["format"] = "V5".into();
+    let err = run_event(
+        &v5,
+        &ranked(json::object! { rank: "National Championship" }),
+        &actor,
+    )
+    .unwrap_err();
+    assert_eq!(err.code(), "tournament.format_forbids_rank");
+
+    let mut nc = make_tournament();
+    nc["rank"] = "Continental Championship".into();
+    let err = run_event(&nc, &ranked(json::object! { format: "V5" }), &actor).unwrap_err();
+    assert_eq!(err.code(), "tournament.format_forbids_rank");
+
+    let mut limited = make_tournament();
+    limited["format"] = "Limited".into();
+    assert!(run_event(
+        &limited,
+        &ranked(json::object! { rank: "National Championship" }),
+        &actor
+    )
+    .is_ok());
+}
+
+#[test]
 fn test_update_config_finish_before_start() {
     // A finish-only patch must be ordered against the STORED start, and the two
     // sides carry different precisions (form posts minutes, store keeps seconds)

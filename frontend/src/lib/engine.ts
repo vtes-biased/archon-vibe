@@ -666,6 +666,22 @@ export function computeRatingPoints(
 }
 
 /**
+ * A player's SA-adjusted (vp, gw), finals included — the same aggregation backend
+ * ratings.py stores. Null while the engine isn't loaded.
+ */
+export function computeRatingVpGw(
+  tournamentJson: string,
+  sanctionsJson: string,
+  userUid: string
+): [vp: number, gw: number] | null {
+  const engine = getEngineReactive();
+  if (!engine) return null;
+  // Null rather than a fabricated 0 the caller would render as a real score.
+  const [vp, gw] = engine.computeRatingVpGw(tournamentJson, sanctionsJson, userUid);
+  return vp === undefined || gw === undefined ? null : [vp, gw];
+}
+
+/**
  * Ranking-eligibility gate (VEKN rules 3.1/3.1.6), single-sourced in the engine
  * alongside backend ratings.py's inclusion filter.
  * Returns "eligible" | "open_rounds" | "few_players" | "no_final",

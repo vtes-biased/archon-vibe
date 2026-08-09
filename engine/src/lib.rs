@@ -457,6 +457,24 @@ mod wasm {
             super::ratings::compute_rating_points(vp, gw, finalist_position, player_count, rank)
         }
 
+        /// A player's SA-adjusted (vp, gw), finals included, as `[vp, gw]` — the
+        /// same aggregation the backend rating uses (standings are prelim-only).
+        #[wasm_bindgen(js_name = computeRatingVpGw)]
+        pub fn compute_rating_vp_gw(
+            &self,
+            tournament_json: &str,
+            sanctions_json: &str,
+            user_uid: &str,
+        ) -> Result<Vec<f64>, String> {
+            let tournament =
+                json::parse(tournament_json).map_err(|e| super::EngineError::from(e).to_json())?;
+            let sanctions =
+                json::parse(sanctions_json).map_err(|e| super::EngineError::from(e).to_json())?;
+            let (vp, gw) =
+                super::tournament::compute_rating_vp_gw(&tournament, &sanctions, user_uid);
+            Ok(vec![vp, gw])
+        }
+
         #[wasm_bindgen(js_name = ratingCategory)]
         pub fn rating_category(&self, format: &str, online: bool) -> String {
             super::ratings::rating_category(format, online).to_string()
@@ -586,11 +604,12 @@ mod python {
         /// Tournament in Python and never runs engine create_tournament.
         fn validate_rank_legality(
             &self,
+            format: &str,
             rank: &str,
             proxies: bool,
             multideck: bool,
         ) -> PyResult<()> {
-            crate::tournament::validate_rank_legality(rank, proxies, multideck)
+            crate::tournament::validate_rank_legality(format, rank, proxies, multideck)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
         }
 

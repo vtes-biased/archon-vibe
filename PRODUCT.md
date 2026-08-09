@@ -402,6 +402,26 @@ Per tournament (DQ'd players earn zero — no entry created):
 
 Player removed from rankings after 12 months of inactivity; rating preserved indefinitely.
 
+### Never chase vekn.net's stored RtP
+
+A player's `rtp` on vekn.net can be **higher than ours and still be wrong**. VEKN stores `vp`
+(preliminary) and `vpf` (finals) per player and its rating adds them; legacy archon pushed `vp`
+already including the finals VP, so every finalist it uploaded carries `4 * vpf` too many points
+upstream. Our push (`generate_archondata`) sends prelim `vp` with `vpf` separate and is correct.
+An inflated upstream value is then frozen there and unfixable via the API (the results upload is
+write-once, §7). Observed behaviour is that vekn.net keeps the `rtp` we push rather than
+re-deriving it from its own roster (verified on vekn 13453, where it stored our N=20 figures
+against a 19-row roster of its own) — but not universally, so don't rely on it either way.
+
+**So a gap between our number and vekn.net's is not evidence our maths is wrong**, and "align
+with vekn.net" is not a valid reason to change the engine or `backend/src/ratings.py`. Decide
+against the rules above (§A.2: 4 RtP per VP, on the player's *total* VP), then check whether
+upstream's figure is explained by the double-count. Verified example: Hungarian Finals 2026
+(vekn 12836) — ours 191 is right, vekn.net's 197 is prelim+finals VP counted twice.
+
+Divergences worth acting on are the ones where *our* input is wrong — e.g. a rank the app cannot
+represent, so the coefficient bonus is missed.
+
 ## 9. Reference Documents
 
 | Document | Location | Content |

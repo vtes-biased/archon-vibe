@@ -1,5 +1,5 @@
-import type { Tournament, TournamentState } from "./types";
-import { computeFinalStandings, computeRatingPoints, rankingEligibility } from "./engine";
+import type { Sanction, Tournament, TournamentState } from "./types";
+import { computeFinalStandings, computeRatingPoints, computeRatingVpGw, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
@@ -284,7 +284,7 @@ export function roundsPlayed(tournament: Tournament, uid: string): number {
  *  field size that feeds every profile-rating coefficient (t.players.length would
  *  over-count no-shows). Stays inclusive of DQ'd players: their head-count still lifts
  *  everyone else's finalist coefficient. */
-export function seatedPlayerCount(tournament: Tournament): number {
+export function playedPlayerUids(tournament: Tournament): Set<string> {
   const rounds = tournament.rounds ?? [];
   if (rounds.length) {
     const played = new Set<string>();
@@ -294,9 +294,15 @@ export function seatedPlayerCount(tournament: Tournament): number {
           if (seat.player_uid) played.add(seat.player_uid);
     for (const seat of tournament.finals?.seating ?? [])
       if (seat.player_uid) played.add(seat.player_uid);
-    return played.size;
+    return played;
   }
-  return (tournament.standings ?? []).filter((s) => s.gw || s.vp || s.tp).length;
+  return new Set(
+    (tournament.standings ?? []).filter((s) => s.gw || s.vp || s.tp).map((s) => s.user_uid),
+  );
+}
+
+export function seatedPlayerCount(tournament: Tournament): number {
+  return playedPlayerUids(tournament).size;
 }
 
 export type RankedStatus =
@@ -329,20 +335,44 @@ export function rankedStatus(t: Tournament): RankedStatus {
   return null; // Planned/Registration: too early to call
 }
 
-/** Rating points a Finished tournament awards a standings entry — the single copy.
- *  DQ'd/proxy players earn none (not even the base); the winner gains the +1 GW and
- *  finalist position 1. `playedCount` is seatedPlayerCount(tournament) — the field
- *  size backend ratings.py uses — NOT standings.length (over-counts no-shows).
- *  Ranking-ineligible events (< 8 players / no final / house format) award none:
- *  the RtP column must agree with the pipeline's engine-gated inclusion filter. */
-export function getRatingPts(entry: StandingEntry, tournament: Tournament, playedCount: number): number {
-  if (tournament.state !== "Finished" || entry.disqualified || entry.non_competing) return 0;
-  if (rankingEligibility(tournament) !== "eligible") return 0;
-  const isWinner = entry.user_uid === tournament.winner;
-  const finalistPos = isWinner ? 1
+/** Per-tournament RtP inputs, built once per render: the engine aggregation takes
+ *  the whole tournament plus its sanctions, not standings-row fields. */
+export interface RatingContext {
+  played: Set<string>;
+  playedCount: number;
+  tournamentJson: string;
+  sanctionsJson: string;
+  eligible: boolean;
+}
+
+export function ratingContext(tournament: Tournament, sanctions: Sanction[] | undefined): RatingContext {
+  const played = playedPlayerUids(tournament);
+  return {
+    played,
+    playedCount: played.size,
+    tournamentJson: JSON.stringify(tournament),
+    sanctionsJson: JSON.stringify(sanctions ?? []),
+    eligible: rankingEligibility(tournament) === "eligible",
+  };
+}
+
+/** Rating points a Finished tournament awards a standings entry, or null where the
+ *  backend stores no entry — never played, DQ'd, proxy, ranking-ineligible event.
+ *  Null renders blank (frontend/DESIGN.md). VP/GW come from the same engine call
+ *  backend ratings.py uses; standings rows are prelim-only and carry no SA. */
+export function getRatingPts(
+  entry: StandingEntry,
+  tournament: Tournament,
+  ctx: RatingContext,
+): number | null {
+  if (tournament.state !== "Finished" || entry.disqualified || entry.non_competing) return null;
+  if (!ctx.eligible || !ctx.played.has(entry.user_uid)) return null;
+  const vpGw = computeRatingVpGw(ctx.tournamentJson, ctx.sanctionsJson, entry.user_uid);
+  if (!vpGw) return null;
+  const finalistPos = entry.user_uid === tournament.winner ? 1
     : (tournament.finals?.seating.some((s) => s.player_uid === entry.user_uid) ? 2 : 0);
-  const gw = isWinner ? entry.gw + 1 : entry.gw;
-  return computeRatingPoints(entry.vp, gw, finalistPos, playedCount, tournament.rank);
+  // Engine returns gw as f64; the backend stores int(gw) before scoring it.
+  return computeRatingPoints(vpGw[0], Math.trunc(vpGw[1]), finalistPos, ctx.playedCount, tournament.rank);
 }
 
 export function translateStandingsMode(mode: string | undefined): string {

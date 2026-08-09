@@ -3,7 +3,7 @@ name = "archon-engine"
 # Bumped by hand when the engine changes — independent of the monorepo release
 # tag that drives backend/bot/frontend versions (keep in sync with the version in
 # engine/pyproject.toml). The engine wheel/WASM ride this number, not the tag.
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 
 [lib]

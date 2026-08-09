@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, seatedPlayerCount } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, ratingContext } from "$lib/tournament-utils";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { formatScore } from "$lib/utils";
   import { previewScoresSync, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck } from "@lucide/svelte";
@@ -212,7 +213,10 @@
     return tournamentSanctions.filter(s => s.user_uid === uid);
   }
 
-  const seatedCount = $derived(seatedPlayerCount(tournament));
+  const ratingCtx = $derived(ratingContext(tournament, tournamentSanctions));
+  // Anonymous viewers hold no sanctions: the SA-adjusted figure isn't computable
+  // for them, so drop the column rather than show a possibly-wrong number.
+  const showRating = $derived(isFinished && getAuthState().isAuthenticated);
 </script>
 
 <!-- Missing/invalid decklist no longer hides the check-in button (engine treats it
@@ -768,7 +772,7 @@
                 {#if hasFinals}
                   <th class="text-right py-1 px-2">{m.tournament_col_finals()}</th>
                 {/if}
-                {#if isFinished}
+                {#if showRating}
                   <th class="text-right py-1 px-2">{m.tournament_col_rating()}</th>
                 {/if}
               </tr>
@@ -788,8 +792,9 @@
                   {#if hasFinals}
                     <td class="text-right py-1 px-2">{entry.finals ?? ""}</td>
                   {/if}
-                  {#if isFinished}
-                    <td class="text-right py-1 px-2 text-ink-muted">{getRatingPts(entry, tournament, seatedCount)}</td>
+                  {#if showRating}
+                    {@const pts = getRatingPts(entry, tournament, ratingCtx)}
+                    <td class="text-right py-1 px-2 text-ink-muted">{pts ?? "—"}</td>
                   {/if}
                 </tr>
               {/each}

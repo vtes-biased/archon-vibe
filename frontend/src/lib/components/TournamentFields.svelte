@@ -162,7 +162,13 @@
       id={id("format")}
       value={values.format}
       disabled={disabled || disabledFields.has("format")}
-      onchange={(e) => handleInput("format", (e.target as HTMLSelectElement).value)}
+      onchange={(e) => {
+        const format = (e.target as HTMLSelectElement).value;
+        // No V5 championship type on vekn.net (engine-enforced). Clear locally
+        // only — persistence is the parent's, same as the rank clears below.
+        if (format === "V5") values.rank = "";
+        handleInput("format", format);
+      }}
       class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
     >
       <option value="Standard">Standard</option>
@@ -178,7 +184,7 @@
     <select
       id={id("rank")}
       value={values.rank}
-      disabled={disabled || disabledFields.has("rank")}
+      disabled={disabled || disabledFields.has("rank") || values.format === "V5"}
       onchange={(e) => {
         const rank = (e.target as HTMLSelectElement).value;
         // Championships forbid proxies/multideck (engine-enforced): clear the
@@ -200,6 +206,8 @@
     </select>
     {#if disabledFields.has("rank")}
       <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+    {:else if values.format === "V5"}
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_rank_v5_hint()}</p>
     {/if}
   </div>
 </div>

@@ -96,13 +96,20 @@ def test_vekn_type_limited():
     assert tournament_to_vekn_type(TournamentFormat.Limited, TournamentRank.BASIC) == 3
 
 
+def test_vekn_type_limited_championships():
+    """Filed as plain Limited, a championship's finalists lose the rank bonus."""
+    assert tournament_to_vekn_type(TournamentFormat.Limited, TournamentRank.NC) == 13
+    assert tournament_to_vekn_type(TournamentFormat.Limited, TournamentRank.CC) == 14
+
+
 def test_vekn_type_v5():
     assert tournament_to_vekn_type(TournamentFormat.V5, TournamentRank.BASIC) == 16
 
 
-def test_vekn_type_unknown_defaults_to_standard():
-    """Unmapped combinations should default to 2 (Standard Constructed)."""
-    assert tournament_to_vekn_type(TournamentFormat.V5, TournamentRank.NC) == 2
+def test_vekn_type_unmappable_is_none():
+    """No V5 championship type upstream, and no silent Standard fallback."""
+    assert tournament_to_vekn_type(TournamentFormat.V5, TournamentRank.NC) is None
+    assert tournament_to_vekn_type(TournamentFormat.V5, TournamentRank.CC) is None
 
 
 # ---------------------------------------------------------------------------

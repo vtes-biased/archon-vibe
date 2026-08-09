@@ -974,11 +974,14 @@ async def create_tournament(
                 detail="You don't have permission to attach tournaments to this league",
             )
 
-    # VEKN legality (championships forbid proxies/multideck) — single-sourced
-    # in the engine; this route builds the Tournament in Python rather than
-    # through engine create_tournament, so call the gate explicitly.
+    # VEKN legality (championships forbid proxies/multideck, and only
+    # Standard/Limited may be ranked at all) — single-sourced in the engine;
+    # this route builds the Tournament in Python rather than through engine
+    # create_tournament, so call the gate explicitly.
     try:
-        _engine.validate_rank_legality(rank, request.proxies, request.multideck)
+        _engine.validate_rank_legality(
+            fmt.value, rank, request.proxies, request.multideck
+        )
         _engine.validate_finish_after_start(request.start or "", request.finish or "")
     except ValueError as e:
         raise EngineRejection.from_engine(e) from e
