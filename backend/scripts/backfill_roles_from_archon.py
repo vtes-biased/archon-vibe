@@ -6,7 +6,8 @@ for every member the VEKN member sync had ALREADY created before the ETL ran, th
 legacy role list was silently discarded and the account kept only what
 `vekn_sync._derive_role_seeds` could reconstruct: Prince from `princeid`, NC from
 `coordinatorid`, IC from the hardcoded ADMINS set, and at most one judge rank from
-the ~44-entry JUDGES dict in `backend/src/data/vekn_roster.py`. Everything else
+the ~44-entry JUDGES dict in `backend/src/data/vekn_roster.py` (that dict has since
+been removed — the app is the system of record for judge ranks). Everything else
 legacy recorded was lost — which is how Portuguese judges came to be missing their
 rank in the new app.
 

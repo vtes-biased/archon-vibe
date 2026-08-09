@@ -9,7 +9,7 @@ from typing import Any
 from uuid import uuid7
 
 from .broadcast import broadcast_precomputed
-from .data.vekn_roster import ADMINS, JUDGES
+from .data.vekn_roster import ADMINS
 from .db import (
     decode_json,
     get_connection,
@@ -77,8 +77,6 @@ def _derive_role_seeds(vekn_player: dict[str, Any]) -> list[Role]:
     vekn_id = str(vekn_player.get("veknid", ""))
     if vekn_id in ADMINS:
         roles.append(Role.IC)
-    if vekn_id in JUDGES:
-        roles.append(JUDGES[vekn_id])
     return roles
 
 

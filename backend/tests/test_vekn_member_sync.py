@@ -17,22 +17,22 @@ in this access-control-sensitive path:
 
 Both run sync_player end-to-end against the real DB (real save_user /
 get_user_by_vekn_id / _derive_role_seeds) — the shipped interface, no mocks.
-A static-roster admin/judge id (ADMINS/JUDGES in data/vekn_roster.py) is
-imported so the assertion tracks the shipped roster rather than a hand-copied id.
+A static-roster admin id (ADMINS in data/vekn_roster.py) is imported so the
+assertion tracks the shipped roster rather than a hand-copied id.
 """
 
 import pytest
-from src.data.vekn_roster import ADMINS, JUDGES
+from src.data.vekn_roster import ADMINS
 from src.models import Role
 from src.vekn_sync import VEKNSyncService
 
 
 @pytest.mark.asyncio
 async def test_create_seeds_derived_roles(test_db):
-    # One id that is both a static-roster admin and judge, so the create seed
-    # must cover Prince (princeid), NC (coordinatorid), IC (ADMINS) and the
-    # judge-tier role (JUDGES) in a single pass.
-    roster_id = next(iter(ADMINS & JUDGES.keys()))
+    # A static-roster admin, so the create seed must cover Prince (princeid),
+    # NC (coordinatorid) and IC (ADMINS) in a single pass. Judge ranks are no
+    # longer seeded here — they are app-managed (see data/vekn_roster.py).
+    roster_id = next(iter(ADMINS))
 
     user, action = await VEKNSyncService().sync_player(
         {
@@ -45,7 +45,7 @@ async def test_create_seeds_derived_roles(test_db):
     )
 
     assert action == "created"
-    assert set(user.roles) == {Role.PRINCE, Role.NC, Role.IC, JUDGES[roster_id]}
+    assert set(user.roles) == {Role.PRINCE, Role.NC, Role.IC}
 
 
 @pytest.mark.asyncio

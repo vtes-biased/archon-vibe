@@ -7,7 +7,8 @@ metadata:
 
 `backend/tests/test_vekn_member_sync.py` covers the role-seed contract for
 `vekn_sync.sync_player`: (a) CREATE seeds derived roles (Prince/NC from
-princeid/coordinatorid, IC/judge from the static `data/vekn_roster.py`); (b) UPDATE
+princeid/coordinatorid, IC from the static `data/vekn_roster.py`; judge ranks are
+NOT seeded — app-managed); (b) UPDATE
 never writes roles (app-granted roles survive a re-sync that would derive a
 different set). Both run end-to-end against the real `test_db` DB, no mocks; import
 roster ids from `vekn_roster.py` rather than hand-copying.

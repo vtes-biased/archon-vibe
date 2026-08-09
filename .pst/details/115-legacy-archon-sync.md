@@ -73,8 +73,10 @@ Decided with owner 2026-06-10. Supersedes the wipe+re-ETL design in `#35`
   roles and a locked-out role-edit API (it needs an IC caller). Restored as a
   **create-path-only seed** (`_derive_role_seeds` + restored
   `data/vekn_roster.py`): when the member sync *creates* a user it seeds
-  Prince/NC from `princeid`/`coordinatorid` and IC/judge roles from the static
-  roster — symmetric with this merge sync's own "or on first merge insert"
+  Prince/NC from `princeid`/`coordinatorid` and IC from the static roster
+  (the judge-rank half of that roster was later removed — app-managed, nothing
+  upstream to derive from) — symmetric with this merge sync's own "or on first
+  merge insert"
   clause. `_update_user` remains role-free, so ETL-seeded and app-granted roles
   are never touched. In prod the ETL runs first, so the roster effectively only
   matters where this sync is the sole importer.
