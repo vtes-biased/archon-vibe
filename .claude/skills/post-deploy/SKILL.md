@@ -74,8 +74,24 @@ contributor.
 - Name the span at the top (`v1.0.0 → v1.0.2`).
 - If nothing user-facing shipped, say exactly that — do not pad it out.
 
-Output it in chat. **Don't publish it anywhere** — no Discord post, no release
-edit, no committed changelog — unless asked; where it goes is the owner's call.
+Write it to `CHANGELOG.md` at the repo root, newest entry first, directly under
+the marker comment. Heading is the version now live plus the date; add a
+`Covers <from> → <to>.` line only when the run spans more than one release:
+
+```markdown
+## v1.0.3 — 2026-08-15
+
+Covers v1.0.1 → v1.0.3.
+
+- Ratings shown on a tournament page now match the ones on your profile.
+```
+
+Show it in chat too. That file is the record — the GitHub Releases are not one:
+`--generate-notes` lists merged PRs and this repo commits straight to main, so
+their bodies are just a compare link.
+
+Publishing it **anywhere else** (Discord, release notes, in-app) is the owner's
+call: draft on request, never post unasked.
 
 ## 3. Close what shipped
 
@@ -124,8 +140,10 @@ issue closed wrongly costs more than one closed late.
 
 ## 5. Finish
 
-Rewrite `last-run` with the deployed tag's SHA, tag and date. Commit it together
-with the changeset work, referencing no pst number.
+Rewrite `last-run` with the deployed tag's SHA, tag and date, and commit it with
+the `CHANGELOG.md` entry in one commit — the file is the human record, the marker
+is the machine anchor, and the two must not drift apart. No pst number in the
+message.
 
 Report to the owner: the span covered, the changeset, which issues were closed,
 and any straggler needing a decision.

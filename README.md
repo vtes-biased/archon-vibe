@@ -8,6 +8,8 @@
 
 Web application for managing the VEKN community and tournaments.
 
+**What's new**: [CHANGELOG.md](CHANGELOG.md)
+
 ## About
 
 **VEKN** (Vampire: Elder Kindred Network) is the international players association for **V:TES** (Vampire: The Eternal Struggle), a multiplayer collectible card game set in the World of Darkness. 
