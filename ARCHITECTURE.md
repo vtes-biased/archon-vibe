@@ -392,7 +392,7 @@ Designer credit: the winner's name is always in the header; a separate optional 
 |------|--------|
 | identity (name/country/city/state) | VEKN sync |
 | contact / nickname / discord / coopted_by / community links | archon sync |
-| roles | nobody — seeded once by ETL, app-managed thereafter |
+| roles | nobody — seeded once by whichever creates the row first (VEKN sync's bootstrap seed or the ETL insert), app-managed thereafter; a member the sync creates first never receives the ETL's role data (VEKN_SYNC.md) |
 | sanctions, leagues | archon sync (upsert by source uid) |
 | rich play data (rounds/seatings/decks/finals) | archon sync |
 | `local_modifications` fields | nobody — local edits trump both syncs |

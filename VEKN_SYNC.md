@@ -94,10 +94,15 @@ i18n keys: `vekn_sync_pending_results`, `vekn_sync_pending_member`, `vekn_sync_p
 ### Member sync
 
 `VEKNSyncService` pulls the full VEKN roster and reconciles with local users:
-- Creates User objects for unknown VEKN IDs
+- Creates User objects for unknown VEKN IDs, seeding roles at creation
+  (`_derive_role_seeds`: Prince/NC from `princeid`/`coordinatorid`, IC/judge
+  ranks from the static roster in `data/vekn_roster.py`) — a bootstrap seed,
+  not a full transcription of legacy archon's role history
 - Updates identity (name, country, city/state) for existing members
-- Never writes roles: they are seeded once from legacy archon (ETL / first
-  merge insert) and app-managed thereafter
+- Never re-writes roles on update: `_update_user` never touches them, so a
+  member already created by this sync before the legacy-archon ETL/merge ran
+  keeps only its bootstrap seed — the ETL's richer role data never lands for
+  that member
 - Infers `coopted_by` relationships
 - Non-destructive: fields in `local_modifications` are never overwritten
   (recorded by profile/user edit routes for identity, contact and nickname

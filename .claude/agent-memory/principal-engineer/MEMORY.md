@@ -105,6 +105,7 @@
 ## Authorization (cross-stack)
 - Authz predicates single-sourced in engine/src/permissions.rs (PyO3+WASM); frontend fail-closed, UX-only — see ARCHITECTURE.md (Authorization).
 - [Projection tier: column vs content split](projection-tier-column-vs-content-split.md) — new precomputed access column ONLY when projection CONTENT must vary by viewer at the same level (else collapse onto existing column + shrink lower one); base64 contact obfuscation is a harvester speed-bump, not access control.
+- [Role writes have two out-of-band consumers](role-write-out-of-band-consumers.md) — Discord Linked Roles push fires on ANY role delta (no periodic reconcile); resync/access-version fires only for IC/NC. Non-users.py writers skip both silently.
 - [entitled_level vs overlay catch-up asymmetry](entitled-level-vs-overlay-catchup-asymmetry.md) — a new full-access branch in entitled_level only wires the LIVE path; non-country/non-own-object full grants must ALSO be added to _overlay_frames (main.py) or the resync re-delivers the lower projection (promo holdings for NC is the exemplar gap).
 
 ## Deploy / infra (cross-stack)
