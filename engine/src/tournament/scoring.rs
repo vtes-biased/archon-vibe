@@ -11,9 +11,10 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
         return Some(VpError::InvalidTableSize);
     }
     // Seats accounted for: scoring each seat as ousts made plus half a VP for
-    // surviving makes this sum exactly the table size. The oust-order pass
-    // below leans on that and mis-reads a table with seats missing, so it stays
-    // the gate on validity.
+    // surviving makes this sum exactly the table size. Do NOT loosen this into a
+    // raw-total check — the oust-order pass below is only sound because it never
+    // sees a table with seats missing, and would accept [0.0, 0.0, 0.0, 0.0, 4.0]
+    // (four seats at zero is four ousts, so the survivor swept for 5, not 4).
     let accounted: i64 = vps.iter().map(|&v| v.ceil() as i64).sum();
     if accounted > n as i64 {
         return Some(VpError::ExcessiveTotal);
