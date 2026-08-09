@@ -13,8 +13,7 @@ several releases at once.
 
 Archon v2 replaced the original app at archon.vekn.net. Accounts, tournament
 history, leagues, sanctions and ratings all carried over. Sessions did not:
-everyone signed in again — Discord login unchanged, email passwords replaced by a
-login link sent to the address on file.
+**everyone needs to sign in again** — Discord login unchanged, email logins need to reset password.
 
 **Running an event**
 
