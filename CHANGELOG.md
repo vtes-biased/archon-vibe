@@ -9,6 +9,25 @@ several releases at once.
 
 <!-- New entries go directly below this line. -->
 
+## v1.0.2 — 2026-08-10
+
+Covers v1.0.0 → v1.0.2.
+
+- The tournament organizer console has been redesigned: the immediate actions more accessible, everything else moved into the Tools sheet, and the players tab is more compact.
+- Check-in stays open once a round has started, so a latecomer can be added more easily.
+- Dropping a player out is reversible.
+- A judge playing at a table counts as a player at that table.
+- Printed seating sheets show real names.
+- Round count and open rounds are set on the create form, since VEKN fixes them when the event is created.
+- Judge and Judgekin ranks lost in the move to Archon v2 are restored — 64 members.
+- Your rating history shows where you finished in each tournament, over how many participants.
+- Judge override made more accessible in odd VP cases (eg. Life Boon).
+- Fixed rating points display - it now matches the ones on the profile.
+- Limited National and Continental championships count as championships
+- Member and card search were too slow, they are instant now.
+- 423 tournaments whose end date fell before their start date are corrected
+- A migrated tournament whose results had never reached vekn.net was unstuck and pushed.
+
 ## v1.0.0 — 2026-08-07
 
 Archon v2 replaced the original app at archon.vekn.net. Accounts, tournament
