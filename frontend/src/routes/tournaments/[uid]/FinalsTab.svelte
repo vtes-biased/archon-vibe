@@ -89,7 +89,23 @@
   {#if !hasFinalsCandidate}
     <p class="text-ink-muted">{m.finals_require_rounds()}</p>
   {:else if !tournament.finals}
-    <p class="text-ink-muted">{m.finals_not_started()}</p>
+    <!-- Who would sit if a final is called — the thing an organizer actually
+         wants from this tab before one exists. Deliberately no Start Finals
+         button: finishing without a final is legitimate (VEKN §3.1.6), so this
+         must not frame a final as the expected next step, and the action bar
+         owns every state transition anyway. It also owns the "toss needed"
+         warning when the cutoff is tied, so this panel does not repeat it. -->
+    <p class="text-ink-muted text-sm">{m.finals_seeding_projected()}</p>
+    <div class="bg-surface-muted/50 rounded-lg p-4 space-y-1.5">
+      {#each standings.slice(0, 5) as e, i}
+        <div class="flex items-center gap-2 text-sm">
+          <span class="w-5 shrink-0 text-xs text-ink-faint">{i + 1}.</span>
+          <span class="min-w-0 truncate text-ink">{seatDisplayUtil(e.user_uid, playerInfo, tournament.online)}</span>
+          <span class="flex-1"></span>
+          <span class="shrink-0 text-xs text-ink-muted">{formatScore(e.gw, e.vp, e.tp)}</span>
+        </div>
+      {/each}
+    </div>
   {:else}
     <h3 class="text-lg font-medium text-ink-strong">{m.finals_title()}</h3>
 
@@ -167,7 +183,7 @@
             <div class="mt-1.5">
               {#if !isOrganizer && tournament.finals.seating.some(s => s.judge_uid)}
                 <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
-                  {seat.result.vp}
+                  {seat.result.vp}VP
                   <Lock class="w-3.5 h-3.5" aria-hidden="true" />
                 </span>
               {:else}

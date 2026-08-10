@@ -147,7 +147,11 @@
   {/if}
 {/snippet}
 
-<div class="min-h-screen bg-surface pb-16 sm:pb-0">
+<!-- dvh, not vh: on iOS `100vh` is the LARGE viewport (URL bar hidden), so with the
+     bar showing the shell is taller than the visible area and leaves dead scroll
+     under the fixed nav. Does not address the iOS 26 fixed-element repaint bug —
+     see the nav ticket. -->
+<div class="min-h-dvh bg-surface pb-14 sm:pb-0">
   <!-- Status/update banners: a normal-flow sticky stack so they push content
        down instead of overlaying the page header; multiple banners stack as
        block siblings (no hard-coded per-banner top offsets). -->
@@ -201,8 +205,16 @@
   <!-- Bottom navigation (mobile) — icon-only: visible labels truncated to
        ambiguity in longer locales (es/pt), so the destination name lives in
        aria-label/title (announced by AT, shown on hover) instead. -->
-  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-surface-card border-t border-line sm:hidden">
-    <div class="flex justify-around">
+  <!-- h-14 is declared, not emergent: the shell's bottom padding and the
+       console's sticky CTA both sit on this exact number, and letting the
+       height fall out of the icons' padding left a strip of page showing
+       between the CTA and the nav.
+       transform-gpu promotes the bar to its own compositing layer: iOS skips
+       repainting non-composited fixed elements during momentum scroll, which is
+       the classic cause of a bottom bar stranded mid-screen. Self-transform, so
+       it does not become a containing block for anything above it. -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 h-14 transform-gpu bg-surface-card border-t border-line sm:hidden">
+    <div class="flex h-full justify-around">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
         <a

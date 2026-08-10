@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getCountryFlag } from "$lib/geonames";
-  import { getRoleClasses, getRoleLabel } from "$lib/roles";
+  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import Badge from "$lib/components/Badge.svelte";
   import { LANGUAGE_NAMES } from "$lib/data/languages";
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
@@ -56,11 +57,10 @@
           </div>
           <div class="flex items-center gap-2 text-xs text-ink-muted flex-wrap">
             {#if scope(link)}
-              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium
-                {scope(link) === 'global' ? 'badge-blue' : 'badge-amethyst'}">
-                <Pin class="w-3 h-3" />
+              <Badge tone={scope(link) === 'global' ? 'blue' : 'amethyst'}>
+                <Pin class="w-3 h-3" aria-hidden="true" />
                 {scope(link) === 'global' ? m.community_scope_global() : m.community_scope_national()}
-              </span>
+              </Badge>
             {/if}
             {#if user.name}
               <a href="/users/{user.uid}" class="hover:text-link transition-colors">{user.name}</a>
@@ -69,7 +69,7 @@
               <span>{getCountryFlag(user.country)}</span>
             {/if}
             {#each user.roles.filter(r => r === "NC" || r === "Prince" || r === "IC") as role}
-              <span class="px-1.5 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{getRoleLabel(role)}</span>
+              <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
             {/each}
             {#if (link.languages?.length ?? 0) > 1}
               <span class="text-ink-faint tracking-wide">{link.languages!.map(c => c.toUpperCase()).join(" · ")}</span>

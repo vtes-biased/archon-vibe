@@ -148,3 +148,48 @@ def render_league_og_html(
         title = pub.get("name") or SITE_TITLE
         description = _league_description(pub, event_count)
     return _render_stub(base_url, f"/leagues/{uid}", title, description, None)
+
+
+# Static help pages, so a shared reference doc previews as itself instead of the
+# generic site card. Mirrors helpDocs in frontend/src/lib/help-docs.ts (the
+# help_*_title / help_*_description messages); crawlers get one language, so only
+# the base-locale strings live here. Unknown slug → site card, as for an unknown uid.
+HELP_PAGES: dict[str, tuple[str, str]] = {
+    "rules": (
+        "VTES Comprehensive Rules",
+        "The complete official rules for Vampire: The Eternal Struggle.",
+    ),
+    "tournament-rules": (
+        "Tournament Rules",
+        "Official VEKN tournament rules and procedures.",
+    ),
+    "judges-guide": (
+        "Judges Guide",
+        "Tournament conduct and infraction guide for judges.",
+    ),
+    "code-of-ethics": (
+        "Code of Ethics",
+        "VEKN Code of Ethics for players and organizers.",
+    ),
+    "player-guide": (
+        "Player Guide",
+        "How to find tournaments, register, check in, and upload decks.",
+    ),
+    "organizer-guide": (
+        "Organizer Guide",
+        "How to create, configure, and run tournaments with Archon.",
+    ),
+}
+
+
+def render_help_og_html(base_url: str, slug: str) -> str:
+    """Render the og-tagged HTML stub for /help/{slug}."""
+    page = HELP_PAGES.get(slug)
+    if not page:
+        return _render_stub(
+            base_url, f"/help/{slug}", SITE_TITLE, SITE_DESCRIPTION, None
+        )
+    title, description = page
+    return _render_stub(
+        base_url, f"/help/{slug}", f"{title} - {SITE_TITLE}", description, None
+    )

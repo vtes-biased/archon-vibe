@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "$lib/types";
   import type { VenueInfo } from "$lib/db";
   import { getSortedCountries, getCountryFlag } from "$lib/geonames";
@@ -6,7 +7,8 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canLinkTournamentToLeague } from "$lib/engine";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
-  import { Info, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import FoldableSection from "./FoldableSection.svelte";
+  import { Info } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   export interface TournamentFieldValues {
@@ -44,6 +46,8 @@
     disabled = false,
     disabledFields = new Set<string>(),
     idPrefix = "",
+    mode = "edit",
+    venueExtra,
   }: {
     values: TournamentFieldValues;
     onchange?: (field: string, value: any) => void;
@@ -51,6 +55,15 @@
     disabled?: boolean;
     disabledFields?: Set<string>;
     idPrefix?: string;
+    /**
+     * Same sections either way — only what starts open differs, because the two
+     * jobs differ. Creating means filling the required path, so it opens.
+     * Editing is targeted: you came to change one thing, and a closed list of
+     * peers is the index that gets you there.
+     */
+    mode?: "create" | "edit";
+    /** Rendered at the foot of the Venue section (the table-rooms editor). */
+    venueExtra?: Snippet;
   } = $props();
 
   const countries = getSortedCountries();
@@ -81,10 +94,15 @@
     return idPrefix ? `${idPrefix}-${name}` : name;
   }
 
-  // Rare fields live behind disclosures so the required path (Name/Start/
-  // Country/Venue) reads at a glance for a first-time organizer.
-  let visibilityExpanded = $state(false);
-  let advancedExpanded = $state(false);
+  // svelte-ignore state_referenced_locally — initial state only, by design
+  const creating = mode === "create";
+  let basicsOpen = $state(creating);
+  let locationOpen = $state(creating);
+  // Open at creation unlike the other optional sections: these fields freeze on
+  // the VEKN push, which fires at creation.
+  let roundsOpen = $state(creating);
+  let visibilityOpen = $state(false);
+  let descriptionOpen = $state(false);
 
   // What-players-see helpers: name when the reveal happens, per selected mode.
   function standingsHelp(mode: string): string {
@@ -119,7 +137,7 @@
         values.max_rounds = 3;
       }
     }
-    // Persist open_rounds last so ConfigTab can read the coerced sibling fields.
+    // Persist open_rounds last so the parent can read the coerced sibling fields.
     handleInput("open_rounds", checked);
   }
 
@@ -137,454 +155,403 @@
   }
 </script>
 
-<h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.tfield_section_basics()}</h3>
+<!-- Sections are peers, named for what they configure. There is deliberately no
+     "Advanced": that names a frequency, not a topic, so it becomes the bucket
+     everything unplaced falls into — which is how round count and timer, both
+     core to running an event, ended up two folds deep. -->
 
-<!-- Name -->
-<div>
-  <label class="block text-sm text-ink-muted mb-1" for={id("name")}>{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
-  <input
-    id={id("name")}
-    type="text"
-    required
-    value={values.name}
-    {disabled}
-    oninput={(e) => handleInput("name", (e.target as HTMLInputElement).value)}
-    class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.name.trim() ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
-    placeholder={m.tfield_name_placeholder()}
-  />
-</div>
-
-<!-- Format & Rank -->
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<FoldableSection title={m.tfield_section_basics()} bind:open={basicsOpen}>
+  <!-- Name -->
   <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("format")}>{m.tfield_format()}</label>
-    <select
-      id={id("format")}
-      value={values.format}
-      disabled={disabled || disabledFields.has("format")}
-      onchange={(e) => {
-        const format = (e.target as HTMLSelectElement).value;
-        // No V5 championship type on vekn.net (engine-enforced). Clear locally
-        // only — persistence is the parent's, same as the rank clears below.
-        if (format === "V5") values.rank = "";
-        handleInput("format", format);
-      }}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      <option value="Standard">Standard</option>
-      <option value="V5">V5</option>
-      <option value="Limited">Limited</option>
-    </select>
-    {#if disabledFields.has("format")}
-      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
-    {/if}
-  </div>
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("rank")}>{m.tfield_rank()}</label>
-    <select
-      id={id("rank")}
-      value={values.rank}
-      disabled={disabled || disabledFields.has("rank") || values.format === "V5"}
-      onchange={(e) => {
-        const rank = (e.target as HTMLSelectElement).value;
-        // Championships forbid proxies/multideck (engine-enforced): clear the
-        // local values only — persistence is owned by the parent (ConfigTab
-        // bundles rank+proxies+multideck into one save; the create form posts
-        // the whole values object). Emitting per-field clears here would
-        // double-save.
-        if (rank) {
-          values.proxies = false;
-          values.multideck = false;
-        }
-        handleInput("rank", rank);
-      }}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      <option value="">{m.tfield_rank_basic()}</option>
-      <option value="National Championship">National Championship</option>
-      <option value="Continental Championship">Continental Championship</option>
-    </select>
-    {#if disabledFields.has("rank")}
-      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
-    {:else if values.format === "V5"}
-      <p class="text-xs text-ink-faint mt-1">{m.tfield_rank_v5_hint()}</p>
-    {/if}
-  </div>
-</div>
-
-<!-- League -->
-{#if allActiveLeagues.length > 0}
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("league")}>{m.tfield_league()}</label>
-    <select
-      id={id("league")}
-      value={values.league_uid}
-      {disabled}
-      onchange={(e) => handleInput("league_uid", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      <option value="">{m.common_none()}</option>
-      {#each myLeagues as league}
-        <!-- Format-restricted league: disabled-with-reason instead of a server 400 -->
-        {#if league.format && values.format !== league.format}
-          <option value={league.uid} disabled>{league.name} — {m.tfield_league_format_mismatch({ format: league.format })}</option>
-        {:else}
-          <option value={league.uid}>{league.name}</option>
-        {/if}
-      {/each}
-      {#each otherLeagues as league}
-        <option value={league.uid} disabled>{league.name} — {m.tfield_league_not_organizer()}</option>
-      {/each}
-    </select>
-  </div>
-{/if}
-
-<!-- Dates & Timezone -->
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("start")}>{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
+    <label class="block text-sm text-ink-muted mb-1" for={id("name")}>{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
     <input
-      id={id("start")}
-      type="datetime-local"
-      required
-      value={values.start}
-      disabled={disabled || disabledFields.has("start")}
-      onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.start ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
-    />
-    {#if disabledFields.has("start")}
-      <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
-    {/if}
-  </div>
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("finish")}>{m.tfield_finish()}</label>
-    <input
-      id={id("finish")}
-      type="datetime-local"
-      value={values.finish}
-      min={values.start || undefined}
-      {disabled}
-      onchange={(e) => handleInput("finish", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-    />
-  </div>
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("timezone")}>{m.tfield_timezone()}</label>
-    <select
-      id={id("timezone")}
-      value={values.timezone}
-      {disabled}
-      onchange={(e) => handleInput("timezone", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      {#each timezones as tz}
-        <option value={tz}>{tz.replace(/_/g, " ")}</option>
-      {/each}
-    </select>
-  </div>
-</div>
-
-<h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide border-t border-line pt-4">{m.tfield_section_location()}</h3>
-
-<!-- Online toggle -->
-<label class="flex items-center gap-3 cursor-pointer">
-  <input
-    type="checkbox"
-    checked={values.online}
-    {disabled}
-    onchange={(e) => {
-      const checked = (e.target as HTMLInputElement).checked;
-      handleInput("online", checked);
-      if (checked) {
-        handleInput("proxies", false);
-      }
-      if (checked && !values.venue) {
-        handleInput("venue", "VEKN Discord");
-        handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
-      }
-    }}
-    class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-  />
-  <span class="text-sm text-ink-bright">{m.tfield_online()}</span>
-</label>
-
-<!-- Location fields (hidden when online) -->
-{#if !values.online}
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("country")}>{m.common_country()} <span class="text-link text-xs">({m.common_required()})</span></label>
-    <select
-      id={id("country")}
-      required
-      value={values.country}
-      {disabled}
-      onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright {values.country ? 'border-line-strong' : 'border-accent-strong/50'}"
-    >
-      <option value="">{m.tfield_select_country()}</option>
-      {#each countries as c}
-        <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
-      {/each}
-    </select>
-  </div>
-{/if}
-
-<!-- Venue (always shown) -->
-<div>
-  <label class="block text-sm text-ink-muted mb-1" for={id("venue")}>{m.tfield_venue()}</label>
-  <VenueAutocomplete
-    id={id("venue")}
-    bind:value={values.venue}
-    country={values.country}
-    countryHint={!values.online}
-    {disabled}
-    onselect={handleVenueSelect}
-    oninput={() => onchange?.("venue", values.venue)}
-  />
-</div>
-
-<!-- Venue URL (always shown) -->
-<div>
-  <label class="block text-sm text-ink-muted mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
-  <input
-    id={id("venue-url")}
-    type="url"
-    value={values.venue_url}
-    {disabled}
-    oninput={(e) => handleInput("venue_url", (e.target as HTMLInputElement).value)}
-    class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-    placeholder="https://..."
-  />
-</div>
-
-{#if !values.online}
-  <!-- Address -->
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("address")}>{m.tfield_address()}</label>
-    <input
-      id={id("address")}
+      id={id("name")}
       type="text"
-      value={values.address}
+      required
+      value={values.name}
       {disabled}
-      oninput={(e) => handleInput("address", (e.target as HTMLInputElement).value)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-      placeholder={m.tfield_address_placeholder()}
+      oninput={(e) => handleInput("name", (e.target as HTMLInputElement).value)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.name.trim() ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
+      placeholder={m.tfield_name_placeholder()}
     />
   </div>
 
-  <!-- Map URL -->
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
+  <!-- Format & Rank -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("format")}>{m.tfield_format()}</label>
+      <select
+        id={id("format")}
+        value={values.format}
+        disabled={disabled || disabledFields.has("format")}
+        onchange={(e) => {
+          const format = (e.target as HTMLSelectElement).value;
+          // No V5 championship type on vekn.net (engine-enforced). Clear locally
+          // only — persistence is the parent's, same as the rank clears below.
+          if (format === "V5") values.rank = "";
+          handleInput("format", format);
+        }}
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      >
+        <option value="Standard">Standard</option>
+        <option value="V5">V5</option>
+        <option value="Limited">Limited</option>
+      </select>
+      {#if disabledFields.has("format")}
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+      {/if}
+    </div>
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("rank")}>{m.tfield_rank()}</label>
+      <select
+        id={id("rank")}
+        value={values.rank}
+        disabled={disabled || disabledFields.has("rank") || values.format === "V5"}
+        onchange={(e) => {
+          const rank = (e.target as HTMLSelectElement).value;
+          // Championships forbid proxies/multideck (engine-enforced): clear the
+          // local values only — persistence is owned by the parent (the config
+          // form bundles rank+proxies+multideck into one save; the create form
+          // posts the whole values object). Emitting per-field clears here would
+          // double-save.
+          if (rank) {
+            values.proxies = false;
+            values.multideck = false;
+          }
+          handleInput("rank", rank);
+        }}
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      >
+        <option value="">{m.tfield_rank_basic()}</option>
+        <option value="National Championship">National Championship</option>
+        <option value="Continental Championship">Continental Championship</option>
+      </select>
+      {#if disabledFields.has("rank")}
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+      {:else if values.format === "V5"}
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_rank_v5_hint()}</p>
+      {/if}
+    </div>
+  </div>
+
+  <!-- League -->
+  {#if allActiveLeagues.length > 0}
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("league")}>{m.tfield_league()}</label>
+      <select
+        id={id("league")}
+        value={values.league_uid}
+        {disabled}
+        onchange={(e) => handleInput("league_uid", (e.target as HTMLSelectElement).value)}
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      >
+        <option value="">{m.common_none()}</option>
+        {#each myLeagues as league}
+          <!-- Format-restricted league: disabled-with-reason instead of a server 400 -->
+          {#if league.format && values.format !== league.format}
+            <option value={league.uid} disabled>{league.name} — {m.tfield_league_format_mismatch({ format: league.format })}</option>
+          {:else}
+            <option value={league.uid}>{league.name}</option>
+          {/if}
+        {/each}
+        {#each otherLeagues as league}
+          <option value={league.uid} disabled>{league.name} — {m.tfield_league_not_organizer()}</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
+
+  <!-- Dates & Timezone -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("start")}>{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
+      <input
+        id={id("start")}
+        type="datetime-local"
+        required
+        value={values.start}
+        disabled={disabled || disabledFields.has("start")}
+        onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
+        class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.start ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
+      />
+      {#if disabledFields.has("start")}
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+      {/if}
+    </div>
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("finish")}>{m.tfield_finish()}</label>
+      <input
+        id={id("finish")}
+        type="datetime-local"
+        value={values.finish}
+        min={values.start || undefined}
+        {disabled}
+        onchange={(e) => handleInput("finish", (e.target as HTMLInputElement).value)}
+        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+      />
+    </div>
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("timezone")}>{m.tfield_timezone()}</label>
+      <select
+        id={id("timezone")}
+        value={values.timezone}
+        {disabled}
+        onchange={(e) => handleInput("timezone", (e.target as HTMLSelectElement).value)}
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      >
+        {#each timezones as tz}
+          <option value={tz}>{tz.replace(/_/g, " ")}</option>
+        {/each}
+      </select>
+    </div>
+  </div>
+
+  <!-- Event rules. These sit with format and rank because that is what governs
+       them: selecting a championship rank disables proxies and multideck. -->
+  <div class="space-y-3 border-t border-line pt-4">
+    {#if !values.online}
+      <label class="flex items-center gap-3 {disabled || values.rank || disabledFields.has('proxies') ? '' : 'cursor-pointer'}">
+        <input
+          type="checkbox"
+          checked={values.proxies}
+          disabled={disabled || !!values.rank || disabledFields.has("proxies")}
+          onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
+          class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+        />
+        <span class="text-sm {values.rank ? 'text-ink-faint' : 'text-ink-bright'}">{m.tfield_allow_proxies()}</span>
+      </label>
+      {#if values.rank}
+        <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
+      {:else if disabledFields.has("proxies")}
+        <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_vekn_locked_hint()}</p>
+      {/if}
+    {/if}
+    <label class="flex items-center gap-3 {disabled || values.rank ? '' : 'cursor-pointer'}">
+      <input
+        type="checkbox"
+        checked={values.multideck}
+        disabled={disabled || !!values.rank}
+        onchange={(e) => handleInput("multideck", (e.target as HTMLInputElement).checked)}
+        class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+      />
+      <span class="text-sm {values.rank ? 'text-ink-faint' : 'text-ink-bright'}">{m.tfield_multideck()}</span>
+    </label>
+    {#if values.rank}
+      <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
+    {/if}
+    <label class="flex items-center gap-3 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={values.decklist_required}
+        {disabled}
+        onchange={(e) => handleInput("decklist_required", (e.target as HTMLInputElement).checked)}
+        class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+      />
+      <span class="text-sm text-ink-bright">{m.tfield_decklist_required()}</span>
+    </label>
+  </div>
+</FoldableSection>
+
+<FoldableSection title={m.tfield_section_location()} bind:open={locationOpen}>
+  <!-- Online toggle -->
+  <label class="flex items-center gap-3 cursor-pointer">
     <input
-      id={id("map-url")}
-      type="url"
-      value={values.map_url}
+      type="checkbox"
+      checked={values.online}
       {disabled}
-      oninput={(e) => handleInput("map_url", (e.target as HTMLInputElement).value)}
+      onchange={(e) => {
+        const checked = (e.target as HTMLInputElement).checked;
+        handleInput("online", checked);
+        if (checked) {
+          handleInput("proxies", false);
+        }
+        if (checked && !values.venue) {
+          handleInput("venue", "VEKN Discord");
+          handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
+        }
+      }}
+      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+    />
+    <span class="text-sm text-ink-bright">{m.tfield_online()}</span>
+  </label>
+
+  <!-- Location fields (hidden when online) -->
+  {#if !values.online}
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("country")}>{m.common_country()} <span class="text-link text-xs">({m.common_required()})</span></label>
+      <select
+        id={id("country")}
+        required
+        value={values.country}
+        {disabled}
+        onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
+        class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright {values.country ? 'border-line-strong' : 'border-accent-strong/50'}"
+      >
+        <option value="">{m.tfield_select_country()}</option>
+        {#each countries as c}
+          <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
+
+  <!-- Venue (always shown) -->
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("venue")}>{m.tfield_venue()}</label>
+    <VenueAutocomplete
+      id={id("venue")}
+      bind:value={values.venue}
+      country={values.country}
+      countryHint={!values.online}
+      {disabled}
+      onselect={handleVenueSelect}
+      oninput={() => onchange?.("venue", values.venue)}
+    />
+  </div>
+
+  <!-- Venue URL (always shown) -->
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
+    <input
+      id={id("venue-url")}
+      type="url"
+      value={values.venue_url}
+      {disabled}
+      oninput={(e) => handleInput("venue_url", (e.target as HTMLInputElement).value)}
       class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
       placeholder="https://..."
     />
   </div>
-{/if}
 
-<!-- Rare fields behind disclosures: the required path stays scannable -->
-<div class="bg-surface-muted/30 rounded-lg p-4">
-  <button type="button" onclick={() => visibilityExpanded = !visibilityExpanded}
-    aria-expanded={visibilityExpanded}
-    class="flex items-center gap-2 py-1 text-sm font-medium text-ink w-full text-left">
-    {#if visibilityExpanded}<ChevronDown class="w-4 h-4" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4" aria-hidden="true" />{/if}
-    {m.tfield_section_visibility()}
-  </button>
-  {#if visibilityExpanded}
-    <div class="mt-3 space-y-4">
-<!-- Standings & Decklists -->
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("standings")}>{m.tfield_standings_visibility()}</label>
-    <select
-      id={id("standings")}
-      value={values.standings_mode}
-      {disabled}
-      onchange={(e) => handleInput("standings_mode", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      <option value="Private">{m.tournament_standings_private()}</option>
-      <option value="Cutoff">{m.tfield_standings_cutoff()}</option>
-      <option value="Top 10">{m.tournament_standings_top10()}</option>
-      <option value="Public">{m.tournament_standings_public()}</option>
-    </select>
-    <p class="text-xs text-ink-faint mt-1">{standingsHelp(values.standings_mode)}</p>
-  </div>
-  <div>
-    <label class="block text-sm text-ink-muted mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
-    <select
-      id={id("decklists")}
-      value={values.decklists_mode}
-      {disabled}
-      onchange={(e) => handleInput("decklists_mode", (e.target as HTMLSelectElement).value)}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      <option value="Winner">{m.tfield_decklists_winner()}</option>
-      <option value="Finalists">{m.tfield_decklists_finalists()}</option>
-      <option value="All">{m.tfield_decklists_all()}</option>
-    </select>
-    <p class="text-xs text-ink-faint mt-1">{decklistsHelp(values.decklists_mode)}</p>
-  </div>
-</div>
+  {#if !values.online}
+    <!-- Address -->
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("address")}>{m.tfield_address()}</label>
+      <input
+        id={id("address")}
+        type="text"
+        value={values.address}
+        {disabled}
+        oninput={(e) => handleInput("address", (e.target as HTMLInputElement).value)}
+        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+        placeholder={m.tfield_address_placeholder()}
+      />
+    </div>
+
+    <!-- Map URL -->
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
+      <input
+        id={id("map-url")}
+        type="url"
+        value={values.map_url}
+        {disabled}
+        oninput={(e) => handleInput("map_url", (e.target as HTMLInputElement).value)}
+        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+        placeholder="https://..."
+      />
     </div>
   {/if}
-</div>
+  <!-- Rooms are part of the venue, but they need a tournament that already
+       exists, so the edit form passes the editor in; creation passes nothing. -->
+  {#if venueExtra && !values.online}
+    <div class="pt-4 border-t border-line">
+      {@render venueExtra()}
+    </div>
+  {/if}
+</FoldableSection>
 
-<div class="bg-surface-muted/30 rounded-lg p-4">
-  <button type="button" onclick={() => advancedExpanded = !advancedExpanded}
-    aria-expanded={advancedExpanded}
-    class="flex items-center gap-2 py-1 text-sm font-medium text-ink w-full text-left">
-    {#if advancedExpanded}<ChevronDown class="w-4 h-4" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4" aria-hidden="true" />{/if}
-    {m.tfield_section_advanced()}
-  </button>
-  {#if advancedExpanded}
-    <div class="mt-3 space-y-4">
-<!-- Boolean toggles -->
-<div class="space-y-3">
-  <!-- Championships forbid proxies/multideck (VEKN rules, engine-enforced):
-       explained-disable when a rank is selected. -->
-  {#if !values.online}
-    <label class="flex items-center gap-3 {disabled || values.rank || disabledFields.has('proxies') ? '' : 'cursor-pointer'}">
+<FoldableSection title={m.tfield_section_rounds()} bind:open={roundsOpen}>
+  <fieldset class="border-0 p-0 m-0 space-y-4">
+    <label class="flex items-center gap-3 cursor-pointer">
       <input
         type="checkbox"
-        checked={values.proxies}
-        disabled={disabled || !!values.rank || disabledFields.has("proxies")}
-        onchange={(e) => handleInput("proxies", (e.target as HTMLInputElement).checked)}
+        checked={values.open_rounds}
+        disabled={disabled || disabledFields.has("open_rounds")}
+        onchange={(e) => handleOpenRoundsToggle((e.target as HTMLInputElement).checked)}
         class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
       />
-      <span class="text-sm {values.rank ? 'text-ink-faint' : 'text-ink-bright'}">{m.tfield_allow_proxies()}</span>
+      <span class="text-sm text-ink-bright">{m.tfield_open_rounds()}</span>
     </label>
-    {#if values.rank}
-      <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
-    {:else if disabledFields.has("proxies")}
-      <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_vekn_locked_hint()}</p>
+    {#if values.open_rounds}
+      <div class="banner-warn flex items-start gap-2 rounded-lg p-2 -mt-2 ml-8 text-xs">
+        <Info class="w-4 h-4 shrink-0 mt-px" aria-hidden="true" />
+        <span>{m.tfield_open_rounds_warning()}</span>
+      </div>
+    {:else}
+      <p class="text-xs text-ink-faint -mt-2 ml-8">{m.tfield_open_rounds_desc()}</p>
     {/if}
-  {/if}
-  <label class="flex items-center gap-3 {disabled || values.rank ? '' : 'cursor-pointer'}">
-    <input
-      type="checkbox"
-      checked={values.multideck}
-      disabled={disabled || !!values.rank}
-      onchange={(e) => handleInput("multideck", (e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-    />
-    <span class="text-sm {values.rank ? 'text-ink-faint' : 'text-ink-bright'}">{m.tfield_multideck()}</span>
-  </label>
-  {#if values.rank}
-    <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
-  {/if}
-  <label class="flex items-center gap-3 cursor-pointer">
-    <input
-      type="checkbox"
-      checked={values.decklist_required}
-      {disabled}
-      onchange={(e) => handleInput("decklist_required", (e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-    />
-    <span class="text-sm text-ink-bright">{m.tfield_decklist_required()}</span>
-  </label>
-</div>
 
-<!-- Rounds: open-rounds opt-in + round count / per-player cap. Defaults (3
-     standard rounds, no cap) fit most events, so the block lives in Advanced. -->
-<div class="border-t border-line pt-4">
-<fieldset class="border-0 p-0 m-0">
-  <h3 class="text-sm font-medium text-ink-strong mb-3">{m.tfield_section_rounds()}</h3>
-  <label class="flex items-center gap-3 cursor-pointer">
-    <input
-      type="checkbox"
-      checked={values.open_rounds}
-      disabled={disabled || disabledFields.has("open_rounds")}
-      onchange={(e) => handleOpenRoundsToggle((e.target as HTMLInputElement).checked)}
-      class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-    />
-    <span class="text-sm text-ink-bright">{m.tfield_open_rounds()}</span>
-  </label>
-  {#if values.open_rounds}
-    <div class="banner-warn flex items-start gap-2 rounded-lg p-2 mt-1 ml-8 text-xs">
-      <Info class="w-4 h-4 shrink-0 mt-px" aria-hidden="true" />
-      <span>{m.tfield_open_rounds_warning()}</span>
-    </div>
-  {:else}
-    <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_open_rounds_desc()}</p>
-  {/if}
-
-  <!-- Round count (standard) / per-player cap (open rounds). The VEKN-push
-       build constrains a standard tournament to 2–4 (the count it reports). -->
-  <div class="mt-3">
-    <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>
-      {values.open_rounds ? m.tfield_round_cap() : m.tfield_round_count()}
-    </label>
-    <select
-      id={id("max-rounds")}
-      value={String(values.max_rounds)}
-      disabled={disabled || disabledFields.has("max_rounds")}
-      onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
-      class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-    >
-      {#if !values.open_rounds && veknPush}
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-      {:else}
-        <option value="0">{m.tfield_max_rounds_no_limit()}</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-      {/if}
-    </select>
-    {#if disabledFields.has("max_rounds")}
-      <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_locked_hint()}</p>
-    {/if}
-  </div>
-
-  <!-- Soft registration cap: warn-only (venue seat limits are advisory) -->
-  <div class="mt-3">
-    <label class="block text-sm text-ink-muted mb-1" for={id("max-players")}>{m.tfield_max_players()}</label>
-    <input
-      id={id("max-players")}
-      type="number"
-      min="0"
-      value={values.max_players || ""}
-      {disabled}
-      placeholder={m.tfield_max_players_none()}
-      onchange={(e) => handleInput("max_players", parseInt((e.target as HTMLInputElement).value) || 0)}
-      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
-    />
-    <p class="text-xs text-ink-faint mt-1">{m.tfield_max_players_desc()}</p>
-  </div>
-
-  <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite
-       (works offline and with or without a per-player cap) — lets present players
-       seat their own pod without an organizer. -->
-  {#if values.open_rounds}
-    <div class="mt-3">
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={values.self_organized_rounds}
-          {disabled}
-          onchange={(e) => handleInput("self_organized_rounds", (e.target as HTMLInputElement).checked)}
-          class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-        />
-        <span class="text-sm text-ink-bright">{m.tfield_self_organized_rounds()}</span>
+    <!-- Round count (standard) / per-player cap (open rounds). The VEKN-push
+         build constrains a standard tournament to 2–4 (the count it reports). -->
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>
+        {values.open_rounds ? m.tfield_round_cap() : m.tfield_round_count()}
       </label>
-      <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_self_organized_rounds_desc()}</p>
+      <select
+        id={id("max-rounds")}
+        value={String(values.max_rounds)}
+        disabled={disabled || disabledFields.has("max_rounds")}
+        onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      >
+        {#if !values.open_rounds && veknPush}
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        {:else}
+          <option value="0">{m.tfield_max_rounds_no_limit()}</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        {/if}
+      </select>
+      {#if disabledFields.has("max_rounds")}
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_locked_hint()}</p>
+      {/if}
     </div>
-  {/if}
-</fieldset>
-</div>
 
-<!-- Timer Configuration -->
-<div class="border-t border-line pt-4">
-  <h3 class="text-sm font-medium text-ink-strong mb-3">{m.timer_config_heading()}</h3>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <!-- Soft registration cap: warn-only (venue seat limits are advisory) -->
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("max-players")}>{m.tfield_max_players()}</label>
+      <input
+        id={id("max-players")}
+        type="number"
+        min="0"
+        value={values.max_players || ""}
+        {disabled}
+        placeholder={m.tfield_max_players_none()}
+        onchange={(e) => handleInput("max_players", parseInt((e.target as HTMLInputElement).value) || 0)}
+        class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+      />
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_max_players_desc()}</p>
+    </div>
+
+    <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite
+         (works offline and with or without a per-player cap) — lets present players
+         seat their own pod without an organizer. -->
+    {#if values.open_rounds}
+      <div>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={values.self_organized_rounds}
+            {disabled}
+            onchange={(e) => handleInput("self_organized_rounds", (e.target as HTMLInputElement).checked)}
+            class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+          />
+          <span class="text-sm text-ink-bright">{m.tfield_self_organized_rounds()}</span>
+        </label>
+        <p class="text-xs text-ink-faint mt-1 ml-8">{m.tfield_self_organized_rounds_desc()}</p>
+      </div>
+    {/if}
+  </fieldset>
+
+  <!-- Round length is a property of a round, so it lives with the other round
+       settings rather than in a section of its own. -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-line">
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("round-time")}>{m.timer_round_time()}</label>
       <select
@@ -620,24 +587,60 @@
       </select>
     </div>
   </div>
-</div>
-    </div>
-  {/if}
-</div>
+</FoldableSection>
 
-<!-- Description -->
-<div>
-  <label class="block text-sm text-ink-muted mb-1" for={id("description")}>{m.common_description()}</label>
-  <span class="text-xs text-ink-faint mb-1 block">
-    {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ink-muted hover:text-ink-bright">Markdown</a>' })}
-  </span>
-  <textarea
-    id={id("description")}
-    value={values.description}
-    {disabled}
-    oninput={(e) => handleInput("description", (e.target as HTMLTextAreaElement).value)}
-    rows="10"
-    class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none resize-y"
-    placeholder={m.tfield_description_placeholder()}
-  ></textarea>
-</div>
+<FoldableSection title={m.tfield_section_visibility()} bind:open={visibilityOpen}>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("standings")}>{m.tfield_standings_visibility()}</label>
+      <select
+        id={id("standings")}
+        value={values.standings_mode}
+        {disabled}
+        onchange={(e) => handleInput("standings_mode", (e.target as HTMLSelectElement).value)}
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      >
+        <option value="Private">{m.tournament_standings_private()}</option>
+        <option value="Cutoff">{m.tfield_standings_cutoff()}</option>
+        <option value="Top 10">{m.tournament_standings_top10()}</option>
+        <option value="Public">{m.tournament_standings_public()}</option>
+      </select>
+      <p class="text-xs text-ink-faint mt-1">{standingsHelp(values.standings_mode)}</p>
+    </div>
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
+      <select
+        id={id("decklists")}
+        value={values.decklists_mode}
+        {disabled}
+        onchange={(e) => handleInput("decklists_mode", (e.target as HTMLSelectElement).value)}
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+      >
+        <option value="Winner">{m.tfield_decklists_winner()}</option>
+        <option value="Finalists">{m.tfield_decklists_finalists()}</option>
+        <option value="All">{m.tfield_decklists_all()}</option>
+      </select>
+      <p class="text-xs text-ink-faint mt-1">{decklistsHelp(values.decklists_mode)}</p>
+    </div>
+  </div>
+</FoldableSection>
+
+<FoldableSection title={m.common_description()} bind:open={descriptionOpen}>
+  <div>
+    <span class="text-xs text-ink-faint mb-1 block">
+      {@html m.tfield_markdown_support({ link: '<a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener noreferrer" class="underline text-ink-muted hover:text-ink-bright">Markdown</a>' })}
+    </span>
+    <!-- The section title carries the visible name, so the control needs its
+         own accessible one rather than a duplicate label above it. -->
+    <textarea
+      id={id("description")}
+      aria-label={m.common_description()}
+      value={values.description}
+      {disabled}
+      oninput={(e) => handleInput("description", (e.target as HTMLTextAreaElement).value)}
+      rows="10"
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none resize-y"
+      placeholder={m.tfield_description_placeholder()}
+    ></textarea>
+  </div>
+</FoldableSection>

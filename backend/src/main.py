@@ -623,6 +623,23 @@ async def league_og_stub(uid: str, request: Request) -> Response:
     return Response(content=html, media_type="text/html")
 
 
+@app.get("/help/{slug}")
+async def help_og_stub(slug: str, request: Request) -> Response:
+    """Open Graph stub for a help-page share link — same crawler-only UA-split.
+
+    Static content, so no projection lookup; an unknown slug falls back to the
+    site-wide card rather than erroring.
+    """
+    from .og import render_help_og_html
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    return Response(
+        content=render_help_og_html(f"{proto}://{host}", slug),
+        media_type="text/html",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Data-level helpers
 # ---------------------------------------------------------------------------

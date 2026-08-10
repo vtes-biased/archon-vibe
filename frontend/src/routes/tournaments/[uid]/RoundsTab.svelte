@@ -13,7 +13,7 @@
   import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2 } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";
 
@@ -222,6 +222,15 @@
       : []
   );
 
+  // Seat pool = both banners above; the engine accepts either state.
+  const seatablePlayers = $derived(
+    canEditSeating
+      ? (tournament.players ?? []).filter(
+          p => p.state === "Registered" || p.state === "Checked-in"
+        )
+      : []
+  );
+
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
@@ -391,12 +400,12 @@
   }
 
   function printSeatHtml(uid: string): string {
-    const info = playerInfo[uid];
-    if (!info) return esc(uid);
-    const name = esc(info.nickname || info.name);
-    const base = info.vekn
-      ? `${name} <span style="color:#888;font-size:10pt">(${esc(info.vekn)})</span>`
-      : name;
+    // Nicknames are an online-event privacy device; an IRL seating sheet prints
+    // the real name. This used to ignore that and print the nickname either way.
+    const { primary, detail } = seatDisplayParts(uid, playerInfo, tournament.online);
+    const base = detail
+      ? `${esc(primary)} <span style="color:#888;font-size:10pt">(${esc(detail)})</span>`
+      : esc(primary);
     return nonCompetingUids.has(uid)
       ? `${base} <span style="color:#888;font-size:9pt">(${esc(m.proxy_label())})</span>`
       : base;
@@ -635,10 +644,10 @@
             {#if alterMode && r === alterRoundIdx}
               <!-- In-place alter seating mode -->
               <p class="text-sm text-ink">{m.rounds_alter_hint()}</p>
-              {#if unseatedPlayers.length > 0}
+              {#if seatablePlayers.length > 0}
                 <!-- Cross-link: adding a pool player is a separate engine event
                      (AlterSeating keeps the player set fixed), so point at it. -->
-                <p class="text-sm text-ink-muted">{m.rounds_alter_pool_hint({ count: String(unseatedPlayers.length) })}</p>
+                <p class="text-sm text-ink-muted">{m.rounds_alter_pool_hint({ count: String(seatablePlayers.length) })}</p>
               {/if}
               {#if round.some(t => t.seating.some(s => s.result.vp > 0))}
                 <p class="text-sm text-warn">{m.rounds_alter_scores_warning()}</p>
@@ -807,7 +816,7 @@
                         <div class="mt-1.5">
                           {#if !isOrganizer && table.seating.some(s => s.judge_uid)}
                             <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
-                              {seat.result.vp}
+                              {seat.result.vp}VP
                               <Lock class="w-3.5 h-3.5" />
                             </span>
                           {:else}
@@ -900,11 +909,11 @@
                   </div>
                 {/if}
                 <!-- Seat a player (last round, or an earlier still-live round — parallel/open pods take substitutes too) -->
-                {#if isEditable && (isLast || isRoundLive) && unseatedPlayers.length > 0 && table.seating.length < 5 && table.state !== "Finished" && !isCancelled}
+                {#if isEditable && (isLast || isRoundLive) && seatablePlayers.length > 0 && table.seating.length < 5 && table.state !== "Finished" && !isCancelled}
                   <div class="mt-2 pt-2 border-t border-line">
                     {#if seatTargetTable === `${r}:${i}`}
                       <div class="flex flex-wrap gap-1">
-                        {#each unseatedPlayers as player}
+                        {#each seatablePlayers as player}
                           {@const puid = player.user_uid ?? ""}
                           <button
                             onclick={() => { doAction("SeatPlayer", { player_uid: puid, table: i, seat: table.seating.length, round: r }); seatTargetTable = null; }}

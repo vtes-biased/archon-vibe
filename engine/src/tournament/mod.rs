@@ -596,7 +596,18 @@ fn apply_event(
             vekn_id,
             display_name,
         } => {
-            require_state_or_finished(state, TournamentState::Waiting)?;
+            // A round under way does not close the door. Late arrivals are routine:
+            // the organizer seats them now if a table is short, or next round if play
+            // has really begun. Drop-outs come back the same way.
+            if !matches!(
+                state,
+                TournamentState::Waiting | TournamentState::Playing | TournamentState::Finished
+            ) {
+                return Err(EngineError::WrongState {
+                    expected: TournamentState::Waiting.as_str().to_string(),
+                    current: state.as_str().to_string(),
+                });
+            }
 
             // Permission: organizer or self (player checking themselves in)
             if !actor.is_organizer && actor.uid != *player_uid {
@@ -606,7 +617,8 @@ fn apply_event(
             let idx = match find_player_index(&tournament["players"], player_uid) {
                 Some(idx) => idx,
                 None => {
-                    if state != TournamentState::Waiting {
+                    // A walk-in nobody registered still gets in mid-round.
+                    if state != TournamentState::Waiting && state != TournamentState::Playing {
                         return Err(EngineError::PlayerNotFound);
                     }
                     // Require VEKN ID for auto-registration (same as Register)
@@ -672,7 +684,21 @@ fn apply_event(
                 !decks.members().any(|d| d["user_uid"].as_str() == Some(pk))
             };
 
-            tournament["players"][idx]["state"] = "Checked-in".into();
+            // A drop-out reinstated mid-round keeps the seat they never left.
+            let seated_live = tournament["rounds"].members().any(|round| {
+                round.members().any(|t| {
+                    t["state"].as_str() != Some("Finished")
+                        && t["seating"]
+                            .members()
+                            .any(|s| s["player_uid"].as_str() == Some(player_uid.as_str()))
+                })
+            });
+            tournament["players"][idx]["state"] = if was_finished && seated_live {
+                "Playing"
+            } else {
+                "Checked-in"
+            }
+            .into();
             if missing_decklist {
                 tournament["players"][idx]["missing_decklist"] = true.into();
             }
@@ -1616,9 +1642,9 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            // Verify player exists and is Registered — or a Finished player
-            // with ZERO rounds played: a round-1 no-show who walks in while
-            // players are still sitting down is reinstated by seating them.
+            // Registered or Checked-in: both are present and unseated. Plus a
+            // Finished player with ZERO rounds played — a no-show who walks in
+            // is reinstated by seating them.
             let player_idx = find_player_index(&tournament["players"], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
             let player_state = tournament["players"][player_idx]["state"]
@@ -1626,7 +1652,8 @@ fn apply_event(
                 .unwrap_or("");
             let reinstatable_no_show = player_state == "Finished"
                 && count_player_rounds_played(tournament, player_uid) == 0;
-            if player_state != "Registered"
+            let present_and_unseated = player_state == "Registered" || player_state == "Checked-in";
+            if !present_and_unseated
                 && !(state == TournamentState::Finished && player_state == "Finished")
                 && !reinstatable_no_show
             {
@@ -1897,7 +1924,9 @@ fn apply_event(
                     t["seating"][i]["result"]["vp"] = vps[i].into();
                     t["seating"][i]["result"]["gw"] = gws[i].into();
                     t["seating"][i]["result"]["tp"] = tps[i].into();
-                    if actor.is_organizer {
+                    // A seated organizer plays, not adjudicates: stamping would lock
+                    // their own tablemates out. Override still locks a table you sit at.
+                    if actor.is_organizer && !is_at_table {
                         t["seating"][i]["judge_uid"] = actor.uid.as_str().into();
                     }
                 }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getCountryFlag } from "$lib/geonames";
-  import { getRoleClasses, getRoleLabel } from "$lib/roles";
+  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import Badge from "$lib/components/Badge.svelte";
   import type { User, CommunityLink } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunityModerationActions from "./CommunityModerationActions.svelte";
@@ -59,7 +60,7 @@
                   <div class="flex items-center gap-2 mb-2 flex-wrap">
                     <a href="/users/{user.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{user.name}</a>
                     {#each user.roles.filter(r => r === "NC" || r === "Prince" || r === "IC") as role}
-                      <span class="px-2 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{getRoleLabel(role)}</span>
+                      <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
                     {/each}
                     {#if user.city}
                       <span class="text-sm text-ink-muted">{user.city}</span>

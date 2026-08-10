@@ -1,17 +1,15 @@
 <script lang="ts">
   import type { Tournament, TournamentState, DeckObject } from "$lib/types";
   import type { TournamentEventType } from "$lib/engine";
-  import type { Component } from "svelte";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import FinishedResults from "./FinishedResults.svelte";
-  import FinishConfirmModal from "./FinishConfirmModal.svelte";
-  import { QrCode, Undo2, CheckCheck, Banknote, RotateCcw, TriangleAlert } from "@lucide/svelte";
+  import InlineNotice from "$lib/components/InlineNotice.svelte";
+  import { Undo2, CheckCheck, Banknote, RotateCcw } from "@lucide/svelte";
   import { translateTournamentState, seatDisplay, top5HasTies as top5HasTiesFn, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
-  type MenuItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
 
   let {
     tournament,
@@ -20,11 +18,8 @@
     decksByUser,
     actionLoading,
     doAction,
-    syncVeknItem,
-    archonImportItem,
-    csvImportItem,
     onImportArchon,
-    onRecordPromos,
+    onAddBanner,
   }: {
     tournament: Tournament;
     standings: StandingEntry[];
@@ -32,15 +27,11 @@
     decksByUser: Record<string, DeckObject[]>;
     actionLoading: boolean;
     doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
-    syncVeknItem: MenuItem | null;
-    archonImportItem: MenuItem;
-    csvImportItem: MenuItem;
     onImportArchon: () => void;
-    onRecordPromos: () => void;
+    onAddBanner: () => void;
   } = $props();
 
   let showQrCode = $state(false);
-  let showFinishConfirm = $state(false);
 
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
 
@@ -107,11 +98,86 @@
       .filter(p => p.state === "Registered" && p.user_uid)
       .map(p => seatDisplay(p.user_uid!, playerInfo, tournament.online));
   });
+
+  // Present but not seated in any live round — a late arrival just checked in, or
+  // a rotation sit-out. Nothing in the data tells them apart, and both leave the
+  // organizer the same two choices, so one notice serves both.
+  const unseatedCheckedIn = $derived.by(() => {
+    if (tournament?.state !== "Playing") return [];
+    const seated = new Set<string>();
+    for (const round of tournament.rounds ?? []) {
+      for (const t of round) {
+        if (t.state === "Finished") continue;
+        for (const s of t.seating) seated.add(s.player_uid);
+      }
+    }
+    return (tournament.players ?? [])
+      .filter(p => p.state === "Checked-in" && p.user_uid && !seated.has(p.user_uid))
+      .map(p => seatDisplay(p.user_uid!, playerInfo, tournament.online));
+  });
+
+  const nextRoundLabel = $derived(m.overview_start_round({ n: String((tournament?.rounds?.length ?? 0) + 1) }));
+  // Online events start the next round while the current one is still running,
+  // so seats come from both pools.
+  const canStartNextOnline = $derived((checkedInCount + playingCount) >= 4);
+
+  // The single state-appropriate CTA, as data — rendered twice (in the bar, and
+  // in the sticky strip once the bar scrolls away), so it must not be markup.
+  type Primary = { label: string; onclick: () => void; disabled?: boolean };
+  const primary = $derived.by((): Primary | null => {
+    switch (tournament.state) {
+      case "Planned":
+        return { label: m.overview_open_registration(), onclick: () => doAction("OpenRegistration") };
+      case "Registration":
+        return { label: m.overview_close_registration(), onclick: () => doAction("CloseRegistration") };
+      case "Waiting":
+        return finalsReady
+          ? { label: m.overview_start_finals(), onclick: () => doAction("StartFinals") }
+          : { label: nextRoundLabel, onclick: () => doAction("StartRound"), disabled: checkedInCount < 4 };
+      case "Playing":
+        if (isFinals) return { label: m.finals_finish(), onclick: () => doAction("FinishFinals"), disabled: !finalsTableFinished };
+        if (!hasParallelRounds) return { label: m.rounds_end_round(), onclick: () => doAction("FinishRound", { round: activeRoundIdx }), disabled: !allTablesFinished };
+        return tournament.online ? { label: nextRoundLabel, onclick: () => doAction("StartRound"), disabled: !canStartNextOnline } : null;
+      default:
+        return null;
+    }
+  });
+
+  // Compact progress for the sticky strip: digits only, so it needs no
+  // translation and stays legible at any width. The full sentence rides along
+  // as the accessible label.
+  const stickyProgress = $derived(
+    tournament.state === "Playing" && !isFinals && !hasParallelRounds && tablesFinishedCount.total > 0
+      ? `${tablesFinishedCount.done}/${tablesFinishedCount.total}`
+      : null
+  );
+  const stickyLabel = $derived(
+    stickyProgress
+      ? m.action_bar_playing_round({ n: String(activeRoundIdx + 1), done: String(tablesFinishedCount.done), total: String(tablesFinishedCount.total) })
+      : translateTournamentState(tournament.state)
+  );
+
+  // The sticky strip stands in for the action bar only while the bar is off
+  // screen — the organizer works in the tables far below it.
+  let barEl = $state<HTMLElement | null>(null);
+  let barOnScreen = $state(true);
+  $effect(() => {
+    const el = barEl;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => (barOnScreen = entries[entries.length - 1]?.isIntersecting ?? true));
+    io.observe(el);
+    return () => io.disconnect();
+  });
 </script>
 
-<!-- Action Bar -->
-<div class="border-b border-line px-3 sm:px-6 py-3 space-y-3">
-  <!-- Step indicator -->
+<!-- Action Bar — tournament-level, so it sits ABOVE the tab bar: it is the same
+     panel whichever tab is open, and nesting it inside the tab content made it
+     read as if it belonged to that tab. -->
+<div bind:this={barEl} class="border-b border-line px-3 sm:px-6 py-3 space-y-3">
+  <!-- Step indicator. Gone once the event is Finished: the rail answers "how
+       far along am I", and the guidance line below already answers it with
+       "Tournament complete." -->
+  {#if tournament.state !== "Finished"}
   <div class="flex items-center gap-1 sm:gap-2 text-xs overflow-x-auto">
     {#each ["Planned", "Registration", "Waiting", "Playing", "Finished"] as step, i}
       {@const states = ["Planned", "Registration", "Waiting", "Playing", "Finished"]}
@@ -127,6 +193,7 @@
       </span>
     {/each}
   </div>
+  {/if}
 
   <!-- Guidance message -->
   <p class="text-sm text-ink-muted">
@@ -159,29 +226,21 @@
 
   <!-- Actions: ONE primary CTA per state; secondaries collapse into a More overflow -->
   <div class="flex flex-wrap items-center gap-2">
-    {#if tournament.state === "Planned"}
-      <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("OpenRegistration")}>{m.overview_open_registration()}</Button>
-      <ActionMenu label={m.common_more()} items={[...(syncVeknItem ? [syncVeknItem] : []), archonImportItem]} />
+    {#if primary}
+      <Button variant="primary" size="lg" loading={actionLoading} disabled={primary.disabled} onclick={primary.onclick}>{primary.label}</Button>
+    {/if}
 
-    {:else if tournament.state === "Registration"}
-      <Button variant="primary" size="lg" disabled={actionLoading} onclick={() => doAction("CloseRegistration")}>{m.overview_close_registration()}</Button>
+    {#if tournament.state === "Registration"}
       <ActionMenu label={m.common_more()} items={[
-        ...(qrCheckin ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
-        csvImportItem,
         { label: m.overview_back_to_planning(), icon: Undo2, onclick: () => doAction("CancelRegistration"), disabled: actionLoading },
-        ...(syncVeknItem ? [syncVeknItem] : []),
-        archonImportItem,
       ]} />
 
     {:else if tournament.state === "Waiting"}
+      <!-- Whichever of start-round / start-finals the primary didn't take -->
       {#if finalsReady}
-        <Button variant="primary" size="lg" loading={actionLoading} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
-        <Button variant="secondary" size="md" loading={actionLoading} disabled={checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
-      {:else}
-        <Button variant="primary" size="lg" loading={actionLoading} disabled={checkedInCount < 4} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
-        {#if hasFinalsCandidate}
-          <Button variant="secondary" size="md" loading={actionLoading} disabled={!finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
-        {/if}
+        <Button variant="secondary" size="md" loading={actionLoading} disabled={checkedInCount < 4} onclick={() => doAction("StartRound")}>{nextRoundLabel}</Button>
+      {:else if hasFinalsCandidate}
+        <Button variant="secondary" size="md" loading={actionLoading} disabled={!finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
       {/if}
       <!-- In-person first check-in: surface the QR directly (players self-check-in by scanning) instead of burying it in More -->
       {#if qrCheckin && !hasRounds}
@@ -200,30 +259,29 @@
       <ActionMenu label={m.common_more()} items={[
         { label: m.payment_mark_all_paid(), icon: Banknote, onclick: () => doAction("MarkAllPaid"), disabled: actionLoading },
         ...(hasRounds && !tournament.online ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
-        ...(qrCheckin && hasRounds ? [{ label: showQrCode ? m.checkin_qr_hide_code() : m.checkin_qr_show_code(), icon: QrCode, onclick: () => (showQrCode = !showQrCode) }] : []),
         { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
-        ...(syncVeknItem ? [syncVeknItem] : []),
-        archonImportItem,
       ]} />
 
     {:else if tournament.state === "Playing"}
       {#if isFinals}
-        <Button variant="primary" size="lg" loading={actionLoading} disabled={!finalsTableFinished} onclick={() => doAction("FinishFinals")}>{m.finals_finish()}</Button>
         <!-- Revert finals seating (e.g. a finalist no-showed): back to Waiting to drop them and re-seat. -->
         <Button variant="ghost" size="md" disabled={actionLoading} onclick={() => doAction("CancelFinals")}><Undo2 class="w-4 h-4" aria-hidden="true" />{m.finals_cancel()}</Button>
-      {:else if !hasParallelRounds}
-        <Button variant="primary" size="lg" loading={actionLoading} disabled={!allTablesFinished} onclick={() => doAction("FinishRound", { round: activeRoundIdx })}>{m.rounds_end_round()}</Button>
-        {#if tournament.online}
-          {@const canStartNext = (checkedInCount + playingCount) >= 4}
-          <Button variant="secondary" size="md" loading={actionLoading} disabled={!canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
-        {/if}
-      {:else if tournament.online}
-        {@const canStartNext = (checkedInCount + playingCount) >= 4}
-        <Button variant="primary" size="lg" loading={actionLoading} disabled={!canStartNext} onclick={() => doAction("StartRound")}>{m.overview_start_round({ n: String((tournament.rounds?.length ?? 0) + 1) })}</Button>
+      {:else if !hasParallelRounds && tournament.online}
+        <Button variant="secondary" size="md" loading={actionLoading} disabled={!canStartNextOnline} onclick={() => doAction("StartRound")}>{nextRoundLabel}</Button>
       {/if}
-      <ActionMenu label={m.common_more()} items={[...(syncVeknItem ? [syncVeknItem] : []), archonImportItem]} />
     {/if}
   </div>
+
+  <!-- Before the event is announced, the banner IS the share card (og.py renders
+       it), so it earns a nudge here — and only here, until one exists. -->
+  {#if !tournament.banner_path && (tournament.state === "Planned" || tournament.state === "Registration")}
+    <InlineNotice>
+      {m.banner_nudge()}
+      <button type="button" onclick={onAddBanner} class="text-link hover:text-link-soft underline ml-1">
+        {m.tournament_banner_add()}
+      </button>
+    </InlineNotice>
+  {/if}
 
   <!-- Finished results: winner + share/export + reopen (re-homed from the former Overview tab).
        Archon import only when there are no standings (an empty finished shell to migrate into). -->
@@ -233,10 +291,7 @@
       {playerInfo}
       {standings}
       winnerHasDeck={!!(tournament.winner && decksByUser[tournament.winner]?.length)}
-      {doAction}
-      {actionLoading}
       {onImportArchon}
-      {onRecordPromos}
     />
   {/if}
 
@@ -259,26 +314,11 @@
     {/if}
   {/if}
 
-  <!-- Danger action (Waiting state): destructive, set apart with its own hue + icon -->
-  {#if tournament.state === "Waiting"}
-    <div class="pt-2 border-t border-line">
-      <Button variant="danger" size="md" disabled={actionLoading} onclick={() => (showFinishConfirm = true)}>
-        <TriangleAlert class="w-4 h-4" aria-hidden="true" />
-        {m.overview_finish_tournament()}
-      </Button>
-    </div>
-  {/if}
-
-  {#if showFinishConfirm}
-    <FinishConfirmModal
-      {tournament}
-      {standings}
-      {playerInfo}
-      {decksByUser}
-      {actionLoading}
-      onConfirm={async () => { await doAction("FinishTournament"); showFinishConfirm = false; }}
-      onClose={() => (showFinishConfirm = false)}
-    />
+  <!-- Checking someone in mid-round leaves them present but unseated, and that is
+       a decision the organizer has to make under time pressure. State it; the two
+       options are theirs to weigh, so the copy carries no default. -->
+  {#if tournament.state === "Playing" && unseatedCheckedIn.length > 0}
+    <InlineNotice>{m.action_bar_unseated_notice({ names: unseatedCheckedIn.join(", ") })}</InlineNotice>
   {/if}
 
   <!-- QR Check-in display -->
@@ -288,3 +328,22 @@
     </div>
   {/if}
 </div>
+
+<!-- Sticky CTA: the organizer works in the tables far below the bar, so the one
+     state action follows them down rather than making them scroll back up.
+     Sits flush on the mobile nav (bottom-14 == the nav's declared h-14) and
+     clears the desktop side nav (sm:left-20). -->
+{#if primary && !barOnScreen}
+  <div
+    class="fixed left-0 right-0 bottom-14 sm:bottom-0 sm:left-20 z-30 border-t border-line bg-surface-card/95 backdrop-blur-sm print:hidden"
+  >
+    <div class="max-w-4xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-3">
+      <span class="text-sm text-ink-muted truncate" aria-hidden="true">
+        {translateTournamentState(tournament.state)}{#if stickyProgress}<span class="text-ink-faint"> · {stickyProgress}</span>{/if}
+      </span>
+      <Button variant="primary" size="lg" class="shrink-0" loading={actionLoading} disabled={primary.disabled} onclick={primary.onclick} aria-label="{primary.label} — {stickyLabel}">
+        {primary.label}
+      </Button>
+    </div>
+  </div>
+{/if}

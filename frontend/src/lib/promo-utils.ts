@@ -1,5 +1,5 @@
 // Display helpers for the promo catalog (gallery, inventory, modals).
-import type { Promo, PromoKind, TournamentRank } from '$lib/types';
+import type { Promo, PromoKind } from '$lib/types';
 import * as m from '$lib/paraglide/messages.js';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
@@ -7,13 +7,6 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '';
 /** Full URL for a promo image (image_path is a versioned server path). */
 export function promoImageUrl(promo: Promo): string | null {
   return promo.image_path ? `${API_BASE}${promo.image_path}` : null;
-}
-
-/** Short pill label for a rank-gating badge ("" never renders a badge). */
-export function rankBadgeLabel(rank: TournamentRank): string {
-  if (rank === 'National Championship') return m.promo_rank_national();
-  if (rank === 'Continental Championship') return m.promo_rank_continental();
-  return rank;
 }
 
 export function promoKindLabel(kind: PromoKind): string {

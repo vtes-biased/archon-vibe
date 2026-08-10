@@ -80,6 +80,23 @@ Barriers to check-in:
 - Player reached their per-player max_rounds cap (Open Rounds only)
 ```
 
+**The door stays open mid-round.** Check-in is not confined to the check-in
+window — it is allowed while a round is `Playing`, and a player who was never
+registered is enrolled by it. Checking someone in never seats them: it records
+that they are present and available, nothing more. Whether a late arrival joins
+a short table in the current round or waits for the next one is the organizer's
+call, taken as a separate seating action — **the app has no default and must not
+decide**. Both outcomes are routine: a round turns `Playing` the moment it is
+seated, while players are still shuffling and finding their seats, so an arrival
+in that gap can often still be seated; once play has genuinely begun they
+usually wait.
+
+The same path reverses a drop-out, who returns to `Playing` if their seat is
+still live, since dropping out never vacates a seat — which is why Drop Out
+carries no confirmation: it is undoable rather than guarded. Only `Planned` and
+`Registration` refuse a check-in; a `Finished` tournament accepts one only for
+post-hoc correction.
+
 ### 3.3 Round Structure
 
 **Minimum rounds**: 3 (2 preliminary + 1 final), per VEKN rules 3.1.

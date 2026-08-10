@@ -4,7 +4,8 @@
   import type { User, Role } from "$lib/types";
   import { createUser, updateUser, uploadAvatar } from "$lib/api";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getRoleClasses, getRoleLabel } from "$lib/roles";
+  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
   import { deobfuscateContact } from "$lib/contact";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canChangeRole as engineCanChangeRole, canChangeCountry, isOfficial } from "$lib/engine";
@@ -466,7 +467,7 @@
               disabled={!allowed}
               title={allowed ? m.user_toggle_role({ role: getRoleLabel(role) }) : m.user_cannot_change_role({ role: getRoleLabel(role) })}
               class="px-3 py-1 rounded text-sm font-medium transition-colors {editRoles.includes(role)
-                ? getRoleClasses(role)
+                ? badgeToneClass(getRoleTone(role))
                 : 'bg-surface-hover text-ink-muted'} {allowed ? 'hover:opacity-80 cursor-pointer' : 'opacity-50 cursor-not-allowed'}"
             >
               {getRoleLabel(role)}
@@ -596,11 +597,7 @@
               <span class="font-medium">{m.common_roles()}:</span>
               <div class="flex flex-wrap gap-1">
                 {#each user.roles as role}
-                  <span
-                    class="px-2 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}"
-                  >
-                    {getRoleLabel(role)}
-                  </span>
+                  <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
                 {/each}
               </div>
             </div>

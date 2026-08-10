@@ -6,7 +6,8 @@
   import DeceasedIcon from "./DeceasedIcon.svelte";
   import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getRoleClasses, getRoleLabel } from "$lib/roles";
+  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { isOfficial as engineIsOfficial } from "$lib/engine";
@@ -472,7 +473,7 @@
                   class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors {selectedRoles.includes(
                     role,
                   )
-                    ? getRoleClasses(role)
+                    ? badgeToneClass(getRoleTone(role))
                     : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
                 >
                   {getRoleLabel(role)}
@@ -622,13 +623,7 @@
                   {#if user.roles.length > 0}
                     <div class="flex flex-wrap gap-1">
                       {#each user.roles as role}
-                        <span
-                          class="px-2 py-1 rounded text-xs font-medium {getRoleClasses(
-                            role,
-                          )}"
-                        >
-                          {getRoleLabel(role)}
-                        </span>
+                        <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
                       {/each}
                     </div>
                   {/if}
@@ -658,13 +653,7 @@
                     {#if user.roles.length > 0}
                       <div class="flex flex-wrap gap-1">
                         {#each user.roles as role}
-                          <span
-                            class="px-2 py-1 rounded text-xs font-medium {getRoleClasses(
-                              role,
-                            )}"
-                          >
-                            {getRoleLabel(role)}
-                          </span>
+                          <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
                         {/each}
                       </div>
                     {:else}

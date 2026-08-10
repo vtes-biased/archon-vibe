@@ -5,6 +5,7 @@
   import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import UserPicker from '$lib/components/UserPicker.svelte';
+  import Badge from '$lib/components/Badge.svelte';
   import { getCountryFlag } from "$lib/geonames";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -161,10 +162,10 @@
       {#if user.vekn_id}
         {m.vekn_id_display({ id: user.vekn_id })}
         {#if veknSyncPending}
-          <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1">
+          <span class="ml-2"><Badge kind="status" tone="pending">
             <CloudOff class="w-3 h-3" aria-hidden="true" />
             {m.vekn_sync_pending_member()}
-          </span>
+          </Badge></span>
         {/if}
       {:else}
         {m.vekn_no_id()}

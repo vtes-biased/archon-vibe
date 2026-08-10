@@ -33,8 +33,8 @@ metadata:
 | set (a score, verb — organizer/judge action, `err_tournament_score_set_by_organizer`) | saisir (saisi/saisis) | establecer | definir | impostare |
 | locked (a score, adj — distinct sense from device-locked) | verrouillé | bloqueada/os (agree w/ puntuación fem) | bloqueada/os (agree w/ pontuação fem) | bloccato |
 | sanction | — | sanción | sanção | sanzione |
-| caution | — | advertencia verbal | advertência verbal | avvertimento verbale |
-| warning | — | advertencia | advertência | avvertimento |
+| caution (sanction level, milder of the two) | Avertissement††† | advertencia verbal | advertência verbal | avvertimento verbale |
+| warning (sanction level, stronger of the two) | Alerte††† | advertencia | advertência | avvertimento |
 | disqualification | — | descalificación | desqualificação | squalifica |
 | league | — | liga | liga | campionato |
 | offline mode | — | modo sin conexión | modo offline | modalità offline |
@@ -50,8 +50,8 @@ metadata:
 | proxy (player) | Proxy | Proxy | Proxy | Proxy |
 | random (deck label) | Aléatoire | Aleatorio | Aleatório | Casuale |
 | drop player (organiser action) | Retirer le joueur | Retirar jugador | Retirar jogador | Ritira giocatore |
-| open rounds (house format) | Rondes libres | Rondas abiertas | Rodadas abertas | Round liberi |
-| self-organized rounds | Rondes auto-organisées | Rondas auto-organizadas | Rodadas auto-organizadas | Round auto-organizzati |
+| open rounds (house format) | Rondes libres | Rondas abiertas | Rodadas abertas | Round liberi ⚠ stale, see footnote §§§ |
+| self-organized rounds | Rondes auto-organisées | Rondas auto-organizadas | Rodadas auto-organizadas | Round auto-organizzati ⚠ stale, see footnote §§§ |
 | completed (player state) | Complété | Completado | Completado | Completato |
 | announcement (tournament broadcast) | Annonce | Anuncio | Anúncio | Annuncio |
 | proxy (non-competing player) | Proxy | Proxy | Proxy | Proxy |
@@ -116,5 +116,9 @@ metadata:
 **"disputed" false-friend trap**: don't translate "disputed" (as in "a disputed table result") using the disputer/disputar family in fr/es/pt/it — that verb is already established elsewhere in the file to mean "to play [a round]" (`og_open_rounds`/`og_faq_a_open_rounds`: fr "chaque joueur dispute...Rondes", es/pt/it "cada jugador/jogador/giocatore disputa..."). Using "disputée"/"disputada"/"disputada"/"disputato" for "a disputed table" would misleadingly read as "a table that was played". Used instead: fr "contestée", es "en disputa" (idiomatic prepositional phrase, not the participle), pt "em disputa", it "contestato" — coined 2026-07-13 for `override_usage_hint`.
 **** **"timer" fr/pt correction (found 2026-07-24)**: the old table cell "minuteur"(fr)/"cronômetro"(pt) doesn't match actual file usage. fr's own `timer_*` UI cluster (`timer_config_heading`, `timer_no_timer`) uses **Chronomètre**, not "minuteur" (that word only shows up loosely in `og_discord`/`og_faq_a_discord` prose as a synonym) — use Chronomètre for any new `timer_*` string. pt has **no dominant term**: `timer_no_timer`="Sem temporizador" uses temporizador, but `og_timer`/`og_cfg_round_time_desc` use cronômetro — a pre-existing split, not fixed. For a new key inside the `timer_*` cluster, match the closest sibling in that same cluster (usually temporizador, since `timer_no_timer` is the closer sibling) rather than the help-guide heading.
 **** "clock skew" (device-vs-server clock offset, `timer_clock_skew_advisory`, coined 2026-07-24, no prior precedent — distinct from `timer_reset`'s "clock" = horloge/reloj/relógio/orologio, which is the round countdown, not the device's system clock): fr **décalage**, es **desfase**, pt **desvio**, it **sfasamento** — all standard per-locale tech terms for a clock offset (fr "décalage horaire", es "desfase horario", it "sfasamento orario"). "device" reused the established device-locked adjective's noun (appareil/dispositivo/dispositivo/dispositivo, see "device-locked" row). Register treated as a routine any-viewer hint (not the heavy offline/admin Lei block): fr vous, es usted, pt você, it tu — "turn on automatic date & time" imperative built from each locale's own OS-settings convention for that toggle (fr "date et l'heure automatiques", es "fecha y hora automáticas", pt "data e hora automáticas", it "data e l'ora automatiche" — matches Android/iOS's own localized setting name in each language, verified against general OS-localization convention, not an in-file precedent).
+
+§§§ **it "Round Aperti"/"Round autogestiti" supersede this table's older "Round liberi"/"Round auto-organizzati"** (found 2026-08-09, retranslating `og_open_rounds`/`og_self_organized`): the actual current it.json UI labels are `tfield_open_rounds`="Round Aperti" and `tfield_self_organized_rounds`="Round autogestiti" — the table's older renderings were never fixed in the live file. **General rule this confirms**: when a task instruction says to look up and reuse a listed UI key's *actual current value* from the locale file, that live value always wins over this glossary table if they disagree — the table can drift stale while the app's own strings move on (renames, rewording) and nobody backports the change here. Re-verify a glossary row against the live file before reusing it in prose, especially for feature names that read like they might get renamed (house-format/beta-ish features are the most likely to drift).
+
+††† **fr sanction-level pairing is counter-intuitive — verify, don't guess** (found 2026-08-09, retranslating the redesigned-console `og_timer_extensions`/`pg_standings` sanction sections): live `sanction_level_caution`="Avertissement" and `sanction_level_warning`="Alerte" — i.e. the *milder* level (Caution) gets the more formal-sounding fr word, the *stronger* level (Warning) gets the more urgent-sounding one. A pre-redesign draft of this same doc had it backwards ("Avertissement verbal" for Caution, "Avertissement" for Warning) — that pairing is stale/wrong now; always grep `sanction_level_caution`/`sanction_level_warning` directly rather than assuming from the English word's apparent severity. See [[glossary_conventions]]'s fr redesigned-console entry for the full context.
 
 See also: [[glossary_conventions]] for coined phrases and ordering rules not captured in this table, [[tone_register]], [[infrastructure]].

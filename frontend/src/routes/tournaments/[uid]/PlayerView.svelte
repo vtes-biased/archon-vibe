@@ -5,13 +5,13 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { formatScore } from "$lib/utils";
   import { previewScoresSync, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck } from "@lucide/svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck, Undo2 } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import ScoreLegend from "$lib/components/ScoreLegend.svelte";
   import RankedBadge from "./RankedBadge.svelte";
-  import ShareResultsButtons from "./ShareResultsButtons.svelte";
+  import CopyResultsButton from "./CopyResultsButton.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import Button from '$lib/components/Button.svelte';
   import TimerDisplay from "./TimerDisplay.svelte";
@@ -82,6 +82,21 @@
   });
 
   const myStanding = $derived(standings.find(s => s.user_uid === userUid));
+  const showMyScore = $derived(
+    !!myStanding &&
+    (tournament.state === "Playing" || tournament.state === "Waiting") &&
+    (tournament.rounds?.length ?? 0) > 0,
+  );
+  // Finished means played-out or walked-out; only a standings row tells them apart.
+  const myStatusLabel = $derived.by(() => {
+    const p = currentPlayerEntry;
+    if (!p) return "";
+    if (p.state !== "Finished") return translatePlayerState(p.state);
+    const ended = tournament.finals !== null || tournament.state === "Finished";
+    return ended && standings.some(s => s.user_uid === p.user_uid)
+      ? m.tournament_status_finished()
+      : m.tournament_status_dropped();
+  });
   // Open rounds: this player has reached their per-player round cap. Gate self-check-in on the
   // rounds-played count (not the player state), so a capped player can't self-check-in regardless
   // of whether they rest in Completed, Finished, or Registered.
@@ -147,27 +162,6 @@
   // engine allows deck-less check-in (mod.rs CheckIn just stamps missing_decklist).
   // Only surfaced when a decklist is required (playerHasValidDeck is always true otherwise).
   const showDeckWarn = $derived(notCheckedIn && tournament.decklist_required && !playerHasValidDeck);
-  const previousRounds = $derived.by(() => {
-    if (!tournament.rounds || tournament.rounds.length < 1) return [];
-    const result: { round: number; roundIdx: number; tableIdx: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
-    for (let r = 0; r < tournament.rounds.length; r++) {
-      const round = tournament.rounds[r]!;
-      // Skip in-progress rounds (shown as "Your Table(s)")
-      if (tournament.state === "Playing" && !isFinals && round.some(t => t.state !== "Finished")) continue;
-      const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
-      if (tIdx >= 0) {
-        result.push({
-          round: r + 1,
-          roundIdx: r,
-          tableIdx: tIdx,
-          tableLabel: resolveTableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
-          table: round[tIdx]!,
-        });
-      }
-    }
-    return result;
-  });
-
   // Active rounds where the player is seated (for parallel round support)
   const myActiveRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.state !== "Playing" || isFinals) return [];
@@ -191,6 +185,30 @@
   const hasParallelRounds = $derived(myActiveRounds.length > 1 || (
     tournament.rounds?.filter(r => r.some(t => t.state !== "Finished")).length ?? 0
   ) > 1);
+
+  // History is whatever isn't live. Deferring to myActiveRounds is what keeps the
+  // current round out of it: that list owns the last round even once every table
+  // reads Finished, and testing table state here instead showed it in both.
+  const previousRounds = $derived.by(() => {
+    if (!tournament.rounds?.length) return [];
+    const active = new Set(myActiveRounds.map(a => a.roundIdx));
+    const result: { round: number; roundIdx: number; tableIdx: number; tableLabel: string; table: typeof tournament.rounds[0][0] }[] = [];
+    for (let r = 0; r < tournament.rounds.length; r++) {
+      if (active.has(r)) continue;
+      const round = tournament.rounds[r]!;
+      const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
+      if (tIdx >= 0) {
+        result.push({
+          round: r + 1,
+          roundIdx: r,
+          tableIdx: tIdx,
+          tableLabel: resolveTableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
+          table: round[tIdx]!,
+        });
+      }
+    }
+    return result;
+  });
 
   async function handleCallJudge(tableIdx: number) {
     if (judgeCallCooldown) return;
@@ -285,11 +303,11 @@
       >{m.tournament_register_btn()}</Button>
     {/if}
   {:else if tournament.state === "Registration" && currentPlayerEntry}
-    <div class="text-sm mb-3 flex items-center justify-between">
-      <div>
-        <span class="text-ink-faint">{m.tournament_your_status()}</span>
-        <span class="ml-2 text-ink-bright">{translatePlayerState(currentPlayerEntry.state)}</span>
-      </div>
+    <div class="text-sm mb-3 flex items-center justify-between gap-2">
+      <span class="text-ink-bright">
+        <span class="sr-only">{m.tournament_your_status()}</span>
+        {translatePlayerState(currentPlayerEntry.state)}
+      </span>
       <Button
         variant="danger"
         onclick={() => doAction("Unregister", { user_uid: userUid })}
@@ -336,12 +354,27 @@
         {/if}
       </div>
     {:else}
-    <div class="text-sm mb-3 flex items-center justify-between">
-      <div>
-        <span class="text-ink-faint">{m.tournament_your_status()}</span>
-        <span class="ml-2 text-ink-bright">{currentPlayerEntry.state === "Finished"
-          ? ((tournament.finals !== null || tournament.state === "Finished") && standings.some(s => s.user_uid === currentPlayerEntry.user_uid) ? m.tournament_status_finished() : m.tournament_status_dropped())
-          : translatePlayerState(currentPlayerEntry.state)}</span>
+    <!-- State, score and the bar to clear are one fact: one line. -->
+    <div class="text-sm mb-3 flex items-start justify-between gap-2">
+      <div class="min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span class="text-ink-bright">
+          <span class="sr-only">{m.tournament_your_status()}</span>
+          {myStatusLabel}
+        </span>
+        {#if showMyScore && myStanding}
+          <span class="text-ink-faint" aria-hidden="true">·</span>
+          <span class="text-ink-strong font-medium">
+            <span class="sr-only">{m.tournament_your_score()}</span>
+            {formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}
+          </span>
+          <ScoreLegend compact />
+        {/if}
+        {#if cutoffScore}
+          <span class="w-full text-xs text-ink-faint">
+            {m.tournament_cutoff_threshold()}
+            <span class="text-ink-muted">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
+          </span>
+        {/if}
       </div>
       {#if !tournament.online && !atCap && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting"}
         <Button
@@ -352,13 +385,16 @@
           <QrCode class="w-4 h-4" />
           {m.checkin_qr_scan_btn()}
         </Button>
-      {:else if !tournament.online && !atCap && currentPlayerEntry.state === "Finished" && tournament.state === "Waiting"}
+      {:else if currentPlayerEntry.state === "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
+        <!-- Dropping out is undone here rather than guarded by a confirm. No QR:
+             a drop-out never left the venue, and the engine takes a self check-in
+             (at cap it reinstates to Completed, mid-round back to their seat). -->
         <Button
           variant="ghost"
-          onclick={() => showQrScanner = true}
+          onclick={() => doAction("CheckIn", { player_uid: userUid })}
           disabled={actionLoading}
         >
-          <QrCode class="w-4 h-4" />
+          <Undo2 class="w-4 h-4" aria-hidden="true" />
           {m.tournament_check_in_btn()}
         </Button>
       {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
@@ -384,16 +420,9 @@
     {#if showDeckWarn}
       <div class="mb-3">{@render deckWarn()}</div>
     {/if}
-    <!-- Player's current score -->
-    {#if myStanding && (tournament.state === "Playing" || tournament.state === "Waiting") && (tournament.rounds?.length ?? 0) > 0}
-      <div class="text-sm">
-        <span class="text-ink-faint">{m.tournament_your_score()}</span>
-        <span class="ml-2 text-ink-strong font-medium">{formatScore(myStanding.gw, myStanding.vp, myStanding.tp)}</span>
-      </div>
-    {/if}
     <!-- Self-organize a round (open-rounds, online): seat your own 4-5 pod without an organizer -->
     {#if canSelfOrganize}
-      <div class="bg-surface-muted/50 rounded-lg p-4 space-y-2">
+      <div class="border-t border-line pt-4 space-y-2">
         <div class="flex items-start gap-2">
           <Users class="w-4 h-4 mt-0.5 text-link shrink-0" aria-hidden="true" />
           <div class="min-w-0">
@@ -417,7 +446,7 @@
     {#if isFinals && !isFinished && tournament.finals}
       {@const finalsSeatIdx = tournament.finals.seating.findIndex(s => s.player_uid === userUid)}
       {@const finalsSize = tournament.finals.seating.length}
-      <div class="bg-surface-muted/50 rounded-lg p-4">
+      <div class="border-t border-line pt-4">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-sm font-medium text-ink-strong">{m.tournament_finals_heading()}</h3>
           <span class="text-xs px-2 py-0.5 rounded {tournament.finals.state === 'Finished' ? 'badge-success' : tournament.finals.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
@@ -464,11 +493,9 @@
                   onchange={(v) => setFinalsVp(seat.player_uid, v, tournament.finals!.seating)}
                 />
               {:else}
-                <!-- Non-finalists spectate: the engine rejects their VP edits, so
-                     show read-only values instead of tappable chips (FinalsTab
-                     judge-lock pattern). -->
+                <!-- The engine rejects non-finalists' VP edits: read-only, not chips. -->
                 <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
-                  {seat.result.vp}
+                  {seat.result.vp}VP
                   <Lock class="w-3.5 h-3.5" aria-hidden="true" />
                 </span>
               {/if}
@@ -477,14 +504,11 @@
         </div>
       </div>
     {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0}
+      <!-- Idle is uneventful, not an alert. -->
       {#if currentPlayerEntry?.state === "Completed"}
-        <div class="banner-info border rounded-lg p-4">
-          <p class="text-sm">{m.player_completed_awaiting_finals()}</p>
-        </div>
+        <p class="text-sm text-ink-muted">{m.player_completed_awaiting_finals()}</p>
       {:else if myActiveRounds.length === 0 && currentPlayerEntry?.state === "Checked-in"}
-        <div class="banner-info border rounded-lg p-4">
-          <p class="text-sm">{m.player_sitting_out()}</p>
-        </div>
+        <p class="text-sm text-ink-muted">{m.player_sitting_out()}</p>
       {:else}
         {#each myActiveRounds as active}
           {@const myTable = active.table}
@@ -493,7 +517,7 @@
           {@const mySeatIdx = myTable.seating.findIndex(s => s.player_uid === userUid)}
           {@const tableSize = myTable.seating.length}
           {@const tableLocked = myTable.seating.some(s => s.judge_uid) || !!myTable.override}
-          <div class="bg-surface-muted/50 rounded-lg p-4">
+          <div class="border-t border-line pt-4">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-sm font-medium text-ink-strong">
                 {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
@@ -544,7 +568,7 @@
                   </div>
                   {#if tableLocked}
                     <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
-                      {seat.result.vp}
+                      {seat.result.vp}VP
                       <Lock class="w-3.5 h-3.5" aria-hidden="true" />
                     </span>
                   {:else}
@@ -578,29 +602,24 @@
         {/each}
       {/if}
     {/if}
-    <!-- Cutoff score threshold for players -->
-    {#if cutoffScore}
-      <div class="bg-surface-muted/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-ink-strong mb-2">
-          {m.tournament_standings()}
-          <span class="text-xs text-ink-faint font-normal ml-1">({m.tournament_standings_cutoff()})</span>
-        </h3>
-        <ScoreLegend />
-        <p class="text-sm text-ink">
-          {m.tournament_cutoff_threshold()} <span class="text-ink-strong font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
-        </p>
-      </div>
+    <!-- Spectators have no score line to carry the cutoff. -->
+    {#if cutoffScore && !currentPlayerEntry}
+      <p class="text-sm text-ink-muted">
+        {m.tournament_cutoff_threshold()}
+        <span class="text-ink font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
+      </p>
     {/if}
     <!-- Standings for players -->
     {#if tournament.state !== "Finished" && playerStandings.length > 0}
-      <div class="bg-surface-muted/50 rounded-lg p-4">
+      <div class="border-t border-line pt-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">
           {m.tournament_standings()}
           {#if tournament.standings_mode !== "Public"}
             <span class="text-xs text-ink-faint font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
           {/if}
         </h3>
-        <ScoreLegend />
+        <!-- The score line above already carries it. -->
+        {#if !showMyScore}<ScoreLegend />{/if}
         <table class="w-full text-sm">
           <thead>
             <tr class="text-ink-faint text-xs">
@@ -640,7 +659,7 @@
         {#if showPreviousRounds}
           <div class="mt-2 space-y-3">
             {#each previousRounds as prev}
-              <div class="bg-surface-muted/50 rounded-lg p-3">
+              <div class="border-t border-line pt-3">
                 <h4 class="text-xs font-medium text-ink-muted mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
                 {#if prev.table.override}
                   <p class="text-xs text-warn mb-1.5">
@@ -757,9 +776,9 @@
       <!-- Players are the ones motivated to post their placement: share stays
            here too, not only on the organizer view (reports stay organizer-only) -->
       <div class="flex flex-wrap items-center gap-2">
-        <ShareResultsButtons {tournament} {playerInfo} {standings} />
+        <CopyResultsButton {tournament} {playerInfo} {standings} />
       </div>
-      <div class="bg-surface-muted/50 rounded-lg p-4">
+      <div class="border-t border-line pt-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_standings()}</h3>
         <ScoreLegend showRtp />
         <div class="overflow-x-auto">
@@ -804,7 +823,7 @@
       </div>
     {/if}
     {#if tournament.finals}
-      <div class="bg-surface-muted/50 rounded-lg p-4">
+      <div class="border-t border-line pt-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">{m.tournament_finals_table()}</h3>
         <div class="divide-y divide-line">
           {#each tournament.finals.seating as seat, j}

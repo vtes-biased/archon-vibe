@@ -10,6 +10,7 @@
     confirmLabel,
     action,
     onClose,
+    reportResult = true,
   }: {
     title: string;
     body: string;
@@ -17,6 +18,12 @@
     /** Runs the operation; may resolve with a stats map (or { stats }) to display. */
     action: () => Promise<unknown>;
     onClose: () => void;
+    /**
+     * Keep the modal open on success to show stats — right for the admin syncs,
+     * wrong for a plain confirm, where the screen changing IS the confirmation
+     * and a second dismissal is one click of nothing. Errors always stay.
+     */
+    reportResult?: boolean;
   } = $props();
 
   let status = $state<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -38,6 +45,10 @@
       // Background-dispatched jobs (the admin syncs) return
       // {status:'started'|'already_running'} with no stats — the outcome shows
       // up in the status panel, not here.
+      if (!reportResult) {
+        onClose();
+        return;
+      }
       const s = result && typeof result === 'object' ? (result as { status?: unknown }).status : undefined;
       if (s === 'started' || s === 'already_running') {
         started = true;

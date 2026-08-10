@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Sanction, SanctionLevel } from "$lib/types";
   import { Ban, Check, Clock } from "@lucide/svelte";
+  import Badge, { type BadgeTone } from "$lib/components/Badge.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { sanction }: { sanction: Sanction } = $props();
@@ -16,14 +17,15 @@
   );
   const isInactive = $derived(isLifted || isExpired);
 
-  // Ordinal severity ramp (amethyst → fuchsia → crimson) — semantic badge-* classes from app.css
-  const SANCTION_CLASSES: Record<SanctionLevel, string> = {
-    caution: "badge-pending",
-    warning: "badge-pending",
-    standings_adjustment: "badge-highlight",
-    disqualification: "badge-danger",
-    suspension: "bg-accent-soft/80 text-link-soft", // crimson uses custom palette
-    probation: "badge-danger",
+  // Ordinal severity ramp (amethyst → fuchsia → crimson): a sanction is STATUS,
+  // so it is one of the few chips that earns a meaning-bearing colour.
+  const SANCTION_TONES: Record<SanctionLevel, BadgeTone> = {
+    caution: "pending",
+    warning: "pending",
+    standings_adjustment: "highlight",
+    disqualification: "danger",
+    suspension: "accent", // crimson uses the accent palette, not the badge one
+    probation: "danger",
   };
 
   const levelLabelFns: Record<SanctionLevel, () => string> = {
@@ -35,7 +37,7 @@
     probation: () => m.sanction_level_probation(),
   };
 
-  const badgeClass = $derived(SANCTION_CLASSES[sanction.level]);
+  const tone = $derived(SANCTION_TONES[sanction.level]);
   const label = $derived(levelLabelFns[sanction.level]());
 
   // Format date for tooltip
@@ -58,12 +60,7 @@
   });
 </script>
 
-<span
-  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium {badgeClass} {isInactive
-    ? 'line-through opacity-60'
-    : ''}"
-  title={tooltipText}
->
+<Badge kind="status" {tone} lapsed={isInactive} title={tooltipText}>
   {#if isPermanent}
     <Ban class="w-3 h-3" />
   {/if}
@@ -73,4 +70,4 @@
   {:else if isExpired}
     <span title={m.sanction_expired()}><Clock class="w-3 h-3" /></span>
   {/if}
-</span>
+</Badge>

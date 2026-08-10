@@ -22,6 +22,13 @@
 
   const groupLabel = $derived(label ? `${label} — ${m.vp_label()}` : m.vp_label());
 
+  // Whole numbers on the row, the half as one toggle. Which halves are legal
+  // stays in vpOptions(): the toggle just asks whether whole + 0.5 is offered.
+  const wholes = $derived(options.filter((o) => Number.isInteger(o)));
+  const whole = $derived(Math.floor(value));
+  const hasHalf = $derived(value % 1 !== 0);
+  const halfAvailable = $derived(options.includes(whole + 0.5));
+
   // Flash a brief "saved" check when an in-flight save for this seat completes.
   let justSaved = $state(false);
   // Intentionally a plain (non-reactive) local: it only carries the previous
@@ -40,18 +47,28 @@
 </script>
 
 <div class="flex flex-wrap items-center gap-1" role="group" aria-label={groupLabel}>
-  {#each options as opt (opt)}
+  {#each wholes as opt (opt)}
     <button
       type="button"
       onclick={() => { if (opt !== value) onchange(opt); }}
       {disabled}
-      aria-pressed={opt === value}
+      aria-pressed={whole === opt}
       class="h-11 min-w-11 px-2 rounded-lg border text-sm font-semibold tabular-nums transition-colors disabled:opacity-40
-        {opt === value
+        {whole === opt
           ? 'bg-accent-strong text-white border-accent-strong-hover ring-2 ring-accent'
           : 'bg-surface-hover text-ink-strong border-line-strong hover:border-line-strong'}"
     >{opt}</button>
   {/each}
+  <button
+    type="button"
+    onclick={() => onchange(hasHalf ? whole : whole + 0.5)}
+    disabled={disabled || !halfAvailable}
+    aria-pressed={hasHalf}
+    class="h-11 min-w-11 px-2 ml-1 rounded-lg border text-sm font-semibold tabular-nums transition-colors disabled:opacity-40
+      {hasHalf
+        ? 'bg-accent-strong text-white border-accent-strong-hover ring-2 ring-accent'
+        : 'bg-surface-hover text-ink-strong border-line-strong hover:border-line-strong'}"
+  >+½</button>
   <span class="w-5 h-5 ml-0.5 flex items-center justify-center" aria-live="polite">
     {#if saving}
       <Loader2 class="w-4 h-4 text-ink-muted animate-spin" aria-hidden="true" />

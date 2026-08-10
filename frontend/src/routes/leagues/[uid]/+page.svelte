@@ -12,11 +12,12 @@
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
   import { tournamentAction } from "$lib/tournament-actions";
-  import { translateTournamentState, seatedPlayerCount } from "$lib/tournament-utils";
+  import { translateTournamentState, getStateTone, seatedPlayerCount } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from '$lib/components/Button.svelte';
+  import Badge from '$lib/components/Badge.svelte';
   import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar, Crown, Flag } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -357,9 +358,9 @@
           <div>
             <h1 class="text-3xl font-semibold text-accent">{league.name}</h1>
             <div class="flex gap-2 mt-1 text-sm text-ink-muted">
-              <span class="px-2 py-0.5 rounded text-xs font-medium {isActive() ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">
+              <Badge kind="status" tone={isActive() ? "info" : "slate"}>
                 {isActive() ? m.league_status_active() : m.league_status_finished()}
-              </span>
+              </Badge>
               <span>{standingsModeLabel(league.standings_mode)}</span>
               {#if league.format}
                 <span>· {league.format}</span>
@@ -370,11 +371,11 @@
                 <span>· {m.league_worldwide()}</span>
               {/if}
               {#if league.kind === "Meta-League"}
-                <span class="px-2 py-0.5 rounded text-xs font-medium badge-amethyst">{m.league_meta_badge()}</span>
+                <Badge tone="amethyst">{m.league_meta_badge()}</Badge>
               {/if}
               {#if parentLeague}
-                <a href="/leagues/{parentLeague.uid}" title={m.league_kind_meta()}
-                   class="px-2 py-0.5 rounded text-xs font-medium badge-amethyst hover:opacity-80 transition-opacity">{parentLeague.name}</a>
+                <Badge kind="link" tone="amethyst" truncate
+                       href="/leagues/{parentLeague.uid}" title={m.league_kind_meta()}>{parentLeague.name}</Badge>
               {/if}
             </div>
           </div>
@@ -640,9 +641,9 @@
                         · {t.format}
                       </div>
                     </div>
-                    <span class="px-2 py-1 rounded text-xs font-medium {t.state === 'Finished' ? 'bg-surface-hover text-ink-muted' : 'badge-success'}">
+                    <Badge kind="status" tone={getStateTone(t.state)}>
                       {translateTournamentState(t.state)}
-                    </span>
+                    </Badge>
                   </div>
                 </a>
               {/each}

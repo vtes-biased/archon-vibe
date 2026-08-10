@@ -8,7 +8,8 @@
   import { canCreateTournament } from "$lib/engine";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import type { Tournament, TournamentFormat } from "$lib/types";
-  import { getStateBadgeClass, translateTournamentState } from "$lib/tournament-utils";
+  import { getStateTone, translateTournamentState } from "$lib/tournament-utils";
+  import Badge from "$lib/components/Badge.svelte";
   import { zonedDate } from "$lib/utils";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import { Loader2, Trophy, Calendar, Copy, Check } from "@lucide/svelte";
@@ -520,9 +521,9 @@
                       {/if}
                     </div>
                   </div>
-                  <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
+                  <Badge kind="status" tone={getStateTone(tournament.state)}>
                     {translateTournamentState(tournament.state)}
-                  </span>
+                  </Badge>
                 </div>
                 <div class="flex gap-2 text-xs text-ink-faint flex-wrap">
                   <span>{tournament.format}</span>
@@ -567,9 +568,9 @@
                   {tournament.format}
                 </div>
                 <div class="col-span-2">
-                  <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
+                  <Badge kind="status" tone={getStateTone(tournament.state)}>
                     {translateTournamentState(tournament.state)}
-                  </span>
+                  </Badge>
                 </div>
               </div>
             </a>

@@ -1,13 +1,13 @@
 <script lang="ts">
+  // The tournament settings form. Organizers, table rooms and promo
+  // distribution used to be foldable siblings here; they are now their own rows
+  // in the Tools sheet, reachable in one tap instead of three.
   import { toUserMessage } from '$lib/errors';
   import type { Tournament } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
-  import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
-  import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
-  import PromosDistributedEditor from "./PromosDistributedEditor.svelte";
-  import { RefreshCw, Check, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import { RefreshCw, Check } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const DISCORD_VENUE = "Official Discord";
@@ -16,15 +16,9 @@
   let {
     tournament = $bindable(),
     isOrganizer,
-    expandOrganizers = false,
-    expandPromos = false,
   }: {
     tournament: Tournament;
     isOrganizer: boolean;
-    /** Open the organizers section on mount (header add-co-organizer chip). */
-    expandOrganizers?: boolean;
-    /** Open the promos section on mount (FinishedResults record-promos nudge). */
-    expandPromos?: boolean;
   } = $props();
 
   let saving = $state(false);
@@ -38,15 +32,6 @@
     clearTimeout(savedTimer);
     savedTimer = setTimeout(() => (savedFlash = false), 2000);
   }
-
-  // Re-homed setup sections (foldable, collapsed by default). Initial-value
-  // capture is intended: the tab remounts on every switch, so the chip's
-  // expand request applies at mount.
-  // svelte-ignore state_referenced_locally
-  let organizersExpanded = $state(expandOrganizers);
-  let roomsExpanded = $state(false);
-  // svelte-ignore state_referenced_locally
-  let promosExpanded = $state(expandPromos);
 
   // Stash location fields when toggling online mode, so we can restore on toggle-back
   let stashedPhysical = $state<{ country: string; venue: string; venue_url: string; address: string; map_url: string } | null>(null);
@@ -242,7 +227,17 @@
   }
 </script>
 
-<div class="space-y-6">
+{#snippet venueExtra()}
+  <TableRoomsEditor
+    tournamentUid={tournament.uid}
+    tableRooms={tournament.table_rooms ?? []}
+    onupdate={(t) => { tournament = t; }}
+  />
+{/snippet}
+
+<!-- space-y-4 matches the gap between the sections themselves, so the form's
+     sections and the section around it (organizers) sit on one rhythm. -->
+<div class="space-y-4">
   {#if error}
     <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
       <p class="text-link-soft text-sm">{error}</p>
@@ -252,69 +247,15 @@
   {#if !isOrganizer}
     <p class="text-ink-muted">{m.config_no_permission()}</p>
   {:else}
-    <!-- Organizers + table rooms first: operational levers, most needed as the
-         event nears or starts (re-homed from the former Overview tab). -->
-    <div class="space-y-3">
-      <div class="bg-surface-muted/30 rounded-lg p-4">
-        <button onclick={() => organizersExpanded = !organizersExpanded}
-          aria-expanded={organizersExpanded}
-          class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
-          {#if organizersExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-          {m.organizers_title()}
-        </button>
-        {#if organizersExpanded}
-          <div class="mt-3">
-            <OrganizerManager
-              organizerUids={tournament.organizers_uids ?? []}
-              onadd={async (userUid) => { await addTournamentOrganizer(tournament.uid, userUid); }}
-              onremove={async (userUid) => { await removeTournamentOrganizer(tournament.uid, userUid); }}
-            />
-          </div>
-        {/if}
-      </div>
-      <div class="bg-surface-muted/30 rounded-lg p-4">
-        <button onclick={() => roomsExpanded = !roomsExpanded}
-          aria-expanded={roomsExpanded}
-          class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
-          {#if roomsExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-          {m.rooms_title()}
-        </button>
-        {#if roomsExpanded}
-          <div class="mt-3">
-            <TableRoomsEditor
-              tournamentUid={tournament.uid}
-              tableRooms={tournament.table_rooms ?? []}
-              onupdate={(t) => { tournament = t; }}
-            />
-          </div>
-        {/if}
-      </div>
-      <div class="bg-surface-muted/30 rounded-lg p-4">
-        <button onclick={() => promosExpanded = !promosExpanded}
-          aria-expanded={promosExpanded}
-          class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
-          {#if promosExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-          {m.promos_title()}
-        </button>
-        {#if promosExpanded}
-          <div class="mt-3">
-            <PromosDistributedEditor
-              {tournament}
-              onupdate={(t) => { tournament = t; }}
-            />
-          </div>
-        {/if}
-      </div>
-    </div>
-
     <!-- Tournament settings -->
-    <div class="space-y-4 pt-4 border-t border-line">
+    <div class="space-y-4">
       <TournamentFields
         bind:values={fieldValues}
         onchange={handleFieldChange}
         onvenueselect={(fields) => saveMultiple(fields)}
         {disabledFields}
         idPrefix="cfg"
+        {venueExtra}
       />
     </div>
 

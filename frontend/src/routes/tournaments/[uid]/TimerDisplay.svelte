@@ -194,6 +194,7 @@
     body={m.timer_reset_confirm_body()}
     confirmLabel={m.timer_reset()}
     action={doReset}
+    reportResult={false}
     onClose={() => (showResetConfirm = false)}
   />
 {/if}

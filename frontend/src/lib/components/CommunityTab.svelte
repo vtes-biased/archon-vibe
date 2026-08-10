@@ -3,7 +3,8 @@
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { getRoleClasses, getRoleLabel } from "$lib/roles";
+  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import Badge from "$lib/components/Badge.svelte";
   import { deobfuscateContact } from "$lib/contact";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -397,7 +398,7 @@
                         <div class="flex items-center gap-2 flex-wrap">
                           <a href="/users/{official.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{official.name}</a>
                           {#each official.roles.filter(r => r === "NC" || r === "Prince") as role}
-                            <span class="px-2 py-0.5 rounded text-xs font-medium {getRoleClasses(role)}">{getRoleLabel(role)}</span>
+                            <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
                           {/each}
                         </div>
                         {#if official.city}

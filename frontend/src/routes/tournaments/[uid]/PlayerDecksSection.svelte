@@ -194,13 +194,6 @@
     {/if}
   {/if}
 
-  <!-- Proxy policy: a deck-building constraint the player must know before showing up -->
-  {#if isPlayer && (tournament.state === 'Registration' || tournament.state === 'Waiting')}
-    <p class="text-xs text-ink-muted">
-      {tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}
-    </p>
-  {/if}
-
   <!-- Winner's deck nudge (post-tournament) -->
   {#if tournament.state === 'Finished' && winnerUid && !winnerHasDeck}
     {#if isWinner}
@@ -325,15 +318,23 @@
               {/if}
             </div>
           {/if}
-        {:else}
-          <div class="p-3 sm:p-4">
-            <h3 class="text-sm font-semibold text-ink-strong mb-3">{m.decks_my_deck()}</h3>
-            {#if singleDeckEditable && (uploadingFor === myUid || myDecks.length === 0)}
+        {:else if singleDeckEditable}
+          <!-- The uploader is a screenful, so it waits behind its own button. -->
+          {@const uploading = uploadingFor === myUid}
+          <div class="p-3 sm:p-4 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_deck()}</h3>
+              <Button
+                variant={uploading ? "secondary" : "primary"}
+                onclick={() => (uploadingFor = uploading ? null : myUid)}
+              >{uploading ? m.common_cancel() : m.decks_upload()}</Button>
+            </div>
+            {#if uploading}
               <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
-            {:else}
-              <p class="text-sm text-ink-muted">{m.decks_no_deck_yet()}</p>
             {/if}
           </div>
+        {:else}
+          <p class="p-3 sm:p-4 text-sm text-ink-muted">{m.decks_no_deck_yet()}</p>
         {/if}
       </div>
     {/if}

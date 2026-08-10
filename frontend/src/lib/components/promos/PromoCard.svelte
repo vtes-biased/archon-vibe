@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Promo } from "$lib/types";
-  import { promoImageUrl, promoKindLabel, rankBadgeLabel } from "$lib/promo-utils";
+  import { promoImageUrl, promoKindLabel } from "$lib/promo-utils";
+  import { rankBadgeLabel } from "$lib/tournament-utils";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import { RectangleVertical, Package, Gift, Pencil, Archive, ArchiveRestore, Trash2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';

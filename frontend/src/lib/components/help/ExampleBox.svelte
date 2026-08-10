@@ -8,7 +8,8 @@
   <div class="px-3 py-1.5 bg-surface-hover/50 border-b border-line-strong">
     <span class="text-xs font-medium text-ink-faint uppercase tracking-wider">{m.example_box_label()}</span>
   </div>
-  <div class="p-4 pointer-events-none select-none" aria-hidden="true">
+  <!-- inert, not just aria-hidden: otherwise every button stays tabbable. -->
+  <div class="p-4 pointer-events-none select-none" aria-hidden="true" inert>
     {@render children()}
   </div>
 </div>

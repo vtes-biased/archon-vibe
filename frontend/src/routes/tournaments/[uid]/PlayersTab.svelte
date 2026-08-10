@@ -9,13 +9,14 @@
   import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, ChevronDown, ChevronRight, EyeOff, Trash2, Ellipsis, Dices, Printer } from "@lucide/svelte";
+  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
+  import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, EyeOff, Trash2, Ellipsis, Dices, Printer, SlidersHorizontal, ChevronDown, ChevronRight, Banknote } from "@lucide/svelte";
+  import ActionMenu from "$lib/components/ActionMenu.svelte";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
-  import RaffleSection from "./RaffleSection.svelte";
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import { validateDeck, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { top5HasTies as top5HasTiesFn, top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -120,7 +121,6 @@
 
   let editingToss = $state(false);
   let tossEdits = $state<Record<string, string>>({});
-  let raffleExpanded = $state(false);
   // svelte-ignore state_referenced_locally — intentionally captures initial value
   let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
   let standingsInitialized = false;
@@ -139,6 +139,18 @@
 
   function togglePlayer(uid: string) {
     expandedPlayer = expandedPlayer === uid ? null : uid;
+    expandedDeckRound = null;
+    uploadingFor = null;
+    uploadingRound = undefined;
+  }
+
+  // Mobile card expansion (one at a time). The deck panel and the More drawer
+  // are sub-panels of an open card, so opening another card closes them with it.
+  let expandedCard = $state<string | null>(null);
+  function toggleCard(uid: string) {
+    expandedCard = expandedCard === uid ? null : uid;
+    morePlayer = null;
+    expandedPlayer = null;
     expandedDeckRound = null;
     uploadingFor = null;
     uploadingRound = undefined;
@@ -230,6 +242,11 @@
   });
 
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
+  // The door desk. At registration and before round 1, taking payment and
+  // chasing decklists IS the work, so those controls stay inline on every card
+  // instead of one tap deep — the same state-owns-the-surface rule that
+  // collapses the card once the event is under way.
+  const doorMode = $derived(isOrganizer && (tournament.state === "Registration" || (tournament.state === "Waiting" && !hasRounds)));
   const standingsMap = $derived(new Map(standings.map(s => [s.user_uid, s])));
   // Exact-score ties involving a top-5 seat (either side of the pair) — the uids
   // needing a toss to break the finals cutoff. Computed once instead of the
@@ -307,6 +324,10 @@
     return players;
   });
 
+  // Trigger dot: a filter is hiding players. Sort is excluded — it reorders,
+  // it never hides, so it needs no warning.
+  const filtersActive = $derived(paymentFilter !== 'all' || deckFilter !== 'all');
+
   // Modal entry points (modal internals live in CreateAndRegisterModal)
   let sponsorTarget = $state<User | null>(null);
   let showCreateModal = $state(false);
@@ -324,12 +345,15 @@
     await doAction("AddPlayer", { user_uid: user.uid, vekn_id: user.vekn_id });
   }
 
-  async function removePlayer(userUid: string) {
-    await doAction("RemovePlayer", { user_uid: userUid });
-  }
+  // Both are one tap from an expanded card and neither is undoable in place, so
+  // they confirm. The modal closes on success — the row changing is the receipt.
+  let removalTarget = $state<{ kind: "drop" | "remove"; uid: string; name: string } | null>(null);
 
-  async function dropPlayer(playerUid: string) {
-    await doAction("DropOut", { player_uid: playerUid });
+  async function runRemoval() {
+    const t = removalTarget;
+    if (!t) return;
+    if (t.kind === "drop") await doAction("DropOut", { player_uid: t.uid });
+    else await doAction("RemovePlayer", { user_uid: t.uid });
   }
 
   function enterTossEdit() {
@@ -409,21 +433,39 @@
 </script>
 
 <div class="space-y-4">
+  <!-- One option in the sort/filter menu. Touch floor applies: the menu is
+       narrow, but it is still tapped standing at a table. -->
+  {#snippet optionChip(label: string, selected: boolean, choose: () => void, tone: string)}
+    <button
+      type="button"
+      onclick={choose}
+      aria-pressed={selected}
+      class="px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1 text-xs rounded transition-colors {selected ? tone : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
+    >{label}</button>
+  {/snippet}
+
   <!-- Per-player "More" drawer: rare/destructive tail (drop/remove + sanction lead,
        proxy demoted). Shared by the mobile card and the desktop expand row. -->
   {#snippet moreDrawer(player: Player, puid: string)}
     <div class="space-y-3">
       <div class="flex gap-2 flex-wrap">
         {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
-          <Button variant="danger" size="sm" onclick={() => dropPlayer(puid)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop_player()}</Button>
+          <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "drop", uid: puid, name: playerInfo[puid]?.name ?? puid }}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop_player()}</Button>
         {:else if puid && !hasRounds}
-          <Button variant="danger" size="sm" onclick={() => removePlayer(puid)}><X class="w-4 h-4" aria-hidden="true" />{m.players_remove_title()}</Button>
+          <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "remove", uid: puid, name: playerInfo[puid]?.name ?? puid }}><X class="w-4 h-4" aria-hidden="true" />{m.players_remove_title()}</Button>
         {/if}
         <!-- Available offline too: sanctions are offline-manageable on the
              lock-holding device (saved to IDB, reconciled at go-online). -->
         {#if puid && hasRounds}
           <Button variant="secondary" size="sm" onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}>
             <TriangleAlert class="w-4 h-4 text-warn" aria-hidden="true" />{m.players_sanction_btn()}
+          </Button>
+        {/if}
+        <!-- The mobile card's sanction dot is inert (it sits inside the card's
+             own tap target), so the list opens from here. -->
+        {#if playerSanctionsMap[puid]?.length}
+          <Button variant="secondary" size="sm" onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}>
+            {m.players_view_sanctions()}
           </Button>
         {/if}
       </div>
@@ -447,6 +489,86 @@
         <p class="text-xs text-ink-faint mt-1.5">{m.proxy_hint()}</p>
       </div>
     </div>
+  {/snippet}
+
+  <!-- Collapsed mobile card: two lines. Line one is who and where they stand,
+       line two is their identity and their score — the two questions asked of a
+       player list. Payment used to be the loudest thing on the card, a solid
+       button outranking the result; it now lives in the expansion (or inline in
+       door mode, where it is the actual work). -->
+  {#snippet cardSummary(player: Player, puid: string, expandable: boolean, open: boolean)}
+    {@const entry = standingsMap.get(puid)}
+    {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
+    {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
+    {@const isTied = entry ? tiedUids.has(entry.user_uid) : false}
+    {@const meta = [tournament.online ? playerInfo[puid]?.nickname : null, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}
+    <div class="flex items-center gap-1.5">
+      {#if playerSort === 'standings' && entry}
+        <span class="text-ink-faint text-xs font-medium shrink-0">{#if entry.disqualified || entry.non_competing}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} hash />{/if}</span>
+      {/if}
+      <span class="min-w-0 truncate {(entry?.disqualified || entry?.non_competing) ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} text-sm">
+        {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
+      </span>
+      {#if player.non_competing}
+        <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted shrink-0" title={m.proxy_hint()}>{m.proxy_label()}</span>
+      {/if}
+      {#if playerSanctionsMap[puid]?.length}
+        <!-- Inert here: the card header is one tap target, so opening the
+             sanction list from inside it would nest a button in a button. The
+             list opens from the More drawer instead. -->
+        <SanctionIndicator sanctions={playerSanctionsMap[puid]} />
+      {/if}
+      <span class="flex-1"></span>
+      <span class="shrink-0">
+        {#if player.state === "Disqualified"}
+          <span class="text-xs px-2 py-0.5 rounded bg-accent-soft/60 text-link-soft">{m.player_state_disqualified()}</span>
+        {:else if player.state === "Finished"}
+          {@const played = standingsMap.has(puid)}
+          {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
+          <span class="text-xs px-2 py-0.5 rounded bg-surface-hover text-ink-faint">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
+        {:else if player.state === "Completed"}
+          <!-- Open rounds: reached per-player cap — done with prelims, awaiting finals. -->
+          <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted" title={m.player_completed_hint()}>{m.player_state_completed()}</span>
+        {:else}
+          <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">{translatePlayerState(player.state)}</span>
+        {/if}
+        <!-- Open rounds: progress toward the per-player cap while in-flight; the badge carries the capped/done state. -->
+        {#if openRounds}
+          {@const rp = roundsPlayedMap.get(puid) ?? 0}
+          {#if rp > 0 && rp < (tournament.max_rounds ?? 0)}
+            <span class="text-xs text-ink-faint ml-1">{rp}/{tournament.max_rounds} {m.player_rounds_unit()}</span>
+          {/if}
+        {/if}
+      </span>
+      {#if expandable}
+        {#if open}<ChevronDown class="w-4 h-4 shrink-0 text-ink-faint" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4 shrink-0 text-ink-faint" aria-hidden="true" />{/if}
+      {/if}
+    </div>
+    {#if meta || entry}
+      <div class="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+        <span class="min-w-0 truncate">{meta}</span>
+        <span class="flex-1"></span>
+        {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
+          <!-- Toss stays on the collapsed line: when it is editable it is the
+               work of the moment, across several players at once. -->
+          {#if editingToss && isOrganizer}
+            <span class="shrink-0">{m.tournament_toss_label()}</span>
+            <input type="number" min="1" class="w-12 min-h-[44px] bg-surface-hover text-ink-strong text-xs rounded px-1 py-1.5 border border-line-strong"
+              value={tossEdits[puid] ?? ""} oninput={(e) => tossEdits[puid] = (e.target as HTMLInputElement).value} />
+          {:else}
+            <span class="shrink-0">{m.tournament_toss_label()} {entry?.toss || "—"}</span>
+          {/if}
+        {/if}
+        {#if entry}
+          <span class="shrink-0 text-ink-muted">{formatScore(entry.gw, entry.vp, entry.tp)}</span>
+          {#if hasFinals && entry.finals}<span class="shrink-0">{entry.finals}</span>{/if}
+          {#if showRating && playerSort === 'standings'}
+            {@const pts = getRatingPts(entry, tournament, ratingCtx)}
+            {#if pts !== null}<span class="shrink-0">{pts} RP</span>{/if}
+          {/if}
+        {/if}
+      </div>
+    {/if}
   {/snippet}
 
   <!-- Per-player expanded deck panel (upload / accordion / validation errors).
@@ -524,11 +646,19 @@
   <!-- Header + Add Player -->
   <div class="space-y-2">
     <div class="flex items-center gap-3">
+      <!-- The paid / decks-in tallies used to be captions under their own chip
+           rows; they are counts of the roster, so they belong on the roster line. -->
       <p class="text-ink-muted shrink-0">
         {#if (tournament.max_players ?? 0) > 0}
           {m.players_count_capped({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players) })}
         {:else}
           {m.players_count({ count: String(tournament.players?.length ?? 0) })}
+        {/if}
+        {#if isOrganizer && totalPlayers > 0}
+          <span class="text-xs text-ink-faint">· {m.payment_summary({ paid: String(paidCount), total: String(totalPlayers) })}</span>
+          {#if tournament.decklist_required}
+            <span class="text-xs text-ink-faint">· {m.decks_submitted_count({ submitted: String(decksSubmittedCount), total: String(totalPlayers) })}</span>
+          {/if}
         {/if}
       </p>
       {#if isOrganizer}
@@ -585,20 +715,25 @@
 
   <!-- Toss controls (only between rounds, not during play) -->
   {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings)}
-    <div class="flex items-center gap-2">
+    <!-- Buttons only: the action bar already says to resolve ties with a toss, and
+         a hint sharing this row squeezed both labels into mid-word wraps. -->
+    <div class="flex flex-wrap items-center gap-2">
       {#if editingToss}
         <Button
           variant="secondary"
+          class="whitespace-nowrap"
           onclick={saveTossEdits}
           disabled={actionLoading}
         >{m.common_save()}</Button>
         <Button
           variant="secondary"
+          class="whitespace-nowrap"
           onclick={cancelTossEdit}
         >{m.common_cancel()}</Button>
       {:else}
         <Button
           variant="secondary"
+          class="whitespace-nowrap"
           onclick={randomToss}
           disabled={actionLoading}
         >
@@ -607,104 +742,67 @@
         </Button>
         <Button
           variant="secondary"
+          class="whitespace-nowrap"
           onclick={enterTossEdit}
         >{m.players_edit_toss()}</Button>
-        {#if top5HasTiesFn(standings)}
-          <span class="text-xs text-ink-faint">{m.players_toss_hint()}</span>
-        {/if}
-      {/if}
-    </div>
-  {/if}
-
-  <!-- Raffle (re-homed from the former Overview tab) -->
-  {#if isOrganizer && (tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished")}
-    <div class="bg-surface-muted/30 rounded-lg p-4">
-      <button onclick={() => raffleExpanded = !raffleExpanded}
-        aria-expanded={raffleExpanded}
-        class="flex items-center gap-2 py-2 text-sm font-medium text-ink w-full text-left">
-        {#if raffleExpanded}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-        {m.raffle_title()}
-      </button>
-      {#if raffleExpanded}
-        <div class="mt-3">
-          <RaffleSection
-            {tournament}
-            {playerInfo}
-            isOrganizer={true}
-            {doAction}
-            {actionLoading}
-          />
-        </div>
       {/if}
     </div>
   {/if}
 
   {#if (tournament.players?.length ?? 0) > 0}
-    <!-- Sort + filter controls -->
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <div class="flex gap-1">
-        {#if standings.length > 0}
-          <button
-            class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'standings' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-            onclick={() => playerSort = 'standings'}
-          >{m.players_sort_standings()}</button>
-        {/if}
-        <button
-          class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'name' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-          onclick={() => playerSort = 'name'}
-        >{m.players_sort_name()}</button>
-        <button
-          class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {playerSort === 'vekn' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-          onclick={() => playerSort = 'vekn'}
-        >{m.players_sort_vekn()}</button>
-      </div>
+    <!-- One control row. Sort, payment filter and deck filter were three chip
+         rows plus two captions; they are all "how do I want this list?", asked
+         once in a while, so they collapse behind a single settings menu and the
+         tab opens on the players instead of ~400px of controls. -->
+    <div class="flex items-center gap-2">
+      <ActionMenu label={m.players_sort_filter()} icon={SlidersHorizontal} indicator={filtersActive}>
+        <div class="w-48 space-y-3">
+          <div>
+            <p class="text-[11px] uppercase tracking-wide text-ink-faint mb-1">{m.players_sort_by()}</p>
+            <div class="flex flex-wrap gap-1">
+              {#if standings.length > 0}
+                {@render optionChip(m.players_sort_standings(), playerSort === 'standings', () => playerSort = 'standings', 'bg-surface-active text-ink-strong')}
+              {/if}
+              {@render optionChip(m.players_sort_name(), playerSort === 'name', () => playerSort = 'name', 'bg-surface-active text-ink-strong')}
+              {@render optionChip(m.players_sort_vekn(), playerSort === 'vekn', () => playerSort = 'vekn', 'bg-surface-active text-ink-strong')}
+            </div>
+          </div>
+          {#if isOrganizer}
+            <div>
+              <p class="text-[11px] uppercase tracking-wide text-ink-faint mb-1">{m.payment_column()}</p>
+              <div class="flex flex-wrap gap-1">
+                {@render optionChip(m.common_all(), paymentFilter === 'all', () => paymentFilter = 'all', 'bg-surface-active text-ink-strong')}
+                {@render optionChip(m.payment_pending(), paymentFilter === 'Pending', () => paymentFilter = 'Pending', 'btn-pending')}
+                {@render optionChip(m.payment_paid(), paymentFilter === 'Paid', () => paymentFilter = 'Paid', 'btn-success')}
+              </div>
+            </div>
+            {#if tournament.decklist_required}
+              <div>
+                <p class="text-[11px] uppercase tracking-wide text-ink-faint mb-1">{m.tournament_col_deck()}</p>
+                <div class="flex flex-wrap gap-1">
+                  {@render optionChip(m.common_all(), deckFilter === 'all', () => deckFilter = 'all', 'bg-surface-active text-ink-strong')}
+                  {@render optionChip(m.decks_missing(), deckFilter === 'missing', () => deckFilter = 'missing', 'btn-pending')}
+                  {@render optionChip(m.deck_filter_problems(), deckFilter === 'problems', () => deckFilter = 'problems', 'btn-pending')}
+                </div>
+              </div>
+            {/if}
+          {/if}
+        </div>
+      </ActionMenu>
       {#if isOrganizer && (playerStandings.length > 0 || cutoffScore)}
+        <!-- Icon-only: it prints the list you are looking at, and the printer is
+             the one glyph nobody misreads. -->
         <button
           onclick={printStandings}
-          class="inline-flex items-center gap-1 px-3 py-2 sm:px-2 sm:py-1 text-xs rounded bg-surface-hover/50 text-ink-muted hover:text-ink-bright transition-colors"
+          class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-2 rounded-lg bg-surface-hover text-ink-muted hover:text-ink-bright hover:bg-surface-active transition-colors"
           title={m.players_print_standings_hint()}
+          aria-label={m.players_print_standings()}
         >
-          <Printer class="w-3.5 h-3.5" />
-          {m.players_print_standings()}
+          <Printer class="w-4 h-4" aria-hidden="true" />
         </button>
       {/if}
-      {#if isOrganizer}
-        <div class="flex items-center gap-2">
-          <div class="flex gap-1">
-            <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'all' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-              onclick={() => paymentFilter = 'all'}
-            >{m.payment_filter_all()}</button>
-            <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Pending' ? 'btn-pending' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-              onclick={() => paymentFilter = 'Pending'}
-            >{m.payment_pending()}</button>
-            <button
-              class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {paymentFilter === 'Paid' ? 'btn-success' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-              onclick={() => paymentFilter = 'Paid'}
-            >{m.payment_paid()}</button>
-          </div>
-          <span class="text-xs text-ink-faint">{m.payment_summary({ paid: String(paidCount), total: String(totalPlayers) })}</span>
-        </div>
-        {#if tournament.decklist_required}
-          <div class="flex items-center gap-2">
-            <div class="flex gap-1">
-              <button
-                class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {deckFilter === 'all' ? 'bg-surface-active text-ink-strong' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-                onclick={() => deckFilter = 'all'}
-              >{m.deck_filter_all()}</button>
-              <button
-                class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {deckFilter === 'missing' ? 'btn-pending' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-                onclick={() => deckFilter = 'missing'}
-              >{m.decks_missing()}</button>
-              <button
-                class="px-3 py-2 sm:px-2 sm:py-1 text-xs rounded transition-colors {deckFilter === 'problems' ? 'btn-pending' : 'bg-surface-hover/50 text-ink-muted hover:text-ink-bright'}"
-                onclick={() => deckFilter = 'problems'}
-              >{m.deck_filter_problems()}</button>
-            </div>
-            <span class="text-xs text-ink-faint">{m.decks_submitted_count({ submitted: String(decksSubmittedCount), total: String(totalPlayers) })}</span>
-          </div>
-        {/if}
+      {#if filteredPlayers.length !== totalPlayers}
+        <span class="text-xs text-ink-faint">{m.players_filtered_count({ shown: String(filteredPlayers.length), total: String(totalPlayers) })}</span>
       {/if}
     </div>
 
@@ -716,116 +814,75 @@
         {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
         {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
         {@const isTied = entry ? tiedUids.has(entry.user_uid) : false}
-        <div class="bg-surface-muted/50 rounded-lg p-3 {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-accent-soft-border' : ''}">
-          <!-- Top row: rank + name + sanctions + status -->
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-1.5">
-                {#if playerSort === 'standings' && entry}
-                  <span class="text-ink-faint text-xs font-medium shrink-0">{#if entry.disqualified || entry.non_competing}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} hash />{/if}</span>
-                {/if}
-                <span class="truncate {(entry?.disqualified || entry?.non_competing) ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} text-sm">
-                  {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
-                </span>
-                {#if player.non_competing}
-                  <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted shrink-0" title={m.proxy_hint()}>{m.proxy_label()}</span>
-                {/if}
-                {#if playerSanctionsMap[puid]?.length}
-                  <SanctionIndicator
-                    sanctions={playerSanctionsMap[puid]}
-                    onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
-                  />
-                {/if}
-              </div>
-              {#if (tournament.online && playerInfo[puid]?.nickname) || playerInfo[puid]?.vekn}
-                <div class="text-xs text-ink-faint truncate">{[tournament.online ? playerInfo[puid]?.nickname : null, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}</div>
-              {/if}
-            </div>
-            <div class="shrink-0">
-              {#if player.state === "Disqualified"}
-                <span class="text-xs px-2 py-0.5 rounded bg-accent-soft/60 text-link-soft">{m.player_state_disqualified()}</span>
-              {:else if player.state === "Finished"}
-                {@const played = standingsMap.has(puid)}
-                {@const finalsPhase = tournament.finals !== null || tournament.state === "Finished"}
-                <span class="text-xs px-2 py-0.5 rounded bg-surface-hover text-ink-faint">{played && finalsPhase ? m.tournament_status_finished() : m.tournament_status_dropped()}</span>
-              {:else if player.state === "Completed"}
-                <!-- Open rounds: reached per-player cap — done with prelims, awaiting finals. -->
-                <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted" title={m.player_completed_hint()}>{m.player_state_completed()}</span>
-              {:else}
-                <span class="text-xs px-2 py-0.5 rounded {player.state === 'Checked-in' ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">{translatePlayerState(player.state)}</span>
-              {/if}
-              <!-- Open rounds: show progress toward the per-player cap while in-flight; the badge carries the capped/done state. -->
-              {#if openRounds}
-                {@const rp = roundsPlayedMap.get(puid) ?? 0}
-                {#if rp > 0 && rp < (tournament.max_rounds ?? 0)}
-                  <span class="text-xs text-ink-faint ml-1">{rp}/{tournament.max_rounds} {m.player_rounds_unit()}</span>
-                {/if}
-              {/if}
-            </div>
-          </div>
-          <!-- Score row -->
-          {#if entry}
-            <div class="mt-1 flex items-center gap-3 text-xs text-ink-muted">
-              <span>{formatScore(entry.gw, entry.vp, entry.tp)}</span>
-              {#if hasFinals && entry.finals}<span>{entry.finals}</span>{/if}
-              {#if showRating && playerSort === 'standings'}
-                {@const pts = getRatingPts(entry, tournament, ratingCtx)}
-                {#if pts !== null}<span class="text-ink-faint">{pts} RP</span>{/if}
-              {/if}
-              {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
-                {#if editingToss && isOrganizer}
-                  <span class="text-ink-faint">{m.tournament_toss_label()}</span>
-                  <input type="number" min="1" class="w-12 min-h-[44px] bg-surface-hover text-ink-strong text-xs rounded px-1 py-1.5 border border-line-strong"
-                    value={tossEdits[puid] ?? ""} oninput={(e) => tossEdits[puid] = (e.target as HTMLInputElement).value} />
-                {:else}
-                  <span class="text-ink-faint">{m.tournament_toss_label()} {entry.toss || "—"}</span>
-                {/if}
-              {/if}
+        <!-- Expandable except when the controls ARE the moment (door mode) or
+             when toss editing puts an input on the summary line — a tap target
+             cannot contain one. -->
+        {@const expandable = isOrganizer && !doorMode && !editingToss}
+        {@const open = doorMode || expandedCard === puid}
+        <div class="bg-surface-muted/50 rounded-lg {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-accent-soft-border' : ''}">
+          {#if expandable}
+            <button type="button" class="w-full text-left p-3" onclick={() => toggleCard(puid)} aria-expanded={open}>
+              {@render cardSummary(player, puid, true, open)}
+            </button>
+          {:else}
+            <div class="p-3 {isOrganizer && open ? 'pb-0' : ''}">
+              {@render cardSummary(player, puid, false, open)}
             </div>
           {/if}
-          <!-- Organizer actions row -->
-          {#if isOrganizer}
-            <div class="mt-2 flex items-center gap-2 flex-wrap">
-              <!-- Door controls: mobile card is the on-the-floor surface — 44px touch floor. -->
-              <button onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
-                disabled={actionLoading}
-                class="px-3 py-1 min-h-[44px] text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-success hover:opacity-80' : 'badge-pending hover:opacity-80'}">
-                {player.payment_status === 'Paid' ? m.payment_paid() : m.payment_pending()}
-              </button>
+          <!-- Organizer actions, revealed with the card -->
+          {#if isOrganizer && open}
+            <div class="px-3 pb-3 pt-2">
+              <div class="flex items-center gap-2 flex-wrap">
+              <!-- Status rides the icon and text, never the chrome: one ghost
+                   Button throughout, so the only filled control is the real CTA. -->
+              <Button variant="ghost" size="sm" class="min-h-[44px]" disabled={actionLoading}
+                onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
+                title={player.payment_status === 'Paid' ? m.payment_mark_unpaid() : m.payment_mark_paid()}>
+                {#if player.payment_status === 'Paid'}
+                  <Banknote class="w-3.5 h-3.5 text-info" aria-hidden="true" /><span class="text-info">{m.payment_paid()}</span>
+                {:else}
+                  <Banknote class="w-3.5 h-3.5 text-warn" aria-hidden="true" /><span class="text-warn">{m.payment_pending()}</span>
+                {/if}
+              </Button>
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
-                <button onclick={() => togglePlayer(puid)} class="inline-flex items-center gap-1 px-3 py-1 min-h-[44px] text-xs rounded transition-colors hover:bg-surface-hover" title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
-                  {#if player.non_competing}<Dices class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.proxy_random_deck()}</span>
-                  {:else if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-info" /><span class="text-info">{m.players_view_deck()}</span>
-                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-warn" /><span class="text-warn">{m.players_view_deck()}</span>
-                  {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-link" /><span class="text-link">{m.players_view_deck()}</span>
-                  {:else if deckStatus === 'unknown'}<CircleHelp class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_view_deck()}</span>
-                  {:else}<FileX class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_no_deck()}</span>{/if}
-                </button>
+                <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => togglePlayer(puid)} title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
+                  {#if player.non_competing}<Dices class="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /><span class="text-ink-muted">{m.proxy_random_deck()}</span>
+                  {:else if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-info" aria-hidden="true" /><span class="text-info">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-warn" aria-hidden="true" /><span class="text-warn">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'error'}<CircleX class="w-3.5 h-3.5 text-link" aria-hidden="true" /><span class="text-link">{m.players_view_deck()}</span>
+                  {:else if deckStatus === 'unknown'}<CircleHelp class="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /><span class="text-ink-muted">{m.players_view_deck()}</span>
+                  {:else}<FileX class="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /><span class="text-ink-muted">{m.players_no_deck()}</span>{/if}
+                </Button>
               {/if}
               {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
                 <!-- Open rounds: at cap and not dropped — no check-in, show their played count. -->
                 <Button variant="ghost" size="sm" class="min-h-[44px]" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
-              {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
-                <!-- Finished = dropped out: CheckIn reinstates (Checked-in under cap, Completed at cap).
-                     Primary for waiting registrants: check-in is THE door action of the moment. -->
+              {:else if puid && (tournament.state === "Waiting" || tournament.state === "Playing") && (player.state === "Finished" || player.state === "Registered")}
+                <!-- Mid-round too: late arrivals check in for the next round or a short
+                     table, and Finished = dropped out, whom CheckIn reinstates —
+                     Checked-in under cap, Completed at it, back to their seat mid-round.
+                     Primary for waiting registrants: check-in is THE door action. -->
                 <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" class="min-h-[44px]" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
               {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
                 <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
               {/if}
-              <!-- Rare/destructive tail (drop/remove · sanction · proxy) lives in "More". -->
-              <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} class="ml-auto min-h-[44px]" aria-expanded={morePlayer === puid}><Ellipsis class="w-4 h-4" aria-hidden="true" />{m.players_more()}</Button>
-            </div>
-            {#if morePlayer === puid}
-              <div class="mt-2 pt-2 border-t border-line">
-                {@render moreDrawer(player, puid)}
+              <!-- Door mode only: every card is open at once there, so the rare
+                   tail stays folded. A tapped-open card is already the detail view. -->
+              {#if doorMode}
+                <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} class="ml-auto min-h-[44px]" aria-expanded={morePlayer === puid}><Ellipsis class="w-3.5 h-3.5" aria-hidden="true" />{m.players_more()}</Button>
+              {/if}
               </div>
-            {/if}
-          {/if}
-          <!-- Expanded deck -->
-          {#if expandedPlayer === puid}
-            <div class="mt-2 pt-2 border-t border-line space-y-2">
-              {@render deckPanel(puid)}
+              {#if !doorMode || morePlayer === puid}
+                <div class="mt-2 pt-2 border-t border-line">
+                  {@render moreDrawer(player, puid)}
+                </div>
+              {/if}
+              {#if expandedPlayer === puid}
+                <div class="mt-2 pt-2 border-t border-line space-y-2">
+                  {@render deckPanel(puid)}
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
@@ -968,7 +1025,7 @@
                   <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                     {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
                       <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
-                    {:else if tournament.state === "Waiting" && (player.state === "Finished" || player.state === "Registered") && puid}
+                    {:else if puid && (tournament.state === "Waiting" || tournament.state === "Playing") && (player.state === "Finished" || player.state === "Registered")}
                       <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
                     {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
                       <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
@@ -1012,6 +1069,19 @@
     playerName={sanctionTarget.name}
     {currentRound}
     onClose={() => sanctionTarget = null}
+  />
+{/if}
+
+{#if removalTarget}
+  <ConfirmActionModal
+    title={removalTarget.kind === "drop"
+      ? m.players_drop_confirm_title({ name: removalTarget.name })
+      : m.players_remove_confirm_title({ name: removalTarget.name })}
+    body={removalTarget.kind === "drop" ? m.players_drop_confirm_body() : m.players_remove_confirm_body()}
+    confirmLabel={removalTarget.kind === "drop" ? m.players_drop_player() : m.players_remove_title()}
+    action={runRemoval}
+    reportResult={false}
+    onClose={() => removalTarget = null}
   />
 {/if}
 

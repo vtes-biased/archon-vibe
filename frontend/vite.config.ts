@@ -20,6 +20,11 @@ export default defineConfig({
 		sveltekit(),
 	],
 	server: {
+		watch: {
+			// A `build` while `dev` is live fired one page reload per emitted file;
+			// reloading mid-flight strands initAuth and reads as a logged-out session.
+			ignored: ['**/build/**', '**/.svelte-kit/output/**']
+		},
 		proxy: {
 			'/api': {
 				target: 'http://localhost:8000',

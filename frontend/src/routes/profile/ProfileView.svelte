@@ -11,6 +11,7 @@
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
   import type { CommunityLinkType } from "$lib/types";
+  import Badge from "$lib/components/Badge.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface Props {
@@ -224,11 +225,10 @@
       <span class="text-ink-muted">{m.add_player_vekn_id_label()}</span>
       <div class="flex items-center gap-2">
         {#if veknSyncPending}
-          <span class="px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1"
-                title={m.vekn_sync_pending_hint()}>
+          <Badge kind="status" tone="pending" title={m.vekn_sync_pending_hint()}>
             <CloudOff class="w-3 h-3" aria-hidden="true" />
             {m.vekn_sync_pending_member()}
-          </span>
+          </Badge>
         {/if}
         <span class="text-ink-strong font-mono">{user.vekn_id}</span>
         <button

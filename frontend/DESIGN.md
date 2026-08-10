@@ -60,6 +60,19 @@ Two layers share these hues:
 | **Status** (meaning) | `badge-success`/`-pending`/`-danger`/`-info`/`-highlight` · `banner-info`/`-warn`/`-error`/`-highlight` · `toast-success`/`-warn` · `status-offline`/`-update` · `btn-success`/`-pending` · `dot-pending`/`-highlight`/`-danger` · `text-info`/`text-warn`/`text-highlight` | success/info = azure · pending/warn = amethyst · danger/error = crimson · highlight = fuchsia |
 | **Categorical** (identity) | `badge-blue`/`-amethyst`/`-fuchsia`/`-crimson`/`-slate` | arbitrary distinct tags (roles, link platforms) — pick by family, the hue is just a label |
 
+### Badges — `<Badge>` owns every chip
+
+Never hand-roll `px-2 py-0.5 rounded text-xs font-medium` again; that string was pasted 29 times across 14 files and drifted in padding, size and hue. `Badge.svelte` owns the chrome and takes a **kind**, which is a grammar the reader can triage on, plus a **tone** from the palette above:
+
+| Kind | Means | Looks like |
+|------|-------|-----------|
+| `status` | carries meaning — tournament state, sanction severity, sync warnings | the coloured one; keep it rare per row |
+| `identity` | names the thing — format, rank, role, league kind | quiet (`neutral`) unless the hue *is* the label, as with roles |
+| `link` | goes somewhere | taller (32px), hover fade |
+| `control` | does something | taller (32px), bordered, pressable |
+
+The height difference is the affordance, not just the touch target: an inert label never grows. One row should carry **one** meaning-bearing colour — if everything is coloured the eye has nothing to triage on. Tone lookups live beside their data (`getStateTone`, `getRoleTone`, `SANCTION_TONES`) and return tone names, never classes, so a chip cannot drift back into raw utilities. `badgeToneClass(tone)` is the escape hatch for the two role *editors*, which are `text-sm` toggle buttons rather than chips.
+
 **Colourblind-safe severity/status rule:** every severity/status tier = fixed colour token + fixed shape-distinct lucide icon + text label. Colour is reinforcement, never the sole signal. The ordinal severity scale for seating issues:
 
 | Tier | Token | Icon | Used by |
@@ -78,7 +91,7 @@ This mirrors `.dot-danger`→`.dot-highlight`→`.dot-pending` (crimson→fuchsi
 - **Selection tokens** (`text-select`, `border-select-border`, `bg-select-soft`) — seating tap-to-swap affordance only. Never use for status.
 - **Categorical classes** (`badge-blue` etc.) — identity tags where the hue is arbitrary.
 - `btn-*` — solid status chips only (paid/pending filter chips, help-guide mockups). **Action buttons go through `<Button>`** (below), which uses `bg-crimson-*` / `btn-danger`.
-- `banner-*` — info/warning boxes (add `border rounded-lg p-3` etc.).
+- `banner-*` — info/warning boxes (add `border rounded-lg p-3` etc.). **Never on a chip:** a bordered `banner-warn` span reads as a shrunken alert box next to real badges. Use `<Badge kind="status" tone="pending">`.
 - Accent role tokens (`bg-accent*`, `text-link*`, `border-accent`, `ring-accent`) — crimson, theme-switched via `light-dark()`; use directly.
 
 **Adding a semantic colour:** add one `light-dark(LIGHT, DARK)` rule in `app.css` and verify AA in both themes. Do **not** reintroduce green/amber or a parallel `html.light` override block.

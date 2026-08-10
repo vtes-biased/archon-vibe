@@ -11,8 +11,17 @@
     bannerPath?: string | null;
     /** Organizer view: show add/change/remove affordances. */
     canManage: boolean;
+    /**
+     * Empty-state dropzone. The console turns it off and calls openCropper()
+     * from Tools instead, rather than park a dashed box atop every event.
+     */
+    showEmpty?: boolean;
   }
-  let { tournamentUid, bannerPath, canManage }: Props = $props();
+  let { tournamentUid, bannerPath, canManage, showEmpty: allowEmpty = true }: Props = $props();
+
+  export function openCropper() {
+    showCropper = true;
+  }
 
   let showCropper = $state(false);
   let showRemoveConfirm = $state(false);
@@ -45,7 +54,7 @@
 
   const src = $derived(override === undefined ? (bannerPath ?? null) : (override?.url ?? null));
   const heroVisible = $derived(!!src && !broken);
-  const showEmpty = $derived(canManage && !heroVisible);
+  const showEmpty = $derived(allowEmpty && canManage && !heroVisible);
 
   async function handleCropSave(blob: Blob) {
     // Throws on failure; the api layer has already surfaced the error toast, so
@@ -133,6 +142,7 @@
     body={m.tournament_banner_remove_confirm_body()}
     confirmLabel={m.tournament_banner_remove()}
     action={removeBanner}
+    reportResult={false}
     onClose={() => (showRemoveConfirm = false)}
   />
 {/if}

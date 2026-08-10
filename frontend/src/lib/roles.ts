@@ -1,24 +1,25 @@
 import type { Role } from '$lib/types';
+import type { BadgeTone } from '$lib/components/Badge.svelte';
 import * as m from '$lib/paraglide/messages.js';
 
-// Gothic-inspired muted role colors - see DESIGN.md
-// Uses semantic badge-* classes from app.css for light/dark mode support
-const ROLE_CLASSES: Record<Role, string> = {
-  // Gothic-jewel families: governance = crimson · judiciary = amethyst · playtest = blue · ethics = fuchsia · dev = slate
-  IC: 'badge-crimson',
-  NC: 'badge-crimson',
-  Prince: 'bg-accent-soft/60 text-link-soft', // crimson uses custom palette
-  Ethics: 'badge-fuchsia',
-  PTC: 'badge-blue',
-  PT: 'badge-blue',
-  Rulemonger: 'badge-amethyst',
-  Judge: 'badge-amethyst',
-  Judgekin: 'badge-amethyst',
-  DEV: 'badge-slate',
+// A role is an IDENTITY badge whose hue IS the label — the colour groups the
+// role family, it does not rank or warn. Gothic-jewel families: governance =
+// crimson · judiciary = amethyst · playtest = blue · ethics = fuchsia · dev = slate.
+const ROLE_TONES: Record<Role, BadgeTone> = {
+  IC: 'crimson',
+  NC: 'crimson',
+  Prince: 'accent', // crimson uses the accent palette, not the badge one
+  Ethics: 'fuchsia',
+  PTC: 'blue',
+  PT: 'blue',
+  Rulemonger: 'amethyst',
+  Judge: 'amethyst',
+  Judgekin: 'amethyst',
+  DEV: 'slate',
 };
 
-export function getRoleClasses(role: Role): string {
-  return ROLE_CLASSES[role];
+export function getRoleTone(role: Role): BadgeTone {
+  return ROLE_TONES[role];
 }
 
 // Roles render as their stored value except where the two diverge. The stored

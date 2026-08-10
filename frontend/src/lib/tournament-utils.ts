@@ -1,4 +1,5 @@
-import type { Sanction, Tournament, TournamentState } from "./types";
+import type { Sanction, Tournament, TournamentState, TournamentRank } from "./types";
+import type { BadgeTone } from "./components/Badge.svelte";
 import { computeFinalStandings, computeRatingPoints, computeRatingVpGw, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
@@ -25,14 +26,17 @@ export type PlayerInfoMap = Record<
   { name: string; nickname: string | null; vekn: string | null; display_name?: string | null }
 >;
 
-export function getStateBadgeClass(state: TournamentState): string {
+/** The state is the one STATUS badge in the header — it is the only chip in the
+ *  row allowed to carry a meaning-bearing colour. Tones only; the chip chrome
+ *  belongs to <Badge>, so this can never drift into raw utilities again. */
+export function getStateTone(state: TournamentState): BadgeTone {
   switch (state) {
-    case "Planned": return "bg-surface-hover text-ink";
-    case "Registration": return "badge-success";
-    case "Waiting": return "badge-pending";
-    case "Playing": return "bg-accent-soft/60 text-link-soft";
-    case "Finished": return "bg-surface-active text-ink-muted";
-    default: return "bg-surface-hover text-ink";
+    case "Planned": return "neutral";      // not happening yet — quietest
+    case "Registration": return "info";    // sign-ups open
+    case "Waiting": return "pending";      // at the door / between rounds
+    case "Playing": return "crimson";      // live, and crimson is the app's "now"
+    case "Finished": return "slate";
+    default: return "neutral";
   }
 }
 
@@ -57,19 +61,27 @@ export function abbreviateName(name: string): string {
  * own access projection already put in playerInfo — nothing is precomputed server-side.
  */
 export function seatDisplay(uid: string, playerInfo: PlayerInfoMap, online = false): string {
+  const { primary, detail } = seatDisplayParts(uid, playerInfo, online);
+  return detail ? `${primary} (${detail})` : primary;
+}
+
+/** The same rule, split, for callers that style the parenthetical separately
+ *  (the printed seating sheet greys it). Keeps one copy of a privacy rule. */
+export function seatDisplayParts(
+  uid: string,
+  playerInfo: PlayerInfoMap,
+  online = false,
+): { primary: string; detail: string } {
   const info = playerInfo[uid];
-  if (!info) return uid;
+  if (!info) return { primary: uid, detail: "" };
   if (online) {
     const nick = info.display_name || info.nickname;
     const abbrev = abbreviateName(info.name) || info.name;
-    if (nick) {
-      const inside = [abbrev, info.vekn].filter(Boolean).join(" · ");
-      return inside ? `${nick} (${inside})` : nick;
-    }
-    return info.vekn ? `${abbrev} (${info.vekn})` : abbrev;
+    if (nick) return { primary: nick, detail: [abbrev, info.vekn].filter(Boolean).join(" · ") };
+    return { primary: abbrev, detail: info.vekn ?? "" };
   }
   // Offline (IRL) events: real name + vekn only — the nickname is never shown.
-  return info.vekn ? `${info.name} (${info.vekn})` : info.name;
+  return { primary: info.name, detail: info.vekn ?? "" };
 }
 
 export function vpOptions(tableSize: number, allowImpossible: boolean): number[] {
@@ -246,6 +258,18 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
     if (fr) entry.finals = formatScore(fr.gw, fr.vp, fr.tp);
     return entry;
   });
+}
+
+/**
+ * Short badge label for a championship rank ("" never renders a badge).
+ * Deliberately NOT initials: "NC"/"CC" invert across the languages we ship
+ * (Campeonato Nacional, Championnat National), and the full rank names are what
+ * made the header row wrap in the first place — one word each is the middle.
+ */
+export function rankBadgeLabel(rank: TournamentRank): string {
+  if (rank === 'National Championship') return m.promo_rank_national();
+  if (rank === 'Continental Championship') return m.promo_rank_continental();
+  return rank;
 }
 
 export function translateTournamentState(state: TournamentState): string {

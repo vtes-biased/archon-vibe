@@ -26,6 +26,7 @@
   import DeveloperSection from "./DeveloperSection.svelte";
   import AdminSection from "./AdminSection.svelte";
   import DataSection from "./DataSection.svelte";
+  import Badge from "$lib/components/Badge.svelte";
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -252,10 +253,10 @@
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.user_detail_ratings()}</h3>
             {#if (user.wins?.length ?? 0) >= 5}
-              <a href="/rankings?tab=halloffame" class="px-2 py-0.5 rounded text-xs font-medium badge-highlight inline-flex items-center gap-1 hover:opacity-80 transition-opacity">
+              <Badge kind="link" tone="highlight" href="/rankings?tab=halloffame">
                 <Trophy class="w-3 h-3" aria-hidden="true" />
                 {m.profile_hof_member({ wins: String(user.wins?.length ?? 0) })}
-              </a>
+              </Badge>
             {/if}
           </div>
           <PlayerRatings {user} showHeading={false} />

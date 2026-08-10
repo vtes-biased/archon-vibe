@@ -8,6 +8,7 @@
   import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
   import { Loader2, BarChart3 } from "@lucide/svelte";
+  import Badge from "$lib/components/Badge.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);
@@ -206,9 +207,9 @@
                       {formatDateRange(league)}
                     </div>
                   </div>
-                  <span class="px-2 py-1 rounded text-xs font-medium {isActive(league) ? 'badge-success' : 'bg-surface-hover text-ink-muted'}">
+                  <Badge kind="status" tone={isActive(league) ? "info" : "slate"}>
                     {isActive(league) ? m.league_status_active() : m.league_status_finished()}
-                  </span>
+                  </Badge>
                 </div>
                 <div class="flex gap-2 text-xs text-ink-faint">
                   <span>{standingsModeLabel(league.standings_mode)}</span>
@@ -233,10 +234,10 @@
                   <div class="font-semibold text-ink-strong">
                     {league.name}
                     {#if league.kind === "Meta-League"}
-                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium badge-amethyst">{m.league_meta_badge()}</span>
+                      <span class="ml-2"><Badge tone="amethyst">{m.league_meta_badge()}</Badge></span>
                     {/if}
                     {#if metaLeagueNames[league.uid]}
-                      <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium badge-amethyst" title={m.league_kind_meta()}>{metaLeagueNames[league.uid]}</span>
+                      <span class="ml-2"><Badge tone="amethyst" truncate title={m.league_kind_meta()}>{metaLeagueNames[league.uid]}</Badge></span>
                     {/if}
                   </div>
                   {#if league.format}

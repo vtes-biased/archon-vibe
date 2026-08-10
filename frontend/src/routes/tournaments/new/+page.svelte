@@ -164,7 +164,7 @@
             </div>
           {/if}
 
-          <TournamentFields bind:values disabled={isSubmitting} />
+          <TournamentFields bind:values disabled={isSubmitting} mode="create" />
         </div>
 
         <!-- Actions -->

@@ -87,9 +87,16 @@ server {
   # proxied to FastAPI's per-object og stubs (they don't run JS, so the SPA's
   # client-set meta is invisible to them). `if`+`return` is the safe escape from
   # a location (NOT proxy_pass inside if); the named @og_stub does the proxy.
-  # Only the bare /tournaments/{uid} and /leagues/{uid} share URLs — sub-routes
-  # fall through to SPA.
+  # Only the bare /tournaments/{uid}, /leagues/{uid} and /help/{slug} share URLs
+  # — sub-routes fall through to SPA. Help slugs are words, not uids, so they
+  # need their own pattern; the backend maps an unknown one to the site card.
   location ~ ^/(tournaments|leagues)/[0-9a-fA-F-]+$ {
+    error_page 418 = @og_stub;
+    if ($is_social_bot) { return 418; }
+    try_files $uri $uri.html /200.html;
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+  }
+  location ~ ^/help/[a-z0-9-]+$ {
     error_page 418 = @og_stub;
     if ($is_social_bot) { return 418; }
     try_files $uri $uri.html /200.html;

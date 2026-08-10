@@ -374,6 +374,22 @@ fn test_start_round_no_show_drop_scoped_to_standard_round_one() {
 }
 
 #[test]
+fn test_seat_player_accepts_checked_in_late_arrival() {
+    // A latecomer checked in mid-round is Checked-in, not Registered, and must
+    // still be seatable.
+    let mut t = tournament_with_round();
+    t["players"]
+        .push(json::object! { user_uid: "p9", state: "Checked-in", payment_status: "Pending", toss: 0 })
+        .unwrap();
+    let org = make_organizer();
+
+    let event = json::object! { type: "SeatPlayer", player_uid: "p9", table: 1, seat: 4 };
+    let updated = json::parse(&run_event(&t, &event, &org).unwrap()).unwrap();
+    assert_eq!(updated["rounds"][0][1]["seating"].len(), 5);
+    assert_eq!(updated["players"][8]["state"].as_str(), Some("Playing"));
+}
+
+#[test]
 fn test_seat_player_reinstates_zero_round_no_show() {
     // A recorded round-1 no-show (Finished, zero rounds played) who walks in
     // mid-round is seated straight onto a live table; a Finished player who
@@ -3149,6 +3165,69 @@ fn test_organizer_can_rescore_judge_locked_table() {
     let organizer = make_organizer();
     let result = run_event(&t, &event, &organizer);
     assert!(result.is_ok());
+}
+
+#[test]
+fn test_seated_organizer_score_does_not_lock_tablemates() {
+    // No judge stamp when seated, or the judge locks their own tablemates out.
+    let mut t = tournament_with_round();
+    t["players"][4]["user_uid"] = "organizer-1".into();
+    t["rounds"][0][1]["seating"][0]["player_uid"] = "organizer-1".into();
+
+    let event = json::object! {
+        type: "SetScore",
+        round: 0,
+        table: 1,
+        scores: [ { player_uid: "organizer-1", vp: 2.0 } ],
+    };
+    let scored = json::parse(&run_event(&t, &event, &make_organizer()).unwrap()).unwrap();
+    assert_eq!(
+        scored["rounds"][0][1]["seating"][0]["judge_uid"].as_str(),
+        Some("")
+    );
+
+    // The invariant: a tablemate can still score afterwards.
+    let follow_up = json::object! {
+        type: "SetScore",
+        round: 0,
+        table: 1,
+        scores: [ { player_uid: "p6", vp: 1.0 } ],
+    };
+    assert!(run_event(&scored, &follow_up, &make_player("p6")).is_ok());
+}
+
+#[test]
+fn test_dropped_player_reinstated_during_play() {
+    let t = tournament_with_round();
+    let drop = json::object! { type: "DropOut", player_uid: "p5" };
+    let dropped = json::parse(&run_event(&t, &drop, &make_player("p5")).unwrap()).unwrap();
+    assert_eq!(dropped["players"][4]["state"].as_str(), Some("Finished"));
+
+    let back = json::object! { type: "CheckIn", player_uid: "p5" };
+    let back_in = json::parse(&run_event(&dropped, &back, &make_organizer()).unwrap()).unwrap();
+    // The seat was never vacated, so they resume Playing rather than await one.
+    assert_eq!(back_in["players"][4]["state"].as_str(), Some("Playing"));
+}
+
+#[test]
+fn test_late_arrival_checked_in_mid_round() {
+    // Real tournaments take walk-ins after a round starts — seated at a short
+    // table if play hasn't begun, next round otherwise. Both must reach the door.
+    let mut t = tournament_with_round();
+    t["players"][0]["state"] = "Registered".into();
+
+    let known = json::object! { type: "CheckIn", player_uid: "p1" };
+    let after = json::parse(&run_event(&t, &known, &make_organizer()).unwrap()).unwrap();
+    assert_eq!(after["players"][0]["state"].as_str(), Some("Checked-in"));
+
+    // Never registered at all: checking in enrols them.
+    let walk_in = json::object! { type: "CheckIn", player_uid: "p99", vekn_id: "12345" };
+    let after = json::parse(&run_event(&after, &walk_in, &make_organizer()).unwrap()).unwrap();
+    let added = after["players"]
+        .members()
+        .find(|p| p["user_uid"].as_str() == Some("p99"))
+        .expect("walk-in was not enrolled");
+    assert_eq!(added["state"].as_str(), Some("Checked-in"));
 }
 
 // --- Out-of-round score correction (organizer edits past round while Waiting) ---

@@ -12,16 +12,17 @@
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { initEngine, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
-  import { getStateBadgeClass, translateTournamentState, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   // The back link returns to the list the way it was left, like the nav menu.
   import { openLastView } from "$lib/last-view";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, UserPlus, TriangleAlert, Users, Swords, Trophy, Settings, ExternalLink, MapPin, CloudOff, CloudAlert, Trash2, Upload, CloudUpload, Share2, CalendarPlus } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, CloudOff, CloudAlert, Upload, CloudUpload, Share2, CalendarPlus } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import TournamentBanner from "$lib/components/TournamentBanner.svelte";
+  import Badge from "$lib/components/Badge.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -35,7 +36,8 @@
   import PlayersTab from "./PlayersTab.svelte";
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
-  import ConfigTab from "./ConfigTab.svelte";
+  import ToolsSheet from "./ToolsSheet.svelte";
+import SetupTab from "./SetupTab.svelte";
 import { toUserMessage } from '$lib/errors';
 import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
@@ -98,8 +100,6 @@ import TournamentModals from "./TournamentModals.svelte";
   );
   let viewAsPlayer = $state(false);
   let showDeleteConfirm = $state(false);
-  let configExpandOrganizers = $state(false);
-  let configExpandPromos = $state(false);
   // Offline mode state
   const tournamentIsOffline = $derived(isOffline(uid));
   const deviceId = getDeviceId();
@@ -181,27 +181,62 @@ import TournamentModals from "./TournamentModals.svelte";
     });
   });
 
-  // Tab state
-  type TabId = 'players' | 'rounds' | 'finals' | 'config';
+  // Tabs follow the event, like everything else in the console: a tab exists
+  // only where it has something to show. Setup is the work before the doors
+  // open and disappears once they have; Rounds is dead weight until a round
+  // exists. Tools remains the durable index of everything — a tab is the
+  // current moment's shortcut into it, the same relationship the action bar has
+  // with the one CTA it promotes.
+  type TabId = 'players' | 'setup' | 'rounds' | 'finals';
+  const preEvent = $derived(tournament?.state === "Planned" || tournament?.state === "Registration");
   let activeTab = $state<TabId>('players');
+  let showTools = $state(false);
+  let toolsPanel = $state<'details' | 'organizers' | 'qr' | 'promos' | null>(null);
+  function openTools(panel: typeof toolsPanel = null) {
+    toolsPanel = panel;
+    showTools = true;
+  }
   // Archon import modal (organizer; opened from the action-bar More menu)
   let showArchonImport = $state(false);
   let showCsvImport = $state(false);
 
+  // Order is stable across states so the tabs never shuffle underfoot; only
+  // membership changes.
   const tabs = $derived.by(() => {
     const t: { id: TabId; label: string; icon: typeof Users }[] = [
       { id: 'players', label: m.tournament_tab_players(), icon: Users },
-      { id: 'rounds', label: m.tournament_tab_rounds(), icon: Swords },
     ];
-    // Show Finals tab when ≥2 rounds played
+    if (showOrganizerView && preEvent) {
+      t.push({ id: 'setup', label: m.tools_group_setup(), icon: Settings2 });
+    }
+    // An empty Rounds tab is pure cost: no round, no tab.
+    if ((tournament?.rounds?.length ?? 0) > 0) {
+      t.push({ id: 'rounds', label: m.tournament_tab_rounds(), icon: Swords });
+    }
+    // Show Finals tab when ≥2 rounds played. A finished event that ended
+    // without a final has none to show, and ending without one is legitimate
+    // (VEKN §3.1.6) — drop the tab rather than keep an empty state explaining
+    // an absence, which also buys the row back some width.
     const hasFinalsCandidate = (tournament?.rounds?.length ?? 0) >= 2;
-    if (hasFinalsCandidate || tournament?.finals) {
+    const finishedWithoutFinals = tournament?.state === "Finished" && !tournament?.finals;
+    if (!finishedWithoutFinals && (hasFinalsCandidate || tournament?.finals)) {
       t.push({ id: 'finals', label: m.tournament_tab_finals(), icon: Trophy });
     }
-    if (showOrganizerView) {
-      t.push({ id: 'config', label: m.tournament_tab_config(), icon: Settings });
-    }
     return t;
+  });
+
+  // A tab can vanish under the active selection (a round is cancelled, the
+  // doors open). Fall back rather than render an empty panel.
+  $effect(() => {
+    if (!tabs.some(t => t.id === activeTab)) activeTab = tabs[0]?.id ?? 'players';
+  });
+  // Pre-event there are no players and no rounds, so setup is the only thing
+  // to do — land on it rather than on an empty roster.
+  let landedOnSetup = false;
+  $effect(() => {
+    if (landedOnSetup || !tournament) return;
+    landedOnSetup = true;
+    if (showOrganizerView && tournament.state === "Planned") activeTab = 'setup';
   });
 
   // Player display info keyed by uid
@@ -294,6 +329,22 @@ import TournamentModals from "./TournamentModals.svelte";
 
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
 
+  // From check-in on the organizer is in the venue: the info card answers
+  // "should I attend", not "what now". Player view keeps it at every state.
+  const eventUnderWay = $derived(
+    tournament?.state === "Waiting" || tournament?.state === "Playing" || tournament?.state === "Finished"
+  );
+
+  // The banner is the per-tournament og:image, so it matters more now that
+  // sharing the link IS the share path — but it is a setup job, not something
+  // the masthead should hold a dropzone open for. The cropper lives in the
+  // component; this just reaches in and opens it.
+  let bannerComp = $state<ReturnType<typeof TournamentBanner> | null>(null);
+  const bannerItem = $derived({
+    label: tournament?.banner_path ? m.tournament_banner_change() : m.tournament_banner_add(),
+    onclick: () => bannerComp?.openCropper(),
+  });
+
   // Archon import lives in the action-bar More menu across every organizer state.
   const archonImportItem = $derived({ label: m.archon_import_title(), icon: Upload, onclick: () => (showArchonImport = true) });
   const csvImportItem = $derived({ label: m.csv_import_title(), icon: Upload, onclick: () => (showCsvImport = true) });
@@ -326,13 +377,24 @@ import TournamentModals from "./TournamentModals.svelte";
   // event also push results + the winner's TWDA deck. Shown whenever push is on and
   // the event isn't fully on VEKN yet (never silently absent — an unconfigured round
   // count is explained on click, not hidden). Not for non-VEKN open-rounds events.
-  const syncVeknItem = $derived(
-    veknPush && !tournament?.open_rounds && !tournament?.self_organized_rounds
-      && (!tournament?.external_ids?.vekn
-          || (tournament?.state === "Finished" && !tournament?.vekn_pushed_at))
-      ? { label: m.vekn_sync_action(), icon: CloudUpload, onclick: () => doSyncVekn(), disabled: actionLoading || syncingVekn }
-      : null
-  );
+  // One endpoint, two jobs: registering the calendar event beforehand and
+  // reporting results afterwards. Naming each by what it does beats one label
+  // that means whichever the state happens to imply — and the name and the
+  // Tools group are decided together here, so the row can never sit in a group
+  // that contradicts what it calls itself.
+  const syncVeknItem = $derived.by(() => {
+    if (!veknPush || tournament?.open_rounds || tournament?.self_organized_rounds) return null;
+    const onCalendar = !!tournament?.external_ids?.vekn;
+    // Nothing left to publish once the calendar entry exists and results are in.
+    if (onCalendar && !(tournament?.state === "Finished" && !tournament?.vekn_pushed_at)) return null;
+    return {
+      label: onCalendar ? m.vekn_report_results() : m.vekn_add_to_calendar(),
+      group: (onCalendar ? "wrapup" : "setup") as "setup" | "wrapup",
+      icon: CloudUpload,
+      onclick: () => doSyncVekn(),
+      disabled: actionLoading || syncingVekn,
+    };
+  });
 
 
   function playerUidsOf(t: Tournament | null | undefined): string[] {
@@ -634,9 +696,11 @@ import TournamentModals from "./TournamentModals.svelte";
       <!-- Tournament banner (optional, PUBLIC level — visible pre-login). Sits at
            the top as a masthead; warnings + header follow below. -->
       <TournamentBanner
+        bind:this={bannerComp}
         tournamentUid={tournament.uid}
         bannerPath={tournament.banner_path}
         canManage={showOrganizerView}
+        showEmpty={false}
       />
 
       <!-- Offline mode banner (this device has lock) -->
@@ -695,66 +759,70 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
-      <!-- Header -->
-      <div class="flex items-start justify-between mb-6">
+      <!-- Header. The title owns its full width — sharing a row with the
+           buttons wrapped long names to three lines on a phone and wrapped the
+           buttons' own labels too. Buttons take the row beneath. -->
+      <div class="mb-6">
         <div>
           <h1 class="text-3xl font-semibold text-accent">{tournament.name}</h1>
           <div class="flex flex-wrap items-center gap-3 mt-2">
-            <span class="px-2 py-1 rounded text-xs font-medium {getStateBadgeClass(tournament.state)}">
+            <!-- State is the only meaning-bearing colour here; the league links
+                 keep their hues because there the hue is the label. -->
+            <Badge kind="status" tone={getStateTone(tournament.state)}>
               {translateTournamentState(tournament.state)}
-            </span>
-            <span class="text-sm text-ink-muted">{tournament.format}</span>
+            </Badge>
+            <Badge>{tournament.format}</Badge>
             {#if tournament.rank}
-              <span class="text-sm text-ink-muted">· {tournament.rank}</span>
+              <!-- One word, not the full "Continental Championship", which
+                   wrapped the row on a phone; the full name is the tooltip. -->
+              <Badge title={tournament.rank}>{rankBadgeLabel(tournament.rank)}</Badge>
             {/if}
             <RankedBadge {tournament} />
+            <!-- No default either way, so both readings are news. -->
+            <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
             {#if tournament.external_ids?.vekn}
-              <a href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
-                 target="_blank" rel="noopener noreferrer"
-                 class="px-2 py-0.5 rounded text-xs font-medium bg-surface-muted text-ink hover:text-ink-strong inline-flex items-center gap-1"
-                 title={m.tournament_vekn_link_title()}>
-                VEKN <ExternalLink class="w-3 h-3" />
-              </a>
+              <Badge kind="link" external
+                     href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
+                     title={m.tournament_vekn_link_title()}>
+                VEKN <ExternalLink class="w-3 h-3" aria-hidden="true" />
+              </Badge>
             {/if}
             {#if isOrganizer && veknResultsPending}
-              <span class="px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1"
-                    title={m.vekn_sync_pending_hint()}>
+              <Badge kind="status" tone="pending" title={m.vekn_sync_pending_hint()}>
                 <CloudOff class="w-3 h-3" aria-hidden="true" />
                 {m.vekn_sync_pending_results()}
-              </span>
+              </Badge>
             {/if}
             {#if isOrganizer && tournament.vekn_results_stale}
-              <span class="px-2 py-0.5 rounded text-xs font-medium banner-warn border inline-flex items-center gap-1"
-                    title={m.vekn_out_of_sync_hint()}>
+              <Badge kind="status" tone="pending" title={m.vekn_out_of_sync_hint()}>
                 <CloudAlert class="w-3 h-3" aria-hidden="true" />
                 {m.vekn_out_of_sync()}
-              </span>
+              </Badge>
             {/if}
             {#if tournament.league_uid && leagueName}
-              <a href="/leagues/{tournament.league_uid}"
-                 class="px-2 py-0.5 rounded text-xs font-medium badge-blue inline-flex items-center gap-1 hover:opacity-80 transition-opacity max-w-48 truncate">
+              <Badge kind="link" tone="blue" truncate href="/leagues/{tournament.league_uid}">
                 {leagueName}
-              </a>
+              </Badge>
             {/if}
             {#if metaLeague}
-              <a href="/leagues/{metaLeague.uid}" title={m.league_kind_meta()}
-                 class="px-2 py-0.5 rounded text-xs font-medium badge-amethyst inline-flex items-center gap-1 hover:opacity-80 transition-opacity max-w-48 truncate">
+              <Badge kind="link" tone="amethyst" truncate href="/leagues/{metaLeague.uid}" title={m.league_kind_meta()}>
                 {metaLeague.name}
-              </a>
+              </Badge>
             {/if}
-            <!-- Sole organizer, pre-event: surface the add-co-organizer moment
-                 (OrganizerManager itself lives in a Config accordion). -->
-            {#if showOrganizerView && (tournament.state === "Planned" || tournament.state === "Registration") && (tournament.organizers_uids?.length ?? 0) === 1}
-              <button onclick={() => { configExpandOrganizers = true; activeTab = 'config'; }}
-                class="px-2 py-0.5 rounded text-xs font-medium bg-surface-muted text-ink hover:text-ink-strong inline-flex items-center gap-1 min-h-[28px]">
-                <UserPlus class="w-3 h-3" aria-hidden="true" />
-                {m.organizers_add_chip()}
-              </button>
+            <!-- The view toggle is a control, and looks like one: it is the only
+                 chip in the row you can press. -->
+            {#if isOrganizer}
+              <Badge kind="control" onclick={() => viewAsPlayer = !viewAsPlayer}>
+                {#if viewAsPlayer}<Shield class="w-3 h-3" aria-hidden="true" />{:else}<UserIcon class="w-3 h-3" aria-hidden="true" />{/if}
+                {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
+              </Badge>
             {/if}
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <!-- Own row, not beside the title. Delete moved into Tools; Go Offline
+             is state-dependent and time-critical, so it stays out of the drawer. -->
+        <div class="flex flex-wrap items-center gap-2 mt-3">
           <Button variant="ghost" size="md" onclick={shareEvent} title={m.tournament_share()}>
             <Share2 class="w-4 h-4" aria-hidden="true" />
             {m.tournament_share()}
@@ -765,8 +833,11 @@ import TournamentModals from "./TournamentModals.svelte";
               {m.offline_go_offline()}
             </Button>
           {/if}
-          {#if showOrganizerView && canDelete}
-            <Button variant="danger" size="md" onclick={() => (showDeleteConfirm = true)}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.common_delete()}</Button>
+          {#if showOrganizerView}
+            <Button variant="ghost" size="md" onclick={() => openTools()} title={m.tools_title()}>
+              <Wrench class="w-4 h-4" aria-hidden="true" />
+              {m.tools_title()}
+            </Button>
           {/if}
         </div>
       </div>
@@ -778,6 +849,7 @@ import TournamentModals from "./TournamentModals.svelte";
       {/if}
 
       <!-- Info Card -->
+      {#if !(showOrganizerView && eventUnderWay)}
       <div class="bg-surface-card rounded-lg shadow p-6 border border-line mb-6">
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
           <div>
@@ -847,9 +919,11 @@ import TournamentModals from "./TournamentModals.svelte";
           {/if}
         </div>
       </div>
+      {/if}
 
-      <!-- Collapsible description -->
-      {#if tournament.description}
+      <!-- Description is for people deciding whether to attend. The organizer
+           wrote it; showing it back to them costs a screen of console. -->
+      {#if tournament.description && !showOrganizerView}
         <FoldableDescription description={tournament.description} title={tournament.name} />
       {/if}
 
@@ -864,19 +938,6 @@ import TournamentModals from "./TournamentModals.svelte";
           {/if}
         </div>
       {:else}
-      <!-- View toggle for organizers -->
-      {#if isOrganizer}
-        <div class="flex justify-end mb-4">
-          <button
-            onclick={() => viewAsPlayer = !viewAsPlayer}
-            class="px-3 py-1.5 text-sm text-ink bg-surface-hover hover:bg-surface-active rounded-lg transition-colors"
-          >
-            {#if viewAsPlayer}<Shield class="w-4 h-4 inline mr-1" />{:else}<UserIcon class="w-4 h-4 inline mr-1" />{/if}
-            {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
-          </button>
-        </div>
-      {/if}
-
       <!-- Judge Call Banner (organizer only, shown in any view) -->
       {#if tournament.state === "Playing"}
         <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
@@ -886,7 +947,9 @@ import TournamentModals from "./TournamentModals.svelte";
            banner. Hidden while offline-locked (announcements are online-only and
            would just fail) — consistent with the timer/call-judge affordances. -->
       <PushOptIn tournamentUid={uid} eligible={pushEligible} {isOrganizer} />
-      {#if showOrganizerView && !tournament.offline_mode}
+      {#if showOrganizerView && !tournament.offline_mode && tournament.state !== "Planned" && tournament.state !== "Registration"}
+        <!-- Nobody is at the venue yet while planning, so there is no one to
+             broadcast to — the composer only earns its space from check-in on. -->
         <AnnouncementComposer {tournament} />
       {:else if !showOrganizerView}
         <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
@@ -895,20 +958,8 @@ import TournamentModals from "./TournamentModals.svelte";
       <!-- Organizer Console with Tabs -->
       {#if showOrganizerView}
         <div class="bg-surface-card rounded-lg shadow border border-line mb-6">
-          <!-- Tab bar -->
-          <div class="flex border-b border-line overflow-x-auto">
-            {#each tabs as tab}
-              {@const TabIcon = tab.icon}
-              <button
-                onclick={() => activeTab = tab.id}
-                class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 {activeTab === tab.id ? 'border-accent text-ink-strong' : 'border-transparent text-ink-muted hover:text-ink-bright hover:border-line-strong'}"
-              >
-                <TabIcon class="w-4 h-4" />
-                {tab.label}
-              </button>
-            {/each}
-          </div>
-
+          <!-- The action bar leads: it is tournament-level and identical on every
+               tab, so it reads as the console header and the tabs as the workspace. -->
           <ActionBar
             {tournament}
             {standings}
@@ -916,12 +967,31 @@ import TournamentModals from "./TournamentModals.svelte";
             {decksByUser}
             {actionLoading}
             {doAction}
-            {syncVeknItem}
-            {archonImportItem}
-            {csvImportItem}
             onImportArchon={() => (showArchonImport = true)}
-            onRecordPromos={() => { configExpandPromos = true; activeTab = 'config'; }}
+            onAddBanner={() => bannerComp?.openCropper()}
           />
+
+          <!-- Tab bar. On a phone only the active tab spells itself out; the rest
+               are their icon. Four labelled tabs do not fit 360px in English and
+               are worse in the other four locales ("Jugadores/Rondas/Finales"),
+               and shrinking the type to make them fit would cost more than the
+               labels are worth on a tab you are not looking at. The accessible
+               name stays the full label at every width. -->
+          <div class="flex border-b border-line overflow-x-auto">
+            {#each tabs as tab}
+              {@const TabIcon = tab.icon}
+              {@const active = activeTab === tab.id}
+              <button
+                onclick={() => activeTab = tab.id}
+                aria-label={tab.label}
+                aria-current={active ? 'page' : undefined}
+                class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 {active ? 'border-accent text-ink-strong' : 'border-transparent text-ink-muted hover:text-ink-bright hover:border-line-strong'}"
+              >
+                <TabIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span class={active ? '' : 'hidden sm:inline'}>{tab.label}</span>
+              </button>
+            {/each}
+          </div>
 
           <!-- Tab content -->
           <div class="p-3 sm:p-6">
@@ -939,6 +1009,8 @@ import TournamentModals from "./TournamentModals.svelte";
                 isOfflineMode={tournamentIsOffline}
                 {decksByUser}
               />
+            {:else if activeTab === 'setup'}
+              <SetupTab bind:tournament={tournament} isOrganizer={true} />
             {:else if activeTab === 'rounds'}
               <RoundsTab
                 bind:tournament={tournament}
@@ -965,13 +1037,6 @@ import TournamentModals from "./TournamentModals.svelte";
                 {scoreSaving}
                 {scoreSavingSeat}
                 {tournamentSanctions}
-              />
-            {:else if activeTab === 'config'}
-              <ConfigTab
-                bind:tournament={tournament}
-                isOrganizer={true}
-                expandOrganizers={configExpandOrganizers}
-                expandPromos={configExpandPromos}
               />
             {/if}
           </div>
@@ -1020,6 +1085,26 @@ import TournamentModals from "./TournamentModals.svelte";
   onForceTakeover={handleForceTakeover}
   onForceUnlock={handleForceUnlock}
 />
+
+{#if tournament && showOrganizerView}
+  <ToolsSheet
+    bind:open={showTools}
+    bind:requestPanel={toolsPanel}
+    bind:tournament={tournament}
+    isOrganizer={true}
+    {playerInfo}
+    {standings}
+    {decksByUser}
+    {doAction}
+    {actionLoading}
+    {bannerItem}
+    {csvImportItem}
+    {archonImportItem}
+    {syncVeknItem}
+    {canDelete}
+    onDelete={() => (showDeleteConfirm = true)}
+  />
+{/if}
 
 <ArchonImportModal bind:show={showArchonImport} tournamentUid={uid} {hasRounds} />
 <CsvRegisterModal bind:show={showCsvImport} tournamentUid={uid} onImported={() => load()} />
