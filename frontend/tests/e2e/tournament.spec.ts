@@ -16,6 +16,15 @@ import { waitForSync } from './helpers/wait';
  * server response where the next step depends on a server-side effect.
  */
 
+/**
+ * The action bar's primary CTA. Once the bar scrolls off screen a sticky strip
+ * renders the same CTA again, labelled "<action> — <state>", so an inexact name
+ * match resolves to two buttons.
+ */
+function cta(page: Page, name: string) {
+  return page.getByRole('button', { name, exact: true });
+}
+
 /** Resolve when the server acknowledges a specific tournament action. */
 function actionResponse(page: Page, action: string) {
   return page.waitForResponse(
@@ -94,7 +103,7 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByText('Planned').first()).toBeVisible();
 
     // ── Step 3: Open Registration (optimistic) ──
-    await page.getByRole('button', { name: 'Open Registration' }).click();
+    await cta(page, 'Open Registration').click();
     await expect(page.getByRole('button', { name: /Start Check-in/ })).toBeVisible({ timeout: 2_000 });
 
     // ── Step 4: Add Players via VEKN ID search ──
@@ -117,7 +126,7 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByText('8 registered', { exact: true })).toBeVisible({ timeout: 2_000 });
 
     // ── Step 5: Close Registration & Check In All (optimistic) ──
-    await page.getByRole('button', { name: 'Start Check-in' }).click();
+    await cta(page, 'Start Check-in').click();
     // Bulk check-in lives in the toolbar "More" overflow menu (one primary CTA per
     // state). Per-player rows also carry a "More" drawer, so scope to the overflow
     // trigger (the only one with aria-haspopup) to avoid a strict-mode match.
@@ -125,7 +134,7 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByRole('button', { name: 'Check All In' })).toBeVisible({ timeout: 2_000 });
     await page.getByRole('button', { name: 'Check All In' }).click();
     await expect(
-      page.getByRole('button', { name: 'Start Round 1' }),
+      cta(page, 'Start Round 1'),
     ).toBeVisible({ timeout: 2_000 });
 
     // ── Step 5b: Organizer enters a player's decklist, then replaces it ──
@@ -147,7 +156,7 @@ test.describe('Tournament lifecycle', () => {
     for (const round of [1, 2]) {
       // Wait for the server POST so seating is committed before scoring
       const started = actionResponse(page, 'StartRound');
-      await page.getByRole('button', { name: `Start Round ${round}` }).click();
+      await cta(page, `Start Round ${round}`).click();
       await started;
       await expect(page.getByText('Playing').first()).toBeVisible({ timeout: 2_000 });
 
@@ -192,7 +201,7 @@ test.describe('Tournament lifecycle', () => {
       await sweepTable(page, 'Table 1', 4);
       await sweepTable(page, 'Table 2', 4);
 
-      await page.getByRole('button', { name: 'End Round' }).click();
+      await cta(page, 'End Round').click();
       await expect(page.getByText(`Round ${round} complete`)).toBeVisible({ timeout: 5_000 });
     }
 
@@ -203,11 +212,11 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByText(/start finals/)).toBeVisible({ timeout: 2_000 });
 
     // ── Step 9: Finals (StartFinals auto-switches to the Finals tab) ──
-    await page.getByRole('button', { name: 'Start Finals' }).click();
+    await cta(page, 'Start Finals').click();
     await sweepTable(page, 'Finals Table', 5);
 
     const finished = actionResponse(page, 'FinishFinals');
-    await page.getByRole('button', { name: 'Finish Finals' }).click();
+    await cta(page, 'Finish Finals').click();
     await finished; // server-side finish triggers the ratings recompute + SSE
     await expect(page.getByText('Finished').first()).toBeVisible({ timeout: 2_000 });
     await expect(page.getByText('Tournament complete.')).toBeVisible({ timeout: 2_000 });
