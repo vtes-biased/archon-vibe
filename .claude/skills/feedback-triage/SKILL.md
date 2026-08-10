@@ -11,6 +11,10 @@ In-app feedback (`backend/src/routes/feedback.py`) files GitHub issues on
 app version, page route, locale, user agent. The owner also files issues by hand
 under the same `feedback` label, usually with their own analysis appended.
 
+**`Page:` is always `/help`** — that's the only screen the feedback form lives on,
+so the route says nothing about where the problem was. Ignore it; never treat it
+as a hint about the affected page.
+
 **The repo is public and reporters are real, named people.** Every comment is
 permanent, public, and attached to someone's VEKN identity. No PII, no internal
 infra detail (env vars, server paths, other reporters), no dismissive tone.
