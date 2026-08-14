@@ -442,6 +442,7 @@
   "rankings_all_countries": "Tutte le nazioni",
   "rankings_loading": "Caricamento classifiche...",
   "rankings_no_results": "Nessuna classifica trovata",
+  "rankings_login_prompt": "Accedi per vedere le classifiche e la Hall of Fame.",
   "rankings_col_rank": "#",
   "rankings_col_player": "Giocatore",
   "rankings_col_points": "RtP",

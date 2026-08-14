@@ -78,11 +78,10 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     url = f"{FRONTEND_URL}/tournaments/{t.uid}"
     description = _escape_ical(" ".join(parts) if parts else t.name)
 
-    # Location: venue/address render even in anonymous no-token feeds — a
-    # deliberate projection exception (the .ics is an advertising artifact
-    # mirroring vekn.net's public event calendar; granularity is the
-    # organizer's data-entry choice). See ARCHITECTURE.md "Calendar System";
-    # do not "fix" by stripping to the member projection.
+    # Location: venue/address render even in anonymous no-token feeds — they are
+    # public-projection fields (the .ics is an advertising artifact mirroring
+    # vekn.net's public event calendar; granularity is the organizer's
+    # data-entry choice). See ARCHITECTURE.md "Calendar System".
     if t.online:
         location = "Online"
     elif t.venue or t.address:

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getAllUsers, getSuspendedUserUids } from "$lib/db";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
@@ -26,6 +27,10 @@
   let activeTab = $state<Tab>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : "constructed_offline");
   let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
   let page = $state(readPageParam());
+
+  // Ratings and wins are member-level, so every tab is necessarily empty when
+  // signed out — "no results" would read as "the Hall of Fame is empty".
+  const auth = $derived(getAuthState());
 
   const isHof = $derived(activeTab === "halloffame");
   const pageSize = $derived(isHof ? 100 : 50);
@@ -162,7 +167,12 @@
     </div>
 
     <!-- Table -->
-    {#if isSyncing && users.length === 0}
+    {#if !auth.isLoading && !auth.isAuthenticated}
+      <div class="p-4 rounded-lg bg-surface-muted border border-line-strong text-sm text-ink">
+        {m.rankings_login_prompt()}
+        <a href="/login" class="underline text-link hover:text-link-soft ml-1">{m.community_sign_in()}</a>
+      </div>
+    {:else if isSyncing && users.length === 0}
       <div class="text-center text-ink-muted py-8">
         <Loader2 class="w-6 h-6 animate-spin inline-block" />
         <span class="ml-2">{isHof ? m.hof_loading() : m.rankings_loading()}</span>

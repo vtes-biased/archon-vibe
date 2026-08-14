@@ -21,6 +21,7 @@
 - [Bot test topology](project_bot_test_topology.md) — bot/ has no real backend/Discord, so validated fakes (+ a guard test proving the fake) are legit here; token_store is the one real-artifact seam. Don't misapply the never-mock rule.
 - [Permission marshalling gap](project_permission_marshalling_gap.md) — engine permission tests use struct literals, bypassing `from_json`; a new descriptor JSON key has zero coverage until a backend `permissions.py` wrapper test pins it.
 - [ReportPromos no state gate](project_report_promos_no_state_gate.md) — the ungated mutating event is deliberate (post-finish corrections), not a bug; pinned by one replace-whole-list test. Don't add a gate or more coverage.
+- [Access-projection review](project_access_projection_review.md) — `test_access_levels.py` is the ONLY field-membership assertion in the suite; the `av` resync can't cover projection-code changes (backfill script instead, untestable by design).
 - [Promo stock recompute test infra](project_promo_stock_recompute_test_infra.md) — `recompute_promo_stock` net-arithmetic + stale-key-cleanup invariant (`test_promo_stock.py`); seed via raw promo/user/ledger/tournament, call awaited not scheduled, teardown promo/tournament/promo_ledger; route guards deliberately untested.
 
 ## How to Run Tests

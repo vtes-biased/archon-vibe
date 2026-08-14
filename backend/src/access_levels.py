@@ -140,6 +140,9 @@ def compute_user_full(d: dict) -> dict:
 # Tournament projections
 # ---------------------------------------------------------------------------
 
+# What a prospective attendee needs before signing in. Omitting a BOOLEAN here
+# misinforms rather than withholds: absent and False are the same value after
+# JSON, so a missing `proxies` reads as "not allowed".
 _TOURNAMENT_PUBLIC_FIELDS = {
     "uid",
     "modified",
@@ -155,6 +158,19 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "league_uid",
     "state",
     "banner_path",  # public hero / og:image — visible pre-login
+    "venue",
+    "venue_url",
+    "address",
+    "map_url",
+    "description",
+    "external_ids",  # public ids only (vekn event, legacy archon uid)
+    "proxies",
+    "multideck",
+    "decklist_required",
+    "max_rounds",
+    "max_players",
+    "open_rounds",  # rankedStatus reads it first — else "unranked" can't be shown
+    "self_organized_rounds",
 }
 
 # Member gets everything EXCEPT checkin_code and the VEKN/TWDA push bookkeeping
@@ -167,8 +183,14 @@ _TOURNAMENT_MEMBER_EXCLUDE = {
 
 
 def compute_tournament_public(d: dict) -> dict:
-    """Public projection: minimal tournament info."""
-    return _pick(d, _TOURNAMENT_PUBLIC_FIELDS)
+    """Public projection: what an event advertisement may carry."""
+    proj = _pick(d, _TOURNAMENT_PUBLIC_FIELDS)
+    # On an online event venue_url is the JOIN link, not a venue website (the
+    # form defaults it to a Discord invite), and an invite-only event has
+    # nowhere else to put it. calendar.py withholds it the same way.
+    if d.get("online"):
+        proj.pop("venue_url", None)
+    return proj
 
 
 def compute_tournament_member(d: dict) -> dict:
@@ -221,6 +243,20 @@ def compute_deck_full(d: dict) -> dict:
     return dict(d)
 
 
+# ---------------------------------------------------------------------------
+# League projections
+# ---------------------------------------------------------------------------
+
+
+def compute_league_public(d: dict) -> dict:
+    """Public projection: everything except the organizer roster.
+
+    Ordinary members have no public projection, so the uids would resolve to
+    nothing client-side and render as raw fragments.
+    """
+    return {k: v for k, v in d.items() if k != "organizers_uids"}
+
+
 def compute_promo_public(d: dict) -> dict:
     """Catalog only — the server-written inventory aggregates are officials-only.
 
@@ -238,8 +274,8 @@ def compute_promo_public(d: dict) -> dict:
 def _identity(d: dict) -> dict:
     """Identity projection: object fully visible at this level (no filtering).
 
-    Used where a type has no per-level field policy: leagues are fully public
-    at every level, and sanctions are fully visible to any member.
+    Used where a type has no per-level field policy: leagues are unfiltered from
+    member level up, and sanctions are fully visible to any member.
     """
     return dict(d)
 
@@ -253,7 +289,7 @@ _PUBLIC_DISPATCH = {
     ObjectType.TOURNAMENT: compute_tournament_public,
     ObjectType.SANCTION: compute_sanction_public,
     ObjectType.DECK: compute_deck_public,
-    ObjectType.LEAGUE: _identity,
+    ObjectType.LEAGUE: compute_league_public,
     ObjectType.PROMO: compute_promo_public,
 }
 

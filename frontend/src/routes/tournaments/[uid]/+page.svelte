@@ -778,8 +778,12 @@ import TournamentModals from "./TournamentModals.svelte";
               <Badge title={tournament.rank}>{rankBadgeLabel(tournament.rank)}</Badge>
             {/if}
             <RankedBadge {tournament} />
-            <!-- No default either way, so both readings are news. -->
-            <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
+            <!-- No default either way, so both readings are news — but only once
+                 the field is there: an absent boolean is falsy, and the ternary
+                 would assert "not allowed" on a payload that never carried it. -->
+            {#if tournament.proxies != null}
+              <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
+            {/if}
             {#if tournament.external_ids?.vekn}
               <Badge kind="link" external
                      href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"

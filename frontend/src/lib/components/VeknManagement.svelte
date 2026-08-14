@@ -401,11 +401,14 @@
             <label for="merge-target-search" class="block text-sm font-medium text-ink-muted mb-1">
               {m.vekn_merge_search_label()}
             </label>
+            <!-- The only picker that must see non-members: the duplicate being
+                 merged away is typically the account that never got a VEKN id. -->
             <UserPicker
               inputId="merge-target-search"
               excludeUids={[user.uid]}
               placeholder={m.vekn_merge_search_placeholder()}
               onselect={(u) => (mergeTarget = u)}
+              membersOnly={false}
             />
           </div>
         {:else}

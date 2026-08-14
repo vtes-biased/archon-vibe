@@ -380,7 +380,30 @@ class TestTournamentPublic:
         assert "rounds" not in result
         assert "decks" not in result
         assert "vekn_pushed_at" not in result
-        assert "description" not in result
+
+    def test_includes_attend_decision_fields(self):
+        """Omitting a boolean makes the UI assert its negative, not withhold it."""
+        t = _make_tournament(proxies=True, multideck=True, decklist_required=True)
+        result = compute_public(ObjectType.TOURNAMENT, t)
+        assert result is not None
+        assert result["proxies"] is True
+        assert result["multideck"] is True
+        assert result["decklist_required"] is True
+        assert result["venue"] == t["venue"]
+        assert result["address"] == t["address"]
+        assert result["description"] == t["description"]
+
+    def test_online_event_withholds_venue_url(self):
+        """On an online event venue_url is the join link, not a venue website."""
+        offline = compute_public(ObjectType.TOURNAMENT, _make_tournament(online=False))
+        online = compute_public(
+            ObjectType.TOURNAMENT,
+            _make_tournament(online=True, venue_url="https://discord.gg/private"),
+        )
+        assert offline is not None and online is not None
+        assert offline["venue_url"] == "https://example.com"
+        assert "venue_url" not in online
+        assert online["venue"] == "Le Dernier Bar"  # the name still advertises
 
 
 # ---------------------------------------------------------------------------
@@ -562,21 +585,22 @@ def _make_league(**overrides) -> dict:
 
 
 class TestLeague:
-    def test_public_full_data(self):
-        """Leagues are fully visible at all levels."""
+    def test_public_omits_organizers(self):
+        """Members have no public projection, so the uids would not resolve."""
         lg = _make_league()
         result = compute_public(ObjectType.LEAGUE, lg)
         assert result is not None
         assert result["name"] == "French National League"
-        assert result["organizers_uids"] == ["u-nc-fr"]
+        assert result["description"] == "Year-long league"
+        assert "organizers_uids" not in result
 
-    def test_all_levels_identical(self):
-        """All three projections return the same data for leagues."""
+    def test_member_and_full_identical(self):
+        """Leagues are unfiltered from member level up."""
         lg = _make_league()
-        pub = compute_public(ObjectType.LEAGUE, lg)
         mem = compute_member(ObjectType.LEAGUE, lg)
         full = compute_full(ObjectType.LEAGUE, lg)
-        assert pub == mem == full
+        assert mem == full
+        assert mem["organizers_uids"] == ["u-nc-fr"]
 
 
 # ---------------------------------------------------------------------------

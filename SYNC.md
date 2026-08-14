@@ -8,7 +8,7 @@ Three access levels determine what data each SSE viewer receives:
 
 | Level | Viewer | Description |
 |-------|--------|-------------|
-| `public` | No token or no vekn_id | Only Prince/NC users (with contact info, base64-obfuscated), minimal tournaments, no sanctions |
+| `public` | No token or no vekn_id | Only Prince/NC users (with contact info, base64-obfuscated), event-page tournament fields, leagues minus `organizers_uids`, no sanctions |
 | `member` | Has vekn_id | All users (no contact info), all sanctions, tournaments with standings/filtered decks |
 | `full` | IC, NC (same country), organizer | Everything including rounds, finals, checkin_code |
 
@@ -47,13 +47,17 @@ async def stream_objects_new(         # SSE catch-up + rating recompute
 | Type | `public` | `member` | `full` |
 |------|----------|----------|--------|
 | user | NC/Prince only (with contact + community_links); IC only (community_links, no contact) | all users (no contact, no `deceased_by_uid`, no `github_login`/`github_id`); `deceased_at` included; any user with non-empty community_links gets community_links included | everything except `calendar_token` |
-| tournament | minimal fields + `banner_path` | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything |
+| tournament | event-page fields (config, venue/address/map, description, rules flags, `banner_path`) — everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything |
 | sanction | `None` | full data | full data |
 | deck | `None` | full data if `public=true`, else `None` | full data |
-| league | full data | full data | full data |
+| league | full data except `organizers_uids` | full data | full data |
 | promo | catalog only (no `holdings`) | catalog only, same as public | everything, incl. `holdings` |
 
-`None` means column is NULL in DB — object invisible at that level.
+`None` means column is NULL in DB — object invisible at that level. League: `organizers_uids` is stripped at public level because ordinary members have no public projection (`compute_user_public` returns `None` for them) — a published organizer uid would resolve to nothing client-side and render as a raw uid fragment.
+
+**Booleans need an explicit decision.** Omitting a field withholds it, but omitting a `bool` *misinforms*: absent and `false` are indistinguishable after JSON, so the client reads a missing flag as `false`. Never rely on omission to hide one.
+
+Changing a projection function only affects rows saved *afterwards* — existing rows keep their stored columns until next write. `backend/scripts/reproject_public.py` re-saves every tournament/league to rebuild them and bump `modified_at` (which forces synced clients to re-fetch). Reuse that pattern post-deploy for any projection change; a raw SQL column rewrite cannot run the Python projections and leaves clients on stale rows.
 
 ### Credential Transport
 

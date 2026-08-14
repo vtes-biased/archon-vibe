@@ -588,6 +588,13 @@ async def add_organizer(
             raise HTTPException(
                 status_code=403, detail="Only organizers can manage organizers"
             )
+        # A non-member sits at public level, which carries no organizer view of
+        # the event — same rule as league organizers.
+        organizer = await get_user_by_uid(body.user_uid, conn=tx_conn)
+        if not organizer or not organizer.vekn_id:
+            raise HTTPException(
+                status_code=400, detail="Organizer must be a VEKN member"
+            )
         if body.user_uid not in tournament.organizers_uids:
             tournament.organizers_uids.append(body.user_uid)
             tournament.modified = datetime.now(UTC)

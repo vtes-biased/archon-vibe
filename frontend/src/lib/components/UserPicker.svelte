@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Single-select member typeahead: IndexedDB search, min 2 chars, keyboard
+  // Single-select user typeahead: IndexedDB search, min 2 chars, keyboard
   // nav, flag + #vekn_id rows. The one search box — organizers, promos, …
   import { onMount } from "svelte";
   import type { User } from "$lib/types";
@@ -11,11 +11,17 @@
     onselect,
     placeholder = m.user_picker_placeholder(),
     excludeUids = [],
+    membersOnly = true,
     inputId,
   }: {
     onselect: (user: User) => void;
     placeholder?: string;
     excludeUids?: string[];
+    // Default on: everything a user gets picked FOR here — organizing, holding
+    // promo stock — is member-only, so opting out is the deliberate act. The
+    // one exception is merging a duplicate account, which is usually the
+    // account that never got a VEKN id.
+    membersOnly?: boolean;
     inputId?: string;
   } = $props();
 
@@ -42,7 +48,9 @@
     const results = await getFilteredUsers(undefined, undefined, search.trim());
     if (seq !== searchSeq) return;
     const excluded = new Set(excludeUids);
-    const filtered = results.filter((u) => !excluded.has(u.uid));
+    const filtered = results.filter(
+      (u) => !excluded.has(u.uid) && (!membersOnly || !!u.vekn_id),
+    );
     searchTotal = filtered.length;
     searchResults = filtered.slice(0, SEARCH_LIMIT);
   }

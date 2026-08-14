@@ -159,7 +159,7 @@
 
     // Load organizer names
     const names: Record<string, string> = {};
-    for (const ouid of l.organizers_uids) {
+    for (const ouid of l.organizers_uids ?? []) {
       const u = await getUser(ouid);
       names[ouid] = u?.name || ouid.slice(0, 8);
     }
@@ -500,22 +500,25 @@
           <div class="text-sm text-ink-muted">{m.league_col_dates()}</div>
           <div class="text-ink-strong mt-1">{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : m.league_ongoing()}</div>
         </div>
-        <div class="bg-surface-card rounded-lg shadow p-4 border border-line">
-          <div class="text-sm text-ink-muted mb-1">{m.league_organizers_label()}</div>
-          {#if isOrganizer}
-            <OrganizerManager
-              organizerUids={league.organizers_uids}
-              onadd={async (userUid) => { await addLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
-              onremove={async (userUid) => { await removeLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
-            />
-          {:else}
-            <div class="text-ink-strong">
-              {#each league.organizers_uids as ouid}
-                <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <!-- Stripped from the public projection — hide, don't show it empty. -->
+        {#if league.organizers_uids}
+          <div class="bg-surface-card rounded-lg shadow p-4 border border-line">
+            <div class="text-sm text-ink-muted mb-1">{m.league_organizers_label()}</div>
+            {#if isOrganizer}
+              <OrganizerManager
+                organizerUids={league.organizers_uids}
+                onadd={async (userUid) => { await addLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
+                onremove={async (userUid) => { await removeLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
+              />
+            {:else}
+              <div class="text-ink-strong">
+                {#each league.organizers_uids as ouid}
+                  <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       {#if league.description}

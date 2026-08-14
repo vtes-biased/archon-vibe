@@ -236,7 +236,7 @@ Three data levels control what each connected client sees:
 
 | Level | Who | Gets |
 |-------|-----|------|
-| Public | Unauthenticated / no VEKN ID | Prince/NC list (with contact), minimal tournament info |
+| Public | Unauthenticated / no VEKN ID | Prince/NC list (with contact), event-page tournament fields (config, venue/address/map, description, rules flags), leagues minus `organizers_uids` |
 | Member | Has VEKN ID | All users (no contact info), sanctions, tournaments with standings/own tables/filtered decks |
 | Full | IC (always, everywhere), NC (same country), organizer | Everything: all rounds, finals, check-in codes, contact info |
 
@@ -297,10 +297,10 @@ decision.
 | League list | Active only (`showPast=false`, toggle hidden) | Yes (full list in IndexedDB) |
 | Finished tournament detail (`/tournaments/{uid}`) | Accessible (direct link / og:image crawl) | Yes |
 
-The `.ics` calendar feeds are a further deliberate exception: anonymous (no-token) feeds render
-venue/address into LOCATION from the full column even though those fields are member-level in the
-projections — the calendar is an advertising artifact mirroring vekn.net's public event calendar
-(which shows full addresses anonymously); venue granularity is the organizer's data-entry choice.
+The `.ics` calendar feeds render venue/address into LOCATION even for anonymous (no-token) feeds —
+both are public-projection fields (SYNC.md), consistent with the calendar being an advertising
+artifact mirroring vekn.net's public event calendar (which shows full addresses anonymously);
+venue granularity is the organizer's data-entry choice.
 
 ## 5. Feature Map
 

@@ -13,6 +13,7 @@ from ..broadcast import broadcast_precomputed
 from ..db import (
     get_child_leagues,
     get_league_by_uid,
+    get_user_by_uid,
     save_league,
 )
 from ..middleware.auth import OptionalUser
@@ -198,6 +199,12 @@ async def add_organizer(
         raise HTTPException(404, "League not found")
     if not permissions.can_edit_league(user, league):
         raise HTTPException(403, "Not authorized")
+
+    # A non-member sits at public level, where the league projection carries no
+    # roster — they would never see the league they nominally organize.
+    organizer = await get_user_by_uid(body.user_uid)
+    if not organizer or not organizer.vekn_id:
+        raise HTTPException(400, "Organizer must be a VEKN member")
 
     if body.user_uid not in league.organizers_uids:
         league.organizers_uids.append(body.user_uid)

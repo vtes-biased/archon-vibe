@@ -170,7 +170,7 @@ export interface League extends BaseObject {
   start: string | null;
   finish: string | null; // null = ongoing
   description: string;
-  organizers_uids: string[];
+  organizers_uids?: string[]; // absent at public level
   parent_uid: string | null; // FK → leagues (child of meta-league)
   // Same-country Princes may attach their own tournaments (attach-only).
   // Optional: rows synced before the field existed lack it (treat as false).
