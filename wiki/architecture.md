@@ -368,9 +368,16 @@ lazily on fetch and a device may go offline having never viewed the promo.
 
 ### Shared timer
 
-Online-only. Timer state lives on the `Tournament` object and syncs via the normal
-SSE CRUD-on-save; clients compute the countdown locally, so there are no
-per-second broadcasts.
+Online-only, and **entirely optional** — `round_time = 0` means no timer, and
+offline venues and async pods run on the wall clock. Timer state lives on the
+`Tournament` object and syncs via the normal SSE CRUD-on-save; clients compute the
+countdown locally, so there are no per-second broadcasts.
+
+The rules put a **two-hour floor** on a round
+([§3.1.1](domain/tournament-rules.md#round-structure)), and a round shorter than
+that unsanctions the event if any table ends on time being called
+([JG §5.2](domain/judging.md#event-organization-5)). The app does not check the
+configured value against that floor today.
 
 `TimerState` is `started_at` (UTC, when started or resumed),
 `elapsed_before_pause` (seconds) and `paused`. The tournament carries

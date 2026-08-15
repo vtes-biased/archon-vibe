@@ -37,12 +37,17 @@ exist, and `rank`/`format`/`start` freeze once the event is published to VEKN,
 because the calendar create is write-once and an edit would silently diverge from
 vekn.net ([vekn](vekn.md)).
 
-> **Diverges from the rules.** Rank has no **Grand Prix** value, so the
-> multideck and proxy prohibitions that cover Grand Prix alongside National and
-> Continental championships (tournament rules §3.1.5, §4.5) cannot be enforced for
-> one. Card-set restrictions (§6.1.1) and the Restricted format (§7.9) are not
-> modelled either, so an event that should be excluded from ratings on those
-> grounds is not flagged.
+**No Grand Prix rank, deliberately.** A Grand Prix runs as a **league** — with or
+without GP scoring — because outside the multideck and proxy prohibitions
+(tournament rules §3.1.5, §4.5) it differs from an ordinary tournament in nothing
+the app models, and a rank value earning only two prohibitions is not worth the
+category. Those two prohibitions are therefore left to organizer opt-in on a GP.
+Revisit if a Grand Prix ever acquires real structural differences.
+
+**Card-set restrictions (§6.1.1) and the Restricted format (§7.9) are not
+modelled.** Such an event is entered as Limited, which is close enough in practice
+and already carries no deck check. The cost is that the rules' exclusion of
+set-restricted results from ratings is not applied automatically.
 
 ## State machine
 
@@ -84,11 +89,12 @@ from standings rank, rating and finals. Set by organizers via `SetNonCompeting`,
 blocked once finals are seeded or the tournament is Finished. The field name avoids
 collision with `Tournament.proxies`, which is proxy *cards* allowed.
 
-> **Diverges from the rules.** JG v2 §5.1.1 says a proxy player's victory points,
-> game wins and tournament points "are not recorded and have no effect on
-> standings". The app *keeps and displays* their score, zeroing only the rank —
-> the opposite of its DQ treatment. The scores must stay on the seat for oust-order
-> validity, but whether the standings row should show them is an open question.
+**A proxy's score is displayed, not hidden — deliberately.** JG v2 §5.1.1 requires
+only that their points have *no effect*, which they don't: the proxy is excluded
+from rank, rating and finals. Showing the score keeps the table legible, since the
+VPs are real, they were earned against real opponents, and a blanked row makes the
+table look wrong. This is the opposite of the DQ treatment, where zeroing *is* the
+point.
 
 Barriers to check-in: a required decklist not uploaded, a VEKN ban, a
 disqualification from this event, or reaching the per-player round cap.
@@ -102,9 +108,19 @@ is still live — dropping out never vacates a seat, which is why Drop Out carri
 confirmation. Only `Planned` and `Registration` refuse a check-in; a `Finished`
 tournament accepts one only for post-hoc correction.
 
-> **Diverges from the rules.** Tournament rules §3.3 and §3.1.4 assign a "Loss"
-> for the round to a player not seated within 15 minutes of the start, or leaving
-> after seatings have begun. The app has no Loss concept; it models drops instead.
+**There is no "Loss".** Tournament rules §3.3 and §3.1.4 assign one for the round
+to a player not seated within 15 minutes of the start, or leaving after seatings
+have begun. The app models drops instead: the organizer unseats the absent player
+and the table plays on at 4, which is what JG §5.1 requires anyway. The one thing
+that gets lost is the **last-place TP a Loss would still award** — an unseated
+player scores nothing at all. That can only matter as a tiebreak between players on
+equal GW and VP, and the organizer can reach the same result with an `Override` and
+a comment.
+
+Leaving the absent player *seated* is not a workaround: oust-order validation would
+read their 0 VP as an oust and credit their predator a victory point they never
+earned in play, which is exactly the administrative-removal-is-not-an-oust rule
+(JG §1.1.4).
 
 ## Seating
 
@@ -230,10 +246,14 @@ five exactly like a final, and our VEKN imports mirror that. Owner-approved inte
 position: the engine stays rules-literal, and the ranked/unranked badge makes the
 outcome read as a rule rather than a bug. The question is with the Rules Director.
 
-> **Diverges from the rules.** §3.1.6 permits omitting the final only in a
-> tournament of **fewer than 8 players**, and forbids admitting players between
-> rounds if that would create a round of 8 or more. The app allows a no-final
-> finish at any size and enforces neither constraint.
+**A no-final finish is allowed at any size, deliberately.** §3.1.6 permits omitting
+the final only below 8 players, but force majeure cuts real events short — a venue
+closing, an emergency termination (JG §5.3) — and the app must be able to record
+what actually happened rather than refuse it. The §3.1.6 constraint on admitting
+players between rounds is likewise not enforced.
+
+Whether such an event should then count toward rankings is the genuinely open
+question, and it is on the board with the Rules Director.
 
 ## Engine event catalog
 
@@ -298,10 +318,12 @@ are typically entered post-finish and re-entered on correction.
 Enforcement is single-sourced in `engine/src/permissions.rs` and applied at both
 the REST endpoint and the engine — see [access](access.md).
 
-> **Diverges from the rules.** §1.1 bars the organizer of record and the judges of
-> record from playing, except under the Multi-Judge System (§2.9), which the app
-> does not model at all. The app lets organizers register and play in their own
-> event with no warning.
+**Organizer eligibility is not enforced.** §1.1 bars the organizer of record and
+the judges of record from playing except under the Multi-Judge System (§2.9), which
+the app does not model at all. Organizers may register and play in their own event
+with no warning. This is knowingly unmodelled, not an oversight — eligibility is a
+human call the organizer already owns, and the six-judge structure of §2.9 has no
+representation worth building.
 
 ## Open rounds
 

@@ -53,9 +53,15 @@ ls wiki/*.md wiki/domain/*.md
 whose content would read better folded into its parent. A page earns its existence
 only when the summary line pointing to it is much shorter than what it holds.
 
-**Divergence review** — the `> **Diverges from the rules.**` callouts in
-`tournaments.md` are standing admissions. Each pass, ask of each: is it still true,
-and is it still deliberate? One that has quietly become a bug is a board line.
+**Divergence review** — `tournaments.md` states two different things about where
+the app departs from the rules, and they must not blur:
+
+- a `> **Diverges from the rules.**` callout is a **known gap**, and each one
+  should have a board line fixing it. A callout with no line is either finished —
+  delete it — or work that fell off the board.
+- everything else is a **deliberate choice**, written as plain prose with its one
+  line of why. Each pass, ask whether the reason still holds; a choice whose
+  rationale has expired becomes a board line.
 
 ## 2. Board eviction
 
