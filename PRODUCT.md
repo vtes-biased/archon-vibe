@@ -400,7 +400,7 @@ Behaviors the app must get right that go beyond the headline rules in §3.
 - Member-level field visibility and its security caveats: see §4.
 
 ### VEKN
-- **VEKN IDs required to push**: results can't be pushed until every player has a `vekn_id`; organizers sponsor/link first.
+- **VEKN IDs required to register, not merely to push**: the engine refuses to seat a player without one, so an official sponsors or links the account before the player is added. Offline play is the exception — it mints local `TEMP-` ids, and go-online resolves each against a real account (by VEKN id, then email) or creates a member. That is why taking a tournament offline needs member-creation rights on top of organizer rights.
 - **Fire-and-forget**: pushes never block user actions; an hourly batch catches misses. `max_rounds` is immutable once pushed (Open Rounds tournaments are non-VEKN and not pushed).
 
 ## 8. VEKN Rating System (Reference)
