@@ -198,7 +198,7 @@
     tabindex="-1"
     use:focusOnMount
     onkeydown={(e) => e.key === 'Escape' && onCancel()}
-    class="bg-surface-card rounded-lg p-6 max-w-lg w-full"
+    class="bg-surface-card rounded-lg p-6 max-w-lg w-full max-h-[85dvh] overflow-y-auto"
   >
     <h2 id="banner-modal-title" class="text-lg font-semibold text-ink-strong mb-1">{m.banner_title()}</h2>
     <p class="text-xs text-ink-faint mb-4">{m.banner_dimensions_hint()}</p>

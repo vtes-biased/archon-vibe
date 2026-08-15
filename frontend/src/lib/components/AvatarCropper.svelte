@@ -191,7 +191,7 @@
     tabindex="-1"
     use:focusOnMount
     onkeydown={(e) => e.key === 'Escape' && onCancel()}
-    class="bg-surface-card rounded-lg p-6 max-w-sm w-full"
+    class="bg-surface-card rounded-lg p-6 max-w-sm w-full max-h-[85dvh] overflow-y-auto"
   >
     <h2 id="avatar-modal-title" class="text-lg font-semibold text-ink-strong mb-4">{m.avatar_title()}</h2>
 

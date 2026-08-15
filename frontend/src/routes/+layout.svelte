@@ -210,18 +210,13 @@
   <!-- Bottom navigation (mobile) — icon-only: visible labels truncated to
        ambiguity in longer locales (es/pt), so the destination name lives in
        aria-label/title (announced by AT, shown on hover) instead. -->
-  <!-- The touch row is a declared 3.5rem, not emergent: the shell's bottom
-       padding and the console's sticky CTA both sit on it via --spacing-navbar,
-       and letting the height fall out of the icons' padding left a strip of page
-       showing between the CTA and the nav. h-navbar adds the bottom safe-area on
-       top of that row; pb-safe-b keeps the icons inside it while the background
-       bleeds behind the home indicator.
-       transform-gpu promotes the bar to its own compositing layer — a cheap win
-       for momentum scrolling. It is NOT a fix for the iOS 26 misplacement (that
-       is WebKit 297779, a visual/layout viewport offset, not a skipped repaint);
-       see the nav ticket before re-deriving a theory from this class.
-       Self-transform, so it does not become a containing block for anything
-       above it. -->
+  <!-- h-navbar is declared, not emergent: letting the height fall out of the
+       icons' padding left a strip of page showing between the CTA and the nav.
+       pb-safe-b keeps the icons in the touch row while the background bleeds
+       behind the home indicator.
+       transform-gpu is a compositing win for momentum scroll, NOT a fix for the
+       iOS 26 misplacement (WebKit 297779 is a viewport-offset bug, not a skipped
+       repaint) — don't re-derive a theory from this class. -->
   <nav class="fixed bottom-0 left-0 right-0 z-40 h-navbar pb-safe-b transform-gpu bg-surface-card border-t border-line sm:hidden">
     <div class="flex h-full justify-around">
       {#each navItems as item}
