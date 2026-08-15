@@ -4,7 +4,7 @@
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorVekn, canMergeAccounts, canIssueRestrictedSanction } from "$lib/engine";
+  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
@@ -93,7 +93,7 @@
   const sponsorOnly = $derived.by(() => {
     if (!auth.user || !user || !isOnline) return false;
     if (canManage || user.vekn_id) return false;
-    return canSponsorVekn(auth.user).allowed;
+    return canSponsorMember(auth.user).allowed;
   });
 
   const canIssueSanctions = $derived.by(() => {

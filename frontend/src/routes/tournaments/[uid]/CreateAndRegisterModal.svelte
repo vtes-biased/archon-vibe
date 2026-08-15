@@ -10,7 +10,8 @@
   import { sponsorVeknMember, createUser, ApiError } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { toUserMessage } from "$lib/errors";
-  import { canSponsorVekn, canCreateMember, type TournamentEventType } from "$lib/engine";
+  import { canSponsorMember, type TournamentEventType } from "$lib/engine";
+  import { dialogPanel } from "$lib/actions/dialog";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -30,18 +31,13 @@
 
   const auth = getAuthState();
 
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
-
   // Sponsor modal state
   let sponsorLoading = $state(false);
-  // Each path asks for the capability it actually needs. Both are officials-only
-  // (IC/NC/Prince) and deliberately cross-country, so any official present at the
-  // event qualifies — the copy says so rather than hiding the option, since an
-  // organizer who can't act still needs to know who can.
-  const canSponsor = $derived(canSponsorVekn(auth.user).allowed);
-  const canCreate = $derived(canCreateMember(auth.user).allowed);
+  // Minting a member and issuing a VEKN ID to an accountless one are one
+  // authority: officials-only (IC/NC/Prince) and deliberately cross-country, so
+  // any official present at the event qualifies — the copy says so rather than
+  // hiding the option, since an organizer who can't act needs to know who can.
+  const canSponsor = $derived(canSponsorMember(auth.user).allowed);
   // checkPermission fails closed before WASM loads; don't tell an official they
   // aren't one in that window — show the form (its confirm stays disabled).
   const eligibilityKnown = $derived(engineReady());
@@ -119,7 +115,7 @@
   }
 
   async function handleCreateAndRegister() {
-    if (!createName.trim() || !createEmail.trim() || !canCreate) return;
+    if (!createName.trim() || !createEmail.trim() || !canSponsor) return;
 
     // Guard the whole path (dedup lookup + mint) so a double-tap can't fire two
     // creates during the await, and the review button never sticks.
@@ -220,7 +216,7 @@
     onkeydown={(e) => { if (e.key === 'Escape' && !sponsorLoading) sponsorTarget = null; }}
   >
     <div
-      use:focusOnMount
+      use:dialogPanel={() => { if (!sponsorLoading) sponsorTarget = null; }}
       class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4 max-h-[90dvh] overflow-y-auto"
       role="dialog"
       aria-modal="true"
@@ -271,7 +267,7 @@
     onkeydown={(e) => { if (e.key === 'Escape' && !createLoading) resetCreateModal(); }}
   >
     <div
-      use:focusOnMount
+      use:dialogPanel={() => { if (!createLoading) resetCreateModal(); }}
       class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4 max-h-[90dvh] overflow-y-auto"
       role="dialog"
       aria-modal="true"
@@ -280,7 +276,7 @@
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
     >
-      {#if eligibilityKnown && !canCreate}
+      {#if eligibilityKnown && !canSponsor}
         <!-- Explain instead of offering a form that can never be submitted: a
              filled-in name and email followed by a dead button teaches nothing. -->
         <h3 id="create-modal-title" class="text-lg font-medium text-ink-strong">{m.create_and_register_title()}</h3>
@@ -375,7 +371,7 @@
             variant="primary"
             size="lg"
             loading={createLoading}
-            disabled={!createName.trim() || !createEmail.trim() || !canCreate}
+            disabled={!createName.trim() || !createEmail.trim() || !canSponsor}
             onclick={handleCreateAndRegister}
           >{m.create_and_register_btn()}</Button>
         </div>
@@ -394,7 +390,7 @@
     onkeydown={(e) => { if (e.key === 'Escape') pendingDeceased = null; }}
   >
     <div
-      use:focusOnMount
+      use:dialogPanel={() => pendingDeceased = null}
       class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4 max-h-[90dvh] overflow-y-auto"
       role="dialog"
       aria-modal="true"

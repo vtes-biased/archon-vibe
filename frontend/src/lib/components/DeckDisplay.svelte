@@ -10,6 +10,7 @@
   import { CircleX, TriangleAlert } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   let {
     deck,
@@ -391,6 +392,7 @@
     class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
     onclick={() => cardImageUrl = null}
     onkeydown={(e) => e.key === 'Escape' && (cardImageUrl = null)}
+    use:dialogPanel={() => cardImageUrl = null}
     role="dialog"
     tabindex="-1"
   >

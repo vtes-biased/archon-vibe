@@ -2,6 +2,7 @@
   import * as m from '$lib/paraglide/messages.js';
   import Button from '$lib/components/Button.svelte';
   import { Trash2, TriangleAlert } from "@lucide/svelte";
+  import { dialogPanel } from "$lib/actions/dialog";
 
   let {
     showDeleteConfirm = $bindable(false),
@@ -53,6 +54,7 @@
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => showDeleteConfirm = false}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
@@ -89,6 +91,7 @@
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => showGoOfflineConfirm = false}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
@@ -131,6 +134,7 @@
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => showGoOnlineConfirm = false}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
@@ -165,6 +169,7 @@
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => showForceTakeoverConfirm = false}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
@@ -204,6 +209,7 @@
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => showForceUnlockConfirm = false}
       role="dialog"
       aria-modal="true"
       tabindex="-1"

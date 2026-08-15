@@ -5,6 +5,7 @@
   import { ChevronDown, Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   const auth = $derived(getAuthState());
 
@@ -290,6 +291,7 @@
       class="bg-surface-card rounded-lg border border-line p-6 w-full max-w-sm"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => confirmAction = null}
       role="dialog" aria-modal="true" tabindex="-1"
     >
       {#if confirmAction.action === "regenerate"}

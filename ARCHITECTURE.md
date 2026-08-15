@@ -69,7 +69,7 @@ Action → backend Rust engine → PostgreSQL → CRUD event → SSE broadcast �
 
 Primary-device ownership — no CRUD log or conflict resolution needed:
 
-1. An organizer who can create members takes the tournament offline (`go-offline`) → locked to their device: offline play mints real members at go-online, so it takes `create_member` on top of `organize_tournament`. A tournament can also be *created* while offline (same form, detect-and-adapt): the WASM engine creates it born device-locked; the server first learns of it at go-online (insert path).
+1. An organizer who can create members takes the tournament offline (`go-offline`) → locked to their device: offline play mints real members at go-online, so it takes `sponsor_member` on top of `organize_tournament`. A tournament can also be *created* while offline (same form, detect-and-adapt): the WASM engine creates it born device-locked; the server first learns of it at go-online (insert path).
 2. Other devices see an "offline" message — no mutations.
 3. The WASM Rust engine processes business events locally → writes IndexedDB directly.
 4. Offline-created players get temp UIDs (remapped to real UIDs on sync).
@@ -207,7 +207,7 @@ and is omitted from the rows below.
 
 | Capability | Who, besides IC |
 |---|---|
-| `create_member`, `sponsor_vekn`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
+| `sponsor_member`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
 | `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
 | `merge_accounts`, `delete_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |

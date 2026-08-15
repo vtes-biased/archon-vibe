@@ -187,12 +187,11 @@ impl OwnedResource {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Capability {
     // Members
-    CreateMember,
+    SponsorMember,
     EditMemberProfile,
     DeleteMember,
     MarkDeceased,
     ManageVekn,
-    SponsorVekn,
     MergeAccounts,
     // Tournaments & leagues
     CreateTournament,
@@ -268,14 +267,18 @@ pub const OFFICIAL_ROLES: [Role; 3] = [IC, NC, Prince];
 /// authority. Owner-approved matrix of 2026-08-04 — see .pst/details/538.
 pub const CAPABILITIES: &[Rule] = &[
     // ---- Members ----------------------------------------------------------
+    // Bringing someone into VEKN — minting a member record, or issuing a VEKN ID
+    // to an account that has none. One authority, not two: both allocate an ID
+    // and stamp coopted_by, and splitting them only invited the two halves to
+    // drift. Deliberately cross-country: any official may sponsor anywhere.
     Rule {
-        capability: Capability::CreateMember,
-        name: "create_member",
+        capability: Capability::SponsorMember,
+        name: "sponsor_member",
         global: &OFFICIAL_ROLES,
         same_country: &[],
         self_service: false,
         organizer: false,
-        deny: "Only IC, NC, or Prince can create members",
+        deny: "Only IC, NC, or Prince can sponsor members",
         deny_scope: None,
     },
     Rule {
@@ -317,17 +320,6 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, or the member's national coordinator, can manage VEKN IDs",
         deny_scope: Some("You can only manage VEKN IDs for users in your country"),
-    },
-    // Deliberately cross-country: any official may sponsor a VEKN ID anywhere.
-    Rule {
-        capability: Capability::SponsorVekn,
-        name: "sponsor_vekn",
-        global: &OFFICIAL_ROLES,
-        same_country: &[],
-        self_service: false,
-        organizer: false,
-        deny: "Only IC, NC, or Prince can sponsor VEKN IDs",
-        deny_scope: None,
     },
     // IC-only: the merge unions both accounts' roles, so anyone who could merge
     // could land a role by absorbing a shell that carries it.
@@ -827,7 +819,7 @@ pub fn can_take_tournament_offline(
     if !organizes.allowed {
         return organizes;
     }
-    check(Capability::CreateMember, &Request::new(actor, actor_uid))
+    check(Capability::SponsorMember, &Request::new(actor, actor_uid))
 }
 
 /// Check if actor can edit a league: IC, NC (same country), or a league organizer.
@@ -1144,17 +1136,16 @@ mod tests {
     }
 
     #[test]
-    fn test_create_member_and_sponsor_are_cross_country() {
-        for cap in [Capability::CreateMember, Capability::SponsorVekn] {
-            for role in OFFICIAL_ROLES {
-                assert!(over_country(cap, &ctx(vec![role], Some("FR")), Some("US")));
-            }
-            assert!(!over_country(
-                cap,
-                &ctx(vec![Judge], Some("FR")),
-                Some("FR")
-            ));
+    fn test_sponsor_member_is_cross_country() {
+        let cap = Capability::SponsorMember;
+        for role in OFFICIAL_ROLES {
+            assert!(over_country(cap, &ctx(vec![role], Some("FR")), Some("US")));
         }
+        assert!(!over_country(
+            cap,
+            &ctx(vec![Judge], Some("FR")),
+            Some("FR")
+        ));
     }
 
     #[test]
@@ -1315,14 +1306,14 @@ mod tests {
         let offline = |roles, country, uid: &str| {
             can_take_tournament_offline(&ctx(roles, country), uid, &tournament).allowed
         };
-        // Both halves: implicit organizers who can also create members.
+        // Both halves: implicit organizers who can also sponsor members.
         assert!(offline(vec![IC], Some("US"), "x"));
         assert!(offline(vec![NC], Some("FR"), "x"));
-        // A Prince holds create_member but is never an implicit organizer, so
+        // A Prince holds sponsor_member but is never an implicit organizer, so
         // only on a tournament they are actually named on.
         assert!(offline(vec![Prince], Some("FR"), "prince-1"));
         assert!(!offline(vec![Prince], Some("FR"), "x"));
-        // An explicit organizer who cannot create members fails the other half.
+        // An explicit organizer who cannot sponsor members fails the other half.
         assert!(!offline(vec![], Some("FR"), "player-1"));
         // An NC of another country is neither.
         assert!(!offline(vec![NC], Some("US"), "x"));

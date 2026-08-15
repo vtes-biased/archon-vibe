@@ -1,6 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
   import { CircleCheck, TriangleAlert } from '@lucide/svelte';
   import Button from '$lib/components/Button.svelte';
 
@@ -72,9 +73,6 @@
     if (status !== 'loading') onClose();
   }
 
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -86,7 +84,7 @@
 >
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
-    use:focusOnMount
+    use:dialogPanel={requestClose}
     class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.stopPropagation()}

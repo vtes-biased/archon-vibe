@@ -4,6 +4,7 @@
   import { ChevronDown, Loader2, AppWindow, TriangleAlert } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   interface AuthorizedApp {
     client_id: string;
@@ -119,6 +120,7 @@
       class="bg-surface-card rounded-lg border border-line p-6 w-full max-w-sm"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => confirmRevoke = null}
       role="dialog" aria-modal="true" tabindex="-1"
     >
       <h3 class="text-ink-strong font-medium mb-2">{m.authorized_apps_confirm_title()}</h3>

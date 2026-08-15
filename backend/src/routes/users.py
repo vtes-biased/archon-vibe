@@ -76,7 +76,7 @@ async def create_user(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     # Only IC, NC, or Prince can create users
-    if not permissions.can_create_member(current_user):
+    if not permissions.can_sponsor_member(current_user):
         raise HTTPException(
             status_code=403,
             detail="Only IC, NC, or Prince can create users",

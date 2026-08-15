@@ -17,6 +17,7 @@
   import Button from '$lib/components/Button.svelte';
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   let {
     user,
@@ -688,6 +689,7 @@
       tabindex="-1"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => cancelCountryChange()}
     >
       <div class="p-6 border-b border-line">
         <h2 id="country-confirm-title" class="text-xl font-medium text-ink-strong">

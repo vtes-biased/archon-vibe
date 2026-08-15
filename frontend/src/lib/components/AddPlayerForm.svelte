@@ -5,6 +5,7 @@
   import { getCountryFlag } from "$lib/geonames";
   import { Ban, TriangleAlert, Flower2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   let {
     tournament,
@@ -172,6 +173,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="deceased-warn-title"
+      use:dialogPanel={() => pendingDeceased = null}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     >
       <div class="p-6 border-b border-line">

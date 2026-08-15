@@ -4,6 +4,7 @@
   import Button from "$lib/components/Button.svelte";
   import { Upload, X, TriangleAlert, CircleCheck } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   let {
     show = $bindable(),
@@ -154,7 +155,7 @@
       aria-modal="true"
       aria-labelledby="csv-import-title"
       tabindex="-1"
-      onkeydown={(e) => e.key === 'Escape' && close()}
+      use:dialogPanel={close}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line flex items-center justify-between">

@@ -5,6 +5,7 @@
   import { Upload, Download, X } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -18,9 +19,6 @@
     hasRounds?: boolean;
   } = $props();
 
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
 
   let archonFile = $state<File | null>(null);
   let archonUploading = $state(false);
@@ -87,7 +85,7 @@
       aria-modal="true"
       aria-labelledby="archon-import-title"
       tabindex="-1"
-      use:focusOnMount
+      use:dialogPanel={() => show = false}
     >
       <div class="p-6 border-b border-line flex items-center justify-between gap-2">
         <h2 id="archon-import-title" class="text-xl font-medium text-link">{m.archon_import_title()}</h2>

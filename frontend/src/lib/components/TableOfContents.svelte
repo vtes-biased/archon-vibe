@@ -3,6 +3,7 @@
   import { replaceState } from "$app/navigation";
   import type { TocEntry } from "$lib/help-docs";
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
 
   interface Props {
     entries: TocEntry[];
@@ -66,6 +67,7 @@
         class="absolute bottom-0 left-0 right-0 max-h-[70vh] bg-surface-card border-t border-line rounded-t-2xl overflow-y-auto"
         onclick={(e) => e.stopPropagation()}
         onkeydown={(e) => e.stopPropagation()}
+        use:dialogPanel={() => mobileOpen = false}
         role="dialog"
         aria-modal="true"
         tabindex="-1"

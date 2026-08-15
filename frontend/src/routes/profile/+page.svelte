@@ -27,6 +27,7 @@
   import AdminSection from "./AdminSection.svelte";
   import DataSection from "./DataSection.svelte";
   import Badge from "$lib/components/Badge.svelte";
+  import { dialogPanel } from "$lib/actions/dialog";
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -311,6 +312,7 @@
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => showClaimModal = false}
       role="dialog" aria-modal="true" tabindex="-1"
     >
       <div class="p-6 border-b border-line">
@@ -355,6 +357,7 @@
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
+      use:dialogPanel={() => showAbandonConfirm = false}
       role="dialog" aria-modal="true" tabindex="-1"
     >
       <div class="p-6 border-b border-line">

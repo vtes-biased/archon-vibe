@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from '$lib/paraglide/messages.js';
+  import { dialogPanel } from "$lib/actions/dialog";
   import { getLocale } from '$lib/paraglide/runtime.js';
   import { CircleCheck, TriangleAlert } from '@lucide/svelte';
   import GithubIcon from '$lib/components/GithubIcon.svelte';
@@ -84,9 +85,6 @@
   function requestClose() {
     if (status !== 'loading') onClose();
   }
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
 
   const inputClass =
     'w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent';
@@ -101,7 +99,7 @@
 >
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
-    use:focusOnMount
+    use:dialogPanel={requestClose}
     class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.stopPropagation()}

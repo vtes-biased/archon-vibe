@@ -510,15 +510,12 @@ export function isOfficial(user: UserContext | null): boolean {
 }
 
 /**
- * Create a member record.
- *
- * Gate the create-and-register control on this, never on `canSponsorVekn`:
- * the two rules are identical today but nothing pins them together, and
- * check_permission_drift.py matches role literals, so a future divergence
- * would surface as a bare 403 rather than a failed check.
+ * Bring someone into VEKN: mint a member record, or issue a VEKN ID to an
+ * account that has none. One authority — both allocate an ID and stamp
+ * coopted_by. Deliberately cross-country.
  */
-export function canCreateMember(actor: UserContext | null): PermissionResult {
-  return checkPermission('create_member', actor);
+export function canSponsorMember(actor: UserContext | null): PermissionResult {
+  return checkPermission('sponsor_member', actor);
 }
 
 /** Edit a user's profile fields. */
@@ -529,11 +526,6 @@ export function canEditUser(actor: UserContext | null, target: UserContext): Per
 /** Link or force-abandon a target's VEKN ID. */
 export function canManageVekn(actor: UserContext | null, target: UserContext): PermissionResult {
   return checkPermission('manage_vekn', actor, { target });
-}
-
-/** Sponsor a new VEKN ID — deliberately cross-country. */
-export function canSponsorVekn(actor: UserContext | null): PermissionResult {
-  return checkPermission('sponsor_vekn', actor);
 }
 
 /** Merge one account into another. */

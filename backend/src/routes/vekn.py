@@ -204,7 +204,7 @@ async def sponsor_new_member(
     """
 
     # Check manager has appropriate role
-    if not permissions.can_sponsor_vekn(manager):
+    if not permissions.can_sponsor_member(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can sponsor new members"
         )

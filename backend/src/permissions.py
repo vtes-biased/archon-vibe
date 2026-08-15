@@ -69,9 +69,11 @@ def is_official(user: User) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def can_create_member(user: User) -> bool:
-    """Create a member record."""
-    return _check("create_member", user)
+def can_sponsor_member(user: User) -> bool:
+    """Bring someone into VEKN: mint a member record, or issue a VEKN ID to an
+    account that has none. One authority — both allocate an ID and stamp
+    coopted_by. Deliberately cross-country."""
+    return _check("sponsor_member", user)
 
 
 def can_edit_user(actor: User, target: User) -> bool:
@@ -102,11 +104,6 @@ def can_change_country(actor: User, target: User) -> bool:
 def can_manage_vekn(actor: User, target: User) -> bool:
     """Link or force-abandon a target's VEKN ID."""
     return _check("manage_vekn", actor, target=target)
-
-
-def can_sponsor_vekn(user: User) -> bool:
-    """Sponsor a new VEKN ID — deliberately cross-country."""
-    return _check("sponsor_vekn", user)
 
 
 def can_merge_accounts(actor: User) -> bool:
