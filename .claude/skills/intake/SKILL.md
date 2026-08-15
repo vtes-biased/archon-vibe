@@ -17,8 +17,8 @@ has said yes.
 cat BOARD.md
 ```
 
-The header carries the ranking rules, the hard limit and the triggered-line
-convention. Everything below depends on them.
+The header carries the ranking rules, the hard limit and the no-waiting-state
+rule. Everything below depends on them.
 
 ## 2. Four challenges
 
@@ -40,10 +40,13 @@ possible? If not, it is a subject, not an ask: it belongs on a wiki page. "Keep 
 eye on X", "improve Y", "think about Z" all fail here. A subject that becomes wiki
 content is a *successful* intake, not a rejection.
 
-Externally-gated work is the one exception the board allows: if the ask is real and
-completable but waits on something outside our control, it becomes a **triggered**
-line with a named `[TRIGGER: …]` condition, living below the marker and exempt from
-the cap. A trigger must be a condition someone could observe firing — not "later".
+Externally-gated work does not go on the board — the board holds no waiting state.
+If the ask is real and completable but waits on something outside our control,
+record it as a **deferred item** on the wiki page that owns the subject (the VEKN
+items live in `wiki/vekn-decommission.md`), stating the ask, its done-condition,
+the evidence that cannot be reconstructed later, and a named trigger — a condition
+someone could observe firing, not "later". `/upkeep` watches the triggers; a fired
+one sends the item back through this loop as an ordinary line.
 
 **Scope** — split only on real abstraction boundaries, so an agent can hold each
 part in context. **Never split to defer.** A large cohesive change is one line.
@@ -55,7 +58,7 @@ never edits a domain page.
 
 ## 3. Check the limit
 
-The board holds at most **15 active lines**. If it is full, adding one means
+The board holds at most **15 lines**. If it is full, adding one means
 dropping or promoting another — present that trade to the owner as part of the
 proposal, oldest-first among candidates. Do not quietly exceed it.
 
@@ -78,6 +81,12 @@ One line, however long. It carries the ask in a verb you would recognise "done"
 for, a **Done when** clause, and where the context is. Bulky elaboration — scope,
 hazards, plan, measured evidence — goes in `board/<slug>.md` and dies with the
 line.
+
+Record the **doc-impact durably**: name the wiki pages in the line's **Done when**
+("…and the index table in `wiki/sync.md` updated"), or in a `Doc-impact:` line at
+the top of `board/<slug>.md` when the line has one. `/ship` confirms the contract
+from what the line and its file say — a doc-impact that lives only in this
+conversation is lost on the next session.
 
 Write it in product language. No file paths in place of an explanation, no ticket
 numbers, and never a `#N`, which reads as a GitHub issue.

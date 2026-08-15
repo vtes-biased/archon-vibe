@@ -18,7 +18,7 @@ axis from the authorization predicates in [access](access.md).
 
 | Type | `public` | `member` | `full` |
 |---|---|---|---|
-| user | NC/Prince only, with contact + community links; IC without contact | all users — no contact, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` |
+| user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` |
 | tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything |
 | sanction | none | full data | full data |
 | deck | none | full data when `public = true`, else none | full data |
@@ -237,7 +237,7 @@ write.
 
 | Event | Target | Purpose |
 |---|---|---|
-| `judge_call` | organizers + IC | a player requests a judge at their table |
+| `judge_call` | explicit tournament organizers only | a player requests a judge at their table |
 
 Payload `{tournament_uid, table, table_label, player_name}`. The frontend
 accumulates calls in component state, auto-dismisses after 120s and plays a chime.
@@ -446,6 +446,11 @@ isn't re-fetchable from SSE. Both the upgrade path and the sync manager's
 clear-all-stores path wipe the stores, and **both must rescue the full offline
 set**.
 
+**A new enum value on a synced field breaks stale clients** — a PWA running last
+week's bundle receives the unknown value over SSE, writes it to IndexedDB, and
+silently falls through every branch keyed on the known values. A new *field* is
+additive: old clients ignore it.
+
 Minimal indexes only:
 
 | Store | Indexes |
@@ -456,6 +461,12 @@ Minimal indexes only:
 | decks | `by-tournament`, `by-user` |
 | leagues | `by-country`, `by-start` |
 | promos | none — small catalog |
+
+Deferred, on the trigger "next `DB_VERSION` bump": drop `users.by-country-name`,
+which has no consumers — removing an index forces a full client resync, so it
+rides a bump rather than forcing its own. `decks.by-user` is likewise unconsumed
+today; drop it in the same bump unless a consumer has appeared (the Hall of Fame
+work plans one). Update this table in the same change.
 
 A generic `ObjectSpec` array (`SPECS`) handles all types uniformly in the sync
 manager, and a single `isSynced` flag tracks state.

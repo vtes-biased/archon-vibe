@@ -70,17 +70,20 @@ line gets one of four verdicts, and no line is skipped twice:
 
 - **do** — it is still right and still wanted; leave it, reordering if the ranking
   rules now place it differently;
-- **date** — it is real but not now; it needs a trigger, which makes it a triggered
-  line with a named condition, not a vague deferral;
+- **date** — it is real but not now; it moves off the board to the wiki page that
+  owns it as a deferred item with a named trigger, not a vague deferral;
 - **promote** — it turned out to be a subject, not an ask; it becomes wiki content
   and the line goes;
 - **drop** — it is no longer wanted; delete it.
 
-Then check the **triggered** lines: has any trigger fired? A fired trigger promotes
-the line into the active list at its ranked position, which may push the active
-list to its limit — resolve that here rather than at the next intake.
+Then check the **deferred items** parked in the wiki (`wiki/vekn-decommission.md`,
+plus the deferred notes on `dev.md` and `sync.md`): has a trigger fired? A fired
+trigger sends the item through `/intake` as an ordinary line at its ranked
+position, which may push the list to its limit — resolve that here rather than at
+the next intake. And give each deferred item the same verdict as a line: still
+wanted, or dropped — deferral is not exemption from eviction.
 
-Check the hard limit. If the active list is at 15, the pass must produce at least
+Check the hard limit. If the list is at 15, the pass must produce at least
 one drop or promotion before any new line can land.
 
 A drop that was a promise to a person is something to **say**, not merely delete —

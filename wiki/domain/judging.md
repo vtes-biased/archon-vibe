@@ -3,7 +3,7 @@
 The penalty system the app records. Source: `reference/judges-guide-v2.md`
 (Tournament Conduct & Infraction Guide, the current guide), section numbers cited
 inline. `reference/judges-guide.md` is the 2004 v1 guide, kept for historical
-rulings and served in-app; v2 is what the app models.
+rulings; v2 is what the app models and serves in-app.
 
 ## Philosophy
 
@@ -111,9 +111,8 @@ same tournament.
 
 ## Infractions and baselines
 
-The categories the app tracks per sanction, with the baseline penalty from the
-guide's Appendix — Penalty Summary. The canonical machine-readable copy is
-`engine/src/sanctions.rs`, served at `GET /sanctions/reference`.
+The guide's infraction categories, with the baseline penalty from its Appendix —
+Penalty Summary.
 
 **Procedural Errors (§2)**
 

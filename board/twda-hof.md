@@ -260,7 +260,7 @@ importing. Most of the missing Hall of Fame is already in our database as
 unattributed events.
 
 (Aside, unrelated to this ticket: that count also surfaced one tournament dated
-**2034** — a data-entry typo worth a separate look.)
+**2034** — a data-entry typo, since recorded in `wiki/vekn-decommission.md`.)
 
 Resolve every TWDA entry against the live corpus, in order:
 
@@ -703,8 +703,8 @@ finished row, where a misclassification silently moves ratings.
 a synced field is a **breaking change for offline-first clients**: a PWA running
 last week's bundle receives the new value over SSE, writes it to IndexedDB, and
 falls through every `state === "Finished"` branch in `rankedStatus`, tab
-derivation, the list and the calendar — silently. A new *field* is additive and
-ignored by old clients. General rule worth keeping.
+derivation, the list and the calendar — silently. The general rule is recorded in
+`wiki/sync.md#frontend-storage`.
 
 ## The shape
 
@@ -788,8 +788,8 @@ Beyond the Rust/Python twin there are two more, with a *third* definition:
 Expose `attested_player_count(t_json) -> i32` over PyO3 + WASM in
 `engine/src/lib.rs` and delete the arithmetic in `ratings.py:75` and
 `tournament-utils.ts:328`, keeping the set-returning helpers (enumeration, not
-rule). Leave `_played_player_count` but comment the deliberate divergence.
-Context: `.claude/agent-memory/principal-engineer/player-count-four-implementations.md`.
+rule). Leave `_played_player_count` but comment the deliberate divergence. The
+`player_count` name-collision hazard is in `wiki/hazards.md`.
 
 ## The in-app correction path
 

@@ -14,9 +14,7 @@ doc-impact wiki pages updated, board line deleted — in one commit.
 cat BOARD.md
 ```
 
-Take the **top** active line unless the owner named a different one. Triggered
-lines are not eligible; check first whether the trigger has fired, and if it has,
-promote it into the active list before starting.
+Take the **top** line unless the owner named a different one.
 
 Read its `board/<slug>.md` if it has one. Read the wiki pages the line touches, and
 `wiki/hazards.md` if it names any subsystem you are about to change.
@@ -30,7 +28,8 @@ acceptable when files overlap.
 Before writing code, state — to yourself, and to the owner if anything moved:
 
 - the **done-condition**, from the line;
-- the **doc-impact**: which wiki pages change, or why none do;
+- the **doc-impact**: which wiki pages change, or why none do — intake recorded it
+  in the line's **Done when** or a `Doc-impact:` line in its `board/<slug>.md`;
 - anything the line assumed that turns out to be false.
 
 A line whose premise is wrong goes back through `/intake`; do not silently

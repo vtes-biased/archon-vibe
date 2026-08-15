@@ -1,4 +1,5 @@
-> Elaborated context for a line in `BOARD.md`. Deleted with the line.
+> Elaborated context for **two** lines in `BOARD.md` — the post-flip steps and
+> the legacy-archon decommission. Deleted with the later of the two.
 > `#N` below is a **retired tracker number**, not a GitHub issue and not a live
 > pointer — the surrounding prose carries the fact. A real GitHub issue is
 > written `gh-N`.

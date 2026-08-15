@@ -182,24 +182,9 @@ rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 
 ### Standings computation
 
-`compute_preliminary_standings` sorts by GW > VP > TP with a toss tiebreak. GW and
-TP are **recomputed** per table from raw VPs plus current sanctions, so an SA
-issued after a round was scored re-decides the GW and re-ranks TP — the frozen
-seat values would otherwise go stale. The VP total sums raw per-seat VP then
-subtracts the full SA penalty, which may go negative; per-seat `result.vp` stays
-raw for display.
-
-`compute_rating_vp_gw` is the single source for the backend rating and VEKN-push
-paths. It applies the same rule and additionally includes finals VP/GW; prelim
-comes from the rounds when present, else from the prelim-only standings row for
-round-less VEKN imports; when no `finals` object recorded the win it credits the
-tournament winner a +1 GW (covering a no-final import — a native no-final leaves
-`winner == ""`, so it stays inert there); it returns `(0, 0)` early for DQ'd and
-non-competing players.
-
-`tournament.standings` is **prelim-only and SA-adjusted** — finals are excluded.
-The engine invariant is that standings are non-empty exactly when rounds are
-non-empty, which is what makes VEKN's `rounds > 0` push guard safe.
+`compute_preliminary_standings`, `compute_rating_vp_gw`, the prelim-only invariant
+and final placement are specified on [tournaments](tournaments.md#standings); the
+engine module is `tournament/standings.rs`.
 
 ### Error contract
 
@@ -411,7 +396,8 @@ denylist. Banners are dismissible per-device via localStorage.
 
 `POST /{uid}/call-judge {table}` — the caller must be authenticated and seated at
 that table in the current round, with the tournament in Playing state and not
-offline. It emits the ephemeral `judge_call` SSE event to organizers and IC only.
+offline. It emits the ephemeral `judge_call` SSE event to the tournament's
+explicit organizers only — they are the ones on premises.
 
 ### Web Push
 

@@ -21,9 +21,10 @@ memory store: project facts go in the right wiki page.
 ## The board
 
 [`BOARD.md`](BOARD.md) is a list designed to shrink. One line per ask, completion
-is deletion, position is priority, hard limit 15 active lines. Its own header
-carries the ranking rules and the triggered-line convention. Read it before
-starting anything.
+is deletion, position is priority, hard limit 15 lines, no waiting state —
+externally-gated work is deferred on the wiki page that owns it, with a named
+trigger. Its own header carries the ranking rules. Read it before starting
+anything.
 
 ## The loops
 

@@ -108,7 +108,9 @@ disqualification from this event, or reaching the per-player round cap.
 and a player never registered is enrolled by it. Checking someone in never seats
 them; whether a late arrival joins a short table now or waits is the organizer's
 call, taken as a separate seating action. **The app has no default and must not
-decide.** The same path reverses a drop-out, who returns to `Playing` if their seat
+decide.** A round turns `Playing` the moment it is seated, while players are still
+finding seats, so an arrival in that gap can often still be seated; once play has
+begun they usually wait. The same path reverses a drop-out, who returns to `Playing` if their seat
 is still live — dropping out never vacates a seat, which is why Drop Out carries no
 confirmation. Only `Planned` and `Registration` refuse a check-in; a `Finished`
 tournament accepts one only for post-hoc correction.
@@ -219,8 +221,9 @@ which is what makes the VEKN `rounds > 0` push guard safe.
 paths. It applies the same rule and additionally includes finals VP/GW; prelim
 comes from the rounds when present, else from the prelim-only standings row for
 round-less VEKN imports; when no `finals` object recorded the win it credits the
-tournament winner a +1 GW, covering a no-final import. It returns `(0, 0)` early
-for DQ'd and non-competing players.
+tournament winner a +1 GW, covering a no-final import — a native no-final leaves
+`winner == ""`, so it stays inert there. It returns `(0, 0)` early for DQ'd and
+non-competing players.
 
 `compute_final_standings` implements §3.7.5 placement: winner rank 1, other
 finalists share rank 2, non-finalists competition-ranked from `finalist_count + 1`.

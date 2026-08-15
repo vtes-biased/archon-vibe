@@ -5,6 +5,9 @@
 Rust (rustup), Node 24+, `uv`, `just`, and Docker or OrbStack. `uv` auto-installs
 Python.
 
+Deferred, on the trigger "SvelteKit and svelte-check ship TS 7 support": bump
+TypeScript 6 → 7 — done when `npm ls` is clean and `svelte-check` passes on TS 7.
+
 ```bash
 just update    # install Python, Node, Rust and wasm-pack deps, build the engine
 just dev       # database + backend + frontend

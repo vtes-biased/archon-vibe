@@ -282,3 +282,23 @@ plain-text excerpt from the source for a folded preview.
 
 Shared helpers live in `tournament-utils.ts`; don't re-duplicate score helpers per
 file.
+
+## Console surfaces
+
+The organizer console is a workbench, not a brochure. A proposed console feature
+checks against three rules before adding anything:
+
+1. **State owns the surface.** What is present, expanded and prominent is a
+   function of tournament state; pre-event reference material and setup
+   affordances leave the working surface during play. Placement follows:
+   state-dependent, time-critical actions live in the action bar,
+   state-independent ones in Tools.
+2. **One button budget per surface.** A surface shows the actions of the current
+   moment; everything rarer is exactly one tap deep in Tools — demoted, by
+   preference, to *deleted* (another path already does the job), an *icon*
+   (frequent and self-evident), or the *menu* (rare).
+3. **Say it once.** A fact appears in exactly one place, at its shortest, through
+   one notice component; rule citations belong in help.
+
+The boundary rule: actions that operate on what you are looking at stay on that
+surface as icons; actions that operate on the tournament go in Tools.

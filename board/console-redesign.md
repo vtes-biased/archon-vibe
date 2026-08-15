@@ -11,8 +11,8 @@ new.archon.vekn.net) reviewed with the owner on 2026-08-07/08, plus a read of
 
 ## The direction
 
-**The console is a workbench, not a brochure.** Every child derives from three rules. When a new
-console feature is proposed, check it against these before adding a button.
+**The console is a workbench, not a brochure.** The three rules are standing policy, recorded in
+`wiki/design.md#console-surfaces`; what follows elaborates them against the reviewed screens.
 
 1. **State owns the surface.** What is *present*, *expanded* and *prominent* is a function of
    tournament state. Reference material (description, date, location, organizers) and setup

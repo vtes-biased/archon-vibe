@@ -34,7 +34,9 @@ authority, may appoint other judges with the organizer's agreement, and is
 responsible for reporting all warnings to VEKN directly or through the organizer's
 event report (§2.6). A judge's decision may be appealed to the head judge, whose
 decision is final; players may not appeal before the responding judge has ruled
-(§2.7). Organizer and head judge may be the same person (§2.6).
+(§2.7). Organizer and head judge may be the same person (§2.6). A judge who takes
+more than a minute over a ruling may extend the game time appropriately; the
+extension must be clearly communicated and recorded immediately (§2.8).
 
 The **scorekeeper** receives and records game results, constructs seatings,
 ensures accurate result entry and removes players from the event; the head judge

@@ -83,7 +83,7 @@ VEKN ID prefix and by the `E2E ` name prefix.
 Two auth helpers: one used **after** `page.goto()`, which clears the sync cursor to
 force a full-level resync, and one used **before** the first navigation via
 `addInitScript`, so the first sync already uses full-level data. Sync helpers wait
-on the emerald SSE dot and on the first rendered row.
+on the `[data-sync-state="synced"]` indicator and on the first rendered row.
 
 Coverage: `users.spec.ts` (app load, SSE streaming, user list, profile page,
 sanction modal); `tournament.spec.ts` (the full nominal arc — create, register 8
@@ -107,6 +107,10 @@ click-based unseat/seat flow; drag-and-drop is not reliably scriptable.
 
 **Never `git checkout` during mutation testing** — it has wiped uncommitted feature
 code mid-run. Back the file up first.
+
+**The backend `test_db` fixture wipes only `type = 'user'` rows**
+(`backend/tests/conftest.py`) — a test that creates tournaments or decks cleans up
+after itself, as the existing suites do with `_cleanup()` context managers.
 
 **`test_access_levels.py` is the only place in the backend suite that asserts
 projection field membership.** Everything else mentioning `"public"` asserts row

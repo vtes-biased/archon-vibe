@@ -2,6 +2,7 @@
 
 How the app talks to vekn.net, to the TWDA, and to the legacy archon database. The
 organization and its rules are [domain](domain/vekn.md); this is the plumbing.
+Work deferred until these syncs retire: [vekn-decommission](vekn-decommission.md).
 
 ## Feature flags
 
@@ -11,6 +12,7 @@ organization and its rules are [domain](domain/vekn.md); this is the plumbing.
 | `VITE_VEKN_PUSH` | frontend env | restricts the `max_rounds` UI to 2–4, shows the VEKN link badge and the amber pending-sync badges |
 | `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member and tournament sync |
 | `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period, default 6h |
+| `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound push period, default 1h |
 
 All directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
 `VEKN_API_PASSWORD`.

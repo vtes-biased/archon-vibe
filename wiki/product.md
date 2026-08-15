@@ -96,8 +96,8 @@ dual-audience user may get both for the same event — deliberate, no dedup.
 per-tournament and per-league Open Graph crawler stubs, iCal feeds (personal,
 country, global), agenda matching, list filters.
 
-**Help and feedback** — in-app rulebook, VEKN tournament rules, Judges Guide v1
-and v2, Code of Ethics, and player/organizer guides; members with a VEKN ID can
+**Help and feedback** — in-app rulebook, VEKN tournament rules, Judges Guide v2,
+Code of Ethics, and player/organizer guides; members with a VEKN ID can
 file bug/feature/question reports that become GitHub issues carrying the VEKN ID
 only, never name, email or Discord.
 
@@ -107,18 +107,11 @@ The rules themselves live in [domain](domain/tournament-rules.md); how the app
 implements them, and where it differs, is [tournaments](tournaments.md). What
 follows is the app's own behavior, chosen rather than inherited.
 
-**The door stays open mid-round.** Check-in is not confined to the check-in
-window: it is allowed while a round is `Playing`, and a player who was never
-registered is enrolled by it. Checking someone in never seats them — it records
-that they are present and available. Whether a late arrival joins a short table
-now or waits for the next round is the organizer's call, taken as a separate
-seating action; **the app has no default and must not decide**. A round turns
-`Playing` the moment it is seated, while players are still finding seats, so an
-arrival in that gap can often still be seated; once play has begun they usually
-wait. The same path reverses a drop-out, who returns to `Playing` if their seat is
-still live — dropping out never vacates a seat, which is why Drop Out carries no
-confirmation. Only `Planned` and `Registration` refuse a check-in; a `Finished`
-tournament accepts one only for post-hoc correction.
+**The door stays open mid-round.** Check-in is allowed while a round is `Playing`
+and enrolls a never-registered player; it records presence, never seats. Whether a
+late arrival joins a short table now or waits is the organizer's call — **the app
+has no default and must not decide**. Mechanics and edge cases:
+[tournaments](tournaments.md#player-states).
 
 **Decklist vs check-in** — when decklists are required, a player without one is
 warned at check-in and the organizer may override and check them in anyway.

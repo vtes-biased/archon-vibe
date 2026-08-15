@@ -64,6 +64,12 @@ decision single-sourced in Rust. Frontend wrappers are UX-only and fail closed
 the same inputs**, and must match the backend's *inclusion filter* as well as its
 formula ([dogmas](dogmas.md#product)).
 
+**`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
+the preview runs on not-yet-persisted scores, so the two paths cannot share state.
+A cascade change must land on both sides; the single equality test
+`test_preview_scores_match_setscore_including_sa_cascade` pins them together, and
+one is enough — don't add a second.
+
 ## Renames and references
 
 **Lazy imports hide references.** Function-level imports are used across the
