@@ -399,7 +399,7 @@
     <img
       src={cardImageUrl}
       alt={m.deck_card_image_alt()}
-      class="max-h-[80vh] max-w-full rounded-lg shadow-xl"
+      class="max-h-[80dvh] max-w-full rounded-lg shadow-xl"
       onerror={() => cardImageUrl = null}
     />
   </div>

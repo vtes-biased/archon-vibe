@@ -16,9 +16,14 @@
   let {
     tournament = $bindable(),
     isOrganizer,
+    inSheet = false,
   }: {
     tournament: Tournament;
     isOrganizer: boolean;
+    // Set when the form renders inside a scrolling sheet panel rather than the
+    // page: the sheet already covers the bottom nav, so the save chip must not
+    // reserve clearance for it (see the chip below).
+    inSheet?: boolean;
   } = $props();
 
   let saving = $state(false);
@@ -260,9 +265,14 @@
     </div>
 
     <!-- Sticky save chip: visible wherever the edited field is, not only at the
-         form bottom; confirms success (auto-save has no submit moment) -->
+         form bottom; confirms success (auto-save has no submit moment).
+         Sticky resolves against the scrollport, NOT the shell's padding box, so
+         on the page it has to clear the bottom nav itself or the z-40 nav paints
+         over the only save feedback there is. In a sheet the scrollport is the
+         panel, which already covers the nav — clearing it there would strand the
+         chip ~70px up, eating visible panel height. -->
     {#if saving || savedFlash}
-      <div class="sticky bottom-4 flex justify-end pointer-events-none">
+      <div class="sticky {inSheet ? 'bottom-4' : 'bottom-[calc(1rem+var(--spacing-navbar))] sm:bottom-[calc(1rem+var(--spacing-safe-b))]'} flex justify-end pointer-events-none">
         <div class="bg-surface-card border border-line rounded-full shadow px-3 py-1.5 text-xs text-ink-muted flex items-center gap-1.5">
           {#if saving}
             <RefreshCw class="w-3 h-3 animate-spin" aria-hidden="true" />

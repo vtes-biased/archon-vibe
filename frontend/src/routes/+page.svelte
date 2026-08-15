@@ -9,7 +9,7 @@
   });
 </script>
 
-<div class="flex items-center justify-center min-h-screen">
+<div class="flex items-center justify-center min-h-shell">
   <div class="text-center">
     <h1 class="text-4xl font-light text-accent mb-4">Archon</h1>
     <p class="text-ink-muted">{m.common_loading()}</p>

@@ -117,7 +117,7 @@
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class="bg-surface-card rounded-lg border border-line p-6 w-full max-w-sm"
+      class="bg-surface-card rounded-lg border border-line p-6 w-full max-w-sm max-h-[85dvh] overflow-y-auto"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
       use:dialogPanel={() => confirmRevoke = null}

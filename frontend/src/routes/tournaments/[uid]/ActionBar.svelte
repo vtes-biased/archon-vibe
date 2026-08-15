@@ -332,7 +332,7 @@
 <!-- Sticky CTA: the organizer works in the tables far below the bar, so the one
      state action follows them down rather than making them scroll back up.
      Sits flush on the mobile nav (bottom-navbar == the nav's total footprint,
-     touch row + bottom safe area) and clears the desktop side nav (sm:left-20),
+     touch row + bottom safe area) and clears the desktop side rail (sm:left-rail),
      where it is itself the bottom-most element and absorbs the inset. -->
 {#if primary && !barOnScreen}
   <div

@@ -71,7 +71,7 @@
   <title>{isSignup ? m.auth_verify_title_signup() : m.auth_verify_title_reset()} - Archon</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center p-4">
+<div class="min-h-shell flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
       <h1 class="text-4xl font-light text-accent mb-2">Archon</h1>

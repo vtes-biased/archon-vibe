@@ -242,6 +242,18 @@
 .status-offline { background: light-dark(#6b21a8, rgb(88 28 135 / 0.9)); color: light-dark(#fff, #f3e8ff); }  /* amethyst = offline/attention */
 .status-update  { background: light-dark(#1e40af, rgb(30 58 138 / 0.9)); color: light-dark(#fff, #dbeafe); }  /* blue = info */
 
+/*
+ * Full-height centring INSIDE the app shell. `min-h-screen` is 100vh — on iOS
+ * the large viewport, insets included — while the shell's content box is
+ * dvh minus the safe-area top and the bottom nav, so a vh-sized child overflows
+ * it and centres its content off-screen-low. Anything that wants "fill what the
+ * shell actually gives me" uses this.
+ */
+.min-h-shell { min-height: calc(100dvh - var(--spacing-safe-t) - var(--spacing-navbar)); }
+@media (min-width: 40rem) { /* sm: the rail replaces the bottom nav */
+    .min-h-shell { min-height: calc(100dvh - var(--spacing-safe-t) - var(--spacing-safe-b)); }
+}
+
 /* ── Severity dots (SanctionIndicator) — ordinal amethyst → fuchsia → crimson ── */
 .dot-pending   { background-color: light-dark(#9333ea, #c084fc); }
 .dot-highlight { background-color: light-dark(#a21caf, #e879f9); }

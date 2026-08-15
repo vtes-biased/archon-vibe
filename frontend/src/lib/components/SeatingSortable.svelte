@@ -134,7 +134,10 @@
 
 {#if selected}
   {@const selName = seatDisplay(tables[selected.table]?.[selected.seat] ?? '')}
-  <div class="sticky top-2 z-10 mb-3 flex items-center justify-between gap-2 bg-surface-hover border border-select-border rounded-lg px-3 py-2 text-sm shadow-lg">
+  <!-- Sticky resolves against the scrollport (the viewport), NOT the shell's
+       pt-safe-t padding box, so under viewport-fit=cover a bare top-2 parks this
+       behind the status bar and the layout's z-55 scrim. -->
+  <div class="sticky top-[calc(0.5rem+var(--spacing-safe-t))] z-10 mb-3 flex items-center justify-between gap-2 bg-surface-hover border border-select-border rounded-lg px-3 py-2 text-sm shadow-lg">
     <span class="text-select">
       {isFinals ? m.rounds_seating_moving_finals({ name: selName }) : m.rounds_seating_moving({ name: selName })}
     </span>

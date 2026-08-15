@@ -174,7 +174,7 @@
       aria-modal="true"
       aria-labelledby="deceased-warn-title"
       use:dialogPanel={() => pendingDeceased = null}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <h2 id="deceased-warn-title" class="text-xl font-medium text-ink-strong inline-flex items-center gap-2">

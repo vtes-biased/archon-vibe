@@ -288,11 +288,16 @@
   </nav>
 
   <!-- Status-bar scrim. pt-safe-t only reserves space in the document — once
-       scrolled, live content slides through the strip under the clock. This
-       paints over it, and covers every sticky top-* surface (seating banner,
-       help TOC) that parks against the physical viewport top. Above the banner
-       stack and modals (z-50), below toasts (z-100). Zero-height off iOS. -->
-  <div aria-hidden="true" class="fixed top-0 left-0 right-0 h-safe-t z-[55] bg-surface pointer-events-none"></div>
+       scrolled, live page content slides up through the strip under the clock.
+       This paints bg-surface over it.
+       z-45 is deliberate: above the page and its sticky top-* surfaces, but
+       BELOW anything that owns the whole screen (modals at z-50, lightbox at
+       z-60) — those paint their own colour up there, and an opaque page-coloured
+       band across a full-screen sheet reads as a rendering fault.
+       sm:left-rail for the same reason: the rail is bg-surface-card with a right
+       border, so scrimming its top would notch its silhouette. It reaches the
+       status bar itself and paints its own. Zero-height off iOS. -->
+  <div aria-hidden="true" class="fixed top-0 left-0 right-0 sm:left-rail h-safe-t z-[45] bg-surface pointer-events-none"></div>
 
   <!-- Global toast notifications -->
   <Toast />

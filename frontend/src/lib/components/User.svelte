@@ -682,7 +682,7 @@
     onkeydown={(e) => { e.stopPropagation(); if (e.key === "Escape") cancelCountryChange(); }}
   >
     <div
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="country-confirm-title"

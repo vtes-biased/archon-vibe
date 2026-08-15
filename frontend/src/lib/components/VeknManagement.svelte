@@ -243,7 +243,7 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showSponsorConfirm = false)}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <h2 id="sponsor-modal-title" class="text-xl font-medium text-ink-strong">{m.vekn_sponsor_title()}</h2>
@@ -279,7 +279,7 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showLinkModal = false)}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <h2 id="link-modal-title" class="text-xl font-medium text-ink-strong">{m.vekn_link_modal_title()}</h2>
@@ -341,7 +341,7 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showForceAbandonConfirm = false)}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <h2 id="force-abandon-modal-title" class="text-xl font-medium text-link">{m.vekn_abandon_title()}</h2>
@@ -381,7 +381,7 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showMergeModal = false)}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <h2 id="merge-modal-title" class="text-xl font-medium text-ink-strong">{m.vekn_merge_modal_title()}</h2>
@@ -483,7 +483,7 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showDeleteConfirm = false)}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <h2 id="delete-modal-title" class="text-xl font-medium text-link">{m.member_delete_modal_title()}</h2>

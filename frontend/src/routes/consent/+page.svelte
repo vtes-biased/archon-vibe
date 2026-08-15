@@ -169,7 +169,7 @@
   <title>{m.oauth_page_title()} - Archon</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center p-4">
+<div class="min-h-shell flex items-center justify-center p-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-6">
       <h1 class="text-2xl font-semibold text-accent">Archon</h1>

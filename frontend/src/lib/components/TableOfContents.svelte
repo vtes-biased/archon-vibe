@@ -25,7 +25,9 @@
 
 <!-- Desktop: sticky sidebar -->
 <aside class="hidden lg:block w-64 shrink-0">
-  <div class="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+  <!-- sticky resolves against the scrollport, not the shell's padding box, so
+       the inset has to be carried here (iPad standalone). -->
+  <div class="sticky top-[calc(1rem+var(--spacing-safe-t))] max-h-[calc(100dvh-2rem-var(--spacing-safe-t))] overflow-y-auto">
     <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide mb-3">{m.help_toc_title()}</h3>
     <nav class="space-y-0.5">
       {#each entries as entry}
@@ -66,7 +68,7 @@
     >
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
-        class="absolute bottom-0 left-0 right-0 max-h-[70vh] pb-safe-b bg-surface-card border-t border-line rounded-t-2xl overflow-y-auto"
+        class="absolute bottom-0 left-0 right-0 max-h-[70dvh] pb-safe-b bg-surface-card border-t border-line rounded-t-2xl overflow-y-auto"
         onclick={(e) => e.stopPropagation()}
         onkeydown={(e) => e.stopPropagation()}
         use:dialogPanel={() => mobileOpen = false}

@@ -287,7 +287,7 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && (showSanctionModal = false)}
-      class="bg-surface-card rounded-lg shadow-xl border border-accent-soft-border/50 w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-accent-soft-border/50 w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <h2 id="sanction-modal-title" class="text-xl font-medium text-link">{m.sanction_mgr_issue_btn()}</h2>
@@ -408,7 +408,7 @@
       tabindex="-1"
       use:focusOnMount
       onkeydown={(e) => e.key === 'Escape' && closeEditSanctionModal()}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
         <div class="flex items-center justify-between">

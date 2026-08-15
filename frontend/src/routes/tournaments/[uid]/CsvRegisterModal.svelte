@@ -156,7 +156,7 @@
       aria-labelledby="csv-import-title"
       tabindex="-1"
       use:dialogPanel={close}
-      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto"
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line flex items-center justify-between">
         <h2 id="csv-import-title" class="text-xl font-medium text-ink-strong">{m.csv_import_title()}</h2>

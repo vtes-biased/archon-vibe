@@ -261,7 +261,7 @@
 {/if}
 
 {#snippet detailsPanel()}
-  <TournamentDetailsForm bind:tournament {isOrganizer} />
+  <TournamentDetailsForm bind:tournament {isOrganizer} inSheet />
 {/snippet}
 
 {#snippet organizersPanel()}

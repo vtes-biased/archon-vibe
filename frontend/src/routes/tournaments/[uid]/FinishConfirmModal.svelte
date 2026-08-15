@@ -69,7 +69,7 @@
 >
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
-    class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
+    class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.key === 'Escape' && onClose()}
     role="dialog"

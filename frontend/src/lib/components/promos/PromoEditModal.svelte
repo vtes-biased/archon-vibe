@@ -199,7 +199,7 @@
     tabindex="-1"
     use:focusOnMount
     onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Escape') requestClose(); }}
-    class="bg-surface-card w-full h-full overflow-y-auto pt-safe-t pb-safe-b sm:pt-0 sm:pb-0 sm:h-auto sm:max-h-[90dvh] sm:max-w-lg sm:rounded-lg sm:border sm:border-line sm:shadow-xl"
+    class="bg-surface-card w-full h-full overflow-y-auto pt-safe-t pb-safe-b sm:pt-0 sm:pb-safe-b sm:h-auto sm:max-h-[90dvh] sm:max-w-lg sm:rounded-lg sm:border sm:border-line sm:shadow-xl"
   >
     <div class="p-6 border-b border-line">
       <h2 id="promo-edit-title" class="text-xl font-medium text-ink-strong">

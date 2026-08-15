@@ -58,7 +58,7 @@
     tabindex="-1"
     use:focusOnMount
     onkeydown={(e) => e.key === 'Escape' && onClose()}
-    class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
+    class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
   >
     <div class="p-6 border-b border-line">
       <h2 id="sanction-list-title" class="text-xl font-medium text-ink-strong">{m.sanction_mgr_title()}</h2>
