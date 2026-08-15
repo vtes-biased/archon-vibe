@@ -13,7 +13,7 @@ import msgspec
 from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import permissions
 from ..broadcast import (
@@ -1437,7 +1437,9 @@ class TournamentActionRequest(BaseModel):
     # bot. Display only — it overrides the profile nickname on online events so
     # the roster reads the way the guild does. Never an identity input: the
     # vekn_id below it comes from the resolved user precisely so it can't be.
-    display_name: str | None = None
+    # 32 is Discord's own ceiling for every value the bot can put here —
+    # nicknames are 1-32, usernames 2-32 — so anything longer isn't from Discord.
+    display_name: str | None = Field(default=None, max_length=32)
     round: int | None = None  # For SetScore, SwapSeats
     table: int | None = None  # For SetScore
     table1: int | None = None  # For SwapSeats
