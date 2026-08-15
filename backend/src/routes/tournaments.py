@@ -1433,6 +1433,11 @@ class TournamentActionRequest(BaseModel):
     type: str  # Event type: OpenRegistration, Register, CheckIn, StartRound, etc.
     user_uid: str | None = None  # For Register, AddPlayer, RemovePlayer
     player_uid: str | None = None  # For CheckIn
+    # Register/AddPlayer/CheckIn: the Discord guild nickname, snapshotted by the
+    # bot. Display only — it overrides the profile nickname on online events so
+    # the roster reads the way the guild does. Never an identity input: the
+    # vekn_id below it comes from the resolved user precisely so it can't be.
+    display_name: str | None = None
     round: int | None = None  # For SetScore, SwapSeats
     table: int | None = None  # For SetScore
     table1: int | None = None  # For SwapSeats
@@ -1482,6 +1487,8 @@ async def tournament_action(
         event_data["user_uid"] = request.user_uid
     if request.player_uid:
         event_data["player_uid"] = request.player_uid
+    if request.display_name:
+        event_data["display_name"] = request.display_name
     if request.round is not None:
         event_data["round"] = request.round
     if request.table is not None:

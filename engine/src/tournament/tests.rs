@@ -2860,6 +2860,23 @@ fn test_checkin_auto_register_requires_vekn_id() {
     assert_eq!(result.unwrap_err(), EngineError::VeknIdRequired);
 }
 
+#[test]
+fn test_checkin_refreshes_display_name_of_rostered_player() {
+    // The walk-in arm always stamped it; a player already on the roster — what
+    // the bot actually hits — kept the name they registered under.
+    let tournament = tournament_with_player("Waiting");
+    let event = json::object! {
+        type: "CheckIn", player_uid: "player-1", display_name: "GuildNick"
+    };
+    let actor = make_organizer();
+
+    let updated = json::parse(&run_event(&tournament, &event, &actor).unwrap()).unwrap();
+    assert_eq!(
+        updated["players"][0]["display_name"].as_str(),
+        Some("GuildNick")
+    );
+}
+
 // ================================================================
 // DeleteDeck tests
 // ================================================================

@@ -663,6 +663,16 @@ fn apply_event(
                 return Err(EngineError::PlayerSuspended);
             }
 
+            // Refresh the guild-nickname snapshot: the bot resends it on every
+            // check-in, and a player already on the roster (the common case —
+            // the walk-in arm above only fires for someone nobody registered)
+            // would otherwise keep whatever name they registered under.
+            if let Some(dn) = display_name {
+                if !dn.is_empty() {
+                    tournament["players"][idx]["display_name"] = dn.as_str().into();
+                }
+            }
+
             // Open rounds: a player at their per-player cap can't check in for a new round — but a
             // capped DROP-OUT being reinstated returns to Completed (finals-eligible), not rejected.
             let was_finished = tournament["players"][idx]["state"].as_str() == Some("Finished");
