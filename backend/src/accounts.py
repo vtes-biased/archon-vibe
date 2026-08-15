@@ -227,7 +227,7 @@ async def user_has_active_suspension(user_uid: str) -> bool:
 
     Active = not soft-deleted, not lifted, and either permanent (no expiry) or
     not yet expired. Used to block self-abandon of a VEKN ID (you can't abandon
-    your way out of a suspension — see .pst/details/59-vekn-detach.md).
+    your way out of a suspension — see wiki/architecture.md).
     """
     now = datetime.now(UTC)
     for s in await get_sanctions_for_user(user_uid):
@@ -255,7 +255,7 @@ async def detach_user_from_vekn(
     (caller then merges the freed record into the new owner) and to abandon a
     VEKN ID (record left orphaned for a future claim). The two flows are
     identical here; their only difference (the re-merge) lives in the caller.
-    See .pst/details/59-vekn-detach.md for the full rule.
+    See wiki/architecture.md (Account surgery) for the full rule.
 
     Returns (personal_account, vekn_record, broadcasts) or None if the user is
     not found. `broadcasts` are the BroadcastData for the new personal account

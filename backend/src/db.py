@@ -241,7 +241,7 @@ _encoder = msgspec.json.Encoder()
 
 
 # ---------------------------------------------------------------------------
-# Access-version fingerprint (SSE connect handshake) — see SYNC.md
+# Access-version fingerprint (SSE connect handshake) — see wiki/sync.md
 # ---------------------------------------------------------------------------
 
 # Global wire-shape lever: bump on any change to the projected JSON shape that does
@@ -1566,7 +1566,7 @@ async def delete_promo_image(promo_uid: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Promo ledger (side table, not synced — see the SYNC.md carve-out)
+# Promo ledger (side table, not synced — see the wiki/sync.md carve-out)
 # ---------------------------------------------------------------------------
 
 _LEDGER_COLS = (

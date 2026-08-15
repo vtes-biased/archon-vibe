@@ -1,7 +1,7 @@
 """Regression tests for VEKN account-surgery.
 
 Covers the three db-layer primitives the detach/merge invariant rests on
-(.pst/details/59-vekn-detach.md) plus the self-abandon suspension guard:
+(wiki/architecture.md, Account surgery) plus the self-abandon suspension guard:
 
 - ``merge_users``       — survivor keeps identity + unlisted fields (e.g. wins); the
                           dying uid's contacts/roles/sanctions/decks/auth migrate over.

@@ -385,7 +385,7 @@ export function ratingContext(tournament: Tournament, sanctions: Sanction[] | un
 
 /** Rating points a Finished tournament awards a standings entry, or null where the
  *  backend stores no entry — never played, DQ'd, proxy, ranking-ineligible event.
- *  Null renders blank (frontend/DESIGN.md). VP/GW come from the same engine call
+ *  Null renders blank (wiki/design.md). VP/GW come from the same engine call
  *  backend ratings.py uses; standings rows are prelim-only and carry no SA. */
 export function getRatingPts(
   entry: StandingEntry,

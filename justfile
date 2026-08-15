@@ -183,7 +183,7 @@ _backup-drift:
         fi
     done
 
-# Install git hooks (pre-commit: pst tickets lint + ruff auto-format of staged Python)
+# Install git hooks (pre-commit: ruff auto-format of staged Python)
 hooks:
     #!/usr/bin/env bash
     set -euo pipefail

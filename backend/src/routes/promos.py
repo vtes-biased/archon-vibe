@@ -159,7 +159,7 @@ async def delete_promo(
 
 
 # Promo ledger: append-mostly inventory movements (promo_ledger side table,
-# not synced — officials-only online-only back-office, the SYNC.md carve-out).
+# not synced — officials-only online-only back-office, the wiki/sync.md carve-out).
 # Remaining stock is recomputed server-side after every write and streamed via
 # the Promo/User objects, never derived client-side.
 

@@ -74,7 +74,7 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(
         assert header["type"] == "header"
         assert header["version"] == snapshots.SNAPSHOT_FORMAT_VERSION
         # Both meta fields carry the generation instant — the client's `since` cursor
-        # must be that, never a max over the rows read (see SYNC.md).
+        # must be that, never a max over the rows read (see wiki/sync.md).
         assert header["timestamp"] == header["generated_at"]
 
         assert trailer["type"] == "eof"

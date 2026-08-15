@@ -178,7 +178,7 @@
 
   // Officials directory carries contact info — gate it behind sign-in so it isn't
   // shown directly to logged-out visitors (the public projection still ships the
-  // data; this is a display gate, see .pst/details/307-anonymous-access-tiering.md).
+  // data; this is a display gate, see wiki/sync.md).
   const showOfficials = $derived(auth.isAuthenticated && officialGroups.length > 0);
 
   // In sponsor mode, narrow to the visitor's country; fall back to all countries

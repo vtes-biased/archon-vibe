@@ -50,7 +50,7 @@ just a per-account creation-time snapshot.
     Widening `--roles` to NC manufactures duplicate national coordinators; don't.
 
 Legacy archon was never authoritative for these: Princes are appointed by their NC
-(or IC) and NCs by the IC (PRODUCT.md:39), vekn.net's `princeid`/`coordinatorid`
+(or IC) and NCs by the IC (wiki/access.md), vekn.net's `princeid`/`coordinatorid`
 IS the register of those appointments, and legacy held a mirror of it. A mirror
 never outranks the register.
 

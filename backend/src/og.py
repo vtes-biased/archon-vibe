@@ -17,7 +17,7 @@ from datetime import datetime
 SITE_TITLE = "Archon"
 SITE_DESCRIPTION = "VEKN Tournament Management - Web App"
 FALLBACK_IMAGE = "/icon-512.png"  # square site icon
-# Banner is the de-facto universal og:image size (see .pst/details/278).
+# Banner is the de-facto universal og:image size.
 BANNER_W, BANNER_H = 1200, 630
 ICON_W, ICON_H = 512, 512
 

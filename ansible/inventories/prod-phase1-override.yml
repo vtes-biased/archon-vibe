@@ -8,7 +8,7 @@
 #
 # REMOVE AT THE PHASE-2 FLIP: blank the `phase1_override` variable in the
 # ansible justfile. Prod then reverts to archon.vekn.net with push on.
-# Runbook: ../.pst/details/39-phase1-parallel-run.md
+# Runbook: ../board/prod-migration.md
 
 # Serve the new stack at new.archon.vekn.net (legacy keeps archon.vekn.net).
 # site_url_base, all redirect URIs and WEBAUTHN_RP_ID derive from this.

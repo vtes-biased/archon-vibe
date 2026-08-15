@@ -83,8 +83,7 @@ const updatedTournament = engine.processTournamentEvent(
 
 **Single source of truth for every authorization rule** — consumed by backend
 (PyO3), frontend (WASM) and, through `/oauth/userinfo`, the Discord bot. See
-`.pst/details/72-authz-rust-single-source.md` for the design rationale and
-`.pst/details/538-permission-model-realignment.md` for the capability rewrite.
+`wiki/access.md` for the capability matrix and the rationale.
 
 The rules are **data**, not functions:
 

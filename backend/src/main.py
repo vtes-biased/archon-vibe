@@ -580,8 +580,8 @@ async def server_time() -> Response:
     The round timer subtracts a server-stamped started_at from a client Date.now(),
     so a mis-set device clock shows phantom elapsed time. The client probes this a
     few times, keeps the min-RTT sample, and corrects Date.now()'s offset against
-    our clock (the one that stamps started_at) — see the frontend clock store /
-    .pst/details/512-timer-clock-skew.md. No auth, no DB: just the wall clock.
+    our clock (the one that stamps started_at) — see the frontend clock store.
+    No auth, no DB: just the wall clock.
     Must not be cached — a stale timestamp defeats the sync.
     """
     body = msgspec.json.encode({"server_time": time.time_ns() // 1000})

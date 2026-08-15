@@ -88,7 +88,7 @@ interface ObjectSpec<T> {
   singleType: string;    // "user", "sanction", "tournament", "deck", "league"
   save: (item: T) => Promise<void>;
   saveBatch: (items: T[]) => Promise<void>;
-  // All types hard-delete by uid on a tombstone (Universal Soft-Delete, SYNC.md).
+  // All types hard-delete by uid on a tombstone (Universal Soft-Delete, wiki/sync.md).
   // `item` carries the full soft-deleted payload when available, but isn't needed.
   del: (uid: string, item?: T) => Promise<void>;
 }

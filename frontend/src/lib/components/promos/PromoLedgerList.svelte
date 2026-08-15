@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Online-only ledger read (the sanctioned SYNC.md carve-out) with simple
+  // Online-only ledger read (the sanctioned wiki/sync.md carve-out) with simple
   // client-side filters. Rendered inside the inventory panel.
   import type { Promo, PromoLedgerEntry, PromoLedgerKind } from "$lib/types";
   import { getPromoLedger } from "$lib/api";

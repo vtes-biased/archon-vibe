@@ -1,0 +1,149 @@
+# Product
+
+Archon is an offline-first PWA for running VTES tournaments and managing VEKN
+membership. It replaces a legacy spreadsheet-based system with a mobile-friendly
+tool that works in venues with poor connectivity.
+
+**Core value**: an organizer can run a full event from their phone with no
+internet, and results sync when connectivity returns.
+
+**Out of scope by choice**: card rulings, a rules engine for the card game
+itself, replacing the rulebook, money handling beyond a payment status, and a
+public third-party API — see [dogmas](dogmas.md#product).
+
+## Who uses it
+
+**Organizer / judge** (primary). A Prince, NC or IC running anything from an
+8-player local event to a 100+ player continental championship, on a phone, under
+time pressure, sometimes while playing. Organizers and judges have identical
+permissions inside a tournament; an event can have several organizers, all equal,
+with no head-organizer distinction. Pain points the app exists to remove: manual
+seating calculation, VP validation errors, slow check-in, re-entering data when
+the connection drops.
+
+**Player**. A VEKN member on a phone: register, check in (including by QR), see
+their table and seat each round, report their own table's VPs, watch standings,
+upload a deck, view rating and history.
+
+**VEKN officials**. NC manages Princes and national organized play; IC/Admin runs
+the global organization. NC and IC implicitly act as organizers on tournaments in
+their country; a Prince does not — it is a city-level role without that
+oversight. Judge-call broadcasts reach the explicit tournament organizers only,
+since they are the ones physically present.
+
+VEKN judge certifications (Judge, Sheriff — stored as `Judgekin` —, Rulemonger)
+are profile titles. They appear on member profiles and grant no extra power in
+tournament management.
+
+Who may do what: [access](access.md).
+
+## Capabilities
+
+**Auth and accounts** — email+password, magic link (signup / reset / invite),
+passkeys, Discord OAuth plus Linked Roles, GitHub link (link-only, used to
+@-mention a reporter on their feedback issue), JWT sessions with refresh.
+
+**Members** — profiles with contact and socials, avatar upload, VEKN ID
+claim/sponsor/link/abandon/force-abandon, the role set (IC, NC, Prince, Judge,
+Sheriff, Rulemonger, Ethics, PTC, Playtester, DEV), IC-only account merge,
+cooptation tracking, privacy-filtered directory, in-memoriam flag for deceased
+members.
+
+**Tournaments** — full config, the Planned→Registration→Waiting→Playing→Finished
+state machine with reopen, registration and check-in, simulated-annealing seating
+over nine priorities including staggered seatings for impossible player counts,
+VP entry with oust-order validation, automatic GW/TP, judge override, standings,
+finals qualification and toss, seating edits, round and tournament reopen/cancel,
+delete. Details: [tournaments](tournaments.md).
+
+**Open rounds** — a non-VEKN house format gaining traction online: each player
+plays up to `max_rounds` rounds of a continuously-run pool, so the event may run
+more total rounds than any player plays. Optionally self-organized, where players
+seat their own 4–5 pod. Never pushed to VEKN, never rated.
+
+**Decks** — the card database in IndexedDB; upload by paste (local, offline),
+deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR;
+Rust parse and validation; attribution; decklist-required enforcement with
+override; multideck per-round locking; post-tournament upload; visibility by
+`decklists_mode`; automatic TWDA pull request on finish.
+
+**Sanctions** — event-level (Caution, Warning, Standings Adjustment,
+Disqualification) and VEKN-wide (Suspension, Probation, Ban), with Judges Guide v2
+categories and escalation hints. Rules and visibility:
+[tournaments](tournaments.md#sanctions).
+
+**Leagues** — league and meta-league, standings modes RTP / Score / GP,
+tournament association by league editors or by same-country Princes when the
+league opts in, auto-updating standings, organizer Finish action and rank-1
+Champion crowning.
+
+**Ratings and Hall of Fame** — server-side rating from the best 8 tournaments in
+a trailing 18 months, rating points in finished standings, a rankings page with
+country and date filters, and a Hall of Fame for 5+ wins. The formula and the
+standing warning about vekn.net's stored value are [domain](domain/vekn.md#ratings).
+
+**Live-event surfaces** — shared round timer (online only, one global clock,
+per-table extra time, client-side countdown), organizer announcements, call for
+judge, raffle draws with an optional promo prize, promo catalog and distribution
+reporting with an inventory ledger, table rooms, QR check-in, printable seating.
+
+**Web Push** (opt-in) — seating on round start, announcements, and judge calls to
+organizers. iOS requires Add-to-Home-Screen first. Discord-bot notifications serve
+online events where Discord is the venue; Web Push serves in-person events. A
+dual-audience user may get both for the same event — deliberate, no dedup.
+
+**Social and discovery** — shareable finished-tournament image and text,
+per-tournament and per-league Open Graph crawler stubs, iCal feeds (personal,
+country, global), agenda matching, list filters.
+
+**Help and feedback** — in-app rulebook, VEKN tournament rules, Judges Guide v1
+and v2, Code of Ethics, and player/organizer guides; members with a VEKN ID can
+file bug/feature/question reports that become GitHub issues carrying the VEKN ID
+only, never name, email or Discord.
+
+## Product behaviors
+
+The rules themselves live in [domain](domain/tournament-rules.md); how the app
+implements them, and where it differs, is [tournaments](tournaments.md). What
+follows is the app's own behavior, chosen rather than inherited.
+
+**The door stays open mid-round.** Check-in is not confined to the check-in
+window: it is allowed while a round is `Playing`, and a player who was never
+registered is enrolled by it. Checking someone in never seats them — it records
+that they are present and available. Whether a late arrival joins a short table
+now or waits for the next round is the organizer's call, taken as a separate
+seating action; **the app has no default and must not decide**. A round turns
+`Playing` the moment it is seated, while players are still finding seats, so an
+arrival in that gap can often still be seated; once play has begun they usually
+wait. The same path reverses a drop-out, who returns to `Playing` if their seat is
+still live — dropping out never vacates a seat, which is why Drop Out carries no
+confirmation. Only `Planned` and `Registration` refuse a check-in; a `Finished`
+tournament accepts one only for post-hoc correction.
+
+**Decklist vs check-in** — when decklists are required, a player without one is
+warned at check-in and the organizer may override and check them in anyway.
+
+**Post-tournament deck upload** is allowed, for winner's-deck recovery and TWDA
+submission. Post-finish, players may add but not replace.
+
+**Online tournament player display** (frontend only): nickname is the primary
+label, with the real name abbreviated to first word plus initials alongside the
+VEKN id in parentheses. With no nickname the abbreviation is primary. The
+organizer roster keeps the full real name. In-person tournaments show real name
+and VEKN id only — the nickname is never shown.
+
+**Visibility during an ongoing event** is organizer-set: standings Private /
+Cutoff / Top 10 / Public, decklists Winner / Finalists / All applied only after
+finish. These are display defaults, not access boundaries — see
+[sync](sync.md#what-members-actually-receive).
+
+## Reference material
+
+The domain the product operates in is compiled into
+[domain/](domain/tournament-rules.md) — the game, the tournament rules, judging,
+and the VEKN organization — each claim citing its source.
+
+Those sources are the official documents in `reference/`: tournament rules, Judges
+Guide v1 and v2, Code of Ethics, the complete VTES rules, game-term translations,
+and the rulebook PDFs. They are external artifacts, not ours to edit. The frontend
+serves its own help pages from `frontend/src/lib/help-content/`.

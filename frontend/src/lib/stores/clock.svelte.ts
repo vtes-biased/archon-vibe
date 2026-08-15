@@ -2,8 +2,7 @@
 //
 // The round timer subtracts a SERVER-stamped `started_at` from the CLIENT's
 // Date.now(); a mis-set device clock therefore renders phantom elapsed time
-// (a device 4m fast shows a fresh 120:00 round as 115:32). See
-// .pst/details/512-timer-clock-skew.md.
+// (a device 4m fast shows a fresh 120:00 round as 115:32).
 //
 // We keep Date.now() as the timebase — it survives sleep/hibernate (the OS
 // restores the wall clock on wake, so the countdown accounts for the sleep) —

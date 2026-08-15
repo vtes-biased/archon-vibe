@@ -61,12 +61,12 @@ contributor.
 |---|---|
 | New capability | Refactors, dead-code removal, renames |
 | Behaviour a user would notice changing | Docs, CI, deps, tests, formatting |
-| A bug someone could actually hit | Board/ticket bookkeeping, agent memory |
+| A bug someone could actually hit | Board and wiki bookkeeping |
 | Notable speed or UX change | Chrome: spacing, copy tweaks, icon swaps |
 
 - **Collapse.** Several commits for one change are one line. A fix for a bug
   introduced in the same range is not a line at all — it never shipped broken.
-- **Product language.** No commit hashes, no file paths, no pst numbers, no
+- **Product language.** No commit hashes, no file paths, no internal references, no
   internal component names. "Ratings on a tournament page now match your profile",
   not "bind compute_rating_vp_gw to WASM".
 - **Lead with what changed for them**, not what we did.
@@ -96,7 +96,7 @@ call: draft on request, never post unasked.
 ## 3. Close what shipped
 
 Fixing commits carry a bare `Reported in #N.` backlink and never a closing keyword
-(CLAUDE.md working conventions), so the range yields its own issue list:
+(`wiki/dogmas.md`), so the range yields its own issue list:
 
 ```sh
 git log <last-run-sha>..<deployed-tag> --format='%b' | grep -oE '#[0-9]+' | sort -u
@@ -109,7 +109,7 @@ For each, in order:
    get this treatment.
 2. Draft a reply in the **feedback-triage house voice** — see that skill's "Reply
    style". One or two sentences, first person, casual, no AI boilerplate. Say it's
-   live and what to look for. Never a pst number, never a date promise.
+   live and what to look for. Never an internal reference, never a date promise.
 3. **Show every draft to the owner and wait for approval before posting anything.**
    Public repo, real named people — same rule as feedback-triage.
 4. `gh issue comment N --body "<approved reply>"` then
@@ -142,7 +142,7 @@ issue closed wrongly costs more than one closed late.
 
 Rewrite `last-run` with the deployed tag's SHA, tag and date, and commit it with
 the `CHANGELOG.md` entry in one commit — the file is the human record, the marker
-is the machine anchor, and the two must not drift apart. No pst number in the
+is the machine anchor, and the two must not drift apart. No board reference in the
 message.
 
 Report to the owner: the span covered, the changeset, which issues were closed,

@@ -915,7 +915,7 @@ def _normalize_wall_clock(t: Tournament) -> None:
     Nothing the frontend sends carries an offset today — the config form posts the
     naive text of a `datetime-local` input — but these payloads are whole objects
     off the wire, and one tz-aware value would read back shifted by the venue's
-    offset everywhere (see ARCHITECTURE.md, "API & Data Conventions").
+    offset everywhere (see wiki/architecture.md, "API conventions").
     """
     t.start = _wall_clock(t.start, t.timezone)
     t.finish = _wall_clock(t.finish, t.timezone)

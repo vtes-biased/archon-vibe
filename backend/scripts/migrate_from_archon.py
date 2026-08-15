@@ -26,7 +26,7 @@ Two modes against the same mapping code:
   seeded as soft-deleted shells (historical tournaments reference them; they
   aren't live identities). This is what makes the prod migration **sync-first**
   (VEKN sync creates the accounts, the merge layers history on) instead of
-  ETL-first — see `.pst/details/35` / `169`.
+  ETL-first — see `wiki/vekn.md`.
 
 Reads the OLD archon Postgres (members / leagues / tournaments / clients /
 member_deletions) and writes the NEW archon-vibe schema, REUSING the backend's
@@ -35,8 +35,7 @@ byte-identically to runtime. Note: writes from this script are NOT broadcast
 live over SSE (broadcast is in-process in the backend); clients pick them up
 through the catch-up sync on their next SSE reconnect.
 
-Mapping decisions are recorded in `.pst/details/35-archon-production-migration.md`,
-merge semantics in `.pst/details/115-legacy-archon-sync.md`. Highlights:
+Mapping decisions and merge semantics are recorded in `wiki/vekn.md`. Highlights:
   * roles    Admin→IC, Playtester→PT (others identical) — seed only, see above
   * format   Draft→Limited (draft is a limited format)
   * rank     Grand Prix→BASIC (new model has no GP rank; GP lives in league mode)
@@ -464,8 +463,7 @@ async def other_live_vekn_holders(ext_id: str, but_uid: str) -> list[Tournament]
 # VEKN-less player with NO round seating is a registration artifact → drop; one #
 # who actually played must be resolved (match a real account → remap, else      #
 # allocate a real id + push). Keyed by opaque old-archon uid only (no           #
-# names/emails — the per-case detail lives in                                   #
-# .pst/details/216-veknless-tournament-participants.md).                        #
+# names/emails).                                                                #
 # --------------------------------------------------------------------------- #
 
 # old-archon member uid → the real VEKN id its tournament refs remap onto (the

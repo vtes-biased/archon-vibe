@@ -3,7 +3,7 @@
 # ships the merge script (NOT in the wheel — keeps the app package free of
 # legacy-schema code), renders its env, and installs a oneshot service + daily
 # timer that runs it with the already-deployed venv. Prod-only, parallel-run;
-# remove at Phase-4 decommission. See ../.pst/details/115-legacy-archon-sync.md
+# remove at Phase-4 decommission. See ../wiki/vekn.md
 - name: Assert required inputs
   ansible.builtin.assert:
     that:

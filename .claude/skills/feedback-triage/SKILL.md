@@ -1,6 +1,6 @@
 ---
 name: feedback-triage
-description: Triage user-feedback GitHub issues on vtes-biased/archon-vibe — verify each report against the code, get a product-manager verdict, validate the call with the owner, then either reply-and-close (won't do / already possible / needs info) or file a pst ticket. Use when asked to look at, triage, answer, or handle GitHub issues, user feedback, or bug reports from users.
+description: Triage user-feedback GitHub issues on vtes-biased/archon-vibe — verify each report against the code and the wiki, validate the call with the owner, then either reply-and-close (won't do / already possible / needs info) or send it through /intake as a board line. Use when asked to look at, triage, answer, or handle GitHub issues, user feedback, or bug reports from users.
 ---
 
 # Feedback triage
@@ -27,7 +27,7 @@ is a code-grounded verdict, not a queue-drain.
 | State | Meaning |
 |---|---|
 | open, no `tracked` | needs triage — this is the work queue |
-| open + `tracked` | accepted, pst ticket filed, waiting to ship |
+| open + `tracked` | accepted, board line filed, waiting to ship |
 | closed | resolved, won't-do, duplicate, answered, or not actionable |
 
 Triage always moves an issue out of the first row into one of the other two.
@@ -69,57 +69,61 @@ owner reviews — a verdict with no file reference is not ready to present.
 ## 2. Dedup against the board
 
 ```sh
-grep -n -i '<keyword>' .pst/tickets
+grep -in '<keyword>' BOARD.md wiki/
 ```
 
-If it's already tracked (open **or** closed — a closed ticket may mean "already
-fixed, they're on a stale build"), that *is* the outcome: reply with the existing
-state, label or close accordingly, file nothing new.
+The board holds no closed lines, so a *missing* line proves nothing — a fix may
+have shipped months ago. Check the wiki too: if the behavior the reporter wants is
+already documented as a deliberate decision, that is the answer. And check whether
+they are simply on a stale build.
 
-## 3. Product-manager verdict
+If it is already tracked, that *is* the outcome: reply with the existing state,
+label or close accordingly, file nothing new.
 
-Launch the `product-manager` agent with: the verbatim report, your code grounding,
-the reporter's role, and the dedup result. Ask for: is this real; who benefits and
-how often; the minimal viable fix; a priority; or the reason to decline.
+## 3. Verdict
 
-The PM owns VEKN rules and product priority. Its verdict is **input, not a
-decision** — if it contradicts what you read in the code, say so and push back
-before presenting.
+Decide against the wiki, which is where product scope and the domain now live:
+`wiki/product.md` for what the app does and deliberately does not do,
+`wiki/domain/` for what the VEKN rules actually require, `wiki/dogmas.md` for the
+paradigms a request might contradict. A request that would violate a rule in
+`wiki/domain/` is a decline with a citation, not a judgement call.
 
-Every ask lands in exactly one bucket:
+Ask: is this real; who benefits and how often; what is the minimal viable fix; or
+what is the reason to decline. Every ask lands in exactly one bucket:
 
 | Verdict | Meaning | Action |
 |---|---|---|
-| **Defect** | real bug | pst ticket, **p2 minimum** (any actual issue is p2 min) |
-| **Improvement** | works as designed, but better is possible | pst ticket, p2/p3 |
-| **Already possible** | the feature exists — discoverability or docs gap | reply pointing at it; a p3 discoverability ticket if it genuinely bit a real user |
-| **Ops / data** | no code change (role grant, data fix, migration) | do the ops action or ticket it; reply |
+| **Defect** | real bug | `/intake` → board line, ranked under user-reported defects |
+| **Improvement** | works as designed, but better is possible | `/intake` → board line, ranked by the rules in `BOARD.md` |
+| **Already possible** | the feature exists — a discoverability or docs gap | reply pointing at it; a line only if it genuinely bit a real user |
+| **Ops / data** | no code change — a role grant, data fix, migration | do the ops action, or `/intake` it; reply |
 | **Duplicate** | already on the board or another issue | reply with the tracking |
-| **Needs info** | not actionable without repro/details | reply naming exactly what's missing, close, invite a re-file |
-| **Won't do** | out of scope, against VEKN rules, contradicts the architecture, or cost ≫ value | reply with the reason, close as not planned |
+| **Needs info** | not actionable without a repro | reply naming exactly what is missing, close, invite a re-file |
+| **Won't do** | out of scope, against the VEKN rules, contradicts a wiki decision, or cost ≫ value | reply with the reason, close as not planned |
 
-**Every issue leaves triage either closed or filed** (`tracked` + a pst ticket).
-Nothing stays open and untriaged — an issue we can't act on gets a reply and a
+**Every issue leaves triage either closed or filed** (`tracked` plus a board line).
+Nothing stays open and untriaged — an issue we cannot act on gets a reply and a
 close, not a hold. "Needs info" is a close: say precisely what would make it
 actionable and ask them to file again with it, rather than parking an open issue
 nobody is working.
 
-Cheap-and-isolated is not by itself a reason to accept — CLAUDE.md's
-discuss-before-filing rule applies to feedback-derived tickets too.
+Accepting is not automatic. Cheap and isolated is not by itself a reason — the
+line still has to survive `/intake`'s four challenges, and the board's hard limit
+means accepting this may mean dropping something else.
 
 ## 4. Validate with the owner — MANDATORY GATE
 
-**Never** post a comment, close an issue, apply a label, or file a ticket before
+**Never** post a comment, close an issue, apply a label, or add a board line before
 the owner signs off. One issue per round.
 
 Present as **plain text that ends the turn**:
 
 1. The report, in one line.
 2. What you verified, with `file:line` — including anything that contradicts the report.
-3. The PM verdict, and where you disagree with it.
+3. The verdict, with the wiki page or rule section it rests on.
 4. Your recommendation (one bucket from the table).
 5. The **draft reply, verbatim** — the exact text that would be posted publicly.
-6. The **draft pst ticket body**, if any.
+6. The **draft board line**, if any, with its Done-when clause and proposed position.
 
 Then, in the **next** turn, use `AskUserQuestion` for accept / decline / edit.
 Text emitted before a tool call in the same turn is not rendered in Claude Code, so
@@ -127,10 +131,9 @@ a write-up followed immediately by a tool call is invisible to the owner.
 
 ## 5. Act
 
-**Accepted** (defect / improvement):
+**Accepted** (defect / improvement) — run `/intake` with the approved line, then:
 
 ```sh
-pst add "<body>" --tag p2
 gh issue comment N --body "<approved reply>"
 gh issue edit N --add-label tracked
 ```
@@ -149,15 +152,17 @@ the exact missing detail plus an invitation to file again. Don't leave it open.
 
 ### Cross-reference rules — both directions matter
 
-- **Never write a pst number in a GitHub comment.** `#12` autolinks to GitHub
-  issue 12 and misleads a public reader. Say "tracked internally", never the
-  number. (Same reasoning as CLAUDE.md's no-pst-numbers-in-commits rule.)
-- **Never write `#N` for a GitHub issue in a pst ticket body.** In a pst body
-  `#N` is a ticket reference. Use `gh-4`, or the full issue URL.
-- A ticket born from feedback carries: the code grounding (`file:line`), the
-  reporter's actual constraint (role, device, tournament situation), and `gh-N`.
-  Close the GitHub issue when the fix **deploys** — the pst ticket closes on
-  commit (CLAUDE.md), the public issue closes when the reporter can see it work.
+- **Never point a public comment at internal tracking.** The board has no numbers
+  to quote, and any bare `#12` autolinks to GitHub issue 12 and misleads a reader.
+  Say "tracked", never a reference.
+- **Write a GitHub issue as `gh-N` in a board line**, or use the full URL — a bare
+  `#N` in the repo means a GitHub issue everywhere else, and the ambiguity is not
+  worth it.
+- A line born from feedback carries the code grounding (`file:line`), the
+  reporter's actual constraint — role, device, tournament situation — and `gh-N`.
+- **Close the GitHub issue when the fix deploys**, not when it lands. The board
+  line dies at commit; the public issue closes when the reporter can see it work,
+  which is `/post-deploy`'s job.
 
 ## Reply style — short, first person, human
 
@@ -176,7 +181,7 @@ project. Match that voice:
   chain, the file names, the architecture.
 - Decline in product terms, never codebase terms.
 - English always, whatever the reporter's locale.
-- Never promise a date. Never a pst number. No @-mentions — the body already
+- Never promise a date. Never an internal reference. No @-mentions — the body already
   mentions them and a comment notifies them.
 
 The instinct to be thorough is wrong here. Long replies read as defensive; a

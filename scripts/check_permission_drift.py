@@ -9,7 +9,7 @@ engine/src/permissions.rs; everything else asks it.
 
 The allowlist below is by path + reason, never by directory, so an addition to
 it is a visible decision in review. Reading roles to compute *what a viewer
-sees* (a separate axis, see SYNC.md) or *how a badge renders* is legitimate and
+sees* (a separate axis, see wiki/sync.md) or *how a badge renders* is legitimate and
 listed; deciding what someone may DO is not.
 
 Run: just permission-drift
@@ -35,7 +35,7 @@ ALLOWED = {
     # The adapters themselves: they marshal to the engine and name capabilities.
     "backend/src/permissions.py": "the engine adapter",
     "frontend/src/lib/engine.ts": "the engine adapter",
-    # Visibility projections — WHAT a viewer sees, not what they may do (SYNC.md).
+    # Visibility projections — WHAT a viewer sees, not what they may do (wiki/sync.md).
     "backend/src/access_levels.py": "subject-side projection",
     "backend/src/broadcast.py": "entitled_level projection",
     "backend/src/db.py": "access-version fingerprint",

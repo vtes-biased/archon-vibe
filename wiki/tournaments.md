@@ -1,0 +1,477 @@
+# Tournaments — implementation
+
+How the app implements [the VEKN tournament rules](domain/tournament-rules.md) and
+[the Judge's Guide](domain/judging.md). Those pages state the rules; this one
+states what the code does, including where it knowingly differs.
+
+All state transitions run through the shared Rust engine, so browser (WASM) and
+server (PyO3) behave identically.
+
+## Configuration
+
+| Setting | Values | Notes |
+|---|---|---|
+| Format | Standard, V5, Limited | V5 has its own decklist validation; Limited has no deck check, so draft events run as Limited |
+| Rank | Standard, National, Continental | National and Continental earn the rating coefficient bonus and are engine-blocked from proxies and multideck, at create and at config edit |
+| Proxies | yes/no | Standard rank only |
+| Multideck | yes/no | Standard rank only |
+| Decklist required | yes/no | organizer choice |
+| Online | yes/no | the venue URL is the meeting place |
+| `max_rounds` | int, 0 = uncapped | per-player round cap |
+| `max_players` | int, 0 = none | **soft** cap, advisory for venue capacity: the UI warns past it, the engine never blocks, and there is no waitlist |
+| `open_rounds` | bool | the non-VEKN house format, below |
+| `self_organized_rounds` | bool | players seat their own pods |
+| `standings_mode` | Private / Cutoff / Top 10 / Public | display default during play |
+| `decklists_mode` | Winner / Finalists / All | applied after finish |
+| `round_time`, `finals_time` | seconds, 0 = none | the shared timer |
+| `table_rooms` | named rooms over table ranges | labels in seating, print and player views |
+
+**Ranking eligibility** — the engine's `ranking_eligibility` is the single
+predicate behind the rating inclusion filter, the ranked/unranked badge and the
+RtP column: at least 8 players who played **and** a played final, never for
+open-rounds or self-organized events.
+
+`UpdateConfig` is available in **any** state — mid-event typo fixes matter — with
+targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds
+exist, and `rank`/`format`/`start` freeze once the event is published to VEKN,
+because the calendar create is write-once and an edit would silently diverge from
+vekn.net ([vekn](vekn.md)).
+
+> **Diverges from the rules.** Rank has no **Grand Prix** value, so the
+> multideck and proxy prohibitions that cover Grand Prix alongside National and
+> Continental championships (tournament rules §3.1.5, §4.5) cannot be enforced for
+> one. Card-set restrictions (§6.1.1) and the Restricted format (§7.9) are not
+> modelled either, so an event that should be excluded from ratings on those
+> grounds is not flagged.
+
+## State machine
+
+```
+Planned ──open──> Registration ──close──> Waiting ⇄ Playing ──finish──> Finished
+```
+
+| State | What it means | Key actions |
+|---|---|---|
+| `Planned` | initial | OpenRegistration |
+| `Registration` | players register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
+| `Waiting` | between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
+| `Playing` | round in progress | SetScore, Override, FinishRound, CancelRound, seating edits |
+| `Finished` | complete | ReopenTournament, organizer SetScore/Override, deck uploads |
+
+`UpdateConfig`, `ReportPromos` and Delete are available in any state.
+`SetScore`/`Override`/`Unoverride` are open to players only during `Playing`, and
+to organizers whenever rounds exist — Waiting, Playing or Finished — with standings
+recomputed after every edit. Delete is plain REST, not an engine event, gated only
+on the VEKN footprint: blocked once `external_ids.vekn` or `vekn_pushed_at` is set,
+since deleting would orphan the vekn.net record. Deleting a `Finished` tournament
+triggers a ratings recompute for its players.
+
+## Player states
+
+| State | Meaning | Finals-eligible |
+|---|---|---|
+| `Registered` | signed up | — |
+| `Checked-in` | present and available | — |
+| `Playing` | seated at a live table | — |
+| `Completed` | hit the per-player `max_rounds` cap; done with prelims | **yes** |
+| `Finished` | withdrew, dropped, or the event ended | no |
+| `Disqualified` | DQ sanction active | no |
+
+`non_competing` is a flag rather than a state, implementing the Judge's Guide
+[proxy player](domain/judging.md#event-organization-5). The seat plays normally and
+its VPs count for oust-order validation and for opponents; the player is excluded
+from standings rank, rating and finals. Set by organizers via `SetNonCompeting`,
+blocked once finals are seeded or the tournament is Finished. The field name avoids
+collision with `Tournament.proxies`, which is proxy *cards* allowed.
+
+> **Diverges from the rules.** JG v2 §5.1.1 says a proxy player's victory points,
+> game wins and tournament points "are not recorded and have no effect on
+> standings". The app *keeps and displays* their score, zeroing only the rank —
+> the opposite of its DQ treatment. The scores must stay on the seat for oust-order
+> validity, but whether the standings row should show them is an open question.
+
+Barriers to check-in: a required decklist not uploaded, a VEKN ban, a
+disqualification from this event, or reaching the per-player round cap.
+
+**The door stays open mid-round** — check-in is allowed while a round is `Playing`,
+and a player never registered is enrolled by it. Checking someone in never seats
+them; whether a late arrival joins a short table now or waits is the organizer's
+call, taken as a separate seating action. **The app has no default and must not
+decide.** The same path reverses a drop-out, who returns to `Playing` if their seat
+is still live — dropping out never vacates a seat, which is why Drop Out carries no
+confirmation. Only `Planned` and `Registration` refuse a check-in; a `Finished`
+tournament accepts one only for post-hoc correction.
+
+> **Diverges from the rules.** Tournament rules §3.3 and §3.1.4 assign a "Loss"
+> for the round to a player not seated within 15 minutes of the start, or leaving
+> after seatings have begun. The app has no Loss concept; it models drops instead.
+
+## Seating
+
+Simulated annealing, computed inside the engine's `StartRound` handler — there is
+no separate seating entry point. Tables of 4–5; the impossible counts 6, 7 and 11
+use staggered seatings so the sit-out rotates and everyone plays equally.
+
+The rules require only that exact predator-prey relationships are not duplicated
+between rounds, and point at the legacy Archon spreadsheet's "optimal seating
+chart" for more (§3.1.2). The nine priorities the engine optimizes are that
+convention, in order:
+
+1. No repeated predator-prey relationship (**mandatory**, and the only one the
+   rules themselves require)
+2. No pair shares a table in all rounds
+3. Available VPs equitably distributed (4- vs 5-player tables)
+4. No pair shares a table more than necessary
+5. No player sits in 5th seat more than once
+6. No pair repeats the same relative position
+7. No player repeats the same seat position
+8. Starting transfers equitably distributed
+9. No pair repeats the same relative position group
+
+**Seating is seeded and value-stable.** `seating::seed_for_round(tournament_uid,
+round_index)` feeds a `ChaCha8Rng`, so WASM, PyO3 and the browser compute
+byte-identical seating for the same tournament and round. `StartRound` also accepts
+an optional explicit `seating` (table → ordered player UIDs); the frontend extracts
+the WASM-computed seating and injects it into the server POST as a safety net
+against engine builds drifting, not as a correctness requirement. Engine
+validation: each table 4–5 players, every checked-in player exactly once, no
+duplicate UIDs across tables.
+
+Finals seating is not computed. The physical card-drawing ritual
+([rules §3.1.3](domain/tournament-rules.md#final-round-seating-313)) is recorded
+through `AlterSeating`; the app does not enforce it.
+
+## Scoring
+
+Only VP is user-submitted, per seat. GW and TP are engine-computed to the rules in
+[§3.7](domain/tournament-rules.md#scoring), in
+`engine/src/tournament/scoring.rs`. TP base values by table size: 5-player
+`[60, 48, 36, 24, 12]`, 4-player `[60, 48, 24, 12]`, 3-player `[60, 36, 12]`. The
+rules define only the first two; the 3-player row is defensive and unreachable in
+sanctioned play.
+
+### Oust-order validation
+
+`check_table_vps` refuses a VP combination that no physically possible oust
+sequence around the table could produce, so seating order matters:
+
+1. Check the table size is 4 or 5.
+2. Check the total: `sum(ceil(vp)) == table_size`. Less is insufficient — the round
+   is still in progress. More is invalid.
+3. Repeatedly find a seat with VP = 0, transfer −1 VP to its predator to account
+   for the oust, and remove it from the ring.
+4. Remaining seats should all hold 0.5 (timeout survivors) or exactly one seat
+   holds 1.0.
+
+Failure modes: **MissingVP** (a fractional VP where an oust should have given a
+full point, e.g. a `[0.5, 0]` sequence), **MissingHalfVP** (several non-0.5 seats
+remain after all ousts), **ExcessiveTotal**, **InvalidTableSize**.
+
+Worked example, 5-player `[2, 1, 0, 0.5, 1.5]` in seating order: seat 3 (0) is
+ousted, predator seat 2 takes −1 → 0; seat 2 is ousted, seat 1 takes −1 → 1; seat 1
+is ousted, seat 5 takes −1 → 0.5; seats 4 and 5 remain at 0.5, a valid timeout.
+
+Because `ceil(0.5) = 1`, a withdrawal reads to the algorithm as a survivor and
+validates normally.
+
+### Table state
+
+1. `Cancelled` — set by `CancelRound` on a non-last round (soft cancel).
+2. Otherwise, if `override` is set → `Finished` (a judge forced it).
+3. Otherwise run `check_table_vps`: insufficient total → `In Progress`; other
+   validation error → `Invalid`; no error → `Finished`.
+
+### Standings
+
+`compute_preliminary_standings` sorts GW > VP > TP with a toss tiebreak, using
+competition ranking with skips. GW and TP are **recomputed** per table from raw VPs
+plus current sanctions, so an SA issued after a round was scored re-decides the GW
+and re-ranks TP — the frozen seat values would otherwise go stale. The VP total
+sums raw per-seat VP then subtracts the SA penalty, which may go negative; per-seat
+`result.vp` stays raw for display.
+
+`tournament.standings` is **prelim-only and SA-adjusted** — finals excluded. The
+engine invariant is that standings are non-empty exactly when rounds are non-empty,
+which is what makes the VEKN `rounds > 0` push guard safe.
+
+`compute_rating_vp_gw` is the single source for the backend rating and VEKN-push
+paths. It applies the same rule and additionally includes finals VP/GW; prelim
+comes from the rounds when present, else from the prelim-only standings row for
+round-less VEKN imports; when no `finals` object recorded the win it credits the
+tournament winner a +1 GW, covering a no-final import. It returns `(0, 0)` early
+for DQ'd and non-competing players.
+
+`compute_final_standings` implements §3.7.5 placement: winner rank 1, other
+finalists share rank 2, non-finalists competition-ranked from `finalist_count + 1`.
+Whether a final happened is read from the per-player `finalist` flag, not from
+finals seating data.
+
+## Finals
+
+Qualification follows §3.1: top 5 by GW, VP, TP, with a random toss for ties.
+Organizers must drop unavailable finalists before launching. `StartFinals` excludes
+`Disqualified` and `Finished` (withdrawn) players and auto-promotes the next-ranked
+qualifier; `Completed` players stay eligible, and non-competing proxies never enter
+the candidate pool.
+
+> **Diverges from the rules.** §3.1 resolves remaining ties **for any of the top
+> five rankings** by a fair random method; the app's toss resolves only a tie
+> straddling the top-5 cutoff and never re-orders tied players inside it. Qualifier
+> rank is not cosmetic — §3.1.3 has the **lowest** qualifier place their name card
+> first — so an unbroken tie inside the top five leaves the finals seating order
+> under-determined.
+
+`FinishTournament` without a final sets `Finished` and preliminary standings but
+sets no winner or finalist flags, so a native no-final event awards no
+winner/finalist rating bonus and no winner GW. That is rules-literal — A.2 credits
+a game won "including a final round victory" and A.2.1 defines a finalist as one
+who advanced to a final — but vekn.net's own implementation credits a no-final top
+five exactly like a final, and our VEKN imports mirror that. Owner-approved interim
+position: the engine stays rules-literal, and the ranked/unranked badge makes the
+outcome read as a rule rather than a bug. The question is with the Rules Director.
+
+> **Diverges from the rules.** §3.1.6 permits omitting the final only in a
+> tournament of **fewer than 8 players**, and forbids admitting players between
+> rounds if that would create a round of 8 or more. The app allows a no-final
+> finish at any size and enforces neither constraint.
+
+## Engine event catalog
+
+Every business event goes through `POST /api/tournaments/{uid}/action` with body
+`{type, ...payload}`. There are no per-event REST routes. Each call carries the
+tournament state, the event, and an actor context — user UID, roles, organizer
+status.
+
+**State transitions** — `OpenRegistration`, `CloseRegistration`,
+`CancelRegistration`, `ReopenRegistration`, `ReopenTournament`, `FinishTournament`.
+
+**Players** — `Register` / `Unregister` (self), `AddPlayer` / `RemovePlayer`
+(organizer; RemovePlayer is for a player who has not played — use `DropOut`
+otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckInAll`, `ResetCheckIn`,
+`SetPaymentStatus`, `MarkAllPaid`, `SetNonCompeting`.
+
+**Rounds and seating**
+
+| Event | Notes |
+|---|---|
+| `StartRound` | optional `seating` for deterministic forwarding |
+| `FinishRound` | any round, any order |
+| `CancelRound` | the last round is hard-removed and unrecoverable; any earlier round is soft-cancelled — tables set to `Cancelled`, the slot preserved, players released, restorable |
+| `RestoreRound` | un-voids a soft-cancelled non-last round: re-derives each table's state from retained scores and re-arms seated players. **All-or-nothing** — if any seated player can no longer be reinstated as saved (dropped, disqualified, or already at their cap via other rounds) the whole restore is rejected rather than silently dropping them |
+| `SelfOrganizeRound` | player-authorized, not organizer-gated |
+| `SwapSeats` | swap two players within a table |
+| `AlterSeating` | positional prefix match — existing tables matched by index (results preserved same-table, reset cross-table), extra payload tables appended fresh, each table seating 0/4/5 players (0 = empty draft workspace, dropped after rebuild). On finals it replaces seat order for the same player set |
+| `SeatPlayer` / `UnseatPlayer` | act on the **last** round |
+| `AddTable` / `RemoveTable` | current round |
+
+A round slot is never removed mid-array: `deck.round` and
+`standings_adjustment.round_number` are index-tagged and would be corrupted.
+
+**Scoring** — `SetScore` (`{player_uid, vp}` per seat), `Override` (organizer forces
+a table Finished, comment required), `Unoverride`.
+
+**Finals** — `SetToss`, `RandomToss`, `StartFinals`, `FinishFinals`.
+
+**Decks** — `UpsertDeck`, `DeleteDeck`. All deck mutations are engine `deck_ops`
+side effects; there are no REST deck endpoints.
+
+**Raffle** — `RaffleDraw` (pools AllPlayers, NonFinalists, GameWinners, NoGameWin,
+NoVictoryPoint; optional `prize_promo_uid`, display-only and never written to
+`promos_distributed`), `RaffleUndo`, `RaffleClear`.
+
+**Promos** — `ReportPromos`, replace-the-whole-list, no state gate, since counts
+are typically entered post-finish and re-entered on correction.
+
+**Config** — `UpdateConfig`.
+
+### Who may do what
+
+| Action | Who |
+|---|---|
+| Create tournament | IC, NC, Prince |
+| Register / Unregister | any authenticated member, during Registration |
+| Self-organize a round | registered players, open rounds with `self_organized_rounds`, Waiting/Playing, no finals |
+| Set score | players at the table during Playing; organizers whenever rounds exist |
+| Deck upload | players for their own deck, organizers for any |
+| Everything else | organizers |
+
+Enforcement is single-sourced in `engine/src/permissions.rs` and applied at both
+the REST endpoint and the engine — see [access](access.md).
+
+> **Diverges from the rules.** §1.1 bars the organizer of record and the judges of
+> record from playing, except under the Multi-Judge System (§2.9), which the app
+> does not model at all. The app lets organizers register and play in their own
+> event with no warning.
+
+## Open rounds
+
+`open_rounds` marks the tournament as the non-VEKN **house format**: such events
+are never pushed to VEKN and never counted toward ratings or RtP, enforced in the
+push queries, the `push_tournament_event` guard and the ratings recompute filters.
+
+The flag is **decoupled from `max_rounds`** on purpose: the VEKN-push build forces
+`max_rounds` to 2–4 on every standard tournament, so `max_rounds > 0` alone cannot
+distinguish a house open-rounds event from a standard one.
+
+The per-player cap mechanics are driven by `max_rounds > 0`, independent of the
+flag — a standard tournament where everyone plays every round hits its cap
+naturally:
+
+- Each player plays up to `max_rounds` rounds from a shared pool. The tournament
+  keeps running new rounds for players who have not hit their cap, so total rounds
+  started may exceed `max_rounds`.
+- On reaching the cap a player retires to `Completed` — finals-eligible, done with
+  prelims. `CheckIn` is refused; `CheckInAll` skips them.
+- Deck locking becomes per-player: a player's deck locks when they hit their cap or
+  their last round starts, rather than tournament-wide.
+- Standings are cumulative GW > VP > TP across all rounds played, as usual.
+
+### Self-organized rounds
+
+Settable on any open-rounds tournament, with no online or per-player-cap
+requirement. Eligibility: tournament in Waiting or Playing with no finals; exactly
+4–5 distinct players in `Registered` or `Checked-in` (not `Playing`, `Completed` or
+`Disqualified`), initiator included.
+
+Trust-based — registration is the only integrity gate and collusion risk is
+accepted, this being a non-VEKN house format outside the rules' seating
+requirements. The engine computes single-table seating (best-effort predator-prey
+on round 1, using prior rounds thereafter), moves seated players to `Playing`,
+leaves unseated `Registered` players untouched, and stamps the table
+`organized_by: <initiator_uid>` for audit. Never for finals, never VEKN-pushed.
+
+Organizer oversight is unchanged: `FinishRound` closes any round in any order,
+`CancelRound`/`RestoreRound` void and un-void, `Override` voids a table result.
+
+`StartRound` withdraws `Registered` no-shows only on round 1 of a standard
+tournament; rounds 2+ and open rounds leave them untouched, and a zero-rounds
+no-show is reinstatable by `CheckIn` between rounds or `SeatPlayer` onto a live
+table.
+
+## Sanctions
+
+Sanctions are their own synced object type. The levels, their durations and who may
+issue them are [domain](domain/judging.md); the app's visibility rules are here.
+
+| Level | Where it shows |
+|---|---|
+| Caution | only inside its own tournament — never on member pages or in other events, for anyone including IC and Ethics |
+| Warning, Standings Adjustment, Disqualification | member detail page, members list, and other tournaments' context, for **18 months** from issuance |
+| Suspension, Probation | membership-level, always visible; a permanent ban stays visible past 18 months |
+
+The filtering is a **display rule**: all sanction records sync to every member's
+client at member level. IC and Ethics see every level on every surface.
+
+Expired sanctions are soft-deleted daily after 18 months and hard-deleted 30 days
+later, so a mistaken organizer delete stays IC-recoverable in that window.
+
+| Action | Caution / Warning / SA / DQ | Suspension / Probation |
+|---|---|---|
+| Issue | IC, Ethics, or an organizer of the tournament | IC, Ethics |
+| Lift | IC, Rulemonger, the NC of the tournament's country; a league organizer for a DQ in their league event | IC (Ethics to modify) |
+| Edit fields | IC, Ethics | IC, Ethics |
+| Delete (soft) | IC, Ethics — plus the tournament's own organizer **while the event is not Finished**, for mistake correction by delete-and-reissue (organizers cannot edit) | IC, Ethics |
+
+The category, subcategory, baseline and escalation reference is generated from
+`engine/src/sanctions.rs` and served at `GET /sanctions/reference`. The app
+suggests a level by category and warns when issuing below an existing one.
+
+> **Diverges from the rules.** JG v2 §1.1.4 states that "a DQ always includes a
+> Warning". The app issues a DQ as a single sanction with no accompanying Warning,
+> so the player's permanent record is one entry short.
+
+### Standings Adjustment mechanics
+
+The −1 VP lands on the player's standings total for one round. **Per-seat VP is
+untouched** — raw `seat.result.vp` stays valid, so the VP sum still equals the table
+size and the oust order still parses. The penalty lives only on the standings
+total, may drive it negative, and is never carried to another round.
+
+**GW and TP cascade** as §1.1.3 requires: standings recompute GW and TP per table
+from raw VPs plus current sanctions rather than trusting the frozen seat values.
+
+**Round targeting.** The effective round is the highest round index in which the
+player is seated, **including the finals**, which participates as round index
+`len(rounds)` — the same sentinel `SetScore` uses, accepted by the backend once a
+finals table exists. The stored `round_number` is the fixed issue-time record of
+the game the judge ruled on; the engine honors it when the player was seated in
+that round and otherwise redirects to their most-recently-seated round, so an SA
+referencing a round they sat out lands on a game they actually played. A player who
+has not yet played contributes nothing until they do. The UI auto-computes the
+round; there is no free round picker, so a later round starting cannot migrate an
+existing SA.
+
+> **Diverges from the rules.** JG v2 §1.1.3's third case — an SA issued **before
+> round 1 pairings are announced** applies to round 1 — is unimplemented: the
+> backend requires an existing round, so such an SA cannot be issued at all. This
+> is the one case where the guide does park a penalty on a future round.
+
+**Finals-round SA** penalizes the finals result rather than the preliminary totals:
+prelim standings exclude finals-round SAs from their VP penalty, and the −1 VP
+instead applies to the finals GW derivation — it can flip who wins the tournament —
+and to the rating VP total, which includes finals VP. Every standings recompute
+re-scores a finished finals table from raw VPs plus current sanctions and re-derives
+the winner, so a finals SA issued or lifted after the fact still lands. If
+`CancelFinals` later nulls the finals, a finals-targeted SA gracefully redirects to
+the player's last prelim round and re-lands on the finals when a new final seats
+them.
+
+`resolve_sa_effective_rounds` (`engine/src/tournament/sanctions.rs`) resolves each
+active SA to its effective round once per compute and feeds both the per-table
+GW/TP cascade and the VP total, so the two can never disagree. Both backend and
+frontend read `tournament.standings` rather than re-deriving SA from raw seats.
+
+Issuing, lifting, editing or deleting an SA or a DQ tied to a tournament immediately
+triggers a standings recompute, and the updated tournament is broadcast over SSE.
+
+**Offline sanction management** — event-level sanctions of a device-locked
+tournament are created and deleted offline, written to IndexedDB, with the client
+mirroring the server's side effects: DQ player-state flips, including the playable
+restore, and a standings recompute through the same shared Rust. At go-online the
+sanctions ride the snapshot, the server asserts DQ states inside the locked
+transaction and runs one authoritative recompute. VEKN-wide suspension and probation
+stay online-only.
+
+### Disqualification
+
+The DQ signal is `player.state == "Disqualified"` **or** an active
+`disqualification` sanction — either is sufficient, and every consumer must check
+the combined signal.
+
+- **Standings row**: sorted last, flagged disqualified, VP/GW/TP shown as 0
+  (forfeited), no numeric rank. Opponents keep everything they earned at the table.
+  §1.1.4 says the player is "removed from standings entirely" and the rest move up;
+  showing a zeroed unranked row achieves the second half while keeping the record
+  visible.
+- **Rating**: no points at all — no participation base, no finalist bonus, no
+  rating-history entry.
+- **Player count**: DQ'd players stay **included** in the rating coefficient's
+  player count, per A.2.
+- **Reversibility**: lifting or deleting an active DQ restores the player to a
+  playable state — `Playing` if still seated at a live table, `Checked-in`
+  otherwise, `Finished` only on a finished tournament. A fat-fingered DQ is fully
+  reversible, so it needs no confirmation.
+
+## Data model
+
+Canonical shapes are in `frontend/src/lib/types.ts` and `backend/src/models.py`.
+The non-obvious structure:
+
+- `rounds: Table[][]` — outer index is the round, inner the tables in it. `finals`
+  is a separate field, **not** a round, except where the SA sentinel index
+  `len(rounds)` addresses it.
+- `Table` carries `seating: Seat[]`, a derived `state`, an optional `override`, and
+  an optional `organized_by`.
+- `Score = {gw, vp, tp}` per seat; only `vp` is submitted.
+- `finals.seed_order` holds player **user_uids** — easily missed in any per-player
+  UID remap.
+
+## Where the code lives
+
+- `engine/src/tournament/` — event processing, state machine, scoring, standings,
+  raffle. Entry point `process_tournament_event(tournament, event, actor,
+  sanctions, decks) → {tournament, deck_ops}`.
+- `engine/src/seating/` — the seating algorithm.
+- `backend/src/routes/tournaments.py` — endpoints, offline lifecycle, push hooks.
+- `frontend/src/lib/engine.ts` — the WASM wrapper; `api.ts` — `tournamentAction()`
+  and the optimistic path.

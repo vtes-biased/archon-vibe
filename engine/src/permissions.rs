@@ -264,7 +264,7 @@ pub struct Rule {
 pub const OFFICIAL_ROLES: [Role; 3] = [IC, NC, Prince];
 
 /// **The permission matrix.** Deny by default; a role appears here or it has no
-/// authority. Owner-approved matrix of 2026-08-04 — see .pst/details/538.
+/// authority. The matrix is documented in wiki/access.md.
 pub const CAPABILITIES: &[Rule] = &[
     // ---- Members ----------------------------------------------------------
     // Bringing someone into VEKN — minting a member record, or issuing a VEKN ID

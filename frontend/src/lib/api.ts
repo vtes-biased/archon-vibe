@@ -752,7 +752,7 @@ export async function deleteTournamentBanner(
 }
 
 // ============================================================================
-// Promos (catalog IC-only; ledger self-sourced — see SYNC.md carve-out)
+// Promos (catalog IC-only; ledger self-sourced — see wiki/sync.md carve-out)
 // ============================================================================
 
 export interface PromoPayload {
@@ -815,7 +815,7 @@ export async function createPromoLedgerEntry(payload: LedgerEntryPayload): Promi
 }
 
 /** Whole role-scoped ledger (officials: all rows; others: involved rows).
- * Online-only read — the sanctioned SYNC.md carve-out. */
+ * Online-only read — the sanctioned wiki/sync.md carve-out. */
 export async function getPromoLedger(): Promise<PromoLedgerEntry[]> {
   return apiRequest<PromoLedgerEntry[]>('/api/promos/ledger', { method: 'GET' });
 }

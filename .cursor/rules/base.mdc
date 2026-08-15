@@ -10,4 +10,9 @@ alwaysApply: true
 - Use context7 MCP tools to get up-to-date documentation.
 - Do not assume I'm right: challenge my instructions when needed.
 - Do not congratulate me. Do not say I'm right. Do not thank me.
-- Follow frontend/DESIGN.md for UI styling guidelines.
+- `wiki/index.md` is the source of truth for what this product is and what was
+  decided. `wiki/dogmas.md` holds the paradigms; `wiki/hazards.md` the non-local
+  traps; `wiki/design.md` the UI system. Read the relevant page before changing a
+  subsystem, and update it in the same change when a decision moves.
+- Work owed lives in `BOARD.md`, one line per ask. Never open a TODO file or leave
+  a TODO comment.

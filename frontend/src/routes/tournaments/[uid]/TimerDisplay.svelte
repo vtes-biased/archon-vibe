@@ -28,7 +28,7 @@
   } = $props();
 
   // Keep the server-clock offset synced while any timer is on screen (see the
-  // clock store / .pst/details/512): corrects Date.now()'s skew so a mis-set
+  // clock store): corrects Date.now()'s skew so a mis-set
   // device clock doesn't show phantom elapsed time.
   $effect(() => activateClock());
 

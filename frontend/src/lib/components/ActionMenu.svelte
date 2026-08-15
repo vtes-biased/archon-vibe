@@ -3,7 +3,7 @@
   import type { Component, Snippet } from "svelte";
 
   // Overflow menu for secondary actions, so each state keeps ONE primary CTA.
-  // Menu items are raw rows (not <Button> — per DESIGN.md, dropdown options
+  // Menu items are raw rows (not <Button> — per wiki/design.md, dropdown options
   // don't route through it). Closes on outside-click, Escape, or pick.
   //
   // `children` swaps the item list for arbitrary panel content (settings

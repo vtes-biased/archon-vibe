@@ -2,31 +2,14 @@
 # Shared pre-commit hook. Tracked in-repo; install (or re-install) with `just hooks`,
 # which symlinks .git/hooks/pre-commit -> ../../.githooks/pre-commit.
 #
-#   1. pst: reject a structurally invalid staged .pst/tickets file.
-#   2. ruff: auto-format/-fix staged Python and re-stage it, so formatting never
-#      reaches CI red. Mirrors `just lint` over the staged set.
+#   ruff: auto-format/-fix staged Python and re-stage it, so formatting never
+#   reaches CI red. Mirrors `just lint` over the staged set.
 set -eu
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-# ---- 1. pst tickets validation ----------------------------------------------
-PST_FILE=".pst/tickets"
-if git diff --cached --name-only | grep -qx "$PST_FILE"; then
-    if ! command -v pst >/dev/null 2>&1; then
-        echo "pst not found on PATH; it's part of the build — install it to validate $PST_FILE." >&2
-        exit 1
-    fi
-    tmp="$(mktemp)"
-    trap 'rm -f "$tmp"' EXIT
-    git show ":$PST_FILE" >"$tmp"
-    if ! pst lint --file "$tmp"; then
-        echo "pst: staged $PST_FILE is invalid; commit rejected." >&2
-        exit 1
-    fi
-fi
-
-# ---- 2. ruff auto-format of staged Python -----------------------------------
+# ---- ruff auto-format of staged Python --------------------------------------
 staged="$(git diff --cached --name-only --diff-filter=ACM -- '*.py' || true)"
 [ -z "$staged" ] && exit 0
 

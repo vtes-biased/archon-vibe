@@ -164,7 +164,7 @@
 
   // Flush a pending debounced save so closing the card (or unmounting) never
   // drops the last keystrokes or saves them after the card is gone — the
-  // Close button must not lie (DESIGN.md auto-save pattern).
+  // Close button must not lie (wiki/design.md auto-save pattern).
   function flushPendingSave() {
     if (debounceTimer) {
       clearTimeout(debounceTimer);

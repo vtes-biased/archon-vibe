@@ -197,7 +197,7 @@
             <tr class="border-b border-line text-ink-muted">
               <th class="py-2 px-3 text-left w-12">{m.rankings_col_rank()}</th>
               <th class="py-2 px-3 text-left">{m.rankings_col_player()}</th>
-              <!-- Flag-only on phones (DESIGN.md mobile reflow rule) — the name column
+              <!-- Flag-only on phones (wiki/design.md mobile reflow rule) — the name column
                    is what pushes ~360px viewports into side-scroll. -->
               <th class="py-2 px-3 text-left"><span class="sr-only sm:not-sr-only">{m.common_country()}</span></th>
               <th class="py-2 px-3 text-right">{isHof ? m.hof_col_wins() : m.rankings_col_points()}</th>
