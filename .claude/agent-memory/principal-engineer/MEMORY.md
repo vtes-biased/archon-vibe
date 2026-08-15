@@ -91,6 +91,7 @@
 - [SA round-targeting consumers](sa-round-targeting-two-consumers.md) — SA −1 VP has THREE consumers (prelim standings, rating, SetScore); all share resolve_sa_effective_rounds or VP/GW/TP silently diverge; seated_in is Cancelled-aware (soft-cancelled seat can't anchor an SA), redirect can land later than stored (JG v2 §1.1.3).
 - [DQ dual-signal divergence traps](dq-signal-divergence-traps.md) — DQ = state||active-sanction; audit every consumer for the combined signal, and any DQ sanction create/lift/delete must recompute standings.
 - [Excluded-but-not-zeroed standings consumers](excluded-not-zeroed-standings-consumers.md) — proxy/non_competing is non-ranked but score is KEPT (DQ zeroes); league.rs + vekn_push iterate standings unfiltered and leak proxy scores; filter on disqualified||non_competing.
+- [Player-count rule has four implementations](player-count-four-implementations.md) — "players who played" exists in ratings.rs, ratings.py, routes/tournaments.py (_played_player_count, different definition), and tournament-utils.ts (feeds client-side league standings); plus league.rs already owns the key name `player_count`.
 - [League RTP vs global RTP points base](league-rtp-vs-global-rtp-points-base.md) — league.rs RTP points use PRELIM-ONLY standings vp/gw (finals only added to displayed totals); global rating uses TOTAL vp/gw; the two RTP consumers diverge — verify the `points` field, not just displayed gw/vp.
 
 ## Online-only live tournament sub-data
