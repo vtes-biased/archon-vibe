@@ -96,6 +96,11 @@ VPs are real, they were earned against real opponents, and a blanked row makes t
 table look wrong. This is the opposite of the DQ treatment, where zeroing *is* the
 point.
 
+**Entering the tournament at all requires a `vekn_id`.** `Register`, `AddPlayer`
+and the `CheckIn` walk-in path each reject an empty one, so an official sponsors or
+links the account first. Offline play is the exception — it mints `TEMP-` ids that
+go-online resolves or turns into real members ([vekn](vekn.md#push-constraints)).
+
 Barriers to check-in: a required decklist not uploaded, a VEKN ban, a
 disqualification from this event, or reaching the per-player round cap.
 

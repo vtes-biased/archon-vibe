@@ -36,6 +36,19 @@ projection is a denylist. An organizer-only secret must be added to it or it lea
 **and** `UpdateConfig`'s field array. Shared validation belongs in the shared
 validator.
 
+**`/action` has the same shape, in three places.** A key the Rust `TournamentEvent`
+consumes reaches the engine only if it is declared as a field on
+`TournamentActionRequest` **and** copied into `event_data` by the hand-written
+block below it. Pydantic defaults to `extra="ignore"`, so anything else a client
+sends vanishes with no error. `vekn_id` is **deliberately absent** from that model
+— the server injects it from the resolved user, so a client-sent id can never reach
+the engine, and adding it would reopen the fabricated-id hole.
+
+**A projection change only affects rows written afterwards**, and neither the
+access-version handshake nor any test can catch the missing backfill — see
+[sync](sync.md#access-levels) for the re-save script and
+[testing](testing.md#traps) for why no test covers it.
+
 ## Two implementations of one gate
 
 **Online create bypasses the engine.** `POST /tournaments` builds the Tournament
@@ -88,6 +101,28 @@ anchor an SA — and its redirect can land later than the stored round.
 **League RTP and global RTP use different bases.** League points use prelim-only
 standings VP/GW; the global rating uses totals including finals. Verify the
 `points` field, not just the displayed GW/VP.
+
+**"How many players played" has four implementations**, and two definitions. The
+canonical one is `engine/src/ratings.rs` `players_with_rounds` — rounds and finals
+seats, falling back to standings rows carrying any score, DQ-inclusive per rules
+A.2. `backend/src/ratings.py` is a hand-written Python twin of it, feeding the
+rating computation and the VEKN push. `frontend/src/lib/tournament-utils.ts` is a
+TypeScript twin, consumed by the league page, which computes standings client-side
+and injects the count into the engine. But
+`backend/src/routes/tournaments.py` `_played_player_count`, which gates the TWDA
+floor, **differs by design**: seats only, with no standings fallback — so it returns
+0 for a rounds-less import — and it *subtracts* non-competing proxies.
+
+Any change to the counting rule must land in all four, or they silently disagree.
+Between the TWDA gate and the rest, share the constant rather than the function.
+Prefer a single PyO3/WASM entry point that deletes the two twins over writing a
+fifth copy.
+
+**`player_count` is a taken name.** `engine/src/league.rs` reads
+`tournament["player_count"]` from a **caller-synthesized** summary object, not from
+the Tournament model. Adding a `player_count` field to `Tournament` would make real
+tournament JSON silently satisfy that read with different semantics — name any new
+count field something else.
 
 **Role writes have two out-of-band consumers** — the Discord Linked Roles push,
 which fires on any role delta with no periodic reconcile, and the resync

@@ -22,7 +22,7 @@ omitted from the rows below.
 
 | Capability | Who, besides IC |
 |---|---|
-| `create_member`, `sponsor_vekn`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
+| `sponsor_member`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
 | `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
 | `merge_accounts`, `delete_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |

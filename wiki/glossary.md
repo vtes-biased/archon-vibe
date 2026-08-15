@@ -151,6 +151,8 @@ especially for house-format and beta-ish features.
 | received | reçue(s) / Reçu par | recibida(s) / Recibido por | recebida(s) / Recebido por | ricevuta/e / Ricevuto da |
 | batch (print run) | lot | lote | lote | lotto |
 | member (in a picker) | membre | miembro | membro | membro |
+| account | compte | cuenta | conta | account (English loanword) |
+| sign in (infinitive) | se connecter | iniciar sesión | entrar | accedi |
 | catalog | Catalogue | Catálogo | Catálogo | Catalogo |
 | developer portal | Portail développeur | Portal de desarrollador | Portal do desenvolvedor | Portale sviluppatore |
 | Hall of Fame | Hall of Fame | Hall of Fame | Hall da Fama | Hall of Fame |

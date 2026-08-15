@@ -108,6 +108,32 @@ click-based unseat/seat flow; drag-and-drop is not reliably scriptable.
 **Never `git checkout` during mutation testing** — it has wiped uncommitted feature
 code mid-run. Back the file up first.
 
+**`test_access_levels.py` is the only place in the backend suite that asserts
+projection field membership.** Everything else mentioning `"public"` asserts row
+sets, sizes, or the `calendar_token` exclusion — never which keys a projection
+carries. That is deliberate: it makes "have I just made a field public without
+noticing?" a one-file question, and the file is pure-unit with no DB, so it runs
+even on a skipped-DB run. When reviewing a widened or narrowed projection, read
+that file first; if the sensitive field is already pinned there, a further
+"public ⊆ member" test is redundant — say so and add nothing.
+
+**No test can catch a missing projection backfill, so do not propose one.** The
+access-version resync fires when a *viewer's* level changes. When the *server's
+definition* of a level changes, no viewer transitioned and no row's `modified_at`
+moved, so clients keep the old payload indefinitely. The fix is the re-save script
+([sync](sync.md#access-levels)); verify it exists and is deploy-ordered instead.
+
+**The frontend has no unit-test vertical, and adding one is not the answer.**
+`vitest` appears nowhere in the repo — only `svelte-check`, Playwright and the smoke
+script. Standing up a runner, config and CI wiring for a single test is exactly
+what the policy forbids. Compounding it, `tournament-utils.ts` is **not pure**: it
+imports from `./engine`, and those helpers return an empty result when the WASM
+engine is null. Outside a browser that is always, so a Node-side test would assert
+the degrade-to-preliminary fallback and never the engine's real placement logic —
+it would verify the absence of the engine. Placement semantics belong in Rust,
+rendering belongs in Playwright, and the TypeScript in between is marshalling that
+`svelte-check` plus the E2E lifecycle spec already covers.
+
 **Fixtures can carry engine-impossible states.** Two shared tournament fixtures
 hold stored VP vectors no engine could produce; they are inert only because a
 standings recompute never re-validates them. Don't build full-standings assertions

@@ -357,7 +357,7 @@ an IndexedDB store for a one-time-plus-trickle operator workflow). The recurring
 sync reads the file (packaged via `importlib.resources`, per CLAUDE.md) and is
 then fully idempotent and deterministic: unreviewed entries are logged and
 skipped, never created. Also write the human-readable table to
-`.pst/details/<N>-twda-event-reconciliation.md` the way `#567`'s was.
+`board/twda-event-reconciliation.md` the way the duplicate table was.
 
 Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the

@@ -13,6 +13,10 @@ into this page. **Consistency with this system beats novelty.**
 VTES / Vampire: the Masquerade inspired: gothic horror, pale and muted, dark mode
 primary.
 
+`@theme` is not colour-only — it is the general Tailwind v4 design-token registry,
+and also holds the layout tokens for safe-area insets and the nav footprint (see
+*Mobile first*).
+
 Colour is expressed as **role tokens** in four families — `surface` (backgrounds),
 `ink` (text), `line` (borders) and `accent` (crimson). Each token is defined
 **once** in `app.css` `@theme` via CSS `light-dark(LIGHT, DARK)`, so its value
@@ -180,6 +184,19 @@ Design for touch first, then enhance for desktop.
 - **44×44px minimum touch targets.** This is the recurring gap — re-check small
   icon buttons, steppers, unseat and sanction controls, VP selects, and tab
   toggles.
+- **Safe areas.** `app.html` sets `viewport-fit=cover`, and `@theme` defines
+  `--spacing-safe-t/-l/-r` from `env(safe-area-inset-*)`, always live.
+  `--spacing-safe-b` is **0 by default** and becomes the real inset only inside
+  `@media (display-mode: standalone)`: in an iOS Safari tab the bottom toolbar
+  already occupies that space, and the inset flips as the toolbar collapses on
+  scroll, so honouring it there would make the bottom nav change height mid-scroll.
+  The contract is that **every viewport-edge-anchored surface absorbs its own
+  inset** through the generated utilities — `pt-safe-t`, `pb-safe-b`, `pr-safe-r`,
+  `pl-safe-l`. `--spacing-navbar` is the mobile bottom nav's **total** footprint,
+  its touch row plus `--spacing-safe-b` under the same standalone gate, so anything
+  stacking above the nav derives its offset from it (`h-navbar`, `bottom-navbar`)
+  and never a hard-coded `bottom-14`. `--spacing-rail` is the desktop equivalent,
+  rail width plus the left inset.
 - **No hover-only interactions**; always a tap equivalent.
 - **Tap-to-swap** in the seating editor: tap a player, then tap a seat — same table
   reorders, cross-table swaps, an open seat moves. **No drag-and-drop anywhere in

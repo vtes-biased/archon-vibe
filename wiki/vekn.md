@@ -61,8 +61,14 @@ Standard/CC 6, Limited/Basic 3, V5/Basic 16.
 - `max_rounds` is immutable once pushed, enforced backend and frontend.
 - VEKN requires a name of 3–120 characters, 2–4 rounds, and an organizer holding a
   `vekn_id`.
-- **All players must hold a `vekn_id` before results can be pushed**
-  ([rules §9.6](domain/tournament-rules.md#sanctioning-and-reporting)).
+- **A `vekn_id` is required to *register*, not merely to push.** The engine refuses
+  to seat a player without one (`Register`, `AddPlayer`, and the `CheckIn` walk-in
+  path all reject an empty id), so an official sponsors or links the account before
+  the player is added. That is stricter than [rules §9.6](domain/tournament-rules.md#sanctioning-and-reporting),
+  which only excludes placeholder-numbered results from the ratings. Offline play is
+  the exception: it mints local `TEMP-` ids, and go-online resolves each against a
+  real account — by VEKN id, then by email — or creates a member. Which is why
+  taking a tournament offline needs `sponsor_member` on top of organizer rights.
 - The organizer is impersonated via a `Vekn-Id` header on `create_event`, so the
   calendar entry is filed under the **organizer's own** VEKN id.
 - Open-rounds events are never pushed.

@@ -104,9 +104,9 @@ IndexedDB → reactive Svelte UI.
 Offline uses **primary-device ownership**, which is why no CRUD log or conflict
 resolution is needed:
 
-1. An organizer who can create members takes the tournament offline (`go-offline`)
+1. An organizer holding `sponsor_member` takes the tournament offline (`go-offline`)
    and it locks to their device. Offline play mints real members at go-online, so
-   it takes `create_member` on top of `organize_tournament`. A tournament can also
+   it takes `sponsor_member` on top of `organize_tournament`. A tournament can also
    be *created* while offline through the same form (detect-and-adapt): the WASM
    engine creates it born device-locked, and the server first learns of it at
    go-online, via the insert path.
@@ -117,7 +117,7 @@ resolution is needed:
 
 Going back online, the primary device sends the full tournament state plus offline
 data; the server overwrites, remaps temp UIDs and resumes SSE. Ownership can move
-by **force-takeover** (another organizer who can create members claims the lock,
+by **force-takeover** (another organizer holding `sponsor_member` claims the lock,
 warned about losing the primary's unsaved data) or **force-unlock** (emergency,
 no sync, first-party sessions only — OAuth tokens are rejected). The primary can
 also background-sync without unlocking (`sync-offline`).
@@ -526,11 +526,12 @@ subscribed calendars reconcile on every poll, so an event leaving the feed is
 *deleted* from the subscriber's calendar, and history must not vanish at finish.
 Country, global and league feeds stay upcoming-only.
 
-**Anonymous feeds deliberately render venue and address into LOCATION from the
-`full` column**, bypassing the member-level projection. The `.ics` is an
-advertising artifact mirroring vekn.net's public event calendar, and venue
-granularity is the organizer's data-entry choice. Do not "fix" this by stripping
-location.
+**Anonymous feeds render venue and address into LOCATION**, which takes no special
+casing — both are public-projection fields. That is consistent with the `.ics`
+being an advertising artifact mirroring vekn.net's public event calendar, where
+full addresses show anonymously; venue granularity is the organizer's data-entry
+choice. `venue_url` is the exception, withheld on an online event because there it
+is the join link rather than a venue website.
 
 ### Reports and social sharing
 

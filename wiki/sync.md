@@ -10,7 +10,7 @@ axis from the authorization predicates in [access](access.md).
 
 | Level | Viewer | Gets |
 |---|---|---|
-| `public` | no token, or no `vekn_id` | Prince/NC users with base64-obfuscated contact, minimal tournaments, no sanctions |
+| `public` | no token, or no `vekn_id` | Prince/NC users with base64-obfuscated contact, the event-page fields of every tournament, leagues minus their organizer roster, no sanctions |
 | `member` | has a `vekn_id` | all users without contact, all sanctions, tournaments with standings and filtered decks |
 | `full` | IC, NC of the same country, organizer | everything, including rounds, finals, `checkin_code` |
 
@@ -19,17 +19,38 @@ axis from the authorization predicates in [access](access.md).
 | Type | `public` | `member` | `full` |
 |---|---|---|---|
 | user | NC/Prince only, with contact + community links; IC without contact | all users — no contact, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` |
-| tournament | minimal fields + `banner_path` | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything |
+| tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything |
 | sanction | none | full data | full data |
 | deck | none | full data when `public = true`, else none | full data |
-| league | full data | full data | full data |
+| league | full data **except `organizers_uids`** | full data | full data |
 | promo | catalog only, no `holdings` | same as public | everything including `holdings` |
 
 "None" means the column is NULL and the object is invisible at that level.
 
-The tournament member projection is a **denylist** (`_TOURNAMENT_MEMBER_EXCLUDE`):
-any new Tournament field is member-visible by default, so an organizer-only secret
-must be added to that list or it leaks.
+The tournament public projection is an **allowlist** (`_TOURNAMENT_PUBLIC_FIELDS`),
+with one conditional: on an online event `venue_url` is the *join* link rather than
+a venue website — the form defaults it to a Discord invite — so it is withheld, and
+the calendar withholds it the same way.
+
+The tournament member projection is the mirror image, a **denylist**
+(`_TOURNAMENT_MEMBER_EXCLUDE`): any new Tournament field is member-visible by
+default, so an organizer-only secret must be added to that list or it leaks.
+
+A league's `organizers_uids` is stripped at public level because ordinary members
+have no public projection at all — a published organizer uid would resolve to
+nothing client-side and render as a raw uid fragment.
+
+**Booleans need an explicit decision.** Omitting a field withholds it, but omitting
+a `bool` *misinforms*: after JSON, absent and `false` are indistinguishable, so the
+client reads a missing flag as `false`. Never rely on omission to hide one.
+
+**A projection change only affects rows saved afterwards.** Existing rows keep
+their stored columns until something writes them again, so changing a projection
+function silently leaves the corpus on the old shape.
+`backend/scripts/reproject_public.py` re-saves every tournament and league to
+rebuild the columns and bump `modified_at`, which is what forces synced clients to
+re-fetch. Reuse that pattern post-deploy for any projection change — a raw SQL
+column rewrite cannot run the Python projections and leaves clients on stale rows.
 
 ### Access entitlement
 
@@ -100,7 +121,8 @@ decision.
 | League list | active only | yes |
 | Finished tournament detail | accessible by direct link | yes |
 
-The `.ics` feeds are a further deliberate exception —
+The `.ics` feeds carry venue and address for anonymous subscribers too, which is
+not an exception: both are public-projection fields —
 [architecture](architecture.md#calendar).
 
 ## Streaming

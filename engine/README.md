@@ -93,7 +93,7 @@ The rules are **data**, not functions:
   user-facing denial. Deny by default.
 - `ROLE_APPOINTMENTS` — one row per role: who may grant or revoke it.
 
-A matrix change edits a row. The published matrix lives in ARCHITECTURE.md
+A matrix change edits a row. The published matrix lives in wiki/access.md
 (Authorization); this file describes the mechanism.
 
 **Evaluating** — `check(capability, &Request)` is the single decision point.
@@ -116,7 +116,7 @@ offer without carrying their own copy of the matrix.
 
 ### Sanctions Reference (`src/sanctions.rs`)
 
-Single source for the VEKN Judges-Guide v2 penalty reference: category/subcategory taxonomy, English labels, baseline penalties, escalation ladder. `sanction_reference_json()` → WASM `sanctionReference()` / PyO3 `sanction_reference()`. Consumed by `backend/src/models.py` (derives `SUBCATEGORIES_BY_CATEGORY`/`BASELINE_PENALTIES` at import), the frontend's `getSanctionReference()` (`engine.ts`), and the Discord bot via the public `GET /sanctions/reference` endpoint. Distinct from `tournament/sanctions.rs` (SA effective-round resolution — see TOURNAMENTS.md).
+Single source for the VEKN Judges-Guide v2 penalty reference: category/subcategory taxonomy, English labels, baseline penalties, escalation ladder. `sanction_reference_json()` → WASM `sanctionReference()` / PyO3 `sanction_reference()`. Consumed by `backend/src/models.py` (derives `SUBCATEGORIES_BY_CATEGORY`/`BASELINE_PENALTIES` at import), the frontend's `getSanctionReference()` (`engine.ts`), and the Discord bot via the public `GET /sanctions/reference` endpoint. Distinct from `tournament/sanctions.rs` (SA effective-round resolution — see wiki/tournaments.md).
 
 Revision checklist — grouping/baselines/escalation propagate from here alone, but the *vocabulary and display* layers are still per-consumer: (1) the Python enums in `backend/src/models.py` (their constructors raise at backend boot on a key they don't know — loud); (2) the TS unions in `frontend/src/lib/types.ts` and the `subcategoryLabel` map in `TournamentSanctionModal.svelte` plus the 5 locale files (an unknown key renders as its raw key — quiet, so check these); (3) the bot caches the reference per process — restart it after a backend deploy that revises the tables.
 
@@ -139,7 +139,7 @@ Entry points:
 
 Tournament state machine and event processing for offline-first tournament management.
 
-See [../TOURNAMENTS.md](../TOURNAMENTS.md) for the behavioral reference (state machine, full event catalog, scoring/oust-order, permissions, privacy projections). This README covers the engine's build, bindings, and entry-point signatures.
+See [../wiki/tournaments.md](../wiki/tournaments.md) for the behavioral reference (state machine, full event catalog, scoring/oust-order, permissions, privacy projections). This README covers the engine's build, bindings, and entry-point signatures.
 
 Features:
 - **State machine**: Planned → Registration → Waiting → Playing → Finished
@@ -151,7 +151,7 @@ Entry points:
 - `process_tournament_event(tournament, event, actor, sanctions, decks)` - Main event processor (returns `{tournament, deck_ops}`)
 - `compute_final_standings(standings, winner)` - Reorder preliminary standings into VEKN final placement; shared by league GP/RTP scoring and the post-finals display. Exposed as WASM `computeFinalStandings` and PyO3 `compute_final_standings`.
 
-The event enum lives in `tournament/types.rs`; the full catalog (with required state and permissions) is documented in [../TOURNAMENTS.md](../TOURNAMENTS.md).
+The event enum lives in `tournament/types.rs`; the full catalog (with required state and permissions) is documented in [../wiki/tournaments.md](../wiki/tournaments.md).
 
 ## Design
 

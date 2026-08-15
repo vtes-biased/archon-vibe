@@ -1,12 +1,15 @@
+> Elaborated context for a line in `BOARD.md`. Deleted with the line.
+
 # Events to delete once IC record curation exists
 
-Running list of tournaments that **should not be in the record** and are waiting
-on the `#574` cleanup capability. Distinct from its two sibling lists:
+Running list of tournaments that **should not be in the record**, waiting on the
+IC cleanup capability. Distinct from its two sibling lists:
 
-- `.pst/details/567-post-vekn-decommission-duplicate-cleanup.md` — *duplicates*,
-  one real event entered twice upstream.
-- `#580`'s deliverable — events we hold that **no longer exist upstream**,
-  established by a targeted `fetch_event` probe while the API is still live.
+- `board/duplicate-tournaments.md` — *duplicates*, one real event entered twice
+  upstream.
+- the vekn.net reconciliation line's deliverable — events we hold that **no longer
+  exist upstream**, established by a targeted `fetch_event` probe while the API is
+  still live.
 
 This file is for the third population: events that are simply **wrong** —
 created by mistake, mistyped, or never real — regardless of what vekn.net says.
@@ -45,7 +48,7 @@ sweep bumps that corpus-wide.
 
 **Why it is not harmless while it waits.** It is publicly visible, not merely
 present: the tournament page returns 200 anonymously, logged-out visitors see
-current + upcoming events (PRODUCT.md §4), so it sits at the bottom of the
+current + upcoming events (wiki/sync.md), so it sits at the bottom of the
 upcoming list for the next eight years — and it is exported as a real VEVENT in
 the anonymous `.ics` feed, street address included:
 
