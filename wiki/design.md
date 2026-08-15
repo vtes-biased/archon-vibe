@@ -197,6 +197,19 @@ Design for touch first, then enhance for desktop.
   stacking above the nav derives its offset from it (`h-navbar`, `bottom-navbar`)
   and never a hard-coded `bottom-14`. `--spacing-rail` is the desktop equivalent,
   rail width plus the left inset.
+- **`sticky` carries its own inset.** `sticky top-*` / `bottom-*` resolve against
+  the **scrollport**, not the shell's padding box, so a sticky header parks under
+  the status bar and a sticky footer parks behind the bottom nav unless it adds the
+  inset itself — `top-[calc(1rem+var(--spacing-safe-t))]`,
+  `bottom-[calc(1rem+var(--spacing-navbar))]`.
+- **Modal heights use `dvh`, never `vh`.** On iOS `vh` is the *large* viewport, so
+  a `90vh` sheet outgrows the visible area while the toolbar shows. Vertically
+  centred panels cap at **`85dvh`**: that puts the top edge at `7.5dvh`, the
+  smallest margin that still clears `safe-area-inset-top` on a Dynamic Island
+  phone. `90dvh` clips the panel header under the status bar.
+- **Full height inside the shell is `.min-h-shell`, not `min-h-screen`.** The
+  shell's content box is `dvh` minus the top inset and the nav, so a `100vh` child
+  overflows it and centres its content low.
 - **No hover-only interactions**; always a tap equivalent.
 - **Tap-to-swap** in the seating editor: tap a player, then tap a seat — same table
   reorders, cross-table swaps, an open seat moves. **No drag-and-drop anywhere in

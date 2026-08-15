@@ -3,7 +3,7 @@
 
 @theme {
     /*
-     * VTES Gothic ROLE TOKENS — see DESIGN.md.
+     * VTES Gothic ROLE TOKENS — see wiki/design.md.
      * Each role is defined ONCE via light-dark(LIGHT, DARK): the value is picked
      * from the element's color-scheme (dark on :root, light on html.light). No
      * parallel html.light override block, no numeric scale-inversion to maintain —
@@ -51,7 +51,7 @@
     --color-select-soft:   light-dark(#eff6ff, #1e3a8a);  /* select tint bg (pair with opacity) */
 
     /*
-     * Safe areas — contract in DESIGN.md → Mobile First. The 0px fallbacks are
+     * Safe areas — contract in wiki/design.md → Mobile first. The 0px fallbacks are
      * load-bearing: without one, a UA lacking env() makes calc() invalid at
      * computed-value time and --spacing-navbar collapses the nav to height:auto.
      */
