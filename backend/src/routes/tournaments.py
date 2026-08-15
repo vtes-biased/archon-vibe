@@ -1609,15 +1609,26 @@ async def tournament_action(
             for s in tournament_sanctions
         ]
 
-        # Inject authoritative vekn_id for Register/AddPlayer/CheckIn (server overrides client)
-        if request.type in ("Register", "AddPlayer") and request.user_uid:
-            target_user = await get_user_by_uid(request.user_uid, conn=tx_conn)
-            if target_user and target_user.vekn_id:
-                event_data["vekn_id"] = target_user.vekn_id
-        elif request.type == "CheckIn" and request.player_uid:
-            target_user = await get_user_by_uid(request.player_uid, conn=tx_conn)
-            if target_user and target_user.vekn_id:
-                event_data["vekn_id"] = target_user.vekn_id
+        # The vekn_id for Register/AddPlayer/CheckIn comes from the resolved user
+        # and nowhere else — TournamentActionRequest deliberately has no vekn_id
+        # field, and must never gain one: a client-supplied id would let an
+        # organizer register a VEKN-less member under a fabricated one, bypassing
+        # sponsorship. An unresolvable target is a 404 rather than a fall-through,
+        # which would otherwise store a Player row pointing at no user. Offline
+        # play never reaches here (tournament-actions.ts returns after the local
+        # apply), so a TEMP- id is never a legitimate caller.
+        target_uid = None
+        if request.type in ("Register", "AddPlayer"):
+            target_uid = request.user_uid
+        elif request.type == "CheckIn":
+            target_uid = request.player_uid
+        if target_uid:
+            target_user = await get_user_by_uid(target_uid, conn=tx_conn)
+            if not target_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            # Empty means unsponsored: the engine rejects it for a new player and
+            # ignores it for one already on the roster.
+            event_data["vekn_id"] = target_user.vekn_id or ""
 
         # Serialize tournament to JSON for engine
         tournament_json = encoder.encode(tournament).decode("utf-8")

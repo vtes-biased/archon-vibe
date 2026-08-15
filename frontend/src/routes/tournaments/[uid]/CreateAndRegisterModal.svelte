@@ -2,12 +2,15 @@
   import type { Tournament, User } from "$lib/types";
   import { getFilteredUsers, getUser, getRegistrationBarredUids } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import { isOffline, addOfflinePlayer } from "$lib/stores/offline.svelte";
+  import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import Button from "$lib/components/Button.svelte";
   import { TriangleAlert, Flower2, Ban } from "@lucide/svelte";
-  import { sponsorVeknMember, createUser, isOnline, ApiError } from "$lib/api";
+  import { sponsorVeknMember, createUser, ApiError } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { canSponsorVekn, type TournamentEventType } from "$lib/engine";
+  import { toUserMessage } from "$lib/errors";
+  import { canSponsorVekn, canCreateMember, type TournamentEventType } from "$lib/engine";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -33,12 +36,27 @@
 
   // Sponsor modal state
   let sponsorLoading = $state(false);
-  // Deliberately cross-country: a visiting official can sponsor newcomers abroad.
-  const sponsorEligible = $derived(canSponsorVekn(auth.user).allowed);
+  // Each path asks for the capability it actually needs. Both are officials-only
+  // (IC/NC/Prince) and deliberately cross-country, so any official present at the
+  // event qualifies — the copy says so rather than hiding the option, since an
+  // organizer who can't act still needs to know who can.
+  const canSponsor = $derived(canSponsorVekn(auth.user).allowed);
+  const canCreate = $derived(canCreateMember(auth.user).allowed);
+  // checkPermission fails closed before WASM loads; don't tell an official they
+  // aren't one in that window — show the form (its confirm stays disabled).
+  const eligibilityKnown = $derived(engineReady());
+  // The device lock, not browser connectivity: this must be the same fact that
+  // decides whether doAction skips the server POST (tournament-actions.ts), or a
+  // disconnected device on an online tournament mints a temp player and a user
+  // stub that no go-online push will ever reconcile away.
+  const offlineCreate = $derived(isOffline(tournament.uid));
 
   // Create-and-register modal state
   let createName = $state('');
   let createEmail = $state('');
+  // Offline only: a player who knows their VEKN ID gives go-online an exact
+  // match instead of falling back to email.
+  let createVeknId = $state('');
   // '' is equivalent to tournament.country: every use falls back through
   // `createCountry || tournament.country || ''` (reset re-syncs it anyway).
   let createCountry = $state('');
@@ -61,18 +79,22 @@
     showCreateModal = false;
     createName = '';
     createEmail = '';
+    createVeknId = '';
     createCountry = tournament.country ?? '';
     createCandidates = [];
     candidateSuspended = new Set();
   }
 
   async function handleSponsorAndRegister() {
-    if (!sponsorTarget || !sponsorEligible) return;
+    if (!sponsorTarget || !canSponsor) return;
     sponsorLoading = true;
     try {
       const result = await sponsorVeknMember(sponsorTarget.uid);
       showToast({ type: "success", message: result.message });
-      await doAction("AddPlayer", { user_uid: sponsorTarget.uid, vekn_id: result.user.vekn_id });
+      // doAction reports rather than throws: closing here would claim a success
+      // the organizer didn't get, after a VEKN ID has already been allocated.
+      const err = await doAction("AddPlayer", { user_uid: sponsorTarget.uid, vekn_id: result.user.vekn_id });
+      if (err) { showToast({ type: 'error', message: err }); return; }
       sponsorTarget = null;
     } catch {
       // Error toast shown by apiRequest
@@ -97,45 +119,45 @@
   }
 
   async function handleCreateAndRegister() {
-    if (!createName.trim() || !createEmail.trim()) return;
+    if (!createName.trim() || !createEmail.trim() || !canCreate) return;
 
-    if (!isOnline()) {
-      // Offline mode: temp player, no dedup (the member list isn't authoritative
-      // offline and the WASM engine reconciles on go-online).
-      createLoading = true;
-      try {
-        const tempUid = crypto.randomUUID();
-        const tempVeknId = `TEMP-${tempUid.slice(0, 8)}`;
-        const { addOfflinePlayer } = await import('$lib/stores/offline.svelte');
-        await addOfflinePlayer(tournament.uid, {
-          temp_uid: tempUid,
-          name: createName.trim(),
-          vekn_id: tempVeknId,
-          email: createEmail.trim(),
-        });
-        await doAction('AddPlayer', { user_uid: tempUid, vekn_id: tempVeknId });
-        resetCreateModal();
-      } catch {
-        // Error toast shown by apiRequest
-      } finally {
-        createLoading = false;
-      }
-      return;
-    }
-
-    // Guard the whole online path (dedup lookup + mint) so a double-tap can't
-    // fire two creates during the await, and the review button never sticks.
+    // Guard the whole path (dedup lookup + mint) so a double-tap can't fire two
+    // creates during the await, and the review button never sticks.
     createLoading = true;
     try {
+      // A typed VEKN ID that already belongs to someone means this was never a
+      // create. Check it here because go-online matches on vekn_id FIRST and
+      // never re-checks the name (_resolve_or_create_offline_player), so one
+      // transposed digit would silently bind the seat — and the event's results
+      // and ratings — to a different real member.
+      const typedVekn = createVeknId.trim();
+      if (typedVekn) {
+        const holder = (await getFilteredUsers(undefined, undefined, typedVekn))
+          .find(u => u.vekn_id === typedVekn);
+        if (holder) { chooseCandidate(holder); return; }
+      }
+
       // Dedup gate: surface same-country name look-alikes (incl. accountless
       // VEKN-synced members — the member projection carries them all) before
       // minting. Email dedup is the server's job (create_user 409, cross-country
       // authoritative). Skip once the review has been shown and dismissed.
+      //
+      // Runs offline too: the local member list is stale but complete, which is
+      // ample to surface a look-alike, and this keyboard moment is the only one
+      // where a human can review candidates — go-online is batch and matches on
+      // email alone, so an unreviewed offline create mints a second account for
+      // a member who already has one.
       if (createCandidates.length === 0) {
         const country = createCountry || tournament.country || '';
         const registered = new Set(tournament.players?.map(p => p.user_uid) ?? []);
-        const byName = await getFilteredUsers(country || undefined, undefined, createName.trim());
-        const matches = byName.filter(u => !registered.has(u.uid)).slice(0, 8);
+        const search = async (c: string | undefined) =>
+          (await getFilteredUsers(c, undefined, createName.trim())).filter(u => !registered.has(u.uid));
+        let matches = await search(country || undefined);
+        // Offline there is no server-side email 409 behind this, so a
+        // cross-country duplicate would go uncaught — and a visiting player is
+        // exactly who an offline event collects. Widen rather than miss them.
+        if (matches.length === 0 && offlineCreate && country) matches = await search(undefined);
+        matches = matches.slice(0, 8);
         if (matches.length > 0) {
           createCandidates = matches;
           candidateSuspended = await getRegistrationBarredUids();
@@ -143,12 +165,31 @@
         }
       }
 
+      if (offlineCreate) {
+        // No server to mint against: a temp player the go-online push resolves.
+        const tempUid = crypto.randomUUID();
+        const veknId = typedVekn || `TEMP-${tempUid.slice(0, 8)}`;
+        await addOfflinePlayer(tournament.uid, {
+          temp_uid: tempUid,
+          name: createName.trim(),
+          vekn_id: veknId,
+          email: createEmail.trim(),
+        });
+        const offlineErr = await doAction('AddPlayer', { user_uid: tempUid, vekn_id: veknId });
+        if (offlineErr) { showToast({ type: 'error', message: offlineErr }); return; }
+        resetCreateModal();
+        return;
+      }
+
       // No look-alike, or the official dismissed the review → mint.
       const newUser = await createUser(
         createName.trim(), createCountry || tournament.country || '', null, null, createEmail.trim(),
         undefined, null, { suppressErrorToast: true }
       );
-      await doAction("AddPlayer", { user_uid: newUser.uid, vekn_id: newUser.vekn_id });
+      // The member now exists: keep the modal open on a failed add so the
+      // organizer can retry rather than watch it close on a half-done job.
+      const addErr = await doAction("AddPlayer", { user_uid: newUser.uid, vekn_id: newUser.vekn_id });
+      if (addErr) { showToast({ type: 'error', message: addErr }); return; }
       resetCreateModal();
     } catch (e) {
       // Cross-country email collision the client couldn't see locally: the
@@ -160,7 +201,9 @@
         showToast({ type: 'error', message: m.create_dedup_email_exists_search() });
         return;
       }
-      if (e instanceof ApiError) showToast({ type: 'error', message: e.message });
+      // Offline the engine throws EngineError, not ApiError — an ApiError-only
+      // toast would leave the organizer with a modal that just doesn't respond.
+      showToast({ type: 'error', message: toUserMessage(e, m.tournament_error_action()) });
     } finally {
       createLoading = false;
     }
@@ -178,7 +221,7 @@
   >
     <div
       use:focusOnMount
-      class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4"
+      class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4 max-h-[90dvh] overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="sponsor-modal-title"
@@ -187,27 +230,33 @@
       onkeydown={(e) => e.stopPropagation()}
     >
       <h3 id="sponsor-modal-title" class="text-lg font-medium text-ink-strong">{m.vekn_sponsor_to_register_title()}</h3>
-      <p class="text-sm text-ink">{m.vekn_sponsor_to_register_message({ name: sponsorTarget.name })}</p>
-      {#if !sponsorEligible}
-        <p class="text-sm text-warn inline-flex items-start gap-1.5">
-          <TriangleAlert class="w-4 h-4 shrink-0 mt-0.5" />
-          {m.vekn_sponsor_ineligible()}
+      {#if eligibilityKnown && !canSponsor}
+        <!-- Nothing to offer this organizer: state the rule and who can act,
+             rather than leaving a dead confirm button on the screen. -->
+        <p class="text-sm text-ink inline-flex items-start gap-1.5">
+          <TriangleAlert class="w-4 h-4 shrink-0 mt-0.5 text-warn" />
+          {m.official_required_to_add_player()}
         </p>
+        <div class="flex justify-end">
+          <Button variant="primary" size="lg" onclick={() => sponsorTarget = null}>{m.common_close()}</Button>
+        </div>
+      {:else}
+        <p class="text-sm text-ink">{m.vekn_sponsor_to_register_message({ name: sponsorTarget.name })}</p>
+        <div class="flex gap-2 justify-end">
+          <Button
+            variant="ghost"
+            size="lg"
+            onclick={() => sponsorTarget = null}
+          >{m.common_cancel()}</Button>
+          <Button
+            variant="primary"
+            size="lg"
+            loading={sponsorLoading}
+            disabled={!canSponsor}
+            onclick={handleSponsorAndRegister}
+          >{m.vekn_sponsor_and_register()}</Button>
+        </div>
       {/if}
-      <div class="flex gap-2 justify-end">
-        <Button
-          variant="ghost"
-          size="lg"
-          onclick={() => sponsorTarget = null}
-        >{m.common_cancel()}</Button>
-        <Button
-          variant="primary"
-          size="lg"
-          loading={sponsorLoading}
-          disabled={!sponsorEligible}
-          onclick={handleSponsorAndRegister}
-        >{m.vekn_sponsor_and_register()}</Button>
-      </div>
     </div>
   </div>
 {/if}
@@ -223,7 +272,7 @@
   >
     <div
       use:focusOnMount
-      class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4"
+      class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4 max-h-[90dvh] overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-modal-title"
@@ -231,17 +280,32 @@
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
     >
-      {#if createCandidates.length > 0}
+      {#if eligibilityKnown && !canCreate}
+        <!-- Explain instead of offering a form that can never be submitted: a
+             filled-in name and email followed by a dead button teaches nothing. -->
+        <h3 id="create-modal-title" class="text-lg font-medium text-ink-strong">{m.create_and_register_title()}</h3>
+        <p class="text-sm text-ink inline-flex items-start gap-1.5">
+          <TriangleAlert class="w-4 h-4 shrink-0 mt-0.5 text-warn" />
+          {m.official_required_to_add_player()}
+        </p>
+        <div class="flex justify-end">
+          <Button variant="primary" size="lg" onclick={resetCreateModal}>{m.common_close()}</Button>
+        </div>
+      {:else if createCandidates.length > 0}
         <!-- Dedup review: pick an existing member instead of minting a duplicate -->
         <h3 id="create-modal-title" bind:this={dedupHeading} tabindex="-1" class="text-lg font-medium text-ink-strong outline-none">{m.create_dedup_title()}</h3>
         <p class="text-sm text-ink">{m.create_dedup_message()}</p>
         <div class="border border-line-strong rounded-lg divide-y divide-line max-h-56 overflow-y-auto">
           {#each createCandidates as u}
             {@const isSuspended = candidateSuspended.has(u.uid)}
+            <!-- Sponsoring a VEKN-less candidate needs the server, so offline the
+                 pick would dead-end on a network failure — show it, don't offer it. -->
+            {@const needsServer = offlineCreate && !u.vekn_id}
+            {@const blocked = isSuspended || needsServer}
             <button
-              onclick={() => !isSuspended && chooseCandidate(u)}
-              disabled={isSuspended}
-              class="w-full min-h-[44px] px-3 py-2 text-left text-sm transition-colors inline-flex items-center gap-1 {isSuspended ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright hover:bg-surface-hover'}"
+              onclick={() => !blocked && chooseCandidate(u)}
+              disabled={blocked}
+              class="w-full min-h-[44px] px-3 py-2 text-left text-sm transition-colors inline-flex items-center gap-1 {blocked ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright hover:bg-surface-hover'}"
             >
               {#if u.country}<span class="mr-1">{getCountryFlag(u.country)}</span>{/if}{u.name}
               {#if u.deceased_at}
@@ -257,6 +321,8 @@
               {#if isSuspended}
                 <Ban class="w-3.5 h-3.5 text-link ml-1" />
                 <span class="text-xs text-link">{m.error_suspended_cannot_register()}</span>
+              {:else if needsServer}
+                <span class="text-xs text-link ml-1">{m.error_action_requires_online()}</span>
               {/if}
             </button>
           {/each}
@@ -274,18 +340,30 @@
         <h3 id="create-modal-title" class="text-lg font-medium text-ink-strong">{m.create_and_register_title()}</h3>
         <p class="text-sm text-ink">{m.create_and_register_message()}</p>
         <div class="space-y-2">
+          <!-- Placeholders vanish on the first keystroke: name the fields too. -->
           <input
             type="text"
             bind:value={createName}
+            aria-label={m.offline_player_name()}
             placeholder={m.offline_player_name()}
             class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
           />
           <input
             type="email"
             bind:value={createEmail}
+            aria-label={m.common_email()}
             placeholder={m.common_email()}
             class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
           />
+          {#if offlineCreate}
+            <input
+              type="text"
+              bind:value={createVeknId}
+              aria-label={m.offline_player_vekn_id()}
+              placeholder={m.offline_player_vekn_id()}
+              class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
+            />
+          {/if}
         </div>
         <div class="flex gap-2 justify-end">
           <Button
@@ -297,7 +375,7 @@
             variant="primary"
             size="lg"
             loading={createLoading}
-            disabled={!createName.trim() || !createEmail.trim()}
+            disabled={!createName.trim() || !createEmail.trim() || !canCreate}
             onclick={handleCreateAndRegister}
           >{m.create_and_register_btn()}</Button>
         </div>
@@ -317,7 +395,7 @@
   >
     <div
       use:focusOnMount
-      class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4"
+      class="bg-surface-card border border-line-strong rounded-lg p-6 max-w-sm w-full mx-4 space-y-4 max-h-[90dvh] overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="deceased-add-title"

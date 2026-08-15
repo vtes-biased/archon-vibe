@@ -407,29 +407,6 @@
   const hasFinals = $derived(standings.some(e => e.finals));
   const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
 
-  // Offline player registration
-  let showOfflinePlayerForm = $state(false);
-  let offlinePlayerName = $state('');
-  let offlinePlayerVeknId = $state('');
-  let offlinePlayerEmail = $state('');
-
-  async function addOfflinePlayerAction() {
-    if (!offlinePlayerName.trim()) return;
-    const tempUid = crypto.randomUUID();
-    const veknId = offlinePlayerVeknId.trim() || `TEMP-${tempUid.slice(0, 8)}`;
-    const { addOfflinePlayer } = await import('$lib/stores/offline.svelte');
-    await addOfflinePlayer(tournament.uid, {
-      temp_uid: tempUid,
-      name: offlinePlayerName.trim(),
-      vekn_id: veknId,
-      email: offlinePlayerEmail.trim() || undefined,
-    });
-    await doAction('AddPlayer', { user_uid: tempUid, vekn_id: veknId });
-    offlinePlayerName = '';
-    offlinePlayerVeknId = '';
-    offlinePlayerEmail = '';
-    showOfflinePlayerForm = false;
-  }
 </script>
 
 <div class="space-y-4">
@@ -672,43 +649,17 @@
         <span>{m.players_cap_warning_organizer({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players) })}</span>
       </div>
     {/if}
+    <!-- One create surface, online and off: the modal requires an email and runs
+         the look-alike review, which a second inline form kept skipping. -->
     {#if isOrganizer && isOfflineMode}
       <div class="border-t border-line pt-2">
         <button
-          onclick={() => showOfflinePlayerForm = !showOfflinePlayerForm}
-          class="text-sm text-warn hover:opacity-80 transition-colors flex items-center gap-1"
+          onclick={() => showCreateModal = true}
+          class="text-sm text-warn hover:opacity-80 transition-colors flex items-center gap-1 min-h-[44px] py-2"
         >
           <UserPlus class="w-4 h-4" />
           {m.offline_add_new_player()}
         </button>
-        {#if showOfflinePlayerForm}
-          <div class="mt-2 space-y-2 bg-surface-muted/50 rounded-lg p-3">
-            <input
-              type="text"
-              bind:value={offlinePlayerName}
-              placeholder={m.offline_player_name()}
-              class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
-            />
-            <input
-              type="text"
-              bind:value={offlinePlayerVeknId}
-              placeholder={m.offline_player_vekn_id()}
-              class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
-            />
-            <input
-              type="email"
-              bind:value={offlinePlayerEmail}
-              placeholder={m.offline_player_email()}
-              class="w-full px-3 py-2 bg-surface-hover border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint"
-            />
-            <Button
-              variant="primary"
-              size="lg"
-              onclick={addOfflinePlayerAction}
-              disabled={!offlinePlayerName.trim() || actionLoading}
-            >{m.offline_player_add()}</Button>
-          </div>
-        {/if}
       </div>
     {/if}
   </div>

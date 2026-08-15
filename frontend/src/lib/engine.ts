@@ -509,7 +509,14 @@ export function isOfficial(user: UserContext | null): boolean {
   return callEngine(() => engine.isOfficial(JSON.stringify({ roles: user.roles ?? [] })));
 }
 
-/** Create a member record. */
+/**
+ * Create a member record.
+ *
+ * Gate the create-and-register control on this, never on `canSponsorVekn`:
+ * the two rules are identical today but nothing pins them together, and
+ * check_permission_drift.py matches role literals, so a future divergence
+ * would surface as a bare 403 rather than a failed check.
+ */
 export function canCreateMember(actor: UserContext | null): PermissionResult {
   return checkPermission('create_member', actor);
 }

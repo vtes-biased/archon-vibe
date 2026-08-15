@@ -80,6 +80,7 @@
 ## Engine config & player-authorized events
 - [Config field create/UpdateConfig asymmetry](config-field-create-updateconfig-asymmetry.md) — a tournament config field must be added to BOTH create_tournament's literal AND UpdateConfig's config_fields array; table_rooms is a live one-site gap. Shared rules go in validate_config_fields.
 - [Online create bypasses the engine gate](online-create-bypasses-engine-gate.md) — POST /tournaments builds Tournament() directly in Python (no PyO3 call); engine create-time gates run ONLY on offline/WASM create + UpdateConfig. "Enforce X at create in the engine" tickets silently miss the online path.
+- [TournamentActionRequest is a field allowlist](tournament-action-request-field-allowlist.md) — /action drops any key not on BOTH the pydantic model AND the hand-written event_data block; vekn_id absent by design, display_name absent by bug (bot nickname never lands).
 - [Player-authorized engine event pattern](player-authorized-engine-event-pattern.md) — non-organizer events (CheckIn/SetScore exemplars); eligibility-predicate landmines: state-set (exclude Registered/Playing), dual-DQ, per-player cap, mid-array round removal unsafe, start≠finish authority.
 
 ## Scoring & Standings

@@ -27,6 +27,27 @@ Two traps when assessing changes to that block:
   nearest-named file) is `resolveTableLabelPy` + `broadcast_judge_call` only;
   there is no timer test anywhere, by design (see the consequence note below).
 
+**`vekn_id` on Register/AddPlayer/CheckIn is a GATE, never stored data
+(assessed 2026-08, ticket 622).** Grep `vekn_id` in
+`engine/src/tournament/mod.rs`: it appears only in three
+`is_none_or(|v| v.is_empty()) -> VeknIdRequired` checks — the Player object
+literals carry `user_uid`/`state`/`payment_status`/`toss`/`result`/`finalist`/
+`non_competing` and **no vekn_id**. `vekn_push.py` re-derives every id from
+`user.vekn_id`. Consequence for test design: a fabricated client vekn_id has
+**nothing observable to assert** — it can only flip the gate open, never land in
+a row or reach vekn.net. Also: `TournamentActionRequest` has no `vekn_id` field
+and no `model_config` exists anywhere in `backend/src`, so pydantic's default
+`extra="ignore"` already drops one. Any "the server doesn't trust client
+identity" test here is asserting pydantic + an engine gate that
+`test_checkin_auto_register_requires_vekn_id` (tests.rs) already pins.
+
+Relatedly, **a roster `user_uid` is always resolvable**: the engine requires a
+VEKN id to seat anyone, and a uid holding a VEKN id is never soft-deleted
+(merge raises, `DELETE /users/{uid}` 400s — see the invariant comment in
+`accounts.py::merge_users`). So a resolve-or-404 in the action route has no
+reachable false-positive, and "unresolvable target" is not a state you can seed
+without hand-corrupting the roster.
+
 The timer is **online-only, cosmetic** (countdown display) — not engine-scored,
 not pushed to VEKN, not access-control. Timer-logic regressions are low-
 consequence and self-correct on the next round transition; they rarely clear
