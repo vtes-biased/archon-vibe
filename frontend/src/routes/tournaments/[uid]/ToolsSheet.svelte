@@ -196,7 +196,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="tools-sheet-title"
-      class="relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-surface-card shadow-xl sm:max-w-lg sm:rounded-2xl"
+      class="relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-surface-card shadow-xl pb-safe-b sm:pb-0 sm:max-w-lg sm:rounded-2xl"
     >
       <div class="flex items-center justify-between border-b border-line px-4 py-3">
         <h2 id="tools-sheet-title" class="text-sm font-semibold text-ink-strong">{m.tools_title()}</h2>

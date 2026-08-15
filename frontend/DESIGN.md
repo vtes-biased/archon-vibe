@@ -15,6 +15,8 @@ VTES / Vampire: the Masquerade inspired. Gothic horror, pale and muted, with dar
 
 Colour is expressed as **role tokens** in four families — `surface` (backgrounds), `ink` (text), `line` (borders), `accent` (crimson). Each token is defined **once** in `app.css` `@theme` via CSS `light-dark(LIGHT, DARK)`, so its value follows the element's `color-scheme` automatically — there is **no** per-shade `html.light` override block and **no** numeric scale to hand-invert. Use them as ordinary Tailwind utilities (`bg-surface-card`, `text-ink-muted`, `border-line`, `text-link`), opacity modifiers included (`bg-surface-hover/50`).
 
+`@theme` isn't colour-only — it's the general Tailwind v4 design-token registry. The same block also defines layout spacing tokens (safe-area insets, nav/rail footprint) — see *Mobile First*.
+
 | Token | Utility e.g. | Light | Dark | Role |
 |-------|--------------|-------|------|------|
 | `surface` | `bg-surface` | `#F5F0E6` | `#2A2520` | Page background |
@@ -202,6 +204,7 @@ Because a restored filter can hide data, every list's empty state must distingui
 Design for touch devices first, then enhance for desktop.
 
 - **Touch targets**: Minimum 44x44px
+- **Safe areas**: `app.html` sets `viewport-fit=cover`. `@theme` in `app.css` defines `--spacing-safe-t`/`-l`/`-r` (`env(safe-area-inset-*, 0px)`, always live) and `--spacing-safe-b` (0 by default; only becomes `env(safe-area-inset-bottom)` inside `@media (display-mode: standalone)` — in an iOS Safari tab the bottom toolbar already occupies that space and the inset flips as the toolbar collapses on scroll, so honouring it there would make the bottom nav change height mid-scroll). Contract: every viewport-edge-anchored surface absorbs its own inset via the generated utilities — `pt-safe-t` at the top, `pb-safe-b` at the bottom, `pr-safe-r`/`pl-safe-l` for the landscape notch. `--spacing-navbar` is the mobile bottom nav's **total** footprint (touch row + `--spacing-safe-b`, same standalone gate) — anything stacking above the mobile nav derives its offset from `--spacing-navbar` (`h-navbar`, `bottom-navbar`), never a hard-coded `bottom-14`/`bottom-16`. `--spacing-rail` is the desktop-rail equivalent (rail width + left inset).
 - **No hover-only interactions**: Always have tap/click equivalent
 - **Tap-to-swap**: seating editor uses tap-a-player then tap-a-seat (same table = reorder, cross-table = swap, open seat = move); no drag-and-drop anywhere in the app
 - **Focus ring**: A global `:focus-visible` crimson outline (2px, `--color-crimson-500`) is defined in `@layer base` in `app.css` — do not add bespoke outlines to buttons, links, or nav items. Form inputs may opt out with `focus:outline-none` only if they provide their own visible crimson focus indicator (border or ring).

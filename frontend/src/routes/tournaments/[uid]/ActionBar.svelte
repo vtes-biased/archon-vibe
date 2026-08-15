@@ -331,11 +331,12 @@
 
 <!-- Sticky CTA: the organizer works in the tables far below the bar, so the one
      state action follows them down rather than making them scroll back up.
-     Sits flush on the mobile nav (bottom-14 == the nav's declared h-14) and
-     clears the desktop side nav (sm:left-20). -->
+     Sits flush on the mobile nav (bottom-navbar == the nav's total footprint,
+     touch row + bottom safe area) and clears the desktop side nav (sm:left-20),
+     where it is itself the bottom-most element and absorbs the inset. -->
 {#if primary && !barOnScreen}
   <div
-    class="fixed left-0 right-0 bottom-14 sm:bottom-0 sm:left-20 z-30 border-t border-line bg-surface-card/95 backdrop-blur-sm print:hidden"
+    class="fixed left-0 right-0 bottom-navbar sm:bottom-0 sm:left-rail z-30 sm:pb-safe-b pr-safe-r border-t border-line bg-surface-card/95 backdrop-blur-sm print:hidden"
   >
     <div class="max-w-4xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-3">
       <span class="text-sm text-ink-muted truncate" aria-hidden="true">

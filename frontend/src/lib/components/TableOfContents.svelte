@@ -44,10 +44,12 @@
 
 <!-- Mobile: floating button + drawer -->
 <div class="lg:hidden">
-  <!-- Floating TOC button -->
+  <!-- Floating TOC button. This block is lg:hidden but the bottom nav is
+       sm:hidden, so between the two breakpoints the rail is showing and there
+       is no nav to clear — hence the sm: arm. -->
   <button
     onclick={() => (mobileOpen = true)}
-    class="fixed bottom-20 right-4 z-30 w-12 h-12 rounded-full bg-accent-strong text-white shadow-lg flex items-center justify-center hover:bg-accent-strong-hover transition-colors"
+    class="fixed bottom-navbar mb-6 sm:bottom-6 sm:mb-0 right-4 mr-safe-r z-30 w-12 h-12 rounded-full bg-accent-strong text-white shadow-lg flex items-center justify-center hover:bg-accent-strong-hover transition-colors"
     title={m.help_toc_title()}
   >
     <List class="w-5 h-5" />
@@ -64,7 +66,7 @@
     >
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
-        class="absolute bottom-0 left-0 right-0 max-h-[70vh] bg-surface-card border-t border-line rounded-t-2xl overflow-y-auto"
+        class="absolute bottom-0 left-0 right-0 max-h-[70vh] pb-safe-b bg-surface-card border-t border-line rounded-t-2xl overflow-y-auto"
         onclick={(e) => e.stopPropagation()}
         onkeydown={(e) => e.stopPropagation()}
         use:dialogPanel={() => mobileOpen = false}

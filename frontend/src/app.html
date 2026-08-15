@@ -6,7 +6,12 @@
     <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
     <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
     <meta name="theme-color" content="#DC143C" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: the bottom nav bleeds behind the home indicator
+         instead of sitting above an inert letterbox strip. It also un-insets the
+         TOP of the layout viewport, which is only visible in the installed PWA
+         (display: standalone has no browser chrome covering it) — hence the
+         safe-t padding on the shell and the banner stack. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="VEKN Tournament Management - Web App" />
     <!-- Site-wide social card (Open Graph / Twitter). This static fallback ships
          to every route; per-tournament og:image is server-rendered for crawlers

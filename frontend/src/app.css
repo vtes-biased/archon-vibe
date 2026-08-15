@@ -49,6 +49,43 @@
     --color-select:        light-dark(#1e40af, #60a5fa);  /* select text/icon/ring */
     --color-select-border: light-dark(#bfdbfe, #1e3a8a);  /* select border */
     --color-select-soft:   light-dark(#eff6ff, #1e3a8a);  /* select tint bg (pair with opacity) */
+
+    /*
+     * Safe areas. These resolve to 0 unless app.html opts in with
+     * viewport-fit=cover, so every utility built on them is inert elsewhere.
+     * The 0px fallbacks are load-bearing, not belt-and-braces: without one,
+     * a UA that lacks env() makes calc() invalid at computed-value time, and
+     * --spacing-navbar would collapse the nav to height:auto.
+     * --spacing-navbar is the mobile bottom nav's TOTAL footprint (its 3.5rem
+     * touch row plus the inset it bleeds into): the one number the shell's
+     * bottom padding and anything stacking above the nav must agree on.
+     * safe-l/r only ever bite in landscape on a notched phone, where cover
+     * removes the letterbox that used to keep content clear of the notch.
+     */
+    --spacing-safe-t: env(safe-area-inset-top, 0px);
+    --spacing-safe-b: 0px;
+    --spacing-safe-l: env(safe-area-inset-left, 0px);
+    --spacing-safe-r: env(safe-area-inset-right, 0px);
+    --spacing-navbar: 3.5rem;
+    /* Desktop rail: 5rem of chrome plus whatever the left notch steals. */
+    --spacing-rail: calc(5rem + env(safe-area-inset-left, 0px));
+}
+
+/*
+ * The BOTTOM inset is claimed only by the installed app. In an iOS Safari tab
+ * the bottom toolbar already occupies that space, and the inset flips between
+ * 0 and the home-indicator value as the toolbar collapses on scroll — honouring
+ * it there would make the nav change height mid-scroll, which is precisely the
+ * complaint that started this. Standalone has no toolbar, so the inset is
+ * stable and the bar can bleed behind the home indicator as intended.
+ * Top/left/right are unconditional: they are stable in both modes (a tab's
+ * address bar already covers the status bar, so safe-t is naturally 0 there).
+ */
+@media (display-mode: standalone) {
+    :root {
+        --spacing-safe-b: env(safe-area-inset-bottom, 0px);
+        --spacing-navbar: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+    }
 }
 
 /* VTES icon fonts from krcg-static */

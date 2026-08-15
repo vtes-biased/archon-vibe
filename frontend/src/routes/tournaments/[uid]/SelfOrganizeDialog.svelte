@@ -63,7 +63,7 @@
     use:focusOnMount
     onkeydown={(e) => e.key === 'Escape' && onClose()}
     onclick={(e) => e.stopPropagation()}
-    class="bg-surface-card rounded-t-lg sm:rounded-lg shadow-xl border border-line w-full sm:max-w-md sm:mx-4 max-h-[90vh] flex flex-col"
+    class="bg-surface-card rounded-t-lg sm:rounded-lg shadow-xl border border-line w-full sm:max-w-md sm:mx-4 max-h-[90vh] pb-safe-b sm:pb-0 flex flex-col"
   >
     <div class="p-6 border-b border-line">
       <h2 id="self-organize-title" class="text-xl font-medium text-ink-strong flex items-center gap-2">

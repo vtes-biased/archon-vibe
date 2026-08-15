@@ -150,13 +150,17 @@
 <!-- dvh, not vh: on iOS `100vh` is the LARGE viewport (URL bar hidden), so with the
      bar showing the shell is taller than the visible area and leaves dead scroll
      under the fixed nav. Does not address the iOS 26 fixed-element repaint bug —
-     see the nav ticket. -->
-<div class="min-h-dvh bg-surface pb-14 sm:pb-0">
+     see the nav ticket.
+     pt-safe-t keeps the first content clear of the status bar under
+     viewport-fit=cover; the strip it reserves paints bg-surface. -->
+<div class="min-h-dvh bg-surface pt-safe-t pb-navbar sm:pb-safe-b">
   <!-- Status/update banners: a normal-flow sticky stack so they push content
        down instead of overlaying the page header; multiple banners stack as
-       block siblings (no hard-coded per-banner top offsets). -->
+       block siblings (no hard-coded per-banner top offsets).
+       Sticks at safe-t, not 0, to match the shell's padding — otherwise a stuck
+       banner slides under the status bar in the installed PWA. -->
   {#if engineLoadFailed() || !isOnline || syncError || (getUpdateAvailable() && !hasOfflineLocked)}
-    <div class="sticky top-0 z-50">
+    <div class="sticky top-safe-t z-50">
       <!-- A WASM engine load failure degrades the app (permission checks,
            optimistic writes and standings stop working): a durable banner, not
            a transient toast, since the state persists until reload. -->
@@ -197,23 +201,28 @@
     </div>
   {/if}
 
-  <!-- Main content -->
-  <main class="sm:ml-20">
+  <!-- Main content. pr-safe-r clears the notch when a phone is held with the
+       camera on the right; the left side is already cleared by the rail's width. -->
+  <main class="sm:ml-rail pr-safe-r">
     {@render children()}
   </main>
 
   <!-- Bottom navigation (mobile) — icon-only: visible labels truncated to
        ambiguity in longer locales (es/pt), so the destination name lives in
        aria-label/title (announced by AT, shown on hover) instead. -->
-  <!-- h-14 is declared, not emergent: the shell's bottom padding and the
-       console's sticky CTA both sit on this exact number, and letting the
-       height fall out of the icons' padding left a strip of page showing
-       between the CTA and the nav.
-       transform-gpu promotes the bar to its own compositing layer: iOS skips
-       repainting non-composited fixed elements during momentum scroll, which is
-       the classic cause of a bottom bar stranded mid-screen. Self-transform, so
-       it does not become a containing block for anything above it. -->
-  <nav class="fixed bottom-0 left-0 right-0 z-40 h-14 transform-gpu bg-surface-card border-t border-line sm:hidden">
+  <!-- The touch row is a declared 3.5rem, not emergent: the shell's bottom
+       padding and the console's sticky CTA both sit on it via --spacing-navbar,
+       and letting the height fall out of the icons' padding left a strip of page
+       showing between the CTA and the nav. h-navbar adds the bottom safe-area on
+       top of that row; pb-safe-b keeps the icons inside it while the background
+       bleeds behind the home indicator.
+       transform-gpu promotes the bar to its own compositing layer — a cheap win
+       for momentum scrolling. It is NOT a fix for the iOS 26 misplacement (that
+       is WebKit 297779, a visual/layout viewport offset, not a skipped repaint);
+       see the nav ticket before re-deriving a theory from this class.
+       Self-transform, so it does not become a containing block for anything
+       above it. -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 h-navbar pb-safe-b transform-gpu bg-surface-card border-t border-line sm:hidden">
     <div class="flex h-full justify-around">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
@@ -232,7 +241,12 @@
   </nav>
 
   <!-- Side navigation (desktop) -->
-  <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-20 bg-surface-card border-r border-line flex-col items-center py-4 z-40">
+  <!-- The rail spans every viewport edge it can, so under viewport-fit=cover it
+       absorbs three insets: py-4 grows by the top/bottom ones (iPad standalone —
+       logo under the status bar, sync indicator under the home indicator), and
+       w-rail + pl-safe-l keeps the icons out of the notch on a landscape phone,
+       which is >=640px wide and therefore gets the rail, not the bottom nav. -->
+  <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-rail pl-safe-l bg-surface-card border-r border-line flex-col items-center pt-[calc(1rem+var(--spacing-safe-t))] pb-[calc(1rem+var(--spacing-safe-b))] z-40">
     <!-- Logo -->
     <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="mb-6 text-link hover:text-link-soft" title={m.nav_home()}>
       <img src="/favicon.svg" alt="Archon" class="w-16 h-16" />
@@ -272,6 +286,13 @@
       </div>
     </div>
   </nav>
+
+  <!-- Status-bar scrim. pt-safe-t only reserves space in the document — once
+       scrolled, live content slides through the strip under the clock. This
+       paints over it, and covers every sticky top-* surface (seating banner,
+       help TOC) that parks against the physical viewport top. Above the banner
+       stack and modals (z-50), below toasts (z-100). Zero-height off iOS. -->
+  <div aria-hidden="true" class="fixed top-0 left-0 right-0 h-safe-t z-[55] bg-surface pointer-events-none"></div>
 
   <!-- Global toast notifications -->
   <Toast />
