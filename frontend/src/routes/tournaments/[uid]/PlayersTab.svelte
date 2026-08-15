@@ -127,7 +127,14 @@
   let paymentFilter = $state<'all' | 'Pending' | 'Paid'>('all');
 
   const paidCount = $derived(tournament.players?.filter(p => p.payment_status === 'Paid').length ?? 0);
-  const totalPlayers = $derived(tournament.players?.length ?? 0);
+  const rosterCount = $derived(tournament.players?.length ?? 0);
+  // Imported records: standings may list players the roster lacks. These get
+  // display-only rows (no organizer actions — they would be rejected server-side).
+  const archivalUids = $derived.by(() => {
+    const roster = new Set((tournament.players ?? []).map(p => p.user_uid));
+    return new Set(standings.map(s => s.user_uid).filter(u => !roster.has(u)));
+  });
+  const totalPlayers = $derived(rosterCount + archivalUids.size);
 
   // Deck expansion state
   let expandedPlayer = $state<string | null>(null);
@@ -285,6 +292,14 @@
 
   const sortedPlayers = $derived.by(() => {
     const players = [...(tournament.players ?? [])];
+    // Synthesized rows so organizer and member views agree.
+    for (const s of standings) {
+      if (!archivalUids.has(s.user_uid)) continue;
+      players.push({
+        user_uid: s.user_uid, state: "Finished", payment_status: "Pending",
+        toss: s.toss, result: { gw: s.gw, vp: s.vp, tp: s.tp }, finalist: s.finalist ?? false,
+      });
+    }
     const sort = playerSort;
     if (sort === 'standings' && standings.length > 0) {
       const rankMap = new Map(standings.map(s => [s.user_uid, s.rank]));
@@ -315,6 +330,10 @@
   const filteredPlayers = $derived.by(() => {
     if (!isOrganizer) return sortedPlayers;
     let players = sortedPlayers;
+    // The chase filters ask "who still owes me" — meaningless for archival rows.
+    if (paymentFilter !== 'all' || deckFilter !== 'all') {
+      players = players.filter(p => !archivalUids.has(p.user_uid ?? ""));
+    }
     if (paymentFilter !== 'all') players = players.filter(p => p.payment_status === paymentFilter);
     if (deckFilter === 'missing') {
       players = players.filter(p => getDeckStatus(p.user_uid ?? '') === 'none');
@@ -360,7 +379,7 @@
     editingToss = true;
     const edits: Record<string, string> = {};
     for (const entry of standings) {
-      if (tiedUids.has(entry.user_uid)) {
+      if (tiedUids.has(entry.user_uid) && !archivalUids.has(entry.user_uid)) {
         edits[entry.user_uid] = String(entry.toss ?? "");
       }
     }
@@ -405,7 +424,6 @@
 
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const hasFinals = $derived(standings.some(e => e.finals));
-  const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
 
 </script>
 
@@ -428,7 +446,7 @@
       <div class="flex gap-2 flex-wrap">
         {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
           <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "drop", uid: puid, name: playerInfo[puid]?.name ?? puid }}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop_player()}</Button>
-        {:else if puid && !hasRounds}
+        {:else if puid && !hasRounds && tournament.state !== "Finished"}
           <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "remove", uid: puid, name: playerInfo[puid]?.name ?? puid }}><X class="w-4 h-4" aria-hidden="true" />{m.players_remove_title()}</Button>
         {/if}
         <!-- Available offline too: sanctions are offline-manageable on the
@@ -615,7 +633,7 @@
     {:else}
       <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
     {/if}
-    {#if isOrganizer && playerDecks.length === 0 && (!isMultideck || roundCount === 0) && uploadingFor !== puid}
+    {#if isOrganizer && !archivalUids.has(puid) && playerDecks.length === 0 && (!isMultideck || roundCount === 0) && uploadingFor !== puid}
       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
     {/if}
   {/snippet}
@@ -627,14 +645,14 @@
            rows; they are counts of the roster, so they belong on the roster line. -->
       <p class="text-ink-muted shrink-0">
         {#if (tournament.max_players ?? 0) > 0}
-          {m.players_count_capped({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players) })}
+          {m.players_count_capped({ count: String(totalPlayers), cap: String(tournament.max_players) })}
         {:else}
-          {m.players_count({ count: String(tournament.players?.length ?? 0) })}
+          {m.players_count({ count: String(totalPlayers) })}
         {/if}
-        {#if isOrganizer && totalPlayers > 0}
-          <span class="text-xs text-ink-faint">· {m.payment_summary({ paid: String(paidCount), total: String(totalPlayers) })}</span>
+        {#if isOrganizer && rosterCount > 0}
+          <span class="text-xs text-ink-faint">· {m.payment_summary({ paid: String(paidCount), total: String(rosterCount) })}</span>
           {#if tournament.decklist_required}
-            <span class="text-xs text-ink-faint">· {m.decks_submitted_count({ submitted: String(decksSubmittedCount), total: String(totalPlayers) })}</span>
+            <span class="text-xs text-ink-faint">· {m.decks_submitted_count({ submitted: String(decksSubmittedCount), total: String(rosterCount) })}</span>
           {/if}
         {/if}
       </p>
@@ -700,7 +718,7 @@
     </div>
   {/if}
 
-  {#if (tournament.players?.length ?? 0) > 0}
+  {#if sortedPlayers.length > 0}
     <!-- One control row. Sort, payment filter and deck filter were three chip
          rows plus two captions; they are all "how do I want this list?", asked
          once in a while, so they collapse behind a single settings menu and the
@@ -786,15 +804,17 @@
               <div class="flex items-center gap-2 flex-wrap">
               <!-- Status rides the icon and text, never the chrome: one ghost
                    Button throughout, so the only filled control is the real CTA. -->
-              <Button variant="ghost" size="sm" class="min-h-[44px]" disabled={actionLoading}
-                onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
-                title={player.payment_status === 'Paid' ? m.payment_mark_unpaid() : m.payment_mark_paid()}>
-                {#if player.payment_status === 'Paid'}
-                  <Banknote class="w-3.5 h-3.5 text-info" aria-hidden="true" /><span class="text-info">{m.payment_paid()}</span>
-                {:else}
-                  <Banknote class="w-3.5 h-3.5 text-warn" aria-hidden="true" /><span class="text-warn">{m.payment_pending()}</span>
-                {/if}
-              </Button>
+              {#if !archivalUids.has(puid)}
+                <Button variant="ghost" size="sm" class="min-h-[44px]" disabled={actionLoading}
+                  onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
+                  title={player.payment_status === 'Paid' ? m.payment_mark_unpaid() : m.payment_mark_paid()}>
+                  {#if player.payment_status === 'Paid'}
+                    <Banknote class="w-3.5 h-3.5 text-info" aria-hidden="true" /><span class="text-info">{m.payment_paid()}</span>
+                  {:else}
+                    <Banknote class="w-3.5 h-3.5 text-warn" aria-hidden="true" /><span class="text-warn">{m.payment_pending()}</span>
+                  {/if}
+                </Button>
+              {/if}
               {#if tournament.decklist_required || isOrganizer}
                 {@const deckStatus = getDeckStatus(puid)}
                 <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => togglePlayer(puid)} title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
@@ -820,11 +840,11 @@
               {/if}
               <!-- Door mode only: every card is open at once there, so the rare
                    tail stays folded. A tapped-open card is already the detail view. -->
-              {#if doorMode}
+              {#if doorMode && !archivalUids.has(puid)}
                 <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} class="ml-auto min-h-[44px]" aria-expanded={morePlayer === puid}><Ellipsis class="w-3.5 h-3.5" aria-hidden="true" />{m.players_more()}</Button>
               {/if}
               </div>
-              {#if !doorMode || morePlayer === puid}
+              {#if (!doorMode || morePlayer === puid) && !archivalUids.has(puid)}
                 <div class="mt-2 pt-2 border-t border-line">
                   {@render moreDrawer(player, puid)}
                 </div>
@@ -946,13 +966,15 @@
               </td>
               {#if isOrganizer}
                 <td class="text-center py-1.5 px-2">
-                  <button
-                    onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
-                    disabled={actionLoading}
-                    class="px-2 py-0.5 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-success hover:opacity-80' : 'badge-pending hover:opacity-80'}"
-                    title={player.payment_status === 'Paid' ? m.payment_mark_unpaid() : m.payment_mark_paid()}>
-                    {player.payment_status === 'Paid' ? m.payment_paid() : m.payment_pending()}
-                  </button>
+                  {#if !archivalUids.has(puid)}
+                    <button
+                      onclick={() => doAction("SetPaymentStatus", { player_uid: puid, status: player.payment_status === 'Paid' ? 'Pending' : 'Paid' })}
+                      disabled={actionLoading}
+                      class="px-2 py-0.5 text-xs rounded transition-colors {player.payment_status === 'Paid' ? 'badge-success hover:opacity-80' : 'badge-pending hover:opacity-80'}"
+                      title={player.payment_status === 'Paid' ? m.payment_mark_unpaid() : m.payment_mark_paid()}>
+                      {player.payment_status === 'Paid' ? m.payment_paid() : m.payment_pending()}
+                    </button>
+                  {/if}
                 </td>
               {/if}
               {#if tournament.decklist_required || isOrganizer}
@@ -982,7 +1004,9 @@
                       <Button variant="ghost" size="sm" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
                     {/if}
                     <!-- Rare/destructive tail (drop/remove · sanction · proxy) lives in "More". -->
-                    <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} aria-expanded={morePlayer === puid}><Ellipsis class="w-4 h-4" aria-hidden="true" />{m.players_more()}</Button>
+                    {#if !archivalUids.has(puid)}
+                      <Button variant="ghost" size="sm" onclick={() => toggleMore(puid)} aria-expanded={morePlayer === puid}><Ellipsis class="w-4 h-4" aria-hidden="true" />{m.players_more()}</Button>
+                    {/if}
                   </div>
                 </td>
               {/if}

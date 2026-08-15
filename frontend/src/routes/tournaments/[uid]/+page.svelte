@@ -266,6 +266,14 @@ import TournamentModals from "./TournamentModals.svelte";
         }
       }
     }
+    // Imported records can carry standings/winner/finals without a roster.
+    for (const s of tournament.standings ?? []) {
+      if (s.user_uid) uids.add(s.user_uid);
+    }
+    for (const seat of tournament.finals?.seating ?? []) {
+      if (seat.player_uid) uids.add(seat.player_uid);
+    }
+    if (tournament.winner) uids.add(tournament.winner);
     const uidList = [...uids];
     const users = await Promise.all(uidList.map(u => getUser(u)));
     if (epoch !== playerNamesEpoch) return; // superseded by a newer run
@@ -907,10 +915,11 @@ import TournamentModals from "./TournamentModals.svelte";
               {/if}
             </div>
           </div>
-          {#if tournament.players}
+          {#if tournament.players || standings.length}
           <div>
             <div class="text-ink-faint">{m.tournament_info_players()}</div>
-            <div class="text-ink-bright">{m.tournament_registered_count({ count: String(tournament.players.length) })}</div>
+            <!-- Imported records: standings may exceed a partial/absent roster. -->
+            <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.length ?? 0, standings.length)) })}</div>
           </div>
           {/if}
           {#if tournament.organizers_uids?.length}

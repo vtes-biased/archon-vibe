@@ -139,7 +139,9 @@ export function top5HasScoreTies(standings: StandingEntry[]): boolean {
  * should read the engine-ready signal in their reactive wrapper.
  */
 export function computeStandings(tournament: Tournament | null): StandingEntry[] {
-  if (!tournament || !tournament.players) return [];
+  if (!tournament) return [];
+  // Imported records can carry standings without a roster.
+  const players = tournament.players ?? [];
 
   let prelim: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean }>;
   let winnerUid = tournament.winner ?? "";
@@ -148,14 +150,14 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
   if (!tournament.rounds || tournament.rounds.length < 1) {
     // VEKN-synced / imported: standings already carry totals + finalist flags.
     const finalistUids = new Set(
-      tournament.players.filter(p => p.finalist && p.user_uid).map(p => p.user_uid!)
+      players.filter(p => p.finalist && p.user_uid).map(p => p.user_uid!)
     );
     prelim = tournament.standings?.length
       ? tournament.standings.map(s => ({
           user_uid: s.user_uid, gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0,
           toss: s.toss ?? 0, finalist: s.finalist ?? finalistUids.has(s.user_uid),
         }))
-      : tournament.players
+      : players
           .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
           .map(p => ({
             user_uid: p.user_uid!, gw: p.result.gw ?? 0, vp: p.result.vp ?? 0, tp: p.result.tp ?? 0,
@@ -188,7 +190,7 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
       }
     }
     const tossMap = new Map<string, number>();
-    for (const p of tournament.players) {
+    for (const p of players) {
       if (p.user_uid) tossMap.set(p.user_uid, p.toss ?? 0);
     }
     // Finals count only once finished; otherwise show live preliminary ranking.
@@ -214,7 +216,7 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
   // DQ from live player state OR the engine-persisted standings flag (the latter
   // covers VEKN-synced/imported tournaments that carry no live player.state).
   const dqUids = new Set<string>(
-    tournament.players.filter(p => p.state === "Disqualified" && p.user_uid).map(p => p.user_uid!)
+    players.filter(p => p.state === "Disqualified" && p.user_uid).map(p => p.user_uid!)
   );
   for (const s of tournament.standings ?? []) {
     if (s.disqualified) dqUids.add(s.user_uid);
@@ -223,7 +225,7 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
   // (the seat's VPs are real). Same dual source as DQ: live player flag OR the
   // engine-persisted standings flag (covers synced/imported tournaments).
   const ncUids = new Set<string>(
-    tournament.players.filter(p => p.non_competing && p.user_uid).map(p => p.user_uid!)
+    players.filter(p => p.non_competing && p.user_uid).map(p => p.user_uid!)
   );
   for (const s of tournament.standings ?? []) {
     if (s.non_competing) ncUids.add(s.user_uid);
@@ -345,7 +347,8 @@ export type RankedStatus =
 export function rankedStatus(t: Tournament): RankedStatus {
   if (t.open_rounds || t.self_organized_rounds) return { ranked: false, reason: "open_rounds" };
   if (t.state === "Finished") {
-    if (!t.rounds && !t.standings) return null;
+    // Length, not presence: imported rows often carry empty arrays.
+    if (!t.rounds?.length && !t.standings?.length) return null;
     const verdict = rankingEligibility(t);
     if (verdict === null) return null;
     if (verdict === "eligible") return { ranked: true };

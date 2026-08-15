@@ -23,6 +23,7 @@
 - [ReportPromos no state gate](project_report_promos_no_state_gate.md) — the ungated mutating event is deliberate (post-finish corrections), not a bug; pinned by one replace-whole-list test. Don't add a gate or more coverage.
 - [Access-projection review](project_access_projection_review.md) — `test_access_levels.py` is the ONLY field-membership assertion in the suite; the `av` resync can't cover projection-code changes (backfill script instead, untestable by design).
 - [Promo stock recompute test infra](project_promo_stock_recompute_test_infra.md) — `recompute_promo_stock` net-arithmetic + stale-key-cleanup invariant (`test_promo_stock.py`); seed via raw promo/user/ledger/tournament, call awaited not scheduled, teardown promo/tournament/promo_ledger; route guards deliberately untested.
+- [No frontend unit vertical](trap_frontend_no_unit_vertical.md) — vitest exists NOWHERE (don't trust prompts claiming it does); `tournament-utils.ts` calls WASM, so a Node test would only assert the engine-absent fallback.
 
 ## How to Run Tests
 - **Backend**: `cd backend && uv run python3 -m pytest tests/ -v --tb=short`. Some suites need a test Postgres on port 5433 — skip with `--ignore` if unavailable (e.g. `test_users.py`). Pure-unit suites (SSE filters, offline mode, organizer access, access levels) need no DB.
